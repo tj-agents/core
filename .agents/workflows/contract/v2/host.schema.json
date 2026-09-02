@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tomjseery.github.io/process-agents/agent-workflows/v2/host.schema.json",
+  "$defs": {
+    "host": {"type": "string", "enum": ["codex", "claude"]},
+    "capability": {"type": "string", "enum": ["evidence-explorer", "log-analyst", "test-impact-analyst", "review-lens", "mechanical-worker"]},
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9.][A-Za-z0-9._/-]*$"
+    },
+    "probeReason": {
+      "type": "string",
+      "enum": ["host-unavailable", "role-unavailable", "model-unavailable"]
+    },
+    "fallbackReason": {
+      "type": "string",
+      "enum": [
+        "host-unavailable",
+        "role-unavailable",
+        "model-unavailable",
+        "unsupported-capability",
+        "invalid-result",
+        "cancelled"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["contract_version", "record_type", "host", "status", "reason_code", "version", "available_roles"],
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {"const": "v2"},
+        "record_type": {"const": "host-probe"},
+        "host": {"$ref": "#/$defs/host"},
+        "status": {"type": "string", "enum": ["available", "unavailable"]},
+        "reason_code": {"anyOf": [{"$ref": "#/$defs/probeReason"}, {"type": "null"}]},
+        "version": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "available_roles": {"type": "array", "items": {"$ref": "#/$defs/capability"}, "uniqueItems": true}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "available"}}},
+          "then": {
+            "properties": {
+              "reason_code": {"type": "null"},
+              "version": {"type": "string", "minLength": 1}
+            }
+          },
+          "else": {"properties": {"reason_code": {"$ref": "#/$defs/probeReason"}}}
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "required": ["contract_version", "record_type", "host", "dispatch_id", "capability", "agent_name", "primary_model", "model", "model_selection", "reasoning_effort", "mode", "writer_lease_id"],
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {"const": "v2"},
+        "record_type": {"const": "host-invocation"},
+        "host": {"$ref": "#/$defs/host"},
+        "dispatch_id": {"type": "string", "minLength": 1},
+        "capability": {"$ref": "#/$defs/capability"},
+        "semantic_stage": {
+          "type": "string",
+          "enum": ["strategic", "implementation", "mechanical", "review", "critical"]
+        },
+        "agent_name": {"type": "string", "minLength": 1},
+        "role_agent_name": {"type": "string", "minLength": 1},
+        "role_body": {"type": "string", "minLength": 1},
+        "primary_model": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "model_selection": {"type": "string", "enum": ["primary", "fallback"]},
+        "reasoning_effort": {"type": "string", "minLength": 1},
+        "mode": {"type": "string", "enum": ["read", "write"]},
+        "writer_lease_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"capability": {"const": "mechanical-worker"}}},
+          "then": {
+            "properties": {
+              "mode": {"const": "write"},
+              "writer_lease_id": {"type": "string", "minLength": 1}
+            }
+          },
+          "else": {
+            "properties": {
+              "mode": {"const": "read"},
+              "writer_lease_id": {"type": "null"}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "required": ["contract_version", "record_type", "host", "dispatch_id"],
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {"const": "v2"},
+        "record_type": {"const": "host-cancel-request"},
+        "host": {"$ref": "#/$defs/host"},
+        "dispatch_id": {"type": "string", "minLength": 1}
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "contract_version",
+        "record_type",
+        "host",
+        "dispatch_id",
+        "writer_lease_id",
+        "reason_code",
+        "detail",
+        "observed_paths"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {"const": "v2"},
+        "record_type": {"const": "host-reconciliation-required"},
+        "host": {"$ref": "#/$defs/host"},
+        "dispatch_id": {"type": "string", "minLength": 1},
+        "writer_lease_id": {"type": "string", "minLength": 1},
+        "reason_code": {"type": "string", "enum": ["invalid-result", "cancelled"]},
+        "detail": {"type": "string", "minLength": 1},
+        "observed_paths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/repositoryPath"},
+          "uniqueItems": true
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["contract_version", "record_type", "host", "dispatch_id", "reason_code", "detail", "parent_transition"],
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {"const": "v2"},
+        "record_type": {"const": "host-fallback"},
+        "host": {"$ref": "#/$defs/host"},
+        "dispatch_id": {"type": "string", "minLength": 1},
+        "reason_code": {"$ref": "#/$defs/fallbackReason"},
+        "semantic_stage": {
+          "type": "string",
+          "enum": ["strategic", "implementation", "mechanical", "review", "critical"]
+        },
+        "detail": {"type": "string", "minLength": 1},
+        "failed_model": {"type": "string", "minLength": 1},
+        "next_model": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "parent_transition": {"type": "string", "enum": ["fallback", "cancel", "pause"]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"reason_code": {"const": "cancelled"}}},
+          "then": {"properties": {"parent_transition": {"const": "cancel"}}},
+          "else": {"properties": {"parent_transition": {"enum": ["fallback", "pause"]}}}
+        },
+        {
+          "if": {"required": ["failed_model"]},
+          "then": {
+            "required": ["next_model"],
+            "properties": {"reason_code": {"const": "model-unavailable"}}
+          }
+        },
+        {
+          "if": {"required": ["next_model"]},
+          "then": {"required": ["failed_model"]}
+        }
+      ]
+    }
+  ]
+}

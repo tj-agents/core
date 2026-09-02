@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: workflow contract verification
+        run: python .agents/workflows/verify.py --root .
+
+      - name: hook tests
+        run: python -m unittest discover -s .agents/hooks/tests -t .agents/hooks/tests -v
+
+      - name: generated files are current
+        shell: pwsh
+        run: ./.agents/sync-generated.ps1 -Check

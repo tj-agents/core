@@ -1,0 +1,27 @@
+{
+  "description": "Codex wiring for the SessionStart marketplace refresh and behavioral-floor injector. Codex has no background marketplace auto-update, so the refresh it lacks is wired here and stays deliberately absent from Claude's hooks.json. The Codex manifest points here explicitly so Claude can use its own hook schema independently.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/marketplace_refresh.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/marketplace_refresh.py\"",
+            "timeout": 25
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/session_floor.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/session_floor.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
