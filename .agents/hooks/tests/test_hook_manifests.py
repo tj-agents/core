@@ -20,7 +20,10 @@ SCRIPTS = (
     "plan_handoff_stop_launcher.py",
     "session_floor.py",
 )
-CODEX_SCRIPTS = ("marketplace_refresh.py", "session_floor.py")
+# Codex's roster is NOT Claude's minus nothing: the router is registered for both harnesses, but
+# merge_review_gate.py is Claude-only until Codex's shell tool name is observed in a real payload -
+# its SHELL_TOOLS vocabulary is {bash, powershell}, so a Codex registration would act on nothing.
+CODEX_SCRIPTS = ("skill_router.py", "marketplace_refresh.py", "session_floor.py")
 # A shipped .py that is deliberately not a harness hook, and why. Anything not here and not in a
 # manifest is a hook nobody registered - which is how marketplace_refresh.py shipped dead.
 NON_HOOK_HELPERS = {

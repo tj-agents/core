@@ -926,7 +926,11 @@ class PluginWiringTests(unittest.TestCase):
     CODEX_CANONICAL = REPO / ".codex" / "hooks" / "codex-hooks.json"
     GENERATED = REPO / "plugins" / "process-standards" / "hooks" / "hooks.json"
     CODEX_GENERATED = REPO / "plugins" / "process-standards" / "hooks" / "codex-hooks.json"
-    ROUTER_MANIFESTS = (CANONICAL,)
+    # Both, now. The Codex router registration was deleted in agent-standards 8d4ea58 with no reason
+    # recorded in the commit, the PR, or a test docstring, and a regression-lock asserted its absence
+    # for the next three months while skill_router.py kept its apply_patch handling, its Codex tests,
+    # and a docstring claiming both harnesses run it. That is the ENF1 failure this class exists for.
+    ROUTER_MANIFESTS = (CANONICAL, CODEX_CANONICAL)
 
     def matcher(self, path):
         wiring = json.loads(path.read_text(encoding="utf-8"))
@@ -969,10 +973,34 @@ class PluginWiringTests(unittest.TestCase):
                 set(), unknown, f"{manifest.name}: matcher fires for unknown tools: {unknown}"
             )
 
-    def test_codex_manifest_does_not_restore_the_removed_pretool_router(self):
+    def test_codex_registers_the_write_time_router(self):
+        """Codex writes through `apply_patch`, and the router parses it. Unwired, that code is dead."""
         for manifest in (self.CODEX_CANONICAL, self.CODEX_GENERATED):
             wiring = json.loads(manifest.read_text(encoding="utf-8"))
-            self.assertNotIn("PreToolUse", wiring["hooks"])
+            self.assertIn("PreToolUse", wiring["hooks"], f"{manifest.name} registers no write-time hook")
+            self.assertIn("apply_patch", self.matcher(manifest))
+
+    def test_every_codex_command_carries_a_windows_variant(self):
+        """`python3` is not on PATH on native Windows, so a POSIX-only command is a silent no-op there."""
+        wiring = json.loads(self.CODEX_CANONICAL.read_text(encoding="utf-8"))
+        commands = [
+            inner for groups in wiring["hooks"].values() for group in groups for inner in group["hooks"]
+        ]
+        self.assertTrue(commands)
+        for inner in commands:
+            with self.subTest(command=inner["command"]):
+                self.assertIn("python3 -B", inner["command"])
+                self.assertIn("python -B", inner["commandWindows"])
+
+    def test_the_merge_gate_stays_claude_only_until_codex_names_its_shell_tool(self):
+        """Registering it would look wired and act on nothing: SHELL_TOOLS is {bash, powershell}, and
+        Codex's shell tool name has not been observed in a real hook payload. The binary offers
+        exec_command, unified_exec and local_shell as candidates, which is not evidence."""
+        gate = (self.REPO / ".agents" / "hooks" / "merge_review_gate.py").read_text(encoding="utf-8")
+        self.assertIn('SHELL_TOOLS = {"bash", "powershell"}', gate)
+        self.assertNotIn(
+            "merge_review_gate.py", self.CODEX_CANONICAL.read_text(encoding="utf-8").split('"hooks"')[1]
+        )
 
     def test_the_generated_plugin_wiring_matches_the_canonical_one(self):
         self.assertEqual(
