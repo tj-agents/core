@@ -7,7 +7,7 @@ domain: process
 # Landing a meta-only change
 
 A documentation or meta change has **zero product-runtime blast radius**, so the merge queue's end-to-end
-gate is pure waste on it — tens of minutes to prove nothing. Agent-process hooks still run their focused
+gate is pure waste on it — tens of minutes to prove nothing. The process-standards hooks still run their focused
 tests. This lands such a change through a small
 admin-merged PR: the queue bypass that [`merge`](../merge/SKILL.md) reserves for exactly this diff, made into its
 own one-command flow.
