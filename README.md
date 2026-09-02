@@ -73,12 +73,25 @@ Each names no product and states no rule. Each reads its opt-in table **from the
 running in**, does nothing in a repo that carries no such table, and blocks loudly if a table is present
 but unreadable — failing open on a malformed table is enforcement that is inert while looking wired.
 
-| Hook | Event | Opt-in table | Enforces |
-|---|---|---|---|
-| `skill_router.py` | write | `.agents/skill-routes.json`, else a shipped registry | the standard owning a path is loaded before it is written |
-| `merge_review_gate.py` | `gh pr merge` | `.agents/merge-gate.json` | no merge without a current, clean code-review |
-| `plan_handoff_stop_launcher.py` | turn end | a `_PROGRESS.md` ledger | a selected plan context transfer ends with its continuation pointer |
-| `session_floor.py` | session start | — | `FLOOR.md` is in context from the first turn |
+| Hook | Event | Harness | Opt-in table | Enforces |
+|---|---|---|---|---|
+| `skill_router.py` | write | both | `.agents/skill-routes.json`, else a shipped registry | the standard owning a path is loaded before it is written |
+| `session_floor.py` | session start | both | — | `FLOOR.md` is in context from the first turn |
+| `merge_review_gate.py` | `gh pr merge` | Claude | `.agents/merge-gate.json` | no merge without a current, clean code-review |
+| `plan_handoff_stop_launcher.py` | turn end | Claude | a `_PROGRESS.md` ledger | a selected plan context transfer ends with its continuation pointer |
+| `marketplace_refresh.py` | session start | Codex | — | the installed catalogue is current; Claude does this natively from `autoUpdate` |
+
+Claude's wiring is `.claude/hooks/hooks.json`, Codex's is `.codex/hooks/codex-hooks.json`, and neither
+duplicates a mechanism — each names the shared `.py` under `.agents/hooks/` to run. A hook that only one
+harness runs is authored in that harness's folder, which is why `marketplace_refresh.py` lives under
+`.codex/` rather than beside the shared mechanisms.
+
+**Two hooks are Claude-only, and the reason is the hook, not the harness.** `merge_review_gate.py`'s whole
+vocabulary is `SHELL_TOOLS = {"bash", "powershell"}`; Codex's shell tool name has not been observed in a
+real hook payload (`exec_command`, `unified_exec` and `local_shell` all appear in the CLI binary, which is
+not evidence), and registering it on a guess would look wired while acting on nothing. The `Stop` gate is
+the same shape of open question. Both are asserted as Claude-only by a test, so closing either is a
+deliberate change rather than a discovery.
 
 **The router resolves its registry from any installed plugin, not only from its own.** A carved service
 repo carries no table of its own; an organisation registers it in a `routes/registry.json` shipped from
