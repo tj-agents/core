@@ -48,6 +48,24 @@ class SkillRouterTests(unittest.TestCase):
         (self.root / ".agents").mkdir()
         self.write_routes(ROUTES)
         self.session = str(uuid.uuid4())
+        # The fixture table above names skills, and the router fails CLOSED when not one of them
+        # resolves - it reads that as "the plugin did not load" and blocks even an unrouted path. So the
+        # skills have to be planted in a home this test owns. Leaving them to the ambient environment is
+        # how these tests passed on a machine with the corpus installed and failed in CI with none: the
+        # assertions were reading the developer's plugin cache, not the fixture.
+        self.default_home = self.root / "default-home"
+        for relative in (".claude/skills", ".agents/skills"):
+            for name in ("unit-testing", "integration-testing"):
+                self.plant_skill(
+                    self.default_home / relative,
+                    name,
+                    "Fixture skill planted by the router tests so resolution never depends on what the "
+                    "surrounding repo or machine happens to have installed.",
+                )
+        self.default_env = {
+            "USERPROFILE": str(self.default_home),
+            "HOME": str(self.default_home),
+        }
 
     def tearDown(self):
         self.temp.cleanup()
@@ -84,7 +102,7 @@ class SkillRouterTests(unittest.TestCase):
             input=json.dumps(payload),
             capture_output=True,
             text=True,
-            env={**os.environ, **env} if env else None,
+            env={**os.environ, **(env or self.default_env)},
         )
 
     def write_transcript(self, entries):
@@ -141,7 +159,7 @@ class SkillRouterTests(unittest.TestCase):
             input=json.dumps(payload),
             capture_output=True,
             text=True,
-            env={**os.environ, **env} if env else None,
+            env={**os.environ, **(env or self.default_env)},
         )
 
     def test_non_write_tool_is_ignored(self):
