@@ -1,0 +1,20 @@
+{
+  "name": "process-agents",
+  "interface": {
+    "displayName": "Generic Process Standards"
+  },
+  "plugins": [
+    {
+      "name": "process-standards",
+      "source": {
+        "source": "local",
+        "path": "./plugins/process-standards"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

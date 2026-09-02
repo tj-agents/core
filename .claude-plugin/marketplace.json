@@ -1,0 +1,16 @@
+{
+  "name": "process-agents",
+  "description": "Generic, stack-agnostic engineering process standards, distributed as versioned, load-on-demand skills plus the write-time hook that makes them fire. Names no product and no stack, so it applies to every repo Tommy owns alongside whichever stack plugin that repo needs.",
+  "owner": {
+    "name": "Tommy Seery"
+  },
+  "plugins": [
+    {
+      "name": "process-standards",
+      "source": "./plugins/process-standards",
+      "description": "The generic method: branching, committing, opening a PR and landing it through a queue, plans and roadmaps and progress ledgers, handoffs, reviews and addressing what they find, docs and tech debt, worktrees, and driving a red suite to green tier by tier. Ships the skill router hook, so the standard that owns a path is loaded before the file is written. Names no product.",
+      "category": "standards",
+      "keywords": ["standards", "process", "git", "ci", "merge-queue", "plans", "review", "workflow", "hooks"]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tomjseery.github.io/process-agents/agent-workflows/v2/result.schema.json",
+  "title": "Agent workflow dispatch result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "workflow_id",
+    "workflow_run_id",
+    "stage_id",
+    "dispatch_id",
+    "status",
+    "summary",
+    "claims",
+    "evidence",
+    "acceptance_conditions",
+    "open_questions"
+  ],
+  "properties": {
+    "contract_version": {"const": "v2"},
+    "workflow_id": {"$ref": "#/$defs/identifier"},
+    "workflow_run_id": {"$ref": "#/$defs/identifier"},
+    "stage_id": {"$ref": "#/$defs/identifier"},
+    "dispatch_id": {"$ref": "#/$defs/identifier"},
+    "status": {"enum": ["complete", "incomplete", "blocked", "cancelled"]},
+    "summary": {"$ref": "#/$defs/non_empty_string"},
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "evidence_ids", "confidence", "uncertainty", "alternatives"],
+        "properties": {
+          "claim": {"$ref": "#/$defs/non_empty_string"},
+          "evidence_ids": {"$ref": "#/$defs/string_array"},
+          "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+          "uncertainty": {"type": "string"},
+          "alternatives": {"$ref": "#/$defs/string_array"}
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidence_id", "kind", "locator", "detail"],
+        "properties": {
+          "evidence_id": {"$ref": "#/$defs/identifier"},
+          "kind": {"enum": ["repository", "immutable-artifact", "supplied-log"]},
+          "locator": {"$ref": "#/$defs/non_empty_string"},
+          "detail": {"$ref": "#/$defs/non_empty_string"}
+        }
+      }
+    },
+    "acceptance_conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["condition", "passed", "evidence_ids", "detail"],
+        "properties": {
+          "condition": {"$ref": "#/$defs/non_empty_string"},
+          "passed": {"type": "boolean"},
+          "evidence_ids": {"$ref": "#/$defs/string_array"},
+          "detail": {"$ref": "#/$defs/non_empty_string"}
+        }
+      }
+    },
+    "writer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changed_paths", "validation", "partial_paths"],
+      "properties": {
+        "changed_paths": {"$ref": "#/$defs/string_array"},
+        "validation": {"$ref": "#/$defs/string_array"},
+        "partial_paths": {"$ref": "#/$defs/string_array"}
+      }
+    },
+    "open_questions": {"$ref": "#/$defs/string_array"}
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "non_empty_string": {"type": "string", "minLength": 1},
+    "string_array": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "contract_version": "v2",
+  "host": "claude",
+  "status": "available-with-parent-fallback",
+  "model_override_agent_name": "general-purpose",
+  "delivery": {
+    "project_directory": ".claude/agents",
+    "plugin_directory": "agents",
+    "extension": ".md",
+    "plugin_loading": "supported"
+  },
+  "probe": {
+    "command": "claude",
+    "version_arguments": ["--version"]
+  },
+  "concurrency": {
+    "readers": "parallel",
+    "writers": "serialized",
+    "nested_dispatch": false
+  },
+  "fallback_reasons": [
+    "host-unavailable",
+    "role-unavailable",
+    "model-unavailable",
+    "unsupported-capability",
+    "invalid-result",
+    "cancelled"
+  ],
+  "semantic_stages": {
+    "strategic": {
+      "model": "opus",
+      "effort": "high",
+      "unavailable": "decision"
+    },
+    "implementation": {
+      "model": "sonnet",
+      "effort": "high",
+      "unavailable": "typed-parent-fallback"
+    },
+    "mechanical": {
+      "model": "sonnet",
+      "effort": "medium",
+      "unavailable": "typed-parent-fallback"
+    },
+    "review": {
+      "model": "sonnet",
+      "effort": "high",
+      "unavailable": "decision"
+    },
+    "critical": {
+      "model": "opus",
+      "effort": "xhigh",
+      "unavailable": "decision"
+    }
+  },
+  "continuation": {
+    "turns": "goal",
+    "delayed_state": ["loop", "monitor", "channels"],
+    "resume": ["resume", "continue"],
+    "cross_restart": ["desktop-scheduled-task", "cloud-routine"],
+    "dynamic_workflows": "orchestration-only",
+    "goal_evaluator_model_setting": "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "goal_evaluator_required_family": "sonnet",
+    "unsupported_gate": "product-capability-unavailable"
+  },
+  "roles": {
+    "evidence-explorer": {
+      "agent_name": "workflow-evidence-explorer",
+      "filename": "workflow-evidence-explorer.md",
+      "description": "Read-only repository evidence explorer for one bounded workflow question.",
+      "body": "../roles/evidence-explorer.md",
+      "default_stage": "mechanical",
+      "allowed_stages": ["strategic", "implementation", "mechanical", "critical"],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": ["Read", "Glob", "Grep"],
+      "disallowed_tools": ["Agent"]
+    },
+    "log-analyst": {
+      "agent_name": "workflow-log-analyst",
+      "filename": "workflow-log-analyst.md",
+      "description": "Read-only analyst for reducing supplied logs into evidence without diagnosing the fix.",
+      "body": "../roles/log-analyst.md",
+      "default_stage": "mechanical",
+      "allowed_stages": ["implementation", "mechanical", "critical"],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": ["Read", "Glob", "Grep"],
+      "disallowed_tools": ["Agent"]
+    },
+    "test-impact-analyst": {
+      "agent_name": "workflow-test-impact-analyst",
+      "filename": "workflow-test-impact-analyst.md",
+      "description": "Read-only analyst for affected tests, gaps, and repository-supported validation commands.",
+      "body": "../roles/test-impact-analyst.md",
+      "default_stage": "implementation",
+      "allowed_stages": ["implementation", "review"],
+      "model": "sonnet",
+      "effort": "high",
+      "tools": ["Read", "Glob", "Grep"],
+      "disallowed_tools": ["Agent"]
+    },
+    "review-lens": {
+      "agent_name": "workflow-review-lens",
+      "filename": "workflow-review-lens.md",
+      "description": "Read-only independent review lens over one immutable diff and bounded concern.",
+      "body": "../roles/review-lens.md",
+      "default_stage": "review",
+      "allowed_stages": ["review"],
+      "model": "sonnet",
+      "effort": "high",
+      "tools": ["Read", "Glob", "Grep"],
+      "disallowed_tools": ["Agent"]
+    },
+    "mechanical-worker": {
+      "agent_name": "workflow-mechanical-worker",
+      "filename": "workflow-mechanical-worker.md",
+      "description": "Serialized mechanical writer restricted to one parent-approved writer lease.",
+      "body": "../roles/mechanical-worker.md",
+      "default_stage": "mechanical",
+      "allowed_stages": ["mechanical"],
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
+      "disallowed_tools": ["Agent"]
+    }
+  }
+}
