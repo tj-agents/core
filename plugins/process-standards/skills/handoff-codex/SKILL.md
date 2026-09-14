@@ -68,13 +68,16 @@ means several tabs in this one window, not several windows.
 A Claude Code parent exports variables that make a child render plain and behave as a managed nested
 session. Two treatments are needed, not one:
 
-- **Cleared**: `NO_COLOR`, and the session-binding set `CLAUDECODE`, `CLAUDE_CODE_CHILD_SESSION`,
-  `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_PID`, the `CLAUDE_CODE_MESSAGING_*` pair,
-  and the `WORKBOARD_*` pair.
-- **Forced to an explicit value, never merely left unset**: `FORCE_COLOR=1` and `TERM=xterm-256color`.
-  The Codex binary reads `FORCE_COLOR`, `NO_COLOR`, `CLICOLOR_FORCE` and `COLORTERM`, and an
-  automation-spawned `wt.exe` is not the interactive shell a human would have launched it from, so
-  capability auto-detection cannot be trusted to land on a good value by itself.
+Everything is **cleared**; nothing is forced. `NO_COLOR`, `TERM`, the session-binding set `CLAUDECODE`,
+`CLAUDE_CODE_CHILD_SESSION`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_PID`, the
+`CLAUDE_CODE_MESSAGING_*` pair, and the `WORKBOARD_*` pair.
+
+**`TERM` is cleared here and forced in `handoff-claude`, and that difference is deliberate.** Claude Code
+exports `TERM=xterm-256color`, which suits a Node CLI reading `supports-color`. Codex is a Rust/crossterm
+binary, and on native Windows an unset `TERM` is what selects the console's truecolor path — handing it a
+POSIX terminfo name instead caps the palette at 256 colours and visibly wrecks the theme. `COLORTERM` is
+not set on this machine either, so there is nothing for the leaked `TERM` to be overridden by. Do not
+"align" the two launchers; the runtimes differ, so the correct handling differs.
 
 Only variables observed in a real parent session are listed. Codex's own exported session state has not
 been read from one, so nothing is cleared on a guess.
