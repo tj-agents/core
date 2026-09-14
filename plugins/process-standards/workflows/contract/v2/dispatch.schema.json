@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tomjseery.github.io/process-agents/agent-workflows/v2/dispatch.schema.json",
+  "$id": "https://tomjseery.github.io/base-agents/agent-workflows/v2/dispatch.schema.json",
   "title": "Agent workflow dispatch envelope",
   "type": "object",
   "additionalProperties": false,

@@ -5,4 +5,4 @@ description: The always-loaded behavioral floor — take the scalable long-term 
 
 # floor
 
-The standard is `standards/process/FLOOR.md` in `tomjseery/process-agents`, deployed to `~/.agents/standards/process-agents/process/FLOOR.md`. Read it and follow it; this skill only routes to it. The plugin also injects it automatically at SessionStart, so it is normally already in context.
+The standard is `standards/process/FLOOR.md` in `tomjseery/base-agents`, deployed to `~/.agents/standards/base-agents/process/FLOOR.md`. Read it and follow it; this skill only routes to it. The plugin also injects it automatically at SessionStart, so it is normally already in context.

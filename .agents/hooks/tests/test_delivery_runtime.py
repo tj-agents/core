@@ -19,8 +19,8 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
     def setUp(self):
         self.router = PersistentDeliveryRouter()
         self.binding = {
-            "repository": "tomjseery/process-agents",
-            "pr_url": "https://github.com/tomjseery/process-agents/pull/70",
+            "repository": "tomjseery/base-agents",
+            "pr_url": "https://github.com/tomjseery/base-agents/pull/70",
             "pr_number": 70,
             "worktree": r"C:\source\agent-standards.worktrees\Feature-delivery",
             "branch": "Feature/Delivery",
@@ -95,7 +95,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         }
         successor = {
             **self.binding,
-            "pr_url": "https://github.com/tomjseery/process-agents/pull/71",
+            "pr_url": "https://github.com/tomjseery/base-agents/pull/71",
             "pr_number": 71,
             "worktree": r"C:\source\agent-standards.worktrees\Feature-plan-execution",
             "branch": "Feature/Plan-execution",
@@ -146,7 +146,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         }
         successor = {
             **self.binding,
-            "pr_url": "https://github.com/tomjseery/process-agents/pull/71",
+            "pr_url": "https://github.com/tomjseery/base-agents/pull/71",
             "pr_number": 71,
             "branch": "Feature/Plan-execution",
             "remote_head_sha": SUCCESSOR_HEAD,
@@ -183,7 +183,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         }
         successor = {
             **self.binding,
-            "pr_url": "https://github.com/tomjseery/process-agents/pull/71",
+            "pr_url": "https://github.com/tomjseery/base-agents/pull/71",
             "pr_number": 71,
             "branch": "Feature/Plan-execution",
             "remote_head_sha": SUCCESSOR_HEAD,
@@ -229,7 +229,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
         }
         successor = {
             **self.binding,
-            "pr_url": "https://github.com/tomjseery/process-agents/pull/71",
+            "pr_url": "https://github.com/tomjseery/base-agents/pull/71",
             "pr_number": 71,
             "remote_head_sha": SUCCESSOR_HEAD,
             "pending_evidence": [

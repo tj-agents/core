@@ -105,7 +105,7 @@ into the container is dead, so a connect "succeeds" while no data flows — whic
 one, publish a port, make an HTTP request, and confirm it stays up.
 
 That check carries no repo-specific value, so it is not re-written per repo. It is
-**`./scripts/docker-health.ps1`**, vendored from `tomjseery/process-agents` by its `vendor-hooks.ps1`, and
+**`./scripts/docker-health.ps1`**, vendored from `tomjseery/base-agents` by its `vendor-hooks.ps1`, and
 every repo's E2E entrypoint gates on it automatically. Run it yourself before a local E2E run anyway
 (`dotnet:e2e-debug` Step 0), so a bad engine is caught before a doomed boot.
 

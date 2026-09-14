@@ -5,6 +5,6 @@
   "author": {
     "name": "Tommy Seery"
   },
-  "repository": "https://github.com/tomjseery/process-agents",
+  "repository": "https://github.com/tomjseery/base-agents",
   "keywords": ["standards", "process", "git", "ci", "merge-queue", "plans", "workflow"]
 }

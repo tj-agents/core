@@ -141,7 +141,7 @@ class HookManifestContractTests(unittest.TestCase):
         codex = self.read(PLUGIN / ".codex-plugin" / "plugin.json")
         claude = self.read(PLUGIN / ".claude-plugin" / "plugin.json")
 
-        self.assertEqual("process-agents", marketplace["name"])
+        self.assertEqual("base-agents", marketplace["name"])
         self.assertEqual("process-standards", marketplace["plugins"][0]["name"])
         self.assertEqual("./plugins/process-standards", marketplace["plugins"][0]["source"])
         self.assertEqual("process-standards", codex["name"])
