@@ -1,5 +1,5 @@
 {
-  "name": "process-agents",
+  "name": "base-agents",
   "description": "Generic, stack-agnostic engineering process standards, distributed as versioned, load-on-demand skills plus the write-time hook that makes them fire. Names no product and no stack, so it applies to every repo Tommy owns alongside whichever stack plugin that repo needs.",
   "owner": {
     "name": "Tommy Seery"

@@ -1,5 +1,5 @@
 {
-  "name": "process-agents",
+  "name": "base-agents",
   "interface": {
     "displayName": "Generic Process Standards"
   },

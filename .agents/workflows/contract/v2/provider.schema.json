@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tomjseery.github.io/process-agents/agent-workflows/v2/provider.schema.json",
+  "$id": "https://tomjseery.github.io/base-agents/agent-workflows/v2/provider.schema.json",
   "title": "Agent workflow provider probe",
   "type": "object",
   "additionalProperties": false,

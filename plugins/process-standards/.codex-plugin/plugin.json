@@ -5,7 +5,7 @@
   "author": {
     "name": "Tommy Seery"
   },
-  "repository": "https://github.com/tomjseery/process-agents",
+  "repository": "https://github.com/tomjseery/base-agents",
   "skills": "./codex-skills/",
   "hooks": "./hooks/codex-hooks.json",
   "interface": {

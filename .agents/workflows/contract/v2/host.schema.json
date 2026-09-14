@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tomjseery.github.io/process-agents/agent-workflows/v2/host.schema.json",
+  "$id": "https://tomjseery.github.io/base-agents/agent-workflows/v2/host.schema.json",
   "$defs": {
     "host": {"type": "string", "enum": ["codex", "claude"]},
     "capability": {"type": "string", "enum": ["evidence-explorer", "log-analyst", "test-impact-analyst", "review-lens", "mechanical-worker"]},

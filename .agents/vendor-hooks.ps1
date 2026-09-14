@@ -77,7 +77,7 @@ foreach ($tier in $tiers) {
         if (-not $commit) { throw "$relative has no commit yet; commit it first so the recorded provenance is real." }
         $commit = $commit.Trim()
         $entry = [ordered]@{
-            source = 'tomjseery/process-agents'
+            source = 'tomjseery/base-agents'
             path   = $relative
         }
         $entry['commit'] = $commit
