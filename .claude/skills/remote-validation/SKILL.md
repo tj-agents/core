@@ -107,7 +107,7 @@ one, publish a port, make an HTTP request, and confirm it stays up.
 That check carries no repo-specific value, so it is not re-written per repo. It is
 **`./scripts/docker-health.ps1`**, vendored from `tomjseery/process-agents` by its `vendor-hooks.ps1`, and
 every repo's E2E entrypoint gates on it automatically. Run it yourself before a local E2E run anyway
-([`e2e-debug`](../e2e-debug/SKILL.md) Step 0), so a bad engine is caught before a doomed boot.
+(`dotnet:e2e-debug` Step 0), so a bad engine is caught before a doomed boot.
 
 **A suite that dies at startup is an environment problem until proven otherwise.** Stop after the first such
 run — do not rerun, and do not debug application code. Verify Docker (and that Docker Desktop shows

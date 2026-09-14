@@ -19,10 +19,10 @@ failure by hand is how a tier's known traps get rediscovered one at a time.
 | Red run | Procedure |
 |---|---|
 | Unit | Use the repository's unit-test guidance when present; otherwise the parent diagnoses the smallest failure, fixes its cause, and reruns it |
-| In-process .NET integration using `WebApplicationFactory` | [`integration-debug`](../integration-debug/SKILL.md) |
-| Service E2E (no browser) | [`e2e-api-debug`](../e2e-api-debug/SKILL.md) |
-| Browser E2E | [`e2e-ui-debug`](../e2e-ui-debug/SKILL.md) |
-| Both E2E tiers at once | [`e2e-debug`](../e2e-debug/SKILL.md) |
+| In-process .NET integration using `WebApplicationFactory` | `dotnet:integration-debug` |
+| Service E2E (no browser) | `dotnet:e2e-api-debug` |
+| Browser E2E | `dotnet:e2e-ui-debug` |
+| Both E2E tiers at once | `dotnet:e2e-debug` |
 
 A repository-specific tier procedure applies only when its described runner and harness match the red run.
 Otherwise keep diagnosis in the parent and follow the repository's own test guidance; never force a generic

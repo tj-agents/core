@@ -27,8 +27,8 @@ Symptoms this fixes, and only these:
 - A project's tests missing entirely while a sibling's show.
 - Wrong test counts after scenarios were added or removed.
 
-A test that *fails* is not this. Route that to the tier that owns it: [`integration-debug`](../integration-debug/SKILL.md),
-[`e2e-api-debug`](../e2e-api-debug/SKILL.md) or [`e2e-ui-debug`](../e2e-ui-debug/SKILL.md).
+A test that *fails* is not this. Route that to the tier that owns it: `dotnet:integration-debug`,
+`dotnet:e2e-api-debug` or `dotnet:e2e-ui-debug`.
 
 ## Step 1 — have the IDE closed
 
