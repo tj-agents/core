@@ -19,6 +19,8 @@ Authored:
   standards/<domain>/**.md                routed-domain standards only (self-contained domains have none)
   .agents/skills/<name>/SKILL.md          routed: front matter + the root-relative path of its doc
                                           self-contained: front matter (with `domain:`) + the standard itself
+  .agents/skills/<name>/**                anything else beside a SKILL.md - a script the skill invokes, or
+                                          detail it names by reference - copied into every generated copy
   .agents/hooks/*.py                      the hook mechanisms, shared verbatim by both harnesses
   .agents/routes/*.json                   the registry naming which repo gets which route table, and one
                                           table per registered kind, emitted by .agents/gen_skill_routes.py
@@ -37,6 +39,9 @@ Generated:
                                           loads the standard once. self-contained: verbatim copy.
   plugins/<p>/skills/<name>/SKILL.md      routed: front matter plus the canonical doc body, for the same
                                           single-load behavior. self-contained: verbatim copy.
+  <root>/<name>/** beside each SKILL.md   verbatim copy of the authored skill's other files, into all three
+                                          generated roots. A plugin cannot reference outside its own root,
+                                          so a skill that invokes a script must carry it.
   plugins/<p>/standards/**                full copy of the routed domains' tree, for that same reason.
   plugins/<p>/routes/*                    full copy of the route registry and its tables, shipped by the
                                           plugin that OWNS them, so a registered repo needs no table of its
@@ -173,6 +178,16 @@ function Expand-RoutedSkill(
             return "]($payloadRootPrefix$relative$($match.Groups['anchor'].Value))"
         })
     return $frontMatter.Value.TrimEnd() + "`n`n" + $expanded.TrimStart()
+}
+
+# A skill's payload is its whole folder, not only SKILL.md - a launcher skill names an executable beside
+# it, and instructions shipped without that executable are a skill that cannot run. This must be called
+# for every generated copy: the prune pass deletes anything under a generated root this run did not
+# author, so an unemitted sibling is not merely missing from the copy, it is removed from it.
+function Add-SkillSiblings([string]$prefix, $router) {
+    foreach ($sibling in $router.Siblings) {
+        $generated["$prefix/$($router.Name)/$($sibling.Relative)"] = Read-Lf $sibling.FullName
+    }
 }
 
 # Skills stay flat: discovery is <root>/skills/*/SKILL.md and does not recurse. Only content nests.
@@ -516,6 +531,7 @@ foreach ($router in $routers.Values) {
     } else {
         $router.Body
     }
+    Add-SkillSiblings '.claude/skills' $router
 }
 foreach ($name in $claudeHostSkills.Keys) {
     $generated[".claude/skills/$name/SKILL.md"] = $claudeHostSkills[$name]
@@ -532,12 +548,14 @@ foreach ($plugin in $plugins) {
         $owner = @($routers.Values | Where-Object { $_.Doc -eq $doc })[0]
         $generated["plugins/$($plugin.Name)/skills/$($owner.Name)/SKILL.md"] =
             (Expand-RoutedSkill $owner.Body (Read-Lf (Join-Path $repoRoot $doc)) $doc '../../' $owner.Name)
+        Add-SkillSiblings "plugins/$($plugin.Name)/skills" $owner
     }
     # A self-contained router has no doc to copy or rewrite - its body already IS what ships, verbatim,
     # same as the .claude/skills copy above.
     $mineSelfContained = @($routers.Values | Where-Object { -not $_.Doc -and $pluginDomains[$plugin.Name] -contains $_.Domain })
     foreach ($router in $mineSelfContained) {
         $generated["plugins/$($plugin.Name)/skills/$($router.Name)/SKILL.md"] = $router.Body
+        Add-SkillSiblings "plugins/$($plugin.Name)/skills" $router
     }
     if ($plugin.Name -eq $hookOwner) {
         foreach ($hook in $hookFiles) {
@@ -559,6 +577,7 @@ if ($workflowOwner) {
         } else {
             $router.Body
         }
+        Add-SkillSiblings "plugins/$workflowOwner/codex-skills" $router
     }
     foreach ($name in $claudeHostSkills.Keys) {
         $generated["plugins/$workflowOwner/skills/$name/SKILL.md"] = $claudeHostSkills[$name]

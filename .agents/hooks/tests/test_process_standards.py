@@ -204,5 +204,68 @@ class ProcessStandardsTests(unittest.TestCase):
         )
 
 
+class SkillPayloadTests(unittest.TestCase):
+    """A skill's payload is its folder, not only its SKILL.md.
+
+    The generator's prune pass removes anything under a generated root it did not just author, so a
+    sibling file the generator forgets to emit is not merely absent from the shipped copy - it is deleted
+    from it. `handoff-claude` and `handoff-codex` each invoke a launcher script beside their SKILL.md, and
+    a plugin cannot reference a file outside its own root, so an unshipped script is a skill whose one
+    documented instruction cannot be followed.
+    """
+
+    GENERATED_ROOTS = (
+        ".claude/skills",
+        "plugins/process-standards/skills",
+        "plugins/process-standards/codex-skills",
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[3]
+        cls.authored = cls.root / ".agents" / "skills"
+
+    def siblings(self):
+        for skill in sorted(p for p in self.authored.iterdir() if p.is_dir()):
+            for path in sorted(skill.rglob("*")):
+                if path.is_file() and path.name != "SKILL.md":
+                    yield skill.name, path.relative_to(skill).as_posix(), path
+
+    def test_every_authored_sibling_ships_verbatim_in_every_generated_copy(self):
+        found = 0
+        for skill, relative, source in self.siblings():
+            found += 1
+            expected = source.read_text(encoding="utf-8").replace("\r\n", "\n")
+            for generated_root in self.GENERATED_ROOTS:
+                copy = self.root / generated_root / skill / relative
+                with self.subTest(skill=skill, file=relative, root=generated_root):
+                    self.assertTrue(copy.is_file(), f"{copy} was never generated")
+                    self.assertEqual(
+                        expected, copy.read_text(encoding="utf-8").replace("\r\n", "\n")
+                    )
+        self.assertTrue(found, "no skill ships a sibling file; this contract is untested")
+
+    def test_both_handoff_launchers_ship_their_script(self):
+        for skill, script in (
+            ("handoff-claude", "scripts/launch-claude.ps1"),
+            ("handoff-codex", "scripts/launch-codex.ps1"),
+        ):
+            with self.subTest(skill=skill):
+                self.assertTrue((self.authored / skill / script).is_file())
+                for generated_root in self.GENERATED_ROOTS:
+                    self.assertTrue((self.root / generated_root / skill / script).is_file())
+
+    def test_the_codex_launcher_ranks_by_version_and_refuses_a_stale_build(self):
+        """Ranking the cached payloads by LastWriteTime picked a 0.151.0-alpha.7.1 desktop runtime over
+        the 0.154.0 npm build, and gpt-6-astra does not exist in that alpha at all."""
+        launcher = (
+            self.authored / "handoff-codex" / "scripts" / "launch-codex.ps1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("function Compare-CodexVersion", launcher)
+        self.assertIn("$MinimumVersion = '0.154.0'", launcher)
+        self.assertNotIn("Sort-Object LastWriteTime", launcher)
+
+
 if __name__ == "__main__":
     unittest.main()
