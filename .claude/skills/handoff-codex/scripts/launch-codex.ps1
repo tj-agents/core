@@ -149,8 +149,13 @@ $arguments += $instruction
 
 # Session state a Claude Code parent exports. NO_COLOR=1 alone makes the child black and white, and the
 # CLAUDE_CODE_* set binds it to that session's messaging pipe and makes it act as a managed nested child.
+# TERM is CLEARED, never forced - the opposite of handoff-claude, and not an oversight. Claude Code
+# exports TERM=xterm-256color; Codex is a Rust/crossterm binary, and on native Windows an unset TERM is
+# what selects the console's truecolor path. Handing it a POSIX terminfo name instead caps the palette at
+# 256 colours and visibly wrecks the theme. Do not "align" this with the Claude launcher.
 $clearedVariables = @(
     'NO_COLOR',
+    'TERM',
     'CLAUDECODE',
     'CLAUDE_CODE_CHILD_SESSION',
     'CLAUDE_CODE_ENTRYPOINT',
@@ -162,15 +167,10 @@ $clearedVariables = @(
     'WORKBOARD_WORKFLOW_TOKEN'
 )
 
-# Forced, not merely un-cleared: an automation-spawned wt.exe/codex.exe is not the interactive shell a
-# human would have launched it from, so terminal-capability auto-detection cannot be trusted to land on a
-# good value on its own. The Codex binary reads FORCE_COLOR, NO_COLOR, CLICOLOR_FORCE and COLORTERM;
-# TERM=xterm-256color is a profile Windows Terminal fully supports, set explicitly rather than left blank
-# so nothing falls back to a conservative dumb-terminal default.
-$forcedVariables = @{
-    FORCE_COLOR = '1'
-    TERM        = 'xterm-256color'
-}
+# Only NO_COLOR has to go for colour to come back, and the binary reads it. Nothing else here is forced:
+# every capability variable this launcher could set is one Windows Terminal and the console already
+# negotiate correctly for a native child, and the one that was set - TERM - is what broke the theme.
+$forcedVariables = @{}
 
 $previousValues = @{}
 

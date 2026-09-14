@@ -266,6 +266,18 @@ class SkillPayloadTests(unittest.TestCase):
         self.assertIn("$MinimumVersion = '0.154.0'", launcher)
         self.assertNotIn("Sort-Object LastWriteTime", launcher)
 
+    def test_the_codex_launcher_clears_TERM_rather_than_forcing_it(self):
+        """handoff-claude forces TERM=xterm-256color for a Node CLI reading supports-color. Codex is a
+        Rust/crossterm binary: on native Windows an unset TERM selects the console truecolor path, and a
+        POSIX terminfo name caps it at 256 colours. Aligning the two launchers broke the theme once."""
+        launcher = (
+            self.authored / "handoff-codex" / "scripts" / "launch-codex.ps1"
+        ).read_text(encoding="utf-8")
+
+        cleared = launcher.split("$clearedVariables")[1].split(")")[0]
+        self.assertIn("'TERM'", cleared)
+        self.assertNotIn("TERM        = 'xterm-256color'", launcher)
+
 
 if __name__ == "__main__":
     unittest.main()
