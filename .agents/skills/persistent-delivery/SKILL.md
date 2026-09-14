@@ -43,10 +43,10 @@ An exact-head failure selects its test tier before repair:
 | Evidence | Fresh-context procedure |
 |---|---|
 | Unit | `failing-tests` |
-| In-process integration | `integration-debug` |
-| Service E2E | `e2e-api-debug` |
-| Browser E2E | `e2e-ui-debug` |
-| Both E2E tiers | `e2e-debug` |
+| In-process integration | `dotnet:integration-debug` |
+| Service E2E | `dotnet:e2e-api-debug` |
+| Browser E2E | `dotnet:e2e-ui-debug` |
+| Both E2E tiers | `dotnet:e2e-debug` |
 
 Dispatch one clear context through the host's agent API with the selected skill,
 repository/PR/worktree/branch, full bound SHA, exact
