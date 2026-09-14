@@ -42,6 +42,9 @@ One doc stays routed: `standards/process/FLOOR.md`. It is injected at `SessionSt
 ```
 .agents/skills/<name>/SKILL.md     The standards themselves. Source of truth — edit here.
                                    Front matter (name, description, domain: process) then the standard.
+.agents/skills/<name>/**           Anything else beside a SKILL.md — a script the skill invokes — copied
+                                   verbatim into every generated copy, since a plugin cannot reach outside
+                                   its own root.
 
 standards/process/FLOOR.md         The one routed doc: injected at SessionStart, not invoked.
 .agents/hooks/*.py                 The enforcement mechanisms, shared verbatim by both harnesses,
@@ -129,7 +132,8 @@ the skills **and** the hooks live; settings alone never install a plugin.
 ## Adding a standard
 
 Write it directly at `.agents/skills/<name>/SKILL.md` — front matter (`name`, `description`,
-`domain: process`) followed by the standard itself. No separate doc. Run the generator.
+`domain: process`) followed by the standard itself. No separate doc. Run the generator. A skill that
+invokes a script puts it beside the `SKILL.md`; the generator ships the whole folder.
 
 The `description` names **both** the content and the trigger — "use when enabling auto-merge, when a PR
 seems stuck, when a merge-queue run fails". A vague description means the skill never loads, which is
