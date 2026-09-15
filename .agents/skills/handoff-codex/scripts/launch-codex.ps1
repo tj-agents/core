@@ -10,6 +10,9 @@ param(
 
     [string] $Model,
 
+    [ValidateSet('low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
+    [string] $ReasoningEffort,
+
     [string] $MinimumVersion = '0.154.0',
 
     [switch] $BypassHookTrust
@@ -139,6 +142,10 @@ $arguments = @(
 
 if ($Model) {
     $arguments += @('--model', $Model)
+}
+
+if ($ReasoningEffort) {
+    $arguments += @('--config', "model_reasoning_effort=$ReasoningEffort")
 }
 
 if ($BypassHookTrust) {

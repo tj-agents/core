@@ -26,8 +26,9 @@ Launch with `scripts/launch-codex.ps1`, beside this file:
 Use `-BypassHookTrust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
 user has not authorized repository hooks.
 
-Pass `-Model <slug>` to pre-select a model instead of the `model` in `~/.codex/config.toml`. Use it
-whenever the request names one — a deep-research or design prompt is the usual reason.
+Pass `-Model <slug>` to pre-select a model instead of the `model` in `~/.codex/config.toml`. Pass
+`-ReasoningEffort <level>` to pre-select reasoning effort instead of `model_reasoning_effort` in that
+file. Use them whenever the request names either — a deep-research or design prompt is the usual reason.
 
 ## Which executable it starts, and why the choice is not free
 
