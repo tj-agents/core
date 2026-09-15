@@ -1,6 +1,6 @@
 ---
 name: handoff-codex
-description: Open an independent unmanaged Codex tab in an exact repository or worktree with a prepared prompt and the full native Codex terminal UI. Use when asked to open Codex, hand work to Codex, obtain a Codex second opinion, or run a prompt against a specific Codex model.
+description: Open an independent unmanaged Codex tab in an exact repository or worktree with a prepared prompt and the full native Codex terminal UI. Astra is Codex - the gpt-6-astra model - so a request naming Astra selects this skill, with -Model gpt-6-astra and the named -ReasoningEffort. Use when asked to open Codex or Astra, hand work to either, obtain a second opinion from either, or run a prompt against a specific Codex model.
 domain: process
 ---
 
