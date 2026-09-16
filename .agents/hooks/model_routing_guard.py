@@ -175,7 +175,9 @@ def hook_mode():
             return 0
         content = written_content(tool_input)
         hits = violations(content) + delegation_call_violations(content)
-        if any(Path(path).name.lower() == "skill.md" for path in paths):
+        if tool_name in {"write", "write_file"} and any(
+            Path(path).name.lower() == "skill.md" for path in paths
+        ):
             hits += skill_route_violations(content)
     elif tool_name in SHELL_TOOLS:
         command = tool_input.get("command") or tool_input.get("cmd") or ""
