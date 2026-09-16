@@ -28,7 +28,9 @@ user has not authorized repository hooks.
 
 Pass `-Model <slug>` to pre-select a model instead of the `model` in `~/.codex/config.toml`. Pass
 `-ReasoningEffort <level>` to pre-select reasoning effort instead of `model_reasoning_effort` in that
-file. Use them whenever the request names either — a deep-research or design prompt is the usual reason.
+file. Pass neither by default; the config owns the everyday model. Use `gpt-6-astra` or raise effort only
+when the request names that choice or this task is large or open-ended. An earlier task on the same plan is
+irrelevant; judge this one.
 
 ## Which executable it starts, and why the choice is not free
 
