@@ -2,7 +2,6 @@
   "contract_version": "v2",
   "host": "claude",
   "status": "available-with-parent-fallback",
-  "model_override_agent_name": "general-purpose",
   "delivery": {
     "project_directory": ".claude/agents",
     "plugin_directory": "agents",
@@ -28,28 +27,28 @@
   ],
   "semantic_stages": {
     "strategic": {
-      "model": "opus",
-      "effort": "high",
+      "route": {"tags": ["architecture"]},
       "unavailable": "decision"
     },
     "implementation": {
-      "model": "sonnet",
-      "effort": "high",
+      "route": {},
       "unavailable": "typed-parent-fallback"
     },
     "mechanical": {
-      "model": "sonnet",
-      "effort": "medium",
+      "route": {
+        "reversibility": "reversible",
+        "blast": "file",
+        "ambiguity": "specified",
+        "verifiability": "compiler"
+      },
       "unavailable": "typed-parent-fallback"
     },
     "review": {
-      "model": "sonnet",
-      "effort": "high",
+      "route": {"tags": ["review"]},
       "unavailable": "decision"
     },
     "critical": {
-      "model": "opus",
-      "effort": "xhigh",
+      "route": {"tags": ["security"]},
       "unavailable": "decision"
     }
   },
@@ -71,8 +70,6 @@
       "body": "../roles/evidence-explorer.md",
       "default_stage": "mechanical",
       "allowed_stages": ["strategic", "implementation", "mechanical", "critical"],
-      "model": "sonnet",
-      "effort": "medium",
       "tools": ["Read", "Glob", "Grep"],
       "disallowed_tools": ["Agent"]
     },
@@ -83,8 +80,6 @@
       "body": "../roles/log-analyst.md",
       "default_stage": "mechanical",
       "allowed_stages": ["implementation", "mechanical", "critical"],
-      "model": "sonnet",
-      "effort": "medium",
       "tools": ["Read", "Glob", "Grep"],
       "disallowed_tools": ["Agent"]
     },
@@ -95,8 +90,6 @@
       "body": "../roles/test-impact-analyst.md",
       "default_stage": "implementation",
       "allowed_stages": ["implementation", "review"],
-      "model": "sonnet",
-      "effort": "high",
       "tools": ["Read", "Glob", "Grep"],
       "disallowed_tools": ["Agent"]
     },
@@ -107,8 +100,6 @@
       "body": "../roles/review-lens.md",
       "default_stage": "review",
       "allowed_stages": ["review"],
-      "model": "sonnet",
-      "effort": "high",
       "tools": ["Read", "Glob", "Grep"],
       "disallowed_tools": ["Agent"]
     },
@@ -119,8 +110,6 @@
       "body": "../roles/mechanical-worker.md",
       "default_stage": "mechanical",
       "allowed_stages": ["mechanical"],
-      "model": "sonnet",
-      "effort": "medium",
       "tools": ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
       "disallowed_tools": ["Agent"]
     }

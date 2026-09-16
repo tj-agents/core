@@ -2,6 +2,7 @@
 name: plan-execution
 description: Implement or resume an explicit or uniquely resolved active plan and ledger through its phases, review, validation, delivery slices, and material checkpoints. Use for named plan execution or plan-managed continuation; do not use to author a new plan, prioritize a roadmap, handle unplanned short work, or perform review-only work.
 domain: process
+route: infer
 ---
 
 # Execute a plan continuously

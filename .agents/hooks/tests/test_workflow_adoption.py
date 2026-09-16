@@ -45,12 +45,11 @@ class WorkflowAdoptionTests(unittest.TestCase):
                 with self.subTest(skill=name, capability=candidate):
                     self.assertIn(candidate, self.capabilities)
 
-    def test_no_skill_names_a_host_agent_or_model(self):
+    def test_no_skill_names_a_host_agent(self):
         forbidden = set()
         for manifest in self.hosts.values():
             for role in manifest["roles"].values():
                 forbidden.add(role["agent_name"])
-                forbidden.add(role["model"])
         for name, body in self.skills.items():
             for token in sorted(forbidden):
                 with self.subTest(skill=name, token=token):

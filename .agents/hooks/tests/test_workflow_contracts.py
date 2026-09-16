@@ -25,6 +25,7 @@ from workflow_runtime import (
     select_state_provider,
 )
 from host_runtime import HostAdapterRegistry
+from fixtures.routing_fixture import resolved_route
 
 
 class WorkflowContractTests(unittest.TestCase):
@@ -85,69 +86,31 @@ class WorkflowContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractViolation, "unknown semantic stage evidence"):
             self.contract.select_semantic_stage(["unknown"])
 
-    def test_host_semantic_stage_mappings_are_exact(self):
+    def test_host_semantic_stage_routes_are_exact_and_model_free(self):
         codex = json.loads((WORKFLOWS / "hosts" / "codex.json").read_text(encoding="utf-8"))
         claude = json.loads((WORKFLOWS / "hosts" / "claude.json").read_text(encoding="utf-8"))
-        self.assertEqual(
-            {
-                "strategic": "gpt-5.6-sol",
-                "implementation": "gpt-5.6-terra",
-                "mechanical": "gpt-5.6-luna",
-                "review": "gpt-5.3-codex-spark",
-                "critical": "gpt-5.6-sol",
+        expected = {
+            "strategic": {"tags": ["architecture"]},
+            "implementation": {},
+            "mechanical": {
+                "reversibility": "reversible",
+                "blast": "file",
+                "ambiguity": "specified",
+                "verifiability": "compiler",
             },
-            {stage: value["model"] for stage, value in codex["semantic_stages"].items()},
-        )
-        self.assertEqual(
-            {
-                "strategic": "opus",
-                "implementation": "sonnet",
-                "mechanical": "sonnet",
-                "review": "sonnet",
-                "critical": "opus",
-            },
-            {stage: value["model"] for stage, value in claude["semantic_stages"].items()},
-        )
-        self.assertEqual(
-            {
-                "strategic": [],
-                "implementation": [],
-                "mechanical": [],
-                "review": ["gpt-5.6-terra"],
-                "critical": [],
-            },
-            {
-                stage: value.get("fallback_models", [])
-                for stage, value in codex["semantic_stages"].items()
-            },
-        )
-        self.assertEqual(
-            {
-                "strategic": [],
-                "implementation": [],
-                "mechanical": [],
-                "review": [],
-                "critical": [],
-            },
-            {
-                stage: value.get("fallback_models", [])
-                for stage, value in claude["semantic_stages"].items()
-            },
-        )
-        self.assertNotIn("haiku", json.dumps(claude["roles"]).lower())
+            "review": {"tags": ["review"]},
+            "critical": {"tags": ["security"]},
+        }
+        for manifest in (codex, claude):
+            self.assertEqual(
+                expected,
+                {stage: value["route"] for stage, value in manifest["semantic_stages"].items()},
+            )
+            self.assertNotIn('"model":', json.dumps(manifest).lower())
         settings = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
         self.assertEqual(
             "claude-sonnet-4-6", settings["env"]["ANTHROPIC_DEFAULT_HAIKU_MODEL"]
         )
-
-        shared_policy = "\n".join(
-            [
-                (self.contract_root / "capabilities.json").read_text(encoding="utf-8"),
-                (self.contract_root / "gates.md").read_text(encoding="utf-8"),
-            ]
-        ).lower()
-        for model in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "codex-spark", "opus", "sonnet"):
-            self.assertNotIn(model, shared_policy)
 
     def test_every_compatibility_entry_and_replacement_is_an_installed_skill(self):
         skills = WORKFLOWS.parent / "skills"
@@ -475,8 +438,8 @@ class WorkflowGenerationTests(unittest.TestCase):
                 self.assertEqual(self.normalized(claude_project), self.normalized(claude_plugin))
                 codex = tomllib.loads(self.normalized(codex_project))
                 self.assertEqual(body, codex["developer_instructions"].strip())
-                self.assertEqual(codex_role["model"], codex["model"])
-                self.assertEqual(codex_role["reasoning_effort"], codex["model_reasoning_effort"])
+                self.assertNotIn("model", codex)
+                self.assertNotIn("model_reasoning_effort", codex)
                 self.assertFalse(codex["agents"]["enabled"])
                 expected_sandbox = "workspace-write" if capability == "mechanical-worker" else "read-only"
                 self.assertEqual(expected_sandbox, codex["sandbox_mode"])
@@ -489,8 +452,8 @@ class WorkflowGenerationTests(unittest.TestCase):
                     )
                 }
                 self.assertEqual(body, claude.split("---", 2)[2].strip())
-                self.assertEqual(claude_role["model"], frontmatter["model"])
-                self.assertEqual(claude_role["effort"], frontmatter["effort"])
+                self.assertNotIn("model", frontmatter)
+                self.assertNotIn("effort", frontmatter)
                 self.assertEqual("Agent", frontmatter["disallowedTools"])
                 self.assertNotIn("Agent", frontmatter["tools"].split(", "))
                 if capability == "mechanical-worker":
@@ -721,6 +684,9 @@ class HostAdapterTests(unittest.TestCase):
             changed_since=lambda baseline: set(self.observed_changes),
         )
 
+    def routed_values(self, host, parameters):
+        return resolved_route(host, parameters)
+
     def registry(self, resolver=lambda command: command, repository_root=ROOT, observer=None):
         return HostAdapterRegistry(
             WORKFLOWS,
@@ -728,6 +694,7 @@ class HostAdapterTests(unittest.TestCase):
             executable_resolver=resolver,
             command_runner=self.runner,
             repository_observer=observer or self.observer,
+            route_provider=self.routed_values,
         )
 
     def dispatch(self, capability="evidence-explorer", dispatch_id="dispatch-001"):
@@ -827,7 +794,7 @@ class HostAdapterTests(unittest.TestCase):
         self.assertEqual("pause", paused["parent_transition"])
         self.assertEqual("model-unavailable", paused["reason_code"])
 
-    def test_codex_review_falls_back_to_terra_without_changing_stage(self):
+    def test_codex_review_uses_the_routed_complex_reasoning_model(self):
         registry = self.registry()
         dispatch = self.dispatch("review-lens")
         probe = registry.probe("codex")
@@ -836,14 +803,15 @@ class HostAdapterTests(unittest.TestCase):
             "codex",
             dispatch,
             probe=probe,
-            available_models={"gpt-5.6-terra"},
+            available_models={"gpt-5.6-sol"},
         )
 
         self.assertEqual("review", invocation["semantic_stage"])
-        self.assertEqual("gpt-5.3-codex-spark", invocation["primary_model"])
-        self.assertEqual("gpt-5.6-terra", invocation["model"])
-        self.assertEqual("fallback", invocation["model_selection"])
-        self.assertEqual("default", invocation["agent_name"])
+        self.assertEqual("L1", invocation["routing_lane"])
+        self.assertEqual("gpt-5.6-sol", invocation["primary_model"])
+        self.assertEqual("gpt-5.6-sol", invocation["model"])
+        self.assertEqual("primary", invocation["model_selection"])
+        self.assertEqual("workflow_review_lens", invocation["agent_name"])
         self.assertEqual("workflow_review_lens", invocation["role_agent_name"])
         self.assertEqual("../roles/review-lens.md", invocation["role_body"])
 
@@ -851,12 +819,12 @@ class HostAdapterTests(unittest.TestCase):
             "codex",
             self.dispatch("review-lens", "dispatch-002"),
             probe=probe,
-            available_models={"gpt-5.6-sol"},
+            available_models={"gpt-5.6-terra"},
         )
         self.assertEqual("model-unavailable", paused["reason_code"])
         self.assertEqual("pause", paused["parent_transition"])
 
-    def test_codex_review_launch_failure_retries_terra_in_a_fresh_dispatch(self):
+    def test_codex_review_launch_failure_pauses_without_substituting_a_lane(self):
         registry = self.registry()
         dispatch = self.dispatch("review-lens")
         probe = registry.probe("codex")
@@ -866,31 +834,15 @@ class HostAdapterTests(unittest.TestCase):
             "codex",
             dispatch,
             primary,
-            "Spark quota is exhausted.",
+            "The routed model is unavailable.",
         )
 
         self.assertEqual("model-unavailable", fallback["reason_code"])
-        self.assertEqual("fallback", fallback["parent_transition"])
-        self.assertEqual("gpt-5.3-codex-spark", fallback["failed_model"])
-        self.assertEqual("gpt-5.6-terra", fallback["next_model"])
+        self.assertEqual("pause", fallback["parent_transition"])
+        self.assertEqual("gpt-5.6-sol", fallback["failed_model"])
+        self.assertIsNone(fallback["next_model"])
 
-        retry_dispatch = self.dispatch("review-lens", "dispatch-002")
-        retry = registry.prepare("codex", retry_dispatch, probe=probe)
-        self.assertEqual("gpt-5.6-terra", retry["model"])
-        self.assertEqual("fallback", retry["model_selection"])
-        self.assertEqual("default", retry["agent_name"])
-
-        exhausted = registry.report_model_unavailable(
-            "codex",
-            retry_dispatch,
-            retry,
-            "Terra is unavailable.",
-        )
-        self.assertEqual("pause", exhausted["parent_transition"])
-        self.assertEqual("gpt-5.6-terra", exhausted["failed_model"])
-        self.assertIsNone(exhausted["next_model"])
-
-    def test_claude_nondefault_stage_uses_general_purpose_without_a_fallback(self):
+    def test_claude_nondefault_stage_uses_routed_values_with_the_role_agent(self):
         registry = self.registry()
         dispatch = self.dispatch("evidence-explorer")
         dispatch["semantic_stage"] = "strategic"
@@ -903,8 +855,20 @@ class HostAdapterTests(unittest.TestCase):
 
         self.assertEqual("opus", invocation["model"])
         self.assertEqual("primary", invocation["model_selection"])
-        self.assertEqual("general-purpose", invocation["agent_name"])
+        self.assertEqual("L1", invocation["routing_lane"])
+        self.assertEqual("workflow-evidence-explorer", invocation["agent_name"])
         self.assertEqual("workflow-evidence-explorer", invocation["role_agent_name"])
+
+    def test_available_host_rejects_missing_routing_output(self):
+        registry = HostAdapterRegistry(
+            WORKFLOWS,
+            ROOT,
+            executable_resolver=lambda command: command,
+            command_runner=self.runner,
+            repository_observer=self.observer,
+        )
+        with self.assertRaisesRegex(ContractViolation, "requires resolved routing output"):
+            registry.prepare("codex", self.dispatch(), probe=registry.probe("codex"))
 
     def test_partial_role_install_keeps_available_capabilities_usable(self):
         with tempfile.TemporaryDirectory() as temp:

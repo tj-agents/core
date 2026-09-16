@@ -1,8 +1,6 @@
 ---
 name: workflow-mechanical-worker
 description: Serialized mechanical writer restricted to one parent-approved writer lease.
-model: sonnet
-effort: medium
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
 ---
