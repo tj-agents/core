@@ -2,7 +2,6 @@
   "contract_version": "v2",
   "host": "codex",
   "status": "available-with-parent-fallback",
-  "model_override_agent_name": "default",
   "delivery": {
     "project_directory": ".codex/agents",
     "plugin_directory": "codex-agents",
@@ -30,28 +29,28 @@
   ],
   "semantic_stages": {
     "strategic": {
-      "model": "gpt-5.6-sol",
-      "reasoning_effort": "high",
+      "route": {"tags": ["architecture"]},
       "unavailable": "decision"
     },
     "implementation": {
-      "model": "gpt-5.6-terra",
-      "reasoning_effort": "medium",
+      "route": {},
       "unavailable": "typed-parent-fallback"
     },
     "mechanical": {
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "low",
+      "route": {
+        "reversibility": "reversible",
+        "blast": "file",
+        "ambiguity": "specified",
+        "verifiability": "compiler"
+      },
       "unavailable": "typed-parent-fallback"
     },
     "review": {
-      "model": "gpt-5.6-sol",
-      "reasoning_effort": "high",
+      "route": {"tags": ["review"]},
       "unavailable": "decision"
     },
     "critical": {
-      "model": "gpt-5.6-sol",
-      "reasoning_effort": "high",
+      "route": {"tags": ["security"]},
       "unavailable": "decision"
     }
   },
@@ -68,8 +67,6 @@
       "body": "../roles/evidence-explorer.md",
       "default_stage": "mechanical",
       "allowed_stages": ["strategic", "implementation", "mechanical", "critical"],
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "low",
       "sandbox_mode": "read-only"
     },
     "log-analyst": {
@@ -79,8 +76,6 @@
       "body": "../roles/log-analyst.md",
       "default_stage": "mechanical",
       "allowed_stages": ["implementation", "mechanical", "critical"],
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "low",
       "sandbox_mode": "read-only"
     },
     "test-impact-analyst": {
@@ -90,8 +85,6 @@
       "body": "../roles/test-impact-analyst.md",
       "default_stage": "implementation",
       "allowed_stages": ["implementation", "review"],
-      "model": "gpt-5.6-terra",
-      "reasoning_effort": "medium",
       "sandbox_mode": "read-only"
     },
     "review-lens": {
@@ -99,10 +92,8 @@
       "filename": "workflow-review-lens.toml",
       "description": "Read-only independent review lens over one immutable diff and bounded concern.",
       "body": "../roles/review-lens.md",
-      "model": "gpt-5.6-sol",
       "default_stage": "review",
       "allowed_stages": ["review"],
-      "reasoning_effort": "high",
       "sandbox_mode": "read-only"
     },
     "mechanical-worker": {
@@ -112,8 +103,6 @@
       "body": "../roles/mechanical-worker.md",
       "default_stage": "mechanical",
       "allowed_stages": ["mechanical"],
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "low",
       "sandbox_mode": "workspace-write"
     }
   }

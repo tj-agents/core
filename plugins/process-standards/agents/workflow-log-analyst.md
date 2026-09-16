@@ -1,8 +1,6 @@
 ---
 name: workflow-log-analyst
 description: Read-only analyst for reducing supplied logs into evidence without diagnosing the fix.
-model: haiku
-effort: low
 tools: Read, Glob, Grep
 disallowedTools: Agent
 ---
