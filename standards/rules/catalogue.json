@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "id": "pre-launch-delete-old-shape",
+      "doc": "standards/rules/pre-launch-delete-old-shape.md",
+      "applies_when": { "lifecycle": "pre-launch" }
+    }
+  ]
+}

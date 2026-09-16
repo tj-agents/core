@@ -244,6 +244,13 @@ if (Test-Path $standardsDir) {
 }
 if (-not $docs) { throw "No standards docs found under standards/." }
 
+# Conditional rules are delivered at SessionStart by the profile resolver, never by a skill: a rule must
+# not be loadable in a repository whose profile does not declare it subject to the rule. Their owner is
+# the catalogue that carries each one's applies_when, so they are reconciled against that below.
+$RULES_PREFIX = 'standards/rules/'
+$ruleDocs = @($docs | Where-Object { $_.StartsWith($RULES_PREFIX) })
+$docs = @($docs | Where-Object { -not $_.StartsWith($RULES_PREFIX) })
+
 # Neither structure may grow an orphan. Self-contained routers (no Doc) name nothing here to check -
 # their content is the payload, so there is no doc-side owner or existence to reconcile against.
 $problems = @()
@@ -261,6 +268,26 @@ foreach ($doc in $docs) {
         $problems += "doc '$doc' is routed by $($owners.Count) skills ($($owners -join ', ')); it needs exactly one owner."
     }
 }
+$cataloguePath = Join-Path $repoRoot 'standards/rules/catalogue.json'
+if ($ruleDocs -or (Test-Path $cataloguePath)) {
+    if (-not (Test-Path $cataloguePath)) {
+        $problems += "standards/rules/ carries docs but no catalogue.json, so no profile can select them."
+    } else {
+        $catalogued = @((Get-Content -Raw -Encoding UTF8 $cataloguePath | ConvertFrom-Json).rules |
+            ForEach-Object { $_.doc })
+        foreach ($doc in $ruleDocs) {
+            if ($catalogued -notcontains $doc) {
+                $problems += "rule doc '$doc' is absent from standards/rules/catalogue.json, so no profile selects it."
+            }
+        }
+        foreach ($doc in $catalogued) {
+            if ($ruleDocs -notcontains $doc) {
+                $problems += "catalogue.json names rule doc '$doc', which does not exist."
+            }
+        }
+    }
+}
+
 if ($problems) {
     Write-Host "The standards tree and the skill namespace disagree:"
     foreach ($problem in $problems) { Write-Host "  $problem" }
@@ -545,6 +572,15 @@ foreach ($plugin in $plugins) {
         $generated["plugins/$($plugin.Name)/skills/$($owner.Name)/SKILL.md"] =
             (Expand-RoutedSkill $owner.Body (Read-Lf (Join-Path $repoRoot $doc)) $doc '../../' $owner.Name)
         Add-SkillSiblings "plugins/$($plugin.Name)/skills" $owner
+    }
+
+    # The rules domain has no router to expand: the SessionStart resolver reads its catalogue and picks
+    # per the consuming repository's profile, so the tree ships verbatim, catalogue included.
+    if ($pluginDomains[$plugin.Name] -contains 'rules') {
+        foreach ($file in Get-ChildItem -Path (Join-Path $standardsDir 'rules') -Recurse -File) {
+            $relative = To-RepoRelative $file.FullName $repoRoot
+            $generated["plugins/$($plugin.Name)/$relative"] = Read-Lf $file.FullName
+        }
     }
     # A self-contained router has no doc to copy or rewrite - its body already IS what ships, verbatim,
     # same as the .claude/skills copy above.

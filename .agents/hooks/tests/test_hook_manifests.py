@@ -34,6 +34,7 @@ CODEX_SCRIPTS = (
 # manifest is a hook nobody registered - which is how marketplace_refresh.py shipped dead.
 NON_HOOK_HELPERS = {
     "hook_runtime.py": "shared library the hooks import",
+    "dev_rules.py": "rule resolver the session hook imports",
     "plan_handoff_stop.py": "implementation the registered launcher execs",
     "plan_graph.py": "argparse CLI the plan skills invoke",
     "ci_change_classifier.py": "argparse CLI the CI workflow invokes",

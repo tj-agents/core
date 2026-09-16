@@ -6,7 +6,12 @@ summons it. This hook reads ``standards/process/FLOOR.md`` from the installed pl
 SessionStart context, so the floor is present from the first turn and, with the plugin's compact/resume
 matchers, again after every compaction — without copying the rules into any repo's own AGENTS.md.
 
-Scope: a repo opts in exactly as the skill router does, by carrying ``.agents/skill-routes.json``.
+Beside the floor it injects the conditional rules the repository has declared itself subject to, resolved
+by ``dev_rules`` from its ``.agents/profile.json``. The floor is identical everywhere; a rule arrives only
+where its ``applies_when`` matches the declared profile.
+
+Scope: a repo opts in as the skill router does, by carrying ``.agents/skill-routes.json``, or by
+declaring a profile.
 Outside a standards-managed repo the hook prints nothing, so it stays silent in unrelated projects on the
 same machine. Anything unexpected exits 0 printing nothing: a broken floor hook must never wedge a
 session.
@@ -20,6 +25,7 @@ import json
 import sys
 from pathlib import Path
 
+from dev_rules import PROFILE_FILE, resolve_rules
 from hook_runtime import claim_invocation, own_payload_root
 
 # The floor carries non-ASCII punctuation, and this text is what the agent reads. Windows defaults these
@@ -64,27 +70,32 @@ def _is_standards_repo(project_dir):
     except OSError:
         return False
     for directory in (current, *current.parents):
-        if (directory / ROUTES_FILE).is_file():
+        if (directory / ROUTES_FILE).is_file() or (directory / PROFILE_FILE).is_file():
             return True
     return False
 
 
 def main():
     data = _read_payload()
-    if not _is_standards_repo(_project_dir(data)):
+    project_dir = _project_dir(data)
+    if not _is_standards_repo(project_dir):
         return 0
-    floor = own_payload_root(__file__).joinpath(*FLOOR_DOC)
+    payload_root = own_payload_root(__file__)
+    sections = []
     try:
-        text = floor.read_text(encoding="utf-8").strip()
+        floor = payload_root.joinpath(*FLOOR_DOC).read_text(encoding="utf-8").strip()
     except OSError:
-        return 0
-    if not text:
+        floor = ""
+    if floor:
+        sections.append(floor)
+    sections.extend(text for _, text in resolve_rules(project_dir, payload_root))
+    if not sections:
         return 0
     # A payload-less vendored copy must not suppress the installed plugin copy that can inject the
     # floor. Claim only after this copy has proved it has non-empty context to emit.
     if not claim_invocation(data, HOOK_NAME):
         return 0
-    sys.stdout.write(text + "\n")
+    sys.stdout.write("\n\n".join(sections) + "\n")
     return 0
 
 
