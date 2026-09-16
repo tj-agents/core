@@ -2,6 +2,7 @@
 name: merging
 description: Landing a PR safely through a GitHub merge queue — bring the branch current with base before enabling auto-merge (a behind branch either sits BLOCKED forever or merges code never built against current base), then confirm the outcome with one capped background poll loop that emits transitions only and resolves to exactly one of four terminal states (merged, a failed check, conflicted-so-auto-merge-was-silently-disabled, or green-but-never-admitted), never retrying or toggling a genuine failure, never swallowing poll errors, and telling a failed merge-queue run apart from the re-evaluation glitch by inspecting `merge_group` runs rather than PR state; plus owning only the generated downstream version-bump PR causally produced by that merge, never a pre-existing or superseding PR. Use after enabling auto-merge, when a PR seems stuck, when a merge-queue run fails, or before starting new work on a possibly-broken base.
 domain: process
+route: infer
 ---
 
 # Merging

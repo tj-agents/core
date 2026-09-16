@@ -1,6 +1,7 @@
 ---
 name: persistent-workflow
 description: Keep one Codex Desktop PR delivery alive across delayed CI, review, queue, and merge transitions with one same-chat Scheduled Task bound to the owning local project and worktree. Use after remote work has a real future decision; not for ordinary foreground implementation or terminal-only Codex.
+route: infer
 ---
 
 # Codex persistent workflow

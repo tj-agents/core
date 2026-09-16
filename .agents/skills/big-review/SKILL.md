@@ -2,6 +2,7 @@
 name: big-review
 description: Select and drive the canonical isolated review workflow for a very large immutable branch diff in resumable, dependency-ordered area stages recorded in the branch's one canonical work order. Use for hundreds or thousands of changed files, a multi-service diff, or to resume one staged review area.
 domain: process
+route: tags=review
 ---
 
 # Staged review selector

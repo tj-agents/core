@@ -2,6 +2,7 @@
 name: review-lifecycle
 description: Own the canonical per-branch review work order, its immutable candidate identity, in-progress and complete states, finding statuses, permitted remediation mutations, merge retention, and deletion after the branch lands. Use when producing, staging, incrementally extending, addressing, gating, or retiring a review artifact.
 domain: process
+route: tags=review
 ---
 
 # Review work-order contract

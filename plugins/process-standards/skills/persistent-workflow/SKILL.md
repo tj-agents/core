@@ -1,6 +1,7 @@
 ---
 name: persistent-workflow
 description: Keep one Claude PR delivery alive across agent turns, delayed CI, session resume, and cross-restart scheduling by using each native Claude mechanism only for its supported lifetime. Use after remote work has a real future decision; not for ordinary foreground implementation.
+route: infer
 ---
 
 # Claude persistent workflow

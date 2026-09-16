@@ -2,6 +2,7 @@
 name: big-review-all
 description: Drive every remaining stage of one canonical staged big review to completion unattended, keeping dependency-ordered stages serial while the review pipeline may parallelize only independent read-only lenses or subregions inside the active stage. Use to do all stages, finish a big review, or run the entire staged pass.
 domain: process
+route: tags=review
 ---
 
 # Drive a staged review to completion

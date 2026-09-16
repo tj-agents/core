@@ -1,8 +1,8 @@
 ---
 name: workflow-evidence-explorer
 description: Read-only repository evidence explorer for one bounded workflow question.
-model: sonnet
-effort: medium
+model: haiku
+effort: low
 tools: Read, Glob, Grep
 disallowedTools: Agent
 ---
