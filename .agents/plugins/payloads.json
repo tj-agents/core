@@ -3,6 +3,6 @@
   "hooks": "process-standards",
   "workflows": "process-standards",
   "payloads": {
-    "process-standards": ["process"]
+    "process-standards": ["process", "rules"]
   }
 }

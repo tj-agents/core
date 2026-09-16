@@ -12,6 +12,7 @@ from pathlib import Path
 HOOKS_DIR = Path(__file__).resolve().parents[1]
 HOOK_SRC = HOOKS_DIR / "session_floor.py"
 RUNTIME_SRC = HOOKS_DIR / "hook_runtime.py"
+RULES_SRC = HOOKS_DIR / "dev_rules.py"
 FLOOR_TEXT = "# The behavioral floor\n\nTake the scalable approach. Questions before actions.\n"
 
 
@@ -25,6 +26,7 @@ class SessionFloorTests(unittest.TestCase):
         (self.plugin / "hooks").mkdir(parents=True)
         shutil.copy(HOOK_SRC, self.plugin / "hooks" / "session_floor.py")
         shutil.copy(RUNTIME_SRC, self.plugin / "hooks" / "hook_runtime.py")
+        shutil.copy(RULES_SRC, self.plugin / "hooks" / "dev_rules.py")
         self.floor_doc = self.plugin / "standards" / "process" / "FLOOR.md"
         self.floor_doc.parent.mkdir(parents=True)
         self.floor_doc.write_text(FLOOR_TEXT, encoding="utf-8")
@@ -40,6 +42,7 @@ class SessionFloorTests(unittest.TestCase):
         vendored_hooks.mkdir()
         shutil.copy(HOOK_SRC, vendored_hooks / "session_floor.py")
         shutil.copy(RUNTIME_SRC, vendored_hooks / "hook_runtime.py")
+        shutil.copy(RULES_SRC, vendored_hooks / "dev_rules.py")
         self.vendored_hook = vendored_hooks / "session_floor.py"
 
     def tearDown(self):
