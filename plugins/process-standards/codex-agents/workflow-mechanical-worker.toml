@@ -1,7 +1,5 @@
 name = "workflow_mechanical_worker"
 description = "Serialized mechanical writer restricted to one parent-approved writer lease."
-model = "gpt-5.6-luna"
-model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """

@@ -55,7 +55,7 @@
     },
     {
       "type": "object",
-      "required": ["contract_version", "record_type", "host", "dispatch_id", "capability", "agent_name", "primary_model", "model", "model_selection", "reasoning_effort", "mode", "writer_lease_id"],
+      "required": ["contract_version", "record_type", "host", "dispatch_id", "capability", "agent_name", "routing_lane", "model", "model_selection", "reasoning_effort", "mode", "writer_lease_id"],
       "additionalProperties": false,
       "properties": {
         "contract_version": {"const": "v2"},
@@ -70,9 +70,9 @@
         "agent_name": {"type": "string", "minLength": 1},
         "role_agent_name": {"type": "string", "minLength": 1},
         "role_body": {"type": "string", "minLength": 1},
-        "primary_model": {"type": "string", "minLength": 1},
+        "routing_lane": {"type": "string", "pattern": "^L[0-9]+$"},
         "model": {"type": "string", "minLength": 1},
-        "model_selection": {"type": "string", "enum": ["primary", "fallback"]},
+        "model_selection": {"const": "routed"},
         "reasoning_effort": {"type": "string", "minLength": 1},
         "mode": {"type": "string", "enum": ["read", "write"]},
         "writer_lease_id": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}

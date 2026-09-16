@@ -192,6 +192,7 @@ class HostAdapterRegistry:
         command_runner=None,
         lease_registry=None,
         repository_observer=None,
+        route_provider=None,
     ):
         self.workflow_root = Path(workflow_root).resolve()
         self.repository_root = Path(repository_root).resolve()
@@ -203,6 +204,7 @@ class HostAdapterRegistry:
         self.command_runner = command_runner or subprocess.run
         self.lease_registry = lease_registry or WriterLeaseRegistry.for_repository(self.repository_root)
         self.repository_observer = repository_observer or RepositoryChangeObserver(self.repository_root)
+        self.route_provider = route_provider
         self.active_lock = threading.Lock()
         self.manifests = {
             host: _load_json(self.workflow_root / "hosts" / f"{host}.json")
@@ -239,7 +241,7 @@ class HostAdapterRegistry:
         version = output[0]
         return self._probe_record(host, "available", None, version, available_roles)
 
-    def prepare(self, host, dispatch, probe=None, available_models=None):
+    def prepare(self, host, dispatch, probe=None, available_models=None, route=None):
         self.contract.validate_dispatch(dispatch)
         manifest = self._manifest(host)
         capability = dispatch["capability"]
@@ -284,7 +286,10 @@ class HostAdapterRegistry:
                 capability,
                 semantic_stage=semantic_stage,
             )
-        model_route = [stage["model"], *stage.get("fallback_models", [])]
+        if route is None and self.route_provider is not None:
+            route = self.route_provider(host, stage["route"])
+        selected_model, selected_effort, routing_lane = self._routed_selection(host, route)
+        model_route = [selected_model]
         route_key = self._model_route_key(host, dispatch, capability, semantic_stage)
         failed_models = self.model_failures.get(route_key, set())
         eligible_models = [model for model in model_route if model not in failed_models]
@@ -306,9 +311,6 @@ class HostAdapterRegistry:
             )
         lease_id = dispatch["permissions"].get("writer_lease", {}).get("lease_id")
         role_agent_name = role["agent_name"]
-        agent_name = role_agent_name
-        if selected_model != role["model"]:
-            agent_name = manifest["model_override_agent_name"]
         invocation = {
             "contract_version": self.contract.version,
             "record_type": "host-invocation",
@@ -316,18 +318,13 @@ class HostAdapterRegistry:
             "dispatch_id": dispatch["dispatch_id"],
             "capability": capability,
             "semantic_stage": semantic_stage,
-            "agent_name": agent_name,
+            "agent_name": role_agent_name,
             "role_agent_name": role_agent_name,
             "role_body": role["body"],
-            "primary_model": stage["model"],
+            "routing_lane": routing_lane,
             "model": selected_model,
-            "model_selection": (
-                "primary" if selected_model == stage["model"] else "fallback"
-            ),
-            "reasoning_effort": stage.get(
-                "reasoning_effort",
-                stage.get("effort", "medium"),
-            ),
+            "model_selection": "routed",
+            "reasoning_effort": selected_effort,
             "mode": dispatch["permissions"]["mode"],
             "writer_lease_id": lease_id,
         }
@@ -390,7 +387,7 @@ class HostAdapterRegistry:
                 raise ContractViolation("model failure differs from the prepared invocation")
             semantic_stage = active["semantic_stage"]
             stage = manifest["semantic_stages"][semantic_stage]
-            model_route = [stage["model"], *stage.get("fallback_models", [])]
+            model_route = [invocation["model"]]
             failed_model = invocation["model"]
             failures = self.model_failures.setdefault(active["model_route_key"], set())
             failures.add(failed_model)
@@ -525,6 +522,21 @@ class HostAdapterRegistry:
         if host not in self.manifests:
             raise ContractViolation(f"unknown host adapter {host!r}")
         return self.manifests[host]
+
+    def _routed_selection(self, host, route):
+        if not isinstance(route, dict):
+            raise ContractViolation("host preparation requires resolved routing output")
+        fields = (
+            ("codex_model", "codex_effort")
+            if host == "codex"
+            else ("model", "effort")
+        )
+        model = route.get(fields[0])
+        effort = route.get(fields[1])
+        lane = route.get("lane")
+        if any(not isinstance(value, str) or not value for value in (model, effort, lane)):
+            raise ContractViolation("resolved routing output is missing model, effort, or lane")
+        return model, effort, lane
 
     def _probe_record(self, host, status, reason_code, version, available_roles):
         return self.contract.validate(

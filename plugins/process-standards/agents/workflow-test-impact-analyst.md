@@ -1,8 +1,6 @@
 ---
 name: workflow-test-impact-analyst
 description: Read-only analyst for affected tests, gaps, and repository-supported validation commands.
-model: sonnet
-effort: medium
 tools: Read, Glob, Grep
 disallowedTools: Agent
 ---
