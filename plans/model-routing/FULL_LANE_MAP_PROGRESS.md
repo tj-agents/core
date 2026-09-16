@@ -11,14 +11,14 @@
 
 ## Current state
 
-The policy and repository implementation are complete in this candidate. It contains routed
-handoffs, route declarations for every delegating skill, runtime and repository-scan enforcement, corrected
-Workflow v2 lane peers, generated payloads, tests, and this plan corpus.
+Implementation, review remediation, and local validation are complete in the current candidate. It contains
+routed handoffs, route declarations for every delegating skill, runtime and repository-scan enforcement,
+mandatory routed inputs for Workflow v2, model-free generated agent defaults, generated payloads, tests,
+and this plan corpus.
 
 ## Next Steps
 
-Run the full CI-equivalent validation, create the immutable implementation commit, complete the canonical
-review, address any findings, then push, open the PR, and own CI and merge to terminal.
+Push the stable candidate once, open the GitHub PR, and own exact-head CI and merge to terminal.
 
 ## Completed work
 
@@ -29,16 +29,20 @@ review, address any findings, then push, open the PR, and own CI and merge to te
 - Added route declarations and enforcement for handoffs, review lenses, workflow calls, and native agent
   dispatch, including missing-model and missing-effort rejection.
 - Aligned Workflow v2 strategic/review, implementation, and mechanical roles with L1, L2, and L3.
+- Removed Workflow v2's duplicate model table and generated role defaults; host preparation now requires
+  externally resolved model, effort, and lane values.
+- Addressed all canonical review findings through commits `2e2932c`, `9b1f0df`, `943347f`, and this commit.
 
 ## Verification
 
-Focused routing-guard tests pass (13 tests); the repository scan is clean; Workflow v2 contract tests pass
-(53 tests); generated files were regenerated successfully; representative resolver calls return all four
+Full CI-equivalent validation passes: 443 hook tests with one platform skip, Workflow v2 verification, the
+repository routing scan, and generated-file verification. Representative resolver calls return all four
 distinct lane pairs.
 
 ## Reviews
 
-Not started; review follows the first immutable implementation candidate.
+Canonical work order `reviews/Feature-Model-Routing.md` is complete and approved; it owns the exact current
+watermark. All three findings are resolved and no finding remains open.
 
 ## Decisions, discoveries, blockers, and deviations
 
