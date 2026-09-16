@@ -20,8 +20,9 @@ repair attempt; it never recursively blocks the repair response.
 
 - Start with the worktree opener — `cd <absolute-worktree-path>`, or `/open-worktree <Type>/<Name>` when
   the worktree doesn't exist yet — and keep it inside the paste-ready prompt.
-- For **non-plan** work, make the prompt self-contained for zero context: name the branch or PR, relevant
-  working files, and exact next action.
+- For **non-plan** work, hand off only when size or independence warrants another context; never hand off a
+  small edit this session can make. Then make the prompt self-contained for zero context: name the branch or
+  PR, relevant working files, and exact next action.
 - For **plan-managed** work, introduce each handoff with one `Why:` line derived from the first paragraph of
   the ledger's current `## Next Steps`. This makes the purpose explicit without duplicating the operational
   procedure. Then end with the paste-ready prompt, which is ONLY the pointer — an opener line then the read
