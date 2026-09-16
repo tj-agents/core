@@ -1,7 +1,8 @@
 ---
 name: handoff-codex
-description: Open an independent unmanaged Codex tab in an exact repository or worktree with a prepared prompt and the full native Codex terminal UI. Astra is Codex - the gpt-6-astra model - so a request naming Astra selects this skill, with -Model gpt-6-astra and the named -ReasoningEffort. Use when asked to open Codex or Astra, hand work to either, obtain a second opinion from either, or run a prompt against a specific Codex model.
+description: Open an independent unmanaged Codex tab in an exact repository or worktree with a prepared prompt, policy-routed model and effort, and the full native Codex terminal UI. Use when asked to open Codex, hand work to it, obtain a second opinion from it, or run a prompt against a specific Codex tier.
 domain: process
+route: infer
 ---
 
 # Codex handoff
@@ -17,20 +18,35 @@ through nested command strings or place its contents directly in the Windows Ter
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
+## Route before launch
+
+Route declaration: infer `reversibility`, `blast`, `ambiguity`, `verifiability`, and task `tags` from the
+delegated task. Set `authorization=frontier` only when the user explicitly requested the frontier/top tier
+or a checked-in workflow declaration supplied it; never infer that authorization from size, difficulty,
+ambiguity, or importance.
+
+Immediately before launch, run `~/.claude/routing/route.py` with those parameters and parse its JSON output.
+Do not choose, remember, or substitute a model or effort. The launch binding is exactly:
+
+```powershell
+$route = python (Join-Path $env:USERPROFILE '.claude\routing\route.py') @routeArguments | ConvertFrom-Json
+& '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.codex_model -ReasoningEffort $route.codex_effort -BypassHookTrust
+```
+
+Treat a missing resolver, failed resolver, invalid JSON, or absent `codex_model`/`codex_effort` field as a
+hard stop. Re-route each separate handoff; an earlier result on the same plan is not reusable.
+
 Launch with `scripts/launch-codex.ps1`, beside this file:
 
 ```powershell
-& '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -BypassHookTrust
+& '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.codex_model -ReasoningEffort $route.codex_effort -BypassHookTrust
 ```
 
 Use `-BypassHookTrust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
 user has not authorized repository hooks.
 
-Pass `-Model <slug>` to pre-select a model instead of the `model` in `~/.codex/config.toml`. Pass
-`-ReasoningEffort <level>` to pre-select reasoning effort instead of `model_reasoning_effort` in that
-file. Pass neither by default; the config owns the everyday model. Use `gpt-6-astra` or raise effort only
-when the request names that choice or this task is large or open-ended. An earlier task on the same plan is
-irrelevant; judge this one.
+`-Model` and `-ReasoningEffort` are mandatory routed inputs for this skill. They come only from the resolver
+fields above; the launcher remains a dumb transport and the caller owns routing.
 
 ## Which executable it starts, and why the choice is not free
 
@@ -52,10 +68,9 @@ that cache it ranked by `LastWriteTime` — landing on 0.151.0-alpha.7.1. Date-r
 once both sources are searched, because a freshly downloaded alpha's file is newer than the release it
 precedes.
 
-**The model roster is gated on the CLI version.** `gpt-6-astra` appears nineteen times in the 0.154.0
-binary and not once in 0.151.0-alpha.7.1, so the stale build could not offer it whatever the account was
-entitled to. That is why the launcher fails loudly below `-MinimumVersion` (default `0.154.0`, the oldest
-build observed to carry the current roster) rather than quietly running an old one. If it refuses, run
+**The model roster is gated on the CLI version.** The stale build could not offer the current roster whatever
+the account was entitled to. That is why the launcher fails loudly below `-MinimumVersion` (default
+`0.154.0`, the oldest build observed to carry the current roster) rather than quietly running an old one. If it refuses, run
 `npm install -g @openai/codex@latest` — do not lower the floor to get past it.
 
 It opens as a **new tab in the current Windows Terminal window**, not a new OS window — the `wt.exe`

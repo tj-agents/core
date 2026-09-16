@@ -1,7 +1,7 @@
 ---
 name: workflow-review-lens
 description: Read-only independent review lens over one immutable diff and bounded concern.
-model: sonnet
+model: opus
 effort: high
 tools: Read, Glob, Grep
 disallowedTools: Agent

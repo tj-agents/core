@@ -2,6 +2,7 @@
 name: persistent-delivery
 description: Shared safety and identity contract for a PR that must survive an agent turn and continue through exact-head validation, repair, review, and authorized delivery. The host-specific persistent-workflow skill supplies the actual wake mechanism.
 domain: process
+route: infer
 ---
 
 # Persistent delivery contract

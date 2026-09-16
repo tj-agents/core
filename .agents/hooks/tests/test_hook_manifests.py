@@ -17,13 +17,19 @@ PLUGIN = ROOT / "plugins" / "process-standards"
 SCRIPTS = (
     "skill_router.py",
     "merge_review_gate.py",
+    "model_routing_guard.py",
     "plan_handoff_stop_launcher.py",
     "session_floor.py",
 )
 # Codex's roster is NOT Claude's minus nothing: the router is registered for both harnesses, but
 # merge_review_gate.py is Claude-only until Codex's shell tool name is observed in a real payload -
 # its SHELL_TOOLS vocabulary is {bash, powershell}, so a Codex registration would act on nothing.
-CODEX_SCRIPTS = ("skill_router.py", "marketplace_refresh.py", "session_floor.py")
+CODEX_SCRIPTS = (
+    "skill_router.py",
+    "model_routing_guard.py",
+    "marketplace_refresh.py",
+    "session_floor.py",
+)
 # A shipped .py that is deliberately not a harness hook, and why. Anything not here and not in a
 # manifest is a hook nobody registered - which is how marketplace_refresh.py shipped dead.
 NON_HOOK_HELPERS = {
@@ -228,6 +234,15 @@ class HookManifestContractTests(unittest.TestCase):
                     "tool_input": {"command": command},
                 }
             )
+        elif script == "model_routing_guard.py":
+            payload.update(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_use_id": f"routing-{invocation}",
+                    "tool_name": "PowerShell" if harness == "claude" else "exec_command",
+                    "tool_input": {"command": "launch.ps1 -Model fixed"},
+                }
+            )
         elif script in ("marketplace_refresh.py", "session_floor.py"):
             payload.update({"hook_event_name": "SessionStart"})
             if script == "marketplace_refresh.py":
@@ -251,6 +266,9 @@ class HookManifestContractTests(unittest.TestCase):
             self.assertEqual(2, result.returncode, result.stderr)
             self.assertIn("cannot resolve PR #1", result.stderr)
             self.assertNotIn("cannot prove this merge's checkout", result.stderr)
+        elif script == "model_routing_guard.py":
+            self.assertEqual(2, result.returncode, result.stderr)
+            self.assertIn("MODEL ROUTING GUARD", result.stderr)
         elif script == "session_floor.py":
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertIn("behavioral floor", result.stdout)
