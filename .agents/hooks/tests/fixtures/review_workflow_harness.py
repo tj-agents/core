@@ -10,6 +10,8 @@ from pathlib import Path
 from threading import Barrier, Lock
 from types import SimpleNamespace
 
+from fixtures.routing_fixture import resolved_route
+
 
 class StaticObserver:
     def capture(self):
@@ -48,6 +50,7 @@ class ReviewWorkflowHarness:
             ),
             lease_registry=writer_lease_registry(),
             repository_observer=StaticObserver(),
+            route_provider=resolved_route,
         )
         self.contract = self.registry.contract
         self.prepare_repository()

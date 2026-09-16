@@ -4,6 +4,8 @@ import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
+from fixtures.routing_fixture import resolved_route
+
 
 class StaticObserver:
     def capture(self):
@@ -58,6 +60,7 @@ class TaskWorkflowHarness:
             ),
             lease_registry=writer_lease_registry(),
             repository_observer=StaticObserver(),
+            route_provider=resolved_route,
         )
         self.contract = self.registry.contract
 

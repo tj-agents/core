@@ -79,6 +79,7 @@ but unreadable — failing open on a malformed table is enforcement that is iner
 | Hook | Event | Harness | Opt-in table | Enforces |
 |---|---|---|---|---|
 | `skill_router.py` | write | both | `.agents/skill-routes.json`, else a shipped registry | the standard owning a path is loaded before it is written |
+| `model_routing_guard.py` | write and shell launch | both | — | skills, scripts, workflows, and launch commands pass resolver values instead of literal model selections |
 | `session_floor.py` | session start | both | — | `FLOOR.md` is in context from the first turn |
 | `merge_review_gate.py` | `gh pr merge` | Claude | `.agents/merge-gate.json` | no merge without a current, clean code-review |
 | `plan_handoff_stop_launcher.py` | turn end | Claude | a `_PROGRESS.md` ledger | a selected plan context transfer ends with its continuation pointer |

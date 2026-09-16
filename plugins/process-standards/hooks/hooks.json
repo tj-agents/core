@@ -23,6 +23,17 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|apply_patch|edit_file|write_file|multi_edit|Bash|PowerShell|Agent|spawn_agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "plugin_root=\"$CLAUDE_PLUGIN_ROOT\"; if command -v cygpath >/dev/null 2>&1; then plugin_root=\"$(cygpath -u \"$plugin_root\")\"; fi; exec bash \"$plugin_root/hooks/run-claude-hook.sh\" \"$plugin_root/hooks/model_routing_guard.py\"",
+            "shell": "bash",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "Stop": [

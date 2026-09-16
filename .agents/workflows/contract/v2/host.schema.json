@@ -70,6 +70,7 @@
         "agent_name": {"type": "string", "minLength": 1},
         "role_agent_name": {"type": "string", "minLength": 1},
         "role_body": {"type": "string", "minLength": 1},
+        "routing_lane": {"type": "string", "pattern": "^L[0-9]+$"},
         "primary_model": {"type": "string", "minLength": 1},
         "model": {"type": "string", "minLength": 1},
         "model_selection": {"type": "string", "enum": ["primary", "fallback"]},

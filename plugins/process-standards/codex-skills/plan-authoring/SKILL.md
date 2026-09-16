@@ -2,6 +2,7 @@
 name: plan-authoring
 description: Design or phase multi-step work and create or update its implementation-ready plan and compact ledger. Use for planning-only requests, roadmap-item planning, or durable promotion when no active plan already owns the work; do not use to execute an existing plan, prioritize a roadmap without a selected item, or directly complete a short unplanned task.
 domain: process
+route: infer
 ---
 
 # Author a durable plan

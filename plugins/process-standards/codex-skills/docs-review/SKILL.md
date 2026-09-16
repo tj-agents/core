@@ -2,6 +2,7 @@
 name: docs-review
 description: Apply the canonical isolated review workflow to a documentation or agent-metadata-only branch using accuracy, contradiction, ownership, concision, dangling-reference, and followability lenses. Use to review docs, plans, skills, or a meta-only PR; route mixed runtime/product/package/CI-selection diffs to review.
 domain: process
+route: tags=review
 ---
 
 # Documentation review mode

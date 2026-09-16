@@ -17,3 +17,13 @@ A skill is harness-specific when the harness **running** it is — never when th
 `handoff-codex` launches Codex but is invoked from Claude, so it is shared; `persistent-workflow` is split
 because the scheduling mechanisms it names exist only in one harness each. Ask which harness executes the
 skill, not which agent its name mentions.
+
+## Standing delivery authorization
+
+In this repository, a request to implement or fix a change, execute a plan, or carry on with active work
+authorizes the owning agent to push each stable candidate, open or update its GitHub pull request, enable
+auto-merge or merge it after the repository's review and validation gates pass, and monitor that delivery to
+its terminal state. Do not stop to ask separately whether to push, open the PR, or merge it.
+
+This standing authorization does not permit force-pushes, bypassing failed or required gates, deployment,
+publishing packages or releases, destructive repository operations, or delivery of unrelated changes.

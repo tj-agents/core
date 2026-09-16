@@ -2,6 +2,7 @@
 name: handoff-claude
 description: Open an independent unmanaged Claude Code window in an exact repository or worktree with a prepared prompt and the full native Claude Code terminal UI. Use when asked to open Claude, open another Claude instance, hand work to a second Claude, or run something in a separate Claude window.
 domain: process
+route: infer
 ---
 
 # Claude Code handoff
@@ -17,10 +18,28 @@ through nested command strings or place its contents directly in the Windows Ter
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
+## Route before launch
+
+Route declaration: infer `reversibility`, `blast`, `ambiguity`, `verifiability`, and task `tags` from the
+delegated task. Set `authorization=frontier` only when the user explicitly requested the frontier/top tier
+or a checked-in workflow declaration supplied it; never infer that authorization from size, difficulty,
+ambiguity, or importance.
+
+Immediately before launch, run `~/.claude/routing/route.py` with those parameters and parse its JSON output.
+Do not choose, remember, or substitute a model. The launch binding is exactly:
+
+```powershell
+$route = python (Join-Path $env:USERPROFILE '.claude\routing\route.py') @routeArguments | ConvertFrom-Json
+& '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.claude_model
+```
+
+Treat a missing resolver, failed resolver, invalid JSON, or absent `claude_model` field as a hard stop.
+Re-route each separate handoff; an earlier result on the same plan is not reusable.
+
 Launch with `scripts/launch-claude.ps1`, beside this file:
 
 ```powershell
-& '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
+& '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.claude_model
 ```
 
 Add `-DangerouslySkipPermissions` **only when the user asks for it in that request**. It disables every

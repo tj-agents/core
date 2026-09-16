@@ -486,8 +486,6 @@ foreach ($capability in $codexRoles) {
     $codexAgent = @(
         "name = `"$(Escape-TomlString $codexRole.agent_name)`"",
         "description = `"$(Escape-TomlString $codexRole.description)`"",
-        "model = `"$(Escape-TomlString $codexRole.model)`"",
-        "model_reasoning_effort = `"$(Escape-TomlString $codexRole.reasoning_effort)`"",
         "sandbox_mode = `"$(Escape-TomlString $codexRole.sandbox_mode)`"",
         '',
         'developer_instructions = """',
@@ -505,8 +503,6 @@ foreach ($capability in $codexRoles) {
     $claudeAgent.Add('---')
     $claudeAgent.Add("name: $($claudeRole.agent_name)")
     $claudeAgent.Add("description: $($claudeRole.description)")
-    $claudeAgent.Add("model: $($claudeRole.model)")
-    $claudeAgent.Add("effort: $($claudeRole.effort)")
     $claudeAgent.Add("tools: $(@($claudeRole.tools) -join ', ')")
     $claudeAgent.Add("disallowedTools: $(@($claudeRole.disallowed_tools) -join ', ')")
     if ($claudeRole.isolation) { $claudeAgent.Add("isolation: $($claudeRole.isolation)") }

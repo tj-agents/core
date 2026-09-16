@@ -20,8 +20,8 @@ skip.
 |---|---|---|
 | Contract versions | `v2` | `v2` |
 | Role delivery | project-scoped `.codex/agents`; plugin loading unsupported, so provisioning installs them per repository | plugin-loaded `agents/`, no per-project install |
-| Semantic stage resolution | `hosts/codex.json` | `hosts/claude.json` |
-| Non-default stage launch | native `default` agent with the bounded role body and explicit model | native `general-purpose` agent with the bounded role body and explicit model |
+| Semantic stage route declaration | `hosts/codex.json` | `hosts/claude.json` |
+| Stage launch | native bounded role with an explicit routed model | native bounded role with an explicit routed model |
 | Read-only enforcement | `sandbox_mode = read-only` | tool allowlist without `Write`, `Edit`, `Bash` |
 | Parallel readers | supported | supported |
 | Serialized writers | required, one repository lease | required, one repository lease |
@@ -30,13 +30,12 @@ skip.
 An unavailable host, role, or model, an unsupported capability, an invalid result, or a cancellation are the
 six declared fallback reasons. Both manifests carry all six, so neither host can quietly drop one.
 
-Shared semantic stage policy contains no provider model name. Each host manifest resolves every stage to its
-own available model or role. A missing implementation or mechanical model returns a typed same-stage parent
-fallback. A missing strategic, review, or critical model pauses for a decision; it is never silently
-downgraded. A model that fails during launch is recorded against the exact workflow stage, and a fresh
-dispatch uses only the next declared model. Claude declares no cross-model fallback route; Codex declares only
-the Spark-to-Terra review fallback. Sol remains reserved for strategic and critical stages rather than model
-availability substitution.
+Each host manifest declares only the task parameters for a semantic stage. The caller resolves those
+parameters through the machine routing policy and passes the returned model, effort, and lane into host
+preparation. Missing routing output is a contract violation, and generated roles carry no model default that
+could conceal it. A missing implementation or mechanical model returns a typed same-stage parent fallback. A
+missing strategic, review, or critical model pauses for a decision; it is never silently downgraded or
+substituted across lanes.
 
 Codex's skills context budget is shared across every installed plugin on the machine, and selection lives
 entirely in skill descriptions, so an oversized roster shortens or drops them and degrades selection itself.

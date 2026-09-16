@@ -8,6 +8,9 @@ param(
 
     [string] $Title = 'Claude handoff',
 
+    [Parameter(Mandatory)]
+    [string] $Model,
+
     [switch] $DangerouslySkipPermissions
 )
 
@@ -48,6 +51,8 @@ $arguments = @(
 if ($DangerouslySkipPermissions) {
     $arguments += '--dangerously-skip-permissions'
 }
+
+$arguments += @('--model', $Model)
 
 $arguments += $instruction
 

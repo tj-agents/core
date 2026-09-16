@@ -400,6 +400,7 @@ class WorkflowContract:
                 raise ContractViolation(f"{deck_id} deck ownership is empty")
         role_ids = set(self.capabilities["delegable_capabilities"])
         fallback_reasons = set(self.schemas["host"]["$defs"]["fallbackReason"]["enum"])
+        declared_stage_routes = None
         for host_id, adapter in self.compatibility["host_adapters"].items():
             manifest_path = (self.contract_root / adapter["manifest"]).resolve()
             if not manifest_path.is_file():
@@ -409,9 +410,6 @@ class WorkflowContract:
                 raise ContractViolation(f"{host_id} host manifest identity mismatch")
             if manifest["status"] != adapter["status"]:
                 raise ContractViolation(f"{host_id} host status differs from compatibility.json")
-            override_agent_name = manifest.get("model_override_agent_name")
-            if not isinstance(override_agent_name, str) or not override_agent_name:
-                raise ContractViolation(f"{host_id} model override agent is required")
             if set(manifest["semantic_stages"]) != stages:
                 raise ContractViolation(f"{host_id} semantic stages differ from capabilities.json")
             if set(manifest["roles"]) != role_ids:
@@ -424,20 +422,33 @@ class WorkflowContract:
                 "nested_dispatch": False,
             }:
                 raise ContractViolation(f"{host_id} concurrency policy is incompatible")
+            stage_routes = {
+                stage_id: stage.get("route")
+                for stage_id, stage in manifest["semantic_stages"].items()
+            }
+            if declared_stage_routes is None:
+                declared_stage_routes = stage_routes
+            elif stage_routes != declared_stage_routes:
+                raise ContractViolation("host semantic stages declare different routing parameters")
             for stage_id, stage in manifest["semantic_stages"].items():
-                fallbacks = stage.get("fallback_models", [])
-                if "fallback_models" in stage and not isinstance(fallbacks, list):
+                route = stage.get("route")
+                if not isinstance(route, dict):
+                    raise ContractViolation(f"{host_id} {stage_id} route must be an object")
+                unknown = set(route) - {
+                    "reversibility",
+                    "blast",
+                    "ambiguity",
+                    "verifiability",
+                    "authorization",
+                    "tags",
+                }
+                if unknown:
                     raise ContractViolation(
-                        f"{host_id} {stage_id} fallback models must be a list"
+                        f"{host_id} {stage_id} route has unknown parameters {sorted(unknown)!r}"
                     )
-                if any(not isinstance(model, str) or not model for model in fallbacks):
-                    raise ContractViolation(
-                        f"{host_id} {stage_id} fallback models must be nonempty strings"
-                    )
-                if stage["model"] in fallbacks or len(fallbacks) != len(set(fallbacks)):
-                    raise ContractViolation(
-                        f"{host_id} {stage_id} fallback model route is invalid"
-                    )
+                values = [item for value in route.values() for item in (value if isinstance(value, list) else [value])]
+                if any(not isinstance(value, str) or not value for value in values):
+                    raise ContractViolation(f"{host_id} {stage_id} route has invalid values")
             for capability_id, role in manifest["roles"].items():
                 default_stage = role.get("default_stage")
                 allowed_stages = set(role.get("allowed_stages", []))
@@ -450,15 +461,8 @@ class WorkflowContract:
                     raise ContractViolation(f"{host_id} role has an invalid default stage")
                 if not allowed_stages.issubset(stages):
                     raise ContractViolation(f"{host_id} role allows an unknown semantic stage")
-                stage = manifest["semantic_stages"][default_stage]
-                if role["model"] != stage["model"]:
-                    raise ContractViolation(f"{host_id} role model differs from its default stage")
-                expected_effort = stage.get("reasoning_effort", stage.get("effort"))
-                actual_effort = role.get("reasoning_effort", role.get("effort"))
-                if actual_effort != expected_effort:
-                    raise ContractViolation(
-                        f"{host_id} role effort differs from its default stage"
-                    )
+                if set(role) & {"model", "effort", "reasoning_effort"}:
+                    raise ContractViolation(f"{host_id} role contains a model routing default")
                 body = (manifest_path.parent / role["body"]).resolve()
                 if not body.is_file():
                     raise ContractViolation(f"missing {host_id} role body {role['body']}")
