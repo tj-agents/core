@@ -58,6 +58,10 @@ shippable and each end green**. A phase states what it changes, why, its verific
 ships a capability something else consumes — its **consumption contract**. Phases sequence so that every
 intermediate state builds and passes.
 
+**Mechanism clauses carry code.** When a clause selects wiring, a type to add, rename, or delete, or a
+call-site shape, include concrete before/after code if prose admits another implementation. Outcome and
+constraint clauses need no snippet. The planning decision must not become implementer invention.
+
 **The consumption contract is a required part of any phase that ships a consumable capability, on the same
 footing as the verification gate** — not an aside to fill in later. It pins who calls the capability and the
 exact shape it hands back: payload, sync vs async, inline vs file/download. Design it from what the *consumer*

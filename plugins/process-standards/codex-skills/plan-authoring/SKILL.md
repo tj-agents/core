@@ -27,7 +27,8 @@ For a request to choose the next roadmap item, let the
    objective completion conditions. A bounded read-only `evidence-explorer` or `test-impact-analyst` may
    gather independent evidence; the parent owns design and scope.
 2. Design independently shippable phases that each end green. Name the exact consumption contract and
-   verification gate for every phase that exposes a capability.
+   verification gate for every phase that exposes a capability. Apply the `plans` skill's rule that
+   mechanism clauses carry code.
 3. Write one plan and compact ledger in the repository's current format. The ledger records its roadmap path
    and stable item key; the plan does not cite the roadmap.
 4. Resolve the Workflow v2 repository provider once. Validate the plan, ledger, worktree, branch, and next
