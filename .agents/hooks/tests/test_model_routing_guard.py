@@ -98,6 +98,19 @@ class ModelRoutingGuardTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("MODEL ROUTING GUARD", result.stderr)
 
+    def test_partial_skill_edit_does_not_require_front_matter_in_the_fragment(self):
+        result = self.run_hook(
+            self.payload(
+                "Edit",
+                {
+                    "file_path": ".agents/skills/example/SKILL.md",
+                    "old_string": "Dispatch one lens.",
+                    "new_string": "Dispatch two independent lenses.",
+                },
+            )
+        )
+        self.assertEqual(0, result.returncode)
+
     def test_unrelated_write_is_ignored(self):
         result = self.run_hook(
             self.payload("Write", {"file_path": "src/example.py", "content": "run -Model fixed"})
