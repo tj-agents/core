@@ -825,8 +825,9 @@ class HostAdapterTests(unittest.TestCase):
 
         self.assertEqual("review", invocation["semantic_stage"])
         self.assertEqual("L1", invocation["routing_lane"])
+        self.assertEqual("gpt-5.6-sol", invocation["primary_model"])
         self.assertEqual("gpt-5.6-sol", invocation["model"])
-        self.assertEqual("routed", invocation["model_selection"])
+        self.assertEqual("primary", invocation["model_selection"])
         self.assertEqual("workflow_review_lens", invocation["agent_name"])
         self.assertEqual("workflow_review_lens", invocation["role_agent_name"])
         self.assertEqual("../roles/review-lens.md", invocation["role_body"])
@@ -870,7 +871,7 @@ class HostAdapterTests(unittest.TestCase):
         )
 
         self.assertEqual("opus", invocation["model"])
-        self.assertEqual("routed", invocation["model_selection"])
+        self.assertEqual("primary", invocation["model_selection"])
         self.assertEqual("L1", invocation["routing_lane"])
         self.assertEqual("workflow-evidence-explorer", invocation["agent_name"])
         self.assertEqual("workflow-evidence-explorer", invocation["role_agent_name"])
