@@ -9,8 +9,9 @@
   "role_agent_name": "workflow_evidence_explorer",
   "role_body": "../roles/evidence-explorer.md",
   "routing_lane": "L1",
+  "primary_model": "gpt-5.6-sol",
   "model": "gpt-5.6-sol",
-  "model_selection": "routed",
+  "model_selection": "primary",
   "reasoning_effort": "high",
   "mode": "read",
   "writer_lease_id": null
