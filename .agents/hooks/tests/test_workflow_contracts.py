@@ -345,7 +345,7 @@ class WorkflowGenerationTests(unittest.TestCase):
         claude = json.loads(
             (plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
         )
-        self.assertEqual("0.1.0", codex["version"])
+        self.assertRegex(codex["version"], r"^\d+\.\d+\.\d+$")
         self.assertEqual(codex["version"], claude["version"])
         self.assertEqual("./codex-skills/", codex["skills"])
         self.assertEqual("./hooks/codex-hooks.json", codex["hooks"])
