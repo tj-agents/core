@@ -40,8 +40,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/session_floor.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/session_floor.py\"",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/always_on_instructions.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/always_on_instructions.py\"",
             "timeout": 15
           }
         ]

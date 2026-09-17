@@ -36,8 +36,8 @@ never inside a `SKILL.md` body — so a router would only add a guaranteed Read 
 skill will never not need. A self-contained skill declares `domain: process` in front matter, since it
 names no doc path for the generator to derive a domain from.
 
-One doc stays routed: `standards/process/FLOOR.md`. It is injected at `SessionStart` by
-`session_floor.py` rather than invoked, so something other than a skill needs it at a stable path.
+One doc stays routed: `standards/process/ALWAYS_ON_INSTRUCTIONS.md`. It is injected at `SessionStart` by
+`always_on_instructions.py` rather than invoked, so something other than a skill needs it at a stable path.
 
 ```
 .agents/skills/<name>/SKILL.md     The standards themselves. Source of truth — edit here.
@@ -46,7 +46,7 @@ One doc stays routed: `standards/process/FLOOR.md`. It is injected at `SessionSt
                                    verbatim into every generated copy, since a plugin cannot reach outside
                                    its own root.
 
-standards/process/FLOOR.md         The one routed doc: injected at SessionStart, not invoked.
+standards/process/ALWAYS_ON_INSTRUCTIONS.md         The one routed doc: injected at SessionStart, not invoked.
 .agents/hooks/*.py                 The enforcement mechanisms, shared verbatim by both harnesses,
                                    with their tests beside them.
 .claude/hooks/, .codex/hooks/      Each harness's own wiring. Neither duplicates a mechanism; each
@@ -80,7 +80,7 @@ but unreadable — failing open on a malformed table is enforcement that is iner
 |---|---|---|---|---|
 | `skill_router.py` | write | both | `.agents/skill-routes.json`, else a shipped registry | the standard owning a path is loaded before it is written |
 | `model_routing_guard.py` | write and shell launch | both | — | skills, scripts, workflows, and launch commands pass resolver values instead of literal model selections |
-| `session_floor.py` | session start | both | — | `FLOOR.md` is in context from the first turn |
+| `always_on_instructions.py` | session start | both | — | `ALWAYS_ON_INSTRUCTIONS.md` is in context from the first turn |
 | `merge_review_gate.py` | `gh pr merge` | Claude | `.agents/merge-gate.json` | no merge without a current, clean code-review |
 | `plan_handoff_stop_launcher.py` | turn end | Claude | a `_PROGRESS.md` ledger | a selected plan context transfer ends with its continuation pointer |
 | `marketplace_refresh.py` | session start | Codex | — | the installed catalogue is current; Claude does this natively from `autoUpdate` |

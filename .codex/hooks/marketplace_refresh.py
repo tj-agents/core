@@ -9,7 +9,7 @@ Rate-limited via a local marker file rather than Codex's own config.toml, so thi
 Codex's config schema changes. A failed or skipped attempt still marks the marker, so a machine with no
 network does not retry-and-stall every session - it just waits for the next window.
 
-Scope: gated the same way session_floor is, by ``.agents/skill-routes.json`` - a repo that never opted
+Scope: gated the same way always_on_instructions is, by ``.agents/skill-routes.json`` - a repo that never opted
 into these standards should not pay for a marketplace refresh on every Codex session.
 """
 

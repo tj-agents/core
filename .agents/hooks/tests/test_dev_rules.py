@@ -13,10 +13,10 @@ sys.path.insert(0, str(HOOKS_DIR))
 
 from dev_rules import find_profile, matches, resolve_rules  # noqa: E402
 
-HOOK_SRC = HOOKS_DIR / "session_floor.py"
+HOOK_SRC = HOOKS_DIR / "always_on_instructions.py"
 RUNTIME_SRC = HOOKS_DIR / "hook_runtime.py"
 RULES_SRC = HOOKS_DIR / "dev_rules.py"
-FLOOR_TEXT = "# The behavioral floor\n\nTake the scalable approach.\n"
+INSTRUCTIONS_TEXT = "# Always-on instructions\n\nTake the scalable approach.\n"
 RULE_TEXT = "# Nothing is live\n\nDelete the old shape.\n"
 
 
@@ -117,9 +117,9 @@ class InjectionTests(unittest.TestCase):
         (self.plugin / "hooks").mkdir(parents=True)
         for src in (HOOK_SRC, RUNTIME_SRC, RULES_SRC):
             shutil.copy(src, self.plugin / "hooks" / src.name)
-        floor = self.plugin / "standards" / "process" / "FLOOR.md"
-        floor.parent.mkdir(parents=True)
-        floor.write_text(FLOOR_TEXT, encoding="utf-8")
+        instructions = self.plugin / "standards" / "process" / "ALWAYS_ON_INSTRUCTIONS.md"
+        instructions.parent.mkdir(parents=True)
+        instructions.write_text(INSTRUCTIONS_TEXT, encoding="utf-8")
         rule = self.plugin / "standards" / "rules" / "pre-launch.md"
         rule.parent.mkdir(parents=True)
         rule.write_text(RULE_TEXT, encoding="utf-8")
@@ -129,7 +129,7 @@ class InjectionTests(unittest.TestCase):
                 "doc": "standards/rules/pre-launch.md",
                 "applies_when": {"lifecycle": "pre-launch"}}]}),
             encoding="utf-8")
-        self.hook = self.plugin / "hooks" / "session_floor.py"
+        self.hook = self.plugin / "hooks" / "always_on_instructions.py"
         self.repo = base / "repo"
         (self.repo / ".agents").mkdir(parents=True)
 
@@ -151,14 +151,14 @@ class InjectionTests(unittest.TestCase):
             json.dumps({"lifecycle": "pre-launch"}), encoding="utf-8")
         result = self.run_hook(self.repo)
         self.assertEqual(result.returncode, 0)
-        self.assertIn("The behavioral floor", result.stdout)
+        self.assertIn("Always-on instructions", result.stdout)
         self.assertIn("Delete the old shape", result.stdout)
 
-    def test_launched_profile_gets_floor_without_the_rule(self):
+    def test_launched_profile_gets_instructions_without_the_rule(self):
         (self.repo / ".agents" / "profile.json").write_text(
             json.dumps({"lifecycle": "launched"}), encoding="utf-8")
         result = self.run_hook(self.repo)
-        self.assertIn("The behavioral floor", result.stdout)
+        self.assertIn("Always-on instructions", result.stdout)
         self.assertNotIn("Delete the old shape", result.stdout)
 
     def test_unmanaged_repo_stays_silent(self):

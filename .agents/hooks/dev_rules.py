@@ -1,7 +1,7 @@
 r"""Resolve the conditional rules a repository has declared it is subject to.
 
-The behavioral floor is unconditional and identical everywhere. A *rule* is conditional: true of a class
-of projects rather than of every project, so it cannot be hardcoded into the floor and must not be copied
+Always-on instructions is unconditional and identical everywhere. A *rule* is conditional: true of a class
+of projects rather than of every project, so it cannot be hardcoded into the instructions and must not be copied
 into each repository that happens to be in that class. The rule text is authored once under
 ``standards/rules/`` and carries an ``applies_when`` predicate in ``catalogue.json``; each repository
 declares its own ``.agents/profile.json``, and this module intersects the two.

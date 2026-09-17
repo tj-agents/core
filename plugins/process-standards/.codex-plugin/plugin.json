@@ -1,6 +1,6 @@
 {
   "name": "process-standards",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Generic engineering process standards for delivery, plans, reviews, validation, and repository hooks.",
   "author": {
     "name": "Tommy Seery"

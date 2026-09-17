@@ -10,13 +10,13 @@ from pathlib import Path
 
 
 HOOKS_DIR = Path(__file__).resolve().parents[1]
-HOOK_SRC = HOOKS_DIR / "session_floor.py"
+HOOK_SRC = HOOKS_DIR / "always_on_instructions.py"
 RUNTIME_SRC = HOOKS_DIR / "hook_runtime.py"
 RULES_SRC = HOOKS_DIR / "dev_rules.py"
-FLOOR_TEXT = "# The behavioral floor\n\nTake the scalable approach. Questions before actions.\n"
+INSTRUCTIONS_TEXT = "# Always-on instructions\n\nTake the scalable approach. Questions before actions.\n"
 
 
-class SessionFloorTests(unittest.TestCase):
+class AlwaysOnInstructionsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         base = Path(self.temp.name).resolve()
@@ -24,26 +24,26 @@ class SessionFloorTests(unittest.TestCase):
         # A plugin layout: hooks/ beside standards/, so own_payload_root resolves the doc.
         self.plugin = base / "plugin"
         (self.plugin / "hooks").mkdir(parents=True)
-        shutil.copy(HOOK_SRC, self.plugin / "hooks" / "session_floor.py")
+        shutil.copy(HOOK_SRC, self.plugin / "hooks" / "always_on_instructions.py")
         shutil.copy(RUNTIME_SRC, self.plugin / "hooks" / "hook_runtime.py")
         shutil.copy(RULES_SRC, self.plugin / "hooks" / "dev_rules.py")
-        self.floor_doc = self.plugin / "standards" / "process" / "FLOOR.md"
-        self.floor_doc.parent.mkdir(parents=True)
-        self.floor_doc.write_text(FLOOR_TEXT, encoding="utf-8")
-        self.hook = self.plugin / "hooks" / "session_floor.py"
+        self.instructions_doc = self.plugin / "standards" / "process" / "ALWAYS_ON_INSTRUCTIONS.md"
+        self.instructions_doc.parent.mkdir(parents=True)
+        self.instructions_doc.write_text(INSTRUCTIONS_TEXT, encoding="utf-8")
+        self.hook = self.plugin / "hooks" / "always_on_instructions.py"
 
         # A standards-managed repo: opts in by carrying the route table.
         self.repo = base / "repo"
         (self.repo / ".agents").mkdir(parents=True)
         (self.repo / ".agents" / "skill-routes.json").write_text('{"routes": []}', encoding="utf-8")
 
-        # A consuming repo vendors the executable hook but deliberately not the plugin's floor payload.
+        # A consuming repo vendors the executable hook but deliberately not the plugin's instructions payload.
         vendored_hooks = self.repo / ".agents" / "hooks"
         vendored_hooks.mkdir()
-        shutil.copy(HOOK_SRC, vendored_hooks / "session_floor.py")
+        shutil.copy(HOOK_SRC, vendored_hooks / "always_on_instructions.py")
         shutil.copy(RUNTIME_SRC, vendored_hooks / "hook_runtime.py")
         shutil.copy(RULES_SRC, vendored_hooks / "dev_rules.py")
-        self.vendored_hook = vendored_hooks / "session_floor.py"
+        self.vendored_hook = vendored_hooks / "always_on_instructions.py"
 
     def tearDown(self):
         self.temp.cleanup()
@@ -68,17 +68,17 @@ class SessionFloorTests(unittest.TestCase):
             env=env,
         )
 
-    def test_injects_floor_in_standards_repo(self):
+    def test_injects_instructions_in_standards_repo(self):
         result = self.run_hook(cwd=self.repo)
         self.assertEqual(result.returncode, 0)
-        self.assertIn("The behavioral floor", result.stdout)
+        self.assertIn("Always-on instructions", result.stdout)
 
     def test_injects_from_subdirectory(self):
         sub = self.repo / "api" / "Service"
         sub.mkdir(parents=True)
         result = self.run_hook(cwd=sub)
         self.assertEqual(result.returncode, 0)
-        self.assertIn("The behavioral floor", result.stdout)
+        self.assertIn("Always-on instructions", result.stdout)
 
     def test_silent_outside_standards_repo(self):
         plain = Path(self.temp.name) / "plain"
@@ -87,8 +87,8 @@ class SessionFloorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
 
-    def test_silent_when_floor_doc_missing(self):
-        self.floor_doc.unlink()
+    def test_silent_when_instructions_doc_missing(self):
+        self.instructions_doc.unlink()
         result = self.run_hook(cwd=self.repo)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "")
@@ -107,7 +107,7 @@ class SessionFloorTests(unittest.TestCase):
         self.assertEqual(vendored.returncode, 0)
         self.assertEqual(vendored.stdout.strip(), "")
         self.assertEqual(plugin.returncode, 0)
-        self.assertIn("The behavioral floor", plugin.stdout)
+        self.assertIn("Always-on instructions", plugin.stdout)
 
     def test_survives_empty_stdin(self):
         result = subprocess.run(
