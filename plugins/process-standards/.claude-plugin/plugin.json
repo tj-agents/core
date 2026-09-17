@@ -1,6 +1,6 @@
 {
   "name": "process-standards",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Generic engineering process standards for delivery, plans, reviews, validation, and repository hooks. Each skill loads only when the task reaches that stage. Names no product and no stack.",
   "author": {
     "name": "Tommy Seery"
