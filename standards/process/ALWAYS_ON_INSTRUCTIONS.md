@@ -1,9 +1,4 @@
----
-name: floor
-description: The always-loaded behavioral floor — take the scalable long-term approach over the quick hack; answer a question before acting on it; load a linked skill only when its stage is entered; act on reversible work without asking, and treat a terminal delivery instruction as authorizing its whole chain. These conventions bind every task and no file path, so the `process-standards` plugin injects this document at SessionStart rather than routing it. Use when you need to re-read the floor, when deciding whether an action is reversible enough to take unasked, or when weighing a quick fix against the durable one.
----
-
-# The behavioral floor
+# Always-on instructions
 
 The always-loaded conventions for *how* an agent works — bound to no file path and to no task type, so
 the write-time route table cannot fire them and no skill summons them. The `process-standards` plugin injects

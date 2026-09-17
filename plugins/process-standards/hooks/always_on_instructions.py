@@ -1,24 +1,24 @@
-r"""SessionStart hook: inject the always-loaded behavioral floor.
+r"""SessionStart hook: inject the always-loaded always-on instructions.
 
-The floor — take the scalable approach, questions before actions, act on reversible work — applies to
+The instructions — take the scalable approach, questions before actions, act on reversible work — applies to
 every task and is bound to no file path, so the write-time route table cannot deliver it and no skill
-summons it. This hook reads ``standards/process/FLOOR.md`` from the installed plugin and prints it as
-SessionStart context, so the floor is present from the first turn and, with the plugin's compact/resume
+summons it. This hook reads ``standards/process/ALWAYS_ON_INSTRUCTIONS.md`` from the installed plugin and prints it as
+SessionStart context, so the instructions are present from the first turn and, with the plugin's compact/resume
 matchers, again after every compaction — without copying the rules into any repo's own AGENTS.md.
 
-Beside the floor it injects the conditional rules the repository has declared itself subject to, resolved
-by ``dev_rules`` from its ``.agents/profile.json``. The floor is identical everywhere; a rule arrives only
+Beside the instructions it injects the conditional rules the repository has declared itself subject to, resolved
+by ``dev_rules`` from its ``.agents/profile.json``. The instructions are identical everywhere; a rule arrives only
 where its ``applies_when`` matches the declared profile.
 
 Scope: a repo opts in as the skill router does, by carrying ``.agents/skill-routes.json``, or by
 declaring a profile.
 Outside a standards-managed repo the hook prints nothing, so it stays silent in unrelated projects on the
-same machine. Anything unexpected exits 0 printing nothing: a broken floor hook must never wedge a
+same machine. Anything unexpected exits 0 printing nothing: a broken instructions hook must never wedge a
 session.
 
 Both harnesses run this one file from the plugin's ``hooks/`` directory and both add a SessionStart
 hook's stdout to the session context, so plain stdout is the portable injection form; a Claude-only JSON
-envelope is deliberately avoided so Codex receives the same floor.
+envelope is deliberately avoided so Codex receives the same instructions.
 """
 
 import json
@@ -28,15 +28,15 @@ from pathlib import Path
 from dev_rules import PROFILE_FILE, resolve_rules
 from hook_runtime import claim_invocation, own_payload_root
 
-# The floor carries non-ASCII punctuation, and this text is what the agent reads. Windows defaults these
+# The instructions carry non-ASCII punctuation, and this text is what the agent reads. Windows defaults these
 # streams to cp1252, which renders it as mojibake.
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
 ROUTES_FILE = ".agents/skill-routes.json"
-FLOOR_DOC = ("standards", "process", "FLOOR.md")
-HOOK_NAME = "session_floor"
+INSTRUCTIONS_DOC = ("standards", "process", "ALWAYS_ON_INSTRUCTIONS.md")
+HOOK_NAME = "always_on_instructions"
 
 
 def _read_payload():
@@ -83,16 +83,16 @@ def main():
     payload_root = own_payload_root(__file__)
     sections = []
     try:
-        floor = payload_root.joinpath(*FLOOR_DOC).read_text(encoding="utf-8").strip()
+        instructions = payload_root.joinpath(*INSTRUCTIONS_DOC).read_text(encoding="utf-8").strip()
     except OSError:
-        floor = ""
-    if floor:
-        sections.append(floor)
+        instructions = ""
+    if instructions:
+        sections.append(instructions)
     sections.extend(text for _, text in resolve_rules(project_dir, payload_root))
     if not sections:
         return 0
     # A payload-less vendored copy must not suppress the installed plugin copy that can inject the
-    # floor. Claim only after this copy has proved it has non-empty context to emit.
+    # instructions. Claim only after this copy has proved it has non-empty context to emit.
     if not claim_invocation(data, HOOK_NAME):
         return 0
     sys.stdout.write("\n\n".join(sections) + "\n")

@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "plugin_root=\"$CLAUDE_PLUGIN_ROOT\"; if command -v cygpath >/dev/null 2>&1; then plugin_root=\"$(cygpath -u \"$plugin_root\")\"; fi; exec bash \"$plugin_root/hooks/run-claude-hook.sh\" \"$plugin_root/hooks/session_floor.py\"",
+            "command": "plugin_root=\"$CLAUDE_PLUGIN_ROOT\"; if command -v cygpath >/dev/null 2>&1; then plugin_root=\"$(cygpath -u \"$plugin_root\")\"; fi; exec bash \"$plugin_root/hooks/run-claude-hook.sh\" \"$plugin_root/hooks/always_on_instructions.py\"",
             "shell": "bash",
             "timeout": 15
           }

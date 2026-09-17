@@ -19,7 +19,7 @@ SCRIPTS = (
     "merge_review_gate.py",
     "model_routing_guard.py",
     "plan_handoff_stop_launcher.py",
-    "session_floor.py",
+    "always_on_instructions.py",
 )
 # Codex's roster is NOT Claude's minus nothing: the router is registered for both harnesses, but
 # merge_review_gate.py is Claude-only until Codex's shell tool name is observed in a real payload -
@@ -28,7 +28,7 @@ CODEX_SCRIPTS = (
     "skill_router.py",
     "model_routing_guard.py",
     "marketplace_refresh.py",
-    "session_floor.py",
+    "always_on_instructions.py",
 )
 # A shipped .py that is deliberately not a harness hook, and why. Anything not here and not in a
 # manifest is a hook nobody registered - which is how marketplace_refresh.py shipped dead.
@@ -244,7 +244,7 @@ class HookManifestContractTests(unittest.TestCase):
                     "tool_input": {"command": "launch.ps1 -Model fixed"},
                 }
             )
-        elif script in ("marketplace_refresh.py", "session_floor.py"):
+        elif script in ("marketplace_refresh.py", "always_on_instructions.py"):
             payload.update({"hook_event_name": "SessionStart"})
             if script == "marketplace_refresh.py":
                 payload["cwd"] = str(Path(self.temp.name))
@@ -270,9 +270,9 @@ class HookManifestContractTests(unittest.TestCase):
         elif script == "model_routing_guard.py":
             self.assertEqual(2, result.returncode, result.stderr)
             self.assertIn("MODEL ROUTING GUARD", result.stderr)
-        elif script == "session_floor.py":
+        elif script == "always_on_instructions.py":
             self.assertEqual(0, result.returncode, result.stderr)
-            self.assertIn("behavioral floor", result.stdout)
+            self.assertIn("Always-on instructions", result.stdout)
         elif script == "marketplace_refresh.py":
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertEqual("", result.stdout)

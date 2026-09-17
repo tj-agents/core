@@ -77,15 +77,15 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertNotIn("Serial by default", address)
         self.assertNotIn("concurrent fixes", address)
 
-    def test_floor_owns_the_stage_pointer_rule_and_no_skill_restates_it(self):
-        floor = (self.root / "standards" / "process" / "FLOOR.md").read_text(
+    def test_instructions_own_the_stage_pointer_rule_and_no_skill_restates_it(self):
+        instructions = (self.root / "standards" / "process" / "ALWAYS_ON_INSTRUCTIONS.md").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("## A link to another skill is a stage pointer, not a read", floor)
+        self.assertIn("## A link to another skill is a stage pointer, not a read", instructions)
         self.assertIn(
             "Load a referenced skill when its stage is actually entered, never because a document",
-            floor,
+            instructions,
         )
         self.assertEqual(1, self.corpus().count("stage is actually entered"))
 
