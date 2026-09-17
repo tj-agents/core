@@ -83,12 +83,16 @@ but unreadable — failing open on a malformed table is enforcement that is iner
 | `always_on_instructions.py` | session start | both | — | `ALWAYS_ON_INSTRUCTIONS.md` is in context from the first turn |
 | `merge_review_gate.py` | `gh pr merge` | Claude | `.agents/merge-gate.json` | no merge without a current, clean code-review |
 | `plan_handoff_stop_launcher.py` | turn end | Claude | a `_PROGRESS.md` ledger | a selected plan context transfer ends with its continuation pointer |
-| `marketplace_refresh.py` | session start | Codex | — | the installed catalogue is current; Claude does this natively from `autoUpdate` |
+| `marketplace_refresh.py` | session start | Codex | `.agents/skill-routes.json` or `.agents/profile.json` | refreshes enabled default plugins from Git marketplaces; Claude does this natively from `autoUpdate` |
 
 Claude's wiring is `.claude/hooks/hooks.json`, Codex's is `.codex/hooks/codex-hooks.json`, and neither
 duplicates a mechanism — each names the shared `.py` under `.agents/hooks/` to run. A hook that only one
 harness runs is authored in that harness's folder, which is why `marketplace_refresh.py` lives under
 `.codex/` rather than beside the shared mechanisms.
+
+The Codex refresh launches a detached worker, finds the bundled native CLI when `codex` is absent from
+`PATH`, and supplies `CODEX_HOME` explicitly. A successful refresh gets the full one-hour throttle; a
+failure is recorded separately and retried after five minutes.
 
 **Two hooks are Claude-only, and the reason is the hook, not the harness.** `merge_review_gate.py`'s whole
 vocabulary is `SHELL_TOOLS = {"bash", "powershell"}`; Codex's shell tool name has not been observed in a
