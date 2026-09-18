@@ -333,14 +333,14 @@ class HookManifestContractTests(unittest.TestCase):
             )
             self.assert_hook_behavior(script, result, "claude")
 
-    def test_claude_launcher_selects_python_for_windows_and_python3_for_posix(self):
+    def test_claude_launcher_selects_python_by_platform_and_enforces_timeout(self):
         launcher = (PLUGIN / "hooks" / "run-claude-hook.sh").read_text(encoding="utf-8")
 
         self.assertIn("CYGWIN*|MINGW*|MSYS*)", launcher)
         self.assertIn("python_command=python", launcher)
         self.assertIn('script="$(cygpath -w "$script")"', launcher)
         self.assertIn("*) python_command=python3 ;;", launcher)
-        self.assertIn('exec "$python_command" -B "$script"', launcher)
+        self.assertIn('exec timeout -k 1s 13s "$python_command" -B "$script"', launcher)
 
     def test_codex_posix_commands_cover_every_hook(self):
         manifest = self.read(PLUGIN / "hooks" / "codex-hooks.json")
