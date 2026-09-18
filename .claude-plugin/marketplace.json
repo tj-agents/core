@@ -6,8 +6,8 @@
   },
   "plugins": [
     {
-      "name": "base",
-      "source": "./plugins/base",
+      "name": "utilities",
+      "source": "./plugins/utilities",
       "description": "Machine utility skills for repository sync, worktrees, transcript recovery, and cross-harness handoffs.",
       "category": "productivity",
       "keywords": [
