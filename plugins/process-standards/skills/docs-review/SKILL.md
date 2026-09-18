@@ -40,10 +40,11 @@ using the bounded `review-lens` fallback when the host has no callable native re
 
 ## Rules
 
-Load the root and changed-path `AGENTS.md` files, the plan floor and `plans` for plan artifacts,
-`review-lifecycle` for work-order changes, `handoff` for transfer instructions, and sibling skills a
-changed skill names. Use the route table when it covers the paths. Convention findings require an owning
-rule; accuracy and contradiction findings stand on repository evidence.
+Load the root and changed-path `AGENTS.md` files, the plan floor and `plans` for plan artifacts and
+implementation-ready design references, `review-lifecycle` for work-order changes, `handoff` for transfer
+instructions, and sibling skills a changed skill names. Apply the `plans` implementation-design review gate,
+including its implementation-path standards resolution. Use the route table when it covers the paths.
+Convention findings require an owning rule; accuracy and contradiction findings stand on repository evidence.
 
 ## Documentation lenses
 
