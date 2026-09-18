@@ -7,6 +7,12 @@
   },
   "repository": "https://github.com/tomjseery/base-agents",
   "skills": "./skills/",
+  "keywords": [
+    "utilities",
+    "powershell",
+    "sessions",
+    "handoff"
+  ],
   "interface": {
     "displayName": "Base Agent Utilities",
     "shortDescription": "Machine utilities and handoff launchers.",
