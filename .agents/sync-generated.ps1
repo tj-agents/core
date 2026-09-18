@@ -156,6 +156,23 @@ function Get-OptionalFrontMatterField([string]$text, [string]$field) {
     return $match.Groups[1].Value.Trim()
 }
 
+function Assert-SkillKind([string]$kind, [string]$name) {
+    if (-not $kind) {
+        throw "$name/SKILL.md has no kind in its front matter."
+    }
+    if ($kind -cnotmatch '^[a-z]+$') {
+        throw "$name/SKILL.md has kind '$kind'; kind must be one lowercase ASCII word."
+    }
+}
+
+function Assert-SameJsonField($claudeValue, $codexValue, [string]$field, [string]$pluginName) {
+    $claudeJson = ConvertTo-Json -InputObject $claudeValue -Compress -Depth 20
+    $codexJson = ConvertTo-Json -InputObject $codexValue -Compress -Depth 20
+    if ($claudeJson -cne $codexJson) {
+        throw "Plugin '$pluginName' has different '$field' metadata in its Claude and Codex manifests."
+    }
+}
+
 function Expand-RoutedSkill(
     [string]$body,
     [string]$docBody,
@@ -199,9 +216,7 @@ $routers = [ordered]@{}
 foreach ($dir in $skillDirs) {
     $text = Read-Lf (Join-Path $dir.FullName 'SKILL.md')
     $kind = Get-OptionalFrontMatterField $text 'kind'
-    if ($kind -ne 'utility') {
-        throw "$($dir.Name)/SKILL.md must declare ``kind: utility``; found '$kind'."
-    }
+    Assert-SkillKind $kind $dir.Name
     $doc = Get-RoutedDoc $text $dir.Name
     if ($doc) {
         $domain = ($doc -split '/')[1]
@@ -332,6 +347,34 @@ $claudeDeclared = @((ConvertFrom-Json (Read-Lf $claudeManifest)).plugins | ForEa
 $codexDeclared = @($declared | Sort-Object)
 if (($claudeDeclared -join "`n") -ne ($codexDeclared -join "`n")) {
     throw "Claude and Codex marketplaces declare different plugins."
+}
+
+# The hosts require different marketplace source/policy shapes, and Codex requires version/interface
+# metadata while a Claude version pins its cache. Portable metadata and user-facing names must still match.
+$claudeManifestJson = ConvertFrom-Json (Read-Lf $claudeManifest)
+foreach ($entry in $manifestJson.plugins) {
+    $claudeEntry = @($claudeManifestJson.plugins | Where-Object { $_.name -eq $entry.name })[0]
+    if ($claudeEntry.category -cne $entry.category) {
+        throw "Plugin '$($entry.name)' has different category casing or values in its Claude and Codex marketplaces."
+    }
+    $source = Join-Path $repoRoot ($entry.source.path -replace '^\./', '')
+    $claudePlugin = ConvertFrom-Json (Read-Lf (Join-Path $source '.claude-plugin/plugin.json'))
+    $codexPlugin = ConvertFrom-Json (Read-Lf (Join-Path $source '.codex-plugin/plugin.json'))
+    foreach ($field in @('name', 'description', 'author', 'repository', 'keywords')) {
+        Assert-SameJsonField $claudePlugin.$field $codexPlugin.$field $field $entry.name
+    }
+    if ($claudePlugin.displayName -cne $codexPlugin.interface.displayName) {
+        throw "Plugin '$($entry.name)' has different display names in its Claude and Codex manifests."
+    }
+    if ($claudePlugin.skills -cne $codexPlugin.skills) {
+        throw "Plugin '$($entry.name)' has different skill paths in its Claude and Codex manifests."
+    }
+    if ($claudePlugin.PSObject.Properties.Name -contains 'version') {
+        throw "Plugin '$($entry.name)' declares a Claude version, which pins its cache; only Codex may declare version."
+    }
+    if (-not $codexPlugin.version) {
+        throw "Plugin '$($entry.name)' has no version in its Codex manifest."
+    }
 }
 
 # Which plugin ships which domains. A consumer installs per stack, so the split is authored rather
