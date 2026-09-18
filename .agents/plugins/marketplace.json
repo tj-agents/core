@@ -1,14 +1,14 @@
 {
   "name": "base-agents",
   "interface": {
-    "displayName": "Generic Process Standards"
+    "displayName": "Base Agent Utilities"
   },
   "plugins": [
     {
-      "name": "process-standards",
+      "name": "base",
       "source": {
         "source": "local",
-        "path": "./plugins/process-standards"
+        "path": "./plugins/base"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
