@@ -33,7 +33,8 @@ foreach ($target in $targets) {
     $hasStart = $current.Contains($startMarker)
     $hasEnd = $current.Contains($endMarker)
     if ($hasStart -xor $hasEnd) { throw "Malformed base-agents profile block: $target" }
-    $installed = $hasStart -and $hasEnd -and $current.Contains($loader)
+    $hasLegacy = [regex]::IsMatch($current, $legacyPattern)
+    $installed = $hasStart -and $hasEnd -and $current.Contains($loader) -and -not $hasLegacy
 
     if ($VerifyOnly) {
         "{0,-70} {1}" -f $target, $(if ($installed) { 'wired' } else { 'NOT wired' })
