@@ -105,6 +105,11 @@ function Get-HostWorkflowSkills([string]$source, [string]$hostName) {
         if ($declaredName -ne $dir.Name) {
             throw "$hostName workflow skill '$($dir.Name)' declares name '$declaredName'; folder and name must match."
         }
+        $kind = Get-FrontMatterField $body 'kind' "$hostName/$($dir.Name)"
+        Assert-SkillKind $kind "$hostName/$($dir.Name)"
+        if ($kind -ne 'workflow') {
+            throw "$hostName workflow skill '$($dir.Name)' declares kind '$kind'; host workflow skills require kind 'workflow'."
+        }
         $skills[$dir.Name] = $body
     }
     return $skills
@@ -123,7 +128,12 @@ function To-RepoRelative([string]$fullPath, [string]$base) {
 }
 
 function Get-FrontMatterField([string]$text, [string]$field, [string]$name) {
-    $match = [regex]::Match($text, "(?s)\A---\n.*?^${field}:[ \t]*(.+?)\n(?:[a-zA-Z-]+:|---)", 'Multiline')
+    $frontMatter = [regex]::Match($text, '(?s)\A---\n(?<body>.*?)^---(?:\n|\z)', 'Multiline')
+    if (-not $frontMatter.Success) {
+        throw "$name/SKILL.md has no complete front matter."
+    }
+    $escapedField = [regex]::Escape($field)
+    $match = [regex]::Match($frontMatter.Groups['body'].Value, "(?s)(?:\A|\n)${escapedField}:[ \t]*(.+?)(?=\n[a-zA-Z][a-zA-Z0-9_-]*:|\z)")
     if (-not $match.Success) {
         throw "$name/SKILL.md has no parsable ``${field}:`` in its front matter."
     }
@@ -151,7 +161,10 @@ function Get-RoutedDoc([string]$text, [string]$name) {
 # domain directly in front matter. A routed skill's domain is derived from its doc's path instead -
 # a second authored fact would just be a second thing to drift from the first.
 function Get-OptionalFrontMatterField([string]$text, [string]$field) {
-    $match = [regex]::Match($text, "(?s)\A---\n.*?^${field}:[ \t]*(.+?)\n(?:[a-zA-Z-]+:|---)", 'Multiline')
+    $frontMatter = [regex]::Match($text, '(?s)\A---\n(?<body>.*?)^---(?:\n|\z)', 'Multiline')
+    if (-not $frontMatter.Success) { return $null }
+    $escapedField = [regex]::Escape($field)
+    $match = [regex]::Match($frontMatter.Groups['body'].Value, "(?s)(?:\A|\n)${escapedField}:[ \t]*(.+?)(?=\n[a-zA-Z][a-zA-Z0-9_-]*:|\z)")
     if (-not $match.Success) { return $null }
     return $match.Groups[1].Value.Trim()
 }
@@ -362,6 +375,13 @@ foreach ($entry in $manifestJson.plugins) {
     $codexPlugin = ConvertFrom-Json (Read-Lf (Join-Path $source '.codex-plugin/plugin.json'))
     foreach ($field in @('name', 'description', 'author', 'repository', 'keywords')) {
         Assert-SameJsonField $claudePlugin.$field $codexPlugin.$field $field $entry.name
+    }
+    foreach ($field in @('description', 'keywords')) {
+        $claudeEntryJson = ConvertTo-Json -InputObject $claudeEntry.$field -Compress -Depth 20
+        $claudePluginJson = ConvertTo-Json -InputObject $claudePlugin.$field -Compress -Depth 20
+        if ($claudeEntryJson -cne $claudePluginJson) {
+            throw "Plugin '$($entry.name)' has different '$field' metadata in its Claude marketplace entry and manifest."
+        }
     }
     if ($claudePlugin.displayName -cne $codexPlugin.interface.displayName) {
         throw "Plugin '$($entry.name)' has different display names in its Claude and Codex manifests."
