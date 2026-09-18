@@ -1,6 +1,6 @@
 {
   "$comment": "The base plugin ships only the machine layer.",
   "payloads": {
-    "utilities": ["machine"]
+    "base": ["machine"]
   }
 }
