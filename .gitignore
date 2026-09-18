@@ -1,2 +1,6 @@
 __pycache__/
 .pytest_cache/
+.cli-session-vault/
+deployment-backups/
+*.jsonl
+*.tmp
