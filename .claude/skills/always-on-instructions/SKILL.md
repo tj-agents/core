@@ -38,9 +38,11 @@ explicitly requested action.
 
 ## A task has an owning lifecycle — load it before the first edit
 
-A requested behaviour change selects `feature`; a defect selects `bugfix`; a named or uniquely resolved
-active plan selects `plan-execution`. Load that skill before editing, not after. A question or a review-only
-request selects none of them.
+A requested behaviour change selects `feature`; a defect selects `bugfix`; implementing or resuming a named
+or uniquely resolved active plan selects `plan-execution`. Authoring or revising an implementation-ready
+plan or design document selects `plan-authoring`, including research decisions and RFCs with a bare
+filename. Load the owning skill before editing, not after. A question or a review-only request selects
+none of them.
 
 ## A link to another skill is a stage pointer, not a read
 

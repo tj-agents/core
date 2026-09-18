@@ -101,7 +101,9 @@ python .agents/hooks/skill_router.py --skills-for "<exact-path-1>" "<exact-path-
 Read every routed skill, the root and nearest changed-path `AGENTS.md` files, and the architecture premise
 from the exported frozen tree, never the live checkout. A `DENY PATTERN HIT` is evidence, not a hint.
 Invoke additional standards only when the diff plainly touches their domain; a missing route is a
-route-table defect rather than a list to duplicate here.
+route-table defect rather than a list to duplicate here. If the candidate contains plans or
+implementation-ready design references, load `plans` and apply its implementation-design review gate to
+those artifacts, including their implementation-path standards.
 
 **Having invoked a skill earlier in the session — including while writing the diff now under review — is not
 evidence its rules were applied.** Re-open each routed skill here and check every changed file against every

@@ -59,10 +59,6 @@ shippable and each end green**. A phase states what it changes, why, its verific
 ships a capability something else consumes — its **consumption contract**. Phases sequence so that every
 intermediate state builds and passes.
 
-**Mechanism clauses carry code.** When a clause selects wiring, a type to add, rename, or delete, or a
-call-site shape, include concrete before/after code if prose admits another implementation. Outcome and
-constraint clauses need no snippet. The planning decision must not become implementer invention.
-
 **The consumption contract is a required part of any phase that ships a consumable capability, on the same
 footing as the verification gate** — not an aside to fill in later. It pins who calls the capability and the
 exact shape it hands back: payload, sync vs async, inline vs file/download. Design it from what the *consumer*
@@ -70,6 +66,44 @@ needs, not from what is convenient to emit. You may defer the *consumer itself* 
 service — to a named later phase or plan; you may **never** defer the *output contract*. A producer with an
 undecided output is not a shippable phase: it cannot be named, typed, or tested against a consumer, and the
 gap resurfaces downstream as naming churn over a thing whose job was never fixed.
+
+## Implementation examples and their standards
+
+**Mechanism clauses carry code.** Whenever prose leaves an implementation choice open, give concrete code
+that resolves it. This applies to plans and to implementation-ready research decisions, RFCs and design
+references, regardless of filename or whether they own phases. Write for an implementing agent that lacks
+the planning context and may have less reasoning capacity: it must not rediscover the design or choose a
+different wiring, type shape, boundary or control flow. Outcome and constraint clauses need no snippet.
+
+Before writing the examples, identify their intended implementation paths, including proposed files. Resolve
+the applicable standards for **those code paths**, not just the Markdown artifact: read the target repo's
+root and relevant ancestor `AGENTS.md` files, then its routed generic, stack and organisation standards.
+Use `skill_router.py --skills-for <intended-paths>` from that target repo when its local or installed router
+is available. A missing route is not evidence that no standards apply; follow the repository's declared
+standard owners and record the gap. Never substitute familiar generic conventions for an applicable local
+rule. Record a compact mapping of implementation paths/areas to the standards actually read, using links or
+skill identities rather than copying their rules into the plan.
+
+For each ambiguous mechanism:
+
+- Name the destination file/type and show the relevant current and proposed code. Ground current code in
+  inspected source; for a new capability, say no current implementation exists and show the proposed code.
+- Show the smallest coherent example that fixes the decision. Interfaces or pseudocode alone are
+  insufficient when the ambiguity is in registration, callers, data mapping, ordering or failure handling.
+  Omit incidental boilerplate, but do not hide the deciding lines behind ellipses or unexplained helpers.
+- Apply the loaded standards to the proposed code exactly as to production code, including architecture,
+  naming, APIs, dependencies and test patterns. Label a nonconforming current excerpt as code being replaced;
+  it is not an approved example to copy. An intentional standards change needs an explicit resolved decision.
+- Validate against the actual surrounding contracts and use appropriate syntax/build checks when feasible.
+  State what was checked; parsing a snippet does not establish compilation, integration or runtime behavior.
+
+**Implementation-design review gate:** before declaring the artifact ready for execution or handing it to
+another agent, check every mechanism for unresolved choices and every proposed snippet against its mapped
+standards. Missing examples, examples that leave the deciding mechanism unspecified, and examples that
+violate the applicable standards are findings to resolve. A code-fence count is not this review. The
+`docs-review` skill owns the independent pass for a planning-only artifact; a mixed candidate's `review`
+includes the same gate. Keep genuinely unresolved design decisions explicit and do not label their dependent
+steps implementation-ready.
 
 ## What a ledger must contain
 

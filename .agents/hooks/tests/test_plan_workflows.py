@@ -76,6 +76,7 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
             {
                 "author-primary",
                 "author-paraphrase",
+                "author-design-reference",
                 "execute-primary",
                 "execute-paraphrase",
                 "roadmap-compat",
@@ -86,8 +87,11 @@ class PlanWorkflowAcceptanceTests(unittest.TestCase):
             set(cases),
         )
         self.assertEqual(
-            ["plan-authoring", "plan-authoring"],
-            [cases[name]["expected_skill"] for name in ("author-primary", "author-paraphrase")],
+            ["plan-authoring", "plan-authoring", "plan-authoring"],
+            [
+                cases[name]["expected_skill"]
+                for name in ("author-primary", "author-paraphrase", "author-design-reference")
+            ],
         )
         self.assertEqual(
             ["plan-execution", "plan-execution"],
