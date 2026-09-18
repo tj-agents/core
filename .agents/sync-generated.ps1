@@ -198,6 +198,10 @@ if (-not $skillDirs) { throw "No canonical skills found under .agents/skills." }
 $routers = [ordered]@{}
 foreach ($dir in $skillDirs) {
     $text = Read-Lf (Join-Path $dir.FullName 'SKILL.md')
+    $kind = Get-OptionalFrontMatterField $text 'kind'
+    if ($kind -ne 'operation') {
+        throw "$($dir.Name)/SKILL.md must declare ``kind: operation``; found '$kind'."
+    }
     $doc = Get-RoutedDoc $text $dir.Name
     if ($doc) {
         $domain = ($doc -split '/')[1]
@@ -222,6 +226,7 @@ foreach ($dir in $skillDirs) {
         Description = Get-FrontMatterField $text 'description' $dir.Name
         Doc         = $doc
         Domain      = $domain
+        Kind        = $kind
         Siblings    = $siblings
     }
 }

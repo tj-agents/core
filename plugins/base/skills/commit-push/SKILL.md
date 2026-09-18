@@ -1,23 +1,26 @@
 ---
 name: commit-push
-description: Commit current changes and push to the current branch in one step. Use whenever Tommy says "commit and push", "commit this", or "push this". No preamble, no analysis.
+description: Commit the intended current changes and push the verified commit to the current branch. Use when Tommy explicitly requests both operations.
 
 kind: operation
 domain: machine
 ---
 
-Run exactly ONE tool call:
+# Commit and push
 
-```powershell
-git add -A; git commit -m @'
-<message>
+Read the repository instructions first. Inspect the branch, staged state, unstaged diff, untracked files, and
+recent commit style before staging anything.
 
-Co-Authored-By: Codex <noreply@anthropic.com>
-'@; git push
-```
+Stage only the intended coherent paths. Preserve an existing curated index, exclude generated junk and
+machine-local files, and never use `git add -A` unless the user explicitly asked to commit the entire tree
+and the complete status was reviewed first.
 
-Rules:
-- Commit EVERYTHING — leave no working-tree change behind. Default to a single `git add -A` commit (stages tracked edits AND new files; node_modules/ and smoke-tests/ are gitignored, so `-A` never touches them). You MAY split into multiple logical commits if it genuinely helps — but then `git push` only ONCE, at the very end.
-- Message: `AB#<ticket> <imperative summary>` — ticket from the current branch name (`AB#xxxxx/...`), summary from what was just changed in this session. Do NOT run `git status`, `git diff`, or `git log` first.
-- On success, reply with one line: the commit hash and "pushed". Nothing else.
-- Only investigate output if the exit code is nonzero.
+Follow the repository's commit policy and message format. Use an `AB#` work-item prefix only when that
+repository's own instructions require it. Never add an AI-attribution trailer.
+
+Run the relevant targeted checkpoint before committing. Commit without bypassing hooks, push the current
+branch once, fetch it, and require the remote-tracking ref and any open PR head to equal the local commit.
+Never force-push unless the user explicitly requests it.
+
+On success, report the commit hash and that the exact head was pushed. On failure, diagnose and fix the
+actual cause; never report success from the command exit code alone.
