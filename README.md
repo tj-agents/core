@@ -3,7 +3,7 @@
 The personal machine layer for Codex and Claude. It owns utilities tied to Tommy's workstation rather than
 engineering standards a repository applies to its code.
 
-The `base@base-agents` plugin ships the ten machine utility skills and the two cross-harness handoff launchers.
+The `base@base-agents` plugin ships eleven machine utility skills and the two cross-harness handoff launchers.
 The repository also owns the PowerShell profile and CLI session-recovery installation. Published engineering
 method, hooks, routes, workflow contracts, and Concertable policy live in `concertable@agents`; generic stack
 standards live in `dotnet@dotagents` and `react@react-agents`.
