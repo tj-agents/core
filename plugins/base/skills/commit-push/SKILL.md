@@ -2,7 +2,7 @@
 name: commit-push
 description: Commit the intended current changes and push the verified commit to the current branch. Use when Tommy explicitly requests both operations.
 
-kind: operation
+kind: utility
 domain: machine
 ---
 

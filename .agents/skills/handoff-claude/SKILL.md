@@ -2,7 +2,7 @@
 name: handoff-claude
 description: Open an independent unmanaged Claude Code window in an exact repository or worktree with a prepared prompt and the full native Claude Code terminal UI. Use when asked to open Claude, open another Claude instance, hand work to a second Claude, or run something in a separate Claude window.
 
-kind: operation
+kind: utility
 domain: machine
 route: infer
 ---

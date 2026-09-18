@@ -199,8 +199,8 @@ $routers = [ordered]@{}
 foreach ($dir in $skillDirs) {
     $text = Read-Lf (Join-Path $dir.FullName 'SKILL.md')
     $kind = Get-OptionalFrontMatterField $text 'kind'
-    if ($kind -ne 'operation') {
-        throw "$($dir.Name)/SKILL.md must declare ``kind: operation``; found '$kind'."
+    if ($kind -ne 'utility') {
+        throw "$($dir.Name)/SKILL.md must declare ``kind: utility``; found '$kind'."
     }
     $doc = Get-RoutedDoc $text $dir.Name
     if ($doc) {
