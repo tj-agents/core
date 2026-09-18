@@ -1,0 +1,14 @@
+{
+  "name": "base",
+  "description": "Machine utility skills and cross-harness handoff launchers.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tomjseery/base-agents",
+  "keywords": [
+    "utilities",
+    "powershell",
+    "sessions",
+    "handoff"
+  ]
+}

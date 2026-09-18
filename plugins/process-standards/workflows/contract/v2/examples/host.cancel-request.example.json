@@ -1,6 +1,0 @@
-{
-  "contract_version": "v2",
-  "record_type": "host-cancel-request",
-  "host": "codex",
-  "dispatch_id": "dispatch-001"
-}

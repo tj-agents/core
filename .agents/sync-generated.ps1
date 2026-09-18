@@ -198,6 +198,10 @@ if (-not $skillDirs) { throw "No canonical skills found under .agents/skills." }
 $routers = [ordered]@{}
 foreach ($dir in $skillDirs) {
     $text = Read-Lf (Join-Path $dir.FullName 'SKILL.md')
+    $kind = Get-OptionalFrontMatterField $text 'kind'
+    if ($kind -ne 'operation') {
+        throw "$($dir.Name)/SKILL.md must declare ``kind: operation``; found '$kind'."
+    }
     $doc = Get-RoutedDoc $text $dir.Name
     if ($doc) {
         $domain = ($doc -split '/')[1]
@@ -222,6 +226,7 @@ foreach ($dir in $skillDirs) {
         Description = Get-FrontMatterField $text 'description' $dir.Name
         Doc         = $doc
         Domain      = $domain
+        Kind        = $kind
         Siblings    = $siblings
     }
 }
@@ -242,7 +247,6 @@ if (Test-Path $standardsDir) {
         ForEach-Object { To-RepoRelative $_.FullName $repoRoot } |
         Sort-Object)
 }
-if (-not $docs) { throw "No standards docs found under standards/." }
 
 # Conditional rules are delivered at SessionStart by the profile resolver, never by a skill: a rule must
 # not be loadable in a repository whose profile does not declare it subject to the rule. Their owner is
@@ -349,13 +353,17 @@ foreach ($name in $declared) {
         throw "marketplace.json declares plugin '$name', which payloads.json assigns no domains."
     }
 }
+$knownDomains = @(
+    @($docs | ForEach-Object { ($_ -split '/')[1] })
+    @($routers.Values | Select-Object -ExpandProperty Domain)
+) | Sort-Object -Unique
 foreach ($plugin in $plugins) {
     if (-not $pluginDomains.ContainsKey($plugin.Name)) {
         throw "plugins/$($plugin.Name) exists but is declared nowhere; add it to marketplace.json and payloads.json."
     }
     foreach ($domain in $pluginDomains[$plugin.Name]) {
-        if (-not (Test-Path (Join-Path $standardsDir $domain))) {
-            throw "plugin '$($plugin.Name)' claims domain '$domain', which is not in standards/."
+        if ($knownDomains -notcontains $domain) {
+            throw "plugin '$($plugin.Name)' claims unknown domain '$domain'."
         }
     }
 }
