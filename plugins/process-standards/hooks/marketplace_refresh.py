@@ -151,6 +151,10 @@ def _codex_environment():
 
 
 def _run(executable, arguments, capture_output=False):
+    # This worker is itself spawned with no console (see start_refresh_if_due). Without
+    # CREATE_NO_WINDOW, Windows allocates a brand-new visible console for `executable` when it
+    # is a .cmd shim - the stray window popping up on every refresh.
+    options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
     return subprocess.run(
         [executable, *arguments],
         stdin=subprocess.DEVNULL,
@@ -160,6 +164,7 @@ def _run(executable, arguments, capture_output=False):
         timeout=COMMAND_TIMEOUT_SECONDS,
         check=False,
         env=_codex_environment(),
+        **options,
     )
 
 
