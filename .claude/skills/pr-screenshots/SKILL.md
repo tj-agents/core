@@ -70,7 +70,7 @@ the image itself:
    this is hosting, not part of the change), on a stable, easily-found path (e.g. one folder per PR
    number).
 2. Reference each image by its raw-content URL at that commit in a PR comment
-   (`![caption](<raw-content-url-for-this-forge>/<branch-or-sha>/<path>.png)`) — this is what makes it
+   (`![caption](https://raw.example.invalid/branch-or-sha/path.png)`) — this is what makes it
    render inline instead of as a bare link.
 3. **This step is additive only.** Add the new image file(s) to whatever is already on that branch;
    never clear or replace what's there first. A scratch/hosting branch still lives in the shared
