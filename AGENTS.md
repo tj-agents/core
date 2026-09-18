@@ -2,7 +2,7 @@
 
 Read `README.md` before changing repository structure.
 
-`.agents/skills/` owns shared skill behaviour. `.claude/skills/` and everything under `plugins/base/` are
+`.agents/skills/` owns shared skill behaviour. `.claude/skills/` and everything under `plugins/utilities/` are
 generated; run `pwsh .agents/sync-generated.ps1` after authored changes and require
 `pwsh .agents/sync-generated.ps1 -Check` before delivery.
 
