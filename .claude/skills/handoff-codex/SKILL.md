@@ -1,7 +1,9 @@
 ---
 name: handoff-codex
 description: Open an independent unmanaged Codex tab in an exact repository or worktree with a prepared prompt, policy-routed model and effort, and the full native Codex terminal UI. Use when asked to open Codex, hand work to it, obtain a second opinion from it, or run a prompt against a specific Codex tier.
-domain: process
+
+kind: operation
+domain: machine
 route: infer
 ---
 

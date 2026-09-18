@@ -1,8 +1,6 @@
 {
-  "$comment": "Which standards domains each plugin ships, and which single plugins ship the hooks and workflow resources. Generator input only - neither harness reads this file. The generator cross-checks every owner against marketplace.json.",
-  "hooks": "process-standards",
-  "workflows": "process-standards",
+  "$comment": "The base plugin ships only the machine layer.",
   "payloads": {
-    "process-standards": ["process", "rules"]
+    "base": ["machine"]
   }
 }

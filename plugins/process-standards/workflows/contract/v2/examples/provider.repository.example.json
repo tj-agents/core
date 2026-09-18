@@ -1,9 +1,0 @@
-{
-  "contract_version": "v2",
-  "record_type": "probe",
-  "provider_id": "repository",
-  "status": "available",
-  "supported_contract_versions": ["v2"],
-  "capabilities": ["discover", "resolve-task", "read-state", "checkpoint-state", "bind-worktree"],
-  "authoritative_fields": ["portable-intent", "next-action", "review-work-order", "git-identity"]
-}
