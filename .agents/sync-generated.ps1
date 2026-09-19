@@ -3,7 +3,7 @@
 Regenerates everything derived from `.agents/`, `.claude/hooks/`, `.codex/hooks/`, and `standards/` - the
 only places anything is authored.
 
-Two skill shapes coexist, chosen per domain:
+Two skill shapes are in use, chosen per domain:
 
 - **Self-contained** (`process`): the SKILL.md body IS the standard. `@`-import does not work inside a
   SKILL.md (only CLAUDE.md/AGENTS.md expand it), and a router that only points at a separate doc costs a
@@ -75,6 +75,7 @@ $codexWorkflowSkills = Join-Path $repoRoot '.codex/workflow-skills'
 $hookSource   = Join-Path $repoRoot '.agents/hooks'
 $routeSource  = Join-Path $repoRoot '.agents/routes'
 $workflowSource = Join-Path $repoRoot '.agents/workflows'
+$laneSource   = Join-Path $repoRoot '.agents/lanes'
 $claudeHookSource = Join-Path $repoRoot '.claude/hooks'
 $codexHookSource = Join-Path $repoRoot '.codex/hooks'
 $manifest     = Join-Path $repoRoot '.agents/plugins/marketplace.json'
@@ -90,6 +91,56 @@ function Read-Lf([string]$path) {
 
 function Escape-TomlString([string]$value) {
     return $value.Replace('\', '\\').Replace('"', '\"')
+}
+
+# A lane is the only model declaration a skill, agent or stage is allowed to make; .agents/lanes/<host>.json
+# turns it into that harness's own keys. Both tables must carry the same rungs, or one declaration would
+# resolve on one harness and fail on the other - which is exactly the drift a single ladder exists to stop.
+function Get-LaneTables([string]$source) {
+    $tables = [ordered]@{}
+    # $host is a read-only automatic variable in PowerShell; a loop variable by that name fails at runtime.
+    foreach ($hostId in @('claude', 'codex')) {
+        $path = Join-Path $source "$hostId.json"
+        if (-not (Test-Path $path)) { throw "No lane table for host '$hostId' at .agents/lanes/$hostId.json." }
+        $tables[$hostId] = ConvertFrom-Json (Read-Lf $path)
+    }
+    $rungs = @($tables['claude'].lanes.PSObject.Properties.Name | Sort-Object)
+    $codexRungs = @($tables['codex'].lanes.PSObject.Properties.Name | Sort-Object)
+    if (($rungs -join ',') -ne ($codexRungs -join ',')) {
+        throw "Lane tables declare different rungs: claude has [$($rungs -join ', ')], codex has [$($codexRungs -join ', ')]."
+    }
+    return $tables
+}
+
+# Replaces the authored `lane:` line with the resolved keys for one harness. Whether that harness accepts
+# an effort key is its table's `skill_supports_effort`, not a host name tested here - a third harness must
+# be addable by adding a table. A rung with no effort (its model rejects the parameter) stamps none,
+# rather than stamping a value the model would refuse.
+function Set-LaneFrontMatter([string]$body, $table, [string]$lane, [string]$name) {
+    $rung = $table.lanes.$lane
+    if (-not $rung) { throw "$name/SKILL.md declares lane '$lane', which the $($table.host) lane table does not define." }
+    $lines = @("model: $($rung.model)")
+    $effortKey = $table.effort_key
+    if ($table.skill_supports_effort -and $rung.PSObject.Properties.Name -contains $effortKey) {
+        $lines += "effort: $($rung.$effortKey)"
+    }
+    # An instance Regex, because the static Replace has no count overload - passing 1 there would bind to
+    # RegexOptions.IgnoreCase and quietly rewrite every match instead of only the front-matter line. '$' is
+    # doubled because it is the replacement-string escape, not a literal, in .NET.
+    $replacement = (($lines -join "`n") + "`n").Replace('$', '$$')
+    $pattern = [regex]::new('(?m)^lane:[ \t]*\S+[ \t]*\r?\n')
+    $replaced = $pattern.Replace($body, $replacement, 1)
+    if ($replaced -eq $body) {
+        throw "$name/SKILL.md declares lane '$lane' but its front-matter line could not be rewritten."
+    }
+    return $replaced
+}
+
+# Every per-harness skill payload goes through here, so a lane declaration cannot reach one harness and
+# miss the other.
+function Resolve-SkillPayload($router, [string]$payload, $table) {
+    if (-not $router.Lane) { return $payload }
+    return Set-LaneFrontMatter $payload $table $router.Lane $router.Name
 }
 
 function Get-HostWorkflowSkills([string]$source, [string]$hostName) {
@@ -149,7 +200,7 @@ function Get-FrontMatterField([string]$text, [string]$field, [string]$name) {
 # The router's single authored fact about its payload: the root-relative path of its doc, in backticks.
 # Parsed rather than held in a side table, because a second structure is a second thing that drifts.
 # Anchored to the actual routing sentence (not a bare substring search) so a self-contained skill's
-# inlined body can freely mention another skill's old doc path in prose without being misread as a route.
+# inlined body can freely mention another skill's former doc location in prose without being misread as a route.
 # Returns $null for a self-contained skill: its content IS the payload, so it names no doc to route to.
 function Get-RoutedDoc([string]$text, [string]$name) {
     $match = [regex]::Match($text, 'The standard is `(standards/[^`]+\.md)` in `[^`]+`, deployed to')
@@ -220,6 +271,8 @@ function Add-SkillSiblings([string]$prefix, $router) {
     }
 }
 
+$laneTables = Get-LaneTables $laneSource
+
 # Skills stay flat: discovery is <root>/skills/*/SKILL.md and does not recurse. Only content nests.
 $skillDirs = @(Get-ChildItem -Path $canonical -Directory |
     Where-Object { Test-Path (Join-Path $_.FullName 'SKILL.md') } | Sort-Object Name)
@@ -248,6 +301,17 @@ foreach ($dir in $skillDirs) {
             Relative = ($_.FullName.Substring($dir.FullName.Length + 1) -replace '\\', '/')
             FullName = $_.FullName
         } })
+    # A lane is optional and opt-in: a skill that declares none inherits the session's model, so adding
+    # the ladder to a skill is a visible decision rather than a default that silently re-points it.
+    $lane = Get-OptionalFrontMatterField $text 'lane'
+    if ($lane -and -not ($laneTables['claude'].lanes.PSObject.Properties.Name -contains $lane)) {
+        throw "$($dir.Name)/SKILL.md declares lane '$lane', which .agents/lanes/claude.json does not define."
+    }
+    # A routed skill is a standard consulted DURING other work, so a lane on one would re-point the model
+    # of whatever task happened to load it. Only a skill that IS the task may carry a lane.
+    if ($lane -and $doc) {
+        throw "$($dir.Name)/SKILL.md is a routed standard and may not declare a lane ('$lane'): it is loaded during other work, so a lane would re-point that task's model."
+    }
     $routers[$dir.Name] = [pscustomobject]@{
         Name        = $dir.Name
         Body        = $text
@@ -255,6 +319,7 @@ foreach ($dir in $skillDirs) {
         Doc         = $doc
         Domain      = $domain
         Kind        = $kind
+        Lane        = $lane
         Siblings    = $siblings
     }
 }
@@ -386,8 +451,16 @@ foreach ($entry in $manifestJson.plugins) {
     if ($claudePlugin.displayName -cne $codexPlugin.interface.displayName) {
         throw "Plugin '$($entry.name)' has different display names in its Claude and Codex manifests."
     }
-    if ($claudePlugin.skills -cne $codexPlugin.skills) {
-        throw "Plugin '$($entry.name)' has different skill paths in its Claude and Codex manifests."
+    # The two hosts deliberately point at different trees once any skill declares a lane: the same
+    # rung resolves to a different model id per harness, so one shared folder could only ever carry
+    # one host's answer. Each must simply declare a tree that exists.
+    foreach ($field in @('skills', 'hooks')) {
+        if ($claudePlugin.$field -and -not (Test-Path (Join-Path $source ($claudePlugin.$field -replace '^\./', '')))) {
+            throw "Plugin '$($entry.name)' Claude manifest declares '$field' at '$($claudePlugin.$field)', which does not exist."
+        }
+    }
+    if (-not $codexPlugin.skills) {
+        throw "Plugin '$($entry.name)' Codex manifest declares no skills path."
     }
     if ($claudePlugin.PSObject.Properties.Name -contains 'version') {
         throw "Plugin '$($entry.name)' declares a Claude version, which pins its cache; only Codex may declare version."
@@ -620,11 +693,12 @@ $generated["plugins/$workflowOwner/$($codexHost.delivery.plugin_installer)"] = $
 }
 
 foreach ($router in $routers.Values) {
-    $generated[".claude/skills/$($router.Name)/SKILL.md"] = if ($router.Doc) {
+    $payload = if ($router.Doc) {
         Expand-RoutedSkill $router.Body (Read-Lf (Join-Path $repoRoot $router.Doc)) $router.Doc '../../../' $router.Name
     } else {
         $router.Body
     }
+    $generated[".claude/skills/$($router.Name)/SKILL.md"] = Resolve-SkillPayload $router $payload $laneTables['claude']
     Add-SkillSiblings '.claude/skills' $router
 }
 foreach ($name in $claudeHostSkills.Keys) {
@@ -657,7 +731,8 @@ foreach ($plugin in $plugins) {
     # same as the .claude/skills copy above.
     $mineSelfContained = @($routers.Values | Where-Object { -not $_.Doc -and $pluginDomains[$plugin.Name] -contains $_.Domain })
     foreach ($router in $mineSelfContained) {
-        $generated["plugins/$($plugin.Name)/skills/$($router.Name)/SKILL.md"] = $router.Body
+        $generated["plugins/$($plugin.Name)/skills/$($router.Name)/SKILL.md"] =
+            Resolve-SkillPayload $router $router.Body $laneTables['claude']
         Add-SkillSiblings "plugins/$($plugin.Name)/skills" $router
     }
     if ($plugin.Name -eq $hookOwner) {
@@ -672,16 +747,23 @@ foreach ($plugin in $plugins) {
     }
 }
 
-if ($workflowOwner) {
+# Codex gets its own tree of every plugin's skills, not only the workflow owner's. The bodies are the
+# same; the resolved model is not, because a lane rung names a different model id per harness. Sharing
+# one folder would hand whichever host lost the coin toss the other's model id.
+foreach ($plugin in $plugins) {
     foreach ($router in $routers.Values) {
-        if ($pluginDomains[$workflowOwner] -notcontains $router.Domain) { continue }
-        $generated["plugins/$workflowOwner/codex-skills/$($router.Name)/SKILL.md"] = if ($router.Doc) {
+        if ($pluginDomains[$plugin.Name] -notcontains $router.Domain) { continue }
+        $payload = if ($router.Doc) {
             Expand-RoutedSkill $router.Body (Read-Lf (Join-Path $repoRoot $router.Doc)) $router.Doc '../../' $router.Name
         } else {
             $router.Body
         }
-        Add-SkillSiblings "plugins/$workflowOwner/codex-skills" $router
+        $generated["plugins/$($plugin.Name)/codex-skills/$($router.Name)/SKILL.md"] =
+            Resolve-SkillPayload $router $payload $laneTables['codex']
+        Add-SkillSiblings "plugins/$($plugin.Name)/codex-skills" $router
     }
+}
+if ($workflowOwner) {
     foreach ($name in $claudeHostSkills.Keys) {
         $generated["plugins/$workflowOwner/skills/$name/SKILL.md"] = $claudeHostSkills[$name]
     }
@@ -760,13 +842,13 @@ $agentGeneratedRoots = @(
 )
 foreach ($plugin in $plugins) {
     $generatedRoots += (Join-Path $plugin.FullName 'skills')
+    $generatedRoots += (Join-Path $plugin.FullName 'codex-skills')
     $generatedRoots += (Join-Path $plugin.FullName 'standards')
     $generatedRoots += (Join-Path $plugin.FullName 'hooks')
     if ($plugin.Name -eq $routeOwner) {
         $generatedRoots += (Join-Path $plugin.FullName 'routes')
     }
     if ($plugin.Name -eq $workflowOwner) {
-        $generatedRoots += (Join-Path $plugin.FullName 'codex-skills')
         $generatedRoots += (Join-Path $plugin.FullName 'workflows')
         $agentGeneratedRoots += [pscustomobject]@{
             Root = (Join-Path $plugin.FullName 'agents')

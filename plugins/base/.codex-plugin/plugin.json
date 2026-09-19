@@ -1,12 +1,12 @@
 {
   "name": "base",
   "version": "1.0.0",
-  "description": "Machine utility skills and cross-harness handoff launchers.",
+  "description": "Generic agent layer for Claude and Codex - machine utilities plus the shared process, planning, review and delivery standards.",
   "author": {
     "name": "Tommy Seery"
   },
   "repository": "https://github.com/tomjseery/base-agents",
-  "skills": "./skills/",
+  "skills": "./codex-skills/",
   "keywords": [
     "utilities",
     "powershell",
