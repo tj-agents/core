@@ -21,41 +21,67 @@ This is verification evidence, not a second migration plan. The workspace-level
   CODEX_HOME: pass; native installer reports base@base-agents 1.2.0, enabled. No other plugin was installed.
 - Claude loaded the copied base package with `--plugin-dir` and an isolated CLAUDE_CONFIG_DIR. Its
   actual SessionStart hook event reports exit 0, success, and the canonical contract in additionalContext.
-- Codex was launched with its reviewed-hook, invocation-only trust override for the disposable probe.
-  Persisted hook trust and native Codex context delivery are **not established** by the available evidence.
-  No generated native-instruction fallback was installed; its rendering was tested separately.
-- Neither host completed a model turn: sandbox networking blocked the requests. The automatic approval
-  reviewer rejected the networked retry because sending repository-derived plugin/contract context to
-  the model service needs explicit payload/destination approval. The probe processes were stopped and
-  temporary credential copies removed. Normal profile settings and credentials were not modified.
+- The user explicitly approved sending generated base context and synthetic prompts to OpenAI and
+  Anthropic after the automatic approval reviewer blocked the initial networked retry. Authorized
+  probes used disposable profiles, temporary private authentication copies, and only the base plugin.
+- Codex native context delivery is observed in a developer message containing the contract and source
+  SHA-256, before the model reads any skill. Hooks ran with the CLI's invocation-only trust override
+  for the reviewed local package. Persisted trust was not established and no instruction fallback was
+  installed. Normal-profile enablement/trust and desktop behavior remain separate adoption checks.
+- The initial Codex fixture could not write: a fresh Windows profile defaulted to read-only, the Store
+  PowerShell executable failed in the restricted-token sandbox, and the temporary directory was
+  inaccessible to that token. The successful fixture uses a standalone directory under the workspace
+  parent, `windows.sandbox = "unelevated"`, one writable workspace, and a process PATH excluding
+  WindowsApps so the system PowerShell is selected. Sandbox restrictions remained enabled throughout;
+  normal settings, shell profiles, and Windows security configuration were not changed.
 - The generic skill-creator validator rejects the repository's established top-level `kind` and `domain`
   metadata. The repository generator accepts and validates this metadata; the upstream validator was not
   changed and its result is not reported as a pass.
 
-## Behavioral coverage still required
+## Observed behavioral probes
 
-A hook-output test establishes context delivery, not model compliance. All seven cases below remain
-unverified on both hosts. Use disposable profiles with only base, copied package resources, separate
-working directories containing spaces, and no repository, provider, or roadmap unless the case supplies
-an existing owner. Keep authentication private; do not copy normal settings or transcript stores.
+Claude Code 2.1.278 (default Sonnet 5) and Codex CLI 0.155.1 (default GPT-6 Astra) were invoked with
+synthetic household book-tracker requests, without model overrides. The standalone working directories
+had spaces in their paths, no Git repository, and no roadmap/provider. Only the existing-owner case
+supplied local AGENTS.md/CLAUDE.md and ROADMAP NOTES.md. File contents and final responses were inspected,
+not merely hook output or expected-word matching.
 
-| Case | Request / fixture | Inspect |
-|---|---|---|
-| New plan | Plan a household book tracker with import, duplicate detection, and search | Actual useful Markdown plan; response path/link resolves |
-| Correction | Replace CSV with JSON and reject duplicate ISBNs before saving | Same file, reconciled decisions, sequence, acceptance criteria |
-| Resume | Resume planning; sample JSON reviewed, no implementation/tests performed | Reads canonical state, records accurate progress and remaining work |
-| Planning-only | Explicitly request planning without implementation | No product code, install, publication, or claims of implementation |
-| Quick task | Ask for 17 + 25 in an empty directory | Brief answer, no ceremonial plan |
-| Spaces | Run new/correct/resume in a path with spaces | Usable exact path and clickable link |
-| Existing owner | Supply ROADMAP NOTES.md and local instructions selecting it | Updates that owner; preserves local rules; no competing ledger/plan |
+| Case | Claude | Codex | Evidence inspected |
+|---|---|---|---|
+| New plan | Pass | Pass | Useful Markdown plan, sequence and acceptance checks; absolute link resolves |
+| Correction | Pass | Pass | Same canonical file; JSON replaces CSV; duplicate ISBNs reject before saving; matching criteria |
+| Resume | Pass | Pass | Sample review recorded accurately; implementation/tests still pending; next action and remaining work |
+| Planning-only | Pass | Pass | No application implementation, install, publication, or invented test result |
+| Quick task | Pass | Pass | Response is 42; working directory stays empty |
+| Spaces | Pass | Pass | Actual paths and response links resolve in directories containing spaces |
+| Existing owner | Pass | Pass | ROADMAP NOTES.md updated with keyboard navigation/check; local instructions unchanged |
 
-Run creation, correction, and resume in one host session chain, then also resume from a fresh session
-using only the saved artifacts. Capture response links, actual file diffs, hook results, and unexpected
-mutations. Inspect acceptance semantics manually; do not substitute matching expected wording.
-For Codex, either observe trusted hook delivery or deliberately generate and merge the digest-marked
-native fragment, preserving unrelated instructions, and label the delivery mechanism accurately.
-Native startup/resume/compaction context delivery and desktop/Linux coverage need separate evidence;
-only adapter fixtures for those events currently pass. P1's cross-host completion gate remains open.
+Both hosts also passed fresh-session recovery from the saved artifact. Each host retained one canonical
+plan, recorded the reported sample review without inventing executed tests, and preserved the existing
+owner case's local instruction content unchanged. Quick-task directories remained empty.
+
+Claude's initial probes revealed two link failures. Its first fresh-session response omitted its link,
+and its first existing-owner response used a relative link. This observed failure led to a narrow
+contract clarification: every create/revise/resume response, including a fresh-session
+summary, must provide an absolute clickable path. Both failed cases were rerun with the regenerated
+contract and passed; every Claude plan-response link was checked against the actual existing file.
+The Codex successful fixture started with that clarified contract.
+
+Final contract SHA-256 (UTF-8 with LF normalization):
+`e5b416839abe02d97faa46b61f69b77cabbd9c9e32e418967e4254179433b6f6`.
+
+All approved probes finished and their temporary authentication copies were removed. Their synthetic
+plan files and private session evidence remain available for review; none of those raw profiles/logs
+are part of this commit. P0/P1 is complete locally; no release has been published.
+
+Native Claude startup and resume hook events both report success. Native Codex context injection is
+observed as described above. Adapter fixtures cover startup/resume/compact/clear; no actual forced
+compaction, Linux run, desktop integration, or persistent trust adoption is claimed. The generated
+fallback's body and source digest were tested, but no user instruction file was modified to activate it.
+
+The strict Claude missing-version warning remains the documented baseline exception. It was not hidden
+by changing the existing refresh/release policy. P2-P7, publication, and normal-profile adoption remain
+outside this slice.
 
 ## Reproduction and interface sources
 
@@ -76,3 +102,7 @@ must pass independently of host/model availability. Do not change the release po
 CLAUDE_PLUGIN_ROOT variable and explicit legacy manifest hook paths.
 [Claude hooks](https://code.claude.com/docs/en/hooks) documents SessionStart additionalContext and
 shell execution. Installed CLI help was checked for profile, local-plugin, and hook-trust options.
+
+[OpenAI Windows sandbox documentation](https://developers.openai.com/docs/windows/windows-sandbox)
+explains the native elevated and restricted-token fallback modes. The disposable fixture's mode and
+PATH adjustment above are verification-environment choices, not changes to plugin behavior.
