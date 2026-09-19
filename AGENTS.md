@@ -6,5 +6,8 @@ Read `README.md` before changing repository structure.
 generated; run `pwsh .agents/sync-generated.ps1` after authored changes and require
 `pwsh .agents/sync-generated.ps1 -Check` before delivery.
 
+A utility skill must not depend on a manually assembled, machine-local file the plugin does not ship.
+See [`PACKAGING.md`](PACKAGING.md).
+
 The repository is the machine layer only. Engineering workflows, hooks, routes, rules, lanes, and stack
 standards belong to their scope plugins and must not be copied back here.

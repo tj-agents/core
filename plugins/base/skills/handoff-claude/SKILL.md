@@ -20,29 +20,23 @@ through nested command strings or place its contents directly in the Windows Ter
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
-## Route before launch
+## Model selection
 
-Route declaration: infer `reversibility`, `blast`, `ambiguity`, `verifiability`, and task `tags` from the
-delegated task. Set `authorization=frontier` only when the user explicitly requested the frontier/top tier
-or a checked-in workflow declaration supplied it; never infer that authorization from size, difficulty,
-ambiguity, or importance.
-
-Immediately before launch, run `~/.claude/routing/route.py` with those parameters and parse its JSON output.
-Do not choose, remember, or substitute a model. The launch binding is exactly:
-
-```powershell
-$route = python (Join-Path $env:USERPROFILE '.claude\routing\route.py') @routeArguments | ConvertFrom-Json
-& '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.claude_model
-```
-
-Treat a missing resolver, failed resolver, invalid JSON, or absent `claude_model` field as a hard stop.
-Re-route each separate handoff; an earlier result on the same plan is not reusable.
+This launcher is a dumb transport — it never chooses a model itself, and it packages no external
+resolver. Pass `-Model` only when the caller already knows which one to use: the user named a specific
+model or tier explicitly, or the calling skill/workflow carries its own checked-in model-selection policy
+(for example a `lanes` contract, where the calling repository ships one) and has already resolved it
+before reaching this launcher. Never invent a selection policy here, and never default to the most
+capable or most expensive model just because none was specified.
 
 Launch with `scripts/launch-claude.ps1`, beside this file:
 
 ```powershell
-& '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.claude_model
+& '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
 ```
+
+Add `-Model '<model-id>'` only when a model was resolved as above. Omitting it lets `claude.exe` fall
+back to its own configured default — the same behavior an interactively launched session gets.
 
 Add `-DangerouslySkipPermissions` **only when the user asks for it in that request**. It disables every
 permission prompt in the new window, so it is never a default and never inferred from the repository

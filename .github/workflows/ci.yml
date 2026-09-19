@@ -18,3 +18,11 @@ jobs:
       - name: CLI session recovery tests
         shell: powershell
         run: ./cli-session-recovery/tests/cli-session-vault.tests.ps1
+
+      - name: skill packaging tests
+        shell: pwsh
+        run: ./tests/skill-packaging.tests.ps1
+
+      - name: handoff launcher tests
+        shell: pwsh
+        run: ./tests/handoff-launchers.tests.ps1

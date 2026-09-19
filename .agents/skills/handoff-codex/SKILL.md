@@ -1,6 +1,6 @@
 ---
 name: handoff-codex
-description: Open an independent unmanaged Codex tab in an exact repository or worktree with a prepared prompt, policy-routed model and effort, and the full native Codex terminal UI. Use when asked to open Codex, hand work to it, obtain a second opinion from it, or run a prompt against a specific Codex tier.
+description: Open an independent unmanaged Codex tab in an exact repository or worktree with a prepared prompt, an optional caller-chosen model and effort, and the full native Codex terminal UI. Use when asked to open Codex, hand work to it, obtain a second opinion from it, or run a prompt against a specific Codex tier.
 
 kind: utility
 domain: machine
@@ -20,35 +20,28 @@ through nested command strings or place its contents directly in the Windows Ter
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
-## Route before launch
+## Model selection
 
-Route declaration: infer `reversibility`, `blast`, `ambiguity`, `verifiability`, and task `tags` from the
-delegated task. Set `authorization=frontier` only when the user explicitly requested the frontier/top tier
-or a checked-in workflow declaration supplied it; never infer that authorization from size, difficulty,
-ambiguity, or importance.
-
-Immediately before launch, run `~/.claude/routing/route.py` with those parameters and parse its JSON output.
-Do not choose, remember, or substitute a model or effort. The launch binding is exactly:
-
-```powershell
-$route = python (Join-Path $env:USERPROFILE '.claude\routing\route.py') @routeArguments | ConvertFrom-Json
-& '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.codex_model -ReasoningEffort $route.codex_effort -BypassHookTrust
-```
-
-Treat a missing resolver, failed resolver, invalid JSON, or absent `codex_model`/`codex_effort` field as a
-hard stop. Re-route each separate handoff; an earlier result on the same plan is not reusable.
+This launcher is a dumb transport — it never chooses a model or effort itself, and it packages no
+external resolver. Pass `-Model` (and `-ReasoningEffort`, for a model that accepts it) only when the
+caller already knows which to use: the user named a specific model or tier explicitly, or the calling
+skill/workflow carries its own checked-in model-selection policy (for example a `lanes` contract, where
+the calling repository ships one) and has already resolved it before reaching this launcher. Never invent
+a selection policy here, and never default to the most capable or most expensive model just because none
+was specified.
 
 Launch with `scripts/launch-codex.ps1`, beside this file:
 
 ```powershell
-& '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>' -Model $route.codex_model -ReasoningEffort $route.codex_effort -BypassHookTrust
+& '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
 ```
+
+Add `-Model '<model-id>'` and `-ReasoningEffort '<level>'` only when both were resolved as above. Omitting
+them lets `codex.exe` fall back to its own configured default — the same behavior an interactively
+launched session gets.
 
 Use `-BypassHookTrust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
 user has not authorized repository hooks.
-
-`-Model` and `-ReasoningEffort` are mandatory routed inputs for this skill. They come only from the resolver
-fields above; the launcher remains a dumb transport and the caller owns routing.
 
 ## Which executable it starts, and why the choice is not free
 
