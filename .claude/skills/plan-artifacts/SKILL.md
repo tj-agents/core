@@ -13,8 +13,10 @@ descriptive filename in the working directory. A standalone directory needs no r
 companion ledger, workflow provider, pull request, or publication. Quick answers and one-step tasks do
 not need ceremonial plans.
 
-Give the user the exact path and a clickable Markdown link to the file. For a path containing spaces,
-wrap the link target in angle brackets. Keep the chat summary aligned with the saved file.
+Whenever you create, revise, or resume a plan, include its exact absolute path as a clickable Markdown
+link in the response, including a fresh-session progress summary. A bare filename or relative link is
+not enough to locate the artifact outside the session. For a path containing spaces, wrap the link
+target in angle brackets. Keep the chat summary aligned with the saved file.
 
 Apply corrections to that same canonical file: reconcile scope, decisions, sequence, and acceptance
 criteria directly. Never ask the user to splice replacement paragraphs or maintain competing copies.
