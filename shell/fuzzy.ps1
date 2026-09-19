@@ -99,5 +99,5 @@ function Invoke-Fuzzycd {
     Set-Location -LiteralPath $map[$best]
 }
 
-function f  { param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Query) Invoke-Fuzzycd "C:\Users\TommySeery\source\repos"  'Repos folder> ' ($Query -join ' ') }
-function fp { param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Query) Invoke-Fuzzycd "C:\Users\TommySeery\CLionProjects" 'CLion folder> ' ($Query -join ' ') }
+function f  { param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Query) Invoke-Fuzzycd (Join-Path $env:USERPROFILE 'source\repos')   'Repos folder> ' ($Query -join ' ') }
+function fp { param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Query) Invoke-Fuzzycd (Join-Path $env:USERPROFILE 'CLionProjects')  'CLion folder> ' ($Query -join ' ') }
