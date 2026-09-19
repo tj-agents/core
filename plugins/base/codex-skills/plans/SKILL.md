@@ -8,6 +8,15 @@ domain: process
 
 # Plans
 
+## Applicability
+
+Read [plan-artifacts](../plan-artifacts/SKILL.md) for the common maintained-plan contract.
+The engineering lifecycle below applies only when selected by the project or user. For standalone
+planning, correction, or resume, follow that common contract and stop here; do not require a roadmap,
+ledger, provider, review pipeline, or publication. Installing base or invoking planning alone does not
+select this richer lifecycle or grant implementation or publication authority.
+
+
 **Git history is the archive.** A plan is a working document for *unfinished* work; a finished plan kept "for
 reference" is rot that misleads the next reader into thinking the work is still pending.
 
