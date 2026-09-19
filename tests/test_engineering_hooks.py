@@ -65,6 +65,33 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("cannot read contract", result.stderr)
         self.assertEqual("", result.stdout)
 
+    def test_each_host_routes_an_active_goal_to_the_packaged_plan_execution_contract(self):
+        (self.cwd / "GOAL.md").write_text(
+            "# Goal\n\nStatus: in progress\n\nComplete every phase.\n", encoding="utf-8"
+        )
+        canonical = (
+            self.package / ".agents/engineering/workflow/plan-execution/SKILL.md"
+        ).read_text(encoding="utf-8").strip()
+        for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
+            with self.subTest(host=host):
+                manifest = json.loads(
+                    (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
+                )
+                hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
+                command = hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
+                self.assertIn(
+                    chr(36) + "{" + variable + "}/hooks/workflow_route.py", command
+                )
+                result = self.run_hook("hooks/workflow_route.py", {
+                    "hook_event_name": "UserPromptSubmit",
+                    "prompt": "Continue and complete the active goal.",
+                })
+                self.assertEqual(0, result.returncode, result.stderr)
+                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertEqual(canonical, context.split("\n\n", 1)[1])
+                self.assertIn(str(
+                    self.package / ".agents/engineering/workflow/plan-execution/SKILL.md"
+                ), context)
     def test_policy_gates_are_silent_without_repository_opt_in(self):
         commands = {'forge_poll_gate': 'gh pr checks 42',
                     'compact_output_gate': 'python -m unittest',
