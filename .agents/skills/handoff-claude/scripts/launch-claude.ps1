@@ -8,7 +8,6 @@ param(
 
     [string] $Title = 'Claude handoff',
 
-    [Parameter(Mandatory)]
     [string] $Model,
 
     [switch] $DangerouslySkipPermissions
@@ -52,7 +51,11 @@ if ($DangerouslySkipPermissions) {
     $arguments += '--dangerously-skip-permissions'
 }
 
-$arguments += @('--model', $Model)
+# Model selection is the caller's job, not this transport's: omit -Model and claude.exe falls back to
+# its own configured default, same as an interactively launched session.
+if ($Model) {
+    $arguments += @('--model', $Model)
+}
 
 $arguments += $instruction
 
