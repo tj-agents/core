@@ -1,6 +1,6 @@
 {
-  "$comment": "The base plugin ships only the machine layer.",
+  "$comment": "The base plugin ships the generic agent layer: machine utilities and the shared process skills.",
   "payloads": {
-    "base": ["machine"]
+    "base": ["machine", "process"]
   }
 }
