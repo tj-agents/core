@@ -1,6 +1,6 @@
 ---
 name: plan-artifacts
-description: Create, correct, or resume a substantive execution plan as one maintained Markdown artifact, including standalone planning without an engineering lifecycle.
+description: Maintain one Markdown plan for a long-term goal or substantive planning request, automatically route authorized execution to its available workflow, and keep corrections and resumable progress in the same artifact.
 kind: contract
 domain: behavior
 ---
@@ -36,6 +36,33 @@ publication, installation, or other actions outside that request.
 The richer `plans`, `plan-authoring`, and `plan-checkpoint` engineering conventions apply only when the
 project or user selects that lifecycle. They are not prerequisites for this common behavior. Preserve
 user plans when disabling or rolling back the plugin.
+
+## Default ownership of long-term work
+
+When a request authorizes a long-term or multi-phase goal, select the available `plan-execution`
+workflow without waiting for the user to name it. Before the first deliverable edit, invoke that skill
+through the host's skill tool when available (for example `base:plan-execution`), or read its advertised
+SKILL.md path when skills are loaded as files. Merely announcing the workflow or following this summary
+does not load its instructions.
+Explicit phases or an existing goal/plan file trigger this routing even for a documentation-only task.
+Read the existing goal before acting, reconcile it with the current request, and keep its progress current;
+finishing deliverable files while leaving that goal stale is incomplete. Keep the same goal, authorization,
+and next action through implementation, review, validation, and authorized
+delivery. Follow the project's selected workflow when present. If its runtime is unavailable, keep
+ownership in the current session and use the available native tools; do not invent missing providers.
+Planning-only requests still end with planning, as described above.
+
+A phase, local commit, open PR, or fresh context is an execution checkpoint, not a new permission
+boundary. Record a slice as the next unit of work without silently narrowing the user's goal to that
+slice. Continue while authorized work remains. Report full completion only at the user's actual outcome;
+a genuine external, destructive, authorization, or unresolved ownership gate must identify the blocked
+action while independent authorized work continues.
+
+A context clear or handoff preserves the goal; it does not return orchestration to the user. Checkpoint
+before transfer and invoke the available automated continuation or handoff capability, confirming the
+successor was started before releasing ownership. Never launch duplicate owners. If no such capability
+is available, preserve a recoverable checkpoint and state that limitation rather than claiming a transfer
+occurred. A user request for only a handoff prompt does not authorize launching a session.
 
 ## Context delivery
 

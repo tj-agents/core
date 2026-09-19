@@ -68,11 +68,35 @@ contract and passed; every Claude plan-response link was checked against the act
 The Codex successful fixture started with that clarified contract.
 
 Final contract SHA-256 (UTF-8 with LF normalization):
-`e5b416839abe02d97faa46b61f69b77cabbd9c9e32e418967e4254179433b6f6`.
+`646b2d968a0462efbff14970e2779880c2e0a8e58eb1d682a9bb4f1b9de99fd7`.
 
-All approved probes finished and their temporary authentication copies were removed. Their synthetic
+## Default execution and continuity probes
+
+The user subsequently required default workflow selection for long-term work and continuous ownership
+through delivery and automated context transfer. The common contract and `plan-execution` trigger now
+state that behavior explicitly. Agent-authored phase limits cannot override the user's request. The
+execution skill also supports standalone work without inventing an engineering runtime or extra ledger.
+
+The synthetic task asks for three consistent lending-club documents without naming a skill. An existing
+GOAL.md contains an agent-authored phase-1 stopping point explicitly identified as not a user restriction.
+Both hosts completed all three deliverables; both planning-only controls created only a plan.
+
+Codex's first continuity run loaded plan-artifacts and plan-execution, repaired the stale scope, updated
+GOAL.md, and linked it in the final response. A fresh Codex rerun with the final contract also
+loaded the execution skill before editing and completed the same ownership checks. Claude's first run completed the documents but left GOAL.md
+stale; its fixture also lacked the native Skill tool. A second run exposed Skill and kept GOAL.md current,
+but still did not load the workflow. A third fresh run with the final trigger and explicit skill-loading
+instruction again skipped the workflow and left GOAL.md stale, despite a successful hook event carrying
+the exact current contract. These Claude outcomes are failures of automatic workflow ownership, not passes.
+
+This instruction layer is not a deterministic enforcement mechanism. P2 must recover the shared workflow
+runtime and verify implicit routing, canonical progress ownership, and actual continuation with both hosts.
+The overall migration and the user's workflow-default correction remain incomplete until that gate passes.
+No result here establishes automated handoff behavior; launcher regression tests cover transport separately.
+
+All probes terminated and their temporary authentication copies were removed. Their synthetic
 plan files and private session evidence remain available for review; none of those raw profiles/logs
-are part of this commit. P0/P1 is complete locally; no release has been published.
+are part of this commit. The original P1 artifact cases passed locally; delivery is pending and P2 owns the open runtime gate.
 
 Native Claude startup and resume hook events both report success. Native Codex context injection is
 observed as described above. Adapter fixtures cover startup/resume/compact/clear; no actual forced
@@ -80,8 +104,7 @@ compaction, Linux run, desktop integration, or persistent trust adoption is clai
 fallback's body and source digest were tested, but no user instruction file was modified to activate it.
 
 The strict Claude missing-version warning remains the documented baseline exception. It was not hidden
-by changing the existing refresh/release policy. P2-P7, publication, and normal-profile adoption remain
-outside this slice.
+by changing the existing refresh/release policy. P2-P7, publication, and normal-profile adoption remain future delivery slices of the same authorized goal.
 
 ## Reproduction and interface sources
 
