@@ -1,6 +1,6 @@
 ---
 name: plan-execution
-description: Implement or resume an explicit or uniquely resolved active plan and ledger through its phases, review, validation, delivery slices, and material checkpoints. Use for named plan execution or plan-managed continuation; do not use to author a new plan, prioritize a roadmap, handle unplanned short work, or perform review-only work.
+description: Automatically own authorized long-term or multi-phase work through completion, including documentation tasks, even when the user does not name a plan or skill. Resume the existing goal and keep its progress current through execution, review, validation, delivery, and context handoffs. Excludes planning-only, quick one-step, and review-only requests.
 
 kind: workflow
 domain: process
@@ -12,6 +12,20 @@ lane: L3
 Own one authoritative plan identity until the requested work completes or reaches a genuine typed gate.
 A phase boundary, subordinate return, diagnosable failure, local commit, or resolved next action is not a
 stopping condition.
+
+Select this workflow by default for authorized long-term or multi-phase execution; the user need not
+name the skill. Before accepting a recorded slice-only boundary, check its source against the current
+request. Preserve explicit user limits and genuine gates, but repair agent-authored stopping points that
+would abandon authorized remaining work. Context transfer must use the available automated continuation
+or launcher after checkpointing; a pointer alone does not transfer ownership unless prompt-only output
+was requested.
+
+For standalone work or a project without the engineering runtime, apply
+[`plan-artifacts`](../plan-artifacts/SKILL.md), keep the existing goal file as the progress owner, and
+execute the authorized phases with the available tools. Do not create a repository, separate ledger,
+roadmap, or provider merely to run this workflow. Checkpoint results and remaining work in that same
+file, verify the requested outcome, and link it in the response. The repository-specific commands below
+apply only where that runtime is present; their absence does not end ownership.
 
 Resolve `plan-execution` as the single owning lifecycle skill and only the technical skills directly routed
 by the current changed paths. Use `python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id>
