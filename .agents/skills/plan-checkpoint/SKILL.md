@@ -9,6 +9,15 @@ lane: L4
 
 # The plan-progress checkpoint
 
+## Applicability
+
+Read [plan-artifacts](../plan-artifacts/SKILL.md) for the common maintained-plan contract.
+The engineering lifecycle below applies only when selected by the project or user. For standalone
+planning, correction, or resume, follow that common contract and stop here; do not require a roadmap,
+ledger, provider, review pipeline, or publication. Installing base or invoking planning alone does not
+select this richer lifecycle or grant implementation or publication authority.
+
+
 A progress ledger is a compact recovery snapshot, not a workflow transcript. Update it only when durable
 state materially changes and a fresh context could otherwise take the wrong action.
 

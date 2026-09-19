@@ -1,6 +1,10 @@
 {
-  "$comment": "The base plugin ships the generic agent layer: machine utilities and the shared process skills.",
+  "$comment": "Base temporarily combines common behavior, machine utilities, and shared process skills until the planned scope split.",
   "payloads": {
-    "base": ["machine", "process"]
+    "base": [
+      "behavior",
+      "machine",
+      "process"
+    ]
   }
 }
