@@ -95,7 +95,7 @@ class PlanArtifactTests(unittest.TestCase):
             contract.unlink()
             result = self.invoke(host)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn(str(contract), result.stderr)
+            self.assertIn(str(contract.resolve()), result.stderr)
 
     def test_fallback_is_digest_marked_and_tracks_contract_changes(self):
         result = self.invoke('codex', extra=('--instruction-fragment',))

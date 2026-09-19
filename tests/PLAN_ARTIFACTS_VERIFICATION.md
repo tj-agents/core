@@ -11,8 +11,11 @@ This is verification evidence, not a second migration plan. The workspace-level
 - `python -B -m unittest discover -s tests -p test_plan_artifacts.py -v`: four passing tests covering
   both packaged roots, resource closure, identical canonical bodies, startup/resume/compact/clear
   fixtures, an unrelated directory with spaces, actual Git Bash command execution, no adapter file
-  mutations, absent/malformed/unreadable contract diagnostics, and digest-marked fallback generation.
+  mutations, absent/malformed/invalid-UTF-8 contract diagnostics, and digest-marked fallback generation.
 - `tests/skill-packaging.tests.ps1` and `tests/handoff-launchers.tests.ps1`: pass.
+- Initial PR CI exposed a test assertion comparing a Windows short temp-path alias with the helper's
+  resolved long path. The assertion now resolves the expected path; the focused suite passes locally.
+  Exact-head CI verifies the runner-specific case. No helper behavior or test was disabled.
 - Claude Code 2.1.278 ordinary plugin validation: pass with the existing missing-version warning.
   Strict validation: exit 1 for that warning, also observed on the unmodified baseline. A disposable
   control copy with only `version: 1.2.0` added passes strict validation. The shipped Claude manifest
