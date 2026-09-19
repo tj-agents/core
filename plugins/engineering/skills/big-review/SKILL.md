@@ -1,0 +1,14 @@
+---
+name: big-review
+description: Select and drive the canonical isolated review workflow for a very large immutable branch diff in resumable, dependency-ordered area stages recorded in the branch's one canonical work order. Use for hundreds or thousands of changed files, a multi-service diff, or to resume one staged review area.
+
+kind: workflow
+domain: process
+model: claude-opus-5
+effort: high
+---
+
+# Staged review selector
+
+Read and follow the [canonical shared definition](../../.agents/engineering/workflow/big-review/SKILL.md) in full.
+This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.

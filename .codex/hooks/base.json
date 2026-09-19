@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/base/plan-artifacts/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/base/plan-artifacts/scripts/session-context.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

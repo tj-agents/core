@@ -1,6 +1,6 @@
 {
   "name": "base-agents",
-  "description": "Generic agent layer for Tommy Seery sessions - machine utilities plus the shared process standards, for Claude Code and Codex.",
+  "description": "Common behavior, optional engineering process and machine utilities.",
   "owner": {
     "name": "Tommy Seery"
   },
@@ -8,11 +8,31 @@
     {
       "name": "base",
       "source": "./plugins/base",
-      "description": "Generic agent layer for Claude and Codex - machine utilities plus the shared process, planning, review and delivery standards.",
+      "description": "Maintained plans and common agent behavior.",
       "category": "Productivity",
       "keywords": [
-        "utilities",
-        "powershell",
+        "behavior",
+        "plans"
+      ]
+    },
+    {
+      "name": "engineering",
+      "source": "./plugins/engineering",
+      "description": "Selected engineering workflows, reviews and Git operations.",
+      "category": "Productivity",
+      "keywords": [
+        "engineering",
+        "workflow",
+        "git"
+      ]
+    },
+    {
+      "name": "machine",
+      "source": "./plugins/machine",
+      "description": "Explicit harness, history and clipboard utilities.",
+      "category": "Productivity",
+      "keywords": [
+        "machine",
         "sessions",
         "handoff"
       ]

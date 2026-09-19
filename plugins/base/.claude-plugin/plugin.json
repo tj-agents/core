@@ -1,17 +1,15 @@
 {
   "name": "base",
-  "displayName": "Base Agent Utilities",
-  "description": "Generic agent layer for Claude and Codex - machine utilities plus the shared process, planning, review and delivery standards.",
+  "description": "Maintained plans and common agent behavior.",
   "author": {
     "name": "Tommy Seery"
   },
   "repository": "https://github.com/tomjseery/base-agents",
-  "skills": "./skills/",
   "keywords": [
-    "utilities",
-    "powershell",
-    "sessions",
-    "handoff"
+    "behavior",
+    "plans"
   ],
-  "hooks": "./skills/plan-artifacts/hooks/hooks.json"
+  "displayName": "Common agent behavior",
+  "skills": "./skills/",
+  "hooks": "./hooks/claude.json"
 }

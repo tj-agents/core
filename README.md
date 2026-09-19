@@ -1,9 +1,8 @@
 # base-agents
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
-The combined `base@base-agents` package includes the common maintained-plan contract and the already
-restored process skills. The later base/engineering/machine split is not implemented here. Stack standards
-remain in their stack plugins; Concertable policy and its remaining enforcement runtime stay with Concertable.
+The repository publishes a minimal `base` package and optional `engineering` and `machine` packages.
+Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
 `base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
@@ -12,9 +11,8 @@ The packaged SessionStart hook emits the same canonical contract to both hosts. 
 as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
 alone is insufficient. The skill documents an explicit generated native-instruction fallback.
 
-The candidate Codex package version is **1.2.0**. Claude retains commit-based refresh (no fixed version)
-until release gates are introduced. Consequently Claude `plugin validate --strict` currently reports its
-missing-version warning, also present at the 1.1.0 baseline; ordinary manifest validation must still pass.
+The split packages form the candidate **2.0.0** release. Existing 1.x consumers can select all three
+packages for equivalent coverage; fresh installations select only `base` by default.
 
 ## Layout
 
@@ -47,7 +45,7 @@ data, transcripts, credentials, and identifiers remain outside the repository.
 ## Install / update the `base` plugin
 
 GitHub is authoritative; a machine's installed copy of `base@base-agents` is expected to be exactly what
-the latest commit on `main` generated into `plugins/base/`. Every skill's own scripts and resources travel
+the latest commit on `main` generated into `plugins/<package>/`. Every skill's own scripts and resources travel
 inside that generated package (see `PACKAGING.md`), so registering the marketplace and installing/updating
 the plugin is the entire supported procedure — never hand-place a script or resolver on a machine to make
 a skill work.

@@ -1,0 +1,15 @@
+{
+  "name": "base",
+  "description": "Maintained plans and common agent behavior.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tomjseery/base-agents",
+  "keywords": [
+    "behavior",
+    "plans"
+  ],
+  "displayName": "Common agent behavior",
+  "skills": "./skills/",
+  "hooks": "./hooks/claude.json"
+}

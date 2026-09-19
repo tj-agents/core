@@ -1,0 +1,286 @@
+import unittest
+from pathlib import Path
+
+from fixtures.lane_expectations import authored_skill
+
+
+class ProcessStandardsTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Path(__file__).resolve().parents[3]
+
+    def corpus(self):
+        paths = [
+            path
+            for scope in ("base", "engineering", "machine")
+            for path in (self.root / ".agents" / scope).rglob("SKILL.md")
+        ]
+        return "\n".join(path.read_text(encoding="utf-8") for path in paths)
+
+    def test_deprecated_checkpoint_ceremony_is_absent(self):
+        corpus = self.corpus().lower()
+        deprecated = (
+            "checkpoint-transport protocol",
+            "before any report or stop",
+            "before every report",
+            "before reporting plan-managed work",
+            "first coherent checkpoint",
+            "normal checkout as the one shared owner",
+            "ledgers always stay in the normal checkout",
+        )
+
+        for phrase in deprecated:
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, corpus)
+
+    def test_checkpoint_standard_owns_material_transitions_and_single_push(self):
+        checkpoint = authored_skill("plan-checkpoint").read_text(
+            encoding="utf-8"
+        )
+
+        for phrase in (
+            "material implementation milestone",
+            "genuine blocker",
+            "a full review completes",
+            "delivery, merge, publication, or final closeout crosses a terminal boundary",
+            "current context is ending with partial state",
+            "A plan-managed push has one leg",
+            "Never create or push an\nobservation-only",
+            "200 lines",
+            "16,000 UTF-8 bytes",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, checkpoint)
+
+    def test_staged_review_uses_its_own_resume_contract(self):
+        staged = authored_skill("big-review").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("## rules manifest", staged.lower())
+        self.assertIn("the canonical work order is the resume contract", staged.lower())
+        self.assertNotRegex(staged.lower(), r"plan checkpoint[^\n]{0,120}(?:each|every) stage")
+
+    def test_address_review_does_not_force_one_agent_context_per_finding(self):
+        address = authored_skill("address-review").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Take one open finding or one tightly coupled group", address)
+        self.assertNotIn("own fresh agent context", address)
+        self.assertNotIn("Spawn exactly one fresh agent context", address)
+        self.assertNotIn("one finding per agent context", address)
+
+    def test_address_review_serializes_every_fix(self):
+        address = authored_skill("address-review").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Never overlap\nwriters", address)
+        self.assertIn("one exclusive writer", address)
+        self.assertIn("even for disjoint files", address)
+        self.assertNotIn("Serial by default", address)
+        self.assertNotIn("concurrent fixes", address)
+
+    def test_always_on_instructions_own_the_stage_pointer_rule(self):
+        instructions = authored_skill("session-guidance").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("## A link to another skill is a stage pointer, not a read", instructions)
+        self.assertIn(
+            "Load a referenced skill when its stage is actually entered, never because a document",
+            instructions,
+        )
+        self.assertEqual(1, self.corpus().count("stage is actually entered"))
+
+    def test_always_on_instructions_reconcile_known_problems_before_terminal_results(self):
+        instructions = authored_skill("session-guidance").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(instructions.split())
+
+        self.assertIn(
+            "Before committing or returning a terminal result, reconcile every problem "
+            "encountered: it is fixed or already has the owning debt entry",
+            flat,
+        )
+
+    def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
+        body = authored_skill("plan-execution").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(body.split())
+
+        self.assertIn(
+            "in exactly three cases: selecting ownership for the first time in this "
+            "context, evidence that is missing or self-contradictory, and writing or "
+            "reconciling a material checkpoint",
+            flat,
+        )
+        self.assertIn(
+            "### Resume a preserved continuation without re-reading the corpus", body
+        )
+        self.assertIn(
+            "trustworthy when it names all five of the plan identity, the absolute "
+            "worktree, the branch, the current state, and the single next action",
+            flat,
+        )
+        self.assertIn("it does not relax the worktree identity check", flat)
+        self.assertIn(
+            "Do not re-read the plan, the ledger, `plans` or `plan-checkpoint`",
+            flat,
+        )
+        self.assertNotIn("Read the repository instructions, [`plans`]", body)
+
+    def test_harness_specific_persistent_continuation_is_routed(self):
+        remote = authored_skill("remote-validation").read_text(
+            encoding="utf-8"
+        )
+        shared = authored_skill("persistent-delivery").read_text(
+            encoding="utf-8"
+        )
+        claude = (
+            self.root / ".claude/skills/persistent-workflow/SKILL.md"
+        ).read_text(encoding="utf-8")
+        codex = (
+            self.root / ".codex/skills/persistent-workflow/SKILL.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("persistent-workflow skill", remote)
+        self.assertIn("persistent-delivery", remote)
+        self.assertIn("one persistent owner for a PR/head pair", shared)
+        self.assertIn("/goal", claude)
+        self.assertIn("Desktop scheduled tasks", claude)
+        self.assertIn("Dynamic Workflows", claude)
+        self.assertIn(
+            "Scheduled Task attached to this owning Codex/ChatGPT Desktop conversation",
+            codex,
+        )
+        self.assertNotIn("Claude uses", remote)
+        self.assertNotIn("Codex Desktop uses", remote)
+        for skill in ("e2e-debug", "e2e-api-debug", "e2e-ui-debug", "integration-debug"):
+            with self.subTest(skill=skill):
+                self.assertIn(skill, shared)
+        self.assertIn("clear context", shared)
+        self.assertNotEqual(claude, codex)
+
+        merge = authored_skill("merge").read_text(encoding="utf-8")
+        merging = authored_skill("merging").read_text(encoding="utf-8")
+        for body in (merge, merging):
+            with self.subTest(policy="merge-debug-dispatch"):
+                self.assertIn("immediately dispatch one fresh", body)
+                self.assertIn("foreground fallback", body)
+        self.assertIn("exact run head", merging)
+        self.assertIn("bound PR source head", merging)
+
+    def test_techdebt_uses_mode_specific_isolation_and_picks_fast(self):
+        body = authored_skill("techdebt").read_text(encoding="utf-8")
+        flat = " ".join(body.split())
+
+        self.assertIn("Single-repo mode — isolate before reading a single `TECH_DEBT.md`", flat)
+        self.assertIn("*before* any survey or investigation", flat)
+        self.assertIn("Polyrepo-root mode — survey first, isolate second", flat)
+        self.assertIn("There is no repo to isolate into until one is chosen", flat)
+        self.assertIn("Pick the item(s) fast", flat)
+        self.assertIn("do not read each entry in full", flat)
+        self.assertIn("the bundling test below is applied after that pick", flat)
+        self.assertNotIn("Survey every `TECH_DEBT.md` in the repo, then choose", flat)
+
+    def test_plan_execution_resumes_into_owned_partial_work(self):
+        body = authored_skill("plan-execution").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(body.split())
+
+        self.assertIn(
+            "A restored worktree that is dirty is not by itself a reason to stop", flat
+        )
+        self.assertIn("that is partial implementation to resume", flat)
+        self.assertIn(
+            "Stop only when the dirty state is conflicting, unexplained, unowned, or unsafe",
+            flat,
+        )
+
+    def test_plan_artifacts_always_reach_merged_default_branch(self):
+        plans = authored_skill("plans").read_text(encoding="utf-8")
+        authoring = authored_skill("plan-authoring").read_text(
+            encoding="utf-8"
+        )
+        execution = authored_skill("plan-execution").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("## Planning artifacts always land", plans)
+        self.assertIn("## Roadmap → plan → progress", plans)
+        self.assertIn("## Implementation examples and their standards", plans)
+        self.assertIn(
+            "planning-only or meta-only slice lands through `merge-docs`",
+            " ".join(plans.split()),
+        )
+        self.assertIn("Location alone never makes a restriction stale", plans)
+        for live_gate in (
+            "explicit current user limitation",
+            "recorded repository authorization",
+            "named PR/head security or validation hold",
+            "merge hold",
+            "repository stop class",
+        ):
+            with self.subTest(live_gate=live_gate):
+                self.assertIn(live_gate, " ".join(plans.split()))
+        self.assertIn("land through `merge-docs`", " ".join(authoring.split()))
+        self.assertIn(
+            "Planning-only work carries standing authorization",
+            " ".join(authoring.split()),
+        )
+        self.assertIn(
+            "A live delivery restriction overrides that standing authorization",
+            " ".join(authoring.split()),
+        )
+        for live_gate in (
+            "explicit current user limitation",
+            "repository authorization",
+            "security or validation hold",
+            "merge hold",
+            "stop class",
+        ):
+            with self.subTest(authoring_live_gate=live_gate):
+                self.assertIn(live_gate, " ".join(authoring.split()))
+        self.assertIn(
+            "only after the design artifact and any owning ledger are merged to the default branch",
+            " ".join(authoring.split()),
+        )
+        self.assertIn(
+            "Planning-artifact publication remains part of the authorized plan lifecycle",
+            " ".join(execution.split()),
+        )
+        self.assertIn(
+            "Deliver a meta-only slice through `engineering:merge-docs`; "
+            "deliver any slice containing runtime, product, package, schema, deployment, "
+            "or test-selection changes through `engineering:merge`",
+            " ".join(execution.split()),
+        )
+        self.assertNotIn("delivering each completed slice through [`merge`]", execution)
+        self.assertIn("including a planning-only slice", " ".join(execution.split()))
+
+    def test_review_rechecks_routed_rules_instead_of_citing_an_earlier_read(self):
+        body = authored_skill("review").read_text(encoding="utf-8")
+        flat = " ".join(body.split())
+
+        self.assertIn("Read only identities returned as `load`", flat)
+        self.assertIn("an unchanged identity returned as `cached`", flat)
+        self.assertIn("changed or missing hash requires a new body read", flat)
+
+    def test_merge_docs_keeps_an_existing_isolated_branch(self):
+        body = authored_skill("merge-docs").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(body.split())
+
+        self.assertIn(
+            "do not create a second branch solely to change the type prefix to `Docs`", flat
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

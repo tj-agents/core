@@ -1,0 +1,24 @@
+{
+  "name": "base",
+  "description": "Maintained plans and common agent behavior.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tomjseery/base-agents",
+  "keywords": [
+    "behavior",
+    "plans"
+  ],
+  "version": "2.0.0",
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "Common agent behavior",
+    "shortDescription": "Maintained plans and common agent behavior.",
+    "longDescription": "Maintained plans and common agent behavior.",
+    "developerName": "Tommy Seery",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the selected capability for this task."
+  },
+  "hooks": "./hooks/codex.json"
+}

@@ -1,0 +1,62 @@
+{
+  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files; no profiles or agents are installed automatically. Codex result and merge hooks await observed host payload support.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
+      }
+    ]
+  }
+}

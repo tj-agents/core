@@ -1,0 +1,41 @@
+{
+  "name": "base-agents",
+  "description": "Common behavior, optional engineering process and machine utilities.",
+  "owner": {
+    "name": "Tommy Seery"
+  },
+  "plugins": [
+    {
+      "name": "base",
+      "source": "./plugins/base",
+      "description": "Maintained plans and common agent behavior.",
+      "category": "Productivity",
+      "keywords": [
+        "behavior",
+        "plans"
+      ]
+    },
+    {
+      "name": "engineering",
+      "source": "./plugins/engineering",
+      "description": "Selected engineering workflows, reviews and Git operations.",
+      "category": "Productivity",
+      "keywords": [
+        "engineering",
+        "workflow",
+        "git"
+      ]
+    },
+    {
+      "name": "machine",
+      "source": "./plugins/machine",
+      "description": "Explicit harness, history and clipboard utilities.",
+      "category": "Productivity",
+      "keywords": [
+        "machine",
+        "sessions",
+        "handoff"
+      ]
+    }
+  ]
+}

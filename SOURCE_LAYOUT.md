@@ -29,6 +29,10 @@ the selected `.codex/` or `.claude/` adapter and all declared resources into a s
 Generated output is validated and may be committed for marketplace distribution, but it is never edited as
 source.
 
+Two host-native marketplace files are generated bridges: `.agents/plugins/marketplace.json` comes from
+the Codex input at `.codex/plugins/marketplace.json`, and `.claude-plugin/marketplace.json` comes from the
+Claude input at `.claude/plugins/marketplace.json`. Their native locations do not make them authored source.
+
 The supported flow is:
 
 ```text

@@ -1,52 +1,37 @@
 # Packaging
 
-A utility skill must work the moment its marketplace plugin is installed on a supported machine.
-Installing the plugin is the whole delivery mechanism — no manually assembled, machine-local file may be
-a precondition for a skill to run.
+A repository-owned runtime dependency must work when its owning plugin is installed on a supported machine.
+Installation is the delivery mechanism; no manually assembled machine-local file may be required.
 
-## The rule
+## Ownership
 
-**A repository-owned runtime dependency ships inside the skill that needs it.** If a skill's
-instructions or its script read a file this repository authored — a helper script, a data table, a
-policy document — that file lives under `.agents/skills/<name>/`, beside `SKILL.md`, so
-`sync-generated.ps1`'s sibling-copy carries it into every generated plugin copy automatically (see
-`AGENTS.md` and the header of `sync-generated.ps1`). A skill that names a path it does not ship is a
-skill that only ever worked on the machine where someone happened to build that path by hand.
+A skill-local helper, template, or policy file lives beside its canonical `SKILL.md` under `.agents/`.
+Generation carries those siblings into the canonical package tree and into both generated host discovery
+entries, so `<skill-directory>` keeps working after installation.
 
-**Resolve a shipped dependency relative to the skill's own installed location, never the caller's.** A
-script uses `$PSScriptRoot` (or an explicit sibling path) to find its own resources. `SKILL.md` prose
-uses the `<skill-directory>` placeholder the invoking agent substitutes with wherever the skill was
-actually installed. Neither may resolve through `$env:USERPROFILE`, `$HOME`, `~`, the caller's current
-working directory, or a hardcoded username — those vary by machine and by installer, and a path built
-from one is not a path the plugin delivered.
+A resource shared by several skills stays under `.agents/` and requires an explicit source/destination
+mapping in `.agents/plugins/sources.json`. The mapping names one owning plugin. Runtime references may not
+cross into another plugin or depend on the author checkout.
 
-**A genuine external prerequisite is named and checked, never assumed.** Something this repository does
-not and should not own — another harness's CLI, an OS feature — is documented explicitly in the skill
-that needs it, with a check that fails loudly and names what is missing (`launch-codex.ps1`'s
-`-MinimumVersion` gate on the Codex CLI is the model to follow). It is never silently required by
-instructions alone, and a missing prerequisite is never worked around by inventing a replacement policy
-or silently degrading behavior — the failure must be visible and correct.
+Resolve shipped files relative to the installed skill or package. Scripts use `$PSScriptRoot`, their own
+file location, or an explicit package-root input. Instructions use `<skill-directory>`. They do not resolve
+repository-owned code through `$env:USERPROFILE`, `$HOME`, `~`, the caller's current directory, or a
+hardcoded username.
+
+A genuine external prerequisite, such as a host CLI or operating-system feature, is named and checked. A
+missing prerequisite must fail clearly. It is not replaced with an invented policy or silently ignored.
 
 ## Why
 
-`base-agents` installs onto machines that were not the one it was authored on. A skill whose
-instructions require a file nobody packaged — a resolver, a policy table, a config — worked by accident
-on the machine that happened to have it, and breaks silently everywhere else the marketplace plugin is
-the only thing installed. `handoff-claude` and `handoff-codex` shipped exactly this defect: both
-required `~/.claude/routing/route.py`, a file this repository never packaged and that had no
-authoritative implementation anywhere to package — the launch scripts already accepted model parameters
-directly, so the unshippable dependency was pure liability. The fix removed the requirement rather than
-inventing a policy to satisfy it (see the `handoff-claude`/`handoff-codex` `SKILL.md` "Model selection"
-sections) and this document is the standing rule so the next utility skill does not reintroduce the same
-shape of bug.
+A skill that refers to an unpackaged helper works only on a machine where that path happens to exist.
+The handoff launchers previously depended on an unshipped `~/.claude/routing/route.py`; removing that
+dependency fixed the immediate defect. This contract prevents the same failure while allowing a deliberately
+shared helper, such as the history reader, to ship once through an explicit mapping.
 
-## What to check when adding or reviewing a utility skill
+## Review checks
 
-- Every path a skill's instructions or scripts read that this repository authored is a sibling file
-  under that skill's own directory.
-- Every such reference resolves relative to the skill's installed location (`$PSScriptRoot`,
-  `<skill-directory>`), never the caller's home, working directory, or username.
-- Any reference to something this repository does not ship is named as an external prerequisite and
-  guarded by a check with a clear failure message — not merely asserted in prose.
-- `pwsh .agents/sync-generated.ps1 -Check` passes, confirming the generated plugin copies actually
-  contain what the skill's instructions reference.
+- Every repository-owned runtime path resolves to a skill-local sibling or a declared shared resource.
+- Generated host entries contain skill-local resources required through `<skill-directory>`.
+- Shared resources remain inside their owning plugin.
+- External prerequisites are explicit and fail with a useful message.
+- `pwsh .agents/sync-generated.ps1 -Check` passes.

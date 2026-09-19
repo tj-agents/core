@@ -26,6 +26,10 @@ jobs:
       - name: handoff launcher tests
         shell: pwsh
         run: ./tests/handoff-launchers.tests.ps1
-      - name: plan artifact context and packaging tests
+      - name: source layout and package tests
         shell: pwsh
-        run: python -B -m unittest discover -s tests -p test_plan_artifacts.py -v
+        run: python -B -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: shared runtime tests
+        shell: pwsh
+        run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v

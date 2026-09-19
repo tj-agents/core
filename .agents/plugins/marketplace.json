@@ -1,7 +1,7 @@
 {
   "name": "base-agents",
   "interface": {
-    "displayName": "Base Agent Utilities"
+    "displayName": "Agent capabilities"
   },
   "plugins": [
     {
@@ -12,6 +12,30 @@
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "engineering",
+      "source": {
+        "source": "local",
+        "path": "./plugins/engineering"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "machine",
+      "source": {
+        "source": "local",
+        "path": "./plugins/machine"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity"
