@@ -1,0 +1,165 @@
+﻿"""Validate the canonical-source, host-adapter, and generated-package boundary."""
+
+import importlib.util
+import json
+from pathlib import Path
+import shutil
+import tempfile
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location(
+    "package_sync", ROOT / "scripts/sync_plugin_packages.py"
+)
+SYNC = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SYNC)
+
+
+class SourceLayoutTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="agent source layout ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        for name in (".agents", ".codex", ".claude"):
+            shutil.copytree(
+                ROOT / name,
+                self.root / name,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
+
+    def config(self, edit):
+        path = self.root / ".agents/plugins/sources.json"
+        value = json.loads(path.read_text(encoding="utf-8"))
+        edit(value)
+        path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+    def test_each_host_adapter_resolves_one_canonical_definition(self):
+        _, output, skills, _ = SYNC.build(self.root)
+        self.assertEqual(58, len(skills))
+        self.assertEqual(set(skills), {
+            path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
+        })
+        self.assertEqual(set(skills), {
+            path.parent.name for path in (self.root / ".claude/skills").glob("*/SKILL.md")
+        })
+        for name, skill in skills.items():
+            for host in ("codex", "claude"):
+                adapter = (self.root / f".{host}/skills/{name}/SKILL.md").read_text(
+                    encoding="utf-8"
+                )
+                self.assertEqual(
+                    1,
+                    adapter.count(f"](../../../{skill['relative']})"),
+                    f"{host}:{name}",
+                )
+        self.assertFalse((self.root / "base").exists())
+        self.assertFalse((self.root / "engineering").exists())
+        self.assertFalse((self.root / "machine").exists())
+        self.assertIn(
+            "plugins/base/.agents/base/plan-artifacts/SKILL.md",
+            output,
+        )
+
+    def test_generated_payloads_are_self_contained(self):
+        _, output, _, _ = SYNC.build(self.root)
+        for relative in (
+            "plugins/base/skills/plan-artifacts/scripts/session-context.py",
+            "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
+            "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
+            "plugins/machine/codex-skills/handoff-claude/scripts/launch-claude.ps1",
+            "plugins/machine/resources/machine/utility/scripts/history.py",
+        ):
+            self.assertIn(relative, output)
+        self.assertEqual(
+            output["plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1"],
+            (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes(),
+        )
+
+    def test_generation_is_deterministic_and_prunes_only_declared_output(self):
+        SYNC.generate(self.root)
+        SYNC.generate(self.root, check=True)
+        unrelated = self.root / "user-owned.txt"
+        unrelated.write_text("preserve", encoding="utf-8")
+        stale = self.root / "plugins/base/obsolete.txt"
+        stale.write_text("generated orphan", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "orphans: 1"):
+            SYNC.generate(self.root, check=True)
+        self.assertTrue(stale.exists())
+        SYNC.generate(self.root)
+        self.assertFalse(stale.exists())
+        self.assertEqual("preserve", unrelated.read_text(encoding="utf-8"))
+
+    def test_adapter_roster_and_body_are_enforced(self):
+        (self.root / ".codex/skills/commit/SKILL.md").unlink()
+        with self.assertRaisesRegex(ValueError, "adapter roster mismatch"):
+            SYNC.build(self.root)
+
+        shutil.copy2(
+            ROOT / ".codex/skills/commit/SKILL.md",
+            self.root / ".codex/skills/commit/SKILL.md",
+        )
+        path = self.root / ".codex/skills/commit/SKILL.md"
+        path.write_text(path.read_text(encoding="utf-8") + "\nDuplicated rule.\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "thin canonical reference"):
+            SYNC.build(self.root)
+
+    def test_scope_metadata_and_public_names_are_enforced(self):
+        path = self.root / ".agents/machine/utility/clip/SKILL.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("kind: utility", "kind: workflow"),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "kind .* does not match kind folder"):
+            SYNC.build(self.root)
+
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("kind: workflow", "kind: utility"),
+            encoding="utf-8",
+        )
+        duplicate = self.root / ".agents/engineering/utility/clip"
+        shutil.copytree(path.parent, duplicate)
+        duplicate_skill = duplicate / "SKILL.md"
+        duplicate_skill.write_text(
+            duplicate_skill.read_text(encoding="utf-8").replace(
+                "domain: machine", "domain: process"
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "Duplicate public skill name"):
+            SYNC.build(self.root)
+
+    def test_resources_and_generated_roots_cannot_escape_ownership(self):
+        self.config(
+            lambda value: value["resources"].append(
+                {
+                    "plugin": "machine",
+                    "source": ".agents/machine/utility/scripts",
+                    "destination": "../base/escaped",
+                }
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "Invalid resource destination"):
+            SYNC.build(self.root)
+
+        self.config(
+            lambda value: value.update(
+                resources=value["resources"][:-1],
+                generated_roots=value["generated_roots"] + [".agents/engineering"],
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "overlaps authored source"):
+            SYNC.build(self.root)
+
+    def test_prerequisite_cycles_and_missing_owners_fail(self):
+        self.config(lambda value: value["prerequisites"]["base"].append("engineering"))
+        with self.assertRaisesRegex(ValueError, "Prerequisite cycle"):
+            SYNC.build(self.root)
+
+        self.config(lambda value: value["prerequisites"].update(base=["absent"]))
+        with self.assertRaisesRegex(ValueError, "Unknown prerequisite"):
+            SYNC.build(self.root)
+
+
+if __name__ == "__main__":
+    unittest.main()

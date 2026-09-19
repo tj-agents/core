@@ -1,0 +1,15 @@
+{
+  "name": "machine",
+  "description": "Explicit harness, history and clipboard utilities.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tomjseery/base-agents",
+  "keywords": [
+    "machine",
+    "sessions",
+    "handoff"
+  ],
+  "displayName": "Machine utilities",
+  "skills": "./skills/"
+}

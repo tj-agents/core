@@ -1,0 +1,149 @@
+{
+  "schema_version": 2,
+  "scopes": [
+    {
+      "name": "base",
+      "root": ".agents/base",
+      "layout": "flat",
+      "plugin": "base",
+      "domain": "behavior"
+    },
+    {
+      "name": "engineering",
+      "root": ".agents/engineering",
+      "layout": "kind",
+      "plugin": "engineering",
+      "domain": "process"
+    },
+    {
+      "name": "machine",
+      "root": ".agents/machine",
+      "layout": "kind",
+      "plugin": "machine",
+      "domain": "machine"
+    }
+  ],
+  "host_adapter_roots": {
+    "codex": ".codex/skills",
+    "claude": ".claude/skills"
+  },
+  "host_manifest_roots": {
+    "codex": ".codex/plugins",
+    "claude": ".claude/plugins"
+  },
+  "host_hook_sources": {
+    "base": {
+      "codex": ".codex/hooks/base.json",
+      "claude": ".claude/hooks/base.json"
+    },
+    "engineering": {
+      "codex": ".codex/hooks/engineering.json",
+      "claude": ".claude/hooks/engineering.json"
+    }
+  },
+  "generated_roots": [
+    "plugins/base",
+    "plugins/engineering",
+    "plugins/machine",
+    ".agents/plugins/marketplace.json",
+    ".claude-plugin/marketplace.json"
+  ],
+  "resources": [
+    {
+      "plugin": "engineering",
+      "source": ".agents/lanes",
+      "destination": ".agents/lanes"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/machine/utility/scripts",
+      "destination": "resources/machine/utility/scripts"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/workflows",
+      "destination": "workflows"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".codex/install-workflow-agents.ps1",
+      "destination": "scripts/install-codex-agents.ps1"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".codex/agent-delivery.json",
+      "destination": "workflows/hosts/agent-delivery.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/compact_output_gate.py",
+      "destination": "hooks/compact_output_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/delivery_binding_gate.py",
+      "destination": "hooks/delivery_binding_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/forge_poll_gate.py",
+      "destination": "hooks/forge_poll_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/git_auth_scope_gate.py",
+      "destination": "hooks/git_auth_scope_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/hook_runtime.py",
+      "destination": "hooks/hook_runtime.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/merge_review_gate.py",
+      "destination": "hooks/merge_review_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/persistent_workflow_merge_gate.py",
+      "destination": "hooks/persistent_workflow_merge_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/plan_graph.py",
+      "destination": "hooks/plan_graph.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/plan_handoff_stop.py",
+      "destination": "hooks/plan_handoff_stop.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/plan_handoff_stop_launcher.py",
+      "destination": "hooks/plan_handoff_stop_launcher.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/worktree_cleanup_gate.py",
+      "destination": "hooks/worktree_cleanup_gate.py"
+    }
+  ],
+  "prerequisites": {
+    "base": [],
+    "engineering": [
+      "base"
+    ],
+    "machine": [
+      "base"
+    ]
+  },
+  "extended_host_adapters": [
+    "persistent-workflow"
+  ],
+  "workflow": {
+    "source": ".agents/workflows",
+    "plugin": "engineering"
+  }
+}

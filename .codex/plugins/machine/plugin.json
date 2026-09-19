@@ -1,0 +1,24 @@
+{
+  "name": "machine",
+  "description": "Explicit harness, history and clipboard utilities.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tomjseery/base-agents",
+  "keywords": [
+    "machine",
+    "sessions",
+    "handoff"
+  ],
+  "version": "2.0.0",
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "Machine utilities",
+    "shortDescription": "Explicit harness, history and clipboard utilities.",
+    "longDescription": "Explicit harness, history and clipboard utilities.",
+    "developerName": "Tommy Seery",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the selected capability for this task."
+  }
+}

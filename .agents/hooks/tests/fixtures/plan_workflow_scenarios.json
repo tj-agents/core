@@ -1,0 +1,290 @@
+{
+  "schema_version": 1,
+  "selection_cases": [
+    {
+      "id": "author-primary",
+      "request": "Design a phased plan and ledger for replacing the cache layer, but do not implement it.",
+      "expected_skill": "plan-authoring",
+      "description_terms": [
+        "planning-only requests",
+        "do not use to execute an existing plan"
+      ]
+    },
+    {
+      "id": "author-paraphrase",
+      "request": "Break the billing migration into shippable stages with verification gates.",
+      "expected_skill": "plan-authoring",
+      "description_terms": [
+        "planning-only requests",
+        "do not use to execute an existing plan"
+      ]
+    },
+    {
+      "id": "author-design-reference",
+      "request": "Research the authorization model and write AUTHORIZATION_MODEL.md so another agent can implement the decision; do not write production code.",
+      "expected_skill": "plan-authoring",
+      "description_terms": [
+        "implementation-ready design documents",
+        "research decision or RFC"
+      ]
+    },
+    {
+      "id": "execute-primary",
+      "request": "Read plans/runtime/RUNTIME_PROGRESS.md and implement its Next Steps continuously.",
+      "expected_skill": "plan-execution",
+      "description_terms": [
+        "authorized long-term or multi-phase",
+        "resume the existing goal"
+      ]
+    },
+    {
+      "id": "execute-paraphrase",
+      "request": "Resume the uniquely active import plan and keep going across its remaining phases.",
+      "expected_skill": "plan-execution",
+      "description_terms": [
+        "authorized long-term or multi-phase",
+        "resume the existing goal"
+      ]
+    },
+    {
+      "id": "roadmap-compat",
+      "request": "Use continue-roadmap to choose and plan the next implementable payments item.",
+      "expected_skill": "continue-roadmap",
+      "description_terms": [
+        "what to plan next",
+        "do not resume an existing plan"
+      ]
+    },
+    {
+      "id": "resume-compat",
+      "request": "Use resume-plan for this legacy handoff.",
+      "expected_skill": "resume-plan",
+      "description_terms": [
+        "explicit resume-plan invocation",
+        "ordinary natural-language requests"
+      ]
+    },
+    {
+      "id": "feature-neighbor",
+      "request": "Add CSV export as one obvious unplanned change.",
+      "expected_skill": "feature",
+      "description_terms": [
+        "when no active plan owns the work",
+        "do not use for defect repair"
+      ]
+    },
+    {
+      "id": "review-neighbor",
+      "request": "Review the current plan branch without implementing it.",
+      "expected_skill": "review",
+      "description_terms": [
+        "full code review",
+        "review a branch"
+      ]
+    }
+  ],
+  "authoring_scenarios": [
+    {
+      "id": "planning-only-authoring",
+      "implementation_authorized": false,
+      "terminal": "complete"
+    },
+    {
+      "id": "author-then-execute",
+      "implementation_authorized": true,
+      "terminal": "continue"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "multi-phase-continuation",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "implement-phase-one",
+        "focused-validate",
+        "checkpoint-phase-one",
+        "continue",
+        "implement-phase-two",
+        "focused-validate",
+        "checkpoint-phase-two",
+        "complete"
+      ],
+      "checkpoints": {
+        "checkpoint-phase-one": "Implement phase two.",
+        "checkpoint-phase-two": "Complete: Both phases are verified."
+      },
+      "terminal": "complete"
+    },
+    {
+      "id": "phase-checkpoint-without-stop",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "implement-phase",
+        "focused-validate",
+        "checkpoint-phase",
+        "continue",
+        "select-next-phase"
+      ],
+      "checkpoints": {
+        "checkpoint-phase": "Implement the next phase."
+      },
+      "terminal": "continue"
+    },
+    {
+      "id": "validation-failure-recovery",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "validation-failed",
+        "parent-diagnosis",
+        "repair",
+        "revalidate",
+        "checkpoint-repair",
+        "continue"
+      ],
+      "checkpoints": {
+        "checkpoint-repair": "Prepare the reviewed delivery candidate."
+      },
+      "terminal": "continue"
+    },
+    {
+      "id": "fresh-context-transfer",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "checkpoint-transfer",
+        "transfer"
+      ],
+      "checkpoints": {
+        "checkpoint-transfer": "Resume from the transferred context after reading this ledger."
+      },
+      "resume_condition": "A fresh parent resolves the same ledger and Git identity.",
+      "terminal": "transfer"
+    },
+    {
+      "id": "compatibility-entries",
+      "entry": "resume-plan",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "resume-plan-entry",
+        "continue-roadmap-entry",
+        "continue"
+      ],
+      "checkpoints": {},
+      "terminal": "continue"
+    },
+    {
+      "id": "blocker-return-path",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "block",
+        "reciprocal-return"
+      ],
+      "checkpoints": {},
+      "blocker": {
+        "reason": "The dependency contract is unavailable.",
+        "owner": "plans/dependency/DEPENDENCY_PROGRESS.md",
+        "action": "Land the dependency contract.",
+        "resume": "The dependency ledger records the published contract and return path."
+      },
+      "terminal": "block"
+    },
+    {
+      "id": "restart-recovery",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "checkpoint-restart",
+        "restart",
+        "re-resolve",
+        "continue",
+        "complete"
+      ],
+      "checkpoints": {
+        "checkpoint-restart": "Resume the next phase after provider restart."
+      },
+      "terminal": "complete"
+    },
+    {
+      "id": "review-finding-recovery",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "checkpoint-review",
+        "review-finding",
+        "address-review",
+        "checkpoint-review-repair",
+        "incremental-review",
+        "continue"
+      ],
+      "checkpoints": {
+        "checkpoint-review": "Run the immutable candidate review.",
+        "checkpoint-review-repair": "Run incremental review over the repair delta."
+      },
+      "terminal": "continue"
+    },
+    {
+      "id": "trusted-continuation-resume",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "accept-continuation",
+        "implement-phase",
+        "focused-validate",
+        "checkpoint-phase",
+        "continue"
+      ],
+      "checkpoints": {
+        "checkpoint-phase": "Implement the next phase."
+      },
+      "continuation": {
+        "next_steps": "Implement phase one."
+      },
+      "terminal": "continue"
+    },
+    {
+      "id": "contradicted-continuation-rereads",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "contradicted-continuation",
+        "implement-phase",
+        "focused-validate",
+        "continue"
+      ],
+      "checkpoints": {},
+      "continuation": {
+        "next_steps": "Implement phase one."
+      },
+      "terminal": "continue"
+    },
+    {
+      "id": "pr-slice-rollover",
+      "entry": "plan-execution",
+      "workflow": "plan-execution",
+      "events": [
+        "resolve",
+        "checkpoint-slice-one",
+        "merge-slice",
+        "rollover-slice",
+        "continue"
+      ],
+      "checkpoints": {
+        "checkpoint-slice-one": "Deliver the reviewed first PR slice."
+      },
+      "rollover_next_steps": "Implement the second PR slice from fresh default.",
+      "terminal": "continue"
+    }
+  ]
+}

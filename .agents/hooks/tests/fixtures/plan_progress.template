@@ -1,0 +1,37 @@
+# Plan workflow acceptance progress
+
+- Plan: plans/runtime/RUNTIME_PLAN.md
+- Roadmap: plans/runtime/RUNTIME_ROADMAP.md
+- Roadmap item: runtime/plan-execution
+- Worktree: __WORKTREE__
+- Branch: __BRANCH__
+- PR: not opened
+
+## Current state
+
+The scripted plan workflow owns the current acceptance phase.
+
+## Next Steps
+
+Scope: whole plan through all remaining phases and terminal delivery.
+Current slice: execute the next implementation phase.
+Remaining scope: all later phases, review, validation, delivery, and closeout.
+Done when: the full plan reaches its documented terminal state.
+
+__NEXT_STEPS__
+
+## Completed work
+
+Baseline plan and ledger created.
+
+## Verification
+
+Pending.
+
+## Reviews
+
+No review work order is open.
+
+## Decisions, discoveries, blockers, and deviations
+
+- Repository state is the portable provider fallback.

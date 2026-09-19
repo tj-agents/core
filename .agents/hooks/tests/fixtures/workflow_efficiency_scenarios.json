@@ -1,0 +1,32 @@
+{
+  "completed_run_while_disconnected": {
+    "before_disconnect": [
+      {"state": "in_progress", "conclusion": null},
+      {"state": "queued", "conclusion": null}
+    ],
+    "after_reconnect": [
+      {"state": "completed", "conclusion": "success"}
+    ]
+  },
+  "machine_suspension": {
+    "elapsed_seconds": 900,
+    "poll_seconds": 60,
+    "minimum_offline_seconds": 840
+  },
+  "unrelated_main_movement": {
+    "candidate_paths": ["src/mapping.txt"],
+    "base_paths": [],
+    "source_review_required": false
+  },
+  "phase_only_execution": {
+    "scope": "current slice only; full plan remains incomplete",
+    "current_slice": "deliver Phase 1",
+    "remaining_scope": "Phases 2-4 remain incomplete",
+    "terminal_state": "Phase 1 merged; full plan remains open"
+  },
+  "bounded_log_output": {
+    "success_summary_bytes": 0,
+    "failure_summary_bytes": 4096,
+    "failure_items": 20
+  }
+}

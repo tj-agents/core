@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://concertable.dev/agent-workflows/v2/state.schema.json",
+  "title": "Agent workflow portable state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "workflow_id",
+    "workflow_run_id",
+    "stage_id",
+    "status",
+    "provider_id",
+    "owner",
+    "artifacts",
+    "decisions",
+    "open_findings",
+    "next_action",
+    "transition"
+  ],
+  "properties": {
+    "contract_version": {"const": "v2"},
+    "workflow_id": {"$ref": "#/$defs/identifier"},
+    "workflow_run_id": {"$ref": "#/$defs/identifier"},
+    "stage_id": {"$ref": "#/$defs/identifier"},
+    "status": {"enum": ["active", "paused", "blocked", "complete"]},
+    "provider_id": {"enum": ["repository"]},
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "worktree", "branch", "head"],
+      "properties": {
+        "repository": {"$ref": "#/$defs/non_empty_string"},
+        "worktree": {"$ref": "#/$defs/non_empty_string"},
+        "branch": {"$ref": "#/$defs/non_empty_string"},
+        "head": {"$ref": "#/$defs/non_empty_string"},
+        "session_id": {"$ref": "#/$defs/non_empty_string"}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan", "ledger", "roadmap", "reviews"],
+      "properties": {
+        "plan": {"$ref": "#/$defs/non_empty_string"},
+        "ledger": {"$ref": "#/$defs/non_empty_string"},
+        "roadmap": {"$ref": "#/$defs/non_empty_string"},
+        "reviews": {"$ref": "#/$defs/string_array"}
+      }
+    },
+    "decisions": {"$ref": "#/$defs/string_array"},
+    "open_findings": {"$ref": "#/$defs/string_array"},
+    "blocker": {"$ref": "#/$defs/gate"},
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "description", "scope", "current_slice", "remaining_scope", "done_when"],
+      "properties": {
+        "kind": {"enum": ["continue", "transfer", "pause", "block", "complete"]},
+        "description": {"$ref": "#/$defs/non_empty_string"},
+        "scope": {"$ref": "#/$defs/non_empty_string"},
+        "current_slice": {"$ref": "#/$defs/non_empty_string"},
+        "remaining_scope": {"$ref": "#/$defs/non_empty_string"},
+        "done_when": {"$ref": "#/$defs/non_empty_string"},
+        "owner": {"$ref": "#/$defs/non_empty_string"},
+        "resume_condition": {"$ref": "#/$defs/non_empty_string"}
+      }
+    },
+    "transition": {"$ref": "#/$defs/transition"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"const": "blocked"}},
+        "required": ["status"]
+      },
+      "then": {"required": ["blocker"]},
+      "else": {"not": {"required": ["blocker"]}}
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+    },
+    "non_empty_string": {"type": "string", "minLength": 1},
+    "string_array": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "transition", "owner", "reason"],
+      "properties": {
+        "contract_version": {"const": "v2"},
+        "transition": {
+          "enum": ["continue", "retry", "fallback", "cancel", "checkpoint", "transfer", "pause", "block", "complete"]
+        },
+        "owner": {"const": "parent"},
+        "reason": {"$ref": "#/$defs/non_empty_string"},
+        "target_stage_id": {"$ref": "#/$defs/identifier"},
+        "dispatch_id": {"$ref": "#/$defs/identifier"},
+        "resume_condition": {"$ref": "#/$defs/non_empty_string"}
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "gate_kind", "status", "owner", "action", "resume_condition", "evidence"],
+      "properties": {
+        "contract_version": {"const": "v2"},
+        "gate_kind": {"enum": ["human", "external", "dependency", "delivery", "destructive", "context-transfer"]},
+        "status": {"enum": ["open", "satisfied"]},
+        "owner": {"$ref": "#/$defs/non_empty_string"},
+        "action": {"$ref": "#/$defs/non_empty_string"},
+        "resume_condition": {"$ref": "#/$defs/non_empty_string"},
+        "evidence": {"$ref": "#/$defs/string_array"}
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "generated_agent_patterns": [
+    "evidence-explorer.toml",
+    "log-analyst.toml",
+    "mechanical-worker.toml",
+    "review-lens.toml",
+    "test-impact-analyst.toml",
+    "lane-*.toml"
+  ],
+  "former_managed_agents": [
+    "workflow-evidence-explorer.toml",
+    "workflow-log-analyst.toml",
+    "workflow-mechanical-worker.toml",
+    "workflow-review-lens.toml",
+    "workflow-test-impact-analyst.toml"
+  ]
+}

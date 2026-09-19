@@ -1,0 +1,36 @@
+{
+  "contract_version": "v2",
+  "workflow_id": "plan-execution",
+  "workflow_run_id": "agent-workflows/runtime-001",
+  "stage_id": "contract-discovery",
+  "semantic_stage": "strategic",
+  "dispatch_id": "dispatch-001",
+  "capability": "evidence-explorer",
+  "objective": "Locate the canonical generator inputs and their drift checks.",
+  "context": {
+    "repository_paths": [".agents/sync-generated.ps1", ".agents/plugins/payloads.json"],
+    "immutable_artifacts": ["git:27460f1518ea945d7c0215fdf65b36854103098a"],
+    "supplied_logs": [],
+    "prior_decisions": ["The shared contract is not a task trigger."],
+    "assumptions": []
+  },
+  "permissions": {
+    "mode": "read",
+    "files": [".agents/sync-generated.ps1", ".agents/plugins/payloads.json"],
+    "tools": ["read", "search"],
+    "allow_subdispatch": false
+  },
+  "result_schema": "result.schema.json",
+  "decision_boundary": {
+    "may_decide": ["repository evidence and its location"],
+    "must_not_decide": ["product scope", "architecture", "implementation choice"]
+  },
+  "acceptance_conditions": ["Every claim cites a repository path or immutable artifact."],
+  "deadline": {"cancellation_condition": "Cancel when the immutable baseline changes."},
+  "failure_behavior": {
+    "uncertainty": "State uncertainty and plausible alternatives.",
+    "missing_context": "Return incomplete and name the missing context.",
+    "conflicting_evidence": "Return both observations without choosing architecture.",
+    "incomplete_result": "Return completed conditions and the exact remaining gap."
+  }
+}
