@@ -1,6 +1,6 @@
 {
   "name": "base-agents",
-  "description": "Machine-specific utilities and handoff launchers for Tommy Seery agent sessions.",
+  "description": "Generic agent layer for Tommy Seery sessions - machine utilities plus the shared process standards, for Claude Code and Codex.",
   "owner": {
     "name": "Tommy Seery"
   },
@@ -8,7 +8,7 @@
     {
       "name": "base",
       "source": "./plugins/base",
-      "description": "Machine utility skills and cross-harness handoff launchers.",
+      "description": "Generic agent layer for Claude and Codex - machine utilities plus the shared process, planning, review and delivery standards.",
       "category": "Productivity",
       "keywords": [
         "utilities",
