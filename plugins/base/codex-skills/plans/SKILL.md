@@ -8,6 +8,15 @@ domain: process
 
 # Plans
 
+## Applicability
+
+Read [plan-artifacts](../plan-artifacts/SKILL.md) for the common maintained-plan contract.
+The engineering lifecycle below applies only when selected by the project or user. For standalone
+planning, correction, or resume, follow that common contract and stop here; do not require a roadmap,
+ledger, provider, review pipeline, or publication. Installing base or invoking planning alone does not
+select this richer lifecycle or grant implementation or publication authority.
+
+
 **Git history is the archive.** A plan is a working document for *unfinished* work; a finished plan kept "for
 reference" is rot that misleads the next reader into thinking the work is still pending.
 
@@ -153,9 +162,12 @@ Every `## Next Steps` includes four non-empty lines: `Scope:`, `Current slice:`,
 authorization should continue across every remaining phase. Use
 `Scope: current slice only; full plan remains incomplete.` when the next execution ends at a phase, PR, or
 gate. `Remaining scope:` names what stays open after that slice and `Done when:` names the terminal state
-after these steps. Put the four lines after any leading blocker, pause, or transfer fields. A task title or
-handoff may imply a broad outcome; these lines decide the actual execution boundary and make any narrower
-slice explicit.
+after these steps. Put the four lines after any leading blocker, pause, or transfer fields. These lines
+record the user's actual authorization; they cannot narrow it or outrank a later user instruction.
+Use current-slice-only scope only when the user explicitly selected that stopping boundary or a genuine
+gate requires it, recording the source of the restriction. An agent-chosen PR or phase size is not such
+a restriction. Carry the whole authorized goal through review, delivery, and any automated continuation;
+reconcile stale handoff restrictions with the current user request before acting.
 
 The retention test for every entry is: **could removing this fact cause a fresh agent to take the wrong
 action or repeat a costly failed approach?** If not, remove it. The checkpoint standard owns the mechanical

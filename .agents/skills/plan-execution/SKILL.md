@@ -1,6 +1,6 @@
 ---
 name: plan-execution
-description: Implement or resume an explicit or uniquely resolved active plan and ledger through its phases, review, validation, delivery slices, and material checkpoints. Use for named plan execution or plan-managed continuation; do not use to author a new plan, prioritize a roadmap, handle unplanned short work, or perform review-only work.
+description: Automatically own authorized long-term or multi-phase work through completion, including documentation tasks, even when the user does not name a plan or skill. Resume the existing goal and keep its progress current through execution, review, validation, delivery, and context handoffs. Excludes planning-only, quick one-step, and review-only requests.
 
 kind: workflow
 domain: process
@@ -12,6 +12,30 @@ lane: L3
 Own one authoritative plan identity until the requested work completes or reaches a genuine typed gate.
 A phase boundary, subordinate return, diagnosable failure, local commit, or resolved next action is not a
 stopping condition.
+
+Select this workflow by default for authorized long-term or multi-phase execution; the user need not
+name the skill. Before accepting a recorded slice-only boundary, check its source against the current
+request. Preserve explicit user limits and genuine gates, but repair agent-authored stopping points that
+would abandon authorized remaining work. Context transfer must use the available automated continuation
+or launcher after checkpointing; a pointer alone does not transfer ownership unless prompt-only output
+was requested.
+
+## Standalone or runtime-unavailable execution
+
+For standalone work or a project without the engineering runtime, apply
+[`plan-artifacts`](../plan-artifacts/SKILL.md), keep the existing goal file as the progress owner, and
+execute the authorized phases with the available tools. If there is no existing owner, create the one
+maintained plan required by that contract. Do not create a repository, separate ledger, roadmap, or
+provider merely to run this workflow. Checkpoint results and remaining work in that same file, verify
+the requested outcome, and link it in the response. Preserve authorization and use an available automated
+continuation when context transfer is needed, as required above.
+
+The rest of this document does not apply in this mode. Continue the task under this standalone loop;
+do not invoke the repository helpers, load Workflow v2 envelopes, or require the separate ledger below.
+
+## Repository runtime execution
+
+Use the remaining sections only when the selected engineering lifecycle has its runtime installed.
 
 Resolve `plan-execution` as the single owning lifecycle skill and only the technical skills directly routed
 by the current changed paths. Use `python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id>
@@ -106,7 +130,9 @@ its lease; never overlap writers or let a subordinate choose a phase, fix, sever
 ## Transfer and restart
 
 Resolve the repository provider once and consume Workflow v2 dispatch/result and provider/state envelopes
-from `.agents/workflows/contract/v2`, or the packaged `../../workflows/contract/v2` bundle. Kandev may host
+from the installed runtime's `.agents/workflows/contract/v2`. Use a plugin-relative contract bundle only
+when the selected package actually declares and ships it; the current combined base package does not.
+Kandev may host
 the task worktree and exact native session, but the workflow does not call Kandev as a state API or persist
 its identifiers. A bare CLI uses the same repository state.
 

@@ -12,5 +12,6 @@
     "powershell",
     "sessions",
     "handoff"
-  ]
+  ],
+  "hooks": "./skills/plan-artifacts/hooks/hooks.json"
 }
