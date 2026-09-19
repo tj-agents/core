@@ -8,8 +8,8 @@
     {
       "name": "base",
       "source": "./plugins/base",
-      "description": "Machine utility skills for repository sync, worktrees, transcript recovery, and cross-harness handoffs.",
-      "category": "productivity",
+      "description": "Machine utility skills and cross-harness handoff launchers.",
+      "category": "Productivity",
       "keywords": [
         "utilities",
         "powershell",
