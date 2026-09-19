@@ -10,6 +10,15 @@ effort: high
 
 # Author a durable plan
 
+## Applicability
+
+Read [plan-artifacts](../plan-artifacts/SKILL.md) for the common maintained-plan contract.
+The engineering lifecycle below applies only when selected by the project or user. For standalone
+planning, correction, or resume, follow that common contract and stop here; do not require a roadmap,
+ledger, provider, review pipeline, or publication. Installing base or invoking planning alone does not
+select this richer lifecycle or grant implementation or publication authority.
+
+
 Turn an explicitly requested planning outcome into one authoritative implementation design. A phased plan
 has a recovery ledger; a standing reference that owns no phases keeps its bare filename and needs no ledger.
 Both follow the `plans` skill's implementation-examples and standards contract. Planning-only authority ends

@@ -33,6 +33,7 @@ Authored:
   .agents/plugins/marketplace.json         Codex marketplace
   .claude-plugin/marketplace.json          Claude marketplace
   plugins/<p>/.codex-plugin/plugin.json    Codex plugin manifests
+  plugins/<p>/.claude-plugin/plugin.json   Claude plugin manifests (authored input exception)
 
 Generated:
   .claude/skills/<name>/SKILL.md          routed: front matter plus the canonical doc body, so discovery
@@ -267,7 +268,12 @@ function Expand-RoutedSkill(
 # author, so an unemitted sibling is not merely missing from the copy, it is removed from it.
 function Add-SkillSiblings([string]$prefix, $router) {
     foreach ($sibling in $router.Siblings) {
-        $generated["$prefix/$($router.Name)/$($sibling.Relative)"] = Read-Lf $sibling.FullName
+        $body = Read-Lf $sibling.FullName
+        if ($router.Name -eq 'plan-artifacts' -and $sibling.Relative -eq 'hooks/hooks.json') {
+            $hostSkillsRoot = if ($prefix.EndsWith('/codex-skills')) { 'codex-skills' } else { 'skills' }
+            $body = $body.Replace('{{HOST_SKILLS_ROOT}}', $hostSkillsRoot)
+        }
+        $generated["$prefix/$($router.Name)/$($sibling.Relative)"] = $body
     }
 }
 
@@ -454,7 +460,7 @@ foreach ($entry in $manifestJson.plugins) {
     # The two hosts deliberately point at different trees once any skill declares a lane: the same
     # rung resolves to a different model id per harness, so one shared folder could only ever carry
     # one host's answer. Each must simply declare a tree that exists.
-    foreach ($field in @('skills', 'hooks')) {
+    foreach ($field in @('skills')) {
         if ($claudePlugin.$field -and -not (Test-Path (Join-Path $source ($claudePlugin.$field -replace '^\./', '')))) {
             throw "Plugin '$($entry.name)' Claude manifest declares '$field' at '$($claudePlugin.$field)', which does not exist."
         }
@@ -806,6 +812,21 @@ foreach ($domain in $domains) {
         '|---|---|---|'
     ) + $rows + @('')
     $generated["standards/$domain/$INDEX_NAME"] = ($lines -join "`n")
+}
+
+# A manifest may reference a resource generated for the first time in this run.
+# Validate both hosts against the output map, not a stale on-disk copy.
+foreach ($plugin in $plugins) {
+    foreach ($hostId in @('claude', 'codex')) {
+        $hostManifest = ConvertFrom-Json (Read-Lf (Join-Path $plugin.FullName ".$hostId-plugin/plugin.json"))
+        if ($hostManifest.hooks) {
+            $hookPath = "plugins/$($plugin.Name)/" + ($hostManifest.hooks -replace '^\./', '')
+            if (-not $generated.Contains($hookPath)) {
+                throw "Plugin '$($plugin.Name)' $hostId hook '$($hostManifest.hooks)' is not generated."
+            }
+            $null = ConvertFrom-Json $generated[$hookPath]
+        }
+    }
 }
 
 $stale = @(); $written = @(); $unchanged = @()
