@@ -10,7 +10,8 @@ $ErrorActionPreference = 'Stop'
 $repository = Split-Path -Parent $PSScriptRoot
 $claudeLauncher = Join-Path $repository 'plugins\machine\skills\handoff-claude\scripts\launch-claude.ps1'
 $codexLauncher = Join-Path $repository 'plugins\machine\skills\handoff-codex\scripts\launch-codex.ps1'
-foreach ($launcher in @($claudeLauncher, $codexLauncher)) {
+$openLauncher = Join-Path $repository 'plugins\machine\skills\open-claude\scripts\open-claude.ps1'
+foreach ($launcher in @($claudeLauncher, $codexLauncher, $openLauncher)) {
     if (-not (Test-Path -LiteralPath $launcher)) {
         throw "Generated launcher missing: $launcher. Run pwsh .agents/sync-generated.ps1."
     }
@@ -137,6 +138,47 @@ class Stub {
     $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
     if ($capturedArgs -notmatch 'gpt-5-codex') { throw 'launch-codex.ps1 did not pass an explicit -Model through.' }
     if ($capturedArgs -notmatch 'model_reasoning_effort=high') { throw 'launch-codex.ps1 did not pass -ReasoningEffort through.' }
+    # --- open-claude: no prompt, no session - just a CLI on a directory ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $openLauncher -WorkingDirectory $workDir -Title 'test open'
+    if (-not (Test-Path -LiteralPath $wtLog)) { throw 'open-claude.ps1 did not invoke the (stubbed) terminal.' }
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($claudeBin + '\claude.exe')) {
+        throw 'open-claude.ps1 did not target the discovered claude.exe.'
+    }
+    if ($capturedArgs -match '--resume' -or $capturedArgs -match '--model') {
+        throw 'open-claude.ps1 passed session/model flags when none were given.'
+    }
+    if ($capturedArgs -notmatch [regex]::Escape($workDir)) {
+        throw 'open-claude.ps1 did not start the tab in the requested directory.'
+    }
+
+    # --- open-claude: -Resume reaches the CLI as --resume <id> ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $openLauncher -WorkingDirectory $workDir -Title 'test open' -Resume 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875'
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch '--resume') { throw 'open-claude.ps1 did not pass -Resume through.' }
+    if ($capturedArgs -notmatch 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875') {
+        throw 'open-claude.ps1 did not pass the session id through.'
+    }
+
+    # --- open-claude: -Resume and -Continue are mutually exclusive ---
+    $rejected = $false
+    try { & $openLauncher -WorkingDirectory $workDir -Resume 'abc' -Continue }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'open-claude.ps1 accepted -Resume together with -Continue.' }
+
+    # --- the shared library is what all three launchers actually load ---
+    foreach ($launcher in @($claudeLauncher, $codexLauncher, $openLauncher)) {
+        $shared = Join-Path (Split-Path -Parent $launcher) '..\..\..\resources\machine\utility\scripts\agent-cli.ps1'
+        if (-not (Test-Path -LiteralPath $shared -PathType Leaf)) {
+            throw "The packaged $(Split-Path -Leaf $launcher) cannot reach the shared agent-cli.ps1."
+        }
+        if ((Get-Content -LiteralPath $launcher -Raw) -notmatch 'agent-cli\.ps1') {
+            throw "$(Split-Path -Leaf $launcher) no longer loads the shared agent-cli.ps1."
+        }
+    }
+
 } finally {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalUserProfile
