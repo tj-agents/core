@@ -100,12 +100,12 @@ class GateSubprocessTests(unittest.TestCase):
 
         self.bindir = base / "bin"
         self.bindir.mkdir()
-        # Two answers, because the bind reads the PR and its complete patch separately.
+        # Two answers, because the bind reads the PR summary and its paginated file list separately.
         if os.name == "nt":
             shim = self.bindir / "gh.cmd"
             shim.write_text(
                 "@echo off\r\n"
-                'echo %* | findstr /C:"--name-only" >nul\r\n'
+                'echo %* | findstr /C:"api --paginate" >nul\r\n'
                 f'if %errorlevel%==0 (type "{self.diff_payload}") else (type "{self.gh_payload}")\r\n',
                 encoding="utf-8",
             )
@@ -114,7 +114,7 @@ class GateSubprocessTests(unittest.TestCase):
             shim.write_text(
                 "#!/bin/sh\n"
                 'case "$*" in\n'
-                f'  *--name-only*) cat "{self.diff_payload}" ;;\n'
+                f'  *"api --paginate"*) cat "{self.diff_payload}" ;;\n'
                 f'  *) cat "{self.gh_payload}" ;;\n'
                 "esac\n",
                 encoding="utf-8",
