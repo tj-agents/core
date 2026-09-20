@@ -5,9 +5,9 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`  `(2026-09-20)`
-**Security-reviewed up to commit:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`  `(2026-09-20)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`  `(2026-09-20)`
+**Security-reviewed up to commit:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`  `(2026-09-20)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-20 — staged:all
 
@@ -148,3 +148,39 @@ all earlier finding text, severities, candidate identity, and pass judgment are 
 and uses a candidate repository copy only when the package has no router. The regression fixture commits a
 shadow router that returns a false skill and proves review preparation still resolves the packaged route.
 All 26 workflow-operation tests and 15 package/source-layout tests pass, and generation remains stable.
+## Review pass — 2026-09-20 — incremental:trusted-router-remediation
+
+**Candidate base:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`
+**Candidate head:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`
+**Candidate branch:** `Refactor/CoreScopes`
+**Candidate scope:** `incremental`
+**Candidate path-set:** `sha256:8ab9adc5d6c9ff58b1c1c70acc12770435b9fc5897dd0ed48d39961887005856` `(4 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\base-agents\.git\agent-workflow\runs\p2-core-scopes-incremental-security-20260920\review\7df1f53409ac2b16588b8500590f28d958076311e9f6ddd9b5b3146545f4f1da`
+**Candidate bundle identity:** `sha256:3c576fb26b6ea878bf2af494fc03422627275df953fcbadd319fbba2b1840a19`
+**Work-order path:** `reviews/Refactor-CoreScopes.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The workflow runtime now selects its own packaged router before considering a repository
+fallback. The regression candidate carries a shadow router and cannot influence the resolved rule set.
+The generated workflow copy is byte-equivalent to canonical source, and the work-order-only changes retain
+all earlier candidate identities, finding text, severities, and completed pass judgments.
+
+### Coverage
+
+- [x] Trusted router selection, shadowing regression, generated copy, and review disposition — 4 paths — 2026-09-20
+
+### Rules manifest
+
+No `.agents/skill-routes.json` exists in this repository, so no repository-specific routed skill applies.
+The security and workflow lenses reviewed the exact four-path frozen delta.
+
+### Parent finalization
+
+**Cross-area notes status:** `complete`
+**Parent summary status:** `complete`
+
+The exact `a086aaf..c632a29` remediation delta is approved with zero new findings. All five findings in the
+canonical work order are resolved, and the current review and security watermarks advance to `c632a29`.
