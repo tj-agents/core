@@ -1,4 +1,4 @@
-﻿"""Validate the canonical-source, host-adapter, and generated-package boundary."""
+"""Validate the canonical-source, host-adapter, and generated-package boundary."""
 
 import importlib.util
 import json
@@ -60,6 +60,14 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/base/.agents/base/plan-artifacts/SKILL.md",
             output,
         )
+
+    def test_authored_host_manifests_have_one_canonical_owner(self):
+        for host in ("codex", "claude"):
+            manifest_root = self.root / f".agents/plugins/manifests/{host}"
+            self.assertTrue((manifest_root / "engineering.json").is_file())
+            self.assertTrue((manifest_root / "engineering-hooks.json").is_file())
+            self.assertFalse((self.root / f".{host}/plugins").exists())
+            self.assertFalse((self.root / f".{host}/hooks").exists())
 
     def test_generated_payloads_are_self_contained(self):
         _, output, _, _ = SYNC.build(self.root)

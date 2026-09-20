@@ -179,6 +179,32 @@ class ReviewTests(RepositoryFixture):
         self.assertEqual("candidate\n", (tree / "src" / "mapping.txt").read_text(encoding="utf-8"))
         self.assertEqual(result["bundle"]["identity_sha256"], ops.sha256_file(Path(result["bundle"]["identity"])))
 
+    def test_review_prepare_resolves_rules_with_the_packaged_router(self):
+        route_table = self.root / ".agents" / "skill-routes.json"
+        route_table.write_text(
+            json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),
+            encoding="utf-8",
+        )
+        self.git("add", ".agents/skill-routes.json")
+        self.git("commit", "-q", "-m", "add routing")
+
+        result = ops.review_prepare(self.root, "routed-review", "origin/main", "HEAD", False)
+
+        self.assertEqual(["feature"], [rule["name"] for rule in result["rules"]])
+        self.assertEqual(".agents/skills/feature/SKILL.md", result["rules"][0]["path"])
+
+    def test_opted_in_review_fails_visibly_when_router_runtime_is_missing(self):
+        (self.root / ".agents" / "skill-routes.json").write_text(
+            json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),
+            encoding="utf-8",
+        )
+        original = ops.__file__
+        ops.__file__ = str(self.root / "absent-package" / "workflows" / "workflow_ops.py")
+        try:
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "has no skill_router.py"):
+                ops.routed_skills(self.root, ["src/mapping.txt"])
+        finally:
+            ops.__file__ = original
     def test_tampered_review_artifact_is_rejected(self):
         descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
         Path(descriptor["bundle"]["patch"]).write_bytes(b"forged")

@@ -25,7 +25,7 @@ not recorded a standing instruction gets no automatic binding. A present but unr
 loud stop, never a silent skip - the failure mode this repo cares about is a mechanism that looks
 wired and is inert.
 
-Claude only, for the reason `.codex/hooks/hooks.json` already records for `red_run_gate.py`:
+Claude only, for the reason `.agents/plugins/manifests/codex/engineering-hooks.json` already records for `red_run_gate.py`:
 Codex exposes no tool-result event, so there is nothing for this hook to register on there. Codex
 reaches the same binding through the `open-pr` procedure, which names the command.
 

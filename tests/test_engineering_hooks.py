@@ -1,4 +1,5 @@
 """Exercise selected engineering hooks from a relocated, self-contained package."""
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -92,6 +93,66 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertIn(str(
                     self.package / ".agents/engineering/workflow/plan-execution/SKILL.md"
                 ), context)
+
+    def test_host_manifests_register_supported_router_and_red_run_events(self):
+        codex = json.loads((self.package / "hooks/codex.json").read_text(encoding="utf-8"))
+        claude = json.loads((self.package / "hooks/claude.json").read_text(encoding="utf-8"))
+
+        def commands(manifest, event):
+            return [
+                hook["command"]
+                for registration in manifest["hooks"].get(event, [])
+                for hook in registration.get("hooks", [])
+            ]
+
+        self.assertTrue(any("skill_router.py" in command for command in commands(codex, "PreToolUse")))
+        self.assertFalse(any("red_run_gate.py" in command for event in codex["hooks"] for command in commands(codex, event)))
+        self.assertTrue(any("skill_router.py" in command for command in commands(claude, "PreToolUse")))
+        for event in ("PostToolUse", "PostToolUseFailure", "Stop"):
+            self.assertTrue(
+                any("red_run_gate.py" in command for command in commands(claude, event)), event
+            )
+
+    def test_packaged_review_runtime_resolves_consumer_routes(self):
+        consumer = self.root / "routed consumer"
+        subprocess.run(["git", "init", "-q", "-b", "main", str(consumer)], check=True)
+
+        def git(*arguments):
+            return subprocess.run(
+                ["git", *arguments], cwd=consumer, capture_output=True, text=True, check=True
+            ).stdout.strip()
+
+        git("config", "user.email", "package@example.test")
+        git("config", "user.name", "Package Fixture")
+        git("remote", "add", "origin", "https://github.com/example/routed-consumer.git")
+        (consumer / ".agents" / "skills" / "feature").mkdir(parents=True)
+        (consumer / ".agents" / "skills" / "feature" / "SKILL.md").write_text(
+            "---\nname: feature\n---\n\n# Feature\n", encoding="utf-8"
+        )
+        (consumer / ".agents" / "skill-routes.json").write_text(
+            json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),
+            encoding="utf-8",
+        )
+        (consumer / "src").mkdir()
+        (consumer / "src" / "item.py").write_text("value = 1\n", encoding="utf-8")
+        git("add", ".")
+        git("commit", "-q", "-m", "baseline")
+        base = git("rev-parse", "HEAD")
+        git("update-ref", "refs/remotes/origin/main", base)
+        git("switch", "-q", "-c", "Feature/Routed-review")
+        (consumer / "src" / "item.py").write_text("value = 2\n", encoding="utf-8")
+        git("add", "src/item.py")
+        git("commit", "-q", "-m", "candidate")
+
+        runtime = self.package / "workflows" / "workflow_ops.py"
+        spec = importlib.util.spec_from_file_location("packaged_workflow_ops", runtime)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        result = module.review_prepare(consumer, "packaged-route", "origin/main", "HEAD", False)
+
+        self.assertEqual(["feature"], [rule["name"] for rule in result["rules"]])
+        self.assertEqual(".agents/skills/feature/SKILL.md", result["rules"][0]["path"])
+
     def test_policy_gates_are_silent_without_repository_opt_in(self):
         commands = {'forge_poll_gate': 'gh pr checks 42',
                     'compact_output_gate': 'python -m unittest',

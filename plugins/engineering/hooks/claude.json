@@ -1,5 +1,5 @@
 {
-  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files; no profiles or agents are installed automatically. Codex result and merge hooks await observed host payload support.",
+  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files. Claude result and stop events enforce the red-run repair loop.",
   "hooks": {
     "SessionStart": [
       {
@@ -13,6 +13,16 @@
       }
     ],
     "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\""
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
+      },
       {
         "hooks": [
           {
@@ -70,6 +80,16 @@
           {
             "type": "command",
             "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py\""
           }
         ],
@@ -77,6 +97,15 @@
       }
     ],
     "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ]
+      },
       {
         "hooks": [
           {
@@ -105,6 +134,18 @@
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py\""
           }
         ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
       }
     ]
   }

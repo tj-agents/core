@@ -310,12 +310,20 @@ def tree_content_digest(path):
 
 
 def routed_skills(root, paths):
-    router = root / ".agents" / "hooks" / "skill_router.py"
     route_table = root / ".agents" / "skill-routes.json"
-    if not route_table.is_file() or not router.is_file() or not paths:
+    if not route_table.is_file() or not paths:
         return []
+    candidates = (
+        root / ".agents" / "hooks" / "skill_router.py",
+        Path(__file__).resolve().parents[1] / "hooks" / "skill_router.py",
+    )
+    router = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if router is None:
+        raise WorkflowOperationError(
+            ".agents/skill-routes.json exists but the engineering package has no skill_router.py"
+        )
     completed = subprocess.run(
-        [sys.executable, str(router), "--skills-for", "--json"],
+        [sys.executable, "-B", str(router), "--skills-for", "--json"],
         cwd=str(root),
         input="\n".join(paths) + "\n",
         capture_output=True,
