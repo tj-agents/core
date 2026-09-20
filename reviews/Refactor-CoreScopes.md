@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `b8e2df716aa0283d58393b82b98ac5eb993db167`  `(2026-09-20)`
-**Security-reviewed up to commit:** `b8e2df716aa0283d58393b82b98ac5eb993db167`  `(2026-09-20)`
+**Reviewed up to commit:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`  `(2026-09-20)`
+**Security-reviewed up to commit:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`  `(2026-09-20)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-20 — staged:all
@@ -221,3 +221,39 @@ The security and workflow lenses reviewed the exact four-path frozen delta.
 The exact `c632a29..b8e2df7` delivery-binding delta is approved with zero findings. All 29 workflow-operation
 tests pass, generation remains stable at 295 files from 58 definitions, and the current review and security
 watermarks advance to `b8e2df7`.
+## Review pass — 2026-09-20 — incremental:windows-path-identity
+
+**Candidate base:** `b8e2df716aa0283d58393b82b98ac5eb993db167`
+**Candidate head:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`
+**Candidate branch:** `Refactor/CoreScopes`
+**Candidate scope:** `incremental`
+**Candidate path-set:** `sha256:a1ead035a6bf66aae38142e0e618e1f87d013a2f090f63310d44de478024b545` `(4 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\base-agents\.git\agent-workflow\runs\p2-core-scopes-incremental-windows-ci-20260920\review\03b7aa51d85819e82f6c3f1f02e43f35b6ad39bb22e2e837bc014423e580e65c`
+**Candidate bundle identity:** `sha256:66670d029eb96aff766d5f8abbf1f7ce0c9cc5ede8668df34d514d2cdf08009f`
+**Work-order path:** `reviews/Refactor-CoreScopes.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The generator resolves its input root once before deriving canonical relative paths, and
+both temporary package fixtures resolve their root before constructing expected paths. This makes Windows
+8.3 and long path aliases compare as one identity without weakening containment checks.
+
+### Coverage
+
+- [x] Generator root identity, both Windows package fixtures, and review record — 4 paths — 2026-09-20
+
+### Rules manifest
+
+No `.agents/skill-routes.json` exists in this repository, so no repository-specific routed skill applies.
+The workflow lens reviewed the exact four-path frozen delta.
+
+### Parent finalization
+
+**Cross-area notes status:** `complete`
+**Parent summary status:** `complete`
+
+The exact `b8e2df7..2d20db6` Windows path-identity delta is approved with zero findings. All 22 root/package
+tests pass locally, generation remains stable at 295 files from 58 definitions, and the current review and
+security watermarks advance to `2d20db6`.
