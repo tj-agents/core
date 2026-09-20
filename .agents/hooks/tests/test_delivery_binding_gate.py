@@ -133,7 +133,7 @@ class GateSubprocessTests(unittest.TestCase):
             json.dumps(policy), encoding="utf-8"
         )
 
-    def write_pr(self, *, files=("README.md",), labels=()):
+    def write_pr(self, *, files=("README.md",), labels=(), changed_files=None):
         self.diff_payload.write_text("\n".join(files) + "\n", encoding="utf-8")
         self.gh_payload.write_text(
             json.dumps(
@@ -144,7 +144,7 @@ class GateSubprocessTests(unittest.TestCase):
                     "headRefName": "Feature/Thing",
                     "state": "OPEN",
                     "isDraft": True,
-                    "changedFiles": len(files),
+                    "changedFiles": len(files) if changed_files is None else changed_files,
                     "labels": [{"name": name} for name in labels],
                     "files": [{"path": path} for path in files],
                     "statusCheckRollup": [
@@ -210,11 +210,11 @@ class GateSubprocessTests(unittest.TestCase):
         self.assertEqual("absent", self.binding()["merge_authorization"]["mode"])
 
     def test_a_truncated_paginated_file_set_creates_no_binding(self):
-        self.write_pr(files=("README.md", "src/two.txt"))
-        self.diff_payload.write_text("README.md\n", encoding="utf-8")
+        self.write_pr(files=("README.md",), changed_files=2)
         result = self.run_hook()
         self.assertEqual(2, result.returncode)
         self.assertIn("API returned 1 of 2 changed paths", result.stderr)
+        self.assertNotIn("missing reported paths", result.stderr)
         self.assertFalse((self.repo / ".agents" / "persistent-workflow-binding.json").exists())
 
     def test_a_repository_that_records_no_instruction_is_left_alone(self):

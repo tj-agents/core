@@ -315,7 +315,7 @@ creates no persistent delivery binding. The focused delivery-binding suite passe
 
 ### Findings
 
-- [ ] **REV-007 — MEDIUM — workflow/testing** — `.agents/hooks/tests/test_delivery_binding_gate.py:213`
+- [x] **REV-007 — MEDIUM — workflow/testing** — `.agents/hooks/tests/test_delivery_binding_gate.py:213`
   The new truncation regression triggers both a missing-summary-path mismatch and a changed-file-count mismatch.
   It can therefore remain green if the authoritative count stops controlling rejection, because the missing
   summary path still fails closed. Let the fixture override `changedFiles`, then keep the summary and API path
@@ -337,3 +337,7 @@ The native-general and workflow lenses inspect the exact two-path frozen remedia
 The exact `4561605..30925db` remediation delta has one new MEDIUM workflow/testing finding. The
 workflow lens found no defect; native-general identified that the regression does not isolate the count gate.
 The completed pass advances the review watermark to `30925db`; remediation requires another incremental pass.
+
+**REV-007 disposition:** `write_pr` now accepts an explicit authoritative count. The regression keeps
+the PR summary and paginated API at the same single path while reporting `changedFiles: 2`, asserts the
+count-mismatch error, asserts no missing-path error, and proves no binding is written.
