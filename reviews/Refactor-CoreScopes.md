@@ -5,9 +5,9 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `30925db6e35961aba525c9fe5992b57955ac5c6c`  `(2026-09-20)`
+**Reviewed up to commit:** `aa3c37209cf5e8065a9162b342dc3f4fb3184a58`  `(2026-09-20)`
 **Security-reviewed up to commit:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`  `(2026-09-20)`
-**Judgment:** `changes-requested`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-20 — staged:all
 
@@ -341,3 +341,39 @@ The completed pass advances the review watermark to `30925db`; remediation requi
 **REV-007 disposition:** `write_pr` now accepts an explicit authoritative count. The regression keeps
 the PR summary and paginated API at the same single path while reporting `changedFiles: 2`, asserts the
 count-mismatch error, asserts no missing-path error, and proves no binding is written.
+
+## Review pass — 2026-09-20 — incremental:isolated-count-remediation
+
+**Candidate base:** `30925db6e35961aba525c9fe5992b57955ac5c6c`
+**Candidate head:** `aa3c37209cf5e8065a9162b342dc3f4fb3184a58`
+**Candidate branch:** `Refactor/CoreScopes`
+**Candidate scope:** `incremental`
+**Candidate path-set:** `sha256:78725d60be3d9a3f87d537d1d3fb7e7cfc50386008a53a3d78b173fd26a3834e` `(2 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\base-agents\.git\agent-workflow\runs\p2-core-scopes-incremental-isolated-count-20260920\review\0b9532d32ba70980fc71b5b528a1f057f80dc574bd2078428d1eb4ecbb6dc041`
+**Candidate bundle identity:** `sha256:02071ce5c71d053e158daf2584ac5b8791b677466b94cb486603ef486ee5ec1a`
+**Work-order path:** `reviews/Refactor-CoreScopes.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The regression now isolates the authoritative `changedFiles` count: the summary and
+paginated API expose the same one path, only the count reports two, the count-specific error is required,
+the missing-path error is excluded, and no persistent binding is written.
+
+### Coverage
+
+- [x] Isolated changed-file-count regression and REV-007 disposition — 2 paths — 2026-09-20
+
+### Rules manifest
+
+No `.agents/skill-routes.json` exists in this repository, so no repository-specific routed skill applies.
+The native-general and workflow lenses inspect the exact two-path frozen remediation delta.
+
+### Parent finalization
+
+**Cross-area notes status:** `complete`
+**Parent summary status:** `complete`
+The exact `30925db..aa3c372` remediation delta is approved with zero findings. Both lenses confirmed
+that the count mismatch is the only rejection cause, all 20 frozen delivery-binding tests pass, the full
+shared-runtime suite passed 545 tests with 8 expected skips, and the review watermark advances to `aa3c372`.
