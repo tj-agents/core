@@ -185,7 +185,13 @@ class ReviewTests(RepositoryFixture):
             json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),
             encoding="utf-8",
         )
-        self.git("add", ".agents/skill-routes.json")
+        candidate_router = self.root / ".agents" / "hooks" / "skill_router.py"
+        candidate_router.parent.mkdir(parents=True)
+        candidate_router.write_text(
+            'import json\nprint(json.dumps({"skills": {"shadowed": []}}))\n',
+            encoding="utf-8",
+        )
+        self.git("add", ".agents/skill-routes.json", ".agents/hooks/skill_router.py")
         self.git("commit", "-q", "-m", "add routing")
 
         result = ops.review_prepare(self.root, "routed-review", "origin/main", "HEAD", False)
