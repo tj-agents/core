@@ -596,6 +596,35 @@ function Select-CrScope {
     return [pscustomobject]@{ Base = $base; IsRepo = $isRepo; Choice = $choice; Others = $others }
 }
 
+# Claude buckets a session under a folder named for its cwd with every non-alphanumeric flattened to a
+# dash, so C:\...\Concertable\.worktrees\Fix-X and C:\...\Concertable-worktrees-Fix-X collide by design.
+# Anything narrower (dropping only : \ /) leaves a dot in the key that the real folder name never has.
+function Get-CrProjectKey {
+    param([string]$Path)
+    return ($Path -replace '[^a-zA-Z0-9]', '-')
+}
+
+# The folder name is a lossy flattening of the cwd, so the transcript's own recorded cwd is the only
+# thing that can put the shell back where a session has to be resumed from.
+function Get-CrSessionCwd {
+    param([string]$Path)
+    try {
+        $fs = New-Object IO.FileStream($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+        $reader = New-Object IO.StreamReader($fs)
+        try {
+            for ($i = 0; $i -lt 40; $i++) {
+                $line = $reader.ReadLine()
+                if ($null -eq $line) { break }
+                $m = [regex]::Match($line, '"cwd":"((?:[^"\\]|\\.)*)"')
+                if ($m.Success) { return ($m.Groups[1].Value -replace '\\\\', '\') }
+            }
+        }
+        finally { $reader.Dispose() }
+    }
+    catch { }
+    return $null
+}
+
 # The cr search bar: type `cr` to open an fzf picker over this repo's Claude or Codex sessions, then keep
 # typing to filter live across EVERYTHING said in them - every message, not just the opening prompt - and
 # press ENTER to resume. Each row is a label (date, story, opening prompt) followed by the flattened body;
@@ -605,7 +634,8 @@ function Select-CrScope {
 #   cr                  pick Claude or Codex, then open the bar for this repo (most recent 500 sessions)
 #   cr tech debt        open it pre-filtered to sessions where "tech" AND "debt" were said
 #   cr -Claude / -Codex skip the agent picker
-#   cr -All             every project, not just this repo
+#   cr -All             every project, not just this repo (CTRL-A does the same from inside the bar,
+#                       keeping whatever is typed - and an empty scope widens to it on its own)
 #   cr -Rebuild         discard the index and rebuild it from scratch
 #   cr -List            print rows instead of opening the picker
 function cr {
@@ -641,41 +671,42 @@ function cr {
 
     $scope = Select-CrScope -All:$All
     $base = $scope.Base
-    $isRepo = $scope.IsRepo
-    $key = ($base -replace '[:\\/]', '-')
+    $key = Get-CrProjectKey $base
     $scopeExclude = @()
     if ($scope.Choice -eq 'MAIN') {
-        $scopeExclude = @($scope.Others | ForEach-Object { $_.Path -replace '[^a-zA-Z0-9]', '-' })
+        $scopeExclude = @($scope.Others | ForEach-Object { Get-CrProjectKey $_.Path })
     }
     elseif ($scope.Choice -ne 'ALL') {
-        $key = ($scope.Choice -replace '[^a-zA-Z0-9]', '-')
+        $key = Get-CrProjectKey $scope.Choice
     }
 
-    # Prefix matching only inside a repo. Outside one, an ancestor like C:\Users\Tommy would swallow
-    # every project nested under it.
-    if ($isRepo) {
-        $dirs = @(Get-ChildItem $root -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -eq $key -or $_.Name -like "$key-*" -or $_.Name -like "$key.*" })
-        foreach ($ex in $scopeExclude) {
-            $dirs = @($dirs | Where-Object { $_.Name -ne $ex -and $_.Name -notlike "$ex-*" -and $_.Name -notlike "$ex.*" })
-        }
-        # Prefix matching only reaches downwards, so in a polyrepo a session rooted at the container
-        # (Concertable, alongside Concertable\b2b) is invisible from every checkout inside it - which is
-        # exactly how one goes missing. Fold in the container itself, and only it, when it has sessions.
+    # Scope is this directory and everything that has ever been under it, repo or not. A polyrepo
+    # container like Concertable holds b2b/pipeline/payment, and a folder since split up or deleted
+    # still owns its sessions - gating descent on a repo being present today is what made them
+    # unreachable. Breadth costs a longer list that fzf filters anyway; narrowness hides sessions.
+    $allDirs = @(Get-ChildItem $root -Directory -ErrorAction SilentlyContinue)
+    $dirs = @($allDirs | Where-Object { $_.Name -eq $key -or $_.Name -like "$key-*" })
+    foreach ($ex in $scopeExclude) {
+        $dirs = @($dirs | Where-Object { $_.Name -ne $ex -and $_.Name -notlike "$ex-*" })
+    }
+    # A session rooted at the container (Concertable, alongside Concertable\b2b) is invisible from every
+    # checkout inside it - which is exactly how one goes missing. Fold in the container itself, and only
+    # it, when it has sessions.
+    if ($scope.IsRepo) {
         $parent = Split-Path $base -Parent
         if ($parent) {
-            $pkey = ($parent -replace '[:\\/]', '-')
-            $dirs += @(Get-ChildItem $root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $pkey })
+            $pkey = Get-CrProjectKey $parent
+            $dirs += @($allDirs | Where-Object { $_.Name -eq $pkey })
         }
     }
-    else {
-        $dirs = @(Get-ChildItem $root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $key })
-    }
-    if ($All) { $dirs = @(Get-ChildItem $root -Directory -ErrorAction SilentlyContinue) }
+    $dirs = @($dirs | Sort-Object FullName -Unique)
+    if ($All) { $dirs = $allDirs }
     if ($dirs.Count -eq 0) {
-        Write-Host "No conversations for $(Split-Path $base -Leaf) - use -All to search every project" -ForegroundColor Red
-        return
+        Write-Host "No conversations for $(Split-Path $base -Leaf) - widening to every project" -ForegroundColor DarkYellow
+        $dirs = $allDirs
+        $All = $true
     }
+    if ($dirs.Count -eq 0) { Write-Host "No Claude conversations at all." -ForegroundColor Red; return }
 
     # Subagent transcripts live in per-session subfolders and are not resumable sessions.
     $files = @($dirs | ForEach-Object { Get-ChildItem $_.FullName -Filter *.jsonl -File -ErrorAction SilentlyContinue } |
@@ -687,6 +718,9 @@ function cr {
         ForEach-Object { $_.Name })
 
     $index = Update-CrIndex -Files $files -Rebuild:$Rebuild -Width (Get-CrPaneWidth)
+
+    $pathBySid = @{}
+    foreach ($f in $files) { $pathBySid[[IO.Path]::GetFileNameWithoutExtension($f.Name)] = $f.FullName }
 
     # Row = "<label>  ||  <body>" TAB "<sid>".  fzf searches only what it displays - --nth applies after
     # --with-nth, so a hidden body field would be unsearchable and the body has to ride in the shown
@@ -714,16 +748,34 @@ function cr {
 
     $q = if ($Text) { $Text } else { ($Query -join ' ').Trim() }
 
+    $scopeName = if ($All) { 'every project' } else { "$(Split-Path $base -Leaf) ($($dirs.Count) project folder(s), $($rows.Count) sessions)" }
     $pane = '"' + (Join-Path $env:USERPROFILE '.claude\bin\cr-preview.cmd') + '" "' + (Join-Path $env:USERPROFILE '.claude\cr-preview') + '" {2} {q}'
     $fzfArgs = @('--prompt', 'search> ', '--height', '70%', '--border', '--exact', '--no-sort',
-                 '--delimiter', "`t", '--with-nth', '1',
+                 '--delimiter', "`t", '--with-nth', '1', '--print-query', '--expect', 'ctrl-a',
                  '--preview', $pane, '--preview-window', 'right:55%:wrap-word:follow:hidden', '--preview-wrap-sign', '  ', '--bind', 'tab:toggle-preview',
-                 '--header', 'search every message in scope (literal, words AND, newest first) / TAB = how it ended / ENTER resumes / PLAN = unfinished plan')
+                 '--header', "scope: $scopeName / TAB = how it ended / ENTER resumes / CTRL-A = search every project / PLAN = unfinished plan")
     if ($q) { $fzfArgs += @('--query', $q) }
-    $selection = $rows | & fzf @fzfArgs
-    if ([string]::IsNullOrWhiteSpace($selection)) { return }
+    $out = @($rows | & fzf @fzfArgs)
+    if ($out.Count -lt 2) { return }
 
-    $sid = ($selection -split "`t")[1]
+    # --print-query puts the typed query on line 1 and the --expect key on line 2, so the row is line 3.
+    if ($out[1].Trim() -eq 'ctrl-a') {
+        if ($All) { return }
+        cr -Claude -All -Text $out[0]
+        return
+    }
+    if ($out.Count -lt 3 -or [string]::IsNullOrWhiteSpace($out[2])) { return }
+
+    $sid = ($out[2] -split "`t")[1]
+    # A session found outside the current project resumes only from the directory it was started in.
+    $sessionCwd = $null
+    if ($pathBySid.ContainsKey($sid)) { $sessionCwd = Get-CrSessionCwd -Path $pathBySid[$sid] }
+    if ($sessionCwd -and (Test-Path -LiteralPath $sessionCwd) -and $sessionCwd -ne (Get-Location).Path) {
+        Write-Host "-> cd $sessionCwd; claude --resume $sid" -ForegroundColor DarkGray
+        Push-Location -LiteralPath $sessionCwd
+        try { claude --resume $sid } finally { Pop-Location }
+        return
+    }
     Write-Host "-> claude --resume $sid" -ForegroundColor DarkGray
     claude --resume $sid
 }
@@ -958,7 +1010,6 @@ function Invoke-CodexCr {
     function Test-CodexCwdInScope {
         param([string]$Cwd)
         if (-not $Cwd) { return $false }
-        if ($scope.Choice -eq 'ALL' -and -not $scope.IsRepo) { return ($Cwd -eq $scope.Base) }
         if ($scope.Choice -eq 'ALL') {
             if ($Cwd -eq $scope.Base -or $Cwd.StartsWith($scope.Base + '\', [StringComparison]::OrdinalIgnoreCase)) { return $true }
             foreach ($o in $scope.Others) {
@@ -989,12 +1040,14 @@ function Invoke-CodexCr {
         }
     }
 
+    if ($inScope.Count -eq 0 -and -not $All) {
+        Write-Host "No Codex conversations for $(Split-Path $scope.Base -Leaf) - widening to every session" -ForegroundColor DarkYellow
+        $inScope = @($allFiles | Where-Object { $meta[$_.Name] -and $meta[$_.Name][2] })
+        $All = $true
+    }
     $files = @($inScope | Sort-Object LastWriteTime -Descending)
     if ($Count -gt 0) { $files = @($files | Select-Object -First $Count) }
-    if ($files.Count -eq 0) {
-        Write-Host "No Codex conversations for $(Split-Path $scope.Base -Leaf) - use -All to search every session" -ForegroundColor Red
-        return
-    }
+    if ($files.Count -eq 0) { Write-Host "No Codex conversations at all." -ForegroundColor Red; return }
 
     $index = Update-CodexTextIndex -Files $files -Rebuild:$Rebuild -Width (Get-CrPaneWidth)
 
@@ -1018,15 +1071,24 @@ function Invoke-CodexCr {
 
     $q = if ($Text) { $Text } else { ($Query -join ' ').Trim() }
 
+    $scopeName = if ($All) { 'every session' } else { "$(Split-Path $scope.Base -Leaf) ($($rows.Count) sessions)" }
     $pane = '"' + (Join-Path $env:USERPROFILE '.claude\bin\cr-preview.cmd') + '" "' + (Join-Path $env:USERPROFILE '.codex\cr-preview') + '" {2} {q}'
     $fzfArgs = @('--prompt', 'search> ', '--height', '70%', '--border', '--exact', '--no-sort', '--delimiter', "`t", '--with-nth', '1',
+                 '--print-query', '--expect', 'ctrl-a',
                  '--preview', $pane, '--preview-window', 'right:55%:wrap-word:follow:hidden', '--preview-wrap-sign', '  ', '--bind', 'tab:toggle-preview',
-                 '--header', 'search every message in scope (literal, words AND, newest first) / TAB = how it ended / ENTER resumes')
+                 '--header', "scope: $scopeName / TAB = how it ended / ENTER resumes / CTRL-A = search every session")
     if ($q) { $fzfArgs += @('--query', $q) }
-    $selection = $rows | & fzf @fzfArgs
-    if ([string]::IsNullOrWhiteSpace($selection)) { return }
+    $out = @($rows | & fzf @fzfArgs)
+    if ($out.Count -lt 2) { return }
 
-    $fileKey = ($selection -split "`t")[1]
+    if ($out[1].Trim() -eq 'ctrl-a') {
+        if ($All) { return }
+        Invoke-CodexCr -Text $out[0] -Count $Count -All -Rebuild:$Rebuild
+        return
+    }
+    if ($out.Count -lt 3 -or [string]::IsNullOrWhiteSpace($out[2])) { return }
+
+    $fileKey = ($out[2] -split "`t")[1]
     $m = $meta[$fileKey]
     if (-not $m -or -not $m[2]) { Write-Host "Could not resolve a session id for that row." -ForegroundColor Red; return }
     $sid = $m[2]
