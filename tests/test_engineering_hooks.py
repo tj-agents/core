@@ -18,7 +18,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='engineering package with spaces ')
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.package = self.root / 'relocated plugin'
         shutil.copytree(ROOT / 'plugins/engineering', self.package)
         self.cwd = self.root / 'unrelated caller'

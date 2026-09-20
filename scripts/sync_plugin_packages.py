@@ -301,6 +301,7 @@ def emit_workflow_agents(root: Path, config: dict, emit):
         )
 
 def build(root: Path):
+    root = root.resolve()
     config = load(root / ".agents/plugins/sources.json")
     payloads = load(root / ".agents/plugins/payloads.json")["payloads"]
     compatibility = load(root / ".agents/plugins/compatibility.json")
