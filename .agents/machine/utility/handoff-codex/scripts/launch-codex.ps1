@@ -20,18 +20,20 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# The shared launch primitives, from the authored source layout or the installed package layout.
+$agentCli = @(
+    (Join-Path $PSScriptRoot '..\..\scripts\agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '..\..\..\resources\machine\utility\scripts\agent-cli.ps1')
+) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+if (-not $agentCli) { throw "The shared agent-cli.ps1 library was not found relative to $PSScriptRoot." }
+. $agentCli
+
 $resolvedWorkingDirectory = (Resolve-Path -LiteralPath $WorkingDirectory -ErrorAction Stop).Path
 $resolvedPromptPath = (Resolve-Path -LiteralPath $PromptPath -ErrorAction Stop).Path
-
-if (-not (Test-Path -LiteralPath $resolvedWorkingDirectory -PathType Container)) {
-    throw "Working directory is not a directory: $resolvedWorkingDirectory"
-}
 
 if (-not (Test-Path -LiteralPath $resolvedPromptPath -PathType Leaf)) {
     throw "Prompt path is not a file: $resolvedPromptPath"
 }
-
-$terminal = (Get-Command wt.exe -ErrorAction Stop).Source
 
 function ConvertTo-CodexVersion([string]$text) {
     $match = [regex]::Match($text, '(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?')
@@ -129,16 +131,7 @@ $inventory
 "@
 }
 
-$instruction = "Read the file at $resolvedPromptPath and follow its instructions, working from the current directory."
-$arguments = @(
-    '--window', '0',
-    'new-tab',
-    '--startingDirectory', $resolvedWorkingDirectory,
-    '--title', $Title,
-    '--suppressApplicationTitle',
-    $codex.Path,
-    '--cd', $resolvedWorkingDirectory
-)
+$arguments = @('--cd', $resolvedWorkingDirectory)
 
 if ($Model) {
     $arguments += @('--model', $Model)
@@ -152,59 +145,19 @@ if ($BypassHookTrust) {
     $arguments += '--dangerously-bypass-hook-trust'
 }
 
-$arguments += $instruction
+$arguments += "Read the file at $resolvedPromptPath and follow its instructions, working from the current directory."
 
-# Session state a Claude Code parent exports. NO_COLOR=1 alone makes the child black and white, and the
-# CLAUDE_CODE_* set binds it to that session's messaging pipe and makes it act as a managed nested child.
 # TERM is CLEARED, never forced - the opposite of handoff-claude, and not an oversight. Claude Code
 # exports TERM=xterm-256color; Codex is a Rust/crossterm binary, and on native Windows an unset TERM is
 # what selects the console's truecolor path. Handing it a POSIX terminfo name instead caps the palette at
-# 256 colours and visibly wrecks the theme. Do not "align" this with the Claude launcher.
-$clearedVariables = @(
-    'NO_COLOR',
-    'TERM',
-    'CLAUDECODE',
-    'CLAUDE_CODE_CHILD_SESSION',
-    'CLAUDE_CODE_ENTRYPOINT',
-    'CLAUDE_CODE_SESSION_ID',
-    'CLAUDE_CODE_MESSAGING_SOCKET',
-    'CLAUDE_CODE_MESSAGING_TOKEN',
-    'CLAUDE_PID',
-    'WORKBOARD_LAUNCH_TOKEN',
-    'WORKBOARD_WORKFLOW_TOKEN'
-)
-
-# Only NO_COLOR has to go for colour to come back, and the binary reads it. Nothing else here is forced:
-# every capability variable this launcher could set is one Windows Terminal and the console already
-# negotiate correctly for a native child, and the one that was set - TERM - is what broke the theme.
-$forcedVariables = @{}
-
-$previousValues = @{}
-
-foreach ($name in $clearedVariables) {
-    $previousValues[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
-}
-foreach ($name in $forcedVariables.Keys) {
-    $previousValues[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
-}
-
-try {
-    foreach ($name in $clearedVariables) {
-        [Environment]::SetEnvironmentVariable($name, $null, 'Process')
-    }
-    foreach ($name in $forcedVariables.Keys) {
-        [Environment]::SetEnvironmentVariable($name, $forcedVariables[$name], 'Process')
-    }
-
-    & $terminal @arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Windows Terminal exited with code $LASTEXITCODE"
-    }
-}
-finally {
-    foreach ($name in $previousValues.Keys) {
-        [Environment]::SetEnvironmentVariable($name, $previousValues[$name], 'Process')
-    }
-}
+# 256 colours and visibly wrecks the theme. Do not "align" this with the Claude launcher. Nothing is
+# forced on: every capability variable this launcher could set is one Windows Terminal and the console
+# already negotiate correctly for a native child, and the one that was set - TERM - is what broke it.
+Invoke-AgentTerminalTab `
+    -WorkingDirectory $resolvedWorkingDirectory `
+    -Executable $codex.Path `
+    -Title $Title `
+    -Arguments $arguments `
+    -ClearEnvironment @('TERM')
 
 Write-Host "Launched codex-cli $($codex.Version.Text) from $($codex.Path)"

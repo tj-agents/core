@@ -12,6 +12,7 @@
     "handoff-claude",
     "handoff-codex",
     "last-conversation",
+    "open-claude",
     "search"
   ]
 }
