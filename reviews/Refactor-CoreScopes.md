@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `a9200fe71c6167fea4dcb7469c001cc7400a2204`  `(2026-09-20)`
-**Security-reviewed up to commit:** `a9200fe71c6167fea4dcb7469c001cc7400a2204`  `(2026-09-20)`
+**Reviewed up to commit:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`  `(2026-09-20)`
+**Security-reviewed up to commit:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`  `(2026-09-20)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-09-20 — staged:all
@@ -47,6 +47,13 @@
   separate work, even though this candidate performs both. Remove the stale statement and describe the
   current ownership boundary so later agents do not treat the landed architecture as unfinished.
 
+- [x] **REV-005 — HIGH — security/workflow** — `.agents/workflows/workflow_ops.py:317`
+  Review routing searches the frozen candidate tree before the installed workflow package for
+  `skill_router.py` and executes the first match. A consumer candidate can therefore place executable
+  Python at `.agents/hooks/skill_router.py` and run it during `review-prepare`, before review isolation has
+  judged the patch. Prefer the workflow package's trusted sibling router; retain the repository copy only
+  as a compatibility fallback when no packaged runtime exists, and add a regression test proving a
+  candidate router cannot shadow the packaged copy.
 ## Coverage
 
 - [x] Canonical shared contracts and runtime — 103 files — 2026-09-20 — `.agents/{base,engineering,machine,workflows}/**`
@@ -101,3 +108,43 @@ Validation: the complete hook suite passed 540 tests with 8 skips before the fin
 post-remediation focused suites passed 5 router, 5 red-run, 19 docs, 2 review-routing, 22 root/package,
 and 7 relocated engineering-package tests. Workflow verification, both PowerShell regression suites, and
 `pwsh .agents/sync-generated.ps1 -Check` also pass; generation is stable at 295 files from 58 definitions.
+## Review pass — 2026-09-20 — incremental:runtime-remediation
+
+**Candidate base:** `a9200fe71c6167fea4dcb7469c001cc7400a2204`
+**Candidate head:** `a086aaf0b8da99f4f98607c19abce17e3556fe2f`
+**Candidate branch:** `Refactor/CoreScopes`
+**Candidate scope:** `incremental`
+**Candidate path-set:** `sha256:20964a9931a5f391f78a4f7cc6f0cb7b8aaf7b7061e7f1f4cca357e4e121e235` `(37 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\base-agents\.git\agent-workflow\runs\p2-core-scopes-incremental-20260920\review\00732b841e84f020d3c09a25f6022038c160c98a06228ce48e0451b55622c68c`
+**Candidate bundle identity:** `sha256:033bff459f872b6d036459d9475af1e870db543a273a9dd125aee78f1bce71e7`
+**Work-order path:** `reviews/Refactor-CoreScopes.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- Added `REV-005`. The restored runtime and prior four dispositions otherwise match their contracts,
+  generated copies, host registrations, and validation evidence.
+
+### Coverage
+
+- [x] Runtime restoration, manifest relocation, generated output, tests, and remediation record — 37 paths — 2026-09-20
+
+### Rules manifest
+
+No `.agents/skill-routes.json` exists in this repository, so no repository-specific routed skill applies.
+The incremental pass used the canonical local guidance and performed security review over both executable
+hooks and the packaging boundary.
+
+### Parent finalization
+
+**Cross-area notes status:** `complete`
+**Parent summary status:** `complete`
+
+The frozen remediation delta was reviewed against `a9200fe`. One new HIGH security finding was opened;
+all earlier finding text, severities, candidate identity, and pass judgment are preserved.
+
+**REV-005 disposition:** `workflow_ops` now prefers the router beside its own trusted workflow package
+and uses a candidate repository copy only when the package has no router. The regression fixture commits a
+shadow router that returns a false skill and proves review preparation still resolves the packaged route.
+All 26 workflow-operation tests and 15 package/source-layout tests pass, and generation remains stable.

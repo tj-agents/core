@@ -314,8 +314,8 @@ def routed_skills(root, paths):
     if not route_table.is_file() or not paths:
         return []
     candidates = (
-        root / ".agents" / "hooks" / "skill_router.py",
         Path(__file__).resolve().parents[1] / "hooks" / "skill_router.py",
+        root / ".agents" / "hooks" / "skill_router.py",
     )
     router = next((candidate for candidate in candidates if candidate.is_file()), None)
     if router is None:
