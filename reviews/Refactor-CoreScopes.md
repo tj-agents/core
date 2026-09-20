@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `45616059eb48943489d88cda2bda59a9c064cb57`  `(2026-09-20)`
+**Reviewed up to commit:** `30925db6e35961aba525c9fe5992b57955ac5c6c`  `(2026-09-20)`
 **Security-reviewed up to commit:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`  `(2026-09-20)`
 **Judgment:** `changes-requested`
 
@@ -299,3 +299,41 @@ the review watermark to `4561605`; remediation must return through a fresh incre
 **REV-006 disposition:** The subprocess PR summary now includes `changedFiles`, and a dedicated
 truncation case proves that one returned path against an authoritative count of two fails closed and
 creates no persistent delivery binding. The focused delivery-binding suite passes all 20 tests.
+
+## Review pass — 2026-09-20 — incremental:changed-file-count-remediation
+
+**Candidate base:** `45616059eb48943489d88cda2bda59a9c064cb57`
+**Candidate head:** `30925db6e35961aba525c9fe5992b57955ac5c6c`
+**Candidate branch:** `Refactor/CoreScopes`
+**Candidate scope:** `incremental`
+**Candidate path-set:** `sha256:78725d60be3d9a3f87d537d1d3fb7e7cfc50386008a53a3d78b173fd26a3834e` `(2 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\base-agents\.git\agent-workflow\runs\p2-core-scopes-incremental-count-remediation-20260920\review\26d63520b42efd27b78b0db3efd32172b8c3c32bd27cc8a3466aa450d7e12414`
+**Candidate bundle identity:** `sha256:2de0c6d6ad3bd96402086732f26ac52477de9162be72ce88ec5886670030e55f`
+**Work-order path:** `reviews/Refactor-CoreScopes.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [ ] **REV-007 — MEDIUM — workflow/testing** — `.agents/hooks/tests/test_delivery_binding_gate.py:213`
+  The new truncation regression triggers both a missing-summary-path mismatch and a changed-file-count mismatch.
+  It can therefore remain green if the authoritative count stops controlling rejection, because the missing
+  summary path still fails closed. Let the fixture override `changedFiles`, then keep the summary and API path
+  sets equal while only the authoritative count disagrees so the test isolates the REV-006 safety property.
+
+### Coverage
+
+- [x] REV-006 remediation, regression coverage, and review disposition — 2 paths — 2026-09-20
+
+### Rules manifest
+
+No `.agents/skill-routes.json` exists in this repository, so no repository-specific routed skill applies.
+The native-general and workflow lenses inspect the exact two-path frozen remediation delta.
+
+### Parent finalization
+
+**Cross-area notes status:** `complete`
+**Parent summary status:** `complete`
+The exact `4561605..30925db` remediation delta has one new MEDIUM workflow/testing finding. The
+workflow lens found no defect; native-general identified that the regression does not isolate the count gate.
+The completed pass advances the review watermark to `30925db`; remediation requires another incremental pass.
