@@ -15,8 +15,11 @@ maintained source.
 ## Host-specific source
 
 `.codex/` contains only material whose shape or behavior is specific to Codex: skill entry points,
-agent TOML, hook wiring, manifest input and installation details. `.claude/` contains the corresponding
-Claude-only material.
+agent TOML and installation details. `.claude/` contains the corresponding Claude-only material.
+
+Authored host manifests and hook wiring live under `.agents/plugins/manifests/`, with their Codex or
+Claude identity explicit in the path. `.agents/plugins/sources.json` is the one source map used to
+assemble those manifests with the host adapter and canonical capability definitions.
 
 Each host skill entry point references one canonical definition under `.agents/` and may add only the
 host-specific metadata or invocation mechanics required by that host. A host difference must be explicit;
@@ -30,8 +33,8 @@ Generated output is validated and may be committed for marketplace distribution,
 source.
 
 Two host-native marketplace files are generated bridges: `.agents/plugins/marketplace.json` comes from
-the Codex input at `.codex/plugins/marketplace.json`, and `.claude-plugin/marketplace.json` comes from the
-Claude input at `.claude/plugins/marketplace.json`. Their native locations do not make them authored source.
+`.agents/plugins/manifests/codex/marketplace.json`, and `.claude-plugin/marketplace.json` comes from
+`.agents/plugins/manifests/claude/marketplace.json`.
 
 The supported flow is:
 

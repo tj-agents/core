@@ -6,10 +6,11 @@ Read `README.md` before changing repository structure.
 shared hooks, schemas, tests and resources. Logical base, engineering and machine ownership lives below
 that directory; it must not be recreated as authored top-level source trees.
 
-`.codex/` contains Codex-only entry points, adapters, agent definitions, hook wiring and configuration.
-`.claude/` contains Claude-only equivalents. A host entry point references its canonical definition in
-`.agents/` and adds only genuine host differences; never copy a shared instruction body into either host
-tree as another authored source.
+`.codex/` contains Codex-only entry points, adapters, agent definitions and configuration. `.claude/`
+contains Claude-only equivalents. Authored host manifests and hook wiring live under
+`.agents/plugins/manifests/` and are mapped explicitly by `.agents/plugins/sources.json`. A host entry
+point references its canonical definition in `.agents/` and adds only genuine host differences; never
+copy a shared instruction body into either host tree as another authored source.
 
 `plugins/*` is generated distribution output, never an authored source tree. Run
 `pwsh .agents/sync-generated.ps1` after authored changes and require
@@ -18,7 +19,7 @@ tree as another authored source.
 A utility skill must not depend on a manually assembled, machine-local file the plugin does not ship.
 See [`PACKAGING.md`](PACKAGING.md).
 
-This repository owns common agent behavior, shared engineering process, and machine utilities.
-`plan-artifacts` supplies the common maintained-plan contract without requiring an engineering lifecycle.
-Stack standards and product policy remain with their scope plugins. Further runtime migration and the
-base/engineering/machine split are separate work; do not copy product-specific enforcement here.
+This repository owns common agent behavior, selected engineering process and machine utilities.
+`plan-artifacts` supplies maintained plans without requiring an engineering lifecycle. Stack standards,
+product profiles and product-specific enforcement remain with their scope owners. Shared runtime recovery
+and host acceptance remain part of P2; source generation alone does not establish adoption.
