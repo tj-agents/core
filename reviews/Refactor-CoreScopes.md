@@ -5,9 +5,9 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`  `(2026-09-20)`
+**Reviewed up to commit:** `45616059eb48943489d88cda2bda59a9c064cb57`  `(2026-09-20)`
 **Security-reviewed up to commit:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`  `(2026-09-20)`
-**Judgment:** `approved`
+**Judgment:** `changes-requested`
 
 ## Review pass — 2026-09-20 — staged:all
 
@@ -257,3 +257,41 @@ The workflow lens reviewed the exact four-path frozen delta.
 The exact `b8e2df7..2d20db6` Windows path-identity delta is approved with zero findings. All 22 root/package
 tests pass locally, generation remains stable at 295 files from 58 definitions, and the current review and
 security watermarks advance to `2d20db6`.
+
+## Review pass — 2026-09-20 — incremental:delivery-gate-fixture
+
+**Candidate base:** `2d20db6eb950ce0b97ab116d7545b402d565b10d`
+**Candidate head:** `45616059eb48943489d88cda2bda59a9c064cb57`
+**Candidate branch:** `Refactor/CoreScopes`
+**Candidate scope:** `incremental`
+**Candidate path-set:** `sha256:78725d60be3d9a3f87d537d1d3fb7e7cfc50386008a53a3d78b173fd26a3834e` `(2 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\base-agents\.git\agent-workflow\runs\p2-core-scopes-incremental-ci-fixture-20260920\review\ecf4661f2dda0acaf565f188862a96fb74a42dbaf5f203ce32648b151bb253ac`
+**Candidate bundle identity:** `sha256:027ef9bd4a5c2bccc390e6dd3b691ceec776208df419be4faa262abfcc5c1e24`
+**Work-order path:** `reviews/Refactor-CoreScopes.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [ ] **REV-006 — MEDIUM — workflow/testing** — `.agents/hooks/tests/test_delivery_binding_gate.py:148`
+  The subprocess fixture omits the `changedFiles` field that production requests and forwards into the
+  complete-path validation. These tests therefore exercise `expected_count=None` and would still pass if
+  delivery binding stopped enforcing GitHub's authoritative changed-file count. Include `changedFiles` in
+  the mocked PR summary and add a subprocess regression proving a truncated paginated response creates no binding.
+
+### Coverage
+
+- [x] Delivery-binding subprocess fixture and review-only watermark commit — 2 paths — 2026-09-20
+
+### Rules manifest
+
+No `.agents/skill-routes.json` exists in this repository, so no repository-specific routed skill applies.
+The native-general and workflow lenses inspect the exact two-path frozen delta.
+
+### Parent finalization
+
+**Cross-area notes status:** `complete`
+**Parent summary status:** `complete`
+The exact `2d20db6..4561605` delta has one new MEDIUM workflow/testing finding. Native-general found no
+defect; the workflow lens identified the missing authoritative-count coverage. The completed pass advances
+the review watermark to `4561605`; remediation must return through a fresh incremental review.
