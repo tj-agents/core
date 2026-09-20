@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -272,6 +273,41 @@ class ReviewTests(RepositoryFixture):
         self.assertFalse(result["ready"])
         self.assertIn("base-ahead-before-final-review", result["blockers"])
 
+
+class ChangedPathsTests(RepositoryFixture):
+    def test_large_pull_uses_the_paginated_files_endpoint(self):
+        paths = [f"src/file-{index:03}.txt" for index in range(658)]
+        completed = subprocess.CompletedProcess([], 0, "\n".join(reversed(paths)) + "\n", "")
+        with mock.patch.object(ops, "repository_slug", return_value="example/workflow-fixture"), \
+                mock.patch.object(ops, "run_process", return_value=completed) as run:
+            actual = ops.changed_paths(self.root, 12, paths[:100], 658)
+
+        self.assertEqual(sorted(paths), actual)
+        run.assert_called_once_with(
+            [
+                "gh",
+                "api",
+                "--paginate",
+                "repos/example/workflow-fixture/pulls/12/files?per_page=100",
+                "--jq",
+                ".[].filename",
+            ],
+            self.root,
+            check=False,
+        )
+
+    def test_paginated_files_must_match_the_authoritative_changed_file_count(self):
+        completed = subprocess.CompletedProcess([], 0, "src/one.txt\n", "")
+        with mock.patch.object(ops, "repository_slug", return_value="example/workflow-fixture"), \
+                mock.patch.object(ops, "run_process", return_value=completed):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "returned 1 of 2"):
+                ops.changed_paths(self.root, 12, ["src/one.txt"], 2)
+    def test_paginated_files_must_include_every_reported_path(self):
+        completed = subprocess.CompletedProcess([], 0, "src/one.txt\n", "")
+        with mock.patch.object(ops, "repository_slug", return_value="example/workflow-fixture"), \
+                mock.patch.object(ops, "run_process", return_value=completed):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "missing reported paths"):
+                ops.changed_paths(self.root, 12, ["src/one.txt", "src/two.txt"])
 
 class MonitorTests(RepositoryFixture):
     def observer(self, values):

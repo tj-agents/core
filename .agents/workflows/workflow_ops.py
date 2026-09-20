@@ -1088,7 +1088,7 @@ def goal_preflight(root, workflow_run_id):
 
 
 def pull_request_state(root, pr):
-    fields = "number,url,headRefOid,headRefName,state,isDraft,labels,files,statusCheckRollup"
+    fields = "number,url,headRefOid,headRefName,state,isDraft,labels,files,changedFiles,statusCheckRollup"
     arguments = ["gh", "pr", "view"]
     if pr is not None:
         arguments.append(str(pr))
@@ -1096,29 +1096,35 @@ def pull_request_state(root, pr):
     return json.loads(run_process(arguments, root).stdout)
 
 
-def changed_paths(root, pr, reported):
-    """Every path the PR changes, from the patch rather than from `gh pr view --json files`.
+def changed_paths(root, pr, reported, expected_count=None):
+    """Every path the PR changes, from GitHub's paginated pull-files endpoint.
 
-    That field stops at 100 entries, and four of this repository's own merged PRs already exceed it.
-    A stop class in file 118 that the resolver never sees is a stop class that never fires, so a
-    truncated read would hand a migration or an auth change the standing `auto` authorization. The
-    patch is the complete set; disagreeing counts mean the set is not established and nothing may be
-    authorized off it.
+    `gh pr view --json files` stops at 100 entries and `gh pr diff` is unavailable once a pull request
+    exceeds GitHub's unified-diff file limit. Standing authorization needs the complete path set, so use
+    the paginated REST collection, require every summary path, and verify GitHub's authoritative count.
     """
-    completed = run_process(["gh", "pr", "diff", str(pr), "--name-only"], root, check=False)
+    endpoint = f"repos/{repository_slug(root)}/pulls/{pr}/files?per_page=100"
+    completed = run_process(
+        ["gh", "api", "--paginate", endpoint, "--jq", ".[].filename"], root, check=False
+    )
     if completed.returncode != 0:
         raise WorkflowOperationError(
             "cannot read the PR's complete changed-path set, so no authorization can be resolved: "
             + (completed.stderr or "").strip()[:DEFAULT_SUMMARY_BYTES]
         )
-    paths = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
-    if len(paths) < len(reported):
+    paths = sorted({line.strip() for line in completed.stdout.splitlines() if line.strip()})
+    missing = sorted(set(reported) - set(paths))
+    count_disagrees = isinstance(expected_count, int) and len(paths) != expected_count
+    if not paths or missing or count_disagrees:
+        detail = f"; missing reported paths: {', '.join(missing[:5])}" if missing else ""
+        if count_disagrees:
+            detail += f"; API returned {len(paths)} of {expected_count} changed paths"
         raise WorkflowOperationError(
-            f"the PR patch lists {len(paths)} paths but its file field lists {len(reported)}; "
-            "the changed-path set is not established"
+            "the paginated PR file set is empty or disagrees with the PR summary"
+            + detail
+            + "; the changed-path set is not established"
         )
     return paths
-
 
 def pending_evidence(rollup, head):
     """Every not-yet-terminal check as an exact `(check id, run id, head)` triple.
@@ -1235,7 +1241,7 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff):
     if state != "open":
         raise WorkflowOperationError(f"PR #{number} is {state or 'unknown'}, so it owns no delivery")
     reported = [str(item.get("path")) for item in value.get("files") or [] if item.get("path")]
-    changed = changed_paths(root, number, reported)
+    changed = changed_paths(root, number, reported, value.get("changedFiles"))
     labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
     resolution = standing_authorization(root, changed, labels)
     binding = {
