@@ -1,5 +1,5 @@
 {
-  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files; no profiles or agents are installed automatically. Codex result and merge hooks await observed host payload support.",
+  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files. Codex result-event hooks remain unwired until the host publishes a supported result payload.",
   "hooks": {
     "SessionStart": [
       {
@@ -24,6 +24,17 @@
       }
     ],
     "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/skill_router.py\""
+          }
+        ],
+        "matcher": "apply_patch|edit_file|write_file|multi_edit|exec_command|unified_exec|local_shell|shell"
+      },
       {
         "hooks": [
           {

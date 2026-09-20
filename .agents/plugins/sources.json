@@ -28,17 +28,17 @@
     "claude": ".claude/skills"
   },
   "host_manifest_roots": {
-    "codex": ".codex/plugins",
-    "claude": ".claude/plugins"
+    "codex": ".agents/plugins/manifests/codex",
+    "claude": ".agents/plugins/manifests/claude"
   },
   "host_hook_sources": {
     "base": {
-      "codex": ".codex/hooks/base.json",
-      "claude": ".claude/hooks/base.json"
+      "codex": ".agents/plugins/manifests/codex/base-hooks.json",
+      "claude": ".agents/plugins/manifests/claude/base-hooks.json"
     },
     "engineering": {
-      "codex": ".codex/hooks/engineering.json",
-      "claude": ".claude/hooks/engineering.json"
+      "codex": ".agents/plugins/manifests/codex/engineering-hooks.json",
+      "claude": ".agents/plugins/manifests/claude/engineering-hooks.json"
     }
   },
   "generated_roots": [
@@ -133,6 +133,21 @@
       "plugin": "engineering",
       "source": ".agents/hooks/workflow_route.py",
       "destination": "hooks/workflow_route.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/skill_router.py",
+      "destination": "hooks/skill_router.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/red_run_gate.py",
+      "destination": "hooks/red_run_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/docs_reachability.py",
+      "destination": "hooks/docs_reachability.py"
     }
   ],
   "prerequisites": {

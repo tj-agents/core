@@ -371,7 +371,7 @@ def build(root: Path):
     manifests: dict[str, dict[str, dict]] = {plugin: {} for plugin in plugins}
     for plugin in sorted(plugins):
         for host, tree in (("codex", "codex-skills"), ("claude", "skills")):
-            manifest_path = root / f".{host}/plugins/{plugin}/plugin.json"
+            manifest_path = inside(root, f"{config['host_manifest_roots'][host]}/{plugin}.json")
             manifest = load(manifest_path)
             manifests[plugin][host] = manifest
             if manifest.get("name") != plugin or manifest.get("skills") != f"./{tree}/":
@@ -408,11 +408,11 @@ def build(root: Path):
 
     emit(
         ".agents/plugins/marketplace.json",
-        read(root / ".codex/plugins/marketplace.json"),
+        read(inside(root, f"{config['host_manifest_roots']['codex']}/marketplace.json")),
     )
     emit(
         ".claude-plugin/marketplace.json",
-        read(root / ".claude/plugins/marketplace.json"),
+        read(inside(root, f"{config['host_manifest_roots']['claude']}/marketplace.json")),
     )
 
     # Every packaged adapter must resolve to the one packaged canonical definition.
