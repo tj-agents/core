@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`  `(2026-09-20)`
-**Security-reviewed up to commit:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`  `(2026-09-20)`
+**Reviewed up to commit:** `b8e2df716aa0283d58393b82b98ac5eb993db167`  `(2026-09-20)`
+**Security-reviewed up to commit:** `b8e2df716aa0283d58393b82b98ac5eb993db167`  `(2026-09-20)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-20 — staged:all
@@ -184,3 +184,40 @@ The security and workflow lenses reviewed the exact four-path frozen delta.
 
 The exact `a086aaf..c632a29` remediation delta is approved with zero new findings. All five findings in the
 canonical work order are resolved, and the current review and security watermarks advance to `c632a29`.
+## Review pass — 2026-09-20 — incremental:large-pr-binding
+
+**Candidate base:** `c632a2984f3b1330d4e6205bd1aaf8eec0806e5f`
+**Candidate head:** `b8e2df716aa0283d58393b82b98ac5eb993db167`
+**Candidate branch:** `Refactor/CoreScopes`
+**Candidate scope:** `incremental`
+**Candidate path-set:** `sha256:8ab9adc5d6c9ff58b1c1c70acc12770435b9fc5897dd0ed48d39961887005856` `(4 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\base-agents\.git\agent-workflow\runs\p2-core-scopes-incremental-large-pr-v2-20260920\review\cddd3805c5b7075d30e1c4b33b2a54428c1214cd95e54b8a03f8322700c9dbb0`
+**Candidate bundle identity:** `sha256:3a5bdd26cfc15e77bd04232204cece0007f592e6d3e8815a03ac10f50ef5b2ba`
+**Work-order path:** `reviews/Refactor-CoreScopes.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. Delivery binding now reads every PR path from GitHub's paginated pull-files endpoint,
+requires all summary paths, and compares the unique result with the authoritative `changedFiles` count.
+The command uses fixed argument boundaries and fails closed on API errors, missing paths, empty output, or
+count disagreement. PR #12 returned 658 unique paths against an authoritative count of 658.
+
+### Coverage
+
+- [x] Large-PR path discovery, complete-set validation, generated workflow copy, and review record — 4 paths — 2026-09-20
+
+### Rules manifest
+
+No `.agents/skill-routes.json` exists in this repository, so no repository-specific routed skill applies.
+The security and workflow lenses reviewed the exact four-path frozen delta.
+
+### Parent finalization
+
+**Cross-area notes status:** `complete`
+**Parent summary status:** `complete`
+
+The exact `c632a29..b8e2df7` delivery-binding delta is approved with zero findings. All 29 workflow-operation
+tests pass, generation remains stable at 295 files from 58 definitions, and the current review and security
+watermarks advance to `b8e2df7`.
