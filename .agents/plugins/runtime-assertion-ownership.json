@@ -1,0 +1,48 @@
+{
+  "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+  "retained_at_product_owner": [
+    {
+      "test": "test_provisioning_declares_the_terminal_marketplace_roster",
+      "source": ".agents/hooks/tests/test_workflow_contracts.py",
+      "reason": "Concertable provisioning and product marketplace roster; verified still present after #124, not part of the removed generic coverage."
+    },
+    {
+      "test": "test_provisioning_is_portable_without_project_role_copies",
+      "source": ".agents/hooks/tests/test_workflow_contracts.py",
+      "reason": "Concertable provisioning and product marketplace roster; verified still present after #124, not part of the removed generic coverage."
+    },
+    {
+      "test": "test_host_semantic_stage_mappings_are_exact/project-settings-override",
+      "source": ".agents/hooks/tests/test_workflow_contracts.py",
+      "reason": "Concertable owns its actual project settings; shared goal-preflight tests verify effective evaluator prerequisites in isolated profiles without installing a model override."
+    },
+    {
+      "test": "test_this_repository_persists_a_sonnet_evaluator_for_its_own_sessions",
+      "source": ".agents/hooks/tests/test_goal_preflight.py",
+      "reason": "Concertable project/user-scope provisioning remains owned and tested there; shared runtime tests only effective prerequisite resolution in disposable profiles."
+    },
+    {
+      "test": "test_the_installer_writes_the_same_variable_at_user_scope",
+      "source": ".agents/hooks/tests/test_goal_preflight.py",
+      "reason": "Concertable project/user-scope provisioning remains owned and tested there; shared runtime tests only effective prerequisite resolution in disposable profiles."
+    },
+    {
+      "test": "test_selected_plan_applies_the_general_prelaunch_guard_to_existing_instructions",
+      "source": ".agents/hooks/tests/test_plan_graph.py",
+      "reason": "Selected-plan pre-launch replacement policy remains in Concertable, whose original module and assertions are unchanged. Shared plan_graph validates structural ledger/ownership only and must permit published compatibility windows (P2 item 2). This is not retired product coverage."
+    },
+    {
+      "test": "test_selected_plan_accepts_a_direct_replacement",
+      "source": ".agents/hooks/tests/test_plan_graph.py",
+      "reason": "Selected-plan pre-launch replacement policy remains in Concertable, whose original module and assertions are unchanged. Shared plan_graph validates structural ledger/ownership only and must permit published compatibility windows (P2 item 2). This is not retired product coverage."
+    }
+  ],
+  "pending_acceptance": [],
+  "verified_acceptance": [
+    "Engineering hook wiring and selected-scope activation replace the former Concertable-only hook path assertion; package relocation and opt-in behavior are verified locally.",
+    "Claude Code 2.1.278 executed the packaged UserPromptSubmit route before its first edit, received the full canonical engineering:plan-execution contract with source digest, completed all three synthetic phases, and reconciled GOAL.md.",
+    "Codex CLI 0.155.1 executed the installed plugin UserPromptSubmit route with the reviewed trust override; an isolated transparent receipt captured the exact hook input, exit 0, empty stderr, and full canonical contract digest. The uninstrumented full-goal run completed all three phases and reconciled GOAL.md; the installed router was restored and hash-matched to generated output.",
+    "Codex CLI 0.155.1 was launched through the packaged unqualified handoff transport into base-agents/.worktrees/Test-P2-Handoff-Acceptance; the sole successor read the two-line pointer, created ACK.md, reconciled GOAL.md to complete, and changed no tracked files.",
+    "Claude Code 2.1.278 was launched through the packaged unqualified handoff transport into the same repository worktree; the sole successor created ACK.md, reconciled GOAL.md to complete, and changed no tracked files."
+  ]
+}

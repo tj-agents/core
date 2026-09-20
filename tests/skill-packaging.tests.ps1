@@ -8,8 +8,21 @@ $ErrorActionPreference = 'Stop'
 # what an install actually delivers.
 
 $repository = Split-Path -Parent $PSScriptRoot
-$pluginSkills = Join-Path $repository 'plugins\base\skills'
+$pluginSkills = Join-Path $repository 'plugins\machine\skills'
 
+function Get-MissingRequiredFiles {
+    param(
+        [Parameter(Mandatory)][string] $SkillDir,
+        [Parameter(Mandatory)][string] $Name
+    )
+
+    $harness = $Name.Substring('handoff-'.Length)
+    $relative = "scripts\launch-$harness.ps1"
+    if (-not (Test-Path -LiteralPath (Join-Path $SkillDir $relative) -PathType Leaf)) {
+        return @($relative)
+    }
+    return @()
+}
 function Get-UnpackagedSkillDirectoryReferences {
     param([Parameter(Mandatory)][string] $SkillDir)
 
@@ -38,7 +51,7 @@ foreach ($name in $targets) {
     $dir = Join-Path $pluginSkills $name
     if (-not (Test-Path -LiteralPath $dir)) { throw "Generated package is missing $name. Run pwsh .agents/sync-generated.ps1." }
 
-    $missing = Get-UnpackagedSkillDirectoryReferences -SkillDir $dir
+    $missing = @(Get-UnpackagedSkillDirectoryReferences -SkillDir $dir) + @(Get-MissingRequiredFiles -SkillDir $dir -Name $name)
     if ($missing.Count -gt 0) {
         throw "$name references packaged dependencies the generated plugin does not contain: $($missing -join ', ')"
     }
@@ -59,7 +72,7 @@ try {
     Copy-Item -LiteralPath $source -Destination $scratch -Recurse
     Remove-Item -LiteralPath (Join-Path $scratch 'scripts\launch-claude.ps1') -Force
 
-    $missing = Get-UnpackagedSkillDirectoryReferences -SkillDir $scratch
+    $missing = @(Get-UnpackagedSkillDirectoryReferences -SkillDir $scratch) + @(Get-MissingRequiredFiles -SkillDir $scratch -Name 'handoff-claude')
     if ($missing.Count -eq 0) {
         throw 'Validation did not detect a packaged dependency removed from a generated skill copy.'
     }

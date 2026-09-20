@@ -1,0 +1,25 @@
+{
+  "name": "engineering",
+  "description": "Selected engineering workflows, reviews and Git operations.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tomjseery/base-agents",
+  "keywords": [
+    "engineering",
+    "workflow",
+    "git"
+  ],
+  "version": "2.0.0",
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "Engineering process",
+    "shortDescription": "Selected engineering workflows, reviews and Git operations.",
+    "longDescription": "Selected engineering workflows, reviews and Git operations.",
+    "developerName": "Tommy Seery",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the selected capability for this task."
+  },
+  "hooks": "./hooks/codex.json"
+}

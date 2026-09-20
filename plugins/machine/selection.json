@@ -1,0 +1,17 @@
+{
+  "plugin": "machine",
+  "payloads": [
+    "machine"
+  ],
+  "prerequisites": [
+    "base"
+  ],
+  "skills": [
+    "auto-memory",
+    "clip",
+    "handoff-claude",
+    "handoff-codex",
+    "last-conversation",
+    "search"
+  ]
+}

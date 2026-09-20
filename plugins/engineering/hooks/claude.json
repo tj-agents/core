@@ -1,0 +1,152 @@
+{
+  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files. Claude result and stop events enforce the red-run repair loop.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\""
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      }
+    ]
+  }
+}

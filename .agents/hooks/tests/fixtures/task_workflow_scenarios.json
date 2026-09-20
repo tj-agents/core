@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "hosts": ["codex", "claude"],
+  "selection_cases": [
+    {"id": "feature-primary", "request": "Add CSV export to reports and finish the change.", "expected_skill": "feature"},
+    {"id": "feature-paraphrase", "request": "Change the dashboard so users can pin a saved view.", "expected_skill": "feature"},
+    {"id": "bug-primary", "request": "Fix the invoice total that is rounded twice.", "expected_skill": "bugfix"},
+    {"id": "bug-paraphrase", "request": "The save action crashes for archived records; diagnose and repair it.", "expected_skill": "bugfix"},
+    {"id": "planning-only", "request": "Design and phase a plan for replacing the cache layer, but do not implement it.", "expected_skill": "plan-authoring"},
+    {"id": "active-plan", "request": "Read plans/example/EXAMPLE_PROGRESS.md and execute its Next Steps.", "expected_skill": "plan-execution"},
+    {"id": "review-only", "request": "Review the current branch without fixing it.", "expected_skill": "review"},
+    {"id": "named-e2e", "request": "The checkout browser E2E scenario is red; diagnose it and drive it green.", "expected_skill": "e2e-ui-debug"},
+    {"id": "red-test", "request": "This unit test run is red; fix the failure and rerun it.", "expected_skill": "failing-tests"}
+  ],
+  "scenarios": [
+    {
+      "id": "feature-short-path",
+      "request": "Add CSV export to the existing report page.",
+      "expected_workflow": "feature",
+      "path": "short",
+      "dispatches": [],
+      "events": ["discover", "parent-architecture", "implement", "focused-validate", "commit-candidate", "review", "validate", "complete"],
+      "durable_artifacts": [],
+      "terminal": {"kind": "completed-repository-outcome"}
+    },
+    {
+      "id": "small-obvious-bug",
+      "request": "Fix the total that is rounded twice on invoice details.",
+      "expected_workflow": "bugfix",
+      "path": "quick",
+      "dispatches": [],
+      "events": ["reproduce", "classify-quick", "parent-diagnosis", "implement", "regression", "focused-validate", "commit-candidate", "review", "validate", "complete"],
+      "durable_artifacts": [],
+      "terminal": {"kind": "completed-repository-outcome"}
+    },
+    {
+      "id": "complex-bug",
+      "request": "Diagnose the intermittent save failure that crosses the API and queue boundary.",
+      "expected_workflow": "bugfix",
+      "path": "investigation",
+      "dispatches": ["log-analyst", "evidence-explorer", "test-impact-analyst"],
+      "events": ["reduce-logs", "classify-investigation", "parallel-readers", "competing-hypotheses", "parent-diagnosis", "implement", "regression", "focused-validate", "commit-candidate", "review", "validate", "complete"],
+      "durable_artifacts": [],
+      "terminal": {"kind": "completed-repository-outcome"}
+    },
+    {
+      "id": "failure-recovery",
+      "request": "Fix the crash even if the bounded evidence reader returns an invalid result.",
+      "expected_workflow": "bugfix",
+      "path": "investigation",
+      "dispatches": ["evidence-explorer"],
+      "events": ["classify-investigation", "reader-invalid", "parent-fallback", "parent-diagnosis", "implement", "regression", "focused-validate", "commit-candidate", "review", "validate", "complete"],
+      "durable_artifacts": [],
+      "terminal": {"kind": "completed-repository-outcome"}
+    },
+    {
+      "id": "writer-serialization",
+      "request": "Add the behavior using two independent mechanical transformations.",
+      "expected_workflow": "feature",
+      "path": "coordinated",
+      "dispatches": ["mechanical-worker", "mechanical-worker"],
+      "events": ["writer-one-leased", "writer-two-rejected", "writer-one-terminal", "writer-two-leased", "writer-two-terminal", "focused-validate", "commit-candidate", "review", "validate", "complete"],
+      "durable_artifacts": [],
+      "terminal": {"kind": "completed-repository-outcome"}
+    },
+    {
+      "id": "feature-durable-promotion",
+      "request": "Add a multi-phase import workflow that must survive a fresh worktree and external approval.",
+      "expected_workflow": "feature",
+      "path": "durable",
+      "dispatches": ["evidence-explorer"],
+      "events": ["discover", "parent-architecture", "promote", "repository-probe", "checkpoint", "implement", "focused-validate", "commit-candidate", "review", "validate", "complete"],
+      "durable_artifacts": ["plans/agent-workflows/AUTOMATED_AGENT_WORKFLOW_FRAMEWORK_PLAN.md", "plans/agent-workflows/AUTOMATED_AGENT_WORKFLOW_FRAMEWORK_PROGRESS.md"],
+      "state_provider": "repository",
+      "terminal": {"kind": "completed-repository-outcome"}
+    },
+    {
+      "id": "human-gate",
+      "request": "Add public sharing, but the repository has no evidence for who may see confidential records.",
+      "expected_workflow": "feature",
+      "path": "short",
+      "dispatches": [],
+      "events": ["discover", "material-security-ambiguity", "pause"],
+      "durable_artifacts": [],
+      "terminal": {
+        "kind": "human-gate",
+        "owner": "product and security owner",
+        "action": "Define the permitted audience for confidential records.",
+        "resume_condition": "Resume when the approved audience rule is recorded in the repository.",
+        "evidence": ["No existing authorization rule covers public sharing."]
+      }
+    }
+  ]
+}

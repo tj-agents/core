@@ -1,26 +1,24 @@
 {
   "name": "base",
-  "version": "1.2.0",
-  "description": "Generic agent layer for Claude and Codex - machine utilities plus the shared process, planning, review and delivery standards.",
+  "description": "Maintained plans and common agent behavior.",
   "author": {
     "name": "Tommy Seery"
   },
   "repository": "https://github.com/tomjseery/base-agents",
-  "skills": "./codex-skills/",
   "keywords": [
-    "utilities",
-    "powershell",
-    "sessions",
-    "handoff"
+    "behavior",
+    "plans"
   ],
+  "version": "2.0.0",
+  "skills": "./codex-skills/",
   "interface": {
-    "displayName": "Base Agent Utilities",
-    "shortDescription": "Machine utilities and handoff launchers.",
-    "longDescription": "Personal machine-layer utility skills shared by Codex and Claude, including cross-harness handoff launchers.",
+    "displayName": "Common agent behavior",
+    "shortDescription": "Maintained plans and common agent behavior.",
+    "longDescription": "Maintained plans and common agent behavior.",
     "developerName": "Tommy Seery",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use the relevant machine utility for this task."
+    "defaultPrompt": "Use the selected capability for this task."
   },
-  "hooks": "./codex-skills/plan-artifacts/hooks/hooks.json"
+  "hooks": "./hooks/codex.json"
 }
