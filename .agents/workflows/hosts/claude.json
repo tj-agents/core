@@ -1,0 +1,194 @@
+{
+  "contract_version": "v2",
+  "host": "claude",
+  "status": "available-with-parent-fallback",
+  "model_override_agent_name": "general-purpose",
+  "delivery": {
+    "project_directory": ".claude/agents",
+    "plugin_directory": "agents",
+    "extension": ".md",
+    "plugin_loading": "supported"
+  },
+  "probe": {
+    "command": "claude",
+    "version_arguments": [
+      "--version"
+    ]
+  },
+  "concurrency": {
+    "readers": "parallel",
+    "writers": "serialized",
+    "nested_dispatch": false
+  },
+  "fallback_reasons": [
+    "host-unavailable",
+    "role-unavailable",
+    "model-unavailable",
+    "unsupported-capability",
+    "invalid-result",
+    "cancelled"
+  ],
+  "semantic_stages": {
+    "strategic": {
+      "model": "claude-opus-5",
+      "effort": "high",
+      "unavailable": "decision"
+    },
+    "implementation": {
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "unavailable": "typed-parent-fallback"
+    },
+    "mechanical": {
+      "model": "claude-sonnet-5",
+      "effort": "medium",
+      "unavailable": "typed-parent-fallback"
+    },
+    "review": {
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "unavailable": "decision"
+    },
+    "critical": {
+      "model": "claude-opus-5",
+      "effort": "xhigh",
+      "unavailable": "decision"
+    }
+  },
+  "continuation": {
+    "turns": "goal",
+    "delayed_state": [
+      "loop",
+      "monitor",
+      "channels"
+    ],
+    "resume": [
+      "resume",
+      "continue"
+    ],
+    "cross_restart": [
+      "desktop-scheduled-task",
+      "cloud-routine"
+    ],
+    "dynamic_workflows": "orchestration-only",
+    "goal_evaluator_model_setting": "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "goal_evaluator_required_family": "sonnet",
+    "unsupported_gate": "product-capability-unavailable"
+  },
+  "roles": {
+    "evidence-explorer": {
+      "agent_name": "evidence-explorer",
+      "filename": "evidence-explorer.md",
+      "description": "Read-only repository evidence explorer for one bounded workflow question.",
+      "body": "../roles/evidence-explorer.md",
+      "default_stage": "mechanical",
+      "allowed_stages": [
+        "strategic",
+        "implementation",
+        "mechanical",
+        "critical"
+      ],
+      "model": "claude-sonnet-5",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "disallowed_tools": [
+        "Agent"
+      ],
+      "kind": "review"
+    },
+    "log-analyst": {
+      "agent_name": "log-analyst",
+      "filename": "log-analyst.md",
+      "description": "Read-only analyst for reducing supplied logs into evidence without diagnosing the fix.",
+      "body": "../roles/log-analyst.md",
+      "default_stage": "mechanical",
+      "allowed_stages": [
+        "implementation",
+        "mechanical",
+        "critical"
+      ],
+      "model": "claude-sonnet-5",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "disallowed_tools": [
+        "Agent"
+      ],
+      "kind": "review"
+    },
+    "test-impact-analyst": {
+      "agent_name": "test-impact-analyst",
+      "filename": "test-impact-analyst.md",
+      "description": "Read-only analyst for affected tests, gaps, and repository-supported validation commands.",
+      "body": "../roles/test-impact-analyst.md",
+      "default_stage": "implementation",
+      "allowed_stages": [
+        "implementation",
+        "review"
+      ],
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "disallowed_tools": [
+        "Agent"
+      ],
+      "kind": "review"
+    },
+    "review-lens": {
+      "agent_name": "review-lens",
+      "filename": "review-lens.md",
+      "description": "Read-only independent review lens over one immutable diff and bounded concern.",
+      "body": "../roles/review-lens.md",
+      "default_stage": "review",
+      "allowed_stages": [
+        "review"
+      ],
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "disallowed_tools": [
+        "Agent"
+      ],
+      "kind": "review"
+    },
+    "mechanical-worker": {
+      "agent_name": "mechanical-worker",
+      "filename": "mechanical-worker.md",
+      "description": "Serialized mechanical writer restricted to one parent-approved writer lease.",
+      "body": "../roles/mechanical-worker.md",
+      "default_stage": "mechanical",
+      "allowed_stages": [
+        "mechanical"
+      ],
+      "model": "claude-sonnet-5",
+      "effort": "medium",
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit",
+        "Bash"
+      ],
+      "disallowed_tools": [
+        "Agent"
+      ],
+      "kind": "worker"
+    }
+  }
+}

@@ -2,14 +2,14 @@ $ErrorActionPreference = 'Stop'
 
 # End-to-end validation of the generated handoff launchers, per PACKAGING.md: neither must require a
 # machine-local file this plugin does not ship. Runs against the actual generated package
-# (plugins/base/skills/...), from an isolated fake profile with no `.claude\routing\route.py` anywhere,
+# (plugins/machine/skills/...), from an isolated fake profile with no `.claude\routing\route.py` anywhere,
 # an unrelated working directory, and paths containing spaces. Windows Terminal is stubbed so no real
 # terminal window opens; a fake codex.exe is compiled so launch-codex.ps1's own version-discovery step
 # (which executes candidates directly, not through the terminal) has something real to run.
 
 $repository = Split-Path -Parent $PSScriptRoot
-$claudeLauncher = Join-Path $repository 'plugins\base\skills\handoff-claude\scripts\launch-claude.ps1'
-$codexLauncher = Join-Path $repository 'plugins\base\skills\handoff-codex\scripts\launch-codex.ps1'
+$claudeLauncher = Join-Path $repository 'plugins\machine\skills\handoff-claude\scripts\launch-claude.ps1'
+$codexLauncher = Join-Path $repository 'plugins\machine\skills\handoff-codex\scripts\launch-codex.ps1'
 foreach ($launcher in @($claudeLauncher, $codexLauncher)) {
     if (-not (Test-Path -LiteralPath $launcher)) {
         throw "Generated launcher missing: $launcher. Run pwsh .agents/sync-generated.ps1."
@@ -100,7 +100,7 @@ class Stub {
     $promptPath = Join-Path $promptDir 'draft prompt.md'
     [System.IO.File]::WriteAllText($promptPath, "Read this and continue.`n")
 
-    $env:PATH = "$binDir;$originalPath"
+    $env:PATH = "$binDir;$env:SystemRoot\System32;$env:SystemRoot"
     $env:USERPROFILE = $fakeProfile
     $env:LOCALAPPDATA = $fakeLocalAppData
 

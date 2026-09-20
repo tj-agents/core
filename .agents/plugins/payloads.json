@@ -1,10 +1,13 @@
 {
-  "$comment": "Base temporarily combines common behavior, machine utilities, and shared process skills until the planned scope split.",
   "payloads": {
     "base": [
-      "behavior",
-      "machine",
+      "behavior"
+    ],
+    "engineering": [
       "process"
+    ],
+    "machine": [
+      "machine"
     ]
   }
 }

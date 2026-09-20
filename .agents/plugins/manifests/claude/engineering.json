@@ -1,0 +1,16 @@
+{
+  "name": "engineering",
+  "description": "Selected engineering workflows, reviews and Git operations.",
+  "author": {
+    "name": "Tommy Seery"
+  },
+  "repository": "https://github.com/tomjseery/base-agents",
+  "keywords": [
+    "engineering",
+    "workflow",
+    "git"
+  ],
+  "displayName": "Engineering process",
+  "skills": "./skills/",
+  "hooks": "./hooks/claude.json"
+}

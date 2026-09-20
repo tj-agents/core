@@ -1,0 +1,10 @@
+{
+  "plugin": "base",
+  "payloads": [
+    "behavior"
+  ],
+  "prerequisites": [],
+  "skills": [
+    "plan-artifacts"
+  ]
+}

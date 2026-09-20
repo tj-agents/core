@@ -1,0 +1,446 @@
+{
+  "repository": "https://github.com/Concertable/agents",
+  "files": [
+    {
+      "path": ".agents/workflows/budgets.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "1c6e15416b7fabfd7b38b829c8d15da720676d63e3c47f7580b3f5c2315da0d5"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/capabilities.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "532770d606b82c7c9b228af1e77014a2437564c6e02560d2e247cf8827fbd3e1"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/compatibility.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "68e4dee99bd8e1f5eb4320f7abe3479082c05668a9fb82d380802a50c11b68df"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/dispatch.schema.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "3d19591050ffc869a9e0ab45b0c8906bb1b5d0e359e2f26f8c8ce005778ec705"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/dispatch.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "42890d64f8cdd4208882774bb86ac0aad35e8382669d6d83ba71a26efeb7a6e6"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/host.cancel-request.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "35f2b247567f6de3a1a317a8f2b0bf929aa33f9b30082faf1d13c91b9dc7c1dd"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/host.fallback.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "10aaef84380c5e37197ffcafe8f779348e00d3da3b9df995f0749228fdd5eca8"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/host.invocation.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "f5427be24b8ef23f77392d4ab789f50b34629bc8b937005cb433c5ac7bb00304"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/host.reconciliation-required.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "af6077e9b60851525911a50dee6d03bd847e794a34af121ef93bcf6993a70805"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/provider.repository.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "8d25f3e7fd1f54aa942b4edad75fe078b8b0ff2eced5dd26a9a626882be03c8d"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/result.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "a0f1e51404b4ab7d8544b56a58eb9b401f3024d904c1bb3bfb2093f6661d6933"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/examples/state.example.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "60855dadff9e32e4fa50e107f39617dc0e0283ab5e1e5eb71485ed1c9e723657"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/gates.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "bb4fcddfdf6fcf03c51a07b60e6b580e676b24d901407ae1f67170ad83f89834"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/host.schema.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "0ddc3160f2ee097aa619fdffbf591686ed6c0f950614279b81988c9ea7b4179a"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/provider.schema.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "f9784957185909bf621074d5720cf75c506871f2206fa150aec39bbc370fc456"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/result.schema.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "59bdbc6c4c2263d133b96720aaca6e313a82e6a7fdfae22e7f2af6c19e5a96fb"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/state.schema.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "5f46d57cf22e86d2126a24abe38c5f553ed171ae5a5ad8cd03dd99913fc53963"
+    },
+    {
+      "path": ".agents/workflows/contract/v2/support-matrix.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "7b5f17378536dfe73f84524f86981ca6d6e220a4854763a9970717ef4c36de54"
+    },
+    {
+      "path": ".agents/workflows/decks/kandev.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "dea2835b3391a45cb6691c4b3940b8619308499ca02fb37350f8d0f19074aee3"
+    },
+    {
+      "path": ".agents/workflows/delivery_runtime.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "d0e9ff7df82113348d70989f99e15d6f4a80771ad3fabe49e77e0e93c1ad1fc8"
+    },
+    {
+      "path": ".agents/workflows/efficiency.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "3959948bc857cdc5b578e89b29e0849f3e9d6f122141acaae0dfc46c55f97228"
+    },
+    {
+      "path": ".agents/workflows/fixtures/role-body.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "0570a87559dc5aa0c64e584b01dad94d1cd4eebfb74d64f5dc4da280746f0a63"
+    },
+    {
+      "path": ".agents/workflows/fixtures/role.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "2baab777885716935d98e7ebcebd4bdbe0de2e20df87573fcb36bb0b7bd3602e"
+    },
+    {
+      "path": ".agents/workflows/fixtures/workflow-contract-fixture.template.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "2bdc5705a8bea0091fadffdd94b1852a4b3b4e839efb25813c4f23d6b4c0a769"
+    },
+    {
+      "path": ".agents/workflows/host_runtime.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "140ae5e8683ef9913d1f11035f581c908057083b42bb08982e5de821b4561593"
+    },
+    {
+      "path": ".agents/workflows/hosts/claude.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "dec643a07ede4d587dcc5c39bc36bb5b081fc781efe7b9486226e2e5477a1b77"
+    },
+    {
+      "path": ".agents/workflows/hosts/codex.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "db001c048382fe7d7f8a15db60c06f83561e101a72b32c5d094656495292bd53"
+    },
+    {
+      "path": ".agents/workflows/hosts/smoke.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "905052541f2e1c621424edf9561d1765a3d7a7dbbe9abb6ec5bb82cc1b302875"
+    },
+    {
+      "path": ".agents/workflows/providers/repository.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "f65d1064479c8ed8c6d36adeb51b960faf0b7bf535530bf72eb0534a8ba73322"
+    },
+    {
+      "path": ".agents/workflows/roles/evidence-explorer.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "0574bb70739ee68adb077298150cd93cf85a77d054caa7e2541d2d331c2fd2e5"
+    },
+    {
+      "path": ".agents/workflows/roles/log-analyst.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "741be3f08550a87e2c5ea4952f76078c1e289e96b9b6bbc5b4d102de3fc66bac"
+    },
+    {
+      "path": ".agents/workflows/roles/mechanical-worker.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "462aa5bbb6a43f5c416b805fdcb9572efa58b58034467a971d7ce336bf998f82"
+    },
+    {
+      "path": ".agents/workflows/roles/review-lens.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "641c66931bf091086e2aab6a55c0ebc6d199b7c6194ab0f9473c78768a023e51"
+    },
+    {
+      "path": ".agents/workflows/roles/test-impact-analyst.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "c9f8a51c41e55fac6c596c059e3a4efbd8b999f6b76bb67fc0f26f645e4a8089"
+    },
+    {
+      "path": ".agents/workflows/verify.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "7be7222db27ae0fe13baf3213e2dd2ba5effb3db28da6ac65cf21b349c126309"
+    },
+    {
+      "path": ".agents/workflows/workflow_ops.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "1c728732fab31f8b48b4d463e57b8c3f59a96bc71e2aa776b112d6bcea588b1f"
+    },
+    {
+      "path": ".agents/workflows/workflow_runtime.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "46708a77b362d29a681aa68a557b7747291a79b0fd85c1720b6da6a4a9445117"
+    },
+    {
+      "path": ".agents/hooks/tests/test_review_workflows.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "375ec517bbfda4750a82e6ba7d2f589e44492fb0ff8060498c8fc71651050112"
+    },
+    {
+      "path": ".agents/hooks/tests/test_plan_workflows.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "3abd785a4dc140843e7e94ffca354e6bb4b6e71b293b014032f9d1d28b282d54"
+    },
+    {
+      "path": ".agents/hooks/tests/test_task_workflows.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "9771f289b4cdfda217609e18d12cd2dbb5c18ebd049a0d15d59d062d6479eb28"
+    },
+    {
+      "path": ".agents/hooks/tests/test_process_standards.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "b7b9400c12e077d49e788980dc793ce6fb008d485e1182f88ecfddca2a786912"
+    },
+    {
+      "path": ".agents/hooks/tests/test_lane_tables.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "1a47d11f950adf3745bb0d7d339bac10ca2c928f12102716503d2a1496288377"
+    },
+    {
+      "path": ".agents/hooks/tests/test_workflow_adoption.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "ca0c6335f6533bf2727b324c52ad2c5a01c9387763e485c88dd8fd164df1881f"
+    },
+    {
+      "path": ".agents/hooks/tests/test_workflow_contracts.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "64942c7c95bfb76c9d436fa947b2c09bd5b65aef9b4f4b5886c6411193ebd413"
+    },
+    {
+      "path": ".agents/hooks/tests/test_workflow_ops.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "5c5919a468a106d3153d25225a7604124b1a4f579fbcfbf9a56576e899dbc9c4"
+    },
+    {
+      "path": ".agents/hooks/tests/test_delivery_runtime.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "1bac657c9e75e85fc79c8303a92ca06f7abeb3d29f98bc83925ee850ed6fa3a8"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/lane_expectations.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "c98c34d5da2dcc46b52f66243959d716879e0c13bded21a737d5247792cbac64"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/plan_authoring_harness.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "759e938ca577704ed79ba40ab4d07c95c793ee579b17bab24dda786c6aa00ff4"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/plan_progress.template",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "6ca4f23d96152d1efbf5d2c2af36de7ac4f0c4857122e3a98b2f164e89370079"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/plan_workflow_harness.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "7a87776c352831491928f4cfde18dc4a9279a92964a6f9c080cbdb5df6dd6a19"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/plan_workflow_scenarios.json",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "2c196cfb4053793c7e4189f6c021a72cd7c019f94f2da42facfb9dd7dd990fac"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/provider_progress.template",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "db0ca1bb2914675887f233b2722d491b3e7dae052cbdb531eb08fcd10084f132"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/review_workflow_harness.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "31c81861068acde3a440c132ba04a0318c9cc2bc3c8cf33c0b5a37ab0ab257da"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/review_workflow_scenarios.json",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "fa3ae92f8e1a52e7fd533f23e0455ff5ad26c0b74cac868006cca082828c7447"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/task_workflow_harness.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "76d6646be404bcf3d87d0f75836f6a2b39db06503db7ddb2eb89a6636e2a4668"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/task_workflow_scenarios.json",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "fea08decc3eafe7a182bda8df7c74c9e9622e31f84ac09e87951278eb319550c"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/workflow_efficiency_scenarios.json",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "35aa3f6a92a4fbf274f522883d9347c865428dffbc0ce49bdef71ba341e50ffc"
+    },
+    {
+      "path": ".agents/hooks/tests/fixtures/workflow_writer_lease_worker.py",
+      "source_commit": "ccd1a843e0b042844a467df5c8fb2047e4931e5b",
+      "sha256": "1c48fde302b2a74094bef6e6f90e1e994b2b3aea14146a9c97e7ee72f764e072"
+    },
+    {
+      "path": ".agents/hooks/plan_graph.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "2b6d4e7a7786fbede756e74d4a57bcf97c01db4c5ebafa6f5ebb784630f9f99a",
+      "adaptation": "Extract structural ledger validation; product convention policy and --plan entry remain at Concertable source unchanged."
+    },
+    {
+      "path": ".codex/install-workflow-agents.ps1",
+      "source_path": ".agents/workflows/hosts/install-codex-agents.ps1",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "907aa7179990caac9670215bc0331f346053b2c7ee06fc9d378d3d1b96310893",
+      "adaptation": "Codex-only installer is authored under .codex and packaged with the engineering plugin."
+    },
+    {
+      "path": ".codex/agent-delivery.json",
+      "source_path": ".agents/workflows/hosts/agent-delivery.json",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "440e8b3d6c4fbede71dae9dafe639d893e3b85ae1279e7cea0eb2af317658ecf",
+      "adaptation": "Codex-only delivery configuration is authored under .codex and packaged with the engineering plugin."
+    },
+    {
+      "path": ".claude/skills/persistent-workflow/SKILL.md",
+      "source_path": ".claude/workflow-skills/persistent-workflow/SKILL.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "87aee19e175d06cc92d27d6cfb9800c9e7d5c218bfa857e893a4b39babb533f6",
+      "adaptation": "Claude host behavior extends and references the canonical .agents workflow definition."
+    },
+    {
+      "path": ".codex/skills/persistent-workflow/SKILL.md",
+      "source_path": ".codex/workflow-skills/persistent-workflow/SKILL.md",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "f2a911b6c2ae900bb2ec99df179b669a0475126bf6d43ff4cb156ed977c25c3a",
+      "adaptation": "Codex host behavior extends and references the canonical .agents workflow definition."
+    },
+    {
+      "path": ".agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1",
+      "source_path": "scripts/delivery-continuation.ps1",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "8db85aaadec524130fbbe27ba8634e8ad44377b260c48d77cedb653b5efef0fb",
+      "adaptation": "Shared continuation launcher is canonical under .agents and packaged beside both host discovery entries."
+    },
+    {
+      "path": ".agents/hooks/tests/test_goal_preflight.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "4989bd96e628bb16bb52327a1e250066b17b6a8b3bf16df9d56af8afa3277973"
+    },
+    {
+      "path": ".agents/hooks/hook_runtime.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "946b9aa08d474560c63ba418221f960b9b5d2b188ad4ae720a26fbe7cbec3002"
+    },
+    {
+      "path": ".agents/hooks/git_auth_scope_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "8c297ef3b80229321bdabe53a7868880951ae2dd4ca735b96eb502187eb32984"
+    },
+    {
+      "path": ".agents/hooks/tests/test_git_auth_scope_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "953897549dbe991fe3f4e8c098b8b25f2cdb6ec6de91fc9d3b70eff6c9522118"
+    },
+    {
+      "path": ".agents/hooks/forge_poll_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "67fb62e88ab12683f70ca10d5dd4b5c7291f38e9b56bf188f6cb24cb4329404e"
+    },
+    {
+      "path": ".agents/hooks/tests/test_forge_poll_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "78fa66dd0e093069f10378afc5538837754a1e73885d8963b5045c29d70c6fcd"
+    },
+    {
+      "path": ".agents/hooks/compact_output_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "3669a8fe65a9fe7751a052a7aba294cd7605120490d09fc7bd5bfe1098cb149e"
+    },
+    {
+      "path": ".agents/hooks/tests/test_compact_output_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "c46570750e9d2119b826a95200a3bf22d676ce0d0e3b1c34081338d71b36d6de"
+    },
+    {
+      "path": ".agents/hooks/worktree_cleanup_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "1de5a539c83d48f1fc674378504a655c049066d7c58d810c5d4001c78d2aee9c"
+    },
+    {
+      "path": ".agents/hooks/tests/test_worktree_cleanup_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "fae8fda7a96cd28263ebf4f0500252de2458eb1aead54705f770d3072640bbdf"
+    },
+    {
+      "path": ".agents/hooks/merge_review_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "14725a3fba2e948636eba521beda791c703892f26e74f354aec3c39e711492cd"
+    },
+    {
+      "path": ".agents/hooks/tests/test_merge_review_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "baf6fef69709e0053a0546667bd23fce0b3a908b4756dac463c9142c53281eb1"
+    },
+    {
+      "path": ".agents/hooks/persistent_workflow_merge_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "b7dff755875c1860aa0558386355a7bb2f4f08cfad7a707322a7785ec325a2bc"
+    },
+    {
+      "path": ".agents/hooks/tests/test_persistent_workflow_merge_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "d9f9c285b3151ae0043c13aa26e8b42c49d471eccc89448435e9d29e5135ef20"
+    },
+    {
+      "path": ".agents/hooks/delivery_binding_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "c581ce7a1eed0fd163be81cb70a4c8f0f8a74a6b222c55f4645b53eb4c2b545f"
+    },
+    {
+      "path": ".agents/hooks/tests/test_delivery_binding_gate.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "ef5013264d119b1806f134e704b6fa9a868cbed2829ffaa667760c9dce6697fe"
+    },
+    {
+      "path": ".agents/hooks/plan_handoff_stop.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "afe5f139ebf8426f6bab41e4382c79f611ef60b1972604b8e7adf12dec139458"
+    },
+    {
+      "path": ".agents/hooks/plan_handoff_stop_launcher.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "2db295f838a140eeca96cf16644d735ccffbb9b0c83799fe9a1f1942b868174d"
+    },
+    {
+      "path": ".agents/hooks/tests/test_plan_handoff_stop.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "a4edc354e6d2b839882af0a25ab07a6c131c1a3d896edc2e42bc9c0b579fc383"
+    },
+    {
+      "path": ".agents/hooks/tests/test_plan_handoff_stop_launcher.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "647a21db0642dbb412af9d9ab9e25fb652d600914b8db20b0770ccbc70b0680b"
+    },
+    {
+      "path": ".agents/hooks/tests/test_plan_handoff_ownership.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "c568c914ec348a50886c2800164beda93d5c4a6a464b34ec4b3bd2dfe5dbd894"
+    },
+    {
+      "path": ".agents/hooks/tests/test_plan_graph.py",
+      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
+      "sha256": "2612bbccb357ebb53810a3dec577eb739a5946358782d246b96d395f0e7cd859"
+    }
+  ]
+}

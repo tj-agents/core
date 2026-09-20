@@ -8,11 +8,12 @@ The vocabulary currently used is:
 
 | Kind | Meaning |
 |---|---|
-| `contract` | A load-on-demand engineering standard. |
+| `contract` | A reusable rule or behavioral agreement; it need not be engineering-specific. |
+| `knowledge` | Descriptive reference material without an execution procedure. |
 | `lane` | A model-selection role. |
-| `lens` | A review perspective. |
 | `operation` | One executable process step. |
-| `utility` | A machine tool run directly by a session. |
+| `review` | A review perspective or bounded review procedure. |
+| `utility` | A directly invoked tool or narrow convenience capability. Its owner follows purpose, not kind. |
 | `workflow` | A coordinated process spanning multiple steps. |
 
 Add a new word here when its meaning is materially distinct. A repository may enforce a semantic invariant

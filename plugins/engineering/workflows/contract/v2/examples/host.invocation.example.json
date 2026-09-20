@@ -1,0 +1,17 @@
+{
+  "contract_version": "v2",
+  "record_type": "host-invocation",
+  "host": "codex",
+  "dispatch_id": "dispatch-001",
+  "capability": "evidence-explorer",
+  "semantic_stage": "strategic",
+  "agent_name": "default",
+  "role_agent_name": "evidence_explorer",
+  "role_body": "../roles/evidence-explorer.md",
+  "primary_model": "gpt-5.6-sol",
+  "model": "gpt-5.6-sol",
+  "model_selection": "primary",
+  "reasoning_effort": "high",
+  "mode": "read",
+  "writer_lease_id": null
+}

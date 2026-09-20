@@ -1,0 +1,32 @@
+# Provider acceptance progress
+
+- Plan: `{plan}`
+- Roadmap: `{roadmap}`
+- Roadmap item: `acceptance/durable-promotion`
+- Worktree: `{worktree}`
+- Branch: `{branch}`
+- PR: not opened
+
+## Current state
+
+Durable promotion is under acceptance validation.
+
+## Next Steps
+
+Validate the repository-backed checkpoint.
+Scope: current slice only; full plan remains incomplete.
+Current slice: validate the repository-backed checkpoint.
+Remaining scope: delivery and closeout remain.
+Done when: this fixture step is green; the full plan remains open.
+
+## Verification
+
+Pending.
+
+## Reviews
+
+No review work order is open.
+
+## Decisions, discoveries, blockers, and deviations
+
+- Execution-deck identity is deliberately absent from the repository checkpoint.

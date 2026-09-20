@@ -1,0 +1,55 @@
+# engineering capabilities
+
+Generated from canonical `.agents/` definitions.
+
+- `address-review` — workflow — `.agents/engineering/workflow/address-review/SKILL.md`
+- `big-review` — workflow — `.agents/engineering/workflow/big-review/SKILL.md`
+- `big-review-all` — workflow — `.agents/engineering/workflow/big-review-all/SKILL.md`
+- `bugfix` — workflow — `.agents/engineering/workflow/bugfix/SKILL.md`
+- `commit` — operation — `.agents/engineering/operation/commit/SKILL.md`
+- `commit-all` — operation — `.agents/engineering/operation/commit-all/SKILL.md`
+- `commit-push` — utility — `.agents/engineering/utility/commit-push/SKILL.md`
+- `committing` — contract — `.agents/engineering/contract/committing/SKILL.md`
+- `continue-roadmap` — workflow — `.agents/engineering/workflow/continue-roadmap/SKILL.md`
+- `docs-and-debt` — contract — `.agents/engineering/contract/docs-and-debt/SKILL.md`
+- `docs-review` — workflow — `.agents/engineering/workflow/docs-review/SKILL.md`
+- `failing-tests` — workflow — `.agents/engineering/workflow/failing-tests/SKILL.md`
+- `failure-provenance` — contract — `.agents/engineering/contract/failure-provenance/SKILL.md`
+- `feature` — workflow — `.agents/engineering/workflow/feature/SKILL.md`
+- `git-auth` — contract — `.agents/engineering/contract/git-auth/SKILL.md`
+- `git-branching` — contract — `.agents/engineering/contract/git-branching/SKILL.md`
+- `handoff` — workflow — `.agents/engineering/workflow/handoff/SKILL.md`
+- `handoff-format` — contract — `.agents/engineering/contract/handoff-format/SKILL.md`
+- `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`
+- `lanes` — contract — `.agents/engineering/contract/lanes/SKILL.md`
+- `merge` — workflow — `.agents/engineering/workflow/merge/SKILL.md`
+- `merge-docs` — workflow — `.agents/engineering/workflow/merge-docs/SKILL.md`
+- `merging` — contract — `.agents/engineering/contract/merging/SKILL.md`
+- `open-pr` — operation — `.agents/engineering/operation/open-pr/SKILL.md`
+- `open-worktree` — operation — `.agents/engineering/operation/open-worktree/SKILL.md`
+- `persistent-delivery` — contract — `.agents/engineering/contract/persistent-delivery/SKILL.md`
+- `persistent-workflow` — workflow — `.agents/engineering/workflow/persistent-workflow/SKILL.md`
+- `plan-authoring` — workflow — `.agents/engineering/workflow/plan-authoring/SKILL.md`
+- `plan-checkpoint` — contract — `.agents/engineering/contract/plan-checkpoint/SKILL.md`
+- `plan-execution` — workflow — `.agents/engineering/workflow/plan-execution/SKILL.md`
+- `plans` — contract — `.agents/engineering/contract/plans/SKILL.md`
+- `pr-preflight` — operation — `.agents/engineering/operation/pr-preflight/SKILL.md`
+- `pr-screenshots` — contract — `.agents/engineering/contract/pr-screenshots/SKILL.md`
+- `prune-worktrees` — utility — `.agents/engineering/utility/prune-worktrees/SKILL.md`
+- `pull` — operation — `.agents/engineering/operation/pull/SKILL.md`
+- `pull-main` — utility — `.agents/engineering/utility/pull-main/SKILL.md`
+- `push` — operation — `.agents/engineering/operation/push/SKILL.md`
+- `recents` — utility — `.agents/engineering/utility/recents/SKILL.md`
+- `remote-validation` — contract — `.agents/engineering/contract/remote-validation/SKILL.md`
+- `resume-plan` — workflow — `.agents/engineering/workflow/resume-plan/SKILL.md`
+- `review` — workflow — `.agents/engineering/workflow/review/SKILL.md`
+- `review-lifecycle` — contract — `.agents/engineering/contract/review-lifecycle/SKILL.md`
+- `session-guidance` — contract — `.agents/engineering/contract/session-guidance/SKILL.md`
+- `skill-routes` — contract — `.agents/engineering/contract/skill-routes/SKILL.md`
+- `sync` — utility — `.agents/engineering/utility/sync/SKILL.md`
+- `sync-all` — utility — `.agents/engineering/utility/sync-all/SKILL.md`
+- `sync-checkout` — operation — `.agents/engineering/operation/sync-checkout/SKILL.md`
+- `techdebt` — workflow — `.agents/engineering/workflow/techdebt/SKILL.md`
+- `unmerged` — utility — `.agents/engineering/utility/unmerged/SKILL.md`
+- `update-roadmap` — workflow — `.agents/engineering/workflow/update-roadmap/SKILL.md`
+- `worktree` — utility — `.agents/engineering/utility/worktree/SKILL.md`
