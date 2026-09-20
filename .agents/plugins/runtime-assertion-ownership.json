@@ -37,8 +37,12 @@
       "reason": "Selected-plan pre-launch replacement policy remains in Concertable, whose original module and assertions are unchanged. Shared plan_graph validates structural ledger/ownership only and must permit published compatibility windows (P2 item 2). This is not retired product coverage."
     }
   ],
-  "pending_acceptance": [
+  "pending_acceptance": [],
+  "verified_acceptance": [
     "Engineering hook wiring and selected-scope activation replace the former Concertable-only hook path assertion; package relocation and opt-in behavior are verified locally.",
-    "Actual cross-host workflow routing and launcher behavior; deterministic fixtures are not model compliance evidence."
+    "Claude Code 2.1.278 executed the packaged UserPromptSubmit route before its first edit, received the full canonical engineering:plan-execution contract with source digest, completed all three synthetic phases, and reconciled GOAL.md.",
+    "Codex CLI 0.155.1 executed the installed plugin UserPromptSubmit route with the reviewed trust override; an isolated transparent receipt captured the exact hook input, exit 0, empty stderr, and full canonical contract digest. The uninstrumented full-goal run completed all three phases and reconciled GOAL.md; the installed router was restored and hash-matched to generated output.",
+    "Codex CLI 0.155.1 was launched through the packaged unqualified handoff transport into base-agents/.worktrees/Test-P2-Handoff-Acceptance; the sole successor read the two-line pointer, created ACK.md, reconciled GOAL.md to complete, and changed no tracked files.",
+    "Claude Code 2.1.278 was launched through the packaged unqualified handoff transport into the same repository worktree; the sole successor created ACK.md, reconciled GOAL.md to complete, and changed no tracked files."
   ]
 }
