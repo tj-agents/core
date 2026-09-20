@@ -273,7 +273,7 @@ security watermarks advance to `2d20db6`.
 
 ### Findings
 
-- [ ] **REV-006 — MEDIUM — workflow/testing** — `.agents/hooks/tests/test_delivery_binding_gate.py:148`
+- [x] **REV-006 — MEDIUM — workflow/testing** — `.agents/hooks/tests/test_delivery_binding_gate.py:148`
   The subprocess fixture omits the `changedFiles` field that production requests and forwards into the
   complete-path validation. These tests therefore exercise `expected_count=None` and would still pass if
   delivery binding stopped enforcing GitHub's authoritative changed-file count. Include `changedFiles` in
@@ -295,3 +295,7 @@ The native-general and workflow lenses inspect the exact two-path frozen delta.
 The exact `2d20db6..4561605` delta has one new MEDIUM workflow/testing finding. Native-general found no
 defect; the workflow lens identified the missing authoritative-count coverage. The completed pass advances
 the review watermark to `4561605`; remediation must return through a fresh incremental review.
+
+**REV-006 disposition:** The subprocess PR summary now includes `changedFiles`, and a dedicated
+truncation case proves that one returned path against an authoritative count of two fails closed and
+creates no persistent delivery binding. The focused delivery-binding suite passes all 20 tests.
