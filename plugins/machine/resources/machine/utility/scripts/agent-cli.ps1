@@ -72,6 +72,11 @@ function Invoke-AgentTerminalTab {
         $Executable
     ) + $Arguments
 
+    # The tab title is the only name for this session the user can see on screen, so the session records
+    # it at SessionStart and peer-cli resolves by it.
+    $ForceEnvironment = $ForceEnvironment.Clone()
+    $ForceEnvironment['AGENT_CLI_TAB_TITLE'] = $Title
+
     $cleared = @($script:AgentSessionEnvironment + $ClearEnvironment | Select-Object -Unique)
     $previousValues = @{}
     foreach ($name in @($cleared + @($ForceEnvironment.Keys))) {
