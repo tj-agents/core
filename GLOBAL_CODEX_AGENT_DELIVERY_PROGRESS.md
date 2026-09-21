@@ -3,31 +3,30 @@
 - Plan: `GLOBAL_CODEX_AGENT_DELIVERY_PLAN.md`
 - Roadmap: none; this repair was authorized directly
 - Roadmap item: `global-codex-agent-delivery/profile-agent-delivery`
-- Worktree: `C:\Users\tommy\source\repos\base-agents\.worktrees\Fix-Global-Codex-Agent-Delivery`
-- Branch: `Fix/Global-Codex-Agent-Delivery`
-- PR: #20 — https://github.com/tomjseery/base-agents/pull/20
-- Dependency/package gates: install and verify the merged release locally before removing project-scoped agents
-- Last reconciled: 2026-09-21 from the green release 2.1.3 merge candidate over `origin/main` at `6dbee6d`
+- Worktree: `C:\Users\tommy\source\repos\base-agents\.worktrees\Docs-Global-Codex-Agent-Delivery-Closeout`
+- Branch: `Docs/Global-Codex-Agent-Delivery-Closeout`
+- PR: closeout not opened; implementation PR #20 merged as `8d121fc`
+- Dependency/package gates: all satisfied; release 2.1.3 is published, installed, and proven profile-wide
+- Last reconciled: 2026-09-21 from release `v2.1.3` and the completed sandbox migration
 
 ## Current state
 
-The candidate installs canonical Codex roles into the resolved profile, records files it actually owns,
-verifies them before digest-proven managed-project cleanup, and makes the host runtime probe profile and intentional project surfaces.
-Claude remains plugin-native. Generated packages and catalog digests are current. Current origin/main and
-the installed 2.1.0 machine package already contain the shared launcher resource; dynamic generated-layout
-coverage now guards every `agent-cli.ps1` consumer. The candidate includes origin/main's portable digest
-repair. Origin/main published a separate UTF-8 bootstrap repair as 2.1.2 before review, so this candidate now
-includes that baseline and advances the package set to immutable release 2.1.3.
+PR #20 merged as `8d121fc`, exact main CI run `35654812492` passed, and immutable release `v2.1.3` is
+published. The supported Codex marketplace refresh installed and enabled `base`, `engineering`, and
+`machine` 2.1.3. Its packaged installer owns and verifies ten canonical profile roles. A fresh ephemeral
+Codex session in an unrelated repository with no local `.codex/agents` advertised all ten roles. The ten
+authorized stale sandbox copies and their empty directory are removed, and `sandbox-hwid/docs/next-session.md`
+records the migration. Only the single automatic successor launch remains.
 
 ## Next Steps
 
-Review and push the remaining Windows CI assertion fix to PR #20, monitor its exact head, and merge the approved
-candidate when green. After merge, install and verify the released profile roles before the
-scoped sandbox migration and successor handoff.
+Launch exactly one Codex successor in `C:\Users\tommy\source\repos\sandbox-hwid` from its maintained
+continuation note, confirm launcher submission, and release this owner. The plan completes when that launch
+is confirmed; no base-agents implementation or release work remains.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: remaining CI portability fix and incremental watermark, then PR/CI/merge delivery.
-Remaining scope: PR/CI/merge, local release installation and fresh-session proof, sandbox cleanup, and automated return.
+Current slice: terminal automatic handoff to the authorized sandbox-hwid refactor.
+Remaining scope: one successor launch and submission confirmation.
 Done when: the merged release is installed and proven profile-wide, only former base-agents project copies are removed, sandbox-hwid records the migration, and its authorized refactor has a successor owner.
 
 ## Completed work
@@ -35,15 +34,17 @@ Done when: the merged release is installed and proven profile-wide, only former 
 - Reconstructed this ledger from the explicit plan and repository evidence before the first deliverable edit.
 - Implemented profile delivery, safe migration, profile-aware host probing, host-divergence coverage,
   documentation, catalog refresh, generated packages, and dynamic launcher dependency closure in this commit.
+- Delivered PR #20, published release 2.1.3, upgraded the three installed packages, installed and verified
+  ten profile roles, proved fresh-session discovery without repository-local roles, and completed the scoped
+  sandbox migration without changing unrelated dirty files.
 
 ## Verification
 
 Green corrected candidate: generated-output, catalog-digest, and whitespace checks pass; 44 tests under
-`tests` pass; all 550 `.agents/hooks/tests` pass with 8 platform skips; and `install.tests.ps1`,
+`tests` pass; all 551 `.agents/hooks/tests` pass with 8 platform skips; and `install.tests.ps1`,
 `cli-session-vault.tests.ps1`, `skill-packaging.tests.ps1`, and `handoff-launchers.tests.ps1` pass. The final
-actionable-error wording was followed by two focused ownership/collision tests and another generation and
-catalog check. The committed-source revision digest gate is intentionally rerun after this working tree is
-committed because it validates `HEAD`, not uncommitted content.
+exact-head PR and main CI runs passed. The 2.1.3 installer reports `VERIFIED: 10 profile agent(s)`, and the
+fresh-session acceptance probe advertised the same ten roles with its local agent directory absent.
 
 ## Reviews
 

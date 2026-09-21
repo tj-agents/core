@@ -130,11 +130,18 @@ Official reference: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - 2026-09-21: the next exact-head run proved that the same Windows short-path alias can also affect the
   environment-derived preview assertion. The installer again completed; replace the remaining absolute
   path-string assertion with a semantic `ADD` suffix check, rerun the focused receipts, and review the fix.
+- 2026-09-21: PR #20 merged as `8d121fce224d3560b67ca747247a92889e01e686`; exact main CI run
+  `35654812492` passed, and immutable release `v2.1.3` was published from that merge commit.
+- 2026-09-21: the supported Codex marketplace refresh installed and enabled `base`, `engineering`, and
+  `machine` 2.1.3. The packaged installer applied and verified all ten profile roles. A fresh ephemeral
+  Codex session in an unrelated temporary Git repository with no `.codex/agents` directory advertised the
+  complete canonical roster.
+- 2026-09-21: removed only the ten authorized stale base-agents files from `sandbox-hwid`, removed the empty
+  agent directory, and recorded the profile migration in `sandbox-hwid/docs/next-session.md` while preserving
+  its pre-existing dirty work.
 
 ## Next Steps
 
-Once the remaining CI portability fix receives its incremental watermark, push it to PR #20 and deliver the approved
-2.1.3 candidate through CI/merge. Refresh the installed release, install and
-verify the profile roles, prove an arbitrary repository advertises them without local copies, then migrate
-only the ten known base-agents files from `sandbox-hwid`, record the migration there, and automatically hand
-ownership back to its authorized refactor.
+Launch exactly one Codex successor in `C:\Users\tommy\source\repos\sandbox-hwid` using the maintained
+continuation note, confirm launcher submission, and release this owner. That confirmation completes the
+plan; no further base-agents implementation, publication, installation, or sandbox migration work remains.
