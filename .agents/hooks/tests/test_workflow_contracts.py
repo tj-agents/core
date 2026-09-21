@@ -587,54 +587,157 @@ class WorkflowGenerationTests(unittest.TestCase):
             with self.assertRaisesRegex(ContractViolation, "oneOf branches"):
                 contract.validate("host", reconciliation)
 
-    def test_codex_installer_previews_and_preserves_unrelated_agents(self):
+    def test_codex_installer_manages_profile_roles_and_migrates_project_copies(self):
         shell = shutil.which("powershell.exe") or shutil.which("pwsh")
         self.assertIsNotNone(shell)
         script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
         with tempfile.TemporaryDirectory() as temp:
-            project = Path(temp)
-            (project / ".git").mkdir()
-            target = project / ".codex" / "agents"
+            root = Path(temp)
+            codex_home = root / "codex-home"
+            target = codex_home / "agents"
             target.mkdir(parents=True)
-            unrelated = target / "unrelated.toml"
-            unrelated.write_text('name = "unrelated"\n', encoding="utf-8")
-            former = target / "workflow-review-lens.toml"
+            unrelated_profile = target / "unrelated.toml"
+            unrelated_profile.write_text('name = "unrelated-profile"\n', encoding="utf-8")
+
+            project = root / "project"
+            (project / ".git").mkdir(parents=True)
+            project_target = project / ".codex" / "agents"
+            project_target.mkdir(parents=True)
+            unrelated_project = project_target / "unrelated.toml"
+            unrelated_project.write_text('name = "unrelated-project"\n', encoding="utf-8")
+            generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
+            shutil.copy2(generated[0], project_target / generated[0].name)
+            former = project_target / "workflow-review-lens.toml"
             former.write_text('name = "former"\n', encoding="utf-8")
             arguments = [shell, "-NoProfile"]
             if Path(shell).name.lower() == "powershell.exe":
                 arguments += ["-ExecutionPolicy", "Bypass"]
             preview = subprocess.run(
-                [*arguments, "-File", str(script), "-ProjectRoot", str(project)],
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-MigrateProjectRoot",
+                    str(project),
+                ],
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(0, preview.returncode, preview.stderr)
-            # Counted from what is generated, not hardcoded: the installer covers every generated
-            # agent family, so a new family changes this number without needing a test edit.
-            generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
             self.assertEqual(
-                f"PREVIEW ONLY: {len(generated) + 1} change(s)",
+                f"PREVIEW ONLY: {len(generated) + 2} change(s)",
                 preview.stdout.splitlines()[-1].split(";")[0],
             )
+            self.assertLess(
+                preview.stdout.index(str(target / generated[0].name)),
+                preview.stdout.index(str(project_target / generated[0].name)),
+                "profile changes must be reported before project cleanup",
+            )
             applied = subprocess.run(
-                [*arguments, "-File", str(script), "-ProjectRoot", str(project), "-Apply"],
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-MigrateProjectRoot",
+                    str(project),
+                    "-Apply",
+                ],
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(0, applied.returncode, applied.stderr)
             self.assertEqual(
-                [path.name for path in generated],
-                sorted(p.name for p in target.glob("*.toml") if p.name != "unrelated.toml"),
+                sorted([path.name for path in generated] + ["unrelated.toml"]),
+                sorted(p.name for p in target.glob("*.toml")),
             )
-            self.assertEqual('name = "unrelated"\n', unrelated.read_text(encoding="utf-8"))
+            self.assertEqual(
+                'name = "unrelated-profile"\n', unrelated_profile.read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                'name = "unrelated-project"\n', unrelated_project.read_text(encoding="utf-8")
+            )
             self.assertFalse(former.exists())
+            self.assertFalse((project_target / generated[0].name).exists())
+
+            verified = subprocess.run(
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-MigrateProjectRoot",
+                    str(project),
+                    "-Verify",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, verified.returncode, verified.stderr)
+            self.assertIn(f"VERIFIED: {len(generated)} profile agent(s)", verified.stdout)
             repeated = subprocess.run(
-                [*arguments, "-File", str(script), "-ProjectRoot", str(project), "-Apply"],
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-MigrateProjectRoot",
+                    str(project),
+                    "-Apply",
+                ],
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(0, repeated.returncode, repeated.stderr)
             self.assertIn("INSTALLED: 0 change(s)", repeated.stdout)
+
+            drifted = target / generated[0].name
+            drifted.write_text('name = "drifted"\n', encoding="utf-8")
+            rejected = subprocess.run(
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Verify"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("Profile verification failed", rejected.stderr)
+
+            repaired = subprocess.run(
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, repaired.returncode, repaired.stderr)
+            removed = subprocess.run(
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-Uninstall",
+                    "-Apply",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, removed.returncode, removed.stderr)
+            self.assertEqual([unrelated_profile], list(target.glob("*.toml")))
+
+            environment = os.environ.copy()
+            environment["CODEX_HOME"] = str(codex_home)
+            environment_preview = subprocess.run(
+                [*arguments, "-File", str(script)],
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+            self.assertEqual(0, environment_preview.returncode, environment_preview.stderr)
+            self.assertIn(str(target / generated[0].name), environment_preview.stdout)
 
     def test_the_authored_installer_refuses_to_run_without_generated_roles(self):
         shell = shutil.which("powershell.exe") or shutil.which("pwsh")
@@ -652,7 +755,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             project.mkdir()
             (project / ".git").mkdir()
             attempted = subprocess.run(
-                [*arguments, "-File", str(script), "-ProjectRoot", str(project)],
+                [*arguments, "-File", str(script), "-CodexHome", str(project / "codex-home")],
                 capture_output=True,
                 text=True,
             )
@@ -661,18 +764,17 @@ class WorkflowGenerationTests(unittest.TestCase):
 
 
 
-    def test_codex_installer_rejects_a_reparse_point_target(self):
+    def test_codex_installer_rejects_a_profile_reparse_point_target(self):
         shell = shutil.which("powershell.exe") or shutil.which("pwsh")
         self.assertIsNotNone(shell)
         script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            project = root / "project"
+            codex_home = root / "codex-home"
             outside = root / "outside"
-            (project / ".git").mkdir(parents=True)
-            (project / ".codex").mkdir()
+            codex_home.mkdir()
             outside.mkdir()
-            target = project / ".codex" / "agents"
+            target = codex_home / "agents"
             if os.name == "nt":
                 linked = subprocess.run(
                     ["cmd.exe", "/D", "/C", "mklink", "/J", str(target), str(outside)],
@@ -687,7 +789,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             if Path(shell).name.lower() == "powershell.exe":
                 arguments += ["-ExecutionPolicy", "Bypass"]
             completed = subprocess.run(
-                [*arguments, "-File", str(script), "-ProjectRoot", str(project), "-Apply"],
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
                 capture_output=True,
                 text=True,
             )
@@ -707,18 +809,17 @@ class WorkflowGenerationTests(unittest.TestCase):
             shutil.copy2(ROOT / ".codex" / script.name, script)
             shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
             (source / "unrelated.toml").write_text('name = "unrelated"\n', encoding="utf-8")
-            project = root / "project"
-            (project / ".git").mkdir(parents=True)
+            codex_home = root / "codex-home"
             arguments = [shell, "-NoProfile"]
             if Path(shell).name.lower() == "powershell.exe":
                 arguments += ["-ExecutionPolicy", "Bypass"]
             completed = subprocess.run(
-                [*arguments, "-File", str(script), "-ProjectRoot", str(project), "-Apply"],
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(0, completed.returncode, completed.stderr)
-            target = project / ".codex" / "agents"
+            target = codex_home / "agents"
             self.assertEqual(10, len(list(target.glob("*.toml"))))
             self.assertFalse((target / "unrelated.toml").exists())
 
@@ -786,7 +887,13 @@ class HostAdapterTests(unittest.TestCase):
             changed_since=lambda baseline: set(self.observed_changes),
         )
 
-    def registry(self, resolver=lambda command: command, repository_root=ROOT, observer=None):
+    def registry(
+        self,
+        resolver=lambda command: command,
+        repository_root=ROOT,
+        observer=None,
+        profile_roots=None,
+    ):
         return HostAdapterRegistry(
             WORKFLOWS,
             repository_root,
@@ -794,6 +901,7 @@ class HostAdapterTests(unittest.TestCase):
             command_runner=self.runner,
             lease_registry=self.lease_registry,
             repository_observer=observer or self.observer,
+            profile_roots={"codex": None} if profile_roots is None else profile_roots,
         )
 
     def dispatch(self, capability="evidence-explorer", dispatch_id="dispatch-001"):
@@ -990,6 +1098,25 @@ class HostAdapterTests(unittest.TestCase):
                 probe=probe,
             )
             self.assertEqual("role-unavailable", missing["reason_code"])
+
+    def test_codex_probe_reads_profile_agents_without_a_project_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            project = root / "project"
+            project.mkdir()
+            codex_home = root / "codex-home"
+            profile_agents = codex_home / "agents"
+            profile_agents.mkdir(parents=True)
+            profile_agents.joinpath("evidence-explorer.toml").write_text("", encoding="utf-8")
+
+            registry = self.registry(
+                repository_root=project,
+                profile_roots={"codex": codex_home},
+            )
+            probe = registry.probe("codex")
+
+            self.assertEqual("available", probe["status"])
+            self.assertEqual(["evidence-explorer"], probe["available_roles"])
 
     def test_probe_identity_and_empty_versions_cannot_claim_availability(self):
         empty_runner = lambda *arguments, **keywords: SimpleNamespace(

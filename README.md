@@ -92,3 +92,30 @@ After a new commit lands on `main`, pick it up with:
 Codex: adding the marketplace (`.agents/plugins/marketplace.json`) installs all three packages
 automatically; each declares `INSTALLED_BY_DEFAULT`. Refresh Codex's copy of the marketplace the same way
 to pick up a new commit.
+
+Codex does not load agent definitions directly from plugins. After installing or updating the marketplace,
+install the engineering package's shared agents once into the active Codex profile. The installer defaults
+to `CODEX_HOME` and then `~/.codex`; `-CodexHome` selects an explicit alternate profile. Preview is the
+default, apply and verify are separate deterministic operations:
+
+```powershell
+$codexProfile = if ($env:CODEX_HOME) {
+    $env:CODEX_HOME
+} else {
+    Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex'
+}
+$engineeringRelease = Get-ChildItem -Directory (Join-Path $codexProfile 'plugins/cache/base-agents/engineering') |
+    Sort-Object { [version]$_.Name } |
+    Select-Object -Last 1
+$agentInstaller = Join-Path $engineeringRelease.FullName 'scripts/install-codex-agents.ps1'
+
+& $agentInstaller -CodexHome $codexProfile
+& $agentInstaller -CodexHome $codexProfile -Apply
+& $agentInstaller -CodexHome $codexProfile -Verify
+```
+
+To migrate a repository that received older base-agents copies, add
+`-MigrateProjectRoot <repository> -Apply`. The installer verifies the profile copies before removing only
+the known managed filenames from that repository and preserves unrelated project agents. Use `-Uninstall`
+to preview profile cleanup and `-Uninstall -Apply` to remove only base-agents-managed profile filenames.
+Claude continues to load the package's `agents/` payload directly and needs no copied `.claude/agents` tree.

@@ -19,7 +19,7 @@ skip.
 | Concern | Codex | Claude |
 |---|---|---|
 | Contract versions | `v2` | `v2` |
-| Role delivery | project-scoped `.codex/agents`; plugin loading unsupported, so provisioning installs them per repository | plugin-loaded `agents/`, no per-project install |
+| Role delivery | profile-scoped `${CODEX_HOME:-~/.codex}/agents`; plugin loading unsupported, so the packaged installer manages shared roles once per profile; project `.codex/agents` remains available only for deliberately project-owned roles | plugin-loaded `agents/`, no per-project install |
 | Semantic stage resolution | `hosts/codex.json` | `hosts/claude.json` |
 | Non-default stage launch | native `default` agent with the bounded role body and explicit model | native `general-purpose` agent with the bounded role body and explicit model |
 | Read-only enforcement | `sandbox_mode = read-only` | tool allowlist without `Write`, `Edit`, `Bash` |
