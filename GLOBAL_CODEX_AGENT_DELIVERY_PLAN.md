@@ -125,8 +125,8 @@ Official reference: https://learn.chatgpt.com/docs/agent-configuration/subagents
 
 ## Next Steps
 
-Commit and review this final plan checkpoint, then push and deliver the approved 2.1.3 candidate through
-PR/CI/merge. Refresh the installed release, install and
+Once this checkpoint receives its required docs-only watermark, push and deliver the approved 2.1.3
+candidate through PR/CI/merge. Refresh the installed release, install and
 verify the profile roles, prove an arbitrary repository advertises them without local copies, then migrate
 only the ten known base-agents files from `sandbox-hwid`, record the migration there, and automatically hand
 ownership back to its authorized refactor.
