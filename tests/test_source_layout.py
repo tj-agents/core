@@ -36,7 +36,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(61, len(skills))
+        self.assertEqual(62, len(skills))
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
         })
@@ -77,6 +77,10 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
             "plugins/machine/codex-skills/handoff-claude/scripts/launch-claude.ps1",
             "plugins/machine/resources/machine/utility/scripts/history.py",
+            "plugins/machine/skills/bootstrap-capabilities/scripts/bootstrap_capabilities.py",
+            "plugins/machine/catalog/catalog.json",
+            "plugins/machine/catalog/capabilities.lock.schema.json",
+            "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)
         self.assertEqual(
@@ -282,6 +286,20 @@ class SourceLayoutTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "overlaps authored source"):
             SYNC.build(self.root)
+
+    def test_catalog_digest_exclusion_cannot_be_widened(self):
+        path = self.root / ".agents/catalog/catalog.json"
+        catalog = json.loads(path.read_text(encoding="utf-8"))
+        machine = next(
+            plugin
+            for release in catalog["releases"]
+            for plugin in release["plugins"]
+            if plugin["id"] == "base-agents/machine"
+        )
+        machine["digest_excludes"].append("codex-skills/bootstrap-capabilities/SKILL.md")
+        path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
+            SYNC.build(self.root, validate_catalog_digests=False)
 
     def test_prerequisite_cycles_and_missing_owners_fail(self):
         self.config(lambda value: value["prerequisites"]["base"].append("engineering"))

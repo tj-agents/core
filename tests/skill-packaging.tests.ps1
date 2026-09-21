@@ -16,8 +16,12 @@ function Get-MissingRequiredFiles {
         [Parameter(Mandatory)][string] $Name
     )
 
-    $harness = $Name.Substring('handoff-'.Length)
-    $relative = "scripts\launch-$harness.ps1"
+    $relative = if ($Name -eq 'bootstrap-capabilities') {
+        'scripts\bootstrap_capabilities.py'
+    } else {
+        $harness = $Name.Substring('handoff-'.Length)
+        "scripts\launch-$harness.ps1"
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $SkillDir $relative) -PathType Leaf)) {
         return @($relative)
     }
@@ -45,7 +49,7 @@ function Get-UnpackagedSkillDirectoryReferences {
 # or an unpackaged path outside the skill's own folder. This is the exact shape of the confirmed defect.
 $forbiddenPatterns = @('routing/route.py', '.claude\routing', '$env:USERPROFILE', '%USERPROFILE%', '~/', '~\')
 
-$targets = @('handoff-claude', 'handoff-codex')
+$targets = @('bootstrap-capabilities', 'handoff-claude', 'handoff-codex')
 
 foreach ($name in $targets) {
     $dir = Join-Path $pluginSkills $name

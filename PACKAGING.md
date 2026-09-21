@@ -21,6 +21,12 @@ hardcoded username.
 A genuine external prerequisite, such as a host CLI or operating-system feature, is named and checked. A
 missing prerequisite must fail clearly. It is not replaced with an invented policy or silently ignored.
 
+Release verification uses `sha256-tree-v1`: hash each sorted forward-slash package-relative path, NUL, byte
+length, NUL and file bytes. Reject symlinks. Digest exclusions must be declared per catalog entry and kept
+narrow. The machine package excludes only `catalog/catalog.json`, because that file contains the machine
+package's digest; schemas, scripts and the rest of the embedded catalog remain covered. Immutable release tags
+and full commits provide the identity of excluded metadata.
+
 ## Why
 
 A skill that refers to an unpackaged helper works only on a machine where that path happens to exist.
