@@ -11,5 +11,6 @@
     "handoff"
   ],
   "displayName": "Machine utilities",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "hooks": "./hooks/claude.json"
 }

@@ -8,4 +8,5 @@ Generated from canonical `.agents/` definitions.
 - `handoff-codex` — utility — `.agents/machine/utility/handoff-codex/SKILL.md`
 - `last-conversation` — utility — `.agents/machine/utility/last-conversation/SKILL.md`
 - `open-claude` — utility — `.agents/machine/utility/open-claude/SKILL.md`
+- `peer-cli` — utility — `.agents/machine/utility/peer-cli/SKILL.md`
 - `search` — utility — `.agents/machine/utility/search/SKILL.md`
