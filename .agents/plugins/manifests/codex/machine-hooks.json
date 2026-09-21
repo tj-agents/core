@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
