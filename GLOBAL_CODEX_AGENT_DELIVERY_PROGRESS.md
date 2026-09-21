@@ -21,12 +21,12 @@ includes that baseline and advances the package set to immutable release 2.1.3.
 
 ## Next Steps
 
-Commit and review this final checkpoint, then push, open the PR, monitor CI, and merge the approved candidate.
-After merge, install and verify the released profile roles before the
+Once this committed checkpoint receives its docs-only watermark, push, open the PR, monitor CI, and merge
+the approved candidate. After merge, install and verify the released profile roles before the
 scoped sandbox migration and successor handoff.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: final docs-only watermark, then PR/CI/merge delivery of the approved 2.1.3 candidate.
+Current delivery sequence: final docs-only watermark, then PR/CI/merge delivery of the approved 2.1.3 candidate.
 Remaining scope: PR/CI/merge, local release installation and fresh-session proof, sandbox cleanup, and automated return.
 Done when: the merged release is installed and proven profile-wide, only former base-agents project copies are removed, sandbox-hwid records the migration, and its authorized refactor has a successor owner.
 
