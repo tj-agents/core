@@ -9,6 +9,9 @@ base, engineering and machine packages are classifications inside `.agents/`; th
 top-level repository trees. Shared workflow contracts, hooks, schemas, tests and resources also remain
 under `.agents/`.
 
+The release catalog and project-lock schemas live under `.agents/catalog/`. `CAPABILITIES.md` is generated
+from that canonical catalog and is never edited as a second source.
+
 A shared rule or procedure is written once. Neither host adapter may reproduce its body as an independently
 maintained source.
 
