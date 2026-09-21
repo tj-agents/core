@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import shutil
@@ -598,6 +599,8 @@ class WorkflowGenerationTests(unittest.TestCase):
             target.mkdir(parents=True)
             unrelated_profile = target / "unrelated.toml"
             unrelated_profile.write_text('name = "unrelated-profile"\n', encoding="utf-8")
+            former_profile = target / "workflow-review-lens.toml"
+            former_profile.write_text('name = "personal-former-name"\n', encoding="utf-8")
 
             project = root / "project"
             (project / ".git").mkdir(parents=True)
@@ -619,7 +622,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                     str(script),
                     "-CodexHome",
                     str(codex_home),
-                    "-MigrateProjectRoot",
+                    "-ProjectRoot",
                     str(project),
                 ],
                 capture_output=True,
@@ -627,9 +630,10 @@ class WorkflowGenerationTests(unittest.TestCase):
             )
             self.assertEqual(0, preview.returncode, preview.stderr)
             self.assertEqual(
-                f"PREVIEW ONLY: {len(generated) + 2} change(s)",
+                f"PREVIEW ONLY: {len(generated) + 1} change(s)",
                 preview.stdout.splitlines()[-1].split(";")[0],
             )
+            self.assertIn("-ProjectRoot is deprecated", preview.stdout)
             self.assertLess(
                 preview.stdout.index(str(target / generated[0].name)),
                 preview.stdout.index(str(project_target / generated[0].name)),
@@ -642,7 +646,7 @@ class WorkflowGenerationTests(unittest.TestCase):
                     str(script),
                     "-CodexHome",
                     str(codex_home),
-                    "-MigrateProjectRoot",
+                    "-ProjectRoot",
                     str(project),
                     "-Apply",
                 ],
@@ -651,7 +655,10 @@ class WorkflowGenerationTests(unittest.TestCase):
             )
             self.assertEqual(0, applied.returncode, applied.stderr)
             self.assertEqual(
-                sorted([path.name for path in generated] + ["unrelated.toml"]),
+                sorted(
+                    [path.name for path in generated]
+                    + ["unrelated.toml", "workflow-review-lens.toml"]
+                ),
                 sorted(p.name for p in target.glob("*.toml")),
             )
             self.assertEqual(
@@ -660,8 +667,11 @@ class WorkflowGenerationTests(unittest.TestCase):
             self.assertEqual(
                 'name = "unrelated-project"\n', unrelated_project.read_text(encoding="utf-8")
             )
-            self.assertFalse(former.exists())
+            self.assertEqual('name = "personal-former-name"\n', former_profile.read_text(encoding="utf-8"))
+            self.assertEqual('name = "former"\n', former.read_text(encoding="utf-8"))
             self.assertFalse((project_target / generated[0].name).exists())
+            ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+            self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
 
             verified = subprocess.run(
                 [
@@ -711,7 +721,28 @@ class WorkflowGenerationTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(0, repaired.returncode, repaired.stderr)
+            self.assertNotEqual(0, repaired.returncode)
+            self.assertIn("unowned or modified profile agent", repaired.stderr)
+            self.assertEqual('name = "drifted"\n', drifted.read_text(encoding="utf-8"))
+            shutil.copy2(generated[0], drifted)
+            drifted.write_text('name = "modified-after-install"\n', encoding="utf-8")
+            refused_uninstall = subprocess.run(
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-Uninstall",
+                    "-Apply",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(0, refused_uninstall.returncode)
+            self.assertIn("modified owned profile agent", refused_uninstall.stderr)
+            self.assertEqual('name = "modified-after-install"\n', drifted.read_text(encoding="utf-8"))
+            shutil.copy2(generated[0], drifted)
             removed = subprocess.run(
                 [
                     *arguments,
@@ -726,7 +757,10 @@ class WorkflowGenerationTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(0, removed.returncode, removed.stderr)
-            self.assertEqual([unrelated_profile], list(target.glob("*.toml")))
+            self.assertEqual(
+                sorted([unrelated_profile, former_profile]), sorted(target.glob("*.toml"))
+            )
+            self.assertFalse((target / ".base-agents-delivery.json").exists())
 
             environment = os.environ.copy()
             environment["CODEX_HOME"] = str(codex_home)
@@ -738,6 +772,100 @@ class WorkflowGenerationTests(unittest.TestCase):
             )
             self.assertEqual(0, environment_preview.returncode, environment_preview.stderr)
             self.assertIn(str(target / generated[0].name), environment_preview.stdout)
+
+    def test_codex_installer_preserves_colliding_unowned_profile_agents(self):
+        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
+        self.assertIsNotNone(shell)
+        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
+        arguments = [shell, "-NoProfile"]
+        if Path(shell).name.lower() == "powershell.exe":
+            arguments += ["-ExecutionPolicy", "Bypass"]
+        with tempfile.TemporaryDirectory() as temp:
+            codex_home = Path(temp) / "codex-home"
+            target = codex_home / "agents"
+            target.mkdir(parents=True)
+            collision = target / generated[0].name
+            collision.write_text('name = "personal-collision"\n', encoding="utf-8")
+            rejected = subprocess.run(
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("unowned or modified profile agent", rejected.stderr)
+            self.assertEqual('name = "personal-collision"\n', collision.read_text(encoding="utf-8"))
+            self.assertEqual([collision], list(target.glob("*.toml")))
+
+            shutil.copy2(generated[0], collision)
+            applied = subprocess.run(
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, applied.returncode, applied.stderr)
+            ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+            self.assertNotIn(generated[0].name, [item["name"] for item in ownership["files"]])
+            removed = subprocess.run(
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-Uninstall",
+                    "-Apply",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, removed.returncode, removed.stderr)
+            self.assertEqual(generated[0].read_bytes(), collision.read_bytes())
+
+    def test_codex_installer_migrates_only_digest_proven_former_project_agents(self):
+        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
+        self.assertIsNotNone(shell)
+        arguments = [shell, "-NoProfile"]
+        if Path(shell).name.lower() == "powershell.exe":
+            arguments += ["-ExecutionPolicy", "Bypass"]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            bundle = root / "bundle" / ".codex"
+            source = bundle / "agents"
+            shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
+            script = bundle / "install-workflow-agents.ps1"
+            shutil.copy2(ROOT / ".codex" / script.name, script)
+            delivery = json.loads((ROOT / ".codex" / "agent-delivery.json").read_text(encoding="utf-8"))
+            known_content = b'name = "known-former"\n'
+            delivery["project_managed_agent_sha256"]["workflow-review-lens.toml"] = [
+                hashlib.sha256(known_content).hexdigest()
+            ]
+            (bundle / "agent-delivery.json").write_text(json.dumps(delivery), encoding="utf-8")
+            project = root / "project"
+            (project / ".git").mkdir(parents=True)
+            project_agents = project / ".codex" / "agents"
+            project_agents.mkdir(parents=True)
+            known = project_agents / "workflow-review-lens.toml"
+            known.write_bytes(known_content)
+            unknown = project_agents / "workflow-log-analyst.toml"
+            unknown.write_text('name = "personal-collision"\n', encoding="utf-8")
+            completed = subprocess.run(
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(root / "codex-home"),
+                    "-MigrateProjectRoot",
+                    str(project),
+                    "-Apply",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertFalse(known.exists())
+            self.assertEqual('name = "personal-collision"\n', unknown.read_text(encoding="utf-8"))
 
     def test_the_authored_installer_refuses_to_run_without_generated_roles(self):
         shell = shutil.which("powershell.exe") or shutil.which("pwsh")
@@ -790,6 +918,44 @@ class WorkflowGenerationTests(unittest.TestCase):
                 arguments += ["-ExecutionPolicy", "Bypass"]
             completed = subprocess.run(
                 [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(0, completed.returncode)
+            self.assertIn("reparse point", completed.stderr)
+            self.assertEqual([], list(outside.iterdir()))
+
+    def test_codex_installer_rejects_a_reparse_point_in_a_profile_ancestor(self):
+        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
+        self.assertIsNotNone(shell)
+        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            outside = root / "outside"
+            outside.mkdir()
+            linked = root / "linked"
+            if os.name == "nt":
+                created = subprocess.run(
+                    ["cmd.exe", "/D", "/C", "mklink", "/J", str(linked), str(outside)],
+                    capture_output=True,
+                    text=True,
+                )
+                if created.returncode:
+                    self.skipTest(created.stderr or created.stdout)
+            else:
+                linked.symlink_to(outside, target_is_directory=True)
+            arguments = [shell, "-NoProfile"]
+            if Path(shell).name.lower() == "powershell.exe":
+                arguments += ["-ExecutionPolicy", "Bypass"]
+            completed = subprocess.run(
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(linked / "profile"),
+                    "-Apply",
+                ],
                 capture_output=True,
                 text=True,
             )

@@ -110,11 +110,18 @@ Official reference: https://learn.chatgpt.com/docs/agent-configuration/subagents
   2.1.3. The 44-test general suite, delivery-focused workflow tests, catalog/generation gates, CLI recovery,
   packaging, and launcher suites pass; the immediately prior combined candidate also passed all 547
   hook/workflow tests with 8 platform skips.
+- 2026-09-21: Cancelled the first immutable review pass after its workflow lens proved the review helper's
+  `path_digest` did not hash the emitted NUL-delimited path manifest as the lifecycle contract requires. The
+  same pass identified installer ownership, legacy CLI, and ancestor-reparse gaps. Corrected the helper and
+  added literal manifest-digest coverage; replaced filename-only ownership with a profile ownership manifest
+  plus shipped historical project-content digests; retained deprecated `-ProjectRoot` as a safe migration
+  alias; and made every existing ancestor component reparse-protected. Focused workflow-helper and six
+  installer safety regressions pass. A new full review must be frozen only after full validation and commit.
 
 ## Next Steps
 
-Complete the reconciled 2.1.3 merge commit, run the required independent review and address findings,
-then push and deliver the candidate through PR/CI/merge. Refresh the installed release, install and
+Complete validation and commit of the corrected 2.1.3 candidate, freeze a new required independent review,
+and address any valid findings before pushing and delivering through PR/CI/merge. Refresh the installed release, install and
 verify the profile roles, prove an arbitrary repository advertises them without local copies, then migrate
 only the ten known base-agents files from `sandbox-hwid`, record the migration there, and automatically hand
 ownership back to its authorized refactor.
