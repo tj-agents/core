@@ -55,13 +55,6 @@ order and disposable bundle were removed; no completed watermark was claimed. A 
 after the fixing commit. The replacement full pass at `00db7c7` found one medium interrupted-apply ownership
 gap. Commit `ce94efa` added a pending ownership journal, atomic staged replacement, exact recovery, and the
 upgrade/uninstall regression. Its clean incremental pass is approved at `ce94efa`; all findings are resolved.
-The first PR #20 run then exposed a Windows-only test assertion coupled to exact temporary-path rendering;
-all preceding gates passed and the installer operations themselves completed. The active fix asserts the
-semantic profile `ADD` precedes the project `REMOVE` without depending on the rendered root path.
-The next exact-head run exposed one remaining environment-preview assertion with the same short-path alias
-assumption. The active follow-up checks the semantic `ADD` suffix under `codex-home\agents` instead of the
-absolute temporary root.
-
 ## Decisions, discoveries, blockers, and deviations
 
 - Codex and Claude deliberately use different host delivery mechanisms while sharing canonical role bodies.
