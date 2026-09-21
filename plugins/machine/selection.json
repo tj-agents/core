@@ -13,6 +13,7 @@
     "handoff-codex",
     "last-conversation",
     "open-claude",
+    "peer-cli",
     "search"
   ]
 }
