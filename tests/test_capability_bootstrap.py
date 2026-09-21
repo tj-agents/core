@@ -79,6 +79,12 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaisesRegex(BOOT.BootstrapError, "requires executable"):
             BOOT.check_required_prerequisites(selections, plugins)
 
+    def test_malformed_catalog_fails_with_a_bootstrap_error(self):
+        catalog = self.catalog()
+        del catalog["releases"][0]["plugins"][0]["external_prerequisites"]
+        with self.assertRaisesRegex(BOOT.BootstrapError, "external_prerequisites"):
+            BOOT.catalog_index(catalog)
+
     def test_cycle_is_rejected(self):
         catalog = self.catalog()
         catalog["releases"][0]["plugins"][0]["dependencies"]["required"] = [
@@ -123,6 +129,10 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.git("config", "core.autocrlf", "false", cwd=self.source)
         self.git("add", ".", cwd=self.source)
         self.git("commit", "-m", "fixture", cwd=self.source)
+        self.parent_commit = self.git("rev-parse", "HEAD", cwd=self.source).strip()
+        (self.source / "release.txt").write_text("release\n", encoding="utf-8")
+        self.git("add", "release.txt", cwd=self.source)
+        self.git("commit", "-m", "release", cwd=self.source)
         self.git("tag", "v1.0.0", cwd=self.source)
         self.commit = self.git("rev-parse", "HEAD", cwd=self.source).strip()
         digest = BOOT.tree_digest(package, [])
@@ -189,6 +199,7 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.plugins = {}
         self.host_mutations = 0
         self.fail_install_once = False
+        self.marketplace_root_override = {}
 
     def git(self, *arguments, cwd=None):
         completed = subprocess.run(
@@ -216,9 +227,20 @@ class BootstrapIntegrationTests(unittest.TestCase):
         arguments = command[1:]
         stdout = ""
         if arguments == ["plugin", "marketplace", "list", "--json"] and not claude:
-            stdout = json.dumps({"marketplaces": [{"name": value} for value in sorted(self.marketplaces)]})
+            stdout = json.dumps({"marketplaces": [
+                {
+                    "name": value,
+                    "root": self.marketplace_root_override.get(
+                        value, str(self.profile / BOOT.STATE_DIRECTORY / "checkouts" / value)
+                    ),
+                }
+                for value in sorted(self.marketplaces)
+            ]})
         elif arguments == ["plugin", "marketplace", "list"] and claude:
-            stdout = "".join(f"local {value}\n" for value in sorted(self.marketplaces))
+            stdout = "".join(
+                f"  ❯ {value}\n    Source: Directory ({self.profile / BOOT.STATE_DIRECTORY / 'checkouts' / value})\n"
+                for value in sorted(self.marketplaces)
+            )
         elif arguments == ["plugin", "list", "--json"]:
             records = [
                 {"id": identity, "scope": "user", "enabled": enabled}
@@ -278,13 +300,38 @@ class BootstrapIntegrationTests(unittest.TestCase):
     def test_partial_apply_is_recoverable(self):
         self.fail_install_once = True
         with mock.patch.object(BOOT, "executable", side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git")):
-            with self.assertRaisesRegex(BOOT.BootstrapError, "injected install failure"):
+            with self.assertRaisesRegex(BOOT.BootstrapError, "injected install failure") as caught:
                 BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            self.assertEqual("partial", caught.exception.report["status"])
+            self.assertIn("marketplace:fixture", caught.exception.report["applied"])
             state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
             self.assertIn("fixture", state["marketplaces"])
             resumed = BOOT.execute(self.arguments("apply"), run=self.fake_run)
             self.assertEqual("applied", resumed["status"])
             self.assertTrue(self.plugins["example@fixture"])
+
+    def test_registered_marketplace_source_drift_is_rejected(self):
+        with mock.patch.object(BOOT, "executable", side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git")):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            self.marketplace_root_override["fixture"] = str(self.root / "somewhere else")
+            with self.assertRaisesRegex(BOOT.BootstrapError, "source disagrees"):
+                BOOT.execute(self.arguments("verify"), run=self.fake_run)
+
+    def test_offline_verify_rejects_local_tag_drift(self):
+        with mock.patch.object(BOOT, "executable", side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git")):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+            self.git("tag", "-f", "v1.0.0", self.parent_commit, cwd=checkout)
+            with self.assertRaisesRegex(BOOT.BootstrapError, "local tag"):
+                BOOT.execute(self.arguments("verify"), run=self.fake_run)
+
+    def test_lock_path_scope_cannot_escape_the_project(self):
+        catalog = json.loads(self.catalog_path.read_text())
+        releases, plugins = BOOT.catalog_index(catalog)
+        lock = json.loads(self.lock_path.read_text())
+        lock["plugins"][0]["path_scopes"][0]["path"] = "../outside/**"
+        with self.assertRaisesRegex(BOOT.BootstrapError, "stay inside"):
+            BOOT.validate_lock(lock, releases, plugins)
 
     def test_existing_unmanaged_marketplace_is_preserved_and_rejected(self):
         self.marketplaces.add("fixture")
