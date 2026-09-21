@@ -11,7 +11,7 @@ The packaged SessionStart hook emits the same canonical contract to both hosts. 
 as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
 alone is insufficient. The skill documents an explicit generated native-instruction fallback.
 
-The split packages form the **2.0.1** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.0** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
@@ -26,6 +26,9 @@ closure.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines this source/adapter/distribution boundary.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared open taxonomy used by every agent marketplace repo.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
+- `.agents/catalog/catalog.json` records immutable cross-repository releases and package digests. The generated
+  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index; project selections live in one
+  `.agents/capabilities.lock.json` governed by the shipped lock schema.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
@@ -34,6 +37,24 @@ closure.
 
 Run `pwsh .agents/sync-generated.ps1` after changing a skill and
 `pwsh .agents/sync-generated.ps1 -Check` before delivery.
+
+When package bytes change, refresh the local catalog digests before generation:
+
+```powershell
+python -B scripts/update_catalog_digests.py
+pwsh .agents/sync-generated.ps1
+```
+
+The `machine:bootstrap-capabilities` skill previews, applies and verifies exact project locks through native
+Codex or Claude plugin commands. It uses installation-owned Git checkouts at full locked commits and isolated
+`CODEX_HOME` or `CLAUDE_CONFIG_DIR` profile paths. Preview changes nothing; verify is offline-safe; apply only
+adds the selected catalog marketplaces and plugins. It never performs an unconditional marketplace refresh.
+
+Catalog releases use immutable semantic tags. Codex manifests carry matching package versions; Claude remains
+commit/tag based until its dependency/version behavior has a separately verified gate. `sha256-tree-v1` hashes
+the sorted package paths, lengths and bytes. The machine package excludes only its embedded
+`catalog/catalog.json` from its own digest to avoid a self-reference; its schemas, bootstrap and all other
+resources remain covered.
 
 ## Install
 
