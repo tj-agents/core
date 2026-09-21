@@ -88,6 +88,130 @@ class SourceLayoutTests(unittest.TestCase):
             (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes(),
         )
 
+    def test_fresh_default_selection_has_handoff_closure_for_both_hosts(self):
+        config, output, skills, compatibility = SYNC.build(self.root)
+        marketplace = json.loads(
+            output[".agents/plugins/marketplace.json"].decode("utf-8")
+        )
+        claude_marketplace = json.loads(
+            output[".claude-plugin/marketplace.json"].decode("utf-8")
+        )
+        default_plugins = [
+            plugin["name"]
+            for plugin in marketplace["plugins"]
+            if plugin["policy"]["installation"] == "INSTALLED_BY_DEFAULT"
+        ]
+        fresh_plugins = [
+            entry.removesuffix(f"@{marketplace['name']}")
+            for entry in compatibility["fresh_selection"]
+        ]
+
+        self.assertEqual(["base", "engineering", "machine"], fresh_plugins)
+        self.assertEqual(fresh_plugins, default_plugins)
+        self.assertEqual(
+            fresh_plugins,
+            [plugin["name"] for plugin in claude_marketplace["plugins"]],
+        )
+
+        catalog_skills = set()
+        for plugin in fresh_plugins:
+            expected_source = f"./plugins/{plugin}"
+            claude_entry = next(
+                entry
+                for entry in claude_marketplace["plugins"]
+                if entry["name"] == plugin
+            )
+            self.assertEqual(expected_source, claude_entry["source"])
+            catalog = json.loads(
+                output[f"plugins/{plugin}/selection.json"].decode("utf-8")
+            )
+            self.assertLessEqual(
+                set(catalog["prerequisites"]), set(fresh_plugins)
+            )
+            catalog_skills.update(catalog["skills"])
+
+        required = set(compatibility["fresh_required_skills"])
+        owners = {name: skill["plugin"] for name, skill in skills.items()}
+        self.assertEqual({"cd", "handoff", "handoff-codex"}, required)
+        self.assertLessEqual(required, catalog_skills)
+        for tree in ("skills", "codex-skills"):
+            for name in required:
+                self.assertIn(
+                    f"plugins/{owners[name]}/{tree}/{name}/SKILL.md",
+                    output,
+                )
+
+    def test_cd_routes_to_automatic_handoff_before_manual_fallback(self):
+        _, output, _, _ = SYNC.build(self.root)
+        bodies = [
+            (self.root / ".agents/base/cd/SKILL.md").read_text(encoding="utf-8"),
+            output["plugins/base/.agents/base/cd/SKILL.md"].decode("utf-8"),
+        ]
+        for body in bodies:
+            normalized = body.replace("\r\n", "\n")
+            automatic = normalized.index("resolve and invoke the unqualified `handoff` workflow")
+            manual = normalized.index("Only after the automatic `handoff` capability")
+            self.assertLess(automatic, manual)
+            self.assertIn("starts exactly one successor", normalized)
+            self.assertIn(
+                "never make\nmanual `/cd` the normal transfer path", normalized
+            )
+
+    def test_fresh_selection_must_match_marketplace_policy(self):
+        path = self.root / ".agents/plugins/manifests/codex/marketplace.json"
+        marketplace = json.loads(path.read_text(encoding="utf-8"))
+        marketplace["plugins"][-1]["policy"]["installation"] = "AVAILABLE"
+        path.write_text(json.dumps(marketplace, indent=2) + "\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            ValueError, "fresh_selection must exactly match"
+        ):
+            SYNC.build(self.root)
+
+    def test_claude_marketplace_must_match_fresh_selection(self):
+        path = self.root / ".agents/plugins/manifests/claude/marketplace.json"
+        marketplace = json.loads(path.read_text(encoding="utf-8"))
+        marketplace["plugins"].pop()
+        path.write_text(json.dumps(marketplace, indent=2) + "\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "Claude marketplace roster"):
+            SYNC.build(self.root)
+
+    def test_claude_marketplace_sources_must_resolve_selected_plugins(self):
+        path = self.root / ".agents/plugins/manifests/claude/marketplace.json"
+        marketplace = json.loads(path.read_text(encoding="utf-8"))
+        marketplace["plugins"][-1]["source"] = "./plugins/absent"
+        path.write_text(json.dumps(marketplace, indent=2) + "\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "Claude marketplace source"):
+            SYNC.build(self.root)
+
+    def test_required_handoff_skills_cannot_be_removed_or_weakened(self):
+        path = self.root / ".agents/plugins/compatibility.json"
+        original = json.loads(path.read_text(encoding="utf-8"))
+        cases = {
+            "missing": None,
+            "empty": [],
+            "wrong-type": "cd",
+            "incomplete": ["cd", "handoff"],
+            "expanded": ["cd", "handoff", "handoff-codex", "missing-skill"],
+        }
+        for name, required in cases.items():
+            with self.subTest(name=name):
+                compatibility = dict(original)
+                if required is None:
+                    compatibility.pop("fresh_required_skills")
+                else:
+                    compatibility["fresh_required_skills"] = required
+                path.write_text(
+                    json.dumps(compatibility, indent=2) + "\n", encoding="utf-8"
+                )
+
+                with self.assertRaisesRegex(
+                    ValueError, "fresh_required_skills must exactly declare"
+                ):
+                    SYNC.build(self.root)
+
     def test_generation_is_deterministic_and_prunes_only_declared_output(self):
         SYNC.generate(self.root)
         SYNC.generate(self.root, check=True)
