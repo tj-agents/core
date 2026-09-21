@@ -10,6 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ownershipManifestName = '.base-agents-delivery.json'
+$pendingManifestName = '.base-agents-delivery.pending.json'
 
 if ($Verify -and ($Apply -or $Uninstall)) {
     throw '-Verify cannot be combined with -Apply or -Uninstall.'
@@ -113,13 +114,13 @@ function Read-OwnershipManifest([string] $ManifestPath) {
     $item = Get-Item -Force -LiteralPath $ManifestPath
     if (-not $item.PSIsContainer -and $item.Length -ge 0) {
         try { $manifest = Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json }
-        catch { throw "Invalid base-agents ownership manifest: $ManifestPath" }
+        catch { throw "Invalid base-agents ownership state: $ManifestPath" }
     }
     else {
-        throw "Base-agents ownership manifest is not a file: $ManifestPath"
+        throw "Base-agents ownership state is not a file: $ManifestPath"
     }
     if ($manifest.schema_version -ne 1 -or $manifest.owner -ne 'base-agents') {
-        throw "Unsupported base-agents ownership manifest: $ManifestPath"
+        throw "Unsupported base-agents ownership state: $ManifestPath"
     }
     foreach ($entry in @($manifest.files)) {
         Assert-AgentName ([string] $entry.name) 'owned'
@@ -265,13 +266,40 @@ if ($null -ne $delivery.project_managed_agent_sha256) {
 $profile = Resolve-CodexProfile $CodexHome
 $target = Join-Path $profile 'agents'
 $manifestPath = Join-Path $target $ownershipManifestName
+$pendingPath = Join-Path $target $pendingManifestName
 Assert-SafeDeliveryPath $target
 $migrationProjects = @(
     $MigrateProjectRoot | ForEach-Object { Resolve-ManagedProject $_ } | Sort-Object -Unique
 )
 $ownedDigests = Read-OwnershipManifest $manifestPath
+$pendingExists = Test-Path -LiteralPath $pendingPath
+$pendingDigests = Read-OwnershipManifest $pendingPath
+if ($pendingExists) {
+    foreach ($name in @($pendingDigests.Keys)) {
+        $destination = Join-Path $target $name
+        Assert-SafeDeliveryPath $destination
+        if (-not (Test-Path -LiteralPath $destination)) { continue }
+        $item = Get-Item -Force -LiteralPath $destination
+        if ($item.PSIsContainer) {
+            throw "Interrupted profile install left a non-file agent target: $destination"
+        }
+        $destinationDigest = Get-FileSha256 $destination
+        if ($destinationDigest -eq $pendingDigests[$name]) {
+            # The prior apply completed this copy before interruption. The pending journal is proof of
+            # ownership; adopting only this exact digest does not claim a pre-existing identical collision.
+            $ownedDigests[$name] = $pendingDigests[$name]
+        }
+        elseif (-not ($ownedDigests.ContainsKey($name) -and
+            $destinationDigest -eq $ownedDigests[$name])) {
+            throw "Interrupted profile install has an unexpected agent state: $destination. Move it aside or restore the recorded file, then rerun -Apply."
+        }
+    }
+}
 
 if ($Verify) {
+    if ($pendingExists) {
+        throw "Profile verification found an interrupted install journal at $pendingPath. Rerun with -Apply to recover it."
+    }
     Assert-ProfileRoles $target $sourceFiles $ownedDigests
     Assert-ProjectsMigrated $migrationProjects $projectManagedNames $projectKnownDigests
     $suffix = if ($migrationProjects.Count) { '; known base-agents project copies absent' } else { '' }
@@ -281,6 +309,9 @@ if ($Verify) {
 
 $changes = 0
 if ($Uninstall) {
+    if ($pendingExists) {
+        throw "Profile uninstall found an interrupted install journal at $pendingPath. Rerun with -Apply before uninstalling."
+    }
     foreach ($name in @($ownedDigests.Keys | Sort-Object)) {
         $destination = Join-Path $target $name
         Assert-SafeDeliveryPath $destination
@@ -350,6 +381,23 @@ foreach ($name in @($ownedDigests.Keys | Sort-Object)) {
     }
 }
 
+$newOwned = @{}
+foreach ($name in $ownedDigests.Keys) {
+    if ($sourceNames -contains $name) { $newOwned[$name] = $ownedDigests[$name] }
+}
+foreach ($action in $installActions) {
+    if ($action.State -ne 'UNCHANGED' -or $ownedDigests.ContainsKey($action.File.Name)) {
+        $newOwned[$action.File.Name] = $action.SourceDigest
+    }
+}
+$profileMutationRequired = @($installActions | Where-Object { $_.State -ne 'UNCHANGED' }).Count -gt 0 -or
+    $retiredOwned.Count -gt 0
+if ($Apply -and ($profileMutationRequired -or $pendingExists)) {
+    # Persist intended ownership before the first role mutation. A retry can then adopt only exact files
+    # proven by this journal, while pre-existing identical collisions remain deliberately unowned.
+    Write-OwnershipManifest $pendingPath $newOwned
+}
+
 foreach ($action in $installActions) {
     Write-Output "$($action.State) $($action.Destination)"
     if ($action.State -eq 'UNCHANGED') { continue }
@@ -359,7 +407,22 @@ foreach ($action in $installActions) {
         New-Item -ItemType Directory -Force -Path $target | Out-Null
         Assert-SafeDeliveryPath $target
         Assert-SafeDeliveryPath $action.Destination
-        Copy-Item -LiteralPath $action.File.FullName -Destination $action.Destination -Force
+        $temporary = Join-Path $target ('.base-agents-delivery.{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
+        try {
+            Assert-SafeDeliveryPath $temporary
+            Copy-Item -LiteralPath $action.File.FullName -Destination $temporary
+            if ((Get-FileSha256 $temporary) -ne $action.SourceDigest) {
+                throw "Staged profile agent differs from its source: $($action.File.FullName)"
+            }
+            Assert-SafeDeliveryPath $action.Destination
+            Move-Item -LiteralPath $temporary -Destination $action.Destination -Force
+        }
+        finally {
+            if (Test-Path -LiteralPath $temporary) {
+                Assert-SafeDeliveryPath $temporary
+                Remove-Item -LiteralPath $temporary -Force
+            }
+        }
     }
 }
 foreach ($destination in $retiredOwned) {
@@ -372,19 +435,11 @@ foreach ($destination in $retiredOwned) {
 }
 
 if ($Apply) {
-    $newOwned = @{}
-    foreach ($name in $ownedDigests.Keys) {
-        if ($sourceNames -contains $name) { $newOwned[$name] = $ownedDigests[$name] }
-    }
-    foreach ($action in $installActions) {
-        if ($action.State -ne 'UNCHANGED' -or $ownedDigests.ContainsKey($action.File.Name)) {
-            $newOwned[$action.File.Name] = $action.SourceDigest
-        }
-    }
     Write-OwnershipManifest $manifestPath $newOwned
     # Project cleanup is intentionally ordered after this verification. A failed or partial profile
     # install can never remove the only usable project-scoped copy.
     Assert-ProfileRoles $target $sourceFiles $newOwned
+    Write-OwnershipManifest $pendingPath @{}
 }
 
 foreach ($project in $migrationProjects) {

@@ -822,6 +822,87 @@ class WorkflowGenerationTests(unittest.TestCase):
             self.assertEqual(0, removed.returncode, removed.stderr)
             self.assertEqual(generated[0].read_bytes(), collision.read_bytes())
 
+    def test_codex_installer_recovers_interrupted_apply_ownership(self):
+        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
+        self.assertIsNotNone(shell)
+        arguments = [shell, "-NoProfile"]
+        if Path(shell).name.lower() == "powershell.exe":
+            arguments += ["-ExecutionPolicy", "Bypass"]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            bundle = root / "bundle" / ".codex"
+            source = bundle / "agents"
+            shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
+            script = bundle / "install-workflow-agents.ps1"
+            shutil.copy2(ROOT / ".codex" / script.name, script)
+            shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+            generated = sorted(source.glob("*.toml"))
+            codex_home = root / "codex-home"
+            target = codex_home / "agents"
+            target.mkdir(parents=True)
+
+            # Simulate termination after the pending journal and first atomic copy, but before the final
+            # ownership manifest. The retry may adopt only files named with the journal's exact digest.
+            pending = {
+                "schema_version": 1,
+                "owner": "base-agents",
+                "files": [
+                    {
+                        "name": path.name,
+                        "sha256": hashlib.sha256(path.read_bytes()).hexdigest().upper(),
+                    }
+                    for path in generated
+                ],
+            }
+            (target / ".base-agents-delivery.pending.json").write_text(
+                json.dumps(pending), encoding="utf-8"
+            )
+            shutil.copy2(generated[0], target / generated[0].name)
+
+            verify_interrupted = subprocess.run(
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Verify"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(0, verify_interrupted.returncode)
+            self.assertIn("interrupted install journal", verify_interrupted.stderr)
+
+            recovered = subprocess.run(
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, recovered.returncode, recovered.stderr)
+            self.assertFalse((target / ".base-agents-delivery.pending.json").exists())
+            ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+            self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
+
+            upgraded_content = generated[0].read_bytes() + b"\n# upgraded\n"
+            generated[0].write_bytes(upgraded_content)
+            upgraded = subprocess.run(
+                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, upgraded.returncode, upgraded.stderr)
+            self.assertEqual(upgraded_content, (target / generated[0].name).read_bytes())
+
+            removed = subprocess.run(
+                [
+                    *arguments,
+                    "-File",
+                    str(script),
+                    "-CodexHome",
+                    str(codex_home),
+                    "-Uninstall",
+                    "-Apply",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, removed.returncode, removed.stderr)
+            self.assertFalse(target.exists())
+
     def test_codex_installer_migrates_only_digest_proven_former_project_agents(self):
         shell = shutil.which("powershell.exe") or shutil.which("pwsh")
         self.assertIsNotNone(shell)
