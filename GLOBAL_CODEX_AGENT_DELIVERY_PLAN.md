@@ -127,10 +127,13 @@ Official reference: https://learn.chatgpt.com/docs/agent-configuration/subagents
   assertion coupled ordering evidence to an exact rendered temporary path even though the operations ran.
   Replace it with semantic `ADD`-before-`REMOVE` action ordering, review and push that fix, then return the
   same PR to exact-head CI.
+- 2026-09-21: the next exact-head run proved that the same Windows short-path alias can also affect the
+  environment-derived preview assertion. The installer again completed; replace the remaining absolute
+  path-string assertion with a semantic `ADD` suffix check, rerun the focused receipts, and review the fix.
 
 ## Next Steps
 
-Once the CI portability fix receives its incremental watermark, push it to PR #20 and deliver the approved
+Once the remaining CI portability fix receives its incremental watermark, push it to PR #20 and deliver the approved
 2.1.3 candidate through CI/merge. Refresh the installed release, install and
 verify the profile roles, prove an arbitrary repository advertises them without local copies, then migrate
 only the ten known base-agents files from `sandbox-hwid`, record the migration there, and automatically hand
