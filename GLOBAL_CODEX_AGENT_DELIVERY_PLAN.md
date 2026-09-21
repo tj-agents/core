@@ -104,11 +104,15 @@ Official reference: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - 2026-09-21: Full local validation is green: generated output is current, 42 general Python tests pass,
   547 hook/workflow tests pass with 8 platform skips, and the CLI recovery, skill packaging, and generated
   launcher PowerShell suites pass.
+- 2026-09-21: Reconciled the candidate with `origin/main` at `c67cef3` / release 2.1.1, including its portable
+  package-digest implementation. Advanced the changed package set to immutable release 2.1.2, regenerated
+  all distributions, and revalidated: 43 general Python tests and 547 hook/workflow tests pass with 8
+  platform skips; catalog, generation, CLI recovery, packaging, and launcher checks are green.
 
 ## Next Steps
 
-Create the focused immutable implementation commit, run the required independent review and address any
-findings, then push and deliver the candidate through PR/CI/merge. Refresh the installed release, install and
+Complete the reconciled 2.1.2 merge commit, run the required independent review and address any findings,
+then push and deliver the candidate through PR/CI/merge. Refresh the installed release, install and
 verify the profile roles, prove an arbitrary repository advertises them without local copies, then migrate
 only the ten known base-agents files from `sandbox-hwid`, record the migration there, and automatically hand
 ownership back to its authorized refactor.

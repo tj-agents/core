@@ -19,6 +19,10 @@ jobs:
         shell: pwsh
         run: python -B scripts/update_catalog_digests.py --check
 
+      - name: committed release package digests are current
+        shell: pwsh
+        run: python -B scripts/update_catalog_digests.py --check --source base-agents=. --source-revision base-agents=HEAD
+
       - name: CLI session recovery tests
         shell: powershell
         run: ./cli-session-recovery/tests/cli-session-vault.tests.ps1
