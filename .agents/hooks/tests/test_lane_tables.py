@@ -204,9 +204,8 @@ class PluginDeliveryTests(unittest.TestCase):
                 )
 
     def test_the_codex_installer_covers_every_generated_agent_family(self):
-        # Codex cannot load an agent from a plugin (plugin_loading is unsupported-use-project-installer),
-        # so this script is the ONLY thing that puts a Codex agent on disk. A family it does not glob is
-        # generated and then silently never installed.
+        # Codex cannot load an agent from a plugin, so the profile installer is the only supported route
+        # from the generated payload to ~/.codex/agents. A family it does not glob is silently omitted.
         delivery = json.loads(
             (ROOT / ".codex" / "agent-delivery.json").read_text(
                 encoding="utf-8-sig"
@@ -223,6 +222,22 @@ class PluginDeliveryTests(unittest.TestCase):
                     any(fnmatch(name, pattern) for pattern in patterns),
                     f"{name} is generated but no installer pattern in {patterns} installs it",
                 )
+
+    def test_hosts_deliberately_use_different_agent_delivery_surfaces(self):
+        manifests = {
+            host: json.loads((HOSTS / f"{host}.json").read_text(encoding="utf-8-sig"))
+            for host in HOST_IDS
+        }
+        codex = manifests["codex"]["delivery"]
+        claude = manifests["claude"]["delivery"]
+
+        self.assertEqual("agents", codex["profile_directory"])
+        self.assertEqual("CODEX_HOME", codex["profile_environment"])
+        self.assertEqual("unsupported-use-profile-installer", codex["plugin_loading"])
+        self.assertNotIn("project_installer", codex)
+        self.assertEqual("supported", claude["plugin_loading"])
+        self.assertEqual("agents", claude["plugin_directory"])
+        self.assertFalse((ROOT / ".claude" / "agents").exists())
 
     def test_the_shipped_skill_names_locations_that_exist_in_each_layout(self):
         canonical = self.PLUGIN / ".agents/engineering/contract/lanes/SKILL.md"
