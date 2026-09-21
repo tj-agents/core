@@ -10,6 +10,7 @@ import sys
 
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
+DEFAULT_HANDOFF_SKILLS = frozenset({"cd", "handoff", "handoff-codex"})
 
 
 def read(path: Path) -> str:
@@ -93,13 +94,19 @@ def validate_default_selection(
     skills: dict[str, dict],
     compatibility: dict,
 ) -> None:
-    marketplace_path = inside(
+    codex_marketplace_path = inside(
         root, f"{config['host_manifest_roots']['codex']}/marketplace.json"
     )
-    marketplace = load(marketplace_path)
-    marketplace_name = marketplace.get("name")
+    claude_marketplace_path = inside(
+        root, f"{config['host_manifest_roots']['claude']}/marketplace.json"
+    )
+    codex_marketplace = load(codex_marketplace_path)
+    claude_marketplace = load(claude_marketplace_path)
+    marketplace_name = codex_marketplace.get("name")
     if not marketplace_name:
-        raise ValueError(f"{marketplace_path}: missing marketplace name")
+        raise ValueError(f"{codex_marketplace_path}: missing marketplace name")
+    if claude_marketplace.get("name") != marketplace_name:
+        raise ValueError("Codex and Claude marketplace names must match")
 
     fresh_entries = compatibility.get("fresh_selection")
     if not isinstance(fresh_entries, list) or not fresh_entries:
@@ -120,7 +127,7 @@ def validate_default_selection(
 
     default_plugins = [
         plugin.get("name")
-        for plugin in marketplace.get("plugins", [])
+        for plugin in codex_marketplace.get("plugins", [])
         if plugin.get("policy", {}).get("installation") == "INSTALLED_BY_DEFAULT"
     ]
     if fresh_plugins != default_plugins:
@@ -128,6 +135,34 @@ def validate_default_selection(
             "Compatibility fresh_selection must exactly match the Codex "
             "INSTALLED_BY_DEFAULT marketplace order"
         )
+
+    claude_plugins = claude_marketplace.get("plugins", [])
+    claude_roster = [plugin.get("name") for plugin in claude_plugins]
+    if fresh_plugins != claude_roster:
+        raise ValueError(
+            "Compatibility fresh_selection must exactly match the Claude "
+            "marketplace roster"
+        )
+
+    codex_by_name = {
+        plugin.get("name"): plugin for plugin in codex_marketplace.get("plugins", [])
+    }
+    claude_by_name = {plugin.get("name"): plugin for plugin in claude_plugins}
+    for plugin in fresh_plugins:
+        expected_path = f"./plugins/{plugin}"
+        codex_source = codex_by_name[plugin].get("source")
+        if (
+            not isinstance(codex_source, dict)
+            or codex_source.get("source") != "local"
+            or codex_source.get("path") != expected_path
+        ):
+            raise ValueError(
+                f"Codex marketplace source for {plugin} must be {expected_path}"
+            )
+        if claude_by_name[plugin].get("source") != expected_path:
+            raise ValueError(
+                f"Claude marketplace source for {plugin} must be {expected_path}"
+            )
 
     known_plugins = set(config["prerequisites"])
     unknown = set(fresh_plugins) - known_plugins
@@ -144,7 +179,17 @@ def validate_default_selection(
     selected_skills = {
         name for name, skill in skills.items() if skill["plugin"] in selected
     }
-    required_skills = set(compatibility.get("fresh_required_skills", []))
+    required_values = compatibility.get("fresh_required_skills")
+    if (
+        not isinstance(required_values, list)
+        or len(required_values) != len(set(required_values))
+        or set(required_values) != DEFAULT_HANDOFF_SKILLS
+    ):
+        raise ValueError(
+            "Compatibility fresh_required_skills must exactly declare "
+            f"{sorted(DEFAULT_HANDOFF_SKILLS)}"
+        )
+    required_skills = set(required_values)
     missing_skills = required_skills - selected_skills
     if missing_skills:
         raise ValueError(
