@@ -21,12 +21,12 @@ includes that baseline and advances the package set to immutable release 2.1.3.
 
 ## Next Steps
 
-Complete full validation and commit of the review-corrected candidate, run a fresh independent review over that immutable head, resolve any findings,
-and complete full delivery. After merge, install and verify the released profile roles before the
+Commit and review this final checkpoint, then push, open the PR, monitor CI, and merge the approved candidate.
+After merge, install and verify the released profile roles before the
 scoped sandbox migration and successor handoff.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: fully validate and commit the ownership-safe, review-helper-corrected 2.1.3 candidate.
+Current slice: final docs-only watermark, then PR/CI/merge delivery of the approved 2.1.3 candidate.
 Remaining scope: PR/CI/merge, local release installation and fresh-session proof, sandbox cleanup, and automated return.
 Done when: the merged release is installed and proven profile-wide, only former base-agents project copies are removed, sandbox-hwid records the migration, and its authorized refactor has a successor owner.
 
@@ -52,7 +52,9 @@ helper's recorded path digest did not hash the exact `paths.nul` bytes required 
 That invalid pass also exposed filename-only ownership, removed `-ProjectRoot` compatibility, and incomplete
 ancestor reparse protection. Those defects are repaired with focused green regressions. The invalid work
 order and disposable bundle were removed; no completed watermark was claimed. A new full pass is required
-after the fixing commit.
+after the fixing commit. The replacement full pass at `00db7c7` found one medium interrupted-apply ownership
+gap. Commit `ce94efa` added a pending ownership journal, atomic staged replacement, exact recovery, and the
+upgrade/uninstall regression. Its clean incremental pass is approved at `ce94efa`; all findings are resolved.
 
 ## Decisions, discoveries, blockers, and deviations
 

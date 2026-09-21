@@ -117,11 +117,16 @@ Official reference: https://learn.chatgpt.com/docs/agent-configuration/subagents
   plus shipped historical project-content digests; retained deprecated `-ProjectRoot` as a safe migration
   alias; and made every existing ancestor component reparse-protected. Focused workflow-helper and six
   installer safety regressions pass. A new full review must be frozen only after full validation and commit.
+- 2026-09-21: The replacement full review at `00db7c7` retained one medium installer-recovery finding: an
+  interrupted apply could copy roles before durable ownership was recorded. Added a pre-mutation pending
+  ownership journal, same-directory staged replacement, exact-digest recovery, and a regression covering
+  recovery, later upgrade, and uninstall. All 19 workflow-generation tests and package gates pass. The clean
+  incremental pass now approves the fixing head `ce94efa` with every finding resolved.
 
 ## Next Steps
 
-Complete validation and commit of the corrected 2.1.3 candidate, freeze a new required independent review,
-and address any valid findings before pushing and delivering through PR/CI/merge. Refresh the installed release, install and
+Commit and review this final plan checkpoint, then push and deliver the approved 2.1.3 candidate through
+PR/CI/merge. Refresh the installed release, install and
 verify the profile roles, prove an arbitrary repository advertises them without local copies, then migrate
 only the ten known base-agents files from `sandbox-hwid`, record the migration there, and automatically hand
 ownership back to its authorized refactor.
