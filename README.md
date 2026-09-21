@@ -11,7 +11,7 @@ The packaged SessionStart hook emits the same canonical contract to both hosts. 
 as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
 alone is insufficient. The skill documents an explicit generated native-instruction fallback.
 
-The split packages form the **2.1.0** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.2** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.

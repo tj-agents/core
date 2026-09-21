@@ -7,24 +7,25 @@
 - Branch: `Fix/Global-Codex-Agent-Delivery`
 - PR: not opened
 - Dependency/package gates: install and verify the merged release locally before removing project-scoped agents
-- Last reconciled: 2026-09-21 from the green uncommitted implementation candidate based on `b62a8ed`
+- Last reconciled: 2026-09-21 from the green 2.1.2 merge candidate over `origin/main` at `c67cef3`
 
 ## Current state
 
-The uncommitted candidate installs canonical Codex roles into the resolved profile, verifies them before
+The candidate installs canonical Codex roles into the resolved profile, verifies them before
 optional managed-project cleanup, and makes the host runtime probe profile and intentional project surfaces.
 Claude remains plugin-native. Generated packages and catalog digests are current. Current origin/main and
 the installed 2.1.0 machine package already contain the shared launcher resource; dynamic generated-layout
-coverage now guards every `agent-cli.ps1` consumer.
+coverage now guards every `agent-cli.ps1` consumer. The candidate includes origin/main's portable digest
+repair and advances the package set to immutable release 2.1.2.
 
 ## Next Steps
 
-Commit the green implementation candidate, run independent review over that immutable head, resolve any
-findings, and complete full delivery. After merge, install and verify the released profile roles before the
+Complete the reconciled merge commit, run independent review over that immutable head, resolve any findings,
+and complete full delivery. After merge, install and verify the released profile roles before the
 scoped sandbox migration and successor handoff.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: commit and independently review the locally green release candidate.
+Current slice: complete and independently review the locally green 2.1.2 release candidate.
 Remaining scope: PR/CI/merge, local release installation and fresh-session proof, sandbox cleanup, and automated return.
 Done when: the merged release is installed and proven profile-wide, only former base-agents project copies are removed, sandbox-hwid records the migration, and its authorized refactor has a successor owner.
 
@@ -36,9 +37,9 @@ Done when: the merged release is installed and proven profile-wide, only former 
 
 ## Verification
 
-Green candidate: `pwsh .agents/sync-generated.ps1 -Check`; 42 tests under `tests`; 547 tests under
+Green candidate: generated-output and catalog-digest checks pass; 43 tests under `tests`; 547 tests under
 `.agents/hooks/tests` with 8 platform skips; `cli-session-vault.tests.ps1`, `skill-packaging.tests.ps1`, and
-`handoff-launchers.tests.ps1` all pass.
+`handoff-launchers.tests.ps1` all pass after merging `origin/main`.
 
 ## Reviews
 

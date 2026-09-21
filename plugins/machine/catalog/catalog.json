@@ -3,18 +3,18 @@
   "digest_format": "sha256-tree-v1",
   "releases": [
     {
-      "id": "base-agents@2.1.0",
+      "id": "base-agents@2.1.2",
       "owner_repository": "tomjseery/base-agents",
       "source": "https://github.com/tomjseery/base-agents.git",
       "marketplace": "base-agents",
-      "revision": "v2.1.0",
-      "version": "2.1.0",
+      "revision": "v2.1.2",
+      "version": "2.1.2",
       "plugins": [
         {
           "id": "base-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "2.1.0",
+          "version": "2.1.2",
           "description": "Maintained plans and common agent behavior.",
           "status": "current",
           "platforms": [
@@ -36,13 +36,13 @@
             ],
             "optional": []
           },
-          "digest": "sha256:3d24f56dd9d2ea39ecc1b34e9b11ddc87324254cd93888970637cb95ddaa8a9e"
+          "digest": "sha256:1d2130831c22852af4c5c342d3b7a770d0f8c59d04fecf6fa1dbc8767aa64e77"
         },
         {
           "id": "base-agents/engineering",
           "name": "engineering",
           "package_path": "plugins/engineering",
-          "version": "2.1.0",
+          "version": "2.1.2",
           "description": "Selected engineering workflows, reviews and Git operations.",
           "status": "current",
           "platforms": [
@@ -119,13 +119,13 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:d158c5cefbda12e550e018ca90a19ae941ff1f363c6c171d9908409ef8891eee"
+          "digest": "sha256:2cfce419d3349faa9abb0c74093170aad6c7be0616e83d0d0b24a3ffa21750d2"
         },
         {
           "id": "base-agents/machine",
           "name": "machine",
           "package_path": "plugins/machine",
-          "version": "2.1.0",
+          "version": "2.1.2",
           "description": "Explicit harness, history and clipboard utilities.",
           "status": "current",
           "platforms": [
@@ -161,7 +161,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:8cd803c1c80a8e920261a0212bdbafd2e0bb57da95a99512d0efdd0e07570d81",
+          "digest": "sha256:f8acc5dfd6943ea672bc5654f1fc2edeaac6d2eda9ca36560770498bc00001a5",
           "digest_excludes": [
             "catalog/catalog.json"
           ]
