@@ -122,11 +122,16 @@ Official reference: https://learn.chatgpt.com/docs/agent-configuration/subagents
   ownership journal, same-directory staged replacement, exact-digest recovery, and a regression covering
   recovery, later upgrade, and uninstall. All 19 workflow-generation tests and package gates pass. The clean
   incremental pass now approves the fixing head `ce94efa` with every finding resolved.
+- 2026-09-21: PR #20's first exact-head CI run passed generation, catalog, committed-package, recovery,
+  packaging, launcher, and general source tests, then failed one Windows-only installer-test assertion. The
+  assertion coupled ordering evidence to an exact rendered temporary path even though the operations ran.
+  Replace it with semantic `ADD`-before-`REMOVE` action ordering, review and push that fix, then return the
+  same PR to exact-head CI.
 
 ## Next Steps
 
-Once this checkpoint receives its required docs-only watermark, push and deliver the approved 2.1.3
-candidate through PR/CI/merge. Refresh the installed release, install and
+Once the CI portability fix receives its incremental watermark, push it to PR #20 and deliver the approved
+2.1.3 candidate through CI/merge. Refresh the installed release, install and
 verify the profile roles, prove an arbitrary repository advertises them without local copies, then migrate
 only the ten known base-agents files from `sandbox-hwid`, record the migration there, and automatically hand
 ownership back to its authorized refactor.

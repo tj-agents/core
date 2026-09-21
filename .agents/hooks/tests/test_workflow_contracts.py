@@ -634,9 +634,22 @@ class WorkflowGenerationTests(unittest.TestCase):
                 preview.stdout.splitlines()[-1].split(";")[0],
             )
             self.assertIn("-ProjectRoot is deprecated", preview.stdout)
+            preview_lines = preview.stdout.splitlines()
+            profile_action = next(
+                index
+                for index, line in enumerate(preview_lines)
+                if line.startswith("ADD ")
+                and line.casefold().endswith(generated[0].name.casefold())
+            )
+            project_action = next(
+                index
+                for index, line in enumerate(preview_lines)
+                if line.startswith("REMOVE ")
+                and line.casefold().endswith(generated[0].name.casefold())
+            )
             self.assertLess(
-                preview.stdout.index(str(target / generated[0].name)),
-                preview.stdout.index(str(project_target / generated[0].name)),
+                profile_action,
+                project_action,
                 "profile changes must be reported before project cleanup",
             )
             applied = subprocess.run(
