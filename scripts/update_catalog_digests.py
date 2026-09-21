@@ -96,16 +96,16 @@ def update(root: Path, source_values: list[str], revision_values: list[str], che
     for release in catalog["releases"]:
         marketplace = release["marketplace"]
         for plugin in release["plugins"]:
-            if marketplace == "base-agents":
-                actual = SYNC.output_tree_digest(
-                    output, plugin["package_path"], plugin.get("digest_excludes", [])
-                )
-            elif marketplace in sources:
+            if marketplace in sources:
                 actual = git_tree_digest(
                     sources[marketplace],
                     revisions.get(marketplace, release["revision"]),
                     plugin["package_path"],
                     plugin.get("digest_excludes", []),
+                )
+            elif marketplace == "base-agents":
+                actual = SYNC.output_tree_digest(
+                    output, plugin["package_path"], plugin.get("digest_excludes", [])
                 )
             else:
                 continue
