@@ -36,7 +36,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:0edded78d7bc4446f1fafd2bca684724aa6b7da74121cf541757908a1612b089"
+          "digest": "sha256:3d24f56dd9d2ea39ecc1b34e9b11ddc87324254cd93888970637cb95ddaa8a9e"
         },
         {
           "id": "base-agents/engineering",
