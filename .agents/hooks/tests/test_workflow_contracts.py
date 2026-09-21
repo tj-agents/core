@@ -784,7 +784,15 @@ class WorkflowGenerationTests(unittest.TestCase):
                 env=environment,
             )
             self.assertEqual(0, environment_preview.returncode, environment_preview.stderr)
-            self.assertIn(str(target / generated[0].name), environment_preview.stdout)
+            expected_suffix = str(Path(codex_home.name) / "agents" / generated[0].name)
+            self.assertTrue(
+                any(
+                    line.startswith("ADD ")
+                    and line.casefold().endswith(expected_suffix.casefold())
+                    for line in environment_preview.stdout.splitlines()
+                ),
+                environment_preview.stdout,
+            )
 
     def test_codex_installer_preserves_colliding_unowned_profile_agents(self):
         shell = shutil.which("powershell.exe") or shutil.which("pwsh")
