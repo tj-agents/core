@@ -1,0 +1,625 @@
+{
+  "schema_version": 1,
+  "digest_format": "sha256-tree-v1",
+  "releases": [
+    {
+      "id": "base-agents@2.1.0",
+      "owner_repository": "tomjseery/base-agents",
+      "source": "https://github.com/tomjseery/base-agents.git",
+      "marketplace": "base-agents",
+      "revision": "v2.1.0",
+      "version": "2.1.0",
+      "plugins": [
+        {
+          "id": "base-agents/base",
+          "name": "base",
+          "package_path": "plugins/base",
+          "version": "2.1.0",
+          "description": "Maintained plans and common agent behavior.",
+          "status": "current",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "cd",
+            "plan-artifacts"
+          ],
+          "dependencies": {
+            "required": [],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "python>=3.9"
+            ],
+            "optional": []
+          },
+          "digest": "sha256:0edded78d7bc4446f1fafd2bca684724aa6b7da74121cf541757908a1612b089"
+        },
+        {
+          "id": "base-agents/engineering",
+          "name": "engineering",
+          "package_path": "plugins/engineering",
+          "version": "2.1.0",
+          "description": "Selected engineering workflows, reviews and Git operations.",
+          "status": "current",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "address-review",
+            "big-review",
+            "big-review-all",
+            "bugfix",
+            "commit",
+            "commit-all",
+            "commit-push",
+            "committing",
+            "continue-roadmap",
+            "docs-and-debt",
+            "docs-review",
+            "failing-tests",
+            "failure-provenance",
+            "feature",
+            "git-auth",
+            "git-branching",
+            "handoff",
+            "handoff-format",
+            "incremental-review",
+            "lanes",
+            "merge",
+            "merge-docs",
+            "merging",
+            "open-pr",
+            "open-worktree",
+            "persistent-delivery",
+            "persistent-workflow",
+            "plan-authoring",
+            "plan-checkpoint",
+            "plan-execution",
+            "plans",
+            "pr-preflight",
+            "pr-screenshots",
+            "prune-worktrees",
+            "pull",
+            "pull-main",
+            "push",
+            "recents",
+            "remote-validation",
+            "resume-plan",
+            "review",
+            "review-lifecycle",
+            "session-guidance",
+            "skill-routes",
+            "sync",
+            "sync-all",
+            "sync-checkout",
+            "techdebt",
+            "unmerged",
+            "update-roadmap",
+            "worktree"
+          ],
+          "dependencies": {
+            "required": [
+              "base-agents/base"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "exe:git",
+              "python>=3.9"
+            ],
+            "optional": [
+              "exe:gh",
+              "exe:powershell"
+            ]
+          },
+          "digest": "sha256:f48e94418fbae9e49d4e158bcdb69263d1c2329112a6f008c7645d4cb322bb92"
+        },
+        {
+          "id": "base-agents/machine",
+          "name": "machine",
+          "package_path": "plugins/machine",
+          "version": "2.1.0",
+          "description": "Explicit harness, history and clipboard utilities.",
+          "status": "current",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "auto-memory",
+            "bootstrap-capabilities",
+            "clip",
+            "handoff-claude",
+            "handoff-codex",
+            "last-conversation",
+            "open-claude",
+            "peer-cli",
+            "search"
+          ],
+          "dependencies": {
+            "required": [
+              "base-agents/base"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "python>=3.9"
+            ],
+            "optional": [
+              "exe:powershell",
+              "exe:codex",
+              "exe:claude",
+              "windows-terminal"
+            ]
+          },
+          "digest": "sha256:d796f4267057012a6f9280530d5eb440456e682f8668d97ca43644b45828a438",
+          "digest_excludes": [
+            "catalog/catalog.json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cpp-agents@0.1.0",
+      "owner_repository": "tomjseery/cpp-agents",
+      "source": "https://github.com/tomjseery/cpp-agents.git",
+      "marketplace": "cpp-agents",
+      "revision": "v0.1.0",
+      "version": "0.1.0",
+      "plugins": [
+        {
+          "id": "cpp-agents/cpp",
+          "name": "cpp",
+          "package_path": "plugins/cpp",
+          "version": "0.1.0",
+          "description": "Platform-neutral modern C++ contracts and learning guidance.",
+          "status": "current",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "cpp-build",
+            "cpp-direction",
+            "cpp-knowledge",
+            "cpp-learning",
+            "cpp-libraries",
+            "cpp-structure",
+            "cpp-style",
+            "cpp-testing"
+          ],
+          "dependencies": {
+            "required": [],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [],
+            "optional": [
+              "exe:cmake",
+              "c++20-compiler"
+            ]
+          },
+          "digest": "sha256:6a8e060230b2fc13c7fac99b6d5b4aae0ed92f3975b82adc7b82ea519a84c289"
+        },
+        {
+          "id": "cpp-agents/gpp",
+          "name": "gpp",
+          "package_path": "plugins/gpp",
+          "version": "0.1.0",
+          "description": "G++, GCC, GDB, and Linux guidance layered on cpp.",
+          "status": "current",
+          "platforms": [
+            "windows",
+            "linux"
+          ],
+          "skills": [
+            "gpp-scaffold",
+            "gpp-toolchain"
+          ],
+          "dependencies": {
+            "required": [
+              "cpp-agents/cpp"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "exe:g++",
+              "exe:cmake"
+            ],
+            "optional": [
+              "exe:gdb",
+              "exe:ninja"
+            ]
+          },
+          "digest": "sha256:47919a5b69d464f28ca707a0ebbb54129c250c6c83d3f78dd7dcac8a42bec519"
+        },
+        {
+          "id": "cpp-agents/msvc",
+          "name": "msvc",
+          "package_path": "plugins/msvc",
+          "version": "0.1.0",
+          "description": "MSVC and clang-cl toolchain guidance and project scaffold layered on cpp.",
+          "status": "current",
+          "platforms": [
+            "windows"
+          ],
+          "skills": [
+            "msvc-scaffold",
+            "msvc-toolchain"
+          ],
+          "dependencies": {
+            "required": [
+              "cpp-agents/cpp"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "platform:windows",
+              "exe:powershell",
+              "exe:cmake"
+            ],
+            "optional": [
+              "visual-studio-build-tools",
+              "exe:ninja"
+            ]
+          },
+          "digest": "sha256:ae3e6e397d51ec92817100d3ef2e283e04a87377e9614d2b9fec088e9fae8804"
+        },
+        {
+          "id": "cpp-agents/win32",
+          "name": "win32",
+          "package_path": "plugins/win32",
+          "version": "0.1.0",
+          "description": "User-mode Win32, Unicode, WIL, and Windows resource guidance layered on cpp.",
+          "status": "current",
+          "platforms": [
+            "windows"
+          ],
+          "skills": [
+            "win32-style",
+            "windows-cpp-knowledge",
+            "windows-overview"
+          ],
+          "dependencies": {
+            "required": [
+              "cpp-agents/cpp"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "platform:windows"
+            ],
+            "optional": [
+              "windows-sdk",
+              "wil"
+            ]
+          },
+          "digest": "sha256:0d88aa4120414bbe5274fd9d0c782b076ae4f37f6b3814f1ac4dbf7b3c0405d5"
+        },
+        {
+          "id": "cpp-agents/base",
+          "name": "base",
+          "package_path": "plugins/base",
+          "version": "0.4.0",
+          "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
+          "status": "deprecated",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "cpp-build",
+            "cpp-direction",
+            "cpp-knowledge",
+            "cpp-learning",
+            "cpp-libraries",
+            "cpp-structure",
+            "cpp-style",
+            "cpp-testing"
+          ],
+          "dependencies": {
+            "required": [],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [],
+            "optional": [
+              "exe:cmake",
+              "c++20-compiler"
+            ]
+          },
+          "digest": "sha256:436cf77dbd488f893b0a02faf1b9f322f504bc7758254f3d169ac90bde6568f6",
+          "replacement": [
+            "cpp-agents/cpp"
+          ],
+          "remove_after": "2027-03-31"
+        },
+        {
+          "id": "cpp-agents/gcc",
+          "name": "gcc",
+          "package_path": "plugins/gcc",
+          "version": "0.4.0",
+          "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
+          "status": "deprecated",
+          "platforms": [
+            "windows",
+            "linux"
+          ],
+          "skills": [
+            "gcc-toolchain",
+            "gpp-scaffold"
+          ],
+          "dependencies": {
+            "required": [
+              "cpp-agents/base"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "exe:g++",
+              "exe:cmake"
+            ],
+            "optional": [
+              "exe:gdb",
+              "exe:ninja"
+            ]
+          },
+          "digest": "sha256:0c641da3fc3584cc952e6c4de1fc5458b309bf753cf2208da853d09f19c5b61f",
+          "replacement": [
+            "cpp-agents/gpp"
+          ],
+          "remove_after": "2027-03-31"
+        },
+        {
+          "id": "cpp-agents/windows",
+          "name": "windows",
+          "package_path": "plugins/windows",
+          "version": "0.6.0",
+          "description": "Deprecated combined MSVC and Win32 compatibility package; split explicitly before 2027-03-31.",
+          "status": "deprecated",
+          "platforms": [
+            "windows"
+          ],
+          "skills": [
+            "msvc-scaffold",
+            "msvc-toolchain",
+            "win32-style",
+            "windows-cpp-knowledge",
+            "windows-overview"
+          ],
+          "dependencies": {
+            "required": [
+              "cpp-agents/base"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "platform:windows",
+              "exe:powershell",
+              "exe:cmake"
+            ],
+            "optional": [
+              "visual-studio-build-tools",
+              "windows-sdk",
+              "wil",
+              "exe:ninja"
+            ]
+          },
+          "digest": "sha256:b0e5821474960d09cc91014ae11f10d505049e86ccc3241c8a04992c95d0db2a",
+          "replacement": [
+            "cpp-agents/msvc",
+            "cpp-agents/win32"
+          ],
+          "remove_after": "2027-03-31"
+        },
+        {
+          "id": "cpp-agents/cpp-standards",
+          "name": "cpp-standards",
+          "package_path": "plugins/cpp-standards",
+          "version": "0.4.0",
+          "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
+          "status": "deprecated",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "cpp-build",
+            "cpp-direction",
+            "cpp-knowledge",
+            "cpp-learning",
+            "cpp-libraries",
+            "cpp-structure",
+            "cpp-style",
+            "cpp-testing"
+          ],
+          "dependencies": {
+            "required": [],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [],
+            "optional": [
+              "exe:cmake",
+              "c++20-compiler"
+            ]
+          },
+          "digest": "sha256:050f05b33dde66dc32ab36dc1ab483a94c786496dd566d8d0b34db728ca85fd6",
+          "replacement": [
+            "cpp-agents/cpp"
+          ],
+          "remove_after": "2027-03-31"
+        },
+        {
+          "id": "cpp-agents/gpp-standards",
+          "name": "gpp-standards",
+          "package_path": "plugins/gpp-standards",
+          "version": "0.4.0",
+          "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
+          "status": "deprecated",
+          "platforms": [
+            "windows",
+            "linux"
+          ],
+          "skills": [
+            "gpp-scaffold",
+            "gpp-toolchain"
+          ],
+          "dependencies": {
+            "required": [
+              "cpp-agents/cpp-standards"
+            ],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [
+              "exe:g++",
+              "exe:cmake"
+            ],
+            "optional": [
+              "exe:gdb",
+              "exe:ninja"
+            ]
+          },
+          "digest": "sha256:0b46bffa8b4fdeb21840df22c205b9fa4af60f324acd90d0f90b2d12a87ec29b",
+          "replacement": [
+            "cpp-agents/gpp"
+          ],
+          "remove_after": "2027-03-31"
+        }
+      ]
+    },
+    {
+      "id": "dotagents@1.1.0",
+      "owner_repository": "tomjseery/dotagents",
+      "source": "https://github.com/tomjseery/dotagents.git",
+      "marketplace": "dotagents",
+      "revision": "v1.1.0",
+      "version": "1.1.0",
+      "plugins": [
+        {
+          "id": "dotagents/dotnet",
+          "name": "dotnet",
+          "package_path": "plugins/dotnet",
+          "version": "1.1.0",
+          "description": "Generic C# and .NET engineering standards.",
+          "status": "current",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "comments",
+            "csharp-naming",
+            "csharp-style",
+            "dependency-injection",
+            "domain-events",
+            "dotnet-stack",
+            "e2e-api-debug",
+            "e2e-debug",
+            "e2e-scenarios",
+            "e2e-ui-debug",
+            "http-api",
+            "integration-debug",
+            "integration-testing",
+            "keyed-strategies",
+            "keyed-unions",
+            "logging",
+            "microservice-boundaries",
+            "module-structure",
+            "multitenancy",
+            "persistence",
+            "proto",
+            "result-carriers",
+            "result-errors",
+            "result-terminals",
+            "seeding",
+            "unit-testing",
+            "validation"
+          ],
+          "dependencies": {
+            "required": [],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [],
+            "optional": [
+              "exe:dotnet",
+              "exe:powershell"
+            ]
+          },
+          "digest": "sha256:e4e7bd669edb3ee1318063eeb70b0767e0589fb0ffc8070df75bf8213904822e"
+        }
+      ]
+    },
+    {
+      "id": "react-agents@1.0.0",
+      "owner_repository": "tomjseery/react-agents",
+      "source": "https://github.com/tomjseery/react-agents.git",
+      "marketplace": "react-agents",
+      "revision": "v1.0.0",
+      "version": "1.0.0",
+      "plugins": [
+        {
+          "id": "react-agents/react",
+          "name": "react",
+          "package_path": "plugins/react",
+          "version": "1.0.0",
+          "description": "Generic React and TypeScript engineering standards.",
+          "status": "current",
+          "platforms": [
+            "windows",
+            "linux",
+            "macos"
+          ],
+          "skills": [
+            "client-state",
+            "contract-naming",
+            "data-tables",
+            "date-formatting",
+            "frontend-testing",
+            "http-layer",
+            "react-structure",
+            "routing",
+            "server-state",
+            "stack-defaults",
+            "tiered-shared-code",
+            "typescript-style",
+            "ui-components",
+            "write-boundary"
+          ],
+          "dependencies": {
+            "required": [],
+            "optional": []
+          },
+          "external_prerequisites": {
+            "required": [],
+            "optional": [
+              "exe:node",
+              "exe:tsc"
+            ]
+          },
+          "digest": "sha256:7e35e19a6adb4eb6374d6b66923ccf197321ffb3d6fb52adb535ddac6bc54426"
+        }
+      ]
+    }
+  ]
+}

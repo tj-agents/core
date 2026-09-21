@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -18,6 +19,102 @@ def read(path: Path) -> str:
 
 def load(path: Path):
     return json.loads(read(path))
+
+
+def catalog_index(catalog: dict) -> tuple[dict[str, dict], dict[str, dict]]:
+    if catalog.get("schema_version") != 1 or catalog.get("digest_format") != "sha256-tree-v1":
+        raise ValueError("Unsupported capability catalog schema or digest format")
+    releases: dict[str, dict] = {}
+    plugins: dict[str, dict] = {}
+    for release in catalog.get("releases", []):
+        release_id = release.get("id")
+        if not release_id or release_id in releases:
+            raise ValueError(f"Invalid or duplicate catalog release: {release_id}")
+        releases[release_id] = release
+        marketplace = release.get("marketplace")
+        for plugin in release.get("plugins", []):
+            plugin_id = plugin.get("id")
+            if not plugin_id or plugin_id in plugins:
+                raise ValueError(f"Invalid or duplicate catalog plugin: {plugin_id}")
+            if plugin_id != f"{marketplace}/{plugin.get('name')}":
+                raise ValueError(f"Catalog plugin identity disagrees with its marketplace: {plugin_id}")
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", plugin.get("digest", "")):
+                raise ValueError(f"Invalid catalog digest: {plugin_id}")
+            plugin["_release"] = release
+            plugins[plugin_id] = plugin
+    if not releases:
+        raise ValueError("Capability catalog has no releases")
+    for plugin_id, plugin in plugins.items():
+        dependencies = plugin.get("dependencies", {})
+        for kind in ("required", "optional"):
+            for dependency in dependencies.get(kind, []):
+                if dependency not in plugins:
+                    raise ValueError(f"{plugin_id} names unknown dependency {dependency}")
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(plugin_id: str):
+        if plugin_id in visiting:
+            raise ValueError(f"Catalog dependency cycle includes {plugin_id}")
+        if plugin_id in visited:
+            return
+        visiting.add(plugin_id)
+        for dependency in plugins[plugin_id]["dependencies"]["required"]:
+            visit(dependency)
+        visiting.remove(plugin_id)
+        visited.add(plugin_id)
+
+    for plugin_id in plugins:
+        visit(plugin_id)
+    return releases, plugins
+
+
+def render_capabilities(catalog: dict) -> str:
+    releases, _ = catalog_index(catalog)
+    lines = [
+        "# Agent capabilities",
+        "",
+        "Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).",
+        "Select exact releases in a project's `.agents/capabilities.lock.json`; do not copy definitions between repositories.",
+        "",
+    ]
+    for release in releases.values():
+        lines.extend((
+            f"## {release['marketplace']} {release['version']}",
+            "",
+            f"Owner: [`{release['owner_repository']}`]({release['source'].removesuffix('.git')}) "
+            f"· immutable revision `{release['revision']}`",
+            "",
+        ))
+        for plugin in release["plugins"]:
+            marker = " (deprecated)" if plugin["status"] == "deprecated" else ""
+            lines.append(f"- **`{plugin['id']}`{marker}** — {plugin['description']}")
+            if plugin.get("replacement"):
+                lines.append(
+                    f"  Replacement: {', '.join(f'`{value}`' for value in plugin['replacement'])}; "
+                    f"remove after {plugin['remove_after']}."
+                )
+        lines.append("")
+    return "\n".join(lines)
+
+
+def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: list[str]) -> str:
+    prefix = package_path.rstrip("/") + "/"
+    excluded_paths = {PurePosixPath(value).as_posix() for value in excluded}
+    digest = hashlib.sha256()
+    members = []
+    for path, data in output.items():
+        if path.startswith(prefix):
+            relative = path[len(prefix):]
+            if relative not in excluded_paths:
+                members.append((relative, data))
+    for relative, data in sorted(members):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(len(data)).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(data)
+    return "sha256:" + digest.hexdigest()
 
 
 def inside(root: Path, relative: str | PurePosixPath) -> Path:
@@ -300,11 +397,13 @@ def emit_workflow_agents(root: Path, config: dict, emit):
             agent_payload(role, body, host),
         )
 
-def build(root: Path):
+def build(root: Path, validate_catalog_digests: bool = True):
     root = root.resolve()
     config = load(root / ".agents/plugins/sources.json")
     payloads = load(root / ".agents/plugins/payloads.json")["payloads"]
     compatibility = load(root / ".agents/plugins/compatibility.json")
+    catalog = load(root / ".agents/catalog/catalog.json")
+    _, catalog_plugins = catalog_index(catalog)
     skills = discover(root, config)
     adapters = validate_adapters(root, config, skills)
     plugins = validate_configuration(root, config)
@@ -407,6 +506,8 @@ def build(root: Path):
         }
         emit(f"plugins/{plugin}/selection.json", json.dumps(selection, indent=2) + "\n")
 
+    emit("CAPABILITIES.md", render_capabilities(catalog))
+
     emit(
         ".agents/plugins/marketplace.json",
         read(inside(root, f"{config['host_manifest_roots']['codex']}/marketplace.json")),
@@ -438,6 +539,36 @@ def build(root: Path):
         resolved = "/".join(parts)
         if resolved not in output:
             raise ValueError(f"{path}: missing packaged canonical definition {resolved}")
+
+    for plugin in sorted(plugins):
+        plugin_id = f"base-agents/{plugin}"
+        entry = catalog_plugins.get(plugin_id)
+        if entry is None:
+            raise ValueError(f"Catalog is missing local plugin {plugin_id}")
+        expected_dependencies = [f"base-agents/{value}" for value in config["prerequisites"][plugin]]
+        if entry["dependencies"]["required"] != expected_dependencies:
+            raise ValueError(f"Catalog prerequisite drift: {plugin_id}")
+        if entry["skills"] != sorted(name for name, skill in skills.items() if skill["plugin"] == plugin):
+            raise ValueError(f"Catalog skill roster drift: {plugin_id}")
+        if entry["package_path"] != f"plugins/{plugin}":
+            raise ValueError(f"Catalog package path drift: {plugin_id}")
+        manifest_version = manifests[plugin]["codex"].get("version")
+        if entry["version"] != manifest_version:
+            raise ValueError(f"Catalog version drift: {plugin_id}")
+        release = entry["_release"]
+        if release["marketplace"] != "base-agents" or release["owner_repository"] != "tomjseery/base-agents":
+            raise ValueError(f"Catalog owner drift: {plugin_id}")
+        if validate_catalog_digests:
+            actual_digest = output_tree_digest(
+                output,
+                entry["package_path"],
+                entry.get("digest_excludes", []),
+            )
+            if entry["digest"] != actual_digest:
+                raise ValueError(
+                    f"Catalog digest drift for {plugin_id}: expected {entry['digest']}, actual {actual_digest}. "
+                    "Run python -B scripts/update_catalog_digests.py"
+                )
 
     return config, output, skills, compatibility
 
