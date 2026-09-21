@@ -5,7 +5,7 @@
 - Roadmap item: `global-codex-agent-delivery/profile-agent-delivery`
 - Worktree: `C:\Users\tommy\source\repos\base-agents\.worktrees\Fix-Global-Codex-Agent-Delivery`
 - Branch: `Fix/Global-Codex-Agent-Delivery`
-- PR: not opened
+- PR: #20 — https://github.com/tomjseery/base-agents/pull/20
 - Dependency/package gates: install and verify the merged release locally before removing project-scoped agents
 - Last reconciled: 2026-09-21 from the green release 2.1.3 merge candidate over `origin/main` at `6dbee6d`
 
@@ -26,7 +26,7 @@ candidate when green. After merge, install and verify the released profile roles
 scoped sandbox migration and successor handoff.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current delivery sequence: CI portability fix and incremental watermark, then PR/CI/merge delivery.
+Current slice: CI portability fix and incremental watermark, then PR/CI/merge delivery.
 Remaining scope: PR/CI/merge, local release installation and fresh-session proof, sandbox cleanup, and automated return.
 Done when: the merged release is installed and proven profile-wide, only former base-agents project copies are removed, sandbox-hwid records the migration, and its authorized refactor has a successor owner.
 
