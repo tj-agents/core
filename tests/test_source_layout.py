@@ -85,8 +85,21 @@ class SourceLayoutTests(unittest.TestCase):
             self.assertIn(relative, output)
         self.assertEqual(
             output["plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1"],
-            (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes(),
+            SYNC.canonical_output_bytes(
+                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes()
+            ),
         )
+
+    def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
+        source = self.root / ".agents/base/plan-artifacts/templates/PLAN.md"
+        lf = source.read_bytes().replace(b"\r\n", b"\n")
+        source.write_bytes(lf.replace(b"\n", b"\r\n"))
+
+        _, output, _, _ = SYNC.build(self.root)
+
+        generated = output["plugins/base/.agents/base/plan-artifacts/templates/PLAN.md"]
+        self.assertEqual(lf, generated)
+        self.assertNotIn(b"\r\n", generated)
 
     def test_fresh_default_selection_has_handoff_closure_for_both_hosts(self):
         config, output, skills, compatibility = SYNC.build(self.root)
