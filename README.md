@@ -11,7 +11,7 @@ The packaged SessionStart hook emits the same canonical contract to both hosts. 
 as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
 alone is insufficient. The skill documents an explicit generated native-instruction fallback.
 
-The split packages form the **2.1.2** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.3** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
@@ -92,3 +92,34 @@ After a new commit lands on `main`, pick it up with:
 Codex: adding the marketplace (`.agents/plugins/marketplace.json`) installs all three packages
 automatically; each declares `INSTALLED_BY_DEFAULT`. Refresh Codex's copy of the marketplace the same way
 to pick up a new commit.
+
+Codex does not load agent definitions directly from plugins. After installing or updating the marketplace,
+install the engineering package's shared agents once into the active Codex profile. The installer defaults
+to `CODEX_HOME` and then `~/.codex`; `-CodexHome` selects an explicit alternate profile. Preview is the
+default, apply and verify are separate deterministic operations:
+
+```powershell
+$codexProfile = if ($env:CODEX_HOME) {
+    $env:CODEX_HOME
+} else {
+    Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex'
+}
+$engineeringRelease = Get-ChildItem -Directory (Join-Path $codexProfile 'plugins/cache/base-agents/engineering') |
+    Sort-Object { [version]$_.Name } |
+    Select-Object -Last 1
+$agentInstaller = Join-Path $engineeringRelease.FullName 'scripts/install-codex-agents.ps1'
+
+& $agentInstaller -CodexHome $codexProfile
+& $agentInstaller -CodexHome $codexProfile -Apply
+& $agentInstaller -CodexHome $codexProfile -Verify
+```
+
+To migrate a repository that received older base-agents copies, add
+`-MigrateProjectRoot <repository> -Apply`. The installer verifies the profile copies before removing only
+files whose content matches the shipped base-agents history; a colliding filename with different content is
+preserved. Deprecated `-ProjectRoot` remains a migration alias so existing automation gets the safe profile
+cut-over instead of a parameter-binding failure. Profile ownership is recorded in
+`agents/.base-agents-delivery.json`: upgrades and `-Uninstall -Apply` replace or remove only files whose
+content still matches that record. An unowned collision or a locally modified owned file is preserved and
+reported as an actionable error instead of being overwritten. Use `-Uninstall` to preview profile cleanup.
+Claude continues to load the package's `agents/` payload directly and needs no copied `.claude/agents` tree.
