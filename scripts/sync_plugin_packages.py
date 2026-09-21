@@ -87,6 +87,83 @@ def validate_configuration(root: Path, config: dict) -> set[str]:
     return plugins
 
 
+def validate_default_selection(
+    root: Path,
+    config: dict,
+    skills: dict[str, dict],
+    compatibility: dict,
+) -> None:
+    marketplace_path = inside(
+        root, f"{config['host_manifest_roots']['codex']}/marketplace.json"
+    )
+    marketplace = load(marketplace_path)
+    marketplace_name = marketplace.get("name")
+    if not marketplace_name:
+        raise ValueError(f"{marketplace_path}: missing marketplace name")
+
+    fresh_entries = compatibility.get("fresh_selection")
+    if not isinstance(fresh_entries, list) or not fresh_entries:
+        raise ValueError("Compatibility fresh_selection must be a non-empty list")
+    expected_suffix = f"@{marketplace_name}"
+    if any(
+        not isinstance(entry, str)
+        or not entry.endswith(expected_suffix)
+        or entry == expected_suffix
+        for entry in fresh_entries
+    ):
+        raise ValueError(
+            f"Fresh selection entries must use <plugin>{expected_suffix}"
+        )
+    fresh_plugins = [entry[: -len(expected_suffix)] for entry in fresh_entries]
+    if len(fresh_plugins) != len(set(fresh_plugins)):
+        raise ValueError("Fresh selection contains duplicate plugins")
+
+    default_plugins = [
+        plugin.get("name")
+        for plugin in marketplace.get("plugins", [])
+        if plugin.get("policy", {}).get("installation") == "INSTALLED_BY_DEFAULT"
+    ]
+    if fresh_plugins != default_plugins:
+        raise ValueError(
+            "Compatibility fresh_selection must exactly match the Codex "
+            "INSTALLED_BY_DEFAULT marketplace order"
+        )
+
+    known_plugins = set(config["prerequisites"])
+    unknown = set(fresh_plugins) - known_plugins
+    if unknown:
+        raise ValueError(f"Fresh selection contains unknown plugins: {sorted(unknown)}")
+    selected = set(fresh_plugins)
+    for plugin in fresh_plugins:
+        missing = set(config["prerequisites"][plugin]) - selected
+        if missing:
+            raise ValueError(
+                f"Fresh selection omits prerequisites for {plugin}: {sorted(missing)}"
+            )
+
+    selected_skills = {
+        name for name, skill in skills.items() if skill["plugin"] in selected
+    }
+    required_skills = set(compatibility.get("fresh_required_skills", []))
+    missing_skills = required_skills - selected_skills
+    if missing_skills:
+        raise ValueError(
+            f"Fresh selection is missing required skills: {sorted(missing_skills)}"
+        )
+
+    replacement_release = compatibility.get("replacement_release")
+    for plugin in sorted(known_plugins):
+        manifest_path = inside(
+            root, f"{config['host_manifest_roots']['codex']}/{plugin}.json"
+        )
+        version = load(manifest_path).get("version")
+        if version != replacement_release:
+            raise ValueError(
+                f"{manifest_path}: version {version!r} does not match "
+                f"replacement release {replacement_release!r}"
+            )
+
+
 def discover(root: Path, config: dict) -> dict[str, dict]:
     found: dict[str, dict] = {}
     for scope in config["scopes"]:
@@ -308,6 +385,7 @@ def build(root: Path):
     skills = discover(root, config)
     adapters = validate_adapters(root, config, skills)
     plugins = validate_configuration(root, config)
+    validate_default_selection(root, config, skills, compatibility)
 
     output: dict[str, bytes] = {}
 

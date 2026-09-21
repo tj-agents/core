@@ -18,6 +18,11 @@ for `/cd`. Do not leave the conversation attached to the directory it happened t
 directory now owns the work.
 
 Use the host's native command interface rather than sending `/cd` through a shell. If that interface is
-not exposed to the agent, give the user the exact `/cd <absolute-path>` command and pause
-repository-scoped work until the session has been retargeted; never claim that a shell directory change
-updated the session.
+not exposed to the agent, resolve and invoke the unqualified `handoff` workflow with the exact target
+checkout. That workflow checkpoints the current owner, selects the supported Codex launcher by default,
+starts exactly one successor, verifies launcher submission, and releases the original writer.
+
+Only after the automatic `handoff` capability is genuinely unavailable, or its launcher fails after
+diagnosis, give the user the exact `/cd <absolute-path>` command and pause repository-scoped work until the
+session has been retargeted. Never claim that a shell directory change updated the session, and never make
+manual `/cd` the normal transfer path.
