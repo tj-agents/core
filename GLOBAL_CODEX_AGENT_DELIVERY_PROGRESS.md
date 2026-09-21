@@ -21,12 +21,12 @@ includes that baseline and advances the package set to immutable release 2.1.3.
 
 ## Next Steps
 
-Once this committed checkpoint receives its docs-only watermark, push, open the PR, monitor CI, and merge
-the approved candidate. After merge, install and verify the released profile roles before the
+Review and push the Windows CI assertion fix to PR #20, monitor its exact head, and merge the approved
+candidate when green. After merge, install and verify the released profile roles before the
 scoped sandbox migration and successor handoff.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current delivery sequence: final docs-only watermark, then PR/CI/merge delivery of the approved 2.1.3 candidate.
+Current delivery sequence: CI portability fix and incremental watermark, then PR/CI/merge delivery.
 Remaining scope: PR/CI/merge, local release installation and fresh-session proof, sandbox cleanup, and automated return.
 Done when: the merged release is installed and proven profile-wide, only former base-agents project copies are removed, sandbox-hwid records the migration, and its authorized refactor has a successor owner.
 
@@ -55,6 +55,9 @@ order and disposable bundle were removed; no completed watermark was claimed. A 
 after the fixing commit. The replacement full pass at `00db7c7` found one medium interrupted-apply ownership
 gap. Commit `ce94efa` added a pending ownership journal, atomic staged replacement, exact recovery, and the
 upgrade/uninstall regression. Its clean incremental pass is approved at `ce94efa`; all findings are resolved.
+The first PR #20 run then exposed a Windows-only test assertion coupled to exact temporary-path rendering;
+all preceding gates passed and the installer operations themselves completed. The active fix asserts the
+semantic profile `ADD` precedes the project `REMOVE` without depending on the rendered root path.
 
 ## Decisions, discoveries, blockers, and deviations
 
