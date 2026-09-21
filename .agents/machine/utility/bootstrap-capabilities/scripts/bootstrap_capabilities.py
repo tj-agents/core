@@ -25,6 +25,14 @@ class BootstrapError(RuntimeError):
     """A user-visible validation or installation failure."""
 
 
+class BootstrapRunError(BootstrapError):
+    """A failure carrying the operations completed before it stopped."""
+
+    def __init__(self, report: dict[str, Any]):
+        super().__init__(report["errors"][-1])
+        self.report = report
+
+
 def load_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -85,30 +93,63 @@ def catalog_index(catalog: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], d
         release_id = require_string(release.get("id"), "release.id")
         if release_id in releases:
             raise BootstrapError(f"Duplicate release id: {release_id}")
-        releases[release_id] = release
         marketplace = require_string(release.get("marketplace"), f"{release_id}.marketplace")
+        version = require_string(release.get("version"), f"{release_id}.version")
+        revision = require_string(release.get("revision"), f"{release_id}.revision")
+        require_string(release.get("owner_repository"), f"{release_id}.owner_repository")
+        require_string(release.get("source"), f"{release_id}.source")
         if not SAFE_NAME.fullmatch(marketplace):
             raise BootstrapError(f"Unsafe marketplace name: {marketplace}")
-        for plugin in release.get("plugins", []):
+        if release_id != f"{marketplace}@{version}":
+            raise BootstrapError(f"Release id must match marketplace and version: {release_id}")
+        if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", revision):
+            raise BootstrapError(f"Release revision must be an immutable semantic tag: {release_id}")
+        release_plugins = release.get("plugins")
+        if not isinstance(release_plugins, list) or not release_plugins:
+            raise BootstrapError(f"{release_id}.plugins must be a non-empty list")
+        releases[release_id] = release
+        for plugin in release_plugins:
             if not isinstance(plugin, dict):
                 raise BootstrapError(f"{release_id}.plugins must contain objects")
             plugin_id = require_string(plugin.get("id"), f"{release_id}.plugin.id")
-            expected_id = f"{marketplace}/{require_string(plugin.get('name'), plugin_id + '.name')}"
+            name = require_string(plugin.get("name"), plugin_id + ".name")
+            expected_id = f"{marketplace}/{name}"
             if plugin_id != expected_id:
                 raise BootstrapError(f"{plugin_id} must equal {expected_id}")
             if plugin_id in plugins:
                 raise BootstrapError(f"Duplicate plugin id: {plugin_id}")
-            plugin["_release"] = release
-            plugins[plugin_id] = plugin
+            package_path = PurePosixPath(require_string(plugin.get("package_path"), f"{plugin_id}.package_path"))
+            if package_path.is_absolute() or ".." in package_path.parts or package_path.as_posix() != f"plugins/{name}":
+                raise BootstrapError(f"Unsafe or mismatched package path for {plugin_id}")
+            platforms = require_string_list(plugin.get("platforms"), f"{plugin_id}.platforms")
+            if not platforms:
+                raise BootstrapError(f"{plugin_id}.platforms must not be empty")
+            status = require_string(plugin.get("status"), f"{plugin_id}.status")
+            if status not in {"current", "deprecated"}:
+                raise BootstrapError(f"Invalid status for {plugin_id}: {status}")
+            require_string(plugin.get("version"), f"{plugin_id}.version")
+            require_string(plugin.get("description"), f"{plugin_id}.description")
             require_string_list(plugin.get("skills"), f"{plugin_id}.skills")
+            excludes = require_string_list(plugin.get("digest_excludes", []), f"{plugin_id}.digest_excludes")
+            for excluded in excludes:
+                path = PurePosixPath(excluded)
+                if path.is_absolute() or ".." in path.parts:
+                    raise BootstrapError(f"Unsafe digest exclusion for {plugin_id}: {excluded}")
             dependencies = plugin.get("dependencies")
             if not isinstance(dependencies, dict):
                 raise BootstrapError(f"{plugin_id}.dependencies must be an object")
             require_string_list(dependencies.get("required"), f"{plugin_id}.dependencies.required")
             require_string_list(dependencies.get("optional"), f"{plugin_id}.dependencies.optional")
+            external = plugin.get("external_prerequisites")
+            if not isinstance(external, dict):
+                raise BootstrapError(f"{plugin_id}.external_prerequisites must be an object")
+            require_string_list(external.get("required"), f"{plugin_id}.external_prerequisites.required")
+            require_string_list(external.get("optional"), f"{plugin_id}.external_prerequisites.optional")
             digest = require_string(plugin.get("digest"), f"{plugin_id}.digest")
             if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
                 raise BootstrapError(f"Invalid digest for {plugin_id}")
+            plugin["_release"] = release
+            plugins[plugin_id] = plugin
     for plugin_id, plugin in plugins.items():
         for dependency in plugin["dependencies"]["required"] + plugin["dependencies"]["optional"]:
             if dependency not in plugins:
@@ -213,6 +254,9 @@ def validate_lock(
         for scope in scopes:
             if not isinstance(scope, dict) or not isinstance(scope.get("path"), str) or not scope["path"]:
                 raise BootstrapError(f"{plugin_id}.path_scopes contains an invalid path")
+            scope_path = PurePosixPath(scope["path"].replace("\\", "/"))
+            if scope_path.is_absolute() or ".." in scope_path.parts or re.match(r"^[A-Za-z]:", scope["path"]):
+                raise BootstrapError(f"{plugin_id}.path_scopes must stay inside the project: {scope['path']}")
             scope_skills = require_string_list(scope.get("skills"), f"{plugin_id}.path_scopes.skills")
             unknown = sorted(set(scope_skills) - set(plugins[plugin_id]["skills"]))
             if unknown:
@@ -284,12 +328,27 @@ class NativeHost:
         except json.JSONDecodeError as error:
             raise BootstrapError(f"{self.harness} returned invalid JSON for {' '.join(arguments)}") from error
 
-    def marketplaces(self) -> set[str]:
+    def marketplaces(self) -> dict[str, str | None]:
         if self.harness == "codex":
             value = self.invoke(["plugin", "marketplace", "list", "--json"], True)
-            return {item["name"] for item in value.get("marketplaces", []) if isinstance(item, dict) and item.get("name")}
+            return {
+                item["name"]: item.get("root")
+                for item in value.get("marketplaces", [])
+                if isinstance(item, dict) and item.get("name")
+            }
         output = self.invoke(["plugin", "marketplace", "list"])
-        return {line.split()[-1] for line in output.splitlines() if line.strip()}
+        marketplaces: dict[str, str | None] = {}
+        current: str | None = None
+        for raw_line in output.splitlines():
+            line = raw_line.strip()
+            if current and line.startswith("Source: Directory (") and line.endswith(")"):
+                marketplaces[current] = line[len("Source: Directory ("):-1]
+            elif line and not line.startswith("Source:"):
+                candidate = line.split()[-1]
+                if SAFE_NAME.fullmatch(candidate):
+                    current = candidate
+                    marketplaces[current] = None
+        return marketplaces
 
     def installed(self) -> dict[str, bool]:
         if self.harness == "codex":
@@ -350,8 +409,9 @@ def checkout_release(run, release: dict[str, Any], commit: str, destination: Pat
     else:
         destination.parent.mkdir(parents=True, exist_ok=True)
         git(run, ["clone", "--no-checkout", "-c", "core.autocrlf=false", source, str(destination)])
-    git(run, ["fetch", "--force", "origin", revision], destination)
-    resolved = git(run, ["rev-parse", "FETCH_HEAD^{commit}"], destination)
+    tag_ref = f"refs/tags/{revision}"
+    git(run, ["fetch", "--force", "origin", f"{tag_ref}:{tag_ref}"], destination)
+    resolved = git(run, ["rev-parse", f"{tag_ref}^{{commit}}"], destination)
     if resolved != commit:
         raise BootstrapError(f"{release['id']} tag {revision} resolves to {resolved}, lock requires {commit}")
     git(run, ["checkout", "--detach", "--force", commit], destination)
@@ -394,6 +454,11 @@ def verify_checkout(
     actual_commit = git(run, ["rev-parse", "HEAD"], checkout)
     if actual_commit != commit:
         raise BootstrapError(f"{marketplace} checkout is {actual_commit}, expected {commit}")
+    tag_commit = git(run, ["rev-parse", f"refs/tags/{release['revision']}^{{commit}}"], checkout)
+    if tag_commit != commit:
+        raise BootstrapError(
+            f"{marketplace} local tag {release['revision']} is {tag_commit}, expected {commit}"
+        )
     if git(run, ["status", "--porcelain"], checkout):
         raise BootstrapError(f"Managed checkout has local changes: {checkout}")
     checks: list[str] = []
@@ -456,54 +521,71 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
     }
     if arguments.mode == "preview":
         return report
-    host = NativeHost(arguments.harness, profile, run)
-    groups = release_groups(selections, plugins)
-    state = load_state(profile)
-    if arguments.mode == "apply":
+    try:
+        host = NativeHost(arguments.harness, profile, run)
+        groups = release_groups(selections, plugins)
+        state = load_state(profile)
+        if arguments.mode == "apply":
+            for release, commit, members in groups:
+                checkout = checkout_path(profile, release["marketplace"])
+                checkout_release(run, release, commit, checkout)
+                report["applied"].append(f"checkout:{release['marketplace']}@{commit}")
+                configured = host.marketplaces()
+                if release["marketplace"] not in configured:
+                    record_marketplace(profile, state, release, commit, checkout)
+                    host.add_marketplace(checkout)
+                    report["applied"].append(f"marketplace:{release['marketplace']}")
+                else:
+                    managed = state["marketplaces"].get(release["marketplace"])
+                    if not managed:
+                        raise BootstrapError(
+                            f"Marketplace name is already registered outside this bootstrap: {release['marketplace']}"
+                        )
+                    expected = {"checkout": str(checkout), "release": release["id"], "commit": commit}
+                    if managed != expected:
+                        raise BootstrapError(
+                            f"Managed marketplace state disagrees with the lock: {release['marketplace']}"
+                        )
+                    registered = configured[release["marketplace"]]
+                    if not registered or Path(registered).resolve() != checkout.resolve():
+                        raise BootstrapError(
+                            f"Registered marketplace source disagrees with managed checkout: {release['marketplace']}"
+                        )
+                installed = host.installed()
+                for selection in members:
+                    identity = f"{plugins[selection['id']]['name']}@{release['marketplace']}"
+                    if identity not in installed:
+                        host.install(identity)
+                        report["applied"].append(f"plugin:{identity}")
+                    elif not installed[identity]:
+                        host.enable(identity)
+                        report["applied"].append(f"enabled:{identity}")
         for release, commit, members in groups:
+            report["checks"].extend(verify_checkout(run, profile, release, commit, members, plugins))
+        configured = host.marketplaces()
+        installed = host.installed()
+        for selection in selections:
+            plugin = plugins[selection["id"]]
+            release = plugin["_release"]
+            registered = configured.get(release["marketplace"])
             checkout = checkout_path(profile, release["marketplace"])
-            checkout_release(run, release, commit, checkout)
-            report["applied"].append(f"checkout:{release['marketplace']}@{commit}")
-            configured = host.marketplaces()
-            if release["marketplace"] not in configured:
-                record_marketplace(profile, state, release, commit, checkout)
-                host.add_marketplace(checkout)
-                report["applied"].append(f"marketplace:{release['marketplace']}")
-            else:
-                managed = state["marketplaces"].get(release["marketplace"])
-                if not managed:
-                    raise BootstrapError(
-                        f"Marketplace name is already registered outside this bootstrap: {release['marketplace']}"
-                    )
-                expected = {"checkout": str(checkout), "release": release["id"], "commit": commit}
-                if managed != expected:
-                    raise BootstrapError(
-                        f"Managed marketplace state disagrees with the lock: {release['marketplace']}"
-                    )
-            installed = host.installed()
-            for selection in members:
-                identity = f"{plugins[selection['id']]['name']}@{release['marketplace']}"
-                if identity not in installed:
-                    host.install(identity)
-                    report["applied"].append(f"plugin:{identity}")
-                elif not installed[identity]:
-                    host.enable(identity)
-                    report["applied"].append(f"enabled:{identity}")
-    for release, commit, members in groups:
-        report["checks"].extend(verify_checkout(run, profile, release, commit, members, plugins))
-    configured = host.marketplaces()
-    installed = host.installed()
-    for selection in selections:
-        plugin = plugins[selection["id"]]
-        release = plugin["_release"]
-        if release["marketplace"] not in configured:
-            raise BootstrapError(f"Marketplace is not registered: {release['marketplace']}")
-        identity = f"{plugin['name']}@{release['marketplace']}"
-        if not installed.get(identity):
-            raise BootstrapError(f"Plugin is not installed and enabled: {identity}")
-        report["checks"].append(f"enabled:{identity}")
-    report["status"] = "applied" if arguments.mode == "apply" else "verified"
-    return report
+            if not registered:
+                raise BootstrapError(f"Marketplace is not registered: {release['marketplace']}")
+            if Path(registered).resolve() != checkout.resolve():
+                raise BootstrapError(
+                    f"Registered marketplace source disagrees with managed checkout: {release['marketplace']}"
+                )
+            report["checks"].append(f"marketplace-source:{release['marketplace']}")
+            identity = f"{plugin['name']}@{release['marketplace']}"
+            if not installed.get(identity):
+                raise BootstrapError(f"Plugin is not installed and enabled: {identity}")
+            report["checks"].append(f"enabled:{identity}")
+        report["status"] = "applied" if arguments.mode == "apply" else "verified"
+        return report
+    except BootstrapError as error:
+        report["status"] = "partial" if report["applied"] or (profile / STATE_DIRECTORY).exists() else "failed"
+        report["errors"].append(str(error))
+        raise BootstrapRunError(report) from error
 
 
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
@@ -521,6 +603,12 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     try:
         report = execute(arguments)
+    except BootstrapRunError as error:
+        report = error.report
+        if arguments.report:
+            write_json(arguments.report.expanduser().resolve(), report)
+        print(json.dumps(report, indent=2), file=sys.stderr)
+        return 1
     except BootstrapError as error:
         report = {
             "schema_version": 1,

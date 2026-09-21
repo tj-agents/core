@@ -287,6 +287,20 @@ class SourceLayoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "overlaps authored source"):
             SYNC.build(self.root)
 
+    def test_catalog_digest_exclusion_cannot_be_widened(self):
+        path = self.root / ".agents/catalog/catalog.json"
+        catalog = json.loads(path.read_text(encoding="utf-8"))
+        machine = next(
+            plugin
+            for release in catalog["releases"]
+            for plugin in release["plugins"]
+            if plugin["id"] == "base-agents/machine"
+        )
+        machine["digest_excludes"].append("codex-skills/bootstrap-capabilities/SKILL.md")
+        path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
+            SYNC.build(self.root, validate_catalog_digests=False)
+
     def test_prerequisite_cycles_and_missing_owners_fail(self):
         self.config(lambda value: value["prerequisites"]["base"].append("engineering"))
         with self.assertRaisesRegex(ValueError, "Prerequisite cycle"):
