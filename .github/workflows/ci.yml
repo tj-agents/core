@@ -15,6 +15,10 @@ jobs:
         shell: pwsh
         run: ./.agents/sync-generated.ps1 -Check
 
+      - name: local capability catalog digests are current
+        shell: pwsh
+        run: python -B scripts/update_catalog_digests.py --check
+
       - name: CLI session recovery tests
         shell: powershell
         run: ./cli-session-recovery/tests/cli-session-vault.tests.ps1

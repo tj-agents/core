@@ -36,7 +36,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(61, len(skills))
+        self.assertEqual(62, len(skills))
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
         })
@@ -77,6 +77,10 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
             "plugins/machine/codex-skills/handoff-claude/scripts/launch-claude.ps1",
             "plugins/machine/resources/machine/utility/scripts/history.py",
+            "plugins/machine/skills/bootstrap-capabilities/scripts/bootstrap_capabilities.py",
+            "plugins/machine/catalog/catalog.json",
+            "plugins/machine/catalog/capabilities.lock.schema.json",
+            "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)
         self.assertEqual(
