@@ -675,6 +675,9 @@ def build(root: Path, validate_catalog_digests: bool = True):
             raise ValueError(f"Catalog skill roster drift: {plugin_id}")
         if entry["package_path"] != f"plugins/{plugin}":
             raise ValueError(f"Catalog package path drift: {plugin_id}")
+        allowed_excludes = ["catalog/catalog.json"] if plugin_id == "base-agents/machine" else []
+        if entry.get("digest_excludes", []) != allowed_excludes:
+            raise ValueError(f"Catalog digest exclusion drift: {plugin_id}")
         manifest_version = manifests[plugin]["codex"].get("version")
         if entry["version"] != manifest_version:
             raise ValueError(f"Catalog version drift: {plugin_id}")
