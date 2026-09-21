@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import subprocess
 import sys
@@ -179,6 +180,9 @@ class ReviewTests(RepositoryFixture):
         tree = Path(result["bundle"]["tree"])
         self.assertEqual("candidate\n", (tree / "src" / "mapping.txt").read_text(encoding="utf-8"))
         self.assertEqual(result["bundle"]["identity_sha256"], ops.sha256_file(Path(result["bundle"]["identity"])))
+        path_bytes = Path(result["bundle"]["paths"]).read_bytes()
+        self.assertFalse(path_bytes.endswith(b"\0"))
+        self.assertEqual(hashlib.sha256(path_bytes).hexdigest(), result["path_digest"])
 
     def test_review_prepare_resolves_rules_with_the_packaged_router(self):
         route_table = self.root / ".agents" / "skill-routes.json"

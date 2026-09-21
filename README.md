@@ -116,6 +116,10 @@ $agentInstaller = Join-Path $engineeringRelease.FullName 'scripts/install-codex-
 
 To migrate a repository that received older base-agents copies, add
 `-MigrateProjectRoot <repository> -Apply`. The installer verifies the profile copies before removing only
-the known managed filenames from that repository and preserves unrelated project agents. Use `-Uninstall`
-to preview profile cleanup and `-Uninstall -Apply` to remove only base-agents-managed profile filenames.
+files whose content matches the shipped base-agents history; a colliding filename with different content is
+preserved. Deprecated `-ProjectRoot` remains a migration alias so existing automation gets the safe profile
+cut-over instead of a parameter-binding failure. Profile ownership is recorded in
+`agents/.base-agents-delivery.json`: upgrades and `-Uninstall -Apply` replace or remove only files whose
+content still matches that record. An unowned collision or a locally modified owned file is preserved and
+reported as an actionable error instead of being overwritten. Use `-Uninstall` to preview profile cleanup.
 Claude continues to load the package's `agents/` payload directly and needs no copied `.claude/agents` tree.
