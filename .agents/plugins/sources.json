@@ -39,6 +39,10 @@
     "engineering": {
       "codex": ".agents/plugins/manifests/codex/engineering-hooks.json",
       "claude": ".agents/plugins/manifests/claude/engineering-hooks.json"
+    },
+    "machine": {
+      "codex": ".agents/plugins/manifests/codex/machine-hooks.json",
+      "claude": ".agents/plugins/manifests/claude/machine-hooks.json"
     }
   },
   "generated_roots": [
