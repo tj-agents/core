@@ -192,6 +192,7 @@ class HostAdapterRegistry:
         command_runner=None,
         lease_registry=None,
         repository_observer=None,
+        profile_roots=None,
     ):
         self.workflow_root = Path(workflow_root).resolve()
         self.repository_root = Path(repository_root).resolve()
@@ -203,6 +204,7 @@ class HostAdapterRegistry:
         self.command_runner = command_runner or subprocess.run
         self.lease_registry = lease_registry or WriterLeaseRegistry.for_repository(self.repository_root)
         self.repository_observer = repository_observer or RepositoryChangeObserver(self.repository_root)
+        self.profile_roots = dict(profile_roots or {})
         self.active_lock = threading.Lock()
         self.manifests = {
             host: _load_json(self.workflow_root / "hosts" / f"{host}.json")
@@ -213,24 +215,41 @@ class HostAdapterRegistry:
 
     def probe(self, host):
         manifest = self._manifest(host)
-        surface = self.repository_root / manifest["delivery"]["project_directory"]
-        if not surface.is_dir() and self.workflow_root.parent.name == ".agents":
+        delivery = manifest["delivery"]
+        surfaces = []
+        project_directory = delivery.get("project_directory")
+        if project_directory:
+            project_surface = self.repository_root / project_directory
+            if project_surface.is_dir():
+                surfaces.append(project_surface)
+
+        profile_directory = delivery.get("profile_directory")
+        if profile_directory:
+            profile_root = self._profile_root(host, delivery)
+            if profile_root is not None:
+                profile_surface = profile_root / profile_directory
+                if profile_surface.is_dir():
+                    surfaces.append(profile_surface)
+
+        if delivery.get("plugin_loading") == "supported":
+            plugin_surface = self.workflow_root.parent / delivery["plugin_directory"]
+            if plugin_surface.is_dir():
+                surfaces.append(plugin_surface)
+
+        if not surfaces and self.workflow_root.parent.name == ".agents":
             source_root = self.workflow_root.parent.parent
-            surface = (
+            development_surface = (
                 source_root
                 / "plugins"
                 / "engineering"
-                / manifest["delivery"]["plugin_directory"]
+                / delivery["plugin_directory"]
             )
-        elif (
-            not surface.is_dir()
-            and manifest["delivery"].get("plugin_loading") == "supported"
-        ):
-            surface = self.workflow_root.parent / manifest["delivery"]["plugin_directory"]
+            if development_surface.is_dir():
+                surfaces.append(development_surface)
         available_roles = sorted(
             capability
             for capability, role in manifest["roles"].items()
-            if (surface / role["filename"]).is_file()
+            if any((surface / role["filename"]).is_file() for surface in surfaces)
         )
         executable = self.executable_resolver(manifest["probe"]["command"])
         if executable is None:
@@ -251,6 +270,16 @@ class HostAdapterRegistry:
             return self._probe_record(host, "unavailable", "host-unavailable", None, available_roles)
         version = output[0]
         return self._probe_record(host, "available", None, version, available_roles)
+
+    def _profile_root(self, host, delivery):
+        if host in self.profile_roots:
+            value = self.profile_roots[host]
+            return None if value is None else Path(value).expanduser().resolve()
+        environment_name = delivery.get("profile_environment")
+        value = os.environ.get(environment_name) if environment_name else None
+        if not value:
+            value = delivery.get("profile_default")
+        return None if not value else Path(value).expanduser().resolve()
 
     def prepare(self, host, dispatch, probe=None, available_models=None):
         self.contract.validate_dispatch(dispatch)
