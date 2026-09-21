@@ -11,8 +11,10 @@ The packaged SessionStart hook emits the same canonical contract to both hosts. 
 as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
 alone is insufficient. The skill documents an explicit generated native-instruction fallback.
 
-The split packages form the candidate **2.0.0** release. Existing 1.x consumers can select all three
-packages for equivalent coverage; fresh installations select only `base` by default.
+The split packages form the **2.0.1** release. Existing 1.x consumers and fresh installations select all
+three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
+separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
+closure.
 
 ## Layout
 
@@ -42,12 +44,13 @@ Run `pwsh .agents/sync-generated.ps1` after changing a skill and
 Use `-WhatIf` to inspect and `-VerifyOnly` to verify without changing the machine. Session-recovery runtime
 data, transcripts, credentials, and identifiers remain outside the repository.
 
-## Install / update the `base` plugin
+## Install / update the default plugins
 
-GitHub is authoritative; a machine's installed copy of `base@base-agents` is expected to be exactly what
+GitHub is authoritative; a machine's installed copies of `base@base-agents`,
+`engineering@base-agents`, and `machine@base-agents` are expected to be exactly what
 the latest commit on `main` generated into `plugins/<package>/`. Every skill's own scripts and resources travel
 inside that generated package (see `PACKAGING.md`), so registering the marketplace and installing/updating
-the plugin is the entire supported procedure — never hand-place a script or resolver on a machine to make
+the plugins is the entire supported procedure — never hand-place a script or resolver on a machine to make
 a skill work.
 
 Claude Code:
@@ -55,6 +58,8 @@ Claude Code:
 ```
 /plugin marketplace add tomjseery/base-agents
 /plugin install base@base-agents
+/plugin install engineering@base-agents
+/plugin install machine@base-agents
 ```
 
 After a new commit lands on `main`, pick it up with:
@@ -63,6 +68,6 @@ After a new commit lands on `main`, pick it up with:
 /plugin marketplace update base-agents
 ```
 
-Codex: adding the marketplace (`.agents/plugins/marketplace.json`) installs `base` automatically — its
-declared policy is `INSTALLED_BY_DEFAULT`. Refresh Codex's copy of the marketplace the same way to pick up
-a new commit.
+Codex: adding the marketplace (`.agents/plugins/marketplace.json`) installs all three packages
+automatically; each declares `INSTALLED_BY_DEFAULT`. Refresh Codex's copy of the marketplace the same way
+to pick up a new commit.
