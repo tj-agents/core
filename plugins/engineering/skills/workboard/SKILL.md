@@ -1,6 +1,6 @@
 ---
 name: workboard
-description: List every plan across every project and say which are still awaiting continuation — reads the plan files themselves, not git, so work that has gone cold for days still shows up. Use whenever Tommy says "/workboard", "what work do I have open", "what plans are still going", "what have I not finished", "what else is active", or has lost track of which session he was on. Optional filter narrows to one project.
+description: List every plan across every project and say which are still awaiting continuation — reads the plan files themselves, not git, so work that has gone cold for days still shows up. Use whenever Tommy says "/workboard", "what work do I have open", "what plans are still going", "what have I not finished", "what else is active", or has lost track of which session he was on. Optional filter narrows to plans about one subject.
 
 kind: utility
 domain: process
