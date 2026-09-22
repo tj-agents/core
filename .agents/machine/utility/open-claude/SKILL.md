@@ -36,3 +36,17 @@ Resolve the exact directory the request concerns and do not substitute another c
 
 It opens as a new tab in the current Windows Terminal window. Open one tab per request, and report the
 directory and any session id afterwards.
+
+## One tab, and never a second
+
+The launcher **throws** on failure and prints `Launched claude handoff tab '<title>' …` on success. Those
+are the only two outcomes.
+
+**Never verify a launch by listing processes, and never re-run the launcher because one looked absent.**
+A tab takes seconds to appear and a process listing is trivially misread — an unsorted `Select-Object
+-First 3` is enough to miss the newest one. Re-running puts two agents on the same task in the same
+repository, which is worse than no handoff at all: they collide on the same files with neither aware of
+the other.
+
+If the launcher printed its confirmation, the handoff happened. Report it and stop. If it threw, say so;
+do not retry blind.

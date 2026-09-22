@@ -57,3 +57,5 @@ Invoke-AgentTerminalTab `
     -Title $Title `
     -Arguments $arguments `
     -ForceEnvironment @{ FORCE_COLOR = '1'; TERM = 'xterm-256color' }
+
+Write-Host "Launched claude handoff tab '$Title' in $resolvedWorkingDirectory with prompt $resolvedPromptPath"
