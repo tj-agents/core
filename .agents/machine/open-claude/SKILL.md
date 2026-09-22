@@ -11,7 +11,7 @@ route: infer
 
 Opens an interactive Claude Code session the user drives themselves. Its sibling `handoff-claude` is for
 delegating prepared work to a second Claude; this one is for putting a terminal in front of the user.
-Both share `scripts/agent-cli.ps1` under `resources/machine/utility/scripts`, which owns the terminal
+Both share `scripts/agent-cli.ps1` under `resources/machine/scripts`, which owns the terminal
 invocation and the environment scrub.
 
 Never open a Claude CLI by typing `claude` into a PowerShell command, `pwsh -Command`, `claude.cmd`,

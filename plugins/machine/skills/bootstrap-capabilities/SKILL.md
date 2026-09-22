@@ -9,5 +9,5 @@ route: infer
 
 # Bootstrap locked capabilities
 
-Read and follow the [canonical shared definition](../../.agents/machine/utility/bootstrap-capabilities/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../.agents/machine/bootstrap-capabilities/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.
