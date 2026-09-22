@@ -646,6 +646,20 @@ def verify_installed_plugin(
     return [f"enabled:{identity}", f"installed-digest:{identity}"]
 
 
+def installed_plugin_is_exact(
+    harness: str,
+    identity: str,
+    installed: dict[str, dict[str, Any]],
+    plugin: dict[str, Any],
+    commit: str,
+) -> bool:
+    try:
+        verify_installed_plugin(harness, identity, installed, plugin, commit)
+    except BootstrapError:
+        return False
+    return True
+
+
 def release_groups(selections: list[dict[str, Any]], plugins: dict[str, dict[str, Any]]) -> list[tuple[dict[str, Any], str, list[dict[str, Any]]]]:
     groups: dict[str, tuple[dict[str, Any], str, list[dict[str, Any]]]] = {}
     for selection in selections:
@@ -735,24 +749,31 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
                     report["applied"].append(f"marketplace:{marketplace}")
                 installed = host.installed()
                 for selection in members:
-                    identity = f"{plugins[selection['id']]['name']}@{release['marketplace']}"
+                    plugin = plugins[selection["id"]]
+                    identity = f"{plugin['name']}@{release['marketplace']}"
                     if identity not in installed:
                         host.install(identity)
                         report["applied"].append(f"plugin:{identity}")
-                    elif pending is not None:
+                    elif pending is not None or not installed_plugin_is_exact(
+                        arguments.harness, identity, installed, plugin, commit
+                    ):
                         host.refresh(identity)
                         report["applied"].append(f"refreshed:{identity}")
-                    elif not installed[identity].get("enabled"):
+                current = host.installed()
+                for selection in members:
+                    plugin = plugins[selection["id"]]
+                    identity = f"{plugin['name']}@{release['marketplace']}"
+                    if identity in current and not current[identity].get("enabled"):
                         host.enable(identity)
                         report["applied"].append(f"enabled:{identity}")
+                refreshed = host.installed()
+                for selection in members:
+                    plugin = plugins[selection["id"]]
+                    identity = f"{plugin['name']}@{marketplace}"
+                    report["checks"].extend(
+                        verify_installed_plugin(arguments.harness, identity, refreshed, plugin, commit)
+                    )
                 if pending is not None:
-                    refreshed = host.installed()
-                    for selection in members:
-                        plugin = plugins[selection["id"]]
-                        identity = f"{plugin['name']}@{marketplace}"
-                        report["checks"].extend(
-                            verify_installed_plugin(arguments.harness, identity, refreshed, plugin, commit)
-                        )
                     finish_transition(profile, state, marketplace, expected)
                     report["applied"].append(f"managed-state:{marketplace}@{commit}")
         for release, commit, members in groups:
