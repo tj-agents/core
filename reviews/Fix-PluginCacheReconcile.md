@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `fbcb83dbff5dc347c67ca0e0754aec06b4a954ef`  `(2026-09-22)`
+**Reviewed up to commit:** `a82ed3b`  `(2026-09-22)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-22 — full
@@ -67,3 +67,52 @@ No new findings. The delta is the PC1 remediation only: the one-line default cha
 that follow from it, and this work order. The regenerated copy is byte-identical to its source apart
 from checkout line endings, which `test_generated_text_bytes_are_stable_across_checkout_line_endings`
 already owns. Reconcile tests and both generation checks pass at the frozen head.
+
+## Review pass - 2026-09-22 - incremental
+
+**Candidate base:** `fbcb83dbff5dc347c67ca0e0754aec06b4a954ef`
+**Candidate head:** `a82ed3b`
+**Candidate branch:** `Fix/PluginCacheReconcile`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:06e7405821fe39b82d73347465d46f2ab226a245fb16e4ef88c98eae22359a1b` `(14 paths)`
+**Work-order path:** `reviews/Fix-PluginCacheReconcile.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Reviewed natively in the owning session; no lens subagent was dispatched. The delta carries the two
+properties the prior passes did not cover - a session pin that makes removal a liveness check, and a
+reader for the rename alias table - plus the work-order commit itself.
+
+### Findings
+
+- [x] **PC2 — MEDIUM — native-general** — `.agents/machine/scripts/prune_plugin_cache.py:record_pin`
+  The pin file is keyed by the hook's parent pid, and two sessions can share one parent. Writing the
+  file replaced its `paths`, so a second session's pin dropped the first session's directory from the
+  held set while that session was still bound to it. That is the failure the pin exists to prevent,
+  reintroduced by the pin's own bookkeeping. Narrow - it needs a shared long-lived parent - but the
+  consequence is exactly failure 3 and the safe direction costs nothing.
+
+  **Resolved** in `a82ed3b`: `record_pin` unions the live registry set with whatever the file already
+  holds, via `held_by()`, which reads an unreadable pin as holding nothing. Over-retention stays
+  bounded by expiry; a lost pin was not bounded by anything. Two tests cover it.
+
+Verified and dismissed during synthesis:
+
+- `read_pins` treating an unreadable pin as expired is correct, not a silent swallow: such a pin names
+  no paths to protect, so trusting it would only defer its own removal indefinitely.
+- The dry run reads the pin registry and writes nothing; the sweep sits inside the `--apply` branch and
+  under `--pin`, and a test asserts the dry-run case.
+- `classify` gives `PINNED` precedence over every dead state and excludes it from `--keep-previous`, so
+  a pinned directory cannot be consumed by the retention count.
+- One-hop alias following cannot loop; the chain test asserts a two-hop chain is not resolved.
+- An unreadable alias table resolves to no aliases rather than an error, which can only restore the
+  behaviour that preceded it - asserted by test.
+- `skill_aliases()` probes the packaged sibling then the source-tree spelling; both are exercised, the
+  first by the synthetic-plugin tests and the second by the shipped-table test.
+- `ALIAS_CANDIDATES` is computed at import from `__file__`, so a vendored copy resolves against its own
+  location exactly as `SHIPPED_ROUTES_DIR` already does.
+- The alias is consulted only when nothing resolved, so an exact match always wins over a rename record.
+
+Not fixed here, unchanged disposition: `test_merge_review_gate.CanonicalEnvelopeShellTests` still fails
+two tests on this machine and passes on CI. This branch touches no file it covers. The entry recorded
+in the completed pass above keeps its resolution condition.
