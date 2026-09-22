@@ -308,6 +308,51 @@ class BootstrapIntegrationTests(unittest.TestCase):
             self.assertEqual("applied", repeated["status"])
             self.assertEqual(before, self.host_mutations)
 
+    def test_apply_migrates_owned_marketplace_to_new_source_and_release(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+            moved_source = self.root / "moved source marketplace"
+            self.git("clone", "--no-hardlinks", str(self.source), str(moved_source), cwd=self.root)
+            self.git("config", "user.name", "Capability Test", cwd=moved_source)
+            self.git("config", "user.email", "capability@example.invalid", cwd=moved_source)
+            (moved_source / "second-release.txt").write_text("second release\n", encoding="utf-8")
+            self.git("add", "second-release.txt", cwd=moved_source)
+            self.git("commit", "-m", "second release", cwd=moved_source)
+            self.git("tag", "v1.0.1", cwd=moved_source)
+            moved_commit = self.git("rev-parse", "HEAD", cwd=moved_source).strip()
+
+            catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+            release = catalog["releases"][0]
+            release.update(
+                {
+                    "id": "fixture@1.0.1",
+                    "source": str(moved_source),
+                    "revision": "v1.0.1",
+                    "version": "1.0.1",
+                }
+            )
+            release["plugins"][0]["version"] = "1.0.1"
+            self.catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+
+            lock = json.loads(self.lock_path.read_text(encoding="utf-8"))
+            lock["plugins"][0].update({"release": "fixture@1.0.1", "commit": moved_commit})
+            self.lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
+
+            migrated = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+        self.assertEqual(str(moved_source), self.git("remote", "get-url", "origin", cwd=checkout).strip())
+        self.assertEqual(moved_commit, self.git("rev-parse", "HEAD", cwd=checkout).strip())
+        state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
+        self.assertEqual("fixture@1.0.1", state["marketplaces"]["fixture"]["release"])
+        self.assertEqual(moved_commit, state["marketplaces"]["fixture"]["commit"])
+        self.assertIn(f"managed-state:fixture@{moved_commit}", migrated["applied"])
+
 
     def test_claude_apply_and_offline_verify_use_the_same_lock(self):
         with mock.patch.object(BOOT, "executable", side_effect=lambda name: f"{name}-fixture" if name in {"codex", "claude"} else shutil.which("git")):
