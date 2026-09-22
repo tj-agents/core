@@ -201,6 +201,7 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.fail_install_once = False
         self.fail_plugin_list_once = False
         self.plugin_refreshes = 0
+        self.host_commands = []
         self.marketplace_root_override = {}
 
     def git(self, *arguments, cwd=None):
@@ -242,6 +243,7 @@ class BootstrapIntegrationTests(unittest.TestCase):
             return subprocess.run(command, **kwargs)
         claude = command[0] == "claude-fixture"
         arguments = command[1:]
+        self.host_commands.append(list(arguments))
         stdout = ""
         if arguments == ["plugin", "marketplace", "list", "--json"] and not claude:
             stdout = json.dumps({"marketplaces": [
@@ -399,6 +401,26 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.assertEqual(1, self.plugin_refreshes)
         self.assertIn(f"managed-state:fixture@{moved_commit}", migrated["applied"])
 
+    def test_apply_repairs_installed_package_drift_then_becomes_idempotent(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            installed_payload = Path(self.plugins["example@fixture"]["path"]) / "payload.txt"
+            installed_payload.write_text("corrupt\n", encoding="utf-8")
+            before_repair = self.host_mutations
+            repaired = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            after_repair = self.host_mutations
+            repeated = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        self.assertEqual("applied", repaired["status"])
+        self.assertEqual("payload\n", installed_payload.read_text(encoding="utf-8"))
+        self.assertEqual(before_repair + 1, after_repair)
+        self.assertEqual(after_repair, self.host_mutations)
+        self.assertEqual("applied", repeated["status"])
+
     def test_interrupted_release_transition_resumes_from_durable_pending_state(self):
         with mock.patch.object(
             BOOT,
@@ -458,14 +480,30 @@ class BootstrapIntegrationTests(unittest.TestCase):
             side_effect=lambda name: f"{name}-fixture" if name in {"codex", "claude"} else shutil.which("git"),
         ):
             BOOT.execute(self.arguments("apply", "claude"), run=self.fake_run)
-            _, moved_commit = self.prepare_moved_release()
+            moved_source, moved_commit = self.prepare_moved_release()
             migrated = BOOT.execute(self.arguments("apply", "claude"), run=self.fake_run)
-            verified = BOOT.execute(self.arguments("verify", "claude"), run=self.fake_run)
+            unavailable_source = self.root / "moved source unavailable during verify"
+            moved_source.rename(unavailable_source)
+            mutations_before_verify = self.host_mutations
+
+            def offline_run(command, **kwargs):
+                if command[0] not in {"codex-fixture", "claude-fixture"} and any(
+                    argument in {"clone", "fetch"} for argument in command[1:]
+                ):
+                    self.fail(f"offline verify attempted network/source Git operation: {command}")
+                return self.fake_run(command, **kwargs)
+
+            verified = BOOT.execute(self.arguments("verify", "claude"), run=offline_run)
 
         self.assertEqual("applied", migrated["status"])
         self.assertEqual("verified", verified["status"])
         self.assertEqual(moved_commit[:12], self.plugins["example@fixture"]["version"])
         self.assertEqual(1, self.plugin_refreshes)
+        self.assertIn(
+            ["plugin", "update", "example@fixture", "--scope", "user", "--yes"],
+            self.host_commands,
+        )
+        self.assertEqual(mutations_before_verify, self.host_mutations)
 
 
     def test_claude_apply_and_offline_verify_use_the_same_lock(self):
