@@ -227,7 +227,7 @@ def state_directory(environ=None, home=None):
     configured = values.get(STATE_DIRECTORY_ENV)
     if configured:
         return Path(configured)
-    return (Path.home() if home is None else home) / ".agents"
+    return (Path.home() if home is None else home) / ".agents-state"
 
 
 def notice_is_due(path, now, interval=NOTICE_INTERVAL_SECONDS):
