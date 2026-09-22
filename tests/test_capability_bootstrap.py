@@ -199,6 +199,8 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.plugins = {}
         self.host_mutations = 0
         self.fail_install_once = False
+        self.fail_plugin_list_once = False
+        self.plugin_refreshes = 0
         self.marketplace_root_override = {}
 
     def git(self, *arguments, cwd=None):
@@ -219,6 +221,21 @@ class BootstrapIntegrationTests(unittest.TestCase):
             catalog=self.catalog_path,
             report=None,
         )
+
+    def cache_plugin(self, identity, claude):
+        name, marketplace = identity.split("@", 1)
+        catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        release = next(item for item in catalog["releases"] if item["marketplace"] == marketplace)
+        plugin = next(item for item in release["plugins"] if item["name"] == name)
+        lock = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        selection = next(item for item in lock["plugins"] if item["id"] == plugin["id"])
+        version = selection["commit"][:12] if claude else plugin["version"]
+        source = self.profile / BOOT.STATE_DIRECTORY / "checkouts" / marketplace / plugin["package_path"]
+        target = self.profile / "fake host cache" / ("claude" if claude else "codex") / marketplace / name
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(source, target)
+        self.plugins[identity] = {"enabled": True, "version": version, "path": str(target)}
 
     def fake_run(self, command, **kwargs):
         if command[0] not in {"codex-fixture", "claude-fixture"}:
@@ -242,10 +259,25 @@ class BootstrapIntegrationTests(unittest.TestCase):
                 for value in sorted(self.marketplaces)
             )
         elif arguments == ["plugin", "list", "--json"]:
+            if self.fail_plugin_list_once:
+                self.fail_plugin_list_once = False
+                return subprocess.CompletedProcess(command, 1, "", "injected plugin-list failure")
             records = [
-                {"id": identity, "scope": "user", "enabled": enabled}
-                if claude else {"pluginId": identity, "installed": True, "enabled": enabled}
-                for identity, enabled in sorted(self.plugins.items())
+                {
+                    "id": identity,
+                    "scope": "user",
+                    "enabled": record["enabled"],
+                    "version": record["version"],
+                    "installPath": record["path"],
+                }
+                if claude else {
+                    "pluginId": identity,
+                    "installed": True,
+                    "enabled": record["enabled"],
+                    "version": record["version"],
+                    "source": {"path": record["path"]},
+                }
+                for identity, record in sorted(self.plugins.items())
             ]
             stdout = json.dumps(records if claude else {"installed": records})
         elif arguments[:3] == ["plugin", "marketplace", "add"]:
@@ -253,11 +285,18 @@ class BootstrapIntegrationTests(unittest.TestCase):
             self.host_mutations += 1
         elif (not claude and arguments[:2] == ["plugin", "add"]) or (
             claude and arguments[:2] == ["plugin", "install"]
+        ) or (
+            claude and arguments[:2] == ["plugin", "update"]
         ):
             if self.fail_install_once:
                 self.fail_install_once = False
                 return subprocess.CompletedProcess(command, 1, "", "injected install failure")
-            self.plugins[arguments[2]] = True
+            if arguments[:2] == ["plugin", "update"] or arguments[2] in self.plugins:
+                self.plugin_refreshes += 1
+            self.cache_plugin(arguments[2], claude)
+            self.host_mutations += 1
+        elif claude and arguments[:2] == ["plugin", "enable"]:
+            self.plugins[arguments[2]]["enabled"] = True
             self.host_mutations += 1
         else:
             return subprocess.CompletedProcess(command, 1, "", "unexpected host arguments")
@@ -308,6 +347,37 @@ class BootstrapIntegrationTests(unittest.TestCase):
             self.assertEqual("applied", repeated["status"])
             self.assertEqual(before, self.host_mutations)
 
+    def prepare_moved_release(self):
+        moved_source = self.root / "moved source marketplace"
+        self.git("clone", "--no-hardlinks", str(self.source), str(moved_source), cwd=self.root)
+        self.git("config", "user.name", "Capability Test", cwd=moved_source)
+        self.git("config", "user.email", "capability@example.invalid", cwd=moved_source)
+        (moved_source / "second-release.txt").write_text("second release\n", encoding="utf-8")
+        (moved_source / "plugins/example/payload.txt").write_text("updated payload\n", encoding="utf-8")
+        self.git("add", "second-release.txt", "plugins/example/payload.txt", cwd=moved_source)
+        self.git("commit", "-m", "second release", cwd=moved_source)
+        self.git("tag", "v1.0.1", cwd=moved_source)
+        moved_commit = self.git("rev-parse", "HEAD", cwd=moved_source).strip()
+
+        catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        release = catalog["releases"][0]
+        release.update(
+            {
+                "id": "fixture@1.0.1",
+                "source": str(moved_source),
+                "revision": "v1.0.1",
+                "version": "1.0.1",
+            }
+        )
+        release["plugins"][0]["version"] = "1.0.1"
+        release["plugins"][0]["digest"] = BOOT.tree_digest(moved_source / "plugins/example", [])
+        self.catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+
+        lock = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        lock["plugins"][0].update({"release": "fixture@1.0.1", "commit": moved_commit})
+        self.lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
+        return moved_source, moved_commit
+
     def test_apply_migrates_owned_marketplace_to_new_source_and_release(self):
         with mock.patch.object(
             BOOT,
@@ -315,34 +385,7 @@ class BootstrapIntegrationTests(unittest.TestCase):
             side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
         ):
             BOOT.execute(self.arguments("apply"), run=self.fake_run)
-
-            moved_source = self.root / "moved source marketplace"
-            self.git("clone", "--no-hardlinks", str(self.source), str(moved_source), cwd=self.root)
-            self.git("config", "user.name", "Capability Test", cwd=moved_source)
-            self.git("config", "user.email", "capability@example.invalid", cwd=moved_source)
-            (moved_source / "second-release.txt").write_text("second release\n", encoding="utf-8")
-            self.git("add", "second-release.txt", cwd=moved_source)
-            self.git("commit", "-m", "second release", cwd=moved_source)
-            self.git("tag", "v1.0.1", cwd=moved_source)
-            moved_commit = self.git("rev-parse", "HEAD", cwd=moved_source).strip()
-
-            catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
-            release = catalog["releases"][0]
-            release.update(
-                {
-                    "id": "fixture@1.0.1",
-                    "source": str(moved_source),
-                    "revision": "v1.0.1",
-                    "version": "1.0.1",
-                }
-            )
-            release["plugins"][0]["version"] = "1.0.1"
-            self.catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
-
-            lock = json.loads(self.lock_path.read_text(encoding="utf-8"))
-            lock["plugins"][0].update({"release": "fixture@1.0.1", "commit": moved_commit})
-            self.lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
-
+            moved_source, moved_commit = self.prepare_moved_release()
             migrated = BOOT.execute(self.arguments("apply"), run=self.fake_run)
 
         checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
@@ -351,7 +394,62 @@ class BootstrapIntegrationTests(unittest.TestCase):
         state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
         self.assertEqual("fixture@1.0.1", state["marketplaces"]["fixture"]["release"])
         self.assertEqual(moved_commit, state["marketplaces"]["fixture"]["commit"])
+        self.assertEqual({}, state["transitions"])
+        self.assertEqual("1.0.1", self.plugins["example@fixture"]["version"])
+        self.assertEqual(1, self.plugin_refreshes)
         self.assertIn(f"managed-state:fixture@{moved_commit}", migrated["applied"])
+
+    def test_interrupted_release_transition_resumes_from_durable_pending_state(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            _, moved_commit = self.prepare_moved_release()
+            self.fail_plugin_list_once = True
+            with self.assertRaisesRegex(BOOT.BootstrapError, "injected plugin-list failure"):
+                BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+            state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
+            self.assertEqual("fixture@1.0.0", state["marketplaces"]["fixture"]["release"])
+            self.assertEqual(moved_commit, state["transitions"]["fixture"]["to"]["commit"])
+            resumed = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        self.assertEqual("applied", resumed["status"])
+        state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
+        self.assertEqual("fixture@1.0.1", state["marketplaces"]["fixture"]["release"])
+        self.assertEqual({}, state["transitions"])
+
+    def test_stale_state_cannot_rewrite_an_unrelated_checkout_origin(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+            def remove_readonly(function, path, _error):
+                os.chmod(path, 0o700)
+                function(path)
+
+            shutil.rmtree(checkout, onexc=remove_readonly)
+            checkout.mkdir()
+            (checkout / "unrelated.txt").write_text("unrelated\n", encoding="utf-8")
+            self.git("init", "-b", "main", cwd=checkout)
+            self.git("config", "user.name", "Capability Test", cwd=checkout)
+            self.git("config", "user.email", "capability@example.invalid", cwd=checkout)
+            self.git("add", ".", cwd=checkout)
+            self.git("commit", "-m", "unrelated", cwd=checkout)
+            self.git("remote", "add", "origin", "https://example.invalid/unrelated.git", cwd=checkout)
+
+            with self.assertRaisesRegex(BOOT.BootstrapError, "recorded state requires"):
+                BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        self.assertEqual(
+            "https://example.invalid/unrelated.git",
+            self.git("remote", "get-url", "origin", cwd=checkout).strip(),
+        )
 
 
     def test_claude_apply_and_offline_verify_use_the_same_lock(self):
