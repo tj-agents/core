@@ -7,6 +7,11 @@
             "type": "command",
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/machine/peer-cli/scripts/register_session.py\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/prune_plugin_cache.py\" --notice",
+            "timeout": 15
           }
         ]
       }
