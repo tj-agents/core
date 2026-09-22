@@ -451,6 +451,22 @@ class BootstrapIntegrationTests(unittest.TestCase):
             self.git("remote", "get-url", "origin", cwd=checkout).strip(),
         )
 
+    def test_claude_release_transition_refreshes_commit_versioned_cache(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: f"{name}-fixture" if name in {"codex", "claude"} else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply", "claude"), run=self.fake_run)
+            _, moved_commit = self.prepare_moved_release()
+            migrated = BOOT.execute(self.arguments("apply", "claude"), run=self.fake_run)
+            verified = BOOT.execute(self.arguments("verify", "claude"), run=self.fake_run)
+
+        self.assertEqual("applied", migrated["status"])
+        self.assertEqual("verified", verified["status"])
+        self.assertEqual(moved_commit[:12], self.plugins["example@fixture"]["version"])
+        self.assertEqual(1, self.plugin_refreshes)
+
 
     def test_claude_apply_and_offline_verify_use_the_same_lock(self):
         with mock.patch.object(BOOT, "executable", side_effect=lambda name: f"{name}-fixture" if name in {"codex", "claude"} else shutil.which("git")):
