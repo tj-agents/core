@@ -42,7 +42,7 @@ class CatalogTests(unittest.TestCase):
             "plugins": [
                 {
                     "id": "base-agents/engineering",
-                    "release": "base-agents@2.1.3",
+                    "release": "base-agents@2.1.4",
                     "commit": "a" * 40,
                     "required_skills": ["review"],
                     "path_scopes": [],
@@ -67,7 +67,7 @@ class CatalogTests(unittest.TestCase):
             "plugins": [
                 {
                     "id": "base-agents/base",
-                    "release": "base-agents@2.1.3",
+                    "release": "base-agents@2.1.4",
                     "commit": "a" * 40,
                     "required_skills": [],
                     "path_scopes": [],

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tomjseery/base-agents/catalog/catalog.schema.json",
+  "$id": "https://github.com/tj-agents/core/catalog/catalog.schema.json",
   "title": "Agent capability catalog",
   "type": "object",
   "additionalProperties": false,

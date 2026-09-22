@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tomjseery/base-agents/catalog/capabilities.lock.schema.json",
+  "$id": "https://github.com/tj-agents/core/catalog/capabilities.lock.schema.json",
   "title": "Project capability lock",
   "type": "object",
   "additionalProperties": false,
