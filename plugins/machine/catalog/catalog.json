@@ -314,7 +314,7 @@
           "id": "cpp-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "0.1.1",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -353,7 +353,7 @@
           "id": "cpp-agents/gcc",
           "name": "gcc",
           "package_path": "plugins/gcc",
-          "version": "0.1.1",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -390,7 +390,7 @@
           "id": "cpp-agents/windows",
           "name": "windows",
           "package_path": "plugins/windows",
-          "version": "0.1.1",
+          "version": "0.6.1",
           "description": "Deprecated combined MSVC and Win32 compatibility package; split explicitly before 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -433,7 +433,7 @@
           "id": "cpp-agents/cpp-standards",
           "name": "cpp-standards",
           "package_path": "plugins/cpp-standards",
-          "version": "0.1.1",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -472,7 +472,7 @@
           "id": "cpp-agents/gpp-standards",
           "name": "gpp-standards",
           "package_path": "plugins/gpp-standards",
-          "version": "0.1.1",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
