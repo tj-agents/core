@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `a82ed3b`  `(2026-09-22)`
+**Reviewed up to commit:** `6a7600f`  `(2026-09-23)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-22 — full
@@ -116,3 +116,109 @@ Verified and dismissed during synthesis:
 Not fixed here, unchanged disposition: `test_merge_review_gate.CanonicalEnvelopeShellTests` still fails
 two tests on this machine and passes on CI. This branch touches no file it covers. The entry recorded
 in the completed pass above keeps its resolution condition.
+
+## Review pass - 2026-09-23 - incremental
+
+**Candidate base:** `a82ed3bd360c6a2d30ca4a4535d0291582d8ca5c`
+**Candidate head:** `6a7600f9362aaade10231eb336608a7b9962a363`
+**Candidate branch:** `Fix/PluginCacheReconcile`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:5344335b3bbe24f5d516b9ba8bd79619286595f131fe5d4b58666a540026fd66` `(9 paths)`
+**Work-order path:** `reviews/Fix-PluginCacheReconcile.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Two fresh read-only lenses were dispatched over `a82ed3b..4d34cad` — one on matcher correctness, one
+on prose/code agreement and the corpus-selection change — alongside the owning session's native pass.
+The range was re-frozen at `6a7600f` to carry the remediation, as the passes above did. The delta is
+the `/workboard` skill: repo-group scoping, subject matching, and the corpus rule.
+
+### Findings
+
+- [x] **WB1 — HIGH — lens:matcher** — `.agents/engineering/utility/workboard/SKILL.md` `matches()`
+  The needle was lowercased but never tokenized, while every candidate word came from `[a-z0-9]+`.
+  Any punctuation in the needle therefore made all three clauses structurally unsatisfiable, and the
+  run printed zero rows with no diagnostic at all. Demonstrated: `FILTER=AB-28884` from
+  `infonetica/cris-diligence` returned nothing while `cris-diligence/AB-28884-country-risk-domain-split.md`
+  sat in the corpus; `pr-633` and a pasted leading space failed the same way. This is the exact defect
+  class the change was made to remove.
+
+  **Resolved** in `6a7600f`: the needle goes through the same `words()` normalizer and every typed
+  word must match, which also makes a multi-word needle work — `b2b accept` now finds
+  `B2B_ACCEPT_UNION_HANDOFF.md`. Verified from both repos.
+
+- [x] **WB2 — HIGH — lens:corpus** — same file, corpus selection
+  Restricting the corpus to one directory deep excluded real plans, so the prose claim that nothing
+  nested is a plan was false. `Concertable/Post Launch Scalability/WORKFLOW_DIVERGENCE_DECISION.md` —
+  a 54KB decision doc with no depth-2 namesake — became permanently invisible.
+
+  **Resolved** in `6a7600f`: a **flat** subfolder (no subdirectories of its own) is a plan folder and
+  is read; only a subfolder with its own structure is a copied repository tree and is skipped whole.
+  Profiled every depth-2 directory to confirm the test is total on this corpus: all six mirrors have
+  subdirectories, every hand-made folder has none. Selection goes 170 → 172 files, 80% still excluded.
+  Two plans dropped inside `Concertable/b2b/` remain invisible; the skill now states that blind spot
+  and says to move such a file up rather than teaching the rule to guess.
+
+- [x] **WB3 — MEDIUM — native + both lenses** — same file, bucket/report interaction
+  The completion filter ran after bucket selection, so a plan named for the needle but marked done
+  left `named` empty; `rows = named or mentioned` then fell back to text-only rows and printed
+  `no plan is named for '<needle>'`. Demonstrated: `FILTER=reconcile` from this worktree printed that
+  line while `base-agents/PLUGIN_CACHE_RECONCILE.md` is named for it and merely finished. The reader is
+  instructed to read those lines out, so the false claim propagates. `hidden` was also charged across
+  both buckets while only one is ever printed.
+
+  **Resolved** in `6a7600f`: a `named_seen` flag distinguishes the two cases and the run now says
+  `every plan named for 'reconcile' is marked done`; `hidden` counts name hits only and the footer
+  says so.
+
+- [x] **WB4 — MEDIUM — lens:corpus** — same file, "Report"
+  "only about one in eight uses checkboxes" was measured on the pre-change walk (112/841 = 13.3%).
+  The change invalidated it: 4 of 172 selected files carry checkboxes, about one in forty. Independently
+  re-measured before correcting the prose.
+
+  **Resolved** in `6a7600f`: restated as one in forty.
+
+- [x] **WB5 — LOW — lens:corpus** — same file, scope skip
+  A loose root plan gets `group = None`, so the out-of-group skip never fired and all seven listed in
+  every session regardless of `SCOPE` — including `vectorized-gathering-pinwheel.md`, which is
+  Infonetica due-diligence work. The prose asserting the guarantee sits in the changed section.
+
+  **Resolved** in `6a7600f`: an ungrouped root plan is `unfiled`, counted in the one-line notice and
+  shown only under `SCOPE=all`. The `"(loose)"` display placeholder no longer feeds the matcher, which
+  also retires the lens's separate observation that `FILTER=loose` reported every root plan as named.
+
+- [x] **WB6 — LOW — native** — same file, `plan_files()` / `group_of()`
+  Replacing `rglob` with `glob` dropped the `.git`/`node_modules` guard, and `pathlib.Path.glob` does
+  match dotted directories (confirmed empirically). No such directory exists under `~/.claude/plans`
+  today, so the exposure was latent rather than live — but the machine-transferable direction puts
+  plans inside repositories. Separately `group_of()` called `repos.iterdir()` unguarded, so a machine
+  with no `~/source/repos` got a `FileNotFoundError` instead of a board.
+
+  **Resolved** in `6a7600f`: guard restored, `repos.is_dir()` checked.
+
+- [x] **WB7 — LOW — lens:matcher** — same file, argument parsing
+  `limit = int(sys.argv[2] or 20)` was unguarded while `FILTER` and `SCOPE` were not, so `LIMIT=all`
+  killed the whole run with a traceback and a negative value made `showing %d` disagree with the rows
+  printed. Pre-existing rather than introduced here, fixed because it is one line in a file already
+  open. `path.stat()` sat outside the `try` that guards the read, so a plan deleted mid-run by another
+  session destroyed the board after all the work was done.
+
+  **Resolved** in `6a7600f`: `LIMIT` falls back to 20 unless it is a non-negative integer; `mtime` is
+  read under the same guard as the text.
+
+Verified and dismissed during synthesis:
+
+- `group_of` is O(files x repos) with no memoization. Measured at 0.070s of a ~1.0s run on the real
+  corpus (12 distinct projects, 170 files); memoizing saves 0.062s and was not worth the change.
+- The empty-needle path is safe: `about("")` is `all()` over an empty token list, so every file buckets
+  as `named` and the unfiltered board is unchanged.
+- `rows = named or mentioned` aliases a bucket and `rows.sort()` mutates it in place; nothing after
+  that point reads bucket order, only length and truthiness, so there is no observable effect.
+- The generated copies are byte-identical to their canonical source, the two host entry points differ
+  only in the host name and their relative link depth is correct, and nothing else in the repository
+  asserts the frontmatter description text.
+- `HTTPServer` tokenizing to one word is the known cost of the lower-to-upper boundary rule, not a
+  separate defect.
+
+Not fixed here, unchanged disposition: `test_merge_review_gate.CanonicalEnvelopeShellTests` still fails
+two tests on this machine and passes on CI. This delta touches no file it covers.
