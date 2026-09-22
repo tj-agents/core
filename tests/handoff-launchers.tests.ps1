@@ -177,7 +177,7 @@ class Stub {
 
     # --- every generated launcher that names the shared library can resolve the shipped dependency ---
     foreach ($launcher in $packagedLaunchers) {
-        $shared = Join-Path (Split-Path -Parent $launcher) '..\..\..\resources\machine\utility\scripts\agent-cli.ps1'
+        $shared = Join-Path (Split-Path -Parent $launcher) '..\..\..\resources\machine\scripts\agent-cli.ps1'
         if (-not (Test-Path -LiteralPath $shared -PathType Leaf)) {
             throw "The packaged $(Split-Path -Leaf $launcher) cannot reach the shared agent-cli.ps1."
         }
