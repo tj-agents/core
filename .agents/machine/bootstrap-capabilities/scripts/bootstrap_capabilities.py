@@ -397,18 +397,58 @@ def git(run, arguments: list[str], cwd: Path | None = None) -> str:
     return completed.stdout.strip()
 
 
-def checkout_release(run, release: dict[str, Any], commit: str, destination: Path) -> None:
+def validate_managed_checkout(run, managed: dict[str, Any], destination: Path) -> None:
+    expected_checkout = managed.get("checkout")
+    expected_release = managed.get("release")
+    expected_commit = managed.get("commit")
+    if (
+        not isinstance(expected_checkout, str)
+        or Path(expected_checkout).resolve() != destination.resolve()
+        or not isinstance(expected_release, str)
+        or "@" not in expected_release
+        or not isinstance(expected_commit, str)
+        or not HEX_COMMIT.fullmatch(expected_commit)
+    ):
+        raise BootstrapError(f"Managed marketplace state is invalid for checkout: {destination}")
+    if not (destination / ".git").exists():
+        raise BootstrapError(f"Managed checkout is missing: {destination}")
+    if git(run, ["status", "--porcelain"], destination):
+        raise BootstrapError(f"Managed checkout has local changes: {destination}")
+    actual_commit = git(run, ["rev-parse", "HEAD"], destination)
+    if actual_commit != expected_commit:
+        raise BootstrapError(
+            f"Managed checkout is {actual_commit}, recorded state requires {expected_commit}: {destination}"
+        )
+    previous_version = expected_release.rsplit("@", 1)[1]
+    previous_tag = f"refs/tags/v{previous_version}"
+    tag_commit = git(run, ["rev-parse", f"{previous_tag}^{{commit}}"], destination)
+    if tag_commit != expected_commit:
+        raise BootstrapError(
+            f"Managed checkout tag {previous_tag} is {tag_commit}, recorded state requires {expected_commit}"
+        )
+
+
+def checkout_release(
+    run, release: dict[str, Any], commit: str, destination: Path, managed: dict[str, Any] | None = None
+) -> None:
     source = require_string(release.get("source"), f"{release['id']}.source")
     revision = require_string(release.get("revision"), f"{release['id']}.revision")
     if destination.exists():
         if not (destination / ".git").exists():
             raise BootstrapError(f"Managed checkout path is not a Git checkout: {destination}")
-        if git(run, ["status", "--porcelain"], destination):
+        expected = {"checkout": str(destination), "release": release["id"], "commit": commit}
+        if managed is not None and managed != expected:
+            validate_managed_checkout(run, managed, destination)
+        elif git(run, ["status", "--porcelain"], destination):
             raise BootstrapError(f"Managed checkout has local changes: {destination}")
         remote = git(run, ["remote", "get-url", "origin"], destination)
         if remote.rstrip("/").removesuffix(".git") != source.rstrip("/").removesuffix(".git"):
-            raise BootstrapError(f"Managed checkout origin disagrees with the catalog: {destination}")
+            if managed is None:
+                raise BootstrapError(f"Managed checkout origin disagrees with the catalog: {destination}")
+            git(run, ["remote", "set-url", "origin", source], destination)
     else:
+        if managed is not None:
+            raise BootstrapError(f"Managed checkout is missing: {destination}")
         destination.parent.mkdir(parents=True, exist_ok=True)
         git(run, ["clone", "--no-checkout", "-c", "core.autocrlf=false", source, str(destination)])
     tag_ref = f"refs/tags/{revision}"
@@ -530,29 +570,28 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
         if arguments.mode == "apply":
             for release, commit, members in groups:
                 checkout = checkout_path(profile, release["marketplace"])
-                checkout_release(run, release, commit, checkout)
-                report["applied"].append(f"checkout:{release['marketplace']}@{commit}")
                 configured = host.marketplaces()
-                if release["marketplace"] not in configured:
-                    record_marketplace(profile, state, release, commit, checkout)
-                    host.add_marketplace(checkout)
-                    report["applied"].append(f"marketplace:{release['marketplace']}")
-                else:
-                    managed = state["marketplaces"].get(release["marketplace"])
+                marketplace = release["marketplace"]
+                managed = state["marketplaces"].get(marketplace)
+                registered = configured.get(marketplace)
+                if marketplace in configured:
                     if not managed:
                         raise BootstrapError(
-                            f"Marketplace name is already registered outside this bootstrap: {release['marketplace']}"
+                            f"Marketplace name is already registered outside this bootstrap: {marketplace}"
                         )
-                    expected = {"checkout": str(checkout), "release": release["id"], "commit": commit}
-                    if managed != expected:
-                        raise BootstrapError(
-                            f"Managed marketplace state disagrees with the lock: {release['marketplace']}"
-                        )
-                    registered = configured[release["marketplace"]]
                     if not registered or Path(registered).resolve() != checkout.resolve():
                         raise BootstrapError(
-                            f"Registered marketplace source disagrees with managed checkout: {release['marketplace']}"
+                            f"Registered marketplace source disagrees with managed checkout: {marketplace}"
                         )
+                checkout_release(run, release, commit, checkout, managed)
+                report["applied"].append(f"checkout:{marketplace}@{commit}")
+                expected = {"checkout": str(checkout), "release": release["id"], "commit": commit}
+                if managed != expected:
+                    record_marketplace(profile, state, release, commit, checkout)
+                    report["applied"].append(f"managed-state:{marketplace}@{commit}")
+                if marketplace not in configured:
+                    host.add_marketplace(checkout)
+                    report["applied"].append(f"marketplace:{marketplace}")
                 installed = host.installed()
                 for selection in members:
                     identity = f"{plugins[selection['id']]['name']}@{release['marketplace']}"
