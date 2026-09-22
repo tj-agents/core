@@ -15,7 +15,7 @@ is an external input, not an unshipped helper dependency. Unsupported/empty reco
 For Codex in the current directory:
 
 ```text
-python -B "<skill-directory>/../../resources/machine/utility/scripts/history.py" recent --host codex
+python -B "<skill-directory>/../../resources/machine/scripts/history.py" recent --host codex
 ```
 
 Use `--host claude` for Claude. Respect the requested harness; otherwise use the current host. Options

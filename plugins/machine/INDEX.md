@@ -2,12 +2,12 @@
 
 Generated from canonical `.agents/` definitions.
 
-- `auto-memory` — utility — `.agents/machine/utility/auto-memory/SKILL.md`
-- `bootstrap-capabilities` — utility — `.agents/machine/utility/bootstrap-capabilities/SKILL.md`
-- `clip` — utility — `.agents/machine/utility/clip/SKILL.md`
-- `handoff-claude` — utility — `.agents/machine/utility/handoff-claude/SKILL.md`
-- `handoff-codex` — utility — `.agents/machine/utility/handoff-codex/SKILL.md`
-- `last-conversation` — utility — `.agents/machine/utility/last-conversation/SKILL.md`
-- `open-claude` — utility — `.agents/machine/utility/open-claude/SKILL.md`
-- `peer-cli` — utility — `.agents/machine/utility/peer-cli/SKILL.md`
-- `search` — utility — `.agents/machine/utility/search/SKILL.md`
+- `auto-memory` — utility — `.agents/machine/auto-memory/SKILL.md`
+- `bootstrap-capabilities` — utility — `.agents/machine/bootstrap-capabilities/SKILL.md`
+- `clip` — utility — `.agents/machine/clip/SKILL.md`
+- `handoff-claude` — utility — `.agents/machine/handoff-claude/SKILL.md`
+- `handoff-codex` — utility — `.agents/machine/handoff-codex/SKILL.md`
+- `last-conversation` — utility — `.agents/machine/last-conversation/SKILL.md`
+- `open-claude` — utility — `.agents/machine/open-claude/SKILL.md`
+- `peer-cli` — utility — `.agents/machine/peer-cli/SKILL.md`
+- `search` — utility — `.agents/machine/search/SKILL.md`

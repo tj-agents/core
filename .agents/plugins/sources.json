@@ -18,7 +18,7 @@
     {
       "name": "machine",
       "root": ".agents/machine",
-      "layout": "kind",
+      "layout": "flat",
       "plugin": "machine",
       "domain": "machine"
     }
@@ -61,8 +61,8 @@
     },
     {
       "plugin": "machine",
-      "source": ".agents/machine/utility/scripts",
-      "destination": "resources/machine/utility/scripts"
+      "source": ".agents/machine/scripts",
+      "destination": "resources/machine/scripts"
     },
     {
       "plugin": "machine",

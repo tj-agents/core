@@ -76,7 +76,7 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
             "plugins/machine/codex-skills/handoff-claude/scripts/launch-claude.ps1",
-            "plugins/machine/resources/machine/utility/scripts/history.py",
+            "plugins/machine/resources/machine/scripts/history.py",
             "plugins/machine/skills/bootstrap-capabilities/scripts/bootstrap_capabilities.py",
             "plugins/machine/catalog/catalog.json",
             "plugins/machine/catalog/capabilities.lock.schema.json",
@@ -86,7 +86,7 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertEqual(
             output["plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1"],
             SYNC.canonical_output_bytes(
-                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes()
+                (self.root / ".agents/machine/handoff-codex/scripts/launch-codex.ps1").read_bytes()
             ),
         )
 
@@ -254,18 +254,19 @@ class SourceLayoutTests(unittest.TestCase):
             SYNC.build(self.root)
 
     def test_scope_metadata_and_public_names_are_enforced(self):
-        path = self.root / ".agents/machine/utility/clip/SKILL.md"
-        path.write_text(
-            path.read_text(encoding="utf-8").replace("kind: utility", "kind: workflow"),
+        kinded = self.root / ".agents/engineering/utility/recents/SKILL.md"
+        kinded.write_text(
+            kinded.read_text(encoding="utf-8").replace("kind: utility", "kind: workflow"),
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValueError, "kind .* does not match kind folder"):
             SYNC.build(self.root)
 
-        path.write_text(
-            path.read_text(encoding="utf-8").replace("kind: workflow", "kind: utility"),
+        kinded.write_text(
+            kinded.read_text(encoding="utf-8").replace("kind: workflow", "kind: utility"),
             encoding="utf-8",
         )
+        path = self.root / ".agents/machine/clip/SKILL.md"
         duplicate = self.root / ".agents/engineering/utility/clip"
         shutil.copytree(path.parent, duplicate)
         duplicate_skill = duplicate / "SKILL.md"
@@ -283,7 +284,7 @@ class SourceLayoutTests(unittest.TestCase):
             lambda value: value["resources"].append(
                 {
                     "plugin": "machine",
-                    "source": ".agents/machine/utility/scripts",
+                    "source": ".agents/machine/scripts",
                     "destination": "../base/escaped",
                 }
             )

@@ -48,7 +48,7 @@ it with the npm/NVM `claude` shim, `claude.cmd`, `claude.ps1`, `node.exe`, or an
 command — the same launch paths that produced a degraded monochrome, non-interactive TUI for Codex.
 
 The terminal invocation and the parent-session environment scrub belong to `scripts/agent-cli.ps1` under
-`resources/machine/utility/scripts`, shared with `open-claude` and `handoff-codex`. Its comments carry the
+`resources/machine/scripts`, shared with `open-claude` and `handoff-codex`. Its comments carry the
 reasoning for the `--window 0` tab targeting, the cleared session variables and the forced colour
 variables; change that behaviour there, not here, and read it before altering any of them.
 
