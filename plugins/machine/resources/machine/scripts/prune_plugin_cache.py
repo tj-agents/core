@@ -7,6 +7,11 @@ predecessor on disk permanently and nothing reconciled the two.
 Unlike `skill_router.manifest_install_roots`, an unreadable registry is fatal here rather than a
 fallback to walking the cache: "no live paths" must never be read as "everything is prunable".
 
+The registry describes the next session, not the running one. A session that started before an update
+still has hooks registered against the directory it resolved at startup, so `--pin` records that set and
+every later pass treats a live session's pins as live too. Removal is therefore a liveness check, not a
+side effect of update.
+
 Codex is deliberately out of scope; see the sibling TECH_DEBT.md for the condition that changes that.
 """
 
@@ -22,8 +27,13 @@ from pathlib import Path
 CACHE_DEPTH = 3
 NOTICE_INTERVAL_SECONDS = 60 * 60
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
+PIN_DIRECTORY = "plugin-pins"
+# A pin younger than this is honoured whatever its pid says. The hook's parent may be a shell that has
+# already exited, which would otherwise read as a dead session the moment it was recorded.
+PIN_GRACE_SECONDS = 12 * 60 * 60
 
 LIVE = "live"
+PINNED = "pinned"
 RETAINED = "retained"
 STALE = "stale"
 ORPHAN = "orphan"
@@ -143,21 +153,28 @@ def modified_at(path):
         return 0.0
 
 
-def classify(versions, live, keep_previous=0):
+def classify(versions, live, pinned=(), keep_previous=0):
     """Label every cached version directory. Returns [(path, state)] in scan order.
 
     A plugin with no live version is orphaned outright - the rename case, where nothing is coming
     back. Retention applies only to plugins that are still installed.
+
+    A pin outranks every dead state and is not counted against retention: it is not a version being
+    kept back, it is a directory a running session is using.
     """
     by_plugin = {}
     for version in versions:
         by_plugin.setdefault(version.parent, []).append(version)
 
+    held = set(pinned)
     states = {}
     for entries in by_plugin.values():
         alive = [entry for entry in entries if normalize(entry) in live]
         for entry in alive:
             states[entry] = LIVE
+        for entry in entries:
+            if entry not in states and normalize(entry) in held:
+                states[entry] = PINNED
         dead = [entry for entry in entries if entry not in states]
         if not alive:
             states.update((entry, ORPHAN) for entry in dead)
@@ -230,6 +247,99 @@ def state_directory(environ=None, home=None):
     return (Path.home() if home is None else home) / ".agents-state"
 
 
+def pin_directory(environ=None, home=None):
+    return state_directory(environ, home) / PIN_DIRECTORY
+
+
+def process_is_alive(pid):
+    """Whether `pid` still names a running process. Undecidable resolves to alive.
+
+    Every ambiguous answer keeps a directory. Keeping a prunable directory costs disk and converges on
+    the next pass; deleting one a session is bound to is the failure this whole pin exists to stop.
+    """
+    if not isinstance(pid, int) or pid <= 0:
+        return True
+    if os.name == "nt":
+        import ctypes
+
+        SYNCHRONIZE = 0x00100000
+        WAIT_TIMEOUT = 0x00000102
+        ERROR_INVALID_PARAMETER = 87
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+        if not handle:
+            return kernel32.GetLastError() != ERROR_INVALID_PARAMETER
+        try:
+            return kernel32.WaitForSingleObject(handle, 0) == WAIT_TIMEOUT
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def pin_is_live(entry, now, grace=PIN_GRACE_SECONDS):
+    started = entry.get("started_at")
+    if isinstance(started, (int, float)) and 0 <= now - started < grace:
+        return True
+    return process_is_alive(entry.get("pid"))
+
+
+def read_pins(environ=None, home=None, now=None, grace=PIN_GRACE_SECONDS):
+    """Install paths held by still-running sessions, and the pin files that no longer hold anything.
+
+    An unreadable or malformed pin is expired rather than trusted: it names no paths to protect, so
+    keeping it would only defer its own removal forever.
+    """
+    moment = time.time() if now is None else now
+    root = pin_directory(environ, home)
+    held, expired = set(), []
+    try:
+        files = sorted(entry for entry in root.glob("*.json") if entry.is_file())
+    except OSError:
+        return held, expired
+    for file in files:
+        try:
+            entry = json.loads(file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            expired.append(file)
+            continue
+        if not isinstance(entry, dict) or not pin_is_live(entry, moment, grace):
+            expired.append(file)
+            continue
+        for value in entry.get("paths") or []:
+            if isinstance(value, str) and value.strip():
+                held.add(normalize(value))
+    return held, expired
+
+
+def sweep_pins(expired):
+    for file in expired:
+        try:
+            file.unlink()
+        except OSError:
+            continue
+
+
+def record_pin(config_root, pid, now, environ=None, home=None):
+    """This session's pin. Returns the entry, or None when there is nothing trustworthy to record."""
+    try:
+        paths = sorted(live_install_paths(config_root))
+    except RegistryUnusable:
+        return None
+    entry = {"pid": pid, "started_at": now, "paths": paths}
+    destination = pin_directory(environ, home) / f"{pid}.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+    staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(staging, destination)
+    return entry
+
+
 def notice_is_due(path, now, interval=NOTICE_INTERVAL_SECONDS):
     try:
         last = float(json.loads(path.read_text(encoding="utf-8")).get("last_notice", 0))
@@ -245,14 +355,17 @@ def record_notice(path, now):
     os.replace(temporary, path)
 
 
-def reconcile(config_root, keep_previous=0):
+def reconcile(config_root, keep_previous=0, environ=None, home=None, now=None):
     live = live_install_paths(config_root)
+    held, expired = read_pins(environ, home, now)
     root = cache_root(config_root)
     versions = cached_versions(root)
     return {
         "cache_root": root,
         "live": live,
-        "entries": classify(versions, live, keep_previous),
+        "pinned": held - live,
+        "expired_pins": expired,
+        "entries": classify(versions, live, held, keep_previous),
         "missing": missing_install_paths(live, versions),
     }
 
@@ -274,9 +387,14 @@ def render_report(result, apply_mode, removed, failures, stream):
         f"{len(entries)} cached version directories",
         file=stream,
     )
-    for state in (LIVE, RETAINED, STALE, ORPHAN):
+    for state in (LIVE, PINNED, RETAINED, STALE, ORPHAN):
         if counts.get(state):
             print(f"  {state:<9} {counts[state]}", file=stream)
+    if counts.get(PINNED):
+        print(
+            f"  {counts[PINNED]} directory(s) held by a running session and not removed",
+            file=stream,
+        )
 
     for path in result["missing"]:
         print(f"warning: registry names a missing install path: {path}", file=stream)
@@ -306,13 +424,28 @@ def render_report(result, apply_mode, removed, failures, stream):
         print(f"re-run with --apply to remove them: {Path(__file__).resolve()}", file=stream)
 
 
+def run_pin(config_root, now, environ=None, home=None):
+    """SessionStart bookkeeping: hold what this session resolved, drop what no session holds.
+
+    Contract: exit 0 whatever happens. A pin that fails must never stop a session starting, and a
+    missing pin degrades to registry-only liveness - which is where this tool started.
+    """
+    try:
+        _, expired = read_pins(environ, home, now)
+        sweep_pins(expired)
+        record_pin(config_root, os.getppid(), now, environ, home)
+    except Exception:  # noqa: BLE001 - bookkeeping must never stop a session starting
+        return EXIT_OK
+    return EXIT_OK
+
+
 def run_notice(config_root, keep_previous, now, environ=None, home=None, stream=sys.stdout):
     """One line when the cache has drifted, silence otherwise. Never removes anything."""
     marker = state_directory(environ, home) / "plugin-cache-notice.json"
     if not notice_is_due(marker, now):
         return EXIT_OK
     try:
-        result = reconcile(config_root, keep_previous)
+        result = reconcile(config_root, keep_previous, environ, home, now)
     except RegistryUnusable:
         return EXIT_OK
     targets = prunable(result["entries"])
@@ -329,9 +462,9 @@ def run_notice(config_root, keep_previous, now, environ=None, home=None, stream=
     return EXIT_OK
 
 
-def run_reconcile(config_root, keep_previous, apply_mode, stream=sys.stdout):
+def run_reconcile(config_root, keep_previous, apply_mode, stream=sys.stdout, environ=None, home=None):
     try:
-        result = reconcile(config_root, keep_previous)
+        result = reconcile(config_root, keep_previous, environ, home)
     except RegistryUnusable as error:
         print(f"error: {error}", file=sys.stderr)
         print("refusing to prune: the registry must establish what is live", file=sys.stderr)
@@ -340,6 +473,8 @@ def run_reconcile(config_root, keep_previous, apply_mode, stream=sys.stdout):
     removed = {}
     failures = {}
     if apply_mode:
+        # Only here: a dry run reads the pin registry but leaves it exactly as it found it.
+        sweep_pins(result["expired_pins"])
         for path in prunable(result["entries"]):
             try:
                 assert_within(result["cache_root"], path)
@@ -382,6 +517,11 @@ def build_parser():
         action="store_true",
         help="Throttled one-line session notice. Reports drift only; never removes.",
     )
+    parser.add_argument(
+        "--pin",
+        action="store_true",
+        help="Record this session's live install paths so no later pass removes what it is bound to.",
+    )
     return parser
 
 
@@ -391,8 +531,13 @@ def main(argv=None):
         print("error: --keep-previous must not be negative", file=sys.stderr)
         return EXIT_REGISTRY
     config_root = arguments.config_dir or claude_config_root()
+    now = time.time()
+    if arguments.pin:
+        run_pin(config_root, now)
+        if not arguments.notice:
+            return EXIT_OK
     if arguments.notice:
-        return run_notice(config_root, arguments.keep_previous, time.time())
+        return run_notice(config_root, arguments.keep_previous, now)
     return run_reconcile(config_root, arguments.keep_previous, arguments.apply)
 
 
