@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `261cde666fe28306966c7e5da57f38fec8403ef4`  `(2026-09-22)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `fbcb83dbff5dc347c67ca0e0754aec06b4a954ef`  `(2026-09-22)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-22 — full
 
@@ -23,7 +23,7 @@
 
 ### Findings
 
-- [ ] **PC1 — MEDIUM — native-general** — `.agents/machine/scripts/prune_plugin_cache.py:225`
+- [x] **PC1 — MEDIUM — native-general** — `.agents/machine/scripts/prune_plugin_cache.py:225`
   `state_directory()` defaults to `Path.home() / ".agents"`, but the machine plugin already owns
   `AGENT_STATE_DIRECTORY` in `.agents/machine/peer-cli/scripts/register_session.py:22`, where the same
   variable defaults to `Path.home() / ".agents-state"`. Two scripts in one plugin therefore read one
@@ -43,3 +43,27 @@ accumulates into a shared `states` dict but each plugin's entries are disjoint, 
 mislabelling occurs; both hosts' packaged SessionStart hook commands resolve to files that exist in the
 generated payloads; and no reference to the removed `machine/utility` path segment remains anywhere in the
 tree under any path separator.
+
+  **Resolved** in `fbcb83d`: the default is now `Path.home() / ".agents-state"`, matching
+  `register_session.py`. Verified the delta contains exactly that one-line change.
+
+## Review pass - 2026-09-22 - incremental
+
+**Candidate base:** `261cde666fe28306966c7e5da57f38fec8403ef4`
+**Candidate head:** `fbcb83dbff5dc347c67ca0e0754aec06b4a954ef`
+**Candidate branch:** `Fix/PluginCacheReconcile`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:1aee893cc5c522574163d9f0a9e010d9cd27612979d44058643c2317832c909b` `(5 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\base-agents\.git\agent-workflow\runs\review-plugincache-20260922\review\35e1ffdec0e78c95db54c32fb1ec2ed557093df6e63991d65a3f95a9c745fe7d`
+**Candidate bundle identity:** `sha256:4ad14816568aec4476f3972f14e78ff5abee7588f1901cf6f73cf6274fd2db4b`
+**Work-order path:** `reviews/Fix-PluginCacheReconcile.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The delta is the PC1 remediation only: the one-line default change in
+`.agents/machine/scripts/prune_plugin_cache.py`, its regenerated payload copy, the two catalog digests
+that follow from it, and this work order. The regenerated copy is byte-identical to its source apart
+from checkout line endings, which `test_generated_text_bytes_are_stable_across_checkout_line_endings`
+already owns. Reconcile tests and both generation checks pass at the frozen head.
