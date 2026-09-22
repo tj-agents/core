@@ -18,3 +18,24 @@ already verified to be incorrect, shipped in the same change as the reconcile it
 entries are reconciled against the marketplaces it actually resolves so the installed set can be
 trusted. When either holds, add a Codex registry reader behind the same report-by-default,
 fail-closed contract and delete this entry.
+
+## A session pin protects against this tool, not against the host's own update
+
+`--pin` stops `prune_plugin_cache.py` from removing a version directory a running session resolved at
+startup. It does not stop Claude Code itself. The host updates a plugin in place and deletes the
+superseded directory while sessions are still bound to it, which is how every stop hook in a live
+session began failing with `Plugin directory does not exist` on 2026-09-22. Nothing in this repository
+sits between the host and its own cache, so that path is unchanged.
+
+What the pin does change: this repository is no longer a second cause of the same failure, and the pin
+file records what a session was bound to, which is the evidence a recovery would need.
+
+**Resolution condition.** The host pins a session's resolved plugin directory for that session's
+lifetime, or exposes the resolved set so a supervisor can. Until then, do not describe the pin as a
+fix for mid-session plugin updates — it bounds our own garbage collection only.
+
+## Codex records no pin
+
+The pin is written by the Claude SessionStart hook only. Codex's `machine-hooks.json` runs
+`register_session.py` and not the reconcile, because the reconcile does not read Codex's cache at all
+(above). Resolving that entry resolves this one with it.

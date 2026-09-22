@@ -14,12 +14,16 @@ PRUNE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PRUNE)
 
 
-class PluginCacheReconcileTests(unittest.TestCase):
+class ReconcileHarness(unittest.TestCase):
+    """Synthetic config root, cache and pin registry. Holds no tests of its own."""
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='synthetic plugin cache ')
         self.addCleanup(self.temp.cleanup)
         self.config = Path(self.temp.name) / '.claude'
         self.cache = self.config / 'plugins' / 'cache'
+        self.state = Path(self.temp.name) / 'state'
+        self.environ = {PRUNE.STATE_DIRECTORY_ENV: str(self.state)}
 
     def version(self, marketplace, plugin, version):
         path = self.cache / marketplace / plugin / version
@@ -47,9 +51,26 @@ class PluginCacheReconcileTests(unittest.TestCase):
             keep_previous=0,
             apply_mode='--apply' in arguments,
             stream=stream,
+            environ=self.environ,
         )
         return code, stream.getvalue()
 
+    def pin(self, *install_paths, pid=None, started_at=0.0):
+        """A pin file as `--pin` writes one. `pid=None` means this process, which is certainly alive."""
+        import os
+
+        entry = {
+            'pid': os.getpid() if pid is None else pid,
+            'started_at': started_at,
+            'paths': [str(path) for path in install_paths],
+        }
+        directory = self.state / PRUNE.PIN_DIRECTORY
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{entry['pid']}.json"
+        path.write_text(json.dumps(entry), encoding='utf-8')
+        return path
+
+class PluginCacheReconcileTests(ReconcileHarness):
     def test_report_is_the_default_and_removes_nothing(self):
         live = self.version('market', 'kept', 'aaaa')
         stale = self.version('market', 'kept', 'bbbb')
@@ -205,6 +226,106 @@ class PluginCacheReconcileTests(unittest.TestCase):
 
         self.assertEqual(PRUNE.EXIT_OK, code)
         self.assertEqual('', stream.getvalue())
+
+
+class SessionPinTests(ReconcileHarness):
+    """A version directory is never removed while a running session is bound to it."""
+
+    def test_a_live_session_holds_a_directory_the_registry_no_longer_names(self):
+        live = self.version('market', 'kept', 'aaaa')
+        bound = self.version('market', 'kept', 'bbbb')
+        self.registry(live)
+        self.pin(bound)
+
+        code, output = self.run_cli('--apply')
+
+        self.assertEqual(PRUNE.EXIT_OK, code)
+        self.assertTrue(bound.is_dir())
+        self.assertIn('pinned', output)
+        self.assertIn('held by a running session', output)
+
+    def test_a_pin_holds_a_wholly_orphaned_plugin_too(self):
+        live = self.version('market', 'kept', 'aaaa')
+        renamed = self.version('gone', 'renamed', 'cccc')
+        self.registry(live)
+        self.pin(renamed)
+
+        self.run_cli('--apply')
+
+        self.assertTrue(renamed.is_dir())
+
+    def test_a_pin_whose_process_is_gone_stops_holding_and_is_swept(self):
+        live = self.version('market', 'kept', 'aaaa')
+        stale = self.version('market', 'kept', 'bbbb')
+        self.registry(live)
+        # Pid 2**22 is above every Windows and Linux pid ceiling, so it names no process anywhere.
+        pin = self.pin(stale, pid=2 ** 22, started_at=1.0)
+
+        code, output = self.run_cli('--apply')
+
+        self.assertEqual(PRUNE.EXIT_OK, code)
+        self.assertFalse(stale.is_dir())
+        self.assertFalse(pin.exists())
+        self.assertNotIn('pinned', output)
+
+    def test_a_young_pin_is_honoured_whatever_its_pid_says(self):
+        bound = self.version('market', 'kept', 'bbbb')
+        self.pin(bound, pid=2 ** 22, started_at=1000.0)
+
+        held, expired = PRUNE.read_pins(self.environ, now=1000.0)
+
+        self.assertEqual({PRUNE.normalize(bound)}, held)
+        self.assertEqual([], expired)
+
+    def test_an_unreadable_pin_holds_nothing_and_is_swept(self):
+        directory = self.state / PRUNE.PIN_DIRECTORY
+        directory.mkdir(parents=True, exist_ok=True)
+        broken = directory / 'broken.json'
+        broken.write_text('{not json', encoding='utf-8')
+
+        held, expired = PRUNE.read_pins(self.environ, now=10.0 ** 9)
+
+        self.assertEqual(set(), held)
+        self.assertEqual([broken], expired)
+
+    def test_a_dry_run_leaves_the_pin_registry_exactly_as_it_found_it(self):
+        live = self.version('market', 'kept', 'aaaa')
+        stale = self.version('market', 'kept', 'bbbb')
+        self.registry(live)
+        pin = self.pin(stale, pid=2 ** 22, started_at=1.0)
+
+        self.run_cli()
+
+        self.assertTrue(pin.exists())
+        self.assertTrue(stale.is_dir())
+
+    def test_pin_records_the_registry_and_never_fails_a_session(self):
+        live = self.version('market', 'kept', 'aaaa')
+        self.registry(live)
+
+        self.assertEqual(PRUNE.EXIT_OK, PRUNE.run_pin(self.config, 1000.0, self.environ))
+
+        written = json.loads(
+            next((self.state / PRUNE.PIN_DIRECTORY).glob('*.json')).read_text(encoding='utf-8')
+        )
+        self.assertEqual([PRUNE.normalize(live)], written['paths'])
+
+    def test_pin_exits_zero_when_the_registry_is_unusable_and_records_nothing(self):
+        self.registry(raw='{not json')
+
+        self.assertEqual(PRUNE.EXIT_OK, PRUNE.run_pin(self.config, 1000.0, self.environ))
+        self.assertFalse((self.state / PRUNE.PIN_DIRECTORY).exists())
+
+    def test_an_undecidable_pid_reads_as_alive(self):
+        self.assertTrue(PRUNE.process_is_alive(None))
+        self.assertTrue(PRUNE.process_is_alive(0))
+        self.assertTrue(PRUNE.process_is_alive(-1))
+
+    def test_this_process_is_alive_and_an_impossible_pid_is_not(self):
+        import os
+
+        self.assertTrue(PRUNE.process_is_alive(os.getpid()))
+        self.assertFalse(PRUNE.process_is_alive(2 ** 22))
 
 
 if __name__ == '__main__':

@@ -120,7 +120,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:9aa9b34bb4eb3a7e6dfbdf24ca10606665fb236d5163b489907053b3689621c0"
+          "digest": "sha256:14b4bc5e2a2574d9a4154c956c84ecb112acecac5d6d048facded3060c5a98fc"
         },
         {
           "id": "base-agents/machine",
@@ -162,7 +162,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:2dc1cda198effb7b8b0dfe442e6a92f3fbdcb0989c9764360b5457362e28685c",
+          "digest": "sha256:cc222f3245243e7567d384f0b06228e2cd6e2d02270b5791de8429cd151081fe",
           "digest_excludes": [
             "catalog/catalog.json"
           ]

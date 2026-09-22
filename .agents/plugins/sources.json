@@ -86,6 +86,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/plugins/compatibility.json",
+      "destination": "hooks/compatibility.json"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/compact_output_gate.py",
       "destination": "hooks/compact_output_gate.py"
     },
