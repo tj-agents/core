@@ -325,14 +325,30 @@ def sweep_pins(expired):
             continue
 
 
-def record_pin(config_root, pid, now, environ=None, home=None):
-    """This session's pin. Returns the entry, or None when there is nothing trustworthy to record."""
+def held_by(path):
+    """The paths an existing pin file holds, or an empty set when it holds nothing readable."""
     try:
-        paths = sorted(live_install_paths(config_root))
+        entry = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    values = entry.get("paths") if isinstance(entry, dict) else None
+    return {value for value in values or [] if isinstance(value, str) and value.strip()}
+
+
+def record_pin(config_root, pid, now, environ=None, home=None):
+    """This session's pin. Returns the entry, or None when there is nothing trustworthy to record.
+
+    A pin file is keyed by pid, and two sessions can share one parent, so the paths are unioned with
+    whatever the file already holds rather than replacing them. Replacing would drop the older
+    session's directory while it was still bound to it - the one way this tool could still cause the
+    failure it exists to prevent. Over-retention is bounded by expiry; losing a pin is not bounded.
+    """
+    try:
+        paths = set(live_install_paths(config_root))
     except RegistryUnusable:
         return None
-    entry = {"pid": pid, "started_at": now, "paths": paths}
     destination = pin_directory(environ, home) / f"{pid}.json"
+    entry = {"pid": pid, "started_at": now, "paths": sorted(paths | held_by(destination))}
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
     staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
