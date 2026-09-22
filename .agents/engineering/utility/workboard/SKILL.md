@@ -13,22 +13,52 @@ Answer "what work have I got open?" by reading the plan corpus directly.
 This exists because `/recents` and `/unmerged` both mine **git**, so a plan nobody has committed
 against for two days is invisible to them — which is exactly when it is needed. Read the files.
 
-## Where plans live
+## Where plans live, and which of them are yours right now
 
 `~/.claude/plans/<project>/*.md`, plus loose `*.md` at the root. **One project spans several
-directories**: Concertable work sits in `Concertable/`, `b2b/`, `system/`, `platform-dotnet/` and
-`agent-standards/`. Never answer "what is active on X" from a single directory — filter instead, which
-matches project *and* filename.
+directories**: Concertable plans sit in `Concertable/`, `b2b/`, `system/`, `platform-dotnet/` and
+`agent-standards/`.
+
+Which directories belong together is **read from the repo layout, never hardcoded**: a plan directory
+belongs to the container under `~/source/repos` that holds a repo of that name, so `b2b` and
+`platform-dotnet` resolve to `Concertable`, `cris-*` resolve to `infonetica`, and a repo sitting
+directly under `repos/` is its own group. A new sibling repo joins its group by existing.
+
+**The invoking repo's group is the default scope, and it is not cosmetic.** `FILTER` matches a word
+against project and filename, not a project you named: from a Concertable session `FILTER=authz`
+matches `cris-authz`, which is Infonetica work. Work plans must never be listed into a personal
+session, or the reverse. Out-of-group matches are counted and named in one line and never listed;
+`SCOPE=all` prints them.
 
 ## Gather
 
 ```bash
-python - "${FILTER:-}" "${LIMIT:-20}" <<'PY'
+python - "${FILTER:-}" "${LIMIT:-20}" "${SCOPE:-auto}" <<'PY'
 import pathlib, re, sys, time
 
 root = pathlib.Path.home() / ".claude" / "plans"
+repos = pathlib.Path.home() / "source" / "repos"
 needle = (sys.argv[1] if len(sys.argv) > 1 else "").lower()
 limit = int(sys.argv[2] or 20)
+scope = (sys.argv[3] if len(sys.argv) > 3 else "auto").lower()
+here = pathlib.Path.cwd()
+
+def is_repo(path):
+    return (path / ".git").exists()
+
+def group_of(project):
+    if (repos / project).is_dir():
+        return project
+    for container in repos.iterdir():
+        if container.is_dir() and not is_repo(container) and is_repo(container / project):
+            return container.name
+    return None
+
+mine = None
+for parent in [here, *here.parents]:
+    if parent.parent == repos:
+        mine = parent.name
+        break
 
 DONE = re.compile(r'^\s*(?:\*\*)?status(?:\*\*)?\s*[:=]\s*(?:\*\*)?\s*(complete|done|landed|closed|shipped)', re.I | re.M)
 # The keyword carries prose before its colon: "**Waiting on Tommy, and it is ...:** mint a token"
@@ -37,12 +67,17 @@ RESOLVES = re.compile(r'\*\*resolves when:?\*\*:?\s*(.+)', re.I)
 OPEN_BOX = re.compile(r'^\s*[-*]\s*\[ \]', re.M)
 DONE_BOX = re.compile(r'^\s*[-*]\s*\[[xX]\]', re.M)
 
-rows, hidden = [], 0
+rows, hidden, elsewhere = [], 0, {}
 for path in root.rglob("*.md"):
     if any(part in {".git", "node_modules"} for part in path.parts):
         continue
-    project = path.parent.name if path.parent != root else "(loose)"
+    loose = path.parent == root
+    project = "(loose)" if loose else path.parent.name
     if needle and needle not in project.lower() and needle not in path.name.lower():
+        continue
+    group = None if loose else group_of(project)
+    if scope != "all" and mine and group and group != mine:
+        elsewhere[group] = elsewhere.get(group, 0) + 1
         continue
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -67,19 +102,25 @@ for mtime, state, project, name, nxt in rows[:limit]:
     if nxt:
         print("%30s -> %s" % ("", nxt))
 print("")
-print("%d open, showing %d. %d marked done, hidden." % (len(rows), min(limit, len(rows)), hidden))
+print("scope: %s. %d open, showing %d. %d marked done, hidden." % (
+    "all" if scope == "all" else (mine or "all (cwd outside source/repos)"),
+    len(rows), min(limit, len(rows)), hidden))
+for group, count in sorted(elsewhere.items(), key=lambda kv: -kv[1]):
+    print("out of scope: %d in %s - rerun with SCOPE=all to include." % (count, group))
 PY
 ```
 
-`FILTER` narrows, `LIMIT` lengthens — `FILTER=concertable`, `FILTER=authz`, `LIMIT=40`.
+`FILTER` narrows, `LIMIT` lengthens, `SCOPE=all` crosses groups — `FILTER=postgres`, `LIMIT=40`.
 
 ## Report
 
 Lead with the list as printed, most recent first. Call out the top few by name in prose and say what
 each is, because the filename alone rarely says it.
 
-**Flag the split.** When one logical project's plans span several directories, say so — that is the
-thing that loses work.
+**Read the out-of-scope lines out, do not expand them.** "18 matches in infonetica, outside this
+repo" is the whole report for another group's work; naming the files puts work material into a
+personal session, which is the failure this scoping exists to stop. Only an explicit `SCOPE=all`
+changes that.
 
 Most rows carry a blank state. That is not a bug in the read: the corpus is prose handoffs, and only
 about one in eight uses checkboxes. Say that plainly rather than implying every blank is unknown-danger,
@@ -93,3 +134,8 @@ different name — cross-check with `/unmerged` when a live-looking plan is susp
 State is inferred from prose, which is the underlying problem rather than a limitation of this skill.
 The fix is tracked records with a real state field; see the plan-tracking handoff under
 `~/.claude/plans/agent-workboard/`.
+
+Grouping is inferred from the repo layout for the same reason: the corpus is machine-local and grouped
+by directory name. `~/.claude/plans/base-agents/PLANS_AND_INSTRUCTIONS_MUST_BE_MACHINE_TRANSFERABLE.md`
+owns moving plans into the repo they concern, which retires the inference entirely — the repo becomes
+the grouping. Keep this scoping until that lands; do not design a competing mapping.
