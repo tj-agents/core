@@ -52,4 +52,5 @@ Generated from canonical `.agents/` definitions.
 - `techdebt` — workflow — `.agents/engineering/workflow/techdebt/SKILL.md`
 - `unmerged` — utility — `.agents/engineering/utility/unmerged/SKILL.md`
 - `update-roadmap` — workflow — `.agents/engineering/workflow/update-roadmap/SKILL.md`
+- `workboard` — utility — `.agents/engineering/utility/workboard/SKILL.md`
 - `worktree` — utility — `.agents/engineering/utility/worktree/SKILL.md`
