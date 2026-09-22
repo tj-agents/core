@@ -10,7 +10,7 @@ domain: machine
 Requires Python 3.9+ and the selected harness's local transcript data. Use the packaged read-only helper:
 
 ```text
-python -B "<skill-directory>/../../resources/machine/utility/scripts/history.py" search --host codex --pattern "<literal term>"
+python -B "<skill-directory>/../../resources/machine/scripts/history.py" search --host codex --pattern "<literal term>"
 ```
 
 Select `--host claude` for Claude. Respect the named harness; otherwise use the current host. The default

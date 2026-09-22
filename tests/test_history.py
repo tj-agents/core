@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location('history', ROOT / '.agents/machine/utility/scripts/history.py')
+SPEC = importlib.util.spec_from_file_location('history', ROOT / '.agents/machine/scripts/history.py')
 HISTORY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HISTORY)
 
@@ -56,7 +56,7 @@ class HistoryTests(unittest.TestCase):
     def test_packaged_cli_missing_root_and_invalid_pattern_are_clear(self):
         package = self.root / 'isolated package'
         shutil.copytree(ROOT / 'plugins/machine', package)
-        script = package / 'resources/machine/utility/scripts/history.py'
+        script = package / 'resources/machine/scripts/history.py'
         result = subprocess.run([sys.executable, '-B', str(script), 'recent', '--host', 'codex',
                                  '--history-root', str(self.root / 'missing')], cwd=self.cwd,
                                 text=True, capture_output=True)
