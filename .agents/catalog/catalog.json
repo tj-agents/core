@@ -101,6 +101,7 @@
             "techdebt",
             "unmerged",
             "update-roadmap",
+            "workboard",
             "worktree"
           ],
           "dependencies": {
@@ -119,7 +120,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:1498cee0c704b74dc2d66050855378842a76d581bf38bc2c27f5abe2e58ad29f"
+          "digest": "sha256:9aa9b34bb4eb3a7e6dfbdf24ca10606665fb236d5163b489907053b3689621c0"
         },
         {
           "id": "base-agents/machine",
