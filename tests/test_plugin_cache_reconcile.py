@@ -328,5 +328,32 @@ class SessionPinTests(ReconcileHarness):
         self.assertFalse(PRUNE.process_is_alive(2 ** 22))
 
 
+    def test_a_second_pin_under_one_parent_does_not_drop_the_first(self):
+        first = self.version('market', 'kept', 'aaaa')
+        second = self.version('market', 'kept', 'bbbb')
+        self.registry(first)
+        PRUNE.run_pin(self.config, 1000.0, self.environ)
+        self.registry(second)
+        PRUNE.run_pin(self.config, 1000.0, self.environ)
+
+        held, _ = PRUNE.read_pins(self.environ, now=1000.0)
+
+        self.assertEqual({PRUNE.normalize(first), PRUNE.normalize(second)}, held)
+
+    def test_a_pin_that_holds_nothing_readable_contributes_nothing_to_the_union(self):
+        live = self.version('market', 'kept', 'aaaa')
+        self.registry(live)
+        directory = self.state / PRUNE.PIN_DIRECTORY
+        directory.mkdir(parents=True, exist_ok=True)
+        import os
+
+        (directory / f'{os.getppid()}.json').write_text('{not json', encoding='utf-8')
+
+        entry = PRUNE.record_pin(self.config, os.getppid(), 1000.0, self.environ)
+
+        self.assertEqual([PRUNE.normalize(live)], entry['paths'])
+
+
+
 if __name__ == '__main__':
     unittest.main()
