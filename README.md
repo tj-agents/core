@@ -1,6 +1,7 @@
-# base-agents
+# core
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
+The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core); the marketplace ID remains `base-agents`.
 The repository publishes a minimal `base` package and optional `engineering` and `machine` packages.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
@@ -11,7 +12,7 @@ The packaged SessionStart hook emits the same canonical contract to both hosts. 
 as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
 alone is insufficient. The skill documents an explicit generated native-instruction fallback.
 
-The split packages form the **2.1.3** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.4** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
@@ -77,7 +78,7 @@ a skill work.
 Claude Code:
 
 ```
-/plugin marketplace add tomjseery/base-agents
+/plugin marketplace add tj-agents/core
 /plugin install base@base-agents
 /plugin install engineering@base-agents
 /plugin install machine@base-agents

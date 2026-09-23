@@ -26,9 +26,12 @@ The modes have deliberately different authority:
   It prints the planned native operations and changes nothing. `--report` may write that report explicitly.
 - `apply` maintains only the catalog marketplaces and plugins selected in the lock. It clones installation-owned
   checkouts at the locked commits, registers those local marketplaces and installs/enables the selected plugins.
-  It never removes an unrelated marketplace, plugin or setting.
+  When a managed release or repository source changes, it journals the prior and target identities before
+  touching the checkout, accepts only the recorded old or new commit while resuming, refreshes installed plugin
+  bytes, verifies their versions and digests, and only then finalizes managed state. It never removes an unrelated
+  marketplace, plugin or setting.
 - `verify` is offline-safe. It does not fetch, install, update or refresh. It verifies checkout commits, package
-  digests and the host's installed/enabled roster, then emits a report.
+  digests, completed managed state, and the host's installed versions and package digests, then emits a report.
 
 The bootstrap uses argument arrays for Git and host CLIs. A failed operation leaves completed checkouts and
 host registrations in place and records the failing step; rerunning `apply` resumes from observable state.
