@@ -53,6 +53,12 @@ class WorkboardHarness(unittest.TestCase):
         path.write_text(text, encoding='utf-8')
         return path
 
+    def repo_plan(self, relative, text='# a plan\n', repo=None):
+        path = (repo or self.here).joinpath(*relative.split('/'))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding='utf-8')
+        return path
+
     def board(self, needle='', limit='20', scope='auto', cwd=None):
         environment = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home))
         result = subprocess.run(
@@ -213,6 +219,55 @@ class ScopingTests(WorkboardHarness):
         self.assertEqual(set(), rows(output))
         self.assertIn('out of scope: 1 in unfiled', output)
         self.assertIn('LOOSE_PAYMENTS.md', self.listed('payments', scope='all'))
+
+
+class RepoResidentPlanTests(WorkboardHarness):
+    """A plan filed beside the code it concerns, which is where they are supposed to live."""
+
+    def test_a_plan_in_the_invoking_repo_is_read(self):
+        self.repo_plan('plans/payments-split/PAYMENTS_ROADMAP.md')
+        self.assertIn('PAYMENTS_ROADMAP.md', self.listed('payments'))
+
+    def test_docs_plans_is_read_as_well_as_plans(self):
+        self.repo_plan('docs/plans/payments-split/ROADMAP.md')
+        self.assertIn('ROADMAP.md', self.listed('payments'))
+
+    def test_a_sibling_repo_in_the_same_group_is_read(self):
+        """Concertable's roadmaps live in its docs repo, not the repo the work happens in."""
+        application = self.repo('group', 'app')
+        documentation = self.repo('group', 'docs')
+        self.repo_plan('docs/plans/payments-split/ROADMAP.md', repo=documentation)
+        self.assertIn('ROADMAP.md', self.listed('payments', cwd=application))
+
+    def test_guidance_files_in_a_plan_tree_are_not_plans(self):
+        for name in ('AGENTS.md', 'CLAUDE.md', 'README.md', 'TECH_DEBT.md', 'TECHNICAL_DEBT.md'):
+            self.repo_plan('plans/%s' % name, '# payments\n')
+        self.repo_plan('plans/REAL_PAYMENTS_PLAN.md')
+        self.assertEqual({'REAL_PAYMENTS_PLAN.md'}, self.listed('payments'))
+
+    def test_vendored_directories_inside_a_plan_tree_are_skipped(self):
+        self.repo_plan('plans/node_modules/PAYMENTS_VENDORED.md')
+        self.repo_plan('plans/PAYMENTS_KEPT.md')
+        self.assertEqual({'PAYMENTS_KEPT.md'}, self.listed('payments'))
+
+    def test_another_groups_repo_is_never_opened(self):
+        """Out-of-group repos are not read at all, so their plans cannot even be counted."""
+        stranger = self.repo('other-group', 'other-repo')
+        self.repo_plan('plans/PAYMENTS_ELSEWHERE.md', repo=stranger)
+        output = self.board('payments')
+        self.assertEqual(set(), rows(output))
+        self.assertNotIn('out of scope', output)
+
+    def test_the_first_unticked_item_is_the_next_action(self):
+        self.repo_plan('plans/payments-split/ROADMAP.md',
+                       '# payments roadmap\n\n- [x] split the ledger\n- [ ] carve the reader\n')
+        output = self.board('payments')
+        self.assertIn('live 1/2', output)
+        self.assertIn('carve the reader', output)
+
+    def test_a_repo_with_no_plan_tree_contributes_nothing(self):
+        self.plan('demo/LOCAL_PAYMENTS.md')
+        self.assertEqual({'LOCAL_PAYMENTS.md'}, self.listed('payments'))
 
 
 if __name__ == '__main__':
