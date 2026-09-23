@@ -15,8 +15,14 @@ against for two days is invisible to them — which is exactly when it is needed
 
 ## Where plans live, and which of them are yours right now
 
-`~/.claude/plans/<project>/*.md`, plus loose `*.md` at the root and the contents of any **flat**
-subfolder — one with no subdirectories of its own, like `Concertable/Post Launch Scalability/`.
+Two corpora. **The repo is the first one**: every repo in the invoking group is read at `plans/` and
+`docs/plans/`, all the way down, so a plan filed beside the code it concerns is found without anyone
+copying it anywhere. `AGENTS.md`, `CLAUDE.md`, `README.md` and `TECH_DEBT.md` sit in those trees and
+are not plans, so they are skipped by name.
+
+**The machine-local corpus is the second**: `~/.claude/plans/<project>/*.md`, plus loose `*.md` at the
+root and the contents of any **flat** subfolder — one with no subdirectories of its own, like
+`Concertable/Post Launch Scalability/`.
 
 A subfolder that has its own directory structure is a **copied repository tree**, and it is skipped
 whole: `Concertable/pristine/` is an entire checkout, `Concertable/b2b/` mirrors the b2b repo. Their
@@ -75,6 +81,8 @@ limit = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].strip().isdigit() 
 scope = (sys.argv[3] if len(sys.argv) > 3 else "auto").lower()
 here = pathlib.Path.cwd()
 SKIP = {".git", "node_modules"}
+PLAN_DIRS = ("plans", "docs/plans")
+NOT_PLANS = {"agents.md", "claude.md", "readme.md", "tech_debt.md", "technical_debt.md"}
 
 WORD = re.compile(r'[a-z0-9]+')
 
@@ -108,40 +116,66 @@ def group_of(project):
                 return container.name
     return None
 
-def plan_files():
-    """The root, each project directory, and any flat subfolder. A subfolder with its own
-    directories is a copied repository tree and is skipped whole."""
-    yield from root.glob("*.md")
-    for project in root.glob("*"):
-        if not project.is_dir() or project.name in SKIP:
-            continue
-        yield from project.glob("*.md")
-        for sub in project.iterdir():
-            if sub.is_dir() and sub.name not in SKIP \
-                    and not any(child.is_dir() for child in sub.iterdir()):
-                yield from sub.glob("*.md")
-
 mine = None
 for parent in [here, *here.parents]:
     if parent.parent == repos:
         mine = parent.name
         break
 
+def local_plans():
+    """The root, each project directory, and any flat subfolder. A subfolder with its own
+    directories is a copied repository tree and is skipped whole."""
+    for path in root.glob("*.md"):
+        yield path, "", "(loose)", "unfiled"
+    for project in root.glob("*"):
+        if not project.is_dir() or project.name in SKIP:
+            continue
+        group = group_of(project.name)
+        for path in project.glob("*.md"):
+            yield path, project.name, project.name, group
+        for sub in project.iterdir():
+            if sub.is_dir() and sub.name not in SKIP and not any(
+                    child.is_dir() for child in sub.iterdir()):
+                for path in sub.glob("*.md"):
+                    yield path, project.name + "/" + sub.name, sub.name, group
+
+def repo_plans():
+    """Plans kept in the repo they concern. Only the invoking group's repos are opened, so another
+    group's work never enters the session."""
+    home = repos / mine if mine else None
+    if not home or not home.is_dir():
+        return
+    members = [home] if is_repo(home) else [
+        child for child in home.iterdir() if child.is_dir() and is_repo(child)]
+    for member in members:
+        for relative in PLAN_DIRS:
+            first = member.joinpath(*relative.split("/"))
+            if not first.is_dir():
+                continue
+            for path in sorted(first.rglob("*.md")):
+                parts = path.relative_to(first).parts
+                if any(part in SKIP for part in parts) or path.name.lower() in NOT_PLANS:
+                    continue
+                topic = parts[-2] if len(parts) > 1 else ""
+                label = topic or member.name
+                yield path, member.name + ("/" + topic if topic else ""), label, mine
+
+def plan_entries():
+    yield from local_plans()
+    yield from repo_plans()
+
 DONE = re.compile(r'^\s*(?:\*\*)?status(?:\*\*)?\s*[:=]\s*(?:\*\*)?\s*(complete|done|landed|closed|shipped)', re.I | re.M)
 # The keyword carries prose before its colon: "**Waiting on Tommy, and it is ...:** mint a token"
 NEXT = re.compile(r'^\s*[-*]?\s*\*\*(?:next|blocked|waiting|remaining|todo)\b[^*]*\*\*:?\s*(.+)', re.I | re.M)
 RESOLVES = re.compile(r'\*\*resolves when:?\*\*:?\s*(.+)', re.I)
 OPEN_BOX = re.compile(r'^\s*[-*]\s*\[ \]', re.M)
+# A checkbox roadmap states its next action as the first unticked item, never as a **Next** line.
+OPEN_ITEM = re.compile(r'^\s*[-*]\s*\[ \]\s*(.+)', re.M)
 DONE_BOX = re.compile(r'^\s*[-*]\s*\[[xX]\]', re.M)
 
 named, mentioned, hidden, elsewhere = [], [], 0, {}
 named_seen = False
-for path in plan_files():
-    rel = path.relative_to(root)
-    loose = len(rel.parts) == 1
-    folder = "" if loose else str(rel.parent).replace("\\", "/")
-    label = "(loose)" if loose else rel.parent.name
-    group = "unfiled" if loose else group_of(rel.parts[0])
+for path, folder, label, group in plan_entries():
     if scope != "all" and mine and group and group != mine:
         if about(folder) or about(path.stem):
             elsewhere[group] = elsewhere.get(group, 0) + 1
@@ -168,7 +202,7 @@ for path in plan_files():
         continue
     else:
         state = ""
-    hit = NEXT.search(text) or RESOLVES.search(text)
+    hit = NEXT.search(text) or RESOLVES.search(text) or OPEN_ITEM.search(text)
     nxt = re.sub(r'\s+', ' ', hit.group(1)).strip()[:100] if hit else ""
     bucket.append((mtime, state, label, path.name, nxt))
 
@@ -227,14 +261,20 @@ unknown-danger, and treat recency as the real signal.
 
 ## What this does not do
 
-It reads plans, not roadmaps, and not git. A plan can look live because its work merged under a
-different name — cross-check with `/unmerged` when a live-looking plan is suspiciously old.
+It does not read git. A plan can look live because its work merged under a different name —
+cross-check with `/unmerged` when a live-looking plan is suspiciously old.
+
+A repo-resident roadmap **is** read, and its checkbox ratio is real state rather than inferred prose.
+Where it states no `**Next**` line, its first unticked item is reported as the next action, because
+that is what a checkbox roadmap uses instead.
 
 State is inferred from prose, which is the underlying problem rather than a limitation of this skill.
 The fix is tracked records with a real state field; see the plan-tracking handoff under
 `~/.claude/plans/agent-workboard/`.
 
-Grouping and the flatness test are both inferences over a machine-local corpus grouped by directory
-name. `~/.claude/plans/base-agents/PLANS_AND_INSTRUCTIONS_MUST_BE_MACHINE_TRANSFERABLE.md` owns moving
-plans into the repo they concern, which retires both — the repo becomes the grouping and a copied doc
-tree has nowhere to sit. Keep this until that lands; do not design a competing mapping.
+Grouping and the flatness test are inferences that exist only to serve the machine-local corpus, and
+they carry its known cost: a plan dropped inside a mirror like `Concertable/b2b/` stays invisible.
+Reading the repo is the way out, not a second mapping — a plan moved into the repo it concerns is
+found by that route and needs none of this.
+`~/.claude/plans/base-agents/PLANS_AND_INSTRUCTIONS_MUST_BE_MACHINE_TRANSFERABLE.md` owns finishing
+the migration; when the local corpus is empty, the inference below it can go.
