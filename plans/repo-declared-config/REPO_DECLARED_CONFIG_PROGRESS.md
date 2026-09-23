@@ -12,9 +12,13 @@ Status: planned; no phase started.
     `C:\Users\tommy\source\repos\tj-agents\{core,cpp,react,dotnet}`.
   - The older `C:\Users\tommy\source\repos\base-agents` checkout is 87 commits behind with
     uncommitted `plan-artifacts` edits and live worktrees; it is not retired.
-  - `~/.claude/settings.json` still has user-scope plugins and marketplaces, including
-    `concertable@agent-standards` and `tomjseery/*` sources for `dotagents` and
-    `react-agents`. `cpp-agents` lacks `autoUpdate`. `tj-agents/core` is not installed in Claude.
+  - Claude now has `base`, `engineering` and `machine@base-agents` (source `tj-agents/core`)
+    at user scope, and `concertable@agent-standards` is disabled at user scope, so Claude's
+    lanes and gates come from core. This is an interim user-scope state until phase 4.
+  - `~/.claude/settings.json` still has other user-scope plugins, `tomjseery/*` sources for
+    `dotagents` and `react-agents`, and `cpp-agents` without `autoUpdate`. Its auto-mode
+    environment text names `Concertable/concertable` as the trusted repo for every session;
+    that belongs in the Concertable repository's project settings (user decision).
   - `~/.codex/agents` holds the ten shared Codex agents installed by core's engineering
     package (owned via `.base-agents-delivery.json`); Codex cannot load agents from plugins, so
     the plan must decide how this stays repository-declared.
@@ -23,9 +27,11 @@ Status: planned; no phase started.
 
 ## Next Steps
 
-Start phase 1 in a fresh worktree from `origin/main`: inventory the hooks in
-`Concertable/agent-standards` `plugins/concertable/hooks` and their tests, classify each as
-generic harness or Concertable-specific, and move the generic ones into core with their tests.
-Record the inventory and classification here before moving code. Phase 3 (self-heal: automatic
+Start phase 1 in a fresh worktree from `origin/main`: inventory `Concertable/agent-standards`
+`plugins/concertable` (hooks, Claude agents, `codex-agents`, generic skills) against core's
+`engineering` and `base` packages, and record here which items are duplicates of core and which
+are Concertable-specific. Port anything generic that core lacks. Then, in the Concertable
+repository, enable core plus concertable in its project settings, and only after that delete the
+duplicates from `Concertable/agent-standards`. Phase 3 (self-heal: automatic
 marketplace refresh and in-session skill injection for Claude and Codex) follows the generator
 in phase 2.
