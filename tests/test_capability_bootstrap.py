@@ -660,7 +660,7 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.assertEqual("v1.0.0", state["marketplaces"]["fixture"]["revision"])
         self.assertEqual({}, state["transitions"])
 
-    def test_legacy_same_revision_transition_resumes_after_target_tag_fetch(self):
+    def assert_legacy_same_revision_transition_resumes(self, checkout_target):
         with mock.patch.object(
             BOOT,
             "executable",
@@ -705,7 +705,11 @@ class BootstrapIntegrationTests(unittest.TestCase):
                 "+refs/tags/v1.0.0:refs/tags/v1.0.0",
                 cwd=checkout,
             )
-            self.assertEqual(prior["commit"], self.git("rev-parse", "HEAD", cwd=checkout).strip())
+            expected_head = prior["commit"]
+            if checkout_target:
+                self.git("checkout", "--detach", moved_commit, cwd=checkout)
+                expected_head = moved_commit
+            self.assertEqual(expected_head, self.git("rev-parse", "HEAD", cwd=checkout).strip())
             resumed = BOOT.execute(self.arguments("apply"), run=self.fake_run)
 
         managed = json.loads(state_file.read_text(encoding="utf-8"))["marketplaces"]["fixture"]
@@ -713,6 +717,12 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.assertEqual(moved_commit, managed["commit"])
         self.assertEqual("v1.0.0", managed["revision"])
         self.assertEqual({}, json.loads(state_file.read_text(encoding="utf-8"))["transitions"])
+
+    def test_legacy_same_revision_transition_resumes_after_target_tag_fetch(self):
+        self.assert_legacy_same_revision_transition_resumes(False)
+
+    def test_legacy_same_revision_transition_resumes_after_target_checkout(self):
+        self.assert_legacy_same_revision_transition_resumes(True)
 
     def test_catalog_revision_is_preserved_when_it_differs_from_version(self):
         self.git("tag", "-d", "v1.0.0", cwd=self.source)
