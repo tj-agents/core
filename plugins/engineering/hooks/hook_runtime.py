@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -14,6 +15,29 @@ CLAIM_RETENTION_SECONDS = 7 * 24 * 60 * 60
 CLAIM_PRUNE_INTERVAL_SECONDS = 60 * 60
 PRUNE_LOCK_NAME = f"{CLAIM_PREFIX}prune.lock"
 PRUNE_MARKER_NAME = f"{CLAIM_PREFIX}last-pruned"
+COMMAND_TIMEOUT_SECONDS = 5
+# A forge read crosses the network; both hosts cap each hook at 15s, so this has to leave the hook
+# room to report the timeout rather than being killed mid-report.
+NETWORK_COMMAND_TIMEOUT_SECONDS = 10
+
+
+class CommandTimeout(RuntimeError):
+    """A hook's child process outlived its ceiling."""
+
+
+def run_command(command, timeout=COMMAND_TIMEOUT_SECONDS, **kwargs):
+    """``subprocess.run`` that cannot hang.
+
+    Every hook runs inside a harness timeout that reports nothing about which child stalled, so an
+    unbounded call surfaces as the whole session pausing. A git call blocked on another worktree's
+    index lock is the shape that actually happens. Raising names the command instead.
+    """
+    kwargs.setdefault("check", False)
+    try:
+        return subprocess.run(command, timeout=timeout, **kwargs)
+    except subprocess.TimeoutExpired:
+        rendered = command if isinstance(command, str) else " ".join(str(part) for part in command)
+        raise CommandTimeout(f"`{rendered}` exceeded {timeout}s") from None
 
 
 def declared_plugin_root(hook_file):

@@ -1,7 +1,7 @@
 # Repo-declared agent configuration — progress
 
 Plan: `REPO_DECLARED_CONFIG_PLAN.md`
-Status: phase 1 in progress — inventory recorded; no code moved yet.
+Status: phase 1 in progress — inventory recorded; step 1 done.
 
 Branch: `Refactor/repo-declared-config_harness-move`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
@@ -81,7 +81,10 @@ only the "Not moved" product hooks. That is a follow-up PR in `Concertable/agent
 
 Continue phase 1 in this worktree, in this order, committing each coherent step with its tests:
 
-1. Port `hook_runtime.run_command` and the timeout-bearing `gh`/`git` calls into core's gates.
+1. Done: `hook_runtime.run_command` and the timeout-bearing `gh`/`git` calls in `merge_review_gate`,
+   `persistent_workflow_merge_gate` and `delivery_binding_gate`, with `test_hook_runtime`. The hook
+   suite's only failures are the two pre-existing `CanonicalEnvelopeShellTests`, which need a Git Bash
+   this machine's test lookup does not find.
 2. Three-way merge `skill_router` and its tests (keep both sides' additions).
 3. Move `standards_currency` and `standards_enforcement_gate` with tests; wire the enforcement gate
    in both hosts' `engineering-hooks.json`.
