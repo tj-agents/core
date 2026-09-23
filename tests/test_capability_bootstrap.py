@@ -380,6 +380,14 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
         return moved_source, moved_commit
 
+    def prepare_source_only_move(self):
+        moved_source = self.root / "source-only moved marketplace"
+        self.git("clone", "--no-hardlinks", str(self.source), str(moved_source), cwd=self.root)
+        catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        catalog["releases"][0]["source"] = str(moved_source)
+        self.catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+        return moved_source
+
     def test_apply_migrates_owned_marketplace_to_new_source_and_release(self):
         with mock.patch.object(
             BOOT,
@@ -400,6 +408,30 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.assertEqual("1.0.1", self.plugins["example@fixture"]["version"])
         self.assertEqual(1, self.plugin_refreshes)
         self.assertIn(f"managed-state:fixture@{moved_commit}", migrated["applied"])
+
+    def test_source_only_transition_is_journaled_and_resumes_after_remote_rewrite(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            moved_source = self.prepare_source_only_move()
+            self.fail_plugin_list_once = True
+            with self.assertRaisesRegex(BOOT.BootstrapError, "injected plugin-list failure"):
+                BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+            state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
+            transition = state["transitions"]["fixture"]
+            self.assertEqual(BOOT.normalize_source(str(moved_source)), transition["to"]["source"])
+            checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+            self.assertEqual(str(moved_source), self.git("remote", "get-url", "origin", cwd=checkout).strip())
+            resumed = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        self.assertEqual("applied", resumed["status"])
+        state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
+        self.assertEqual(BOOT.normalize_source(str(moved_source)), state["marketplaces"]["fixture"]["source"])
+        self.assertEqual({}, state["transitions"])
 
     def test_apply_repairs_installed_package_drift_then_becomes_idempotent(self):
         with mock.patch.object(
@@ -442,6 +474,60 @@ class BootstrapIntegrationTests(unittest.TestCase):
         state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
         self.assertEqual("fixture@1.0.1", state["marketplaces"]["fixture"]["release"])
         self.assertEqual({}, state["transitions"])
+
+    def test_legacy_managed_state_is_upgraded_without_refreshing_plugins(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            state_file = self.profile / BOOT.STATE_DIRECTORY / "managed.json"
+            state = json.loads(state_file.read_text())
+            state["marketplaces"]["fixture"].pop("source")
+            state["marketplaces"]["fixture"].pop("revision")
+            state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+            mutations_before = self.host_mutations
+            upgraded = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        self.assertEqual("applied", upgraded["status"])
+        self.assertEqual(mutations_before, self.host_mutations)
+        state = json.loads(state_file.read_text())
+        self.assertEqual(BOOT.normalize_source(str(self.source)), state["marketplaces"]["fixture"]["source"])
+        self.assertEqual("v1.0.0", state["marketplaces"]["fixture"]["revision"])
+
+    def test_catalog_revision_is_preserved_when_it_differs_from_version(self):
+        self.git("tag", "-d", "v1.0.0", cwd=self.source)
+        self.git("tag", "v2.0.0", cwd=self.source)
+        catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        catalog["releases"][0]["revision"] = "v2.0.0"
+        self.catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            _, moved_commit = self.prepare_moved_release()
+            migrated = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        self.assertEqual("applied", migrated["status"])
+        state = json.loads((self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text())
+        self.assertEqual(moved_commit, state["marketplaces"]["fixture"]["commit"])
+        self.assertEqual("v1.0.1", state["marketplaces"]["fixture"]["revision"])
+
+    def test_offline_verify_rejects_checkout_origin_drift(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+            self.git("remote", "set-url", "origin", "https://example.invalid/drift.git", cwd=checkout)
+            with self.assertRaisesRegex(BOOT.BootstrapError, "origin"):
+                BOOT.execute(self.arguments("verify"), run=self.fake_run)
 
     def test_stale_state_cannot_rewrite_an_unrelated_checkout_origin(self):
         with mock.patch.object(
