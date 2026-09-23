@@ -107,8 +107,15 @@ Continue phase 1 in this worktree, in this order, committing each coherent step 
    suite's only failures are the two pre-existing `CanonicalEnvelopeShellTests`, which need a Git Bash
    this machine's test lookup does not find.
 2. Three-way merge `skill_router`, `red_run_gate` and their tests (keep both sides' additions).
-   Core first added the router on 2026-09-02 (`058e6e6`, extracted from Concertable); find that
-   concertable revision as the merge base.
+   No common blob exists (the extraction edited the file), and a merge against the nearest
+   Concertable revision (`c68ff55`, 2026-08-31) gives 29 conflicts, so replay Concertable's router
+   commits since `7ab1028` onto core one at a time instead. Independent of currency: `ff903b3`
+   (quote masking, foreign paths, first writes), `26941b7` (settle foreign paths first), `f5d2b7e`
+   (qualifier fallback; reconcile with core's `skill_aliases` from `45506cb`). Currency-coupled:
+   `de88e59`, `ee7f228`, `62c3887`. `red_run_gate` merges cleanly (only `invocable_name`, which
+   arrives with `f5d2b7e`).
+   **Open decision:** whether the currency gate moves now (step 3) or is rebuilt in phase 3, where
+   self-heal repairs a stale plugin instead of blocking writes until a restart.
 3. Move `standards_currency` and `standards_enforcement_gate` with tests; wire the enforcement gate
    in both hosts' `engineering-hooks.json`.
 4. Move `claude_marketplace_refresh` (Claude-only, under `.claude/`) with tests; wire SessionStart.
