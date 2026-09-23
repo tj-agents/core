@@ -464,20 +464,18 @@ def resolve_legacy_revision(
     recorded = record.get("revision")
     if isinstance(recorded, str):
         return recorded
-    if (
-        expected is not None
-        and record.get("release") == expected["release"]
-        and record.get("commit") == expected["commit"]
-    ):
-        return expected["revision"]
-    fallback = state_revision(record)
     tags = [
         tag
         for tag in git(run, ["tag", "--points-at", record["commit"]], destination).splitlines()
         if tag
     ]
-    if fallback in tags:
-        return fallback
+    if (
+        expected is not None
+        and record.get("release") == expected["release"]
+        and record.get("commit") == expected["commit"]
+        and expected["revision"] in tags
+    ):
+        return expected["revision"]
     if len(tags) == 1:
         return tags[0]
     raise BootstrapError(
@@ -493,6 +491,7 @@ def validate_checkout_at(
     destination: Path,
     label: str,
     allowed_sources: set[str] | None = None,
+    allowed_tag_commits: set[str] | None = None,
     require_identity: bool = True,
 ) -> None:
     validate_state_record(record, destination, label, require_identity)
@@ -508,9 +507,11 @@ def validate_checkout_at(
         )
     tag_ref = f"refs/tags/{revision}"
     tag_commit = git(run, ["rev-parse", f"{tag_ref}^{{commit}}"], destination)
-    if tag_commit != expected_commit:
+    accepted_tag_commits = allowed_tag_commits or {expected_commit}
+    if tag_commit not in accepted_tag_commits:
+        accepted = ", ".join(sorted(accepted_tag_commits))
         raise BootstrapError(
-            f"Managed checkout local tag {tag_ref} is {tag_commit}, {label} requires {expected_commit}"
+            f"Managed checkout local tag {tag_ref} is {tag_commit}, {label} requires {accepted}"
         )
     if allowed_sources is not None:
         actual_source = normalize_source(git(run, ["remote", "get-url", "origin"], destination))
@@ -637,6 +638,9 @@ def validate_transition_checkout(
     actual_commit = git(run, ["rev-parse", "HEAD"], destination)
     allowed_sources = {prior["source"], target["source"]}
     if actual_commit == prior["commit"]:
+        allowed_tag_commits = {prior["commit"]}
+        if prior["revision"] == target["revision"]:
+            allowed_tag_commits.add(target["commit"])
         validate_checkout_at(
             run,
             prior,
@@ -644,6 +648,7 @@ def validate_transition_checkout(
             destination,
             "pending transition source",
             allowed_sources,
+            allowed_tag_commits,
         )
     elif actual_commit == target["commit"]:
         validate_checkout_at(

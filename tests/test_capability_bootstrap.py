@@ -573,6 +573,93 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.assertEqual("v2.0.0", managed["revision"])
         self.assertEqual(BOOT.normalize_source(str(self.source)), managed["source"])
 
+    def test_legacy_revision_only_change_fetches_target_before_upgrading_state(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            state_file = self.profile / BOOT.STATE_DIRECTORY / "managed.json"
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["marketplaces"]["fixture"].pop("source")
+            state["marketplaces"]["fixture"].pop("revision")
+            state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+            self.git("tag", "v2.0.0", cwd=self.source)
+            catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+            catalog["releases"][0]["revision"] = "v2.0.0"
+            self.catalog_path.write_text(
+                json.dumps(catalog, indent=2) + "\n", encoding="utf-8"
+            )
+            migrated = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        managed = json.loads(state_file.read_text(encoding="utf-8"))["marketplaces"]["fixture"]
+        checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+        self.assertEqual("applied", migrated["status"])
+        self.assertEqual("v2.0.0", managed["revision"])
+        self.assertEqual(
+            self.commit,
+            self.git("rev-parse", "refs/tags/v2.0.0^{commit}", cwd=checkout).strip(),
+        )
+
+    def test_ambiguous_legacy_revision_fails_closed(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+            self.git("tag", "v2.0.0", self.commit, cwd=checkout)
+            state_file = self.profile / BOOT.STATE_DIRECTORY / "managed.json"
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["marketplaces"]["fixture"].pop("source")
+            state["marketplaces"]["fixture"].pop("revision")
+            state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+            self.prepare_moved_release()
+            with self.assertRaisesRegex(
+                BOOT.BootstrapError, "cannot determine an exact revision"
+            ):
+                BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+    def test_same_revision_fetch_interruption_resumes_with_target_tag(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            moved_source, moved_commit = self.prepare_moved_release()
+            self.git("tag", "-f", "v1.0.0", moved_commit, cwd=moved_source)
+            catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+            catalog["releases"][0]["revision"] = "v1.0.0"
+            self.catalog_path.write_text(
+                json.dumps(catalog, indent=2) + "\n", encoding="utf-8"
+            )
+            original_git = BOOT.git
+            interrupted = False
+
+            def fail_after_fetch(run, arguments, cwd=None):
+                nonlocal interrupted
+                result = original_git(run, arguments, cwd)
+                if arguments[0] == "fetch" and not interrupted:
+                    interrupted = True
+                    raise BOOT.BootstrapError("injected post-fetch failure")
+                return result
+
+            with mock.patch.object(BOOT, "git", side_effect=fail_after_fetch):
+                with self.assertRaisesRegex(BOOT.BootstrapError, "post-fetch"):
+                    BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            resumed = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        state = json.loads(
+            (self.profile / BOOT.STATE_DIRECTORY / "managed.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual("applied", resumed["status"])
+        self.assertEqual(moved_commit, state["marketplaces"]["fixture"]["commit"])
+        self.assertEqual("v1.0.0", state["marketplaces"]["fixture"]["revision"])
+        self.assertEqual({}, state["transitions"])
+
     def test_catalog_revision_is_preserved_when_it_differs_from_version(self):
         self.git("tag", "-d", "v1.0.0", cwd=self.source)
         self.git("tag", "v2.0.0", cwd=self.source)
