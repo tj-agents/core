@@ -484,6 +484,32 @@ def resolve_legacy_revision(
     )
 
 
+def resolve_legacy_transition_revision(
+    run,
+    prior: dict[str, Any],
+    target: dict[str, str],
+    destination: Path,
+) -> str:
+    try:
+        return resolve_legacy_revision(run, prior, destination, target)
+    except BootstrapError as error:
+        actual_commit = git(run, ["rev-parse", "HEAD"], destination)
+        target_revision = target["revision"]
+        if actual_commit != prior["commit"] or target_revision != state_revision(prior):
+            raise error
+        try:
+            tag_commit = git(
+                run,
+                ["rev-parse", f"refs/tags/{target_revision}^{{commit}}"],
+                destination,
+            )
+        except BootstrapError:
+            raise error
+        if tag_commit != target["commit"]:
+            raise error
+        return target_revision
+
+
 def validate_checkout_at(
     run,
     record: dict[str, Any],
@@ -599,7 +625,7 @@ def upgrade_pending_transition(
             if isinstance(prior_source, str)
             else actual_source
         ),
-        "revision": resolve_legacy_revision(run, prior, destination, expected),
+        "revision": resolve_legacy_transition_revision(run, prior, expected, destination),
     }
     upgraded = {
         "from": normalized_prior,

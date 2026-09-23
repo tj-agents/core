@@ -660,6 +660,60 @@ class BootstrapIntegrationTests(unittest.TestCase):
         self.assertEqual("v1.0.0", state["marketplaces"]["fixture"]["revision"])
         self.assertEqual({}, state["transitions"])
 
+    def test_legacy_same_revision_transition_resumes_after_target_tag_fetch(self):
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else shutil.which("git"),
+        ):
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            moved_source, moved_commit = self.prepare_moved_release()
+            self.git("tag", "-f", "v1.0.0", moved_commit, cwd=moved_source)
+            catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+            catalog["releases"][0]["revision"] = "v1.0.0"
+            self.catalog_path.write_text(
+                json.dumps(catalog, indent=2) + "\n", encoding="utf-8"
+            )
+
+            state_file = self.profile / BOOT.STATE_DIRECTORY / "managed.json"
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            prior = state["marketplaces"]["fixture"]
+            legacy_prior = {
+                key: prior[key] for key in ("checkout", "release", "commit")
+            }
+            legacy_target = {
+                "checkout": prior["checkout"],
+                "release": "fixture@1.0.1",
+                "commit": moved_commit,
+            }
+            state["marketplaces"]["fixture"] = legacy_prior
+            state["transitions"]["fixture"] = {
+                "from": legacy_prior,
+                "to": legacy_target,
+                "source": str(moved_source),
+                "revision": "v1.0.0",
+            }
+            state_file.write_text(
+                json.dumps(state, indent=2) + "\n", encoding="utf-8"
+            )
+
+            checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+            self.git("remote", "set-url", "origin", str(moved_source), cwd=checkout)
+            self.git(
+                "fetch",
+                "origin",
+                "+refs/tags/v1.0.0:refs/tags/v1.0.0",
+                cwd=checkout,
+            )
+            self.assertEqual(prior["commit"], self.git("rev-parse", "HEAD", cwd=checkout).strip())
+            resumed = BOOT.execute(self.arguments("apply"), run=self.fake_run)
+
+        managed = json.loads(state_file.read_text(encoding="utf-8"))["marketplaces"]["fixture"]
+        self.assertEqual("applied", resumed["status"])
+        self.assertEqual(moved_commit, managed["commit"])
+        self.assertEqual("v1.0.0", managed["revision"])
+        self.assertEqual({}, json.loads(state_file.read_text(encoding="utf-8"))["transitions"])
+
     def test_catalog_revision_is_preserved_when_it_differs_from_version(self):
         self.git("tag", "-d", "v1.0.0", cwd=self.source)
         self.git("tag", "v2.0.0", cwd=self.source)
