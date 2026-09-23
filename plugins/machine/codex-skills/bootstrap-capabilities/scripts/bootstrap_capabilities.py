@@ -455,6 +455,37 @@ def state_revision(record: dict[str, Any]) -> str:
     return f"v{record['release'].rsplit('@', 1)[1]}"
 
 
+def resolve_legacy_revision(
+    run,
+    record: dict[str, Any],
+    destination: Path,
+    expected: dict[str, str] | None = None,
+) -> str:
+    recorded = record.get("revision")
+    if isinstance(recorded, str):
+        return recorded
+    if (
+        expected is not None
+        and record.get("release") == expected["release"]
+        and record.get("commit") == expected["commit"]
+    ):
+        return expected["revision"]
+    fallback = state_revision(record)
+    tags = [
+        tag
+        for tag in git(run, ["tag", "--points-at", record["commit"]], destination).splitlines()
+        if tag
+    ]
+    if fallback in tags:
+        return fallback
+    if len(tags) == 1:
+        return tags[0]
+    raise BootstrapError(
+        f"Legacy managed state cannot determine an exact revision for "
+        f"{record['release']} at {record['commit']}: {destination}"
+    )
+
+
 def validate_checkout_at(
     run,
     record: dict[str, Any],
@@ -491,9 +522,15 @@ def validate_checkout_at(
 
 
 def validate_managed_checkout(
-    run, managed: dict[str, Any], destination: Path
+    run,
+    managed: dict[str, Any],
+    destination: Path,
+    expected: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    revision = state_revision(managed)
+    validate_state_record(managed, destination, "recorded state", require_identity=False)
+    if not (destination / ".git").exists():
+        raise BootstrapError(f"Managed checkout is missing: {destination}")
+    revision = resolve_legacy_revision(run, managed, destination, expected)
     validate_checkout_at(
         run, managed, revision, destination, "recorded state", require_identity=False
     )
@@ -513,6 +550,64 @@ def validate_managed_checkout(
         {normalized["source"]},
     )
     return normalized
+
+
+def upgrade_pending_transition(
+    run,
+    pending: dict[str, Any],
+    managed: dict[str, Any],
+    expected: dict[str, str],
+    destination: Path,
+    marketplace: str,
+) -> tuple[dict[str, str], dict[str, Any]]:
+    prior = pending.get("from")
+    target = pending.get("to")
+    if not isinstance(prior, dict) or not isinstance(target, dict):
+        raise BootstrapError(f"Pending marketplace transition is invalid: {marketplace}")
+    validate_state_record(prior, destination, "pending transition source", require_identity=False)
+    validate_state_record(target, destination, "pending transition target", require_identity=False)
+    if prior != managed:
+        raise BootstrapError(f"Pending marketplace transition source disagrees with state: {marketplace}")
+    target_base = {key: target.get(key) for key in ("checkout", "release", "commit")}
+    expected_base = {key: expected[key] for key in ("checkout", "release", "commit")}
+    target_source = require_string(pending.get("source"), f"{marketplace}.transition.source")
+    target_revision = require_string(pending.get("revision"), f"{marketplace}.transition.revision")
+    if (
+        target_base != expected_base
+        or normalize_source(target_source) != expected["source"]
+        or target_revision != expected["revision"]
+    ):
+        raise BootstrapError(f"Pending marketplace transition disagrees with the lock: {marketplace}")
+    if (
+        isinstance(prior.get("source"), str)
+        and isinstance(prior.get("revision"), str)
+        and isinstance(target.get("source"), str)
+        and isinstance(target.get("revision"), str)
+    ):
+        return managed, pending
+    if not (destination / ".git").exists():
+        raise BootstrapError(f"Managed checkout is missing: {destination}")
+    if git(run, ["status", "--porcelain"], destination):
+        raise BootstrapError(f"Managed checkout has local changes: {destination}")
+    actual_source = normalize_source(git(run, ["remote", "get-url", "origin"], destination))
+    prior_source = prior.get("source")
+    normalized_prior = {
+        **prior,
+        "source": (
+            normalize_source(prior_source)
+            if isinstance(prior_source, str)
+            else actual_source
+        ),
+        "revision": resolve_legacy_revision(run, prior, destination, expected),
+    }
+    upgraded = {
+        "from": normalized_prior,
+        "to": expected,
+        "source": expected["source"],
+        "revision": expected["revision"],
+    }
+    validate_transition_checkout(run, upgraded, destination)
+    return normalized_prior, upgraded
 
 
 def validate_pending_transition(
@@ -797,12 +892,28 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
                 managed = state["marketplaces"].get(marketplace)
                 expected = release_state(release, commit, checkout)
                 pending = state["transitions"].get(marketplace)
-                if managed is not None and pending is None:
-                    normalized = validate_managed_checkout(run, managed, checkout)
-                    if normalized != managed:
+                if managed is not None:
+                    if pending is None:
+                        normalized = validate_managed_checkout(
+                            run, managed, checkout, expected
+                        )
+                        upgraded_pending = None
+                    else:
+                        normalized, upgraded_pending = upgrade_pending_transition(
+                            run,
+                            pending,
+                            managed,
+                            expected,
+                            checkout,
+                            marketplace,
+                        )
+                    if normalized != managed or upgraded_pending != pending:
                         state["marketplaces"][marketplace] = normalized
+                        if upgraded_pending is not None:
+                            state["transitions"][marketplace] = upgraded_pending
                         write_json(state_path(profile), state)
                     managed = normalized
+                    pending = upgraded_pending
                 registered = configured.get(marketplace)
                 if marketplace in configured:
                     if not managed:
@@ -814,7 +925,7 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
                             f"Registered marketplace source disagrees with managed checkout: {marketplace}"
                         )
                 if pending is not None:
-                    if managed is None or managed == expected:
+                    if managed is None:
                         raise BootstrapError(f"Orphaned marketplace transition: {marketplace}")
                     validate_pending_transition(pending, managed, expected, release)
                 elif managed is not None and managed != expected:
@@ -866,7 +977,7 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
                 raise BootstrapError(f"Marketplace transition is incomplete: {marketplace}")
             managed = state["marketplaces"].get(marketplace)
             if managed is not None:
-                managed = validate_managed_checkout(run, managed, checkout)
+                managed = validate_managed_checkout(run, managed, checkout, expected)
                 state["marketplaces"][marketplace] = managed
             if managed != expected:
                 raise BootstrapError(f"Managed marketplace state disagrees with the lock: {marketplace}")
