@@ -38,11 +38,10 @@ Contract: exit 0 = allow; exit 2 = block (stderr is fed back to the agent).
 """
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 
-from hook_runtime import claim_invocation
+from hook_runtime import NETWORK_COMMAND_TIMEOUT_SECONDS, claim_invocation, run_command
 from merge_review_gate import (
     canonical_merge_target_dir,
     invokes_pushd_before_merge,
@@ -112,8 +111,9 @@ def find_config(cwd):
 
 def gh_json(*args):
     """Run ``gh`` where the merge runs, never where the hook process happens to sit."""
-    return subprocess.run(
-        ["gh", *args], capture_output=True, text=True, check=True, cwd=_GIT_CWD[0]
+    return run_command(
+        ["gh", *args], capture_output=True, text=True, check=True, cwd=_GIT_CWD[0],
+        timeout=NETWORK_COMMAND_TIMEOUT_SECONDS,
     ).stdout.strip()
 
 
@@ -195,7 +195,7 @@ def binding_mismatch(binding, *, repo, pr, head, config_root):
 
 def local_repo_slug():
     try:
-        url = subprocess.run(
+        url = run_command(
             ["git", "remote", "get-url", "origin"],
             capture_output=True, text=True, check=True, cwd=_GIT_CWD[0],
         ).stdout.strip()
