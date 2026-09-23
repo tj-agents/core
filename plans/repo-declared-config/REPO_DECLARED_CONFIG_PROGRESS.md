@@ -1,7 +1,7 @@
 # Repo-declared agent configuration — progress
 
 Plan: `REPO_DECLARED_CONFIG_PLAN.md`
-Status: phase 1 in progress — inventory recorded; step 1 done.
+Status: phase 1 in progress; handed off for the full deduplication (2026-09-23).
 
 Branch: `Refactor/repo-declared-config_harness-move`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
@@ -60,7 +60,7 @@ diverged tests (`test_skill_router`, `test_red_run_gate`, `test_merge_review_gat
 `test_delivery_binding_gate`, `test_lane_tables`, `test_workflow_*`, `test_goal_preflight`,
 `test_plan_graph`, `test_docs_reachability`, `lane_expectations` fixture) merge with their hook.
 
-### Generic, not in core — move
+### Generic, not in core — deferred to phase 3, stays in Concertable until then
 
 | Hook | Role | Note |
 |---|---|---|
@@ -100,28 +100,39 @@ diverged tests (`test_skill_router`, `test_red_run_gate`, `test_merge_review_gat
 
 ## Next Steps
 
-Continue phase 1 in this worktree, in this order, committing each coherent step with its tests:
+**Goal: every capability has exactly one copy.** Remove all duplication between `Concertable/agents`
+and the tj-agents repositories (`core`, `dotnet`, `react`). Concertable keeps only
+Concertable-product content; core contains no Concertable reference in code, names, URLs or wording
+(user decision, 2026-09-23). The currency gate, enforcement gate and marketplace refresh are **not**
+moved into core; phase 3 rebuilds currency as self-heal.
 
-1. Done: `hook_runtime.run_command` and the timeout-bearing `gh`/`git` calls in `merge_review_gate`,
-   `persistent_workflow_merge_gate` and `delivery_binding_gate`, with `test_hook_runtime`. The hook
-   suite's only failures are the two pre-existing `CanonicalEnvelopeShellTests`, which need a Git Bash
-   this machine's test lookup does not find.
-2. Three-way merge `skill_router`, `red_run_gate` and their tests (keep both sides' additions).
-   No common blob exists (the extraction edited the file), and a merge against the nearest
-   Concertable revision (`c68ff55`, 2026-08-31) gives 29 conflicts, so replay Concertable's router
-   commits since `7ab1028` onto core one at a time instead. Independent of currency: `ff903b3`
-   (quote masking, foreign paths, first writes), `26941b7` (settle foreign paths first), `f5d2b7e`
-   (qualifier fallback; reconcile with core's `skill_aliases` from `45506cb`). Currency-coupled:
-   `de88e59`, `ee7f228`, `62c3887`. `red_run_gate` merges cleanly (only `invocable_name`, which
-   arrives with `f5d2b7e`).
-   **Open decision:** whether the currency gate moves now (step 3) or is rebuilt in phase 3, where
-   self-heal repairs a stale plugin instead of blocking writes until a restart.
-3. Move `standards_currency` and `standards_enforcement_gate` with tests; wire the enforcement gate
-   in both hosts' `engineering-hooks.json`.
-4. Move `claude_marketplace_refresh` (Claude-only, under `.claude/`) with tests; wire SessionStart.
-5. Port the agent descriptions and `kind` into core's authored agent sources.
-6. Add the missing generic tests; run the full hook suite and `pwsh .agents/sync-generated.ps1 -Check`.
-7. Release core, then follow the retirement order above.
+Done already on this branch: inventory above; `hook_runtime.run_command` with timeout-bearing
+`gh`/`git` calls in `merge_review_gate`, `persistent_workflow_merge_gate` and
+`delivery_binding_gate`, plus `test_hook_runtime`. The hook suite's only failures are the two
+pre-existing `CanonicalEnvelopeShellTests`, which cannot find Git Bash on this machine.
 
-Phase 3 (self-heal: automatic marketplace refresh and in-session skill injection for Claude and
-Codex) follows the generator in phase 2.
+1. **Finish the audit.** The inventory above covers hooks, agents and two skills only. Compare
+   everything else in Concertable's authored sources (`.agents/lanes` lane tables, `.agents/workflows`,
+   `.agents/plugins` install roster/payloads, `scripts/`, `standards/`, `codex-skills`,
+   `enforcement-rules.json`, `.claude/` and `.codex/` adapters) against core's `base`, `engineering` and
+   `machine` sources and against `tj-agents/dotnet` and `tj-agents/react` (Concertable's .NET/React
+   stack skills may duplicate those). Compare content, not names. Record each item as duplicate
+   (which side is ahead), product-only, or generic-missing-from-core in the inventory above.
+2. **Port Concertable-ahead generic fixes into core, rewritten in core's terms**, each commit with its
+   tests: router commits `ff903b3` (quoted `>` is not a redirect; foreign paths; first writes),
+   `26941b7` (settle foreign paths before any gate) and `f5d2b7e` (qualifier fallback; reconcile with
+   core's `skill_aliases` from `45506cb`); `red_run_gate`'s `invocable_name`; the rung-specific lane agent
+   `description`s and `kind` into core's authored agent sources for both hosts. Replay commit by commit
+   (Concertable history since `7ab1028`); a three-way merge against `c68ff55` gives 29 conflicts. Skip the
+   currency-coupled commits (`62c3887`, `de88e59`, `ee7f228`). After source changes run
+   `python -B scripts/update_catalog_digests.py`, `pwsh .agents/sync-generated.ps1` and
+   `pwsh .agents/sync-generated.ps1 -Check`, and the hook suite
+   (`python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py'`).
+3. `/review` this branch, open the PR, merge and release core.
+4. **In `Concertable/agents`** (its own worktree from `origin/main`; the local checkout
+   `C:\Users\tommy\source\repos\agent-standards-fresh` is on another branch): first enable `base`,
+   `engineering`, `machine@base-agents` plus `concertable` in the Concertable product repository's
+   project settings, then delete every duplicate recorded above (hooks and their wiring, the ten agents
+   in both forms, `persistent-workflow`, and whatever step 1 adds), keeping the "Not moved" product
+   pieces. Verify a Concertable session in both hosts loads one copy of each lane, gate and skill.
+5. Record the result here, then continue with phase 2 (repo-config generator).
