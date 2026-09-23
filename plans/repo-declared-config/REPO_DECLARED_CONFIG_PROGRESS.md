@@ -9,16 +9,20 @@ PR: none yet.
 
 ## Current state (2026-09-23)
 
-- The plan is on `main`, amended with the tj-agents-only source rule and the per-machine
-  migration procedure.
+- The plan is on `main`, amended with the tj-agents-only source rule, the per-machine migration
+  procedure and (PR #30) the retire-duplicates framing of phase 1.
 - This PC (first machine):
   - All four canonical repositories are cloned under
     `C:\Users\tommy\source\repos\tj-agents\{core,cpp,react,dotnet}`.
   - The older `C:\Users\tommy\source\repos\base-agents` checkout is 87 commits behind with
     uncommitted `plan-artifacts` edits and live worktrees; it is not retired.
-  - `~/.claude/settings.json` still has user-scope plugins and marketplaces, including
-    `concertable@agent-standards` and `tomjseery/*` sources for `dotagents` and
-    `react-agents`. `cpp-agents` lacks `autoUpdate`. `tj-agents/core` is not installed in Claude.
+  - Claude now has `base`, `engineering` and `machine@base-agents` (source `tj-agents/core`)
+    at user scope, and `concertable@agent-standards` is disabled at user scope, so Claude's
+    lanes and gates come from core. This is an interim user-scope state until phase 4.
+  - `~/.claude/settings.json` still has other user-scope plugins, `tomjseery/*` sources for
+    `dotagents` and `react-agents`, and `cpp-agents` without `autoUpdate`. Its auto-mode
+    environment text names `Concertable/concertable` as the trusted repo for every session;
+    that belongs in the Concertable repository's project settings (user decision).
   - `~/.codex/agents` holds the ten shared Codex agents installed by core's engineering
     package (owned via `.base-agents-delivery.json`); Codex cannot load agents from plugins, so
     the plan must decide how this stays repository-declared.
@@ -32,10 +36,12 @@ repository to `Concertable/agents`, which is the name its README and `standards_
 Its authored hooks live in `.agents/hooks/` (shared), `.claude/hooks/` and `.codex/hooks/`;
 `plugins/concertable/hooks/` is its generated payload.
 
-**Finding: most of the harness is already in core.** Core's `engineering` plugin already ships and
-wires the skill router and every delivery gate for both hosts. With `concertable` also enabled,
-each gate runs twice. The two copies have diverged in both directions since 2026-09-20, so phase 1
-is a convergence onto core plus a small number of genuine moves, not a bulk copy.
+**Finding: the harness is already in core; phase 1 retires Concertable's duplicates.** Core's
+`engineering` plugin ships and wires the skill router, every delivery gate and the ten lane/workflow
+agents for both hosts. With `concertable` also enabled, each gate runs twice. **The copies have
+diverged in both directions since 2026-09-20**, so a duplicate is deleted from concertable only
+after its Concertable-ahead changes are ported into core; otherwise those fixes are lost. Beyond
+that, only generic pieces core lacks move.
 
 ### Already in core — converge, core becomes the only copy
 
@@ -74,8 +80,23 @@ diverged tests (`test_skill_router`, `test_red_run_gate`, `test_merge_review_gat
 | `test_hook_manifests`, `test_gen_skill_routes`, `test_capability_selection` | Concertable-specific | test concertable's own manifests, route generator and capability selection |
 | `test_plugin_pruning` | generic, check | compare with core's `prune_plugin_cache` coverage before moving |
 
-After core releases, concertable deletes every hook in the first two tables and its wiring, keeping
-only the "Not moved" product hooks. That is a follow-up PR in `Concertable/agents`.
+### Agents and skills in `plugins/concertable`
+
+| Item | State vs core `engineering` | Action |
+|---|---|---|
+| `agents/*.md` (10) | duplicates. Concertable ahead: rung-specific `description`s (L1 "Irreversible work…", L5 "Clerical work…") and `kind`. Core ahead: `tools` | port descriptions and `kind` into core's authored agent source, then retire |
+| `codex-agents/*.toml` (10) | duplicates. Same descriptions; core ahead with `sandbox_mode` | port descriptions, then retire |
+| `skills/persistent-workflow` (+ `codex-skills`) | duplicate of `engineering:persistent-workflow`; core is the newer canonical form | retire |
+| `skills/always-on-instructions`, `skills/reset-test-explorer`, and every other skill | Concertable-product or .NET/React stack contracts | stay |
+
+### Retirement order
+
+1. Core releases with the ports above.
+2. The Concertable repository enables core (`base`, `engineering`, `machine@base-agents`) plus
+   `concertable` in its own project settings, so it is never without lanes or gates.
+3. Only then delete the duplicates (both tables of hooks above, their wiring, the ten agents in
+   both forms, and `persistent-workflow`) from `Concertable/agents`, keeping the "Not moved" product
+   hooks and product skills.
 
 ## Next Steps
 
@@ -85,12 +106,15 @@ Continue phase 1 in this worktree, in this order, committing each coherent step 
    `persistent_workflow_merge_gate` and `delivery_binding_gate`, with `test_hook_runtime`. The hook
    suite's only failures are the two pre-existing `CanonicalEnvelopeShellTests`, which need a Git Bash
    this machine's test lookup does not find.
-2. Three-way merge `skill_router` and its tests (keep both sides' additions).
+2. Three-way merge `skill_router`, `red_run_gate` and their tests (keep both sides' additions).
+   Core first added the router on 2026-09-02 (`058e6e6`, extracted from Concertable); find that
+   concertable revision as the merge base.
 3. Move `standards_currency` and `standards_enforcement_gate` with tests; wire the enforcement gate
    in both hosts' `engineering-hooks.json`.
 4. Move `claude_marketplace_refresh` (Claude-only, under `.claude/`) with tests; wire SessionStart.
-5. Add the missing generic tests; run the full hook suite and `pwsh .agents/sync-generated.ps1 -Check`.
-6. Release core; open the concertable removal PR.
+5. Port the agent descriptions and `kind` into core's authored agent sources.
+6. Add the missing generic tests; run the full hook suite and `pwsh .agents/sync-generated.ps1 -Check`.
+7. Release core, then follow the retirement order above.
 
 Phase 3 (self-heal: automatic marketplace refresh and in-session skill injection for Claude and
 Codex) follows the generator in phase 2.
