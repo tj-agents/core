@@ -18,13 +18,8 @@ Status: planned; no phase started.
   - `~/.codex/agents` holds the ten shared Codex agents installed by core's engineering
     package (owned via `.base-agents-delivery.json`); Codex cannot load agents from plugins, so
     the plan must decide how this stays repository-declared.
-- `sandbox-hwid` (first consumer):
-  - Routes resolve for Claude and Codex after cpp-agents v0.3.0 adoption, but through
-    user-scope installs.
-  - It still has ten untracked Codex agent files in `.codex/agents/` (`lane-l1`..`lane-l5`,
-    `workflow-*`). Their naming differs from core's shipped set; identify their origin before
-    removal, and remove only through core's installer migration path
-    (`-MigrateProjectRoot`), which preserves unmatched content.
+- `sandbox-hwid` (first consumer): routes resolve for Claude and Codex after cpp-agents v0.3.0
+  adoption, but through user-scope installs.
 
 ## Next Steps
 
