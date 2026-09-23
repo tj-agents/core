@@ -411,14 +411,30 @@ def git(run, arguments: list[str], cwd: Path | None = None) -> str:
     return completed.stdout.strip()
 
 
+def normalize_source(source: str) -> str:
+    return source.rstrip("/").removesuffix(".git")
+
+
 def release_state(release: dict[str, Any], commit: str, destination: Path) -> dict[str, str]:
-    return {"checkout": str(destination), "release": release["id"], "commit": commit}
+    source = require_string(release.get("source"), f"{release['id']}.source")
+    revision = require_string(release.get("revision"), f"{release['id']}.revision")
+    return {
+        "checkout": str(destination),
+        "release": release["id"],
+        "commit": commit,
+        "source": normalize_source(source),
+        "revision": revision,
+    }
 
 
-def validate_state_record(record: dict[str, Any], destination: Path, label: str) -> None:
+def validate_state_record(
+    record: dict[str, Any], destination: Path, label: str, require_identity: bool = True
+) -> None:
     expected_checkout = record.get("checkout")
     expected_release = record.get("release")
     expected_commit = record.get("commit")
+    expected_source = record.get("source")
+    expected_revision = record.get("revision")
     if (
         not isinstance(expected_checkout, str)
         or Path(expected_checkout).resolve() != destination.resolve()
@@ -426,18 +442,29 @@ def validate_state_record(record: dict[str, Any], destination: Path, label: str)
         or "@" not in expected_release
         or not isinstance(expected_commit, str)
         or not HEX_COMMIT.fullmatch(expected_commit)
+        or (expected_source is not None and (not isinstance(expected_source, str) or not expected_source))
+        or (expected_revision is not None and (not isinstance(expected_revision, str) or not expected_revision))
+        or (require_identity and (expected_source is None or expected_revision is None))
     ):
         raise BootstrapError(f"{label} is invalid for checkout: {destination}")
 
 
 def state_revision(record: dict[str, Any]) -> str:
+    if isinstance(record.get("revision"), str):
+        return record["revision"]
     return f"v{record['release'].rsplit('@', 1)[1]}"
 
 
 def validate_checkout_at(
-    run, record: dict[str, Any], revision: str, destination: Path, label: str
+    run,
+    record: dict[str, Any],
+    revision: str,
+    destination: Path,
+    label: str,
+    allowed_sources: set[str] | None = None,
+    require_identity: bool = True,
 ) -> None:
-    validate_state_record(record, destination, label)
+    validate_state_record(record, destination, label, require_identity)
     if not (destination / ".git").exists():
         raise BootstrapError(f"Managed checkout is missing: {destination}")
     if git(run, ["status", "--porcelain"], destination):
@@ -452,12 +479,40 @@ def validate_checkout_at(
     tag_commit = git(run, ["rev-parse", f"{tag_ref}^{{commit}}"], destination)
     if tag_commit != expected_commit:
         raise BootstrapError(
-            f"Managed checkout tag {tag_ref} is {tag_commit}, {label} requires {expected_commit}"
+            f"Managed checkout local tag {tag_ref} is {tag_commit}, {label} requires {expected_commit}"
         )
+    if allowed_sources is not None:
+        actual_source = normalize_source(git(run, ["remote", "get-url", "origin"], destination))
+        if actual_source not in allowed_sources:
+            expected_sources = ", ".join(sorted(allowed_sources))
+            raise BootstrapError(
+                f"Managed checkout origin is {actual_source}, {label} requires {expected_sources}: {destination}"
+            )
 
 
-def validate_managed_checkout(run, managed: dict[str, Any], destination: Path) -> None:
-    validate_checkout_at(run, managed, state_revision(managed), destination, "recorded state")
+def validate_managed_checkout(
+    run, managed: dict[str, Any], destination: Path
+) -> dict[str, str]:
+    revision = state_revision(managed)
+    validate_checkout_at(
+        run, managed, revision, destination, "recorded state", require_identity=False
+    )
+    actual_source = normalize_source(git(run, ["remote", "get-url", "origin"], destination))
+    recorded_source = managed.get("source")
+    normalized = {
+        **managed,
+        "source": normalize_source(recorded_source) if isinstance(recorded_source, str) else actual_source,
+        "revision": revision,
+    }
+    validate_checkout_at(
+        run,
+        normalized,
+        revision,
+        destination,
+        "recorded state",
+        {normalized["source"]},
+    )
+    return normalized
 
 
 def validate_pending_transition(
@@ -466,8 +521,8 @@ def validate_pending_transition(
     wanted = {
         "from": managed,
         "to": expected,
-        "source": release["source"],
-        "revision": release["revision"],
+        "source": expected["source"],
+        "revision": expected["revision"],
     }
     if pending != wanted:
         raise BootstrapError(f"Pending marketplace transition disagrees with the lock: {release['marketplace']}")
@@ -485,10 +540,25 @@ def validate_transition_checkout(
     if git(run, ["status", "--porcelain"], destination):
         raise BootstrapError(f"Managed checkout has local changes: {destination}")
     actual_commit = git(run, ["rev-parse", "HEAD"], destination)
+    allowed_sources = {prior["source"], target["source"]}
     if actual_commit == prior["commit"]:
-        validate_checkout_at(run, prior, state_revision(prior), destination, "pending transition source")
+        validate_checkout_at(
+            run,
+            prior,
+            state_revision(prior),
+            destination,
+            "pending transition source",
+            allowed_sources,
+        )
     elif actual_commit == target["commit"]:
-        validate_checkout_at(run, target, pending["revision"], destination, "pending transition target")
+        validate_checkout_at(
+            run,
+            target,
+            target["revision"],
+            destination,
+            "pending transition target",
+            allowed_sources,
+        )
     else:
         raise BootstrapError(
             f"Managed checkout is {actual_commit}, pending transition allows only "
@@ -516,7 +586,7 @@ def checkout_release(
         elif git(run, ["status", "--porcelain"], destination):
             raise BootstrapError(f"Managed checkout has local changes: {destination}")
         remote = git(run, ["remote", "get-url", "origin"], destination)
-        if remote.rstrip("/").removesuffix(".git") != source.rstrip("/").removesuffix(".git"):
+        if normalize_source(remote) != normalize_source(source):
             if managed is None:
                 raise BootstrapError(f"Managed checkout origin disagrees with the catalog: {destination}")
             git(run, ["remote", "set-url", "origin", source], destination)
@@ -572,8 +642,8 @@ def start_transition(
     pending = {
         "from": managed,
         "to": expected,
-        "source": release["source"],
-        "revision": release["revision"],
+        "source": expected["source"],
+        "revision": expected["revision"],
     }
     state["transitions"][release["marketplace"]] = pending
     write_json(state_path(profile), state)
@@ -605,6 +675,12 @@ def verify_checkout(
         )
     if git(run, ["status", "--porcelain"], checkout):
         raise BootstrapError(f"Managed checkout has local changes: {checkout}")
+    expected_source = normalize_source(
+        require_string(release.get("source"), f"{release['id']}.source")
+    )
+    actual_source = normalize_source(git(run, ["remote", "get-url", "origin"], checkout))
+    if actual_source != expected_source:
+        raise BootstrapError(f"Managed checkout origin is {actual_source}, expected {expected_source}: {checkout}")
     checks: list[str] = []
     for selection in selected:
         plugin = plugins[selection["id"]]
@@ -721,6 +797,12 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
                 managed = state["marketplaces"].get(marketplace)
                 expected = release_state(release, commit, checkout)
                 pending = state["transitions"].get(marketplace)
+                if managed is not None and pending is None:
+                    normalized = validate_managed_checkout(run, managed, checkout)
+                    if normalized != managed:
+                        state["marketplaces"][marketplace] = normalized
+                        write_json(state_path(profile), state)
+                    managed = normalized
                 registered = configured.get(marketplace)
                 if marketplace in configured:
                     if not managed:
@@ -778,10 +860,15 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
                     report["applied"].append(f"managed-state:{marketplace}@{commit}")
         for release, commit, members in groups:
             marketplace = release["marketplace"]
-            expected = release_state(release, commit, checkout_path(profile, marketplace))
+            checkout = checkout_path(profile, marketplace)
+            expected = release_state(release, commit, checkout)
             if state["transitions"].get(marketplace) is not None:
                 raise BootstrapError(f"Marketplace transition is incomplete: {marketplace}")
-            if state["marketplaces"].get(marketplace) != expected:
+            managed = state["marketplaces"].get(marketplace)
+            if managed is not None:
+                managed = validate_managed_checkout(run, managed, checkout)
+                state["marketplaces"][marketplace] = managed
+            if managed != expected:
                 raise BootstrapError(f"Managed marketplace state disagrees with the lock: {marketplace}")
             report["checks"].extend(verify_checkout(run, profile, release, commit, members, plugins))
         configured = host.marketplaces()
