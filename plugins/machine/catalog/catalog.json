@@ -3,18 +3,18 @@
   "digest_format": "sha256-tree-v1",
   "releases": [
     {
-      "id": "base-agents@2.1.3",
-      "owner_repository": "tomjseery/base-agents",
-      "source": "https://github.com/tomjseery/base-agents.git",
+      "id": "base-agents@2.1.4",
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
       "marketplace": "base-agents",
-      "revision": "v2.1.3",
-      "version": "2.1.3",
+      "revision": "v2.1.4",
+      "version": "2.1.4",
       "plugins": [
         {
           "id": "base-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "2.1.3",
+          "version": "2.1.4",
           "description": "Maintained plans and common agent behavior.",
           "status": "current",
           "platforms": [
@@ -36,13 +36,13 @@
             ],
             "optional": []
           },
-          "digest": "sha256:ce15e3972a2d4a249cd2f5aad564e39618b2ee1d98daf73559fb64219c5b2385"
+          "digest": "sha256:0a4473f35557772372bc7192ec02ae1a654bdf361c5f491f41ff7703c134e327"
         },
         {
           "id": "base-agents/engineering",
           "name": "engineering",
           "package_path": "plugins/engineering",
-          "version": "2.1.3",
+          "version": "2.1.4",
           "description": "Selected engineering workflows, reviews and Git operations.",
           "status": "current",
           "platforms": [
@@ -120,13 +120,13 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:796e833adab32dd35da79e84b2e8271af9af33fc311093f36d33ca3983a0ae91"
+          "digest": "sha256:d6fb157181fef6bcd459c3191701b5a9737b8467939d50c5b233204fb1eacfd2"
         },
         {
           "id": "base-agents/machine",
           "name": "machine",
           "package_path": "plugins/machine",
-          "version": "2.1.3",
+          "version": "2.1.4",
           "description": "Explicit harness, history and clipboard utilities.",
           "status": "current",
           "platforms": [
@@ -162,7 +162,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:937caaa44c13e3adf05b2094a59c2454fe6fbac7d956073c39b00a906a6c597e",
+          "digest": "sha256:9ae21fcd44a30371b7dd57b35de61764e8765c5764174d36c6023d3725bdde7c",
           "digest_excludes": [
             "catalog/catalog.json"
           ]
@@ -170,18 +170,18 @@
       ]
     },
     {
-      "id": "cpp-agents@0.1.0",
-      "owner_repository": "tomjseery/cpp-agents",
-      "source": "https://github.com/tomjseery/cpp-agents.git",
+      "id": "cpp-agents@0.1.1",
+      "owner_repository": "tj-agents/cpp",
+      "source": "https://github.com/tj-agents/cpp.git",
       "marketplace": "cpp-agents",
-      "revision": "v0.1.0",
-      "version": "0.1.0",
+      "revision": "v0.1.1",
+      "version": "0.1.1",
       "plugins": [
         {
           "id": "cpp-agents/cpp",
           "name": "cpp",
           "package_path": "plugins/cpp",
-          "version": "0.1.0",
+          "version": "0.1.1",
           "description": "Platform-neutral modern C++ contracts and learning guidance.",
           "status": "current",
           "platforms": [
@@ -210,13 +210,13 @@
               "c++20-compiler"
             ]
           },
-          "digest": "sha256:4cb41fe48314a7daa9c1a258bf75b330936d10b172a6fde3b3dc5e17a50f7daa"
+          "digest": "sha256:1600f7aa5963ead4587b2c49424066e32c426cc9389206d334745f4a6bcc55e0"
         },
         {
           "id": "cpp-agents/gpp",
           "name": "gpp",
           "package_path": "plugins/gpp",
-          "version": "0.1.0",
+          "version": "0.1.1",
           "description": "G++, GCC, GDB, and Linux guidance layered on cpp.",
           "status": "current",
           "platforms": [
@@ -243,13 +243,13 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:47919a5b69d464f28ca707a0ebbb54129c250c6c83d3f78dd7dcac8a42bec519"
+          "digest": "sha256:7010876f92bb35c78b3a0d17fb6847978b1891fa6b1b5c20b42e9926a0b8addc"
         },
         {
           "id": "cpp-agents/msvc",
           "name": "msvc",
           "package_path": "plugins/msvc",
-          "version": "0.1.0",
+          "version": "0.1.1",
           "description": "MSVC and clang-cl toolchain guidance and project scaffold layered on cpp.",
           "status": "current",
           "platforms": [
@@ -276,13 +276,13 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:ae3e6e397d51ec92817100d3ef2e283e04a87377e9614d2b9fec088e9fae8804"
+          "digest": "sha256:4c79950d6503fa9b3954e448cf3d42378c2c4dbbba9cb2d0c1ca658953e024fa"
         },
         {
           "id": "cpp-agents/win32",
           "name": "win32",
           "package_path": "plugins/win32",
-          "version": "0.1.0",
+          "version": "0.1.1",
           "description": "User-mode Win32, Unicode, WIL, and Windows resource guidance layered on cpp.",
           "status": "current",
           "platforms": [
@@ -308,13 +308,13 @@
               "wil"
             ]
           },
-          "digest": "sha256:0d88aa4120414bbe5274fd9d0c782b076ae4f37f6b3814f1ac4dbf7b3c0405d5"
+          "digest": "sha256:f75924992bf75d609aace599c2d59583e92ba284d34365542eb85697ee82b888"
         },
         {
           "id": "cpp-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "0.4.0",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -343,7 +343,7 @@
               "c++20-compiler"
             ]
           },
-          "digest": "sha256:cdd4bc92d8a2a7c396025ad1a5936747b5c7f58416dde7b3f448f5af8fa80434",
+          "digest": "sha256:92fe3567b29b2836092482834304eee8839fbd04bdfd74116ec5b69c7b9df54a",
           "replacement": [
             "cpp-agents/cpp"
           ],
@@ -353,7 +353,7 @@
           "id": "cpp-agents/gcc",
           "name": "gcc",
           "package_path": "plugins/gcc",
-          "version": "0.4.0",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -380,7 +380,7 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:0c641da3fc3584cc952e6c4de1fc5458b309bf753cf2208da853d09f19c5b61f",
+          "digest": "sha256:ea1ba9207e8dcf7a286103d7f7067c1c828d677dd9656f37f70480da6b4cbc3e",
           "replacement": [
             "cpp-agents/gpp"
           ],
@@ -390,7 +390,7 @@
           "id": "cpp-agents/windows",
           "name": "windows",
           "package_path": "plugins/windows",
-          "version": "0.6.0",
+          "version": "0.6.1",
           "description": "Deprecated combined MSVC and Win32 compatibility package; split explicitly before 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -422,7 +422,7 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:b0e5821474960d09cc91014ae11f10d505049e86ccc3241c8a04992c95d0db2a",
+          "digest": "sha256:8cedba0b00f680b27dea8bfbe754cab81ce5f44215bcf73a2da30fb63e33701d",
           "replacement": [
             "cpp-agents/msvc",
             "cpp-agents/win32"
@@ -433,7 +433,7 @@
           "id": "cpp-agents/cpp-standards",
           "name": "cpp-standards",
           "package_path": "plugins/cpp-standards",
-          "version": "0.4.0",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -462,7 +462,7 @@
               "c++20-compiler"
             ]
           },
-          "digest": "sha256:820e740755f336e5ebe6ddf3ab156233092e62df4ea780719ef1ed7dde457bac",
+          "digest": "sha256:16842a0f0c2911aa1b3be2eb7dfffd4ef3340d398bb07c5a85ab358b36370fc1",
           "replacement": [
             "cpp-agents/cpp"
           ],
@@ -472,7 +472,7 @@
           "id": "cpp-agents/gpp-standards",
           "name": "gpp-standards",
           "package_path": "plugins/gpp-standards",
-          "version": "0.4.0",
+          "version": "0.4.1",
           "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -499,7 +499,7 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:0b46bffa8b4fdeb21840df22c205b9fa4af60f324acd90d0f90b2d12a87ec29b",
+          "digest": "sha256:ae75b4d3912657938384ae56aedd5e23636f24655ea2e269c3f0764f169c30c8",
           "replacement": [
             "cpp-agents/gpp"
           ],
@@ -508,18 +508,18 @@
       ]
     },
     {
-      "id": "dotagents@1.1.0",
-      "owner_repository": "tomjseery/dotagents",
-      "source": "https://github.com/tomjseery/dotagents.git",
+      "id": "dotagents@1.1.1",
+      "owner_repository": "tj-agents/dotnet",
+      "source": "https://github.com/tj-agents/dotnet.git",
       "marketplace": "dotagents",
-      "revision": "v1.1.0",
-      "version": "1.1.0",
+      "revision": "v1.1.1",
+      "version": "1.1.1",
       "plugins": [
         {
           "id": "dotagents/dotnet",
           "name": "dotnet",
           "package_path": "plugins/dotnet",
-          "version": "1.1.0",
+          "version": "1.1.1",
           "description": "Generic C# and .NET engineering standards.",
           "status": "current",
           "platforms": [
@@ -567,23 +567,23 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:e4e7bd669edb3ee1318063eeb70b0767e0589fb0ffc8070df75bf8213904822e"
+          "digest": "sha256:1a93e69f765b91a68158658ecacd2860baefda23e8d911cc916291a5644723cc"
         }
       ]
     },
     {
-      "id": "react-agents@1.0.0",
-      "owner_repository": "tomjseery/react-agents",
-      "source": "https://github.com/tomjseery/react-agents.git",
+      "id": "react-agents@1.0.1",
+      "owner_repository": "tj-agents/react",
+      "source": "https://github.com/tj-agents/react.git",
       "marketplace": "react-agents",
-      "revision": "v1.0.0",
-      "version": "1.0.0",
+      "revision": "v1.0.1",
+      "version": "1.0.1",
       "plugins": [
         {
           "id": "react-agents/react",
           "name": "react",
           "package_path": "plugins/react",
-          "version": "1.0.0",
+          "version": "1.0.1",
           "description": "Generic React and TypeScript engineering standards.",
           "status": "current",
           "platforms": [
@@ -618,7 +618,7 @@
               "exe:tsc"
             ]
           },
-          "digest": "sha256:7e35e19a6adb4eb6374d6b66923ccf197321ffb3d6fb52adb535ddac6bc54426"
+          "digest": "sha256:55fee8585aad43c664500c00223f55693f405198c179bb98491609d1462100a3"
         }
       ]
     }
