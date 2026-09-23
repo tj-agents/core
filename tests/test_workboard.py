@@ -142,8 +142,8 @@ class ReportingTests(WorkboardHarness):
     def test_a_needle_that_matches_nothing_names_the_corpus_it_searched(self):
         self.plan('demo/SOMETHING_ELSE.md')
         output = self.board('payments')
-        self.assertIn("nothing in ~/.claude/plans is named for 'payments'", output)
-        self.assertIn('outside this corpus', output)
+        self.assertIn("nothing in scope is named for 'payments'", output)
+        self.assertIn('~/.claude/plans is the whole corpus', output)
 
     def test_a_non_numeric_limit_falls_back_to_twenty(self):
         for index in range(25):
@@ -198,6 +198,14 @@ class ScopingTests(WorkboardHarness):
         output = self.board('payments')
         self.assertEqual(set(), rows(output))
         self.assertNotIn('out of scope', output)
+
+    def test_the_no_match_line_does_not_contradict_the_out_of_scope_tally(self):
+        """Those rows reached `elsewhere` by name, so they are plans named for the needle."""
+        self.plan('other-repo/PAYMENTS_ELSEWHERE.md')
+        output = self.board('payments')
+        self.assertIn("nothing in scope is named for 'payments'", output)
+        self.assertIn('out of scope: 1 in other-group', output)
+        self.assertNotIn('nothing in ~/.claude/plans', output)
 
     def test_a_loose_root_plan_is_unfiled(self):
         self.plan('LOOSE_PAYMENTS.md')
