@@ -495,7 +495,10 @@ def resolve_legacy_transition_revision(
     except BootstrapError as error:
         actual_commit = git(run, ["rev-parse", "HEAD"], destination)
         target_revision = target["revision"]
-        if actual_commit != prior["commit"] or target_revision != state_revision(prior):
+        if (
+            actual_commit not in {prior["commit"], target["commit"]}
+            or target_revision != state_revision(prior)
+        ):
             raise error
         try:
             tag_commit = git(
