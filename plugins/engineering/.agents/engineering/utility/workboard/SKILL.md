@@ -51,11 +51,11 @@ Three rules, all deliberately blunt:
 `b2b accept` finds `B2B_ACCEPT_UNION_HANDOFF`. Matching the raw needle against words was the old bug:
 any punctuation at all silently matched nothing.
 
-**Whole words, prefixed either way, or sharing five letters.** A word matches when one is a prefix of
-the other — `auth` finds `authorization`, `authz` finds `auth` — or when the two agree on their first
-five characters, which is what gets `tenant` to `tenancy`. A word must be at least four characters to
-stand in for a longer needle. Between them those floors are why `postgres` does not match a stray
-`pos` and `authz` does not match `authored`.
+**The needle leads: a word starts with it, or shares a stem with it.** `auth` finds `authorization`.
+`authz` does **not** find `auth` — a word standing in for a longer needle made the auth *service* the
+answer to a search for authorization. A stem match needs five shared leading characters and at most
+three left over on each side, which gets `tenant` to `tenancy` without getting `authorization` to
+`authored`. Those bounds are also why `postgres` does not match a stray `pos`.
 
 **A name outranks a mention.** A plan's directory, filename and title say what it is about; its body
 merely mentions things. Only name hits are listed. Text-only hits are counted in one line, and are
@@ -85,9 +85,12 @@ needle = words(sys.argv[1] if len(sys.argv) > 1 else "")
 subject = " ".join(needle)
 
 def akin(word, part):
-    return (word.startswith(part)
-            or (len(word) >= 4 and part.startswith(word))
-            or (len(word) >= 5 and len(part) >= 5 and word[:5] == part[:5]))
+    if word.startswith(part):
+        return True
+    shared = 0
+    while shared < min(len(word), len(part)) and word[shared] == part[shared]:
+        shared += 1
+    return shared >= 5 and len(word) - shared <= 3 and len(part) - shared <= 3
 
 def about(text):
     found = words(text)
@@ -188,6 +191,9 @@ if needle:
             subject, "; these only mention it in their text" if mentioned else ""))
     elif not named and mentioned:
         print("no plan is named for '%s'; these only mention it in their text." % subject)
+    elif not named:
+        print("nothing in ~/.claude/plans is named for '%s'. Plans and roadmaps kept inside a repo"
+              " are outside this corpus." % subject)
 for group, count in sorted(elsewhere.items(), key=lambda kv: -kv[1]):
     print("out of scope: %d in %s - rerun with SCOPE=all to include." % (count, group))
 PY
@@ -208,6 +214,11 @@ changes that.
 The mention count is the same kind of line — read it, do not go looking. When the run fell back to
 text-only matches it says so, and those rows are plans that mention the subject rather than plans
 about it. Say which of the two you are reporting.
+
+When a needle matches nothing at all the run says so and names the corpus it searched. Report that
+verbatim rather than concluding the work does not exist — a plan or roadmap living in the repo it
+concerns is invisible here, and `PLANS_AND_INSTRUCTIONS_MUST_BE_MACHINE_TRANSFERABLE.md` owns closing
+that gap.
 
 Nearly every row carries a blank state — only about one plan in forty uses checkboxes. That is not a
 bug in the read: the corpus is prose handoffs. Say that plainly rather than implying every blank is
