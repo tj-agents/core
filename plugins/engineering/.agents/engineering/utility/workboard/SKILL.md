@@ -192,8 +192,8 @@ if needle:
     elif not named and mentioned:
         print("no plan is named for '%s'; these only mention it in their text." % subject)
     elif not named:
-        print("nothing in ~/.claude/plans is named for '%s'. Plans and roadmaps kept inside a repo"
-              " are outside this corpus." % subject)
+        print("nothing in scope is named for '%s'; ~/.claude/plans is the whole corpus, so a plan or"
+              " roadmap kept inside a repo is never searched." % subject)
 for group, count in sorted(elsewhere.items(), key=lambda kv: -kv[1]):
     print("out of scope: %d in %s - rerun with SCOPE=all to include." % (count, group))
 PY
@@ -215,10 +215,11 @@ The mention count is the same kind of line — read it, do not go looking. When 
 text-only matches it says so, and those rows are plans that mention the subject rather than plans
 about it. Say which of the two you are reporting.
 
-When a needle matches nothing at all the run says so and names the corpus it searched. Report that
-verbatim rather than concluding the work does not exist — a plan or roadmap living in the repo it
-concerns is invisible here, and `PLANS_AND_INSTRUCTIONS_MUST_BE_MACHINE_TRANSFERABLE.md` owns closing
-that gap.
+When a needle matches nothing in scope the run says so and names the corpus it searched — alongside
+any out-of-scope tally, which is a count of plans that *are* named for the needle in another group.
+Report both verbatim rather than concluding the work does not exist: a plan or roadmap living in the
+repo it concerns is invisible here, and `PLANS_AND_INSTRUCTIONS_MUST_BE_MACHINE_TRANSFERABLE.md` owns
+closing that gap.
 
 Nearly every row carries a blank state — only about one plan in forty uses checkboxes. That is not a
 bug in the read: the corpus is prose handoffs. Say that plainly rather than implying every blank is
