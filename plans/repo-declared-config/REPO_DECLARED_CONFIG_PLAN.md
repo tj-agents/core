@@ -24,10 +24,13 @@ identical behaviour.
 ## Design
 
 1. **Core owns the generic harness** for Claude and Codex: skill router, SessionStart check,
-   delivery gates (merge-review, forge-poll, red-run, plan-handoff) and self-heal. These
-   currently ship in `concertable@agent-standards` (`Concertable/agent-standards`,
-   `plugins/concertable/hooks`). Move them here; concertable keeps only Concertable-product
-   skills and rules.
+   delivery gates (merge-review, forge-poll, red-run, plan-handoff), the lane and workflow
+   agents, and self-heal. Core's `engineering` package already ships the router, the gates and
+   the agents; `concertable@agent-standards` (`Concertable/agent-standards`,
+   `plugins/concertable`) carries duplicates of them. Retire those duplicates so concertable keeps
+   only Concertable-product skills and rules. Order: the Concertable repository first enables
+   core plus concertable in its own project settings, then the duplicates are deleted, so it is
+   never without lanes or gates.
 2. **Generated repo config.** A core generator reads a repository's `.agents/` profile and
    routes and writes its `.claude/settings.json` (`extraKnownMarketplaces` with GitHub sources
    plus `enabledPlugins`, always including core) and `.codex/config.toml` (same, no local
