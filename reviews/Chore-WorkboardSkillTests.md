@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `d27f71b`  `(2026-09-23)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `965344e`  `(2026-09-23)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-23 — full
 
@@ -101,3 +101,36 @@ paths manifest, identity hash and tree-archive hash all reproduce.
   leaves behind is complete and verifies. Not this branch's code and not its defect; resolves when
   `load_descriptor` validates the existing archive instead of rewriting it, or when the environment
   stops locking it.
+
+## Review pass — 2026-09-23 — incremental
+
+**Candidate base:** `d27f71bf44db4fa1bd89666549ec8be1496f2991`
+**Candidate head:** `965344e` *(remediation of WB1 plus this work order)*
+**Candidate branch:** `Chore/WorkboardSkillTests`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Chore-WorkboardSkillTests.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Delta: the WB1 report line and its Report-section prose, the two tests that pin it, the regenerated
+catalog digests and generated skill copy, and this work order. No new finding.
+
+Checked in this pass:
+
+- The replacement line is true in all three states. With an out-of-scope tally it reads as a
+  continuation; with none it still names the corpus; under `SCOPE=all` "in scope" is the whole corpus
+  and the claim holds. The clause it replaced was the only one that asserted something the next line
+  denied.
+- The Report-section prose now states what the out-of-scope tally actually counts — plans named for
+  the needle in another group — rather than leaving a reader to infer that nothing was named anywhere.
+- `test_the_no_match_line_does_not_contradict_the_out_of_scope_tally` sits in `ScopingTests`, whose
+  fixture already supplies the second group, and asserts the tally, the new sentence, and the absence
+  of the old one. Mutation-checked: restoring the previous line reddens it and
+  `test_a_needle_that_matches_nothing_names_the_corpus_it_searched`.
+- Generated output is consistent at this head: `sync-generated.ps1 -Check` and
+  `update_catalog_digests.py --check` both report 0 changed.
+- `unittest discover -s tests -p 'test_*.py'` green at this head; `pytest tests/test_workboard.py`
+  reports 24 passed.
+
+Both out-of-scope dispositions recorded in the full pass are unchanged; this delta touches no file
+either covers.
