@@ -52,6 +52,44 @@ identical behaviour.
    Core ships a read-only verifier that reports remaining machine-local behavioural state, so
    every machine can be checked the same way.
 
+## Marketplaces come only from tj-agents
+
+The canonical repositories are `tj-agents/core`, `tj-agents/cpp`, `tj-agents/react` and
+`tj-agents/dotnet`. Every marketplace a generated repository config references must use one of
+these GitHub sources; the generator refuses any other source and consumer CI checks it.
+Marketplace IDs stay stable (`base-agents`, `cpp-agents`, `react-agents`, `dotagents`), so
+existing installs keep resolving; only the source changes.
+
+Stale sources observed on this PC (2026-09-23): `tomjseery/dotagents`, `tomjseery/react-agents`
+and `Concertable/agent-standards` in `~/.claude/settings.json`; `tj-agents/core` was not
+installed in Claude at all.
+
+Build the generator and verifier on `machine:bootstrap-capabilities`, which already previews,
+applies and verifies exact project locks through native plugin commands; extend it rather than
+adding a second installer.
+
+## Per-machine migration
+
+This plan stays open until every machine has converged, so the procedure lives here.
+
+1. Clone the canonical repositories side by side under `~/source/repos/tj-agents/`: `core`,
+   `cpp`, `react`, `dotnet`. Retire older checkouts with other names (`base-agents`,
+   `cpp-agents`, `dotagents`, `react-agents`) only after the user has moved or discarded any
+   uncommitted work in them.
+2. Run core's machine verifier (phase 4) and record what it reports in the ledger.
+3. Remove the user-scope marketplaces and plugins it reports, once the repositories on that
+   machine declare their own.
+4. Rerun the verifier; it must report nothing. Record the machine as converged in the ledger.
+
+Paste this into a new Claude or Codex session on each machine:
+
+```text
+cd ~/source/repos/tj-agents/core
+Pull main. Read plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md and
+plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md and do what the ledger's
+`## Next Steps` says; then follow the plan's "Per-machine migration" for this machine.
+```
+
 ## Scope of this plan
 
 Adoption is **`sandbox-hwid` only**. Other consumers (cpp-agents, the Concertable repository,
