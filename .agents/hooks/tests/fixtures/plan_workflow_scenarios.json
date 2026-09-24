@@ -52,7 +52,7 @@
       "expected_skill": "continue-roadmap",
       "description_terms": [
         "what to plan next",
-        "do not resume an existing plan"
+        "do not execute implementation"
       ]
     },
     {
