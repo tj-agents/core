@@ -1,7 +1,8 @@
 ---
 name: lane-l5
 description: Bounded delegated work at L5.
-model: claude-haiku-4-5
+model: claude-sonnet-5
+effort: medium
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
 ---

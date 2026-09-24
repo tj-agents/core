@@ -1,4 +1,4 @@
-# base-agents
+# core
 
 Read `README.md` before changing repository structure.
 

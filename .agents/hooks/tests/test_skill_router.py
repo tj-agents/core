@@ -136,5 +136,68 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
 
 
+    def aliases(self, mapping):
+        (self.plugin / "hooks" / "compatibility.json").write_text(
+            json.dumps({"skills": mapping}), encoding="utf-8"
+        )
+
+    def test_a_superseded_qualified_name_resolves_nowhere_without_the_table(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
+
+        result = self.run_router(["--verify-install", "claude"])
+
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("base:feature", result.stdout)
+
+    def test_the_alias_table_resolves_it_to_the_plugin_that_now_owns_it(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
+        self.aliases({"base:feature": "engineering:feature"})
+
+        result = self.run_router(["--verify-install", "claude"])
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("resolves all 1 routed skill", result.stdout)
+
+    def test_an_alias_to_a_skill_that_is_genuinely_absent_still_reports_missing(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
+        self.aliases({"base:feature": "engineering:never-shipped"})
+
+        result = self.run_router(["--verify-install", "claude"])
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("base:feature", result.stdout)
+
+    def test_an_alias_chain_is_followed_exactly_one_hop(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["oldest:feature"]}]})
+        self.aliases({"oldest:feature": "base:feature", "base:feature": "engineering:feature"})
+
+        result = self.run_router(["--verify-install", "claude"])
+
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+
+    def test_an_unreadable_alias_table_leaves_resolution_where_it_was(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["engineering:feature"]}]})
+        (self.plugin / "hooks" / "compatibility.json").write_text("{not json", encoding="utf-8")
+
+        result = self.run_router(["--verify-install", "claude"])
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_the_shipped_table_still_carries_the_rename_that_deadlocked_the_router(self):
+        import importlib.util
+
+        sys.path.insert(0, str(HOOKS))
+        self.addCleanup(sys.path.remove, str(HOOKS))
+        spec = importlib.util.spec_from_file_location("router_under_test", ROUTER)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        aliases = module.skill_aliases()
+
+        self.assertEqual("engineering:review-lifecycle", aliases["base:review-lifecycle"])
+        self.assertNotIn("base:plan-artifacts", aliases)
+
+
+
 if __name__ == "__main__":
     unittest.main()

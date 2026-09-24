@@ -10,7 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    'reap_orphans', ROOT / '.agents/machine/utility/scripts/reap_orphans.py'
+    'reap_orphans', ROOT / '.agents/machine/scripts/reap_orphans.py'
 )
 REAPER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(REAPER)
