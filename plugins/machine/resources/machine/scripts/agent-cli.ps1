@@ -103,39 +103,44 @@ function Invoke-AgentTerminalTab {
     }
 }
 
-# Lane -> model for a chosen harness, read from model-lanes.json beside this file. The table is data so a
-# retiering is one edit in one shipped file; a launcher that hardcoded a model would have to be found and
-# changed per harness instead. Resolution never picks the lane: a caller that supplies neither -Lane nor
-# -Model gets the CLI's own configured default, because guessing a lane from a prompt is how an expensive
-# model ends up serving a rename.
+# Lane -> model for a chosen harness, read from the canonical lane tables (.agents/lanes in the authored
+# layout, resources/lanes in the packaged one -- the same relative hop from this file in both). The tables
+# are the repo's only model-name owner, so a retiering is one edit there and every consumer inherits it.
+# Resolution never picks the lane: a caller that supplies neither -Lane nor -Model gets the CLI's own
+# configured default, because guessing a lane from a prompt is how an expensive model ends up serving a
+# rename. -Frontier resolves the tier above the ladder, which no lane can reach: its selection is the
+# user's explicit request, never task shape.
 function Resolve-AgentLaneModel {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('L0', 'L1', 'L2', 'L3')]
+        [ValidateSet('claude', 'codex')]
+        [string] $Harness,
+
         [string] $Lane,
 
-        [Parameter(Mandatory)]
-        [ValidateSet('claude', 'codex')]
-        [string] $Harness
+        [switch] $Frontier
     )
 
-    $policyPath = Join-Path $PSScriptRoot 'model-lanes.json'
-    if (-not (Test-Path -LiteralPath $policyPath -PathType Leaf)) {
-        throw "The lane model table was not found beside the shared library: $policyPath"
+    if (-not $Lane -and -not $Frontier) { throw 'Resolve-AgentLaneModel needs a -Lane or -Frontier.' }
+    if ($Lane -and $Frontier) { throw 'A lane and the frontier tier are mutually exclusive.' }
+
+    $tablePath = Join-Path $PSScriptRoot "..\..\lanes\$Harness.json"
+    if (-not (Test-Path -LiteralPath $tablePath -PathType Leaf)) {
+        throw "The $Harness lane table was not found at $tablePath."
     }
 
-    $policy = Get-Content -LiteralPath $policyPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $entry = $policy.lanes.$Lane
-    if (-not $entry) { throw "Lane '$Lane' is not defined in $policyPath." }
-
-    $harnessEntry = $entry.$Harness
-    if (-not $harnessEntry -or -not $harnessEntry.model) {
-        throw "Lane '$Lane' defines no $Harness model in $policyPath."
+    $table = Get-Content -LiteralPath $tablePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $entry = if ($Frontier) { $table.frontier } else { $table.lanes.$Lane }
+    if (-not $entry -or -not $entry.model) {
+        $known = @($table.lanes.PSObject.Properties.Name) -join ' '
+        $asked = if ($Frontier) { 'the frontier tier' } else { "lane '$Lane'" }
+        throw "The $Harness lane table at $tablePath does not price $asked; it has $known."
     }
 
+    $effortKey = if ($table.effort_key) { $table.effort_key } else { 'effort' }
     return [pscustomobject]@{
-        Model  = $harnessEntry.model
-        Effort = $harnessEntry.effort
+        Model  = $entry.model
+        Effort = $entry.$effortKey
     }
 }

@@ -22,20 +22,29 @@ checkout.
 
 ## Model selection
 
-Pass `-Lane` and the launcher resolves the model from `model-lanes.json`, the table it ships beside the
-shared library, so no caller has to know a model id and a retiering is one edit in one file. `-Model` and `-ReasoningEffort`
-still win for a model the user named outright. Supply neither and the CLI keeps its own configured
-default, exactly as an interactively launched session would.
+Pass `-Lane L1`–`L5` and the launcher resolves the model *and its reasoning effort* from the canonical
+lane tables it ships under `resources/lanes` — the `engineering:lanes` ladder, and the repo's only
+model-name owner, so no caller has to know a model id and a retiering is one edit in one authored file.
+The pair matters here: a Codex model is priced and paced by both. An explicit `-Model` or
+`-ReasoningEffort` still wins for whichever half the user named outright. Supply none and the CLI keeps
+its own configured default, exactly as an interactively launched session would.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
-lane from the prompt would quietly decide the cost of every handoff. Choose it from the work:
+lane from the prompt would quietly decide the cost of every handoff. Choose by reversibility, blast
+radius, ambiguity and verifiability — never by how hard the work feels:
 
-| Lane | Model + effort | For |
-|---|---|---|
-| `L0` | `gpt-6-astra` at `max` | Frontier deliberation: a foundational design decision or deep option synthesis. **Only when the user explicitly asks for it** — never inferred from difficulty, ambiguity or scope. |
-| `L1` | `gpt-5.6-sol` at `high` | Complex reasoning: architecture, diagnosis, review, security, irreversible or service-wide change. |
-| `L2` | `gpt-5.6-terra` at `medium` | Everyday engineering. The default when nothing selects another lane. |
-| `L3` | `gpt-5.6-luna` at `low` | Mechanical work already decided, caught by a compiler or a test. |
+| Lane | For |
+|---|---|
+| `L1` | Irreversible work at the top of the ladder, where a mistake cannot be taken back. |
+| `L2` | Open-ended judgement, where the answer is not yet known. |
+| `L3` | Ordinary specified work that a compiler or a test suite will catch. |
+| `L4` | Mechanical work whose shape is already decided. |
+| `L5` | Clerical work with a small input and no judgement to make. |
+
+`-Frontier` selects the tier above the ladder from the same table, model and effort together. **Pass it
+only when the user explicitly asked for that tier or its model by name.** No lane resolves to it —
+frontier spend is the user's provenance to grant, never a reward for a hard-looking task — and it rejects
+`-Lane` or `-Model` beside it.
 
 A calling skill or workflow that ships its own resolved selection may still pass `-Model` and `-ReasoningEffort` directly;
 that wins over `-Lane`. What is no longer acceptable is inventing a model id at the call site.
