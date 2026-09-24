@@ -63,6 +63,7 @@ anything else, deliberately - a `grep`, `cat` or `sed -n` naming a routed path m
 never a write.
 """
 
+import functools
 import hashlib
 import json
 import os
@@ -88,6 +89,15 @@ ROUTES_FILE = ".agents/skill-routes.json"
 # generated table committed into that repo and drifting there.
 SHIPPED_ROUTES_DIR = Path(__file__).resolve().parent.parent / "routes"
 REGISTRY_FILE = "registry.json"
+# A rename moves a skill between plugins; the qualified name in a route, a plan or a habit does not move
+# with it. `.agents/plugins/compatibility.json` already records every such move - it simply had no
+# reader, which is how the base: -> engineering: reorganisation made `base:review-lifecycle` resolve
+# nowhere and deadlocked the very route that demanded it. Packaged beside this file; one level up in the
+# source tree.
+ALIAS_CANDIDATES = (
+    Path(__file__).resolve().parent / "compatibility.json",
+    Path(__file__).resolve().parent.parent / "plugins" / "compatibility.json",
+)
 REMOTE_URL = re.compile(r'\[remote "origin"\][^\[]*?\burl\s*=\s*([^\r\n]+)', re.DOTALL)
 # Lowercased, because the two harnesses do not agree on casing or on names. Claude writes through
 # Write/Edit/MultiEdit/NotebookEdit; Codex writes through apply_patch, and matching only Claude's
@@ -492,7 +502,30 @@ def plugin_of(skills_dir):
 PROOF_ANCHOR_BYTES = 400
 
 
-def resolved_skill(name, harness):
+@functools.lru_cache(maxsize=1)
+def skill_aliases():
+    """Superseded plugin-qualified skill name -> its current name.
+
+    Unreadable or absent resolves to no aliases, never to an error: an alias is a recovery path for a
+    name that would otherwise resolve nowhere, so losing it can only restore today's behaviour.
+    """
+    for candidate in ALIAS_CANDIDATES:
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        skills = data.get("skills") if isinstance(data, dict) else None
+        if not isinstance(skills, dict):
+            continue
+        return {
+            superseded: current
+            for superseded, current in skills.items()
+            if isinstance(superseded, str) and isinstance(current, str) and superseded != current
+        }
+    return {}
+
+
+def resolved_skill(name, harness, following_alias=False):
     """The installed skill file and body, or ``None`` when it cannot be read.
 
     The FIRST readable copy wins, deliberately: nearest delivery answers, and every later root holds a
@@ -525,7 +558,12 @@ def resolved_skill(name, harness):
             first = first or (skill, text)
             continue
         return skill, text
-    return first
+    if first is not None:
+        return first
+    # Nothing answers to this name anywhere, which is what a rename looks like from here. One hop only:
+    # the alias table is a rename record, not a chain to walk.
+    current = None if following_alias else skill_aliases().get(name)
+    return resolved_skill(current, harness, True) if current else None
 
 
 def description_of(body):

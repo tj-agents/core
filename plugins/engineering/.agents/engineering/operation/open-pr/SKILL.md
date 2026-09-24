@@ -4,7 +4,7 @@ description: Open or update the pull request for the current branch with the for
 
 kind: operation
 domain: process
-lane: L3
+lane: L4
 ---
 
 # Opening a pull request

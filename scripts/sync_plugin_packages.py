@@ -691,7 +691,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
         if entry["version"] != manifest_version:
             raise ValueError(f"Catalog version drift: {plugin_id}")
         release = entry["_release"]
-        if release["marketplace"] != "base-agents" or release["owner_repository"] != "tomjseery/base-agents":
+        if release["marketplace"] != "base-agents" or release["owner_repository"] != "tj-agents/core":
             raise ValueError(f"Catalog owner drift: {plugin_id}")
         if validate_catalog_digests:
             actual_digest = output_tree_digest(
