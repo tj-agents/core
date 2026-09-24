@@ -55,6 +55,12 @@ L3 is what ordinary work declares; declare it explicitly rather than relying on 
 Nothing here says "how hard does this feel". A long mechanical edit is still L4; a three-line change to a
 published contract is still L1.
 
+**The frontier tier is above the ladder and is not a rung.** Each table carries a `frontier` entry the
+four questions can never select: it is priced by provenance — the user explicitly asking for that tier or
+its model by name — not by task shape, and a test asserts no rung resolves to its model, so lane inflation
+cannot reach it. Consumers that expose it (the handoff launchers' `-Frontier`) make selecting it a
+distinct visible act rather than one lane value among others.
+
 **Re-route per phase.** One task is usually open/judgement while it is being designed, then specified and
 test-caught while it is built, then clerical to commit and push. Route each phase. Running the whole task
 in the rung its hardest phase needed is the waste this ladder exists to stop, and running the design phase
