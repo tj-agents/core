@@ -45,5 +45,12 @@
     }
   },
 
+  "frontier": {
+    "summary": "Frontier deliberation above the ladder, priced by provenance rather than by task shape.",
+    "model": "gpt-6-astra",
+    "reasoning_effort": "max",
+    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select frontier spend -- a test asserts no rung prices this model, so lane inflation can never reach it."
+  },
+
   "$comment_context_ceiling": "null means unrecorded, not unlimited. The Claude table carries real per-model windows from the published model table; the Codex figures are not verified here, so recording a number would be inventing one. A lane consumer that needs a ceiling must treat null as 'unknown' and not assume the input fits."
 }

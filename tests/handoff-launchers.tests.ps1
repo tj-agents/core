@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 # End-to-end validation of the generated handoff launchers, per PACKAGING.md: neither must require a
 # machine-local file this plugin does not ship. Runs against the actual generated package
@@ -145,6 +145,83 @@ class Stub {
     $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
     if ($capturedArgs -notmatch 'gpt-5-codex') { throw 'launch-codex.ps1 did not pass an explicit -Model through.' }
     if ($capturedArgs -notmatch 'model_reasoning_effort=high') { throw 'launch-codex.ps1 did not pass -ReasoningEffort through.' }
+    # Lane and frontier expectations come from the tables the plugin actually ships, so a retiering there
+    # can never silently disagree with what these launchers pass through.
+    $claudeTable = Get-Content -LiteralPath (Join-Path $repository 'plugins\machine\resources\lanes\claude.json') -Raw | ConvertFrom-Json
+    $codexTable = Get-Content -LiteralPath (Join-Path $repository 'plugins\machine\resources\lanes\codex.json') -Raw | ConvertFrom-Json
+
+    # --- handoff-claude: -Lane resolves through the shipped lane table ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L3'
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.lanes.L3.model)) { throw 'launch-claude.ps1 did not resolve -Lane L3 through the shipped table.' }
+
+    # --- handoff-claude: an explicit -Model still beats -Lane ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L3' -Model 'explicitly-named-model'
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'explicitly-named-model') { throw 'launch-claude.ps1 let -Lane override an explicit -Model.' }
+    if ($capturedArgs -match [regex]::Escape($claudeTable.lanes.L3.model)) { throw 'launch-claude.ps1 passed the lane model alongside an explicit -Model.' }
+
+    # --- handoff-claude: -Frontier resolves the tier above the ladder ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.frontier.model)) { throw 'launch-claude.ps1 did not resolve -Frontier to the frontier model.' }
+
+    # --- handoff-claude: -Frontier rejects a competing selection instead of ranking it ---
+    foreach ($conflict in @(@{ Lane = 'L1' }, @{ Model = 'explicitly-named-model' })) {
+        $rejected = $false
+        try { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier @conflict }
+        catch { $rejected = $true }
+        if (-not $rejected) { throw "launch-claude.ps1 accepted -Frontier together with $($conflict.Keys -join ',')." }
+    }
+
+    # --- handoff-codex: -Lane resolves both model and effort ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($codexTable.lanes.L4.model)) { throw 'launch-codex.ps1 did not resolve -Lane L4 through the shipped table.' }
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L4.reasoning_effort)") { throw 'launch-codex.ps1 did not resolve -Lane L4 to its effort.' }
+
+    # --- handoff-codex: an explicit -Model survives a -Lane, which still fills the effort half ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' -Model 'explicitly-named-model' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'explicitly-named-model') { throw 'launch-codex.ps1 let -Lane override an explicit -Model.' }
+    if ($capturedArgs -match [regex]::Escape($codexTable.lanes.L4.model)) { throw 'launch-codex.ps1 passed the lane model alongside an explicit -Model.' }
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L4.reasoning_effort)") { throw 'launch-codex.ps1 did not fill the effort half from the lane beside an explicit -Model.' }
+
+    # --- handoff-codex: an explicit -ReasoningEffort survives a -Lane that would have set it ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' -ReasoningEffort 'xhigh' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($codexTable.lanes.L4.model)) { throw 'launch-codex.ps1 dropped the lane model when effort was explicit.' }
+    if ($capturedArgs -notmatch 'model_reasoning_effort=xhigh') { throw 'launch-codex.ps1 let -Lane override an explicit -ReasoningEffort.' }
+
+    # --- handoff-codex: -Frontier resolves the tier's model and effort as a pair ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($codexTable.frontier.model)) { throw 'launch-codex.ps1 did not resolve -Frontier to the frontier model.' }
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.frontier.reasoning_effort)") { throw 'launch-codex.ps1 did not resolve -Frontier to its effort.' }
+
+    # --- an out-of-ladder lane is rejected at the parameter surface, never silently defaulted ---
+    foreach ($undefined in @('L0', 'L9')) {
+        $rejected = $false
+        try { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane $undefined }
+        catch { $rejected = $true }
+        if (-not $rejected) { throw "launch-claude.ps1 accepted the undefined lane $undefined." }
+    }
+
+    # --- the resolver's own guard also rejects a lane its table does not price: ValidateSet reaches the
+    # binder before the table lookup, so this calls the shipped shared library directly ---
+    . (Join-Path $repository 'plugins\machine\resources\machine\scripts\agent-cli.ps1')
+    $rejected = $false
+    try { Resolve-AgentLaneModel -Harness 'claude' -Lane 'L9' | Out-Null }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'Resolve-AgentLaneModel accepted a lane its table does not price.' }
+
     # --- open-claude: no prompt, no session - just a CLI on a directory ---
     Remove-Item -LiteralPath $wtLog -Force
     & $openLauncher -WorkingDirectory $workDir -Title 'test open'
