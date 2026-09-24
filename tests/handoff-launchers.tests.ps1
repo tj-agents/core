@@ -11,7 +11,14 @@ $repository = Split-Path -Parent $PSScriptRoot
 $claudeLauncher = Join-Path $repository 'plugins\machine\skills\handoff-claude\scripts\launch-claude.ps1'
 $codexLauncher = Join-Path $repository 'plugins\machine\skills\handoff-codex\scripts\launch-codex.ps1'
 $openLauncher = Join-Path $repository 'plugins\machine\skills\open-claude\scripts\open-claude.ps1'
-foreach ($launcher in @($claudeLauncher, $codexLauncher, $openLauncher)) {
+$packagedLaunchers = @(Get-ChildItem -LiteralPath (Join-Path $repository 'plugins\machine\skills') -Recurse -File -Filter '*.ps1' |
+    Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'agent-cli\.ps1' } |
+    Select-Object -ExpandProperty FullName)
+$expectedLaunchers = @($claudeLauncher, $codexLauncher, $openLauncher) | Sort-Object
+if (Compare-Object $expectedLaunchers ($packagedLaunchers | Sort-Object)) {
+    throw 'The generated launcher dependency inventory changed; every agent-cli.ps1 consumer must be exercised or resolved here.'
+}
+foreach ($launcher in $packagedLaunchers) {
     if (-not (Test-Path -LiteralPath $launcher)) {
         throw "Generated launcher missing: $launcher. Run pwsh .agents/sync-generated.ps1."
     }
@@ -263,8 +270,8 @@ class Stub {
     catch { $rejected = $true }
     if (-not $rejected) { throw 'open-claude.ps1 accepted -Resume together with -Continue.' }
 
-    # --- the shared library is what all three launchers actually load ---
-    foreach ($launcher in @($claudeLauncher, $codexLauncher, $openLauncher)) {
+    # --- every generated launcher that names the shared library can resolve the shipped dependency ---
+    foreach ($launcher in $packagedLaunchers) {
         $shared = Join-Path (Split-Path -Parent $launcher) '..\..\..\resources\machine\utility\scripts\agent-cli.ps1'
         if (-not (Test-Path -LiteralPath $shared -PathType Leaf)) {
             throw "The packaged $(Split-Path -Leaf $launcher) cannot reach the shared agent-cli.ps1."
