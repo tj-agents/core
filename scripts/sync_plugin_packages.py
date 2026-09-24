@@ -99,6 +99,15 @@ def render_capabilities(catalog: dict) -> str:
     return "\n".join(lines)
 
 
+def canonical_output_bytes(data: str | bytes) -> bytes:
+    raw = data.encode("utf-8") if isinstance(data, str) else data
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw
+    return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+
+
 def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: list[str]) -> str:
     prefix = package_path.rstrip("/") + "/"
     excluded_paths = {PurePosixPath(value).as_posix() for value in excluded}
@@ -536,7 +545,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
     def emit(relative: str, data: str | bytes):
         if relative in output:
             raise ValueError(f"Duplicate generated output: {relative}")
-        output[relative] = data.encode("utf-8") if isinstance(data, str) else data
+        output[relative] = canonical_output_bytes(data)
 
     # Ship the canonical definition once. Resource siblings are also copied into each
     # generated discovery entry so <skill-directory> remains valid after installation;
