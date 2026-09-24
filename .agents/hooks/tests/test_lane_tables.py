@@ -24,18 +24,18 @@ EFFORTS = ("low", "medium", "high", "xhigh", "max")
 # The stage vocabulary predates the ladder and stays pinned under the workflow contract's own version.
 # These are the rungs each stage was derived from; the pins must keep agreeing with the ladder.
 STAGE_LANES = {
-    "critical": "L1",
-    "strategic": "L2",
-    "implementation": "L3",
-    "review": "L3",
-    "mechanical": "L4",
+    "critical": "L2",
+    "strategic": "L3",
+    "implementation": "L4",
+    "review": "L4",
+    "mechanical": "L5",
 }
 
 # Capability order per vendor, most capable first. A rung may never sit above the rung before it, and the
 # frontier tier must outrank every rung.
 FAMILY_ORDER = {
     "claude": ("claude-fable-5", "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"),
-    "codex": ("gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"),
+    "codex": ("gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"),
 }
 
 
@@ -111,22 +111,30 @@ class LaneTableTests(unittest.TestCase):
 
     def test_the_frontier_tier_sits_above_the_ladder_and_no_rung_can_reach_it(self):
         # The guard the frontier rule depends on: frontier spend is granted by the user's explicit request,
-        # never resolved from a lane, so the tier must exist as data yet price a model no rung prices.
+        # never resolved from a lane. L1 deliberately prices the frontier family, so the tier is a
+        # model-and-effort pair no rung prices, and any rung sharing the model must sit strictly below
+        # the frontier's effort.
         for host in HOST_IDS:
             data = table(host)
+            key = data["effort_key"]
             with self.subTest(host=host):
                 frontier = data.get("frontier")
                 self.assertIsInstance(frontier, dict, "the frontier tier must be declared as data")
                 self.assertTrue(frontier.get("model"))
                 order = FAMILY_ORDER[host]
                 self.assertEqual(0, order.index(frontier["model"]), "frontier must be the most capable model")
-                rung_models = {rung["model"] for rung in data["lanes"].values()}
-                self.assertNotIn(frontier["model"], rung_models, "a rung pricing the frontier model lets a lane reach it")
-
-    def test_codex_frontier_declares_its_effort_pair(self):
-        # A Codex model is priced and paced by the pair; the launcher reads both from this one entry.
-        frontier = table("codex")["frontier"]
-        self.assertIn(frontier[table("codex")["effort_key"]], EFFORTS)
+                self.assertIn(frontier.get(key), EFFORTS, "the frontier tier is priced by the pair, so it must declare effort")
+                frontier_rank = EFFORTS.index(frontier[key])
+                for lane, rung in data["lanes"].items():
+                    if rung["model"] != frontier["model"]:
+                        continue
+                    with self.subTest(host=host, lane=lane):
+                        self.assertIn(rung.get(key), EFFORTS, "a rung sharing the frontier model must declare effort")
+                        self.assertLess(
+                            EFFORTS.index(rung[key]),
+                            frontier_rank,
+                            "a rung pricing the frontier pair lets a lane reach the tier",
+                        )
 
     def test_claude_records_a_context_ceiling_and_its_cheapest_rung_is_smaller(self):
         lanes = table("claude")["lanes"]
@@ -135,7 +143,7 @@ class LaneTableTests(unittest.TestCase):
         self.assertLess(
             ceilings[-1],
             ceilings[0],
-            "L5 dropping a family is a context step too; if that stops being true, say so here",
+            "L7 dropping a family is a context step too; if that stops being true, say so here",
         )
 
 
