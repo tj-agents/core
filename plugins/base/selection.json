@@ -6,6 +6,7 @@
   "prerequisites": [],
   "skills": [
     "cd",
-    "plan-artifacts"
+    "plan-artifacts",
+    "stack-tiers"
   ]
 }

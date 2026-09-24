@@ -1,6 +1,6 @@
 ---
 name: peer-cli
-description: List, inspect and close the other Claude CLI sessions running on this machine, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session, or to check what another session is doing before continuing.
+description: List, inspect and close the other Claude CLI sessions and their Windows Terminal tabs, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session or a stale tab, or to check what another session is doing before continuing.
 
 kind: utility
 domain: machine
@@ -27,6 +27,31 @@ the two things they do not do: resolving the title the user sees, and ending a s
 `close` prompts unless `-Force`. A session records itself at SessionStart, so one started before that hook
 existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe` processes that own no entry, so
 a running CLI is never invisible just because it predates the registry.
+
+## Closing the tab, not just the process
+
+Ending the process is not closing the window. Terminal's default `closeOnExit: automatic` keeps a tab
+whose process exited non-zero, and a killed one always does, so `peer-cli close` on its own leaves a dead
+pane. Two things fix that, and both are here:
+
+```powershell
+& '<skill-directory>\scripts\configure-terminal-tab-close.ps1'          # once per machine
+& '<skill-directory>\scripts\close-tab.ps1' -List
+& '<skill-directory>\scripts\close-tab.ps1' 'Postgres sweep: Search'
+```
+
+The configurator sets `closeOnExit: always` on Terminal's profile defaults, so from then on a session
+takes its tab with it. `close-tab.ps1` is for tabs already left behind: Terminal exposes no command-line
+verb for closing one, so it drives UI Automation — it finds the `TabItem` whose Name matches and invokes
+that tab's own `CloseButton`, never a keystroke that would land on whichever tab has focus.
+
+Its two refusals both exist because they were broken first:
+
+- **A wildcard reports and stops.** A pattern written to match several can match exactly one and close it
+  silently. `-All` opts in; an exact title is itself the decision.
+- **A live tab is refused.** Liveness is per tab, read from the session registry, so a stale tab is still
+  closable in a window full of busy ones. A title with no registry entry predates the hook and counts as
+  live, because unknown is not dead. `-Force` overrides.
 
 ## Closing a peer
 

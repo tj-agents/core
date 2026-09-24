@@ -37,6 +37,43 @@ function Resolve-ClaudeExecutable {
     throw "The native Claude Code executable was not found. Looked for $env:USERPROFILE\.local\bin\claude.exe and claude.exe on PATH."
 }
 
+# Windows Terminal mangles argument values on the way to the tab process, and does it silently. It splits
+# its own command line on `;` into subcommands, so an unescaped semicolon in a prompt truncates the prompt
+# and turns the remainder into a bogus program; the tab still opens, which is what made the loss invisible.
+# It then re-joins the remaining args into one child command line, quoting an arg only when that arg
+# contains a space and escaping nothing inside it, and the tab process re-parses that string by
+# CommandLineToArgvW rules. So a quote is eaten, and a trailing backslash in a spaced value escapes the
+# closing quote and swallows the next argument whole.
+function ConvertTo-TerminalArgument {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyString()][string] $Value)
+
+    # Windows Terminal quotes on a space and nothing else, so a line break or tab in a value with no space
+    # is dropped outright and no escape can carry it. A refused launch beats a silently shortened prompt.
+    if ($Value -match '[\r\n\t]' -and -not $Value.Contains(' ')) {
+        throw "Windows Terminal cannot carry a line break or tab in an argument containing no space, and would drop it: $Value"
+    }
+
+    $quoted = $Value.Contains(' ')
+    $builder = [System.Text.StringBuilder]::new()
+    $backslashes = 0
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq '\') { $backslashes++; continue }
+        if ($character -eq '"') {
+            [void]$builder.Append('\', (2 * $backslashes) + 1).Append('"')
+        }
+        else {
+            [void]$builder.Append('\', $backslashes).Append($character)
+        }
+        $backslashes = 0
+    }
+    [void]$builder.Append('\', $(if ($quoted) { 2 * $backslashes } else { $backslashes }))
+
+    # Escaped last, because Windows Terminal strips exactly one backslash before a semicolon, so this must
+    # be the outermost layer for a value that legitimately ends a run of backslashes at a semicolon.
+    return $builder.ToString() -replace ';', '\;'
+}
+
 # Opens the CLI as a new tab in the Windows Terminal window that most recently had focus.
 #
 # ClearEnvironment and ForceEnvironment are the whole of the per-agent variance and are always the
@@ -91,7 +128,7 @@ function Invoke-AgentTerminalTab {
             [Environment]::SetEnvironmentVariable($name, $ForceEnvironment[$name], 'Process')
         }
 
-        & $terminal @terminalArguments
+        & $terminal @($terminalArguments | ForEach-Object { ConvertTo-TerminalArgument $_ })
         if ($LASTEXITCODE -ne 0) {
             throw "Windows Terminal exited with code $LASTEXITCODE"
         }
