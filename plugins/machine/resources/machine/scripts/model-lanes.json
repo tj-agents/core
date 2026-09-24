@@ -1,0 +1,25 @@
+{
+  "_": "Lane -> model, per harness. Data, not code: retiering a lane or repricing a model is an edit here and nothing else. Lane selection itself belongs to the caller; this file only says which model serves a chosen lane.",
+  "lanes": {
+    "L0": {
+      "why": "Frontier deliberation. Explicitly authorized work whose main cost is thinking: a foundational design decision or deep option synthesis. Never inferred from difficulty, ambiguity or scope.",
+      "claude": { "model": "claude-fable-5" },
+      "codex": { "model": "gpt-6-astra", "effort": "max" }
+    },
+    "L1": {
+      "why": "Complex reasoning. Bounded but difficult or high-consequence engineering: architecture, diagnosis, review, security, irreversible or service-wide change.",
+      "claude": { "model": "claude-opus-5" },
+      "codex": { "model": "gpt-5.6-sol", "effort": "high" }
+    },
+    "L2": {
+      "why": "Everyday engineering. The default lane when nothing selects another.",
+      "claude": { "model": "claude-sonnet-5" },
+      "codex": { "model": "gpt-5.6-terra", "effort": "medium" }
+    },
+    "L3": {
+      "why": "Mechanical work whose shape is already decided and whose result a compiler or a test catches.",
+      "claude": { "model": "claude-haiku-4-5-20251001" },
+      "codex": { "model": "gpt-5.6-luna", "effort": "low" }
+    }
+  }
+}

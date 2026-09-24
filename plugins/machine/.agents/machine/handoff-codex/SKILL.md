@@ -22,13 +22,23 @@ checkout.
 
 ## Model selection
 
-This launcher is a dumb transport — it never chooses a model or effort itself, and it packages no
-external resolver. Pass `-Model` (and `-ReasoningEffort`, for a model that accepts it) only when the
-caller already knows which to use: the user named a specific model or tier explicitly, or the calling
-skill/workflow carries its own checked-in model-selection policy (for example a `lanes` contract, where
-the calling repository ships one) and has already resolved it before reaching this launcher. Never invent
-a selection policy here, and never default to the most capable or most expensive model just because none
-was specified.
+Pass `-Lane` and the launcher resolves the model from `model-lanes.json`, the table it ships beside the
+shared library, so no caller has to know a model id and a retiering is one edit in one file. `-Model` and `-ReasoningEffort`
+still win for a model the user named outright. Supply neither and the CLI keeps its own configured
+default, exactly as an interactively launched session would.
+
+**The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
+lane from the prompt would quietly decide the cost of every handoff. Choose it from the work:
+
+| Lane | Model + effort | For |
+|---|---|---|
+| `L0` | `gpt-6-astra` at `max` | Frontier deliberation: a foundational design decision or deep option synthesis. **Only when the user explicitly asks for it** — never inferred from difficulty, ambiguity or scope. |
+| `L1` | `gpt-5.6-sol` at `high` | Complex reasoning: architecture, diagnosis, review, security, irreversible or service-wide change. |
+| `L2` | `gpt-5.6-terra` at `medium` | Everyday engineering. The default when nothing selects another lane. |
+| `L3` | `gpt-5.6-luna` at `low` | Mechanical work already decided, caught by a compiler or a test. |
+
+A calling skill or workflow that ships its own resolved selection may still pass `-Model` and `-ReasoningEffort` directly;
+that wins over `-Lane`. What is no longer acceptable is inventing a model id at the call site.
 
 Launch with `scripts/launch-codex.ps1`, beside this file:
 
