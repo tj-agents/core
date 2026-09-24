@@ -158,6 +158,21 @@
       "plugin": "engineering",
       "source": ".agents/hooks/docs_reachability.py",
       "destination": "hooks/docs_reachability.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/tiers/base.json",
+      "destination": "tier.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/tiers/engineering.json",
+      "destination": "tier.json"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/tiers/machine.json",
+      "destination": "tier.json"
     }
   ],
   "prerequisites": {
