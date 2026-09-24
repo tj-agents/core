@@ -4,7 +4,7 @@ description: Compatibility entry for asking what to plan next on an epic roadmap
 
 kind: workflow
 domain: process
-lane: L2
+lane: L3
 ---
 
 # Select a roadmap item for plan authoring
