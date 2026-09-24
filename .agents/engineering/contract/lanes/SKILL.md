@@ -82,6 +82,9 @@ in the rung its cleanup needed is how a bad design gets built efficiently.
   live under the workflow contract's version rather than being re-resolved at dispatch. They are derived
   from the ladder and a test asserts they still agree with it, so a rung and its stage cannot drift apart
   — but the pin is the value the runtime reads.
+- **A handoff launcher** (`machine:handoff-claude`, `machine:handoff-codex`) takes `-Lane` (or
+  `-Frontier`) per dispatch: the calling agent judges the lane by the four questions and the launcher only
+  prices it, never inferring one from the prompt.
 
 ## Where the two ladders are not level — know these before trusting parity
 

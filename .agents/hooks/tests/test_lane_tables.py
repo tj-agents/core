@@ -229,7 +229,7 @@ class PluginDeliveryTests(unittest.TestCase):
         # The handoff launchers resolve -Lane/-Frontier from resources/lanes, two hops up from the shared
         # agent-cli.ps1 -- the same hop that finds .agents/lanes in the authored layout. A machine-only
         # install must price a lane identically to an engineering one.
-        for name in ("claude.json", "codex.json"):
+        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md"):
             with self.subTest(name=name):
                 shipped = ROOT / "plugins" / "machine" / "resources" / "lanes" / name
                 self.assertTrue(shipped.is_file(), f"plugins/machine/resources/lanes/{name} is not shipped")

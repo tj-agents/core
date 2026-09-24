@@ -36,7 +36,7 @@ radius, ambiguity and verifiability — never by how hard the work feels:
 | Lane | For |
 |---|---|
 | `L1` | Irreversible work at the top of the ladder, where a mistake cannot be taken back. |
-| `L2` | Open-ended judgement, where the answer is not yet known. |
+| `L2` | Open-ended judgement at the top of the ladder, where the answer is not yet known. |
 | `L3` | Ordinary specified work that a compiler or a test suite will catch. |
 | `L4` | Mechanical work whose shape is already decided. |
 | `L5` | Clerical work with a small input and no judgement to make. |
@@ -44,7 +44,8 @@ radius, ambiguity and verifiability — never by how hard the work feels:
 `-Frontier` selects the tier above the ladder from the same table, model and effort together. **Pass it
 only when the user explicitly asked for that tier or its model by name.** No lane resolves to it —
 frontier spend is the user's provenance to grant, never a reward for a hard-looking task — and it rejects
-`-Lane` or `-Model` beside it.
+`-Lane` or `-Model` beside it. `-ReasoningEffort` is the one flag it still accepts, winning over the
+tier's own effort, for a user who named the pace as well as the tier.
 
 A calling skill or workflow that ships its own resolved selection may still pass `-Model` and `-ReasoningEffort` directly;
 that wins over `-Lane`. What is no longer acceptable is inventing a model id at the call site.
@@ -55,9 +56,10 @@ Launch with `scripts/launch-codex.ps1`, beside this file:
 & '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
 ```
 
-Add `-Model '<model-id>'` and `-ReasoningEffort '<level>'` only when both were resolved as above. Omitting
-them lets `codex.exe` fall back to its own configured default — the same behavior an interactively
-launched session gets.
+Add `-Lane '<L1..L5>'` (or `-Frontier`) to have the launcher resolve model and effort, or `-Model
+'<model-id>'` and `-ReasoningEffort '<level>'` for values the user named. Omitting them all lets
+`codex.exe` fall back to its own configured default — the same behavior an interactively launched
+session gets.
 
 Use `-BypassHookTrust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
 user has not authorized repository hooks.
