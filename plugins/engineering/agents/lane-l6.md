@@ -1,8 +1,8 @@
 ---
-name: lane-l5
-description: Bounded delegated work at L5.
+name: lane-l6
+description: Bounded delegated work at L6.
 model: claude-sonnet-5
-effort: medium
+effort: low
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
 ---

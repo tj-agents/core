@@ -1,5 +1,5 @@
 {
-  "_": "Claude's rung of the lane ladder. A lane is an ordinal capability/price rung; a skill, an agent or a workflow stage declares a lane and NEVER a model. This file and its Codex sibling are the only two places in the repo a model name may appear, so repricing a rung or adopting a new model is a one-file change per harness. Rungs are ordered L1 (most capable) to L5 (cheapest) and mean the same thing on both harnesses -- see .agents/lanes/codex.json for the paired values and .agents/skills/lanes/SKILL.md for how a lane is chosen.",
+  "_": "Claude's rung of the lane ladder. A lane is an ordinal capability/price rung; a skill, an agent or a workflow stage declares a lane and NEVER a model. This file and its Codex sibling are the only two places in the repo a model name may appear, so repricing a rung or adopting a new model is a one-file change per harness. Rungs are ordered L1 (most capable) to L7 (cheapest) and mean the same thing on both harnesses -- see .agents/lanes/codex.json for the paired values and .agents/skills/lanes/SKILL.md for how a lane is chosen.",
 
   "host": "claude",
   "effort_key": "effort",
@@ -8,34 +8,48 @@
 
   "lanes": {
     "L1": {
-      "summary": "Irreversible work at the top of the ladder, where a mistake cannot be taken back.",
+      "summary": "Irreversible work with wide reach, where a mistake compounds beyond the repository.",
+      "model": "claude-fable-5",
+      "effort": "xhigh",
+      "context_ceiling": 1000000,
+      "why": "frontier family at the coding default setting. Irreversible work whose blast radius reaches a service or production: a schema migration that ships, a contract other teams build on."
+    },
+    "L2": {
+      "summary": "Irreversible work of ordinary reach, where a mistake cannot be taken back.",
       "model": "claude-opus-5",
       "effort": "xhigh",
       "context_ceiling": 1000000,
-      "why": "top family at the setting above `high`. For work whose mistake cannot be taken back: stored data shape, a published contract, a merge that lands."
+      "why": "top general family at the setting above `high`. For work whose mistake cannot be taken back: stored data shape, a published contract, a merge that lands."
     },
-    "L2": {
+    "L3": {
       "summary": "Open-ended judgement at the top of the ladder, where the answer is not yet known.",
       "model": "claude-opus-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "top family at its default setting. Open-ended judgement: architecture, plan authoring, a diagnosis with no known answer."
+      "why": "top general family at its default setting. Open-ended judgement: architecture, plan authoring, a diagnosis with no known answer."
     },
-    "L3": {
+    "L4": {
       "summary": "Ordinary specified work that a compiler or a test suite will catch.",
       "model": "claude-sonnet-5",
       "effort": "high",
       "context_ceiling": 1000000,
       "why": "the workhorse. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses."
     },
-    "L4": {
+    "L5": {
       "summary": "Mechanical work whose shape is already decided.",
       "model": "claude-sonnet-5",
       "effort": "medium",
       "context_ceiling": 1000000,
       "why": "the workhorse at reduced spend. Mechanical work whose shape is already decided: scripted edits, docs, ledger upkeep."
     },
-    "L5": {
+    "L6": {
+      "summary": "Bulk clerical work whose input is too large for the cheapest rung.",
+      "model": "claude-sonnet-5",
+      "effort": "low",
+      "context_ceiling": 1000000,
+      "why": "the workhorse at its lowest setting, kept for the full context window. Clerical loops and bulk passes -- a monitor, a long transcript, a big diff -- that L7's window or capability cannot hold."
+    },
+    "L7": {
       "summary": "Clerical work with a small input and no judgement to make.",
       "model": "claude-haiku-4-5",
       "context_ceiling": 200000,
@@ -47,6 +61,7 @@
   "frontier": {
     "summary": "Frontier deliberation above the ladder, priced by provenance rather than by task shape.",
     "model": "claude-fable-5",
-    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select frontier spend -- a test asserts no rung prices this model, so lane inflation can never reach it."
+    "effort": "max",
+    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select this spend. L1 prices the same family one effort step below, and a test asserts no rung prices this exact model-and-effort pair, so lane inflation can never reach it."
   }
 }

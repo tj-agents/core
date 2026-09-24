@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Resolve a lane to one harness's model and effort.
 
-  resolve.py --host claude --lane L4          -> {"model": "claude-sonnet-5", "effort": "medium"}
-  resolve.py --host codex  --lane L5 --format env
+  resolve.py --host claude --lane L5          -> {"model": "claude-sonnet-5", "effort": "medium"}
+  resolve.py --host codex  --lane L7 --format env
   resolve.py --lanes                          -> the rung list, both harnesses, for a diff
 
 Knows nothing about tasks, repos or skills: a lane in, a model out. Which lane a task belongs to is a

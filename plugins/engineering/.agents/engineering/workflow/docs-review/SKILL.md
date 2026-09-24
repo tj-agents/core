@@ -4,7 +4,7 @@ description: Apply the canonical isolated review workflow to a documentation or 
 
 kind: workflow
 domain: process
-lane: L3
+lane: L4
 ---
 
 # Documentation review mode
