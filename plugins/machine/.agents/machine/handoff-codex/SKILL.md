@@ -22,13 +22,33 @@ checkout.
 
 ## Model selection
 
-This launcher is a dumb transport — it never chooses a model or effort itself, and it packages no
-external resolver. Pass `-Model` (and `-ReasoningEffort`, for a model that accepts it) only when the
-caller already knows which to use: the user named a specific model or tier explicitly, or the calling
-skill/workflow carries its own checked-in model-selection policy (for example a `lanes` contract, where
-the calling repository ships one) and has already resolved it before reaching this launcher. Never invent
-a selection policy here, and never default to the most capable or most expensive model just because none
-was specified.
+Pass `-Lane L1`–`L5` and the launcher resolves the model *and its reasoning effort* from the canonical
+lane tables it ships under `resources/lanes` — the `engineering:lanes` ladder, and the repo's only
+model-name owner, so no caller has to know a model id and a retiering is one edit in one authored file.
+The pair matters here: a Codex model is priced and paced by both. An explicit `-Model` or
+`-ReasoningEffort` still wins for whichever half the user named outright. Supply none and the CLI keeps
+its own configured default, exactly as an interactively launched session would.
+
+**The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
+lane from the prompt would quietly decide the cost of every handoff. Choose by reversibility, blast
+radius, ambiguity and verifiability — never by how hard the work feels:
+
+| Lane | For |
+|---|---|
+| `L1` | Irreversible work at the top of the ladder, where a mistake cannot be taken back. |
+| `L2` | Open-ended judgement at the top of the ladder, where the answer is not yet known. |
+| `L3` | Ordinary specified work that a compiler or a test suite will catch. |
+| `L4` | Mechanical work whose shape is already decided. |
+| `L5` | Clerical work with a small input and no judgement to make. |
+
+`-Frontier` selects the tier above the ladder from the same table, model and effort together. **Pass it
+only when the user explicitly asked for that tier or its model by name.** No lane resolves to it —
+frontier spend is the user's provenance to grant, never a reward for a hard-looking task — and it rejects
+`-Lane` or `-Model` beside it. `-ReasoningEffort` is the one flag it still accepts, winning over the
+tier's own effort, for a user who named the pace as well as the tier.
+
+A calling skill or workflow that ships its own resolved selection may still pass `-Model` and `-ReasoningEffort` directly;
+that wins over `-Lane`. What is no longer acceptable is inventing a model id at the call site.
 
 Launch with `scripts/launch-codex.ps1`, beside this file:
 
@@ -36,9 +56,10 @@ Launch with `scripts/launch-codex.ps1`, beside this file:
 & '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
 ```
 
-Add `-Model '<model-id>'` and `-ReasoningEffort '<level>'` only when both were resolved as above. Omitting
-them lets `codex.exe` fall back to its own configured default — the same behavior an interactively
-launched session gets.
+Add `-Lane '<L1..L5>'` (or `-Frontier`) to have the launcher resolve model and effort, or `-Model
+'<model-id>'` and `-ReasoningEffort '<level>'` for values the user named. Omitting them all lets
+`codex.exe` fall back to its own configured default — the same behavior an interactively launched
+session gets.
 
 Use `-BypassHookTrust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
 user has not authorized repository hooks.
