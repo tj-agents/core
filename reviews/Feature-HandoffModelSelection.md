@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `2fe16d6`  `(2026-09-24)`
+**Reviewed up to commit:** `880b8e4`  `(2026-09-24)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-24 — full
@@ -89,3 +89,29 @@ inventory.
 - `test_merge_review_gate.CanonicalEnvelopeShellTests` fails the same two bash-discovery tests on this
   machine and passes on CI; reproduced on the main checkout, predates this branch, which touches no file
   it covers. The entry recorded in `reviews/Fix-PluginCacheReconcile.md` keeps its resolution condition.
+
+## Review pass — 2026-09-24 — incremental
+
+**Candidate base:** `2fe16d6ade90ccdef358265ff6ace635c5469f1d`
+**Candidate head:** `880b8e4` *(remediation of HM1–HM6 plus this work order)*
+**Candidate branch:** `Feature/HandoffModelSelection`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Feature-HandoffModelSelection.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Delta: the two handoff SKILL.md tails and L2 rows, the codex frontier `-ReasoningEffort` sentence, the
+lanes contract's fourth application bullet, the two launcher-test additions, the widened machine parity
+tuple, regenerated catalog digests and generated mirrors, and this work order. No new finding.
+
+Checked in this pass:
+
+- Both tails now read coherently under the section that precedes them: `-Lane`/`-Frontier` first,
+  `-Model` reserved for a user-named id, defaults unchanged. No model name entered either document.
+- The new codex `-Lane`+`-Model` test asserts all three halves of the documented contract (explicit model
+  through, lane model absent, lane effort filled); the resolver-guard test dot-sources the *packaged*
+  `agent-cli.ps1` and hits the table-lookup throw that `[ValidateSet]` shielded before.
+- `handoff-launchers.tests.ps1`, `test_lane_tables.py`, `skill-packaging.tests.ps1` green at this head;
+  `sync-generated.ps1 -Check` 0 changed.
+
+The out-of-scope disposition recorded in the full pass is unchanged; this delta touches no file it covers.
