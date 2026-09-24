@@ -55,7 +55,8 @@ L4 is what ordinary work declares; declare it explicitly rather than relying on 
    Compiler-caught work drops a rung; judgement-only work does not.
 
 Nothing here says "how hard does this feel". A long mechanical edit is still L5; a three-line change to a
-published contract is still L2.
+published contract is still L2. One extra axis applies at the floor alone: clerical work is L7 only while
+its input fits the cheapest rung, and an input that outgrows it selects L6.
 
 **The frontier tier is above the ladder and is not a rung.** Each table carries a `frontier` entry the
 four questions can never select: it is priced by provenance — the user explicitly asking for that tier or
@@ -99,8 +100,8 @@ in the rung its cleanup needed is how a bad design gets built efficiently.
    records `null`, meaning *unrecorded*, not unlimited.
 2. **The floor is a different kind of drop on each harness.** Claude's L7 drops to a small-window model;
    Codex's L7 drops to the proven previous-generation family at its lowest setting, with no recorded
-   ceiling. Work that genuinely needs a big-window floor has L6, which stays on each harness's small
-   current-generation family.
+   ceiling. Work that genuinely needs a big-window floor has L6, which stops the drop one family early —
+   on Claude the workhorse at its lowest setting, on Codex the small current-generation family.
 3. **A specialist model is a second axis, not a rung.** Codex's review stage names its own review-tuned
    model with a fallback — chosen for the *kind* of work, not its capability rank. Such a choice is
    declared as a `specialist` on the stage, never as its own lane, and it then owns its effort too;
