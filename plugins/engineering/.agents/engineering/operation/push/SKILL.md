@@ -4,7 +4,7 @@ description: Push one stable substantive candidate and prove the remote actually
 
 kind: operation
 domain: process
-lane: L5
+lane: L7
 ---
 
 # Pushing a verified head

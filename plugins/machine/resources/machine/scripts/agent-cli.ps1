@@ -108,7 +108,7 @@ function Invoke-AgentTerminalTab {
 # are the repo's only model-name owner, so a retiering is one edit there and every consumer inherits it.
 # Resolution never picks the lane: a caller that supplies neither -Lane nor -Model gets the CLI's own
 # configured default, because guessing a lane from a prompt is how an expensive model ends up serving a
-# rename. -Frontier resolves the tier above the ladder, which no lane can reach: its selection is the
+# rename. -Frontier resolves the tier above the ladder, which no lane resolves to: its selection is the
 # user's explicit request, never task shape.
 function Resolve-AgentLaneModel {
     [CmdletBinding()]

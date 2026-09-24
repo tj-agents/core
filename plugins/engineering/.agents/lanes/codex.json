@@ -1,5 +1,5 @@
 {
-  "_": "Codex's rung of the lane ladder. Paired name-for-name with .agents/lanes/claude.json: the same LN means the same *relative* capability on both harnesses, so a skill declares `lane: L4` once and each harness resolves it to its own model. These two files are the only two places in the repo a model name may appear. Rungs are ordered L1 (most capable) to L5 (cheapest).",
+  "_": "Codex's rung of the lane ladder. Paired name-for-name with .agents/lanes/claude.json: the same LN means the same *relative* capability on both harnesses, so a skill declares `lane: L4` once and each harness resolves it to its own model. These two files are the only two places in the repo a model name may appear. Rungs are ordered L1 (most capable) to L7 (cheapest).",
 
   "host": "codex",
   "effort_key": "reasoning_effort",
@@ -9,39 +9,53 @@
 
   "lanes": {
     "L1": {
-      "summary": "Irreversible work at the top of the ladder, where a mistake cannot be taken back.",
+      "summary": "Irreversible work with wide reach, where a mistake compounds beyond the repository.",
+      "model": "gpt-6-astra",
+      "reasoning_effort": "xhigh",
+      "context_ceiling": null,
+      "why": "frontier family at the setting above `high`. Irreversible work whose blast radius reaches a service or production: a schema migration that ships, a contract other teams build on."
+    },
+    "L2": {
+      "summary": "Irreversible work of ordinary reach, where a mistake cannot be taken back.",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "xhigh",
       "context_ceiling": null,
-      "why": "top family at the setting above `high`. For work whose mistake cannot be taken back: stored data shape, a published contract, a merge that lands."
+      "why": "top general family at the setting above `high`. For work whose mistake cannot be taken back: stored data shape, a published contract, a merge that lands."
     },
-    "L2": {
+    "L3": {
       "summary": "Open-ended judgement at the top of the ladder, where the answer is not yet known.",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "context_ceiling": null,
-      "why": "top family at its default setting. Open-ended judgement: architecture, plan authoring, a diagnosis with no known answer."
+      "why": "top general family at its default setting. Open-ended judgement: architecture, plan authoring, a diagnosis with no known answer."
     },
-    "L3": {
+    "L4": {
       "summary": "Ordinary specified work that a compiler or a test suite will catch.",
       "model": "gpt-5.6-terra",
       "reasoning_effort": "high",
       "context_ceiling": null,
       "why": "the workhorse. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses."
     },
-    "L4": {
+    "L5": {
       "summary": "Mechanical work whose shape is already decided.",
       "model": "gpt-5.6-luna",
       "reasoning_effort": "medium",
       "context_ceiling": null,
       "why": "the small family at its default setting. Mechanical work whose shape is already decided: scripted edits, docs, ledger upkeep."
     },
-    "L5": {
-      "summary": "Clerical work with a small input and no judgement to make.",
+    "L6": {
+      "summary": "Bulk clerical work whose input is too large for the cheapest rung.",
       "model": "gpt-5.6-luna",
       "reasoning_effort": "low",
       "context_ceiling": null,
-      "why": "clerical work with a small input: commit, push, pull, sync, one poll. Codex has no family below `luna`, so this rung is the same model as L4 at the lowest setting -- an honest asymmetry with Claude, whose L5 drops a family."
+      "why": "the small family at its lowest setting. Clerical loops and bulk passes -- a monitor, a long transcript, a big diff -- that outgrow the floor rung."
+    },
+    "L7": {
+      "summary": "Clerical work with a small input and no judgement to make.",
+      "model": "gpt-5.5",
+      "reasoning_effort": "low",
+      "context_ceiling": null,
+      "why": "the proven previous-generation floor. Clerical work with a small input: commit, push, pull, sync, one poll."
     }
   },
 
@@ -49,7 +63,7 @@
     "summary": "Frontier deliberation above the ladder, priced by provenance rather than by task shape.",
     "model": "gpt-6-astra",
     "reasoning_effort": "max",
-    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select frontier spend -- a test asserts no rung prices this model, so lane inflation can never reach it."
+    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select this spend. L1 prices the same family one effort step below, and a test asserts no rung prices this exact model-and-effort pair, so lane inflation can never reach it."
   },
 
   "$comment_context_ceiling": "null means unrecorded, not unlimited. The Claude table carries real per-model windows from the published model table; the Codex figures are not verified here, so recording a number would be inventing one. A lane consumer that needs a ceiling must treat null as 'unknown' and not assume the input fits."

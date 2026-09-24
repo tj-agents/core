@@ -4,7 +4,7 @@ description: Take one tech-debt item all the way to a PR in an isolated worktree
 
 kind: workflow
 domain: process
-lane: L3
+lane: L4
 ---
 
 # Working one tech-debt item — or a small bundle — to a PR

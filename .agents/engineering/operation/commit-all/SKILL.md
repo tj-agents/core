@@ -4,7 +4,7 @@ description: Commit the ENTIRE working tree in a single commit — no survey, no
 
 kind: operation
 domain: process
-lane: L5
+lane: L7
 ---
 
 # Committing the whole tree in one commit
