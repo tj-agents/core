@@ -50,7 +50,7 @@ radius, ambiguity and verifiability — never by how hard the work feels:
 | Lane | For |
 |---|---|
 | `L1` | Irreversible work at the top of the ladder, where a mistake cannot be taken back. |
-| `L2` | Open-ended judgement, where the answer is not yet known. |
+| `L2` | Open-ended judgement at the top of the ladder, where the answer is not yet known. |
 | `L3` | Ordinary specified work that a compiler or a test suite will catch. |
 | `L4` | Mechanical work whose shape is already decided. |
 | `L5` | Clerical work with a small input and no judgement to make. |
@@ -69,8 +69,9 @@ Launch with `scripts/launch-claude.ps1`, beside this file:
 & '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
 ```
 
-Add `-Model '<model-id>'` only when a model was resolved as above. Omitting it lets `claude.exe` fall
-back to its own configured default — the same behavior an interactively launched session gets.
+Add `-Lane '<L1..L5>'` (or `-Frontier`) to have the launcher resolve the model, or `-Model '<model-id>'`
+for one the user named. Omitting all three lets `claude.exe` fall back to its own configured default —
+the same behavior an interactively launched session gets.
 
 Add `-DangerouslySkipPermissions` **only when the user asks for it in that request**. It disables every
 permission prompt in the new window, so it is never a default and never inferred from the repository
