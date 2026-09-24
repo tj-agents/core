@@ -42,7 +42,7 @@ class CatalogTests(unittest.TestCase):
             "plugins": [
                 {
                     "id": "base-agents/engineering",
-                    "release": "base-agents@2.1.0",
+                    "release": "base-agents@2.1.3",
                     "commit": "a" * 40,
                     "required_skills": ["review"],
                     "path_scopes": [],
@@ -67,7 +67,7 @@ class CatalogTests(unittest.TestCase):
             "plugins": [
                 {
                     "id": "base-agents/base",
-                    "release": "base-agents@2.1.0",
+                    "release": "base-agents@2.1.3",
                     "commit": "a" * 40,
                     "required_skills": [],
                     "path_scopes": [],
@@ -262,6 +262,27 @@ class BootstrapIntegrationTests(unittest.TestCase):
         else:
             return subprocess.CompletedProcess(command, 1, "", "unexpected host arguments")
         return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    def test_native_processes_request_utf8_decoding(self):
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs))
+            stdout = '{"marketplaces": []}' if "codex-fixture" in command[0] else ""
+            return subprocess.CompletedProcess(command, 0, stdout, "")
+
+        with mock.patch.object(
+            BOOT,
+            "executable",
+            side_effect=lambda name: "codex-fixture" if name == "codex" else "git-fixture",
+        ):
+            BOOT.NativeHost("codex", self.profile, run).marketplaces()
+            BOOT.git(run, ["status"], self.root)
+
+        self.assertEqual(2, len(calls))
+        for _, kwargs in calls:
+            self.assertTrue(kwargs["text"])
+            self.assertEqual("utf-8", kwargs["encoding"])
 
     def test_preview_is_read_only_then_apply_and_offline_verify_are_idempotent(self):
         unrelated = self.profile / "unrelated.json"

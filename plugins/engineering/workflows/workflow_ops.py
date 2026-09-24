@@ -399,8 +399,10 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
     head = git(root, "rev-parse", head_ref)
     changed = run_process(["git", "diff", "--name-only", "-z", base, head], root, text=False).stdout
     paths = [item.decode("utf-8", errors="surrogateescape") for item in changed.split(b"\0") if item]
+    paths_bytes = b"\0".join(item.encode("utf-8", errors="surrogateescape") for item in paths)
+    path_digest = hashlib.sha256(paths_bytes).hexdigest()
     patch = run_process(["git", "diff", "--binary", "--full-index", base, head], root, text=False).stdout
-    candidate_key = digest({"base": base, "head": head, "path_digest": digest(paths), "patch_sha256": hashlib.sha256(patch).hexdigest()})
+    candidate_key = digest({"base": base, "head": head, "path_digest": path_digest, "patch_sha256": hashlib.sha256(patch).hexdigest()})
     bundle = run_root(root, workflow_run_id) / "review" / candidate_key
     bundle.mkdir(parents=True, exist_ok=True)
     patch_path = bundle / "candidate.patch"
@@ -408,7 +410,6 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
     archive_path = bundle / "tree.tar"
     tree_path = bundle / "tree"
     patch_path.write_bytes(patch)
-    paths_bytes = b"\0".join(item.encode("utf-8", errors="surrogateescape") for item in paths)
     paths_path.write_bytes(paths_bytes)
     tree_archive = materialize_tree(root, head, archive_path, tree_path)
     tree_sha256 = tree_content_digest(tree_path)
@@ -430,7 +431,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         "tree_archive_sha256": hashlib.sha256(tree_archive).hexdigest(),
         "tree_content_sha256": tree_sha256,
         "paths": paths,
-        "path_digest": digest(paths),
+        "path_digest": path_digest,
         "patch_sha256": hashlib.sha256(patch).hexdigest(),
         "rules": rules,
         "lenses": select_review_lenses(paths),
@@ -528,7 +529,7 @@ def load_descriptor(root, workflow_run_id, path):
         raise WorkflowOperationError("review patch hash differs from its descriptor")
     path_bytes = required["paths"].read_bytes()
     paths = [item.decode("utf-8", errors="surrogateescape") for item in path_bytes.split(b"\0") if item]
-    if paths != value.get("paths") or digest(paths) != value.get("path_digest"):
+    if paths != value.get("paths") or hashlib.sha256(path_bytes).hexdigest() != value.get("path_digest"):
         raise WorkflowOperationError("review path manifest differs from its descriptor")
     current_paths_bytes = run_process(
         ["git", "diff", "--name-only", "-z", value["base"], value["head"]], root, text=False
