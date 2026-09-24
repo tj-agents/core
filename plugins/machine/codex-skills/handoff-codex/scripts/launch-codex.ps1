@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)]
     [string] $WorkingDirectory,
@@ -12,6 +12,9 @@ param(
 
     [ValidateSet('low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
     [string] $ReasoningEffort,
+
+    [ValidateSet('L0', 'L1', 'L2', 'L3')]
+    [string] $Lane,
 
     [string] $MinimumVersion = '0.154.0',
 
@@ -132,6 +135,15 @@ $inventory
 }
 
 $arguments = @('--cd', $resolvedWorkingDirectory)
+
+# An explicit -Model or -ReasoningEffort wins; a -Lane fills whichever of them the caller left out, from the
+# same shipped table handoff-claude reads. Effort is part of the lane here because a Codex model is priced
+# and paced by the pair, not by the model alone. The lane is never guessed from the prompt.
+if ($Lane -and -not ($Model -and $ReasoningEffort)) {
+    $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'codex'
+    if (-not $Model) { $Model = $laneModel.Model }
+    if (-not $ReasoningEffort) { $ReasoningEffort = $laneModel.Effort }
+}
 
 if ($Model) {
     $arguments += @('--model', $Model)

@@ -102,3 +102,40 @@ function Invoke-AgentTerminalTab {
         }
     }
 }
+
+# Lane -> model for a chosen harness, read from model-lanes.json beside this file. The table is data so a
+# retiering is one edit in one shipped file; a launcher that hardcoded a model would have to be found and
+# changed per harness instead. Resolution never picks the lane: a caller that supplies neither -Lane nor
+# -Model gets the CLI's own configured default, because guessing a lane from a prompt is how an expensive
+# model ends up serving a rename.
+function Resolve-AgentLaneModel {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('L0', 'L1', 'L2', 'L3')]
+        [string] $Lane,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('claude', 'codex')]
+        [string] $Harness
+    )
+
+    $policyPath = Join-Path $PSScriptRoot 'model-lanes.json'
+    if (-not (Test-Path -LiteralPath $policyPath -PathType Leaf)) {
+        throw "The lane model table was not found beside the shared library: $policyPath"
+    }
+
+    $policy = Get-Content -LiteralPath $policyPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $entry = $policy.lanes.$Lane
+    if (-not $entry) { throw "Lane '$Lane' is not defined in $policyPath." }
+
+    $harnessEntry = $entry.$Harness
+    if (-not $harnessEntry -or -not $harnessEntry.model) {
+        throw "Lane '$Lane' defines no $Harness model in $policyPath."
+    }
+
+    return [pscustomobject]@{
+        Model  = $harnessEntry.model
+        Effort = $harnessEntry.effort
+    }
+}
