@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 # End-to-end validation of the generated handoff launchers, per PACKAGING.md: neither must require a
 # machine-local file this plugin does not ship. Runs against the actual generated package
@@ -145,6 +145,39 @@ class Stub {
     $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
     if ($capturedArgs -notmatch 'gpt-5-codex') { throw 'launch-codex.ps1 did not pass an explicit -Model through.' }
     if ($capturedArgs -notmatch 'model_reasoning_effort=high') { throw 'launch-codex.ps1 did not pass -ReasoningEffort through.' }
+    # --- handoff-claude: -Lane resolves through the shipped table ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L0'
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'claude-fable-5') { throw 'launch-claude.ps1 did not resolve -Lane L0 to the frontier model.' }
+
+    # --- handoff-claude: an explicit -Model still beats -Lane ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L0' -Model 'claude-haiku-4-5-20251001'
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'claude-haiku-4-5-20251001') { throw 'launch-claude.ps1 let -Lane override an explicit -Model.' }
+    if ($capturedArgs -match 'claude-fable-5') { throw 'launch-claude.ps1 passed the lane model alongside an explicit -Model.' }
+
+    # --- handoff-codex: -Lane resolves both model and effort ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L0' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'gpt-6-astra') { throw 'launch-codex.ps1 did not resolve -Lane L0 to the frontier model.' }
+    if ($capturedArgs -notmatch 'model_reasoning_effort=max') { throw 'launch-codex.ps1 did not resolve -Lane L0 to its effort.' }
+
+    # --- handoff-codex: an explicit -ReasoningEffort survives a -Lane that would have set it ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L0' -ReasoningEffort 'low' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'gpt-6-astra') { throw 'launch-codex.ps1 dropped the lane model when effort was explicit.' }
+    if ($capturedArgs -notmatch 'model_reasoning_effort=low') { throw 'launch-codex.ps1 let -Lane override an explicit -ReasoningEffort.' }
+
+    # --- an unknown lane is rejected, never silently defaulted ---
+    $rejected = $false
+    try { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L9' }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'launch-claude.ps1 accepted an undefined lane.' }
+
     # --- open-claude: no prompt, no session - just a CLI on a directory ---
     Remove-Item -LiteralPath $wtLog -Force
     & $openLauncher -WorkingDirectory $workDir -Title 'test open'

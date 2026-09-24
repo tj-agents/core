@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)]
     [string] $WorkingDirectory,
@@ -9,6 +9,9 @@ param(
     [string] $Title = 'Claude handoff',
 
     [string] $Model,
+
+    [ValidateSet('L0', 'L1', 'L2', 'L3')]
+    [string] $Lane,
 
     [switch] $DangerouslySkipPermissions
 )
@@ -38,8 +41,13 @@ if ($DangerouslySkipPermissions) {
     $arguments += '--dangerously-skip-permissions'
 }
 
-# Model selection is the caller's job, not this transport's: omit -Model and claude.exe falls back to
-# its own configured default, same as an interactively launched session.
+# An explicit -Model wins, a -Lane resolves through the shipped table, and neither leaves claude.exe on its
+# own configured default, same as an interactively launched session. The lane is never guessed here: a
+# transport that inferred one from the prompt would quietly decide the cost of every handoff.
+if (-not $Model -and $Lane) {
+    $Model = (Resolve-AgentLaneModel -Lane $Lane -Harness 'claude').Model
+}
+
 if ($Model) {
     $arguments += @('--model', $Model)
 }
