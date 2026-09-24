@@ -1,6 +1,6 @@
 ---
 name: continue-roadmap
-description: Compatibility entry for asking what to plan next on an epic roadmap. Resolve one implementable unowned roadmap item, then enter plan-authoring; do not resume an existing plan, execute implementation, or reconcile roadmap facts already owned by update-roadmap.
+description: Compatibility entry for asking what to plan next on an epic roadmap. Resolve one implementable unowned roadmap item, then enter plan-authoring; hand an in-flight item to its existing owner rather than stopping at a report; do not execute implementation or reconcile roadmap facts already owned by update-roadmap.
 
 kind: workflow
 domain: process
@@ -18,9 +18,10 @@ This public name owns only the special selection stage before
    and any named preference.
 2. Classify every outstanding item against real ledgers, branches, worktrees, pull requests, dependencies,
    and exact producer artifacts:
-   - in flight: report its existing owner; enter
-     `engineering:plan-execution` only when the original request explicitly authorizes
-     implementation or resumption;
+   - in flight: report its existing owner, then continue that owner's ledger instead of stopping at
+     the report — `engineering:plan-execution` when this request authorizes implementation,
+     otherwise `engineering:handoff` to its owning worktree. A report alone is the outcome only
+     when that owner is blocked or human-gated;
    - implementation-blocked: name the blocker and owner;
    - implementable but delivery-gated: local planning and implementation may proceed with the delivery gate;
    - ready and unowned: eligible for selection.
@@ -36,4 +37,6 @@ Planning-only selection creates no delivery worktree. When the original request 
 reconciliation remains with `engineering:update-roadmap`.
 
 Return the completed planning outcome or one typed selection/dependency gate. Do not implement directly,
-duplicate an in-flight plan, or stop between selection and authorized plan authoring.
+duplicate an in-flight plan, or stop between selection and authorized plan authoring. A harness that
+auto-selects `plan-execution` does not widen this entry's authority: selection still runs first and
+hands over at step 2.
