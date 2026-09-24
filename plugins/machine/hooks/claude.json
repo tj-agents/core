@@ -12,6 +12,11 @@
             "type": "command",
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/prune_plugin_cache.py\" --pin --notice",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py\" --notice",
+            "timeout": 10
           }
         ]
       }

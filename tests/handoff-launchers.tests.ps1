@@ -70,16 +70,83 @@ try {
     $oldRouting = Join-Path $fakeProfile '.claude\routing\route.py'
     if (Test-Path -LiteralPath $oldRouting) { throw 'Test setup is broken: the old routing file should not exist.' }
 
+    # Windows Terminal is stubbed twice over. WT_STUB_LOG keeps the raw argument list the launcher handed
+    # it, which is what the flag assertions below read. WT_STUB_DELIVERED_LOG keeps what the tab process
+    # would actually receive, because Windows Terminal does not hand its arguments over untouched: it
+    # splits its own command line on `;` into subcommands (unescaping `\;` to a literal `;` by dropping
+    # one backslash), then re-joins the tab's command into a single string, quoting a token only when that
+    # token contains a space and escaping nothing inside it, and the tab process parses that string with
+    # CommandLineToArgvW. Both stages are reproduced here; each was checked against a real wt.exe.
     $wtSource = @'
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
+
 class Stub {
+    [DllImport("shell32.dll", SetLastError = true)]
+    static extern IntPtr CommandLineToArgvW([MarshalAs(UnmanagedType.LPWStr)] string commandLine, out int count);
+
+    static List<List<string>> SplitSubcommands(string[] args) {
+        var commands = new List<List<string>>();
+        var current = new List<string>();
+        var token = new StringBuilder();
+        foreach (var arg in args) {
+            token.Length = 0;
+            foreach (var character in arg) {
+                if (character != ';') { token.Append(character); continue; }
+                if (token.Length > 0 && token[token.Length - 1] == (char)92) {
+                    token.Length -= 1;
+                    token.Append(';');
+                    continue;
+                }
+                if (token.Length > 0) { current.Add(token.ToString()); token.Length = 0; }
+                commands.Add(current);
+                current = new List<string>();
+            }
+            if (token.Length > 0) { current.Add(token.ToString()); }
+        }
+        commands.Add(current);
+        return commands;
+    }
+
+    static string[] Deliver(List<string> command) {
+        var start = command.IndexOf("--suppressApplicationTitle");
+        if (start < 0) { return new string[0]; }
+
+        var joined = new StringBuilder("stub.exe");
+        for (var i = start + 1; i < command.Count; i++) {
+            joined.Append(' ');
+            if (command[i].Contains(" ")) { joined.Append('"').Append(command[i]).Append('"'); }
+            else { joined.Append(command[i]); }
+        }
+
+        int count;
+        var argv = CommandLineToArgvW(joined.ToString(), out count);
+        if (argv == IntPtr.Zero) { throw new InvalidOperationException("CommandLineToArgvW failed."); }
+        var delivered = new string[count - 1];
+        for (var i = 1; i < count; i++) {
+            delivered[i - 1] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(argv, i * IntPtr.Size));
+        }
+        Marshal.FreeHGlobal(argv);
+        return delivered;
+    }
+
     static void Main(string[] args) {
         string log = Environment.GetEnvironmentVariable("WT_STUB_LOG");
         if (!string.IsNullOrEmpty(log)) {
             File.WriteAllText(log, string.Join("\u001f", args), Encoding.UTF8);
         }
+
+        string deliveredLog = Environment.GetEnvironmentVariable("WT_STUB_DELIVERED_LOG");
+        if (!string.IsNullOrEmpty(deliveredLog)) {
+            var commands = SplitSubcommands(args);
+            var body = new List<string> { commands.Count.ToString() };
+            body.AddRange(Deliver(commands[0]));
+            File.WriteAllText(deliveredLog, string.Join("\u001f", body.ToArray()), Encoding.UTF8);
+        }
+
         Environment.Exit(0);
     }
 }
@@ -246,6 +313,34 @@ class Stub {
         throw 'open-claude.ps1 did not pass the session id through.'
     }
 
+    # --- open-claude: a prompt survives Windows Terminal's command line intact ---
+    # The defect this covers: an unescaped semicolon ended the tab's command there and turned the rest of
+    # the prompt into a second wt subcommand, so a 914-character handoff arrived as its first 265
+    # characters and nothing anywhere reported the loss.
+    Remove-Item -LiteralPath $wtLog -Force
+    $deliveredLog = Join-Path $scratch 'wt-delivered.log'
+    $env:WT_STUB_DELIVERED_LOG = $deliveredLog
+    $prompt = "Phase one: migrate Auth; then Search.`nPhase two: verify `"end to end`"; report back."
+    & $openLauncher -WorkingDirectory $workDir -Title 'test open' -Prompt $prompt
+    if (-not (Test-Path -LiteralPath $deliveredLog)) { throw 'The stubbed terminal recorded no delivered command line.' }
+    $delivered = [System.IO.File]::ReadAllText($deliveredLog) -split "`u{001f}"
+    if ($delivered[0] -ne '1') {
+        throw "The prompt's semicolons split the terminal command line into $($delivered[0]) subcommands; the tab would have run only the first."
+    }
+    if ($delivered[-1] -cne $prompt) {
+        throw "The prompt did not reach the launched process whole.`nSent:      $prompt`nDelivered: $($delivered[-1])"
+    }
+    if ($delivered[1] -cne (Join-Path $claudeBin 'claude.exe')) {
+        throw 'The spaced executable path did not reach the launched process whole.'
+    }
+    Remove-Item Env:\WT_STUB_DELIVERED_LOG
+
+    # --- open-claude: a long prompt belongs in a file, not on a command line ---
+    $rejected = $false
+    try { & $openLauncher -WorkingDirectory $workDir -Title 'test open' -Prompt ('x' * 501) }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'open-claude.ps1 accepted an inline -Prompt too long to belong on a command line.' }
+
     # --- open-claude: -Resume and -Continue are mutually exclusive ---
     $rejected = $false
     try { & $openLauncher -WorkingDirectory $workDir -Resume 'abc' -Continue }
@@ -268,6 +363,7 @@ class Stub {
     $env:USERPROFILE = $originalUserProfile
     $env:LOCALAPPDATA = $originalLocalAppData
     if ($null -eq $originalWtLog) { Remove-Item Env:\WT_STUB_LOG -ErrorAction SilentlyContinue } else { $env:WT_STUB_LOG = $originalWtLog }
+    Remove-Item Env:\WT_STUB_DELIVERED_LOG -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
 }
 
