@@ -102,3 +102,45 @@ function Invoke-AgentTerminalTab {
         }
     }
 }
+
+# Lane -> model for a chosen harness, read from the canonical lane tables (.agents/lanes in the authored
+# layout, resources/lanes in the packaged one -- the same relative hop from this file in both). The tables
+# are the repo's only model-name owner, so a retiering is one edit there and every consumer inherits it.
+# Resolution never picks the lane: a caller that supplies neither -Lane nor -Model gets the CLI's own
+# configured default, because guessing a lane from a prompt is how an expensive model ends up serving a
+# rename. -Frontier resolves the tier above the ladder, which no lane can reach: its selection is the
+# user's explicit request, never task shape.
+function Resolve-AgentLaneModel {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('claude', 'codex')]
+        [string] $Harness,
+
+        [string] $Lane,
+
+        [switch] $Frontier
+    )
+
+    if (-not $Lane -and -not $Frontier) { throw 'Resolve-AgentLaneModel needs a -Lane or -Frontier.' }
+    if ($Lane -and $Frontier) { throw 'A lane and the frontier tier are mutually exclusive.' }
+
+    $tablePath = Join-Path $PSScriptRoot "..\..\lanes\$Harness.json"
+    if (-not (Test-Path -LiteralPath $tablePath -PathType Leaf)) {
+        throw "The $Harness lane table was not found at $tablePath."
+    }
+
+    $table = Get-Content -LiteralPath $tablePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $entry = if ($Frontier) { $table.frontier } else { $table.lanes.$Lane }
+    if (-not $entry -or -not $entry.model) {
+        $known = @($table.lanes.PSObject.Properties.Name) -join ' '
+        $asked = if ($Frontier) { 'the frontier tier' } else { "lane '$Lane'" }
+        throw "The $Harness lane table at $tablePath does not price $asked; it has $known."
+    }
+
+    $effortKey = if ($table.effort_key) { $table.effort_key } else { 'effort' }
+    return [pscustomobject]@{
+        Model  = $entry.model
+        Effort = $entry.$effortKey
+    }
+}

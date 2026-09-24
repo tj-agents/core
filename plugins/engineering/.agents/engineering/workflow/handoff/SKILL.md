@@ -21,8 +21,9 @@ instructions; do not guess a sibling-plugin or author-checkout path.
    path and execute its `## Next Steps`. Keep the actual work instructions in that same goal file.
 3. For an explicit prompt-only request, return the text without launching. Otherwise write the prompt
    to a UTF-8 file and invoke the selected launcher's packaged script once, following its loaded
-   instructions. Preserve a user-selected model and effort; otherwise inherit defaults. Never launch a
-   second successor because startup is slow or acknowledgement is delayed.
+   instructions. Preserve a user-selected model, effort or frontier request; otherwise choose the lane the
+   remaining work is worth per `engineering:lanes` and pass it, or inherit defaults when no lane is clear.
+   Never launch a second successor because startup is slow or acknowledgement is delayed.
 4. Verify the launch result. On failure ownership stays here: diagnose and preserve the checkpoint.
    Successful launcher submission proves launch, not that the successor has read the plan. Report that
    distinction, release writing ownership after launch, and let the successor acknowledge in the goal.

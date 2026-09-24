@@ -31,10 +31,11 @@ STAGE_LANES = {
     "mechanical": "L4",
 }
 
-# Capability order per vendor, most capable first. A rung may never sit above the rung before it.
+# Capability order per vendor, most capable first. A rung may never sit above the rung before it, and the
+# frontier tier must outrank every rung.
 FAMILY_ORDER = {
-    "claude": ("claude-fable-5-1", "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"),
-    "codex": ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"),
+    "claude": ("claude-fable-5", "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"),
+    "codex": ("gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"),
 }
 
 
@@ -108,6 +109,25 @@ class LaneTableTests(unittest.TestCase):
         self.assertTrue(table("claude")["skill_supports_effort"])
         self.assertFalse(table("codex")["skill_supports_effort"])
 
+    def test_the_frontier_tier_sits_above_the_ladder_and_no_rung_can_reach_it(self):
+        # The guard the frontier rule depends on: frontier spend is granted by the user's explicit request,
+        # never resolved from a lane, so the tier must exist as data yet price a model no rung prices.
+        for host in HOST_IDS:
+            data = table(host)
+            with self.subTest(host=host):
+                frontier = data.get("frontier")
+                self.assertIsInstance(frontier, dict, "the frontier tier must be declared as data")
+                self.assertTrue(frontier.get("model"))
+                order = FAMILY_ORDER[host]
+                self.assertEqual(0, order.index(frontier["model"]), "frontier must be the most capable model")
+                rung_models = {rung["model"] for rung in data["lanes"].values()}
+                self.assertNotIn(frontier["model"], rung_models, "a rung pricing the frontier model lets a lane reach it")
+
+    def test_codex_frontier_declares_its_effort_pair(self):
+        # A Codex model is priced and paced by the pair; the launcher reads both from this one entry.
+        frontier = table("codex")["frontier"]
+        self.assertIn(frontier[table("codex")["effort_key"]], EFFORTS)
+
     def test_claude_records_a_context_ceiling_and_its_cheapest_rung_is_smaller(self):
         lanes = table("claude")["lanes"]
         ceilings = [rung["context_ceiling"] for rung in lanes.values()]
@@ -148,6 +168,8 @@ class LaneDeclarationTests(unittest.TestCase):
 
     def test_no_skill_names_a_model_directly(self):
         models = {rung["model"] for host in HOST_IDS for rung in table(host)["lanes"].values()}
+        # The frontier models especially: hardcoding one is how "only on explicit request" gets bypassed.
+        models |= {table(host)["frontier"]["model"] for host in HOST_IDS}
         for skill in self.skills():
             text = skill.read_text(encoding="utf-8-sig")
             for model in models:
@@ -198,6 +220,19 @@ class PluginDeliveryTests(unittest.TestCase):
             with self.subTest(name=name):
                 shipped = self.PLUGIN / ".agents" / "lanes" / name
                 self.assertTrue(shipped.is_file(), f"plugins/engineering/.agents/lanes/{name} is not shipped")
+                self.assertEqual(
+                    (LANES / name).read_text(encoding="utf-8-sig"),
+                    shipped.read_text(encoding="utf-8-sig"),
+                )
+
+    def test_the_machine_plugin_ships_the_same_tables_for_its_launchers(self):
+        # The handoff launchers resolve -Lane/-Frontier from resources/lanes, two hops up from the shared
+        # agent-cli.ps1 -- the same hop that finds .agents/lanes in the authored layout. A machine-only
+        # install must price a lane identically to an engineering one.
+        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md"):
+            with self.subTest(name=name):
+                shipped = ROOT / "plugins" / "machine" / "resources" / "lanes" / name
+                self.assertTrue(shipped.is_file(), f"plugins/machine/resources/lanes/{name} is not shipped")
                 self.assertEqual(
                     (LANES / name).read_text(encoding="utf-8-sig"),
                     shipped.read_text(encoding="utf-8-sig"),
