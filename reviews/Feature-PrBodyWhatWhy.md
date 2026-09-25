@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `ef54d98`  `(2026-09-25)`
+**Reviewed up to commit:** `b42de61`  `(2026-09-25)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-25 — full (docs)
@@ -26,6 +26,21 @@ on the clean checkout at the candidate head: 0 errors, 0 warnings. No other skil
 `Summary` / `What changed` / `Test coverage` headings. The screenshot rule points at its owner rather than
 restating it. The generated mirror and catalog digests match `sync-generated.ps1 -Check` and
 `update_catalog_digests.py --check`.
+
+### Findings
+
+None.
+
+## Review pass — 2026-09-25 — incremental
+
+**Candidate base:** `fc7b78e`
+**Candidate head:** `b42de615c8cc0d1cb68f70e3a16be2242a779143`
+**Pass judgment:** `approved`
+
+Merge of `origin/main` (#38). The only conflicts were the two catalog digest files, resolved by
+regenerating them over the merged tree; `sync-generated.ps1 -Check` and both
+`update_catalog_digests.py --check` runs pass at this head. The branch's diff against `main` is the same
+four reviewed paths plus this file, and `open-pr/SKILL.md` is byte-identical to the reviewed version.
 
 ### Findings
 
