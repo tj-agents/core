@@ -36,13 +36,15 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual("2027-03-31", plugins["cpp-agents/windows"]["remove_after"])
 
     def test_lock_requires_dependency_closure_and_known_skills(self):
-        releases, plugins = BOOT.catalog_index(self.catalog())
+        catalog = self.catalog()
+        releases, plugins = BOOT.catalog_index(catalog)
+        base_release = catalog["releases"][0]["id"]
         incomplete = {
             "schema_version": 1,
             "plugins": [
                 {
                     "id": "base-agents/engineering",
-                    "release": "base-agents@2.1.4",
+                    "release": base_release,
                     "commit": "a" * 40,
                     "required_skills": ["review"],
                     "path_scopes": [],
@@ -62,12 +64,13 @@ class CatalogTests(unittest.TestCase):
             "exe:definitely-not-a-real-agent-tool"
         ]
         releases, plugins = BOOT.catalog_index(catalog)
+        base_release = catalog["releases"][0]["id"]
         lock = {
             "schema_version": 1,
             "plugins": [
                 {
                     "id": "base-agents/base",
-                    "release": "base-agents@2.1.4",
+                    "release": base_release,
                     "commit": "a" * 40,
                     "required_skills": [],
                     "path_scopes": [],

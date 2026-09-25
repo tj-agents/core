@@ -281,6 +281,34 @@ class ProcessStandardsTests(unittest.TestCase):
             "do not create a second branch solely to change the type prefix to `Docs`", flat
         )
 
+    def test_merge_requires_safe_cleanup_when_the_repository_helper_is_absent(self):
+        body = authored_skill("merge").read_text(encoding="utf-8")
+        cleanup = body.split(
+            "### 5. Return to a clean base, and remove the merged worktree immediately",
+            maxsplit=1,
+        )[1].split("### 6. Follow the publish", maxsplit=1)[0]
+        flat = " ".join(cleanup.split())
+
+        for required in (
+            "Join-Path <primary-checkout> 'scripts/worktrees.ps1'",
+            "Test-Path -LiteralPath $worktreeHelper -PathType Leaf",
+            "If that exact primary-checkout helper path is absent, do not skip cleanup",
+            "status --porcelain=v2 --untracked-files=all",
+            "git merge-base --is-ancestor",
+            "gh pr list --repo <owner/repo> --state open --head <branch> --json number,url",
+            "fresh query returns exactly `[]`",
+            "worktree remove -- <target-worktree>",
+            "branch -d <branch>",
+            "Step 5 is a blocking post-merge gate",
+            "Do not enter Step 6",
+            "never remove that path",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, flat)
+
+        self.assertNotIn("worktree remove --force", cleanup)
+        self.assertNotIn("branch -D", cleanup)
+
 
 if __name__ == "__main__":
     unittest.main()
