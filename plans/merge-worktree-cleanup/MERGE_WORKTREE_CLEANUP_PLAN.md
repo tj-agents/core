@@ -51,6 +51,14 @@ merged local branches, no registered linked worktree, and no user-owned untracke
 - Review the exact candidate and deliver it through the repository's normal workflow where the
   current authorization and repository state permit.
 
+Consumption contract: agents executing `engineering:merge` call Step 5 synchronously after the
+exact bound PR reaches `MERGED`, supplying its repository, PR number, branch, remote head, target
+worktree, primary checkout, and remote default. Step 5 selects the helper only from the primary
+checkout or applies the native-Git gates, then hands Step 6 inline final-inventory evidence: the
+target is absent, its merged local branch is gone, the primary is current on the remote default,
+and pre-existing user files remain. A refusal, command error, open PR, or residual path returns a
+blocking stop with state preserved; it never produces partial success or a deferred cleanup file.
+
 Verification gate: focused tests plus `pwsh .agents/sync-generated.ps1 -Check` pass, independent
 review findings are resolved, and delivery reaches its authorized terminal state.
 
