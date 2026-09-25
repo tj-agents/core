@@ -209,10 +209,15 @@ git -C <primary-checkout> checkout <default>
 git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
-Apply `base:cd` before invoking either cleanup path below. The merge normally runs from the linked target,
-so retarget the host **before** a helper or native Git unregisters or removes it. A per-command `workdir`,
-shell `cd`, or `git -C` does not retarget Codex or Claude and is not evidence that the old directory can be
-deleted.
+Compare the recorded target checkout in the delivery binding with the resolved primary checkout and the
+current host attachment before invoking either cleanup path below. When the target is the primary checkout,
+or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
+and branch deletion in the current session.
+
+Only when the recorded target is a linked worktree, the host is attached to that target, and the target
+differs from the primary checkout, apply `base:cd` and retarget the host **before** a helper or native Git
+unregisters or removes it. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude
+and is not evidence that the old directory can be deleted.
 
 - If the harness exposes its native host command interface, invoke `/cd <primary-checkout>` there and
   continue only after the host confirms that the session is attached to the primary checkout.
