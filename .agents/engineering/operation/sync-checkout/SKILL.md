@@ -4,7 +4,7 @@ description: Bring the whole local checkout up to date with reality, not just th
 
 kind: operation
 domain: process
-lane: L5
+lane: L7
 ---
 
 # Bringing the checkout up to date

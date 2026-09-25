@@ -4,7 +4,7 @@ description: Bring the whole local checkout up to date with reality, not just th
 
 kind: operation
 domain: process
-model: gpt-5.6-luna
+model: gpt-5.5
 ---
 
 # Bringing the checkout up to date

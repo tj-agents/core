@@ -4,7 +4,7 @@ description: Turn the working tree into clean, logical git commits — survey st
 
 kind: operation
 domain: process
-model: gpt-5.6-luna
+model: gpt-5.5
 ---
 
 # Committing the working tree as curated slices
