@@ -7,7 +7,7 @@
 - Branch: `Fix/AutonomousHandoffSelection`
 - PR: not opened
 - Dependency/package gates: none
-- Last reconciled: 2026-09-25 after the real-handoff selection candidate and its generated 2.1.8 packages passed focused checks
+- Last reconciled: 2026-09-25 after the initial immutable review of the real-handoff selection candidate
 
 ## Current state
 
@@ -29,13 +29,14 @@
 - The clean linked target was unregistered by non-forced Git removal, but Windows denied deleting its now-empty
   root directory. Its local merged branch remains until that path is physically absent, as the final-inventory
   gate requires.
-- The uncommitted 2.1.8 candidate now selects and executes `engineering:handoff` when the next action moves
-  to another owner or repository; `handoff-format` is explicitly pointer formatting, not a transfer.
+- Commit `e5b2dd0` selects and executes `engineering:handoff` when the next action moves to another owner or
+  repository; `handoff-format` is explicitly pointer formatting, not a transfer. Its initial docs review is
+  approved at the same head; the review work order is the only uncommitted state.
 
 ## Next Steps
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: review, commit, validate, and open the 2.1.8 real-handoff selection candidate without merging it.
+Current slice: commit the review checkpoint, complete its incremental review, then validate and open the 2.1.8 PR without merging it.
 Remaining scope: retry the core and exact Winwrap empty residual directories after their external handles
 clear; delete the core merged branch only after its target is physically absent; obtain Tommy's explicit
 approval before merging the standards PR; then finish plan closeout.
@@ -59,7 +60,7 @@ and worktree inventory are clean.
 
 ## Reviews
 
-- No review has yet been run for the uncommitted 2.1.8 real-handoff selection candidate.
+- Initial docs review is approved at `e5b2dd0`; canonical work order: `reviews/Fix-AutonomousHandoffSelection.md`.
 
 ## Decisions, discoveries, blockers, and deviations
 
