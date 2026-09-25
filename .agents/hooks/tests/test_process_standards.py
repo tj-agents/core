@@ -290,10 +290,13 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(cleanup.split())
 
         for required in (
-            "If `scripts/worktrees.ps1` is absent, do not skip cleanup",
+            "Join-Path <primary-checkout> 'scripts/worktrees.ps1'",
+            "Test-Path -LiteralPath $worktreeHelper -PathType Leaf",
+            "If that exact primary-checkout helper path is absent, do not skip cleanup",
             "status --porcelain=v2 --untracked-files=all",
             "git merge-base --is-ancestor",
-            "require a fresh open-PR query",
+            "gh pr list --repo <owner/repo> --state open --head <branch> --json number,url",
+            "fresh query returns exactly `[]`",
             "worktree remove -- <target-worktree>",
             "branch -d <branch>",
             "Step 5 is a blocking post-merge gate",

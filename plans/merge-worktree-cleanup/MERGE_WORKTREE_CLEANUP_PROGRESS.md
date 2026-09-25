@@ -29,8 +29,8 @@
 
 ## Next Steps
 
-Complete an independent review of the synchronized immutable candidate, resolve findings, and
-deliver it through the normal PR workflow. Retry removal of Winwrap's exact empty residual directory
+Resolve the three findings from the completed immutable-candidate review, run an incremental review,
+and deliver through the normal PR workflow. Retry removal of Winwrap's exact empty residual directory
 before terminal closeout; do not terminate the three owning Codex sessions without explicit authority.
 
 Scope: whole plan through all remaining phases and terminal delivery.
@@ -58,7 +58,12 @@ Done when: Winwrap cleanup and the reviewed, validated core workflow correction 
 
 ## Reviews
 
-Not started; review is required after focused validation.
+- Full frozen review completed at `cbfec336ee70e6cc559ac0c2003b2bd64cc2b07e` with judgment
+  `changes-requested`; work order: `reviews/Fix-MergeWorktreeCleanupFallback.md`.
+- Findings: resolve and invoke the preferred helper under the primary checkout, specify the exact fresh
+  open-PR query and empty result, and add the phase's required consumption contract.
+- The helper-selected read-only lenses could not launch because their fixed model is unsupported by this
+  account; the owning session completed the documented parent fallback against the immutable bundle.
 
 ## Decisions, discoveries, blockers, and deviations
 
