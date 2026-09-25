@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:ae56591fe6c418b4d7440165823d23532002e1bd837776afbde9d58c04184002"
+          "digest": "sha256:05d779da720041ecad7bae9fe7201ee13286716cda7d4f15409a431b03bc207e"
         },
         {
           "id": "base-agents/engineering",
@@ -122,7 +122,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:b9d12892618c3750280922477cb96e08d18a258df73c5bb6b698407592da8c47"
+          "digest": "sha256:2d16c15661e2d259a729644bf4d2f106bb647bc52dcf5da7a518454eb21c0a67"
         },
         {
           "id": "base-agents/machine",
@@ -164,7 +164,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:872d043442bd29f12827e5f33e619a23b94878f17cfab98949dd1b84cb2961e7",
+          "digest": "sha256:10c40b17509894a549f859586643710e49d8d38e563e25632121fe7fb20bf77a",
           "digest_excludes": [
             "catalog/catalog.json"
           ]
