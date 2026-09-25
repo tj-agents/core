@@ -4,7 +4,7 @@ description: Apply the canonical isolated review workflow to a documentation or 
 
 kind: workflow
 domain: process
-model: gpt-5.6-terra
+model: gpt-6-sol
 ---
 
 # Documentation review mode
