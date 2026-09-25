@@ -7,7 +7,7 @@ from pathlib import Path
 
 REFERRER_NAMES = {"AGENTS.md", "CLAUDE.md", "SKILL.md"}
 CLAUDE_BODY = "@AGENTS.md"
-IGNORED_DIR_NAMES = {"node_modules", "bin", "obj", "dist", ".git"}
+IGNORED_DIR_NAMES = {"node_modules", "bin", "obj", "dist", ".git", ".worktrees"}
 WORKING_DOC_DIRS = {"plans", "reviews"}
 TEST_PROJECT_PATTERN = re.compile(r"<IsTestProject>\s*true\s*</IsTestProject>", re.IGNORECASE)
 LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
@@ -27,7 +27,15 @@ def agents_md_files(root):
     return sorted(
         path
         for path in root.rglob("AGENTS.md")
-        if not hidden(path.relative_to(root)) and not ignored(path.relative_to(root))
+        if not ignored(path.relative_to(root))
+    )
+
+
+def claude_md_files(root):
+    return sorted(
+        path
+        for path in root.rglob("CLAUDE.md")
+        if not ignored(path.relative_to(root))
     )
 
 
@@ -120,6 +128,9 @@ def sibling_errors(root):
             errors.append(
                 f"{repo_path(root, claude)}: must contain exactly `{CLAUDE_BODY}`, found `{body}`"
             )
+    for path in claude_md_files(root):
+        if not path.with_name("AGENTS.md").is_file():
+            errors.append(f"{repo_path(root, path)}: has no sibling AGENTS.md")
     return errors
 
 
