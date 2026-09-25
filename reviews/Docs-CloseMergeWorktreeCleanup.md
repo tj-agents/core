@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `2f9a5eae284230c0efebaad9e3ba141d73542c51`  `(2026-09-25)`
+**Reviewed up to commit:** `fa487c6f31be2a09bf089a84603ab108a67c9dad`  `(2026-09-25)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-25 — full
@@ -62,3 +62,25 @@ The helper-selected `native-general` and `workflow` lens processes remain unavai
 model is not supported by this account; the owning session completed the documented parent fallback over
 the immutable eight-path bundle. No changed path matched the merge gate's security inventory, so no security
 marker is required.
+
+## Review pass — 2026-09-25 — incremental
+
+**Candidate base:** `2f9a5eae284230c0efebaad9e3ba141d73542c51`
+**Candidate head:** `fa487c6f31be2a09bf089a84603ab108a67c9dad`
+**Candidate branch:** `Docs/CloseMergeWorktreeCleanup`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:651722a980e730045d3ba487b1c384e16cfac66877394c00aeaf3543f4e80761` `(2 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\tj-agents\core\.git\agent-workflow\runs\merge-worktree-host-retarget-final-review-20260925\review\21071c5cbf873e32d7c7dc9c8801b3a3ff4e305cc2b9061d84ae02ae9fe5faa3`
+**Candidate bundle identity:** `sha256:977fd8dd4f8d92108ecdeeade08ecef8f2d926ede19ab82a9b3762d7d84d0bee`
+**Work-order path:** `reviews/Docs-CloseMergeWorktreeCleanup.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The two-file delta accurately records the approved remediation pass and advances the plan's
+next action to opening and validating the PR without changing the earlier candidate identity, finding text,
+severity, completed judgment, or terminal disposition.
+
+The selected `native-general` lens process remains unavailable because its fixed model is not supported by
+this account; the owning session completed the documented parent fallback over the immutable metadata bundle.
