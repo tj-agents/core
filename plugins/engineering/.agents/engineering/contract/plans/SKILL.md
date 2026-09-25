@@ -345,8 +345,8 @@ for a handoff or ask the user to name the next phase merely because one phase co
 Transfer to a fresh context only when at least one of these conditions is true:
 
 - the user explicitly asks to clear, restart, or hand the work to another context;
-- the next action changes owner, worktree, PR, or logical workstream, or a workflow deliberately requires an
-  independent context for unbiased review or isolated judgment;
+- the next action changes owner, repository, worktree, PR, or logical workstream, or a workflow deliberately
+  requires an independent context for unbiased review or isolated judgment;
 - the next plan section is materially separate and the earlier reasoning would distract from, rather than
   help with, the new work;
 - the context is genuinely degraded: repeated compaction has lost needed detail, important facts are being
@@ -354,8 +354,9 @@ Transfer to a fresh context only when at least one of these conditions is true:
   the next slice safely.
 
 Age, transcript length, an actionable ledger, or a phase boundary by itself is not evidence that context is
-degraded. When a transfer condition does apply, make the checkpoint durable and emit the exact handoff from
-the `handoff` skill; do not emit one as routine phase-ending ceremony.
+degraded. When a transfer condition does apply, make the checkpoint durable and execute the `handoff` workflow.
+It prepares the exact `handoff-format` pointer and invokes one selected launcher; a pointer in the response alone
+does not transfer ownership. Do not select a handoff as routine phase-ending ceremony.
 
 ## Finishing, superseding, abandoning
 

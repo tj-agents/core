@@ -202,6 +202,23 @@ class ProcessStandardsTests(unittest.TestCase):
             flat,
         )
 
+    def test_ownership_or_repository_change_selects_a_real_handoff(self):
+        plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
+        execution = " ".join(
+            authored_skill("plan-execution").read_text(encoding="utf-8").split()
+        )
+        formatting = " ".join(
+            authored_skill("handoff-format").read_text(encoding="utf-8").split()
+        )
+
+        self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
+        self.assertIn("execute the `handoff` workflow", plans)
+        self.assertIn("a pointer in the response alone does not transfer ownership", plans)
+        self.assertIn("execute `engineering:handoff`", execution)
+        self.assertIn("invokes one selected launcher before this context releases ownership", execution)
+        self.assertIn("It does not select or perform a transfer", formatting)
+        self.assertIn("`engineering:handoff` performs the selected transfer", formatting)
+
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
         authoring = authored_skill("plan-authoring").read_text(
