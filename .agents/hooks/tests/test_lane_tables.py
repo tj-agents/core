@@ -34,7 +34,7 @@ STAGE_LANES = {
 # Capability order per vendor, most capable first. A rung may never sit above the rung before it, and the
 # frontier tier must outrank every rung.
 FAMILY_ORDER = {
-    "claude": ("claude-fable-5", "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"),
+    "claude": ("claude-fable-5", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"),
     "codex": ("gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"),
 }
 
