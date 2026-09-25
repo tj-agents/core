@@ -9,7 +9,7 @@
     "behavior",
     "plans"
   ],
-  "version": "2.1.4",
+  "version": "2.1.5",
   "skills": "./codex-skills/",
   "interface": {
     "displayName": "Common agent behavior",
