@@ -4,7 +4,7 @@ description: Land the current branch's PR through the merge queue and return to 
 
 kind: workflow
 domain: process
-model: claude-opus-5
+model: claude-opus-5-5
 effort: xhigh
 ---
 

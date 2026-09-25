@@ -373,6 +373,9 @@ def synchronize_for_review(root, base_ref):
 
 def materialize_tree(root, head, archive_path, tree_path):
     archive = run_process(["git", "archive", "--format=tar", head], root, text=False).stdout
+    # Replace, never truncate in place: a filesystem filter on the shared .git can reject a truncating
+    # open of an existing archive with EINVAL while a fresh create succeeds.
+    archive_path.unlink(missing_ok=True)
     archive_path.write_bytes(archive)
     if tree_path.exists():
         shutil.rmtree(tree_path)

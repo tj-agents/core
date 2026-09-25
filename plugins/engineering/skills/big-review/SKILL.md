@@ -4,7 +4,7 @@ description: Select and drive the canonical isolated review workflow for a very 
 
 kind: workflow
 domain: process
-model: claude-opus-5
+model: claude-opus-5-5
 effort: high
 ---
 

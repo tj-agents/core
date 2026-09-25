@@ -4,7 +4,7 @@ description: Create, inspect, or close one isolated git worktree so every in-fli
 
 kind: operation
 domain: process
-lane: L5
+lane: L7
 ---
 
 # One checkout per in-flight branch
