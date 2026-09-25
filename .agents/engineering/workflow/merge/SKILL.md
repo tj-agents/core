@@ -209,17 +209,20 @@ git -C <primary-checkout> checkout <default>
 git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
-From the primary checkout, prefer the repository's own worktree command for a worktree-developed branch. It
-refuses every unsafe state and handles the platform details — junctions, long paths, Git administration,
-branch deletion — and the repository's own docs own that list, so trust the refusal instead of
-second-guessing it:
+Resolve the repository's own worktree command under the primary checkout and prefer it for a
+worktree-developed branch. It refuses every unsafe state and handles the platform details — junctions, long
+paths, Git administration, branch deletion — and the repository's own docs own that list, so trust the
+refusal instead of second-guessing it:
 
 ```powershell
-./scripts/worktrees.ps1 close -Worktree <path> -PullRequest <n> [-PlanManaged]
+$worktreeHelper = Join-Path <primary-checkout> 'scripts/worktrees.ps1'
+if (Test-Path -LiteralPath $worktreeHelper -PathType Leaf) {
+    & $worktreeHelper close -Worktree <path> -PullRequest <n> [-PlanManaged]
+}
 ```
 
-Add `-PlanManaged` when a plan owns the work. If `scripts/worktrees.ps1` is absent, do not skip cleanup. Apply
-the same gates with native Git from the primary checkout:
+Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout helper path is absent, do not
+skip cleanup. Apply the same gates with native Git from the primary checkout:
 
 1. Record the target worktree's branch and head from `git worktree list --porcelain`. Refuse the primary
    checkout, a detached target, or a target that does not exactly match the completed PR's recorded branch
@@ -227,8 +230,9 @@ the same gates with native Git from the primary checkout:
 2. Run `git -C <target-worktree> status --porcelain=v2 --untracked-files=all`. Any output means stop: do not
    remove a dirty worktree or discard tracked or untracked files.
 3. Fetch current refs. Require the completed PR to be `MERGED`, require
-   `git merge-base --is-ancestor <target-head> origin/<default>` to succeed, and require a fresh open-PR query
-   for the target branch to return none. A closed-unmerged PR, unmerged head, or open PR preserves both the
+   `git merge-base --is-ancestor <target-head> origin/<default>` to succeed, then run
+   `gh pr list --repo <owner/repo> --state open --head <branch> --json number,url`. Continue only when that
+   fresh query returns exactly `[]`. A closed-unmerged PR, unmerged head, or open PR preserves both the
    worktree and branch.
 4. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
