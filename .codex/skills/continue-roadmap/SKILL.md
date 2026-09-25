@@ -1,6 +1,6 @@
 ---
 name: continue-roadmap
-description: Compatibility entry for asking what to plan next on an epic roadmap. Resolve one implementable unowned roadmap item, then enter plan-authoring; do not resume an existing plan, execute implementation, or reconcile roadmap facts already owned by update-roadmap.
+description: Compatibility entry for asking what to plan next on an epic roadmap. Resolve one implementable unowned roadmap item, then enter plan-authoring; hand an in-flight item to its existing owner rather than stopping at a report; do not execute implementation or reconcile roadmap facts already owned by update-roadmap.
 
 kind: workflow
 domain: process
