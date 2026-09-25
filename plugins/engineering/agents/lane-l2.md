@@ -1,7 +1,7 @@
 ---
 name: lane-l2
 description: Bounded delegated work at L2.
-model: claude-opus-5
+model: claude-opus-5-5
 effort: xhigh
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
