@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `4b0166d091550117b4e7c00e4882b44119255d95`  `(2026-09-25)`
+**Reviewed up to commit:** `4d578192648dc5f13917a4b9e4b02a021639ec7f`  `(2026-09-25)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-25 — full
@@ -94,3 +94,26 @@ and plan-artifact suites are green.
 Fresh `native-general` and `workflow` lens processes were unavailable because their fixed model is not
 supported by this account; the owning session completed the documented parent fallback over the immutable
 eight-path bundle.
+
+## Review pass — 2026-09-25 — incremental
+
+**Candidate base:** `4b0166d091550117b4e7c00e4882b44119255d95`
+**Candidate head:** `4d578192648dc5f13917a4b9e4b02a021639ec7f`
+**Candidate branch:** `Fix/MergeWorktreeCleanupFallback`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:31bb8d20ca92e9ebd50ae4a6c7a8605d2e3585df6c6d9be05ec0b9936691bf6e` `(2 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\tj-agents\core\.git\agent-workflow\runs\worktree-cleanup-merge-workflow-20260925\review\b7f90ad242d8413ef93e227b62c8886f4e2238c3809b8e0f3283ac44928e69b9`
+**Candidate bundle identity:** `sha256:6a7c7da7dfeb69f58236b4e45d3f68f7302208d7ed70a1de44ea10ca12be4f93`
+**Work-order path:** `reviews/Fix-MergeWorktreeCleanupFallback.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The two-file delta accurately checkpoints the prior approved remediation pass and
+keeps the plan's next action, review artifact, commit range, and unresolved Winwrap handle blocker aligned
+with observed state. The prior frozen pass identities, finding text, severities, judgments, and terminal
+dispositions are unchanged.
+
+The selected `native-general` lens process remains unavailable because its fixed model is not supported by
+this account; the owning session completed the documented parent fallback over the immutable metadata bundle.
