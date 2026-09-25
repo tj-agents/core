@@ -102,11 +102,11 @@ class WorkflowContractTests(unittest.TestCase):
         )
         self.assertEqual(
             {
-                "strategic": "claude-opus-5",
+                "strategic": "claude-opus-5-5",
                 "implementation": "claude-sonnet-5",
                 "mechanical": "claude-sonnet-5",
                 "review": "claude-sonnet-5",
-                "critical": "claude-opus-5",
+                "critical": "claude-opus-5-5",
             },
             {stage: value["model"] for stage, value in claude["semantic_stages"].items()},
         )
@@ -1076,6 +1076,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             script = bundle / "install-workflow-agents.ps1"
             shutil.copy2(ROOT / ".codex" / script.name, script)
             shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+            generated = len(list(source.glob("*.toml")))
             (source / "unrelated.toml").write_text('name = "unrelated"\n', encoding="utf-8")
             codex_home = root / "codex-home"
             arguments = [shell, "-NoProfile"]
@@ -1088,7 +1089,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             )
             self.assertEqual(0, completed.returncode, completed.stderr)
             target = codex_home / "agents"
-            self.assertEqual(10, len(list(target.glob("*.toml"))))
+            self.assertEqual(generated, len(list(target.glob("*.toml"))))
             self.assertFalse((target / "unrelated.toml").exists())
 
     def test_generator_preserves_authored_host_files_and_prunes_plugin_orphans(self):
@@ -1343,7 +1344,7 @@ class HostAdapterTests(unittest.TestCase):
             probe=registry.probe("claude"),
         )
 
-        self.assertEqual("claude-opus-5", invocation["model"])
+        self.assertEqual("claude-opus-5-5", invocation["model"])
         self.assertEqual("primary", invocation["model_selection"])
         self.assertEqual("general-purpose", invocation["agent_name"])
         self.assertEqual("evidence-explorer", invocation["role_agent_name"])

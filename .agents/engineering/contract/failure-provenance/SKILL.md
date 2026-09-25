@@ -4,7 +4,7 @@ description: Establish when a failing test last genuinely passed and what was di
 
 kind: contract
 domain: process
-lane: L3
+lane: L4
 ---
 
 # Establishing what changed since it last passed

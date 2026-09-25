@@ -4,7 +4,7 @@ description: Commit the ENTIRE working tree in a single commit — no survey, no
 
 kind: operation
 domain: process
-model: gpt-5.6-luna
+model: gpt-5.5
 ---
 
 # Committing the whole tree in one commit
