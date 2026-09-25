@@ -102,11 +102,11 @@ class WorkflowContractTests(unittest.TestCase):
         )
         self.assertEqual(
             {
-                "strategic": "claude-opus-5",
+                "strategic": "claude-opus-5-5",
                 "implementation": "claude-sonnet-5",
                 "mechanical": "claude-sonnet-5",
                 "review": "claude-sonnet-5",
-                "critical": "claude-opus-5",
+                "critical": "claude-opus-5-5",
             },
             {stage: value["model"] for stage, value in claude["semantic_stages"].items()},
         )
@@ -1344,7 +1344,7 @@ class HostAdapterTests(unittest.TestCase):
             probe=registry.probe("claude"),
         )
 
-        self.assertEqual("claude-opus-5", invocation["model"])
+        self.assertEqual("claude-opus-5-5", invocation["model"])
         self.assertEqual("primary", invocation["model_selection"])
         self.assertEqual("general-purpose", invocation["agent_name"])
         self.assertEqual("evidence-explorer", invocation["role_agent_name"])

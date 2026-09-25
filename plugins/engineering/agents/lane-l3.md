@@ -1,7 +1,7 @@
 ---
 name: lane-l3
 description: Bounded delegated work at L3.
-model: claude-opus-5
+model: claude-opus-5-5
 effort: high
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
