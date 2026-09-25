@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `e5b2dd0d9472d6a7b50263b4dbf5365db93a431b`  `(2026-09-25)`
+**Reviewed up to commit:** `54b1fd495d309f5271c0555b97779fe48b3795a0`  `(2026-09-25)`
 **Judgment:** `approved`
 
 ## Review pass ? 2026-09-25 ? docs
@@ -27,3 +27,23 @@ No findings. The canonical transfer criteria now include repository changes, rou
 the launcher-backed `engineering:handoff` workflow, and retain `handoff-format` as the single pointer-format owner.
 The generated package mirrors, catalog digests, matching 2.1.8 release metadata, plan checkpoint, and focused
 regression coverage agree. The frozen-tree documentation-reachability check passed.
+
+## Review pass ? 2026-09-25 ? incremental
+
+**Candidate base:** `e5b2dd0d9472d6a7b50263b4dbf5365db93a431b`
+**Candidate head:** `54b1fd495d309f5271c0555b97779fe48b3795a0`
+**Candidate branch:** `Fix/AutonomousHandoffSelection`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:f48db1080434535451a740d3866e96a513eb3ebb7125ba8a7e2ee6167691638e` `(2 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\tj-agents\core\.git\agent-workflow\runs\merge-worktree-cleanup-fallback\review\eb17884fc8a497714c418d704e9da57ea5fc3a985b9c0d16cb220735d3f7d6bb`
+**Candidate bundle identity:** `sha256:0ac423fb2d63414af4e74ab2637fd333e4bf6f0d66251da426cca721209ae95a`
+**Work-order path:** `reviews/Fix-AutonomousHandoffSelection.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The review work order and plan checkpoint accurately preserve the approved initial pass without
+changing the frozen candidate identity, transfer contract, generated package contents, or open cleanup gates.
+
+Independent review-lens dispatch remains unavailable in this session; the owning session completed the documented
