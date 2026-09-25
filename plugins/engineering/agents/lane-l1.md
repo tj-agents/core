@@ -1,7 +1,7 @@
 ---
 name: lane-l1
 description: Bounded delegated work at L1.
-model: claude-opus-5
+model: claude-fable-5
 effort: xhigh
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
