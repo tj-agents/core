@@ -49,10 +49,14 @@ the documented parent fallback over the immutable bundle.
   requests only `number,url`, and continues only for the exact empty JSON array. The focused test protects
   the command and acceptance shape; 15 process-standard tests and both generation checks pass.
 
-- [ ] **MW3 — LOW — workflow** — `plans/merge-worktree-cleanup/MERGE_WORKTREE_CLEANUP_PLAN.md:45-54`
+- [x] **MW3 — LOW — workflow** — `plans/merge-worktree-cleanup/MERGE_WORKTREE_CLEANUP_PLAN.md:45-54`
   Phase 2 ships a shared workflow capability, but the phase has no consumption contract. The selected plan
   standard requires every capability-producing phase to pin who consumes it and the exact output/call shape.
   Add the engineering merge workflow's consumers and the helper/native-Git branch plus final inventory shape.
+
+  **Resolved:** Phase 2 now names the `engineering:merge` agent consumer, its synchronous inputs, the exact
+  helper-versus-native selection, the inline final-inventory handoff to Step 6, and the blocking failure
+  result. The plan-artifact tests pass.
 
 ### Verified and dismissed during synthesis
 
