@@ -8,13 +8,20 @@
 # (which executes candidates directly, not through the terminal) has something real to run.
 
 $repository = Split-Path -Parent $PSScriptRoot
+$pluginRoot = Join-Path $repository 'plugins\machine'
 $claudeLauncher = Join-Path $repository 'plugins\machine\skills\handoff-claude\scripts\launch-claude.ps1'
 $codexLauncher = Join-Path $repository 'plugins\machine\skills\handoff-codex\scripts\launch-codex.ps1'
 $openLauncher = Join-Path $repository 'plugins\machine\skills\open-claude\scripts\open-claude.ps1'
-$packagedLaunchers = @(Get-ChildItem -LiteralPath (Join-Path $repository 'plugins\machine\skills') -Recurse -File -Filter '*.ps1' |
+$packagedLaunchers = @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Filter '*.ps1' |
     Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'agent-cli\.ps1' } |
     Select-Object -ExpandProperty FullName)
-$expectedLaunchers = @($claudeLauncher, $codexLauncher, $openLauncher) | Sort-Object
+$expectedLaunchers = @(
+    foreach ($tree in @('.agents\machine', 'codex-skills', 'skills')) {
+        Join-Path $pluginRoot "$tree\handoff-claude\scripts\launch-claude.ps1"
+        Join-Path $pluginRoot "$tree\handoff-codex\scripts\launch-codex.ps1"
+        Join-Path $pluginRoot "$tree\open-claude\scripts\open-claude.ps1"
+    }
+) | Sort-Object
 if (Compare-Object $expectedLaunchers ($packagedLaunchers | Sort-Object)) {
     throw 'The generated launcher dependency inventory changed; every agent-cli.ps1 consumer must be exercised or resolved here.'
 }
@@ -178,6 +185,23 @@ class Stub {
     $env:PATH = "$binDir;$env:SystemRoot\System32;$env:SystemRoot"
     $env:USERPROFILE = $fakeProfile
     $env:LOCALAPPDATA = $fakeLocalAppData
+    $env:WT_STUB_LOG = $wtLog
+
+    # Every generated discovery layout must load the shipped shared library and reach the stub terminal.
+    # The packaged canonical `.agents/machine/.../scripts` copy is one directory deeper than the host
+    # `skills` and `codex-skills` copies; exercising all nine catches a resolver that supports only one.
+    foreach ($launcher in $packagedLaunchers) {
+        if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
+        switch (Split-Path -Leaf $launcher) {
+            'launch-codex.ps1' { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'layout test' | Out-Null }
+            'launch-claude.ps1' { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'layout test' | Out-Null }
+            'open-claude.ps1' { & $launcher -WorkingDirectory $workDir -Title 'layout test' | Out-Null }
+            default { throw "Unexpected generated launcher: $launcher" }
+        }
+        if (-not (Test-Path -LiteralPath $wtLog)) {
+            throw "The generated launcher did not reach the stub terminal: $launcher"
+        }
+    }
 
     # --- handoff-claude: no -Model means the harness picks its own default ---
     $env:WT_STUB_LOG = $wtLog
@@ -347,12 +371,8 @@ class Stub {
     catch { $rejected = $true }
     if (-not $rejected) { throw 'open-claude.ps1 accepted -Resume together with -Continue.' }
 
-    # --- every generated launcher that names the shared library can resolve the shipped dependency ---
+    # --- every generated launcher still names the shared library it just resolved and executed ---
     foreach ($launcher in $packagedLaunchers) {
-        $shared = Join-Path (Split-Path -Parent $launcher) '..\..\..\resources\machine\scripts\agent-cli.ps1'
-        if (-not (Test-Path -LiteralPath $shared -PathType Leaf)) {
-            throw "The packaged $(Split-Path -Leaf $launcher) cannot reach the shared agent-cli.ps1."
-        }
         if ((Get-Content -LiteralPath $launcher -Raw) -notmatch 'agent-cli\.ps1') {
             throw "$(Split-Path -Leaf $launcher) no longer loads the shared agent-cli.ps1."
         }

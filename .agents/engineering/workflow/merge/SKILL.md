@@ -209,6 +209,25 @@ git -C <primary-checkout> checkout <default>
 git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
+Apply `base:cd` before invoking either cleanup path below. The merge normally runs from the linked target,
+so retarget the host **before** a helper or native Git unregisters or removes it. A per-command `workdir`,
+shell `cd`, or `git -C` does not retarget Codex or Claude and is not evidence that the old directory can be
+deleted.
+
+- If the harness exposes its native host command interface, invoke `/cd <primary-checkout>` there and
+  continue only after the host confirms that the session is attached to the primary checkout.
+- If that interface is unavailable, invoke the unqualified `handoff` workflow once with the primary
+  checkout. Checkpoint the exact repository, merged PR, branch, remote head, target worktree, primary
+  checkout, and remote default. Put the remaining Step 5 cleanup and final inventory in the successor's
+  `## Next Steps`. After verified launcher submission the predecessor stops repository-scoped work and
+  releases its host session; it does not run either cleanup path. The successor is the sole cleanup owner:
+  after the predecessor no longer holds the target, it selects the helper or native-Git path below, requires
+  the physical target path to be absent, and then continues this delivery.
+
+Do not make the user choose between these paths or teach them this lifecycle detail. Only the final manual
+`/cd` pause already defined by `base:cd` applies when the automatic handoff capability is genuinely
+unavailable or its diagnosed launcher fails.
+
 Resolve the repository's own worktree command under the primary checkout and prefer it for a
 worktree-developed branch. It refuses every unsafe state and handles the platform details — junctions, long
 paths, Git administration, branch deletion — and the repository's own docs own that list, so trust the
@@ -244,7 +263,8 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
 
 **Step 5 is a blocking post-merge gate. Do not enter Step 6, report terminal delivery, or leave the cleanup
-for a later session until the helper or native-Git path has produced the final inventory above.** The
+for a later session until host retargeting plus the helper or native-Git path has produced the final
+inventory above.** The
 worktree-cleanup audit gate is a backstop that makes a missed cleanup visible, not a substitute for doing it
 immediately.
 
