@@ -7,7 +7,7 @@
 - Branch: `Fix/MergeWorktreeCleanupFallback`
 - PR: not opened
 - Dependency/package gates: none
-- Last reconciled: 2026-09-25 at the validated implementation milestone
+- Last reconciled: 2026-09-25 after synchronizing current `origin/main`
 
 ## Current state
 
@@ -23,17 +23,15 @@
 - Core's canonical `engineering:merge` Step 5 now includes a native-Git fallback, explicit safety
   gates, final inventory evidence, and a blocking transition before Step 6. A focused regression
   test protects that contract, release metadata is `2.1.5`, and generated outputs are current.
-- The validated candidate is on `Fix/MergeWorktreeCleanupFallback` at the pre-sync base
-  `075acee7ed79f6099703b599ec35f036f759e00d`; fetched `origin/main` advanced to
-  `b8566eb`, so the candidate must be committed before merging the new base and revalidating.
+- The implementation milestone is committed at `46af568`; current `origin/main` at `b8566eb`
+  has been merged. Catalog conflicts were resolved from canonical source by recomputing all three
+  package digests and regenerating distribution output.
 
 ## Next Steps
 
-Commit this validated implementation milestone, merge current `origin/main`, resolve any conflicts,
-and rerun focused plus required generation checks. Then review the exact synchronized candidate,
-resolve findings, and deliver it through the normal PR workflow. Retry removal of Winwrap's exact
-empty residual directory before terminal closeout; do not terminate the three owning Codex sessions
-without explicit authority.
+Complete an independent review of the synchronized immutable candidate, resolve findings, and
+deliver it through the normal PR workflow. Retry removal of Winwrap's exact empty residual directory
+before terminal closeout; do not terminate the three owning Codex sessions without explicit authority.
 
 Scope: whole plan through all remaining phases and terminal delivery.
 Current slice: synchronize, review, and deliver the validated core correction.
@@ -55,6 +53,8 @@ Done when: Winwrap cleanup and the reviewed, validated core workflow correction 
 - Core focused process standards: 15 passed. Complete hook suite: 558 passed, 8 skipped.
 - Capability bootstrap after fixture repair: 31 passed. Complete repository suite: 118 passed.
 - Catalog digest check and `pwsh .agents/sync-generated.ps1 -Check`: passed.
+- After merging `origin/main`: 15 process-standard tests passed, 9 catalog unit tests passed,
+  catalog digest check passed, and generated-output check passed.
 
 ## Reviews
 

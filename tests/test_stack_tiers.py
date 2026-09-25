@@ -1,0 +1,274 @@
+"""The stack-tier gate decides applicability from shipped declarations, never from local settings."""
+
+import importlib.util
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+import unittest.mock
+
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / ".agents" / "base" / "stack-tiers" / "scripts" / "tier_gate.py"
+SCHEMA = ROOT / ".agents" / "base" / "stack-tiers" / "tier.schema.json"
+DECLARED = ROOT / ".agents" / "tiers"
+
+
+def load_module():
+    specification = importlib.util.spec_from_file_location("tier_gate", SCRIPT)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+gate = load_module()
+
+
+DOTNET = {
+    "schema_version": 1,
+    "tier": "dotnet",
+    "stack": ".NET",
+    "applies": "stack-present",
+    "owner_repository": "tomjseery/dotagents",
+    "detect": {"globs": ["*.sln", "*.csproj"], "files": ["global.json"]},
+}
+REACT = {
+    "schema_version": 1,
+    "tier": "react",
+    "stack": "TypeScript/React",
+    "applies": "stack-present",
+    "owner_repository": "tomjseery/react-agents",
+    "detect": {"content": [{"glob": "package.json", "pattern": r"\"react\"\s*:"}]},
+}
+BASE = {"schema_version": 1, "tier": "base", "stack": "any project", "applies": "always"}
+
+
+def declaration(plugin, marketplace, data):
+    return gate.Declaration(plugin, marketplace, data)
+
+
+class DeclarationDiscovery(unittest.TestCase):
+    def test_identity_comes_from_the_installed_path_not_the_declaration(self):
+        with tempfile.TemporaryDirectory() as cache:
+            payload = Path(cache) / "dotagents" / "dotnet" / "1.1.0"
+            payload.mkdir(parents=True)
+            claim = dict(DOTNET, tier="dotnet")
+            (payload / "tier.json").write_text(json.dumps(claim), encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.id for item in found], ["dotnet@dotagents"])
+        self.assertEqual(found[0].plugin, "dotnet")
+        self.assertEqual(found[0].marketplace, "dotagents")
+
+    def test_an_unreadable_or_unversioned_declaration_is_ignored(self):
+        with tempfile.TemporaryDirectory() as cache:
+            for name, body in (
+                ("broken", "{not json"),
+                ("future", json.dumps({"schema_version": 99, "tier": "x", "applies": "always"})),
+                ("nameless", json.dumps({"schema_version": 1, "applies": "always"})),
+            ):
+                payload = Path(cache) / name / name / "1.0.0"
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(body, encoding="utf-8")
+
+            self.assertEqual(gate.declarations([cache]), [])
+
+
+class TemporaryProject(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.project = Path(directory.name)
+        patched = unittest.mock.patch.dict(os.environ, {gate.OVERRIDE_VARIABLE: ""})
+        patched.start()
+        self.addCleanup(patched.stop)
+
+
+class Detection(TemporaryProject):
+    def populated(self, stack, names):
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        directory = Path(holder.name)
+        for name in names:
+            path = directory / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(stack, encoding="utf-8")
+        return directory
+
+    def test_a_marker_at_any_depth_proves_the_stack(self):
+        project = self.populated("", ["src/api/Service.csproj"])
+        present, evidence = gate.stack_present(project, DOTNET["detect"])
+        self.assertTrue(present)
+        self.assertIn("Service.csproj", evidence)
+
+    def test_an_unrelated_project_does_not_match(self):
+        project = self.populated("", ["README.md", "app/main.py"])
+        present, _ = gate.stack_present(project, DOTNET["detect"])
+        self.assertFalse(present)
+
+    def test_content_matching_reads_the_file_not_its_name(self):
+        project = self.populated(json.dumps({"dependencies": {"react": "18.3.1"}}), ["package.json"])
+        present, evidence = gate.stack_present(project, REACT["detect"])
+        self.assertTrue(present)
+        self.assertEqual(evidence, "package.json")
+
+        other = self.populated(json.dumps({"dependencies": {"vue": "3"}}), ["package.json"])
+        present, _ = gate.stack_present(other, REACT["detect"])
+        self.assertFalse(present)
+
+
+class Applicability(TemporaryProject):
+    def setUp(self):
+        super().setUp()
+        self.found = [
+            declaration("base", "base-agents", BASE),
+            declaration("dotnet", "dotagents", DOTNET),
+        ]
+
+    def test_a_ubiquitous_package_is_never_gated(self):
+        ubiquitous, _, blocked = gate.assess(self.project, self.found)
+        self.assertEqual([item.tier for item in ubiquitous], ["base"])
+        self.assertNotIn("base", [item.tier for item in blocked])
+
+    def test_a_stack_tier_without_its_stack_is_blocked(self):
+        _, applicable, blocked = gate.assess(self.project, self.found)
+        self.assertEqual(applicable, [])
+        self.assertEqual([item.tier for item in blocked], ["dotnet"])
+
+    def test_a_stack_tier_with_its_stack_applies(self):
+        (self.project / "Solution.sln").write_text("", encoding="utf-8")
+        _, applicable, blocked = gate.assess(self.project, self.found)
+        self.assertEqual([item.tier for item, _ in applicable], ["dotnet"])
+        self.assertEqual(blocked, [])
+
+    def test_the_override_forces_one_session_without_configuring_the_project(self):
+        with unittest.mock.patch.dict(os.environ, {gate.OVERRIDE_VARIABLE: "dotnet"}):
+            _, applicable, blocked = gate.assess(self.project, self.found)
+        self.assertEqual([item.tier for item, _ in applicable], ["dotnet"])
+        self.assertEqual(blocked, [])
+
+    def test_a_tier_is_readable_inside_its_own_authoring_repository(self):
+        subprocess.run(["git", "init", "-q"], cwd=self.project, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/tomjseery/dotagents.git"],
+            cwd=self.project,
+            check=True,
+        )
+        _, applicable, blocked = gate.assess(self.project, self.found)
+        self.assertEqual([item.tier for item, _ in applicable], ["dotnet"])
+        self.assertEqual(blocked, [])
+
+
+class SessionStatement(TemporaryProject):
+    def test_nothing_is_said_when_no_stack_tier_is_installed(self):
+        found = [declaration("base", "base-agents", BASE)]
+        self.assertEqual(gate.statement(self.project, found), "")
+
+    def test_the_statement_names_what_applies_and_what_does_not(self):
+        found = [
+            declaration("base", "base-agents", BASE),
+            declaration("dotnet", "dotagents", DOTNET),
+            declaration("react", "react-agents", REACT),
+        ]
+        (self.project / "Api.csproj").write_text("", encoding="utf-8")
+        text = gate.statement(self.project, found)
+
+        self.assertIn("Ubiquitous, always applies: base", text)
+        self.assertIn("Applies here: `dotnet:*`", text)
+        self.assertIn("Does not apply here: `react:*`", text)
+        self.assertNotIn("Does not apply here: `dotnet", text)
+
+
+class Gate(TemporaryProject):
+    def setUp(self):
+        super().setUp()
+        self.found = [
+            declaration("base", "base-agents", BASE),
+            declaration("dotnet", "dotagents", DOTNET),
+        ]
+
+    def call(self, payload):
+        return gate.gate(dict(payload, cwd=str(self.project)), self.found)
+
+    def test_a_blocked_tier_skill_is_refused(self):
+        payload = {"tool_name": "Skill", "tool_input": {"skill": "dotnet:persistence"}}
+        self.assertEqual(self.call(payload), 2)
+
+    def test_a_ubiquitous_skill_is_allowed(self):
+        payload = {"tool_name": "Skill", "tool_input": {"skill": "engineering:review"}}
+        self.assertEqual(self.call(payload), 0)
+
+    def test_the_same_skill_is_allowed_where_the_stack_exists(self):
+        (self.project / "Api.csproj").write_text("", encoding="utf-8")
+        payload = {"tool_name": "Skill", "tool_input": {"skill": "dotnet:persistence"}}
+        self.assertEqual(self.call(payload), 0)
+
+    def test_a_codex_shell_read_of_the_standard_is_the_same_event(self):
+        command = 'cat ~/.codex/plugins/cache/dotagents/dotnet/1.1.0/skills/persistence/SKILL.md'
+        payload = {"tool_name": "shell", "tool_input": {"command": command}}
+        self.assertEqual(self.call(payload), 2)
+
+    def test_naming_the_plugin_without_reading_a_standard_is_not_a_block(self):
+        payload = {"tool_name": "Bash", "tool_input": {"command": "git log dotagents/dotnet"}}
+        self.assertEqual(self.call(payload), 0)
+
+    def test_an_unrecognized_payload_allows(self):
+        self.assertEqual(self.call({"tool_name": "Read", "tool_input": {"file_path": "x"}}), 0)
+
+
+class ShippedDeclarations(unittest.TestCase):
+    def test_every_base_agents_package_declares_itself_ubiquitous(self):
+        names = sorted(path.stem for path in DECLARED.glob("*.json"))
+        self.assertEqual(names, ["base", "engineering", "machine"])
+        for path in DECLARED.glob("*.json"):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(data["schema_version"], 1)
+            self.assertEqual(data["applies"], "always")
+            self.assertEqual(data["tier"], path.stem)
+
+    def test_each_package_ships_its_declaration_at_its_payload_root(self):
+        for plugin in ("base", "engineering", "machine"):
+            payload = ROOT / "plugins" / plugin / "tier.json"
+            self.assertTrue(payload.is_file(), f"{plugin} ships no tier.json")
+            self.assertEqual(json.loads(payload.read_text(encoding="utf-8"))["tier"], plugin)
+
+    def test_the_schema_describes_the_declarations_it_governs(self):
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        self.assertEqual(set(schema["required"]), {"schema_version", "tier", "applies"})
+        self.assertEqual(set(schema["properties"]["applies"]["enum"]), {"always", "stack-present"})
+        self.assertFalse(schema["additionalProperties"])
+
+
+class Runtime(unittest.TestCase):
+    def test_the_session_hook_prints_valid_hook_output_or_nothing(self):
+        with tempfile.TemporaryDirectory() as project:
+            completed = subprocess.run(
+                [sys.executable, "-B", str(SCRIPT), "--session-context", "--project", project],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        if completed.stdout.strip():
+            emitted = json.loads(completed.stdout)
+            self.assertEqual(
+                emitted["hookSpecificOutput"]["hookEventName"], "SessionStart"
+            )
+
+    def test_a_malformed_payload_never_wedges_a_session(self):
+        completed = subprocess.run(
+            [sys.executable, "-B", str(SCRIPT)],
+            input="not json",
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

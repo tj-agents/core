@@ -24,7 +24,8 @@
           ],
           "skills": [
             "cd",
-            "plan-artifacts"
+            "plan-artifacts",
+            "stack-tiers"
           ],
           "dependencies": {
             "required": [],
@@ -36,7 +37,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:ae7f20a23853f878c8502872c220fe77c7ba610b042f624e354d7d11936691ee"
+          "digest": "sha256:54b0bea94332ad0ae7a6e5702dff36f6b51e6878cc4c14086a3736306169ecfb"
         },
         {
           "id": "base-agents/engineering",
@@ -120,7 +121,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:7eb3db0cb8bc86fd4d45ed384fca03d7024857b15dde3d127df298b1a2d2eb61"
+          "digest": "sha256:e897ed5774a346a5bc4bf6fcd0d694bfa4a52545715edc227e744abff7608ee8"
         },
         {
           "id": "base-agents/machine",
@@ -162,7 +163,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:bedbcda27765e93ca6583bc09d9809c0268b6ce7c63ef035a414d4c877fad54b",
+          "digest": "sha256:714aba264860ff430d1be0019bfc8e7b55f7e3ffae8db17787f63a3151576287",
           "digest_excludes": [
             "catalog/catalog.json"
           ]

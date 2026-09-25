@@ -169,8 +169,9 @@ DONE = re.compile(r'^\s*(?:\*\*)?status(?:\*\*)?\s*[:=]\s*(?:\*\*)?\s*(complete|
 NEXT = re.compile(r'^\s*[-*]?\s*\*\*(?:next|blocked|waiting|remaining|todo)\b[^*]*\*\*:?\s*(.+)', re.I | re.M)
 RESOLVES = re.compile(r'\*\*resolves when:?\*\*:?\s*(.+)', re.I)
 OPEN_BOX = re.compile(r'^\s*[-*]\s*\[ \]', re.M)
-# A checkbox roadmap states its next action as the first unticked item, never as a **Next** line.
-OPEN_ITEM = re.compile(r'^\s*[-*]\s*\[ \]\s*(.+)', re.M)
+# A checkbox roadmap states its next action as the first unticked item, never as a **Next**
+# line, and that item routinely wraps over several source lines.
+OPEN_ITEM = re.compile(r'^[ \t]*[-*][ \t]*\[ \][ \t]*(.+(?:\n[ \t]+\S.*)*)', re.M)
 DONE_BOX = re.compile(r'^\s*[-*]\s*\[[xX]\]', re.M)
 
 named, mentioned, hidden, elsewhere = [], [], 0, {}
@@ -203,7 +204,7 @@ for path, folder, label, group in plan_entries():
     else:
         state = ""
     hit = NEXT.search(text) or RESOLVES.search(text) or OPEN_ITEM.search(text)
-    nxt = re.sub(r'\s+', ' ', hit.group(1)).strip()[:100] if hit else ""
+    nxt = re.sub(r'\s+', ' ', hit.group(1)).strip()[:160] if hit else ""
     bucket.append((mtime, state, label, path.name, nxt))
 
 rows = named or mentioned
@@ -258,6 +259,12 @@ closing that gap.
 Nearly every row carries a blank state — only about one plan in forty uses checkboxes. That is not a
 bug in the read: the corpus is prose handoffs. Say that plainly rather than implying every blank is
 unknown-danger, and treat recency as the real signal.
+
+**End each plan you call out with the exact command that resumes it.** A row is only useful if the
+work restarts from it, and composing that invocation is the one step the reader should not have to do.
+A checkbox roadmap resumes with `continue-roadmap`, a prose handoff with `resume-plan`; give the
+invocation itself, not the skill's name in passing. Where the printed next action was clipped, read
+the item out of the file rather than repeating a truncated line.
 
 ## What this does not do
 

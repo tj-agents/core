@@ -4,7 +4,7 @@ description: Select and run the canonical isolated review workflow over only com
 
 kind: workflow
 domain: process
-lane: L3
+lane: L4
 ---
 
 # Incremental review selector

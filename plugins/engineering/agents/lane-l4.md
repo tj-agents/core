@@ -2,7 +2,7 @@
 name: lane-l4
 description: Bounded delegated work at L4.
 model: claude-sonnet-5
-effort: medium
+effort: high
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
 ---

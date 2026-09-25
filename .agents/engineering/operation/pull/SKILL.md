@@ -4,7 +4,7 @@ description: Pull the latest changes for the current branch, and when the pull f
 
 kind: operation
 domain: process
-lane: L5
+lane: L7
 ---
 
 # Pulling, and recovering a failed pull

@@ -30,7 +30,7 @@
   ],
   "semantic_stages": {
     "strategic": {
-      "model": "claude-opus-5",
+      "model": "claude-opus-5-5",
       "effort": "high",
       "unavailable": "decision"
     },
@@ -50,7 +50,7 @@
       "unavailable": "decision"
     },
     "critical": {
-      "model": "claude-opus-5",
+      "model": "claude-opus-5-5",
       "effort": "xhigh",
       "unavailable": "decision"
     }
