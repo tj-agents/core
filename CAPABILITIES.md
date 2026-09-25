@@ -3,9 +3,9 @@
 Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).
 Select exact releases in a project's `.agents/capabilities.lock.json`; do not copy definitions between repositories.
 
-## base-agents 2.1.5
+## base-agents 2.1.6
 
-Owner: [`tj-agents/core`](https://github.com/tj-agents/core) · immutable revision `v2.1.5`
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core) · immutable revision `v2.1.6`
 
 - **`base-agents/base`** — Maintained plans and common agent behavior.
 - **`base-agents/engineering`** — Selected engineering workflows, reviews and Git operations.

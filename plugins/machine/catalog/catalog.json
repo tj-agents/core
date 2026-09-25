@@ -3,18 +3,18 @@
   "digest_format": "sha256-tree-v1",
   "releases": [
     {
-      "id": "base-agents@2.1.5",
+      "id": "base-agents@2.1.6",
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "base-agents",
-      "revision": "v2.1.5",
-      "version": "2.1.5",
+      "revision": "v2.1.6",
+      "version": "2.1.6",
       "plugins": [
         {
           "id": "base-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "2.1.5",
+          "version": "2.1.6",
           "description": "Maintained plans and common agent behavior.",
           "status": "current",
           "platforms": [
@@ -23,6 +23,7 @@
             "macos"
           ],
           "skills": [
+            "agent-files",
             "cd",
             "plan-artifacts",
             "stack-tiers"
@@ -37,13 +38,13 @@
             ],
             "optional": []
           },
-          "digest": "sha256:54b0bea94332ad0ae7a6e5702dff36f6b51e6878cc4c14086a3736306169ecfb"
+          "digest": "sha256:71991843c6e143b3151e292cfb990c94745e2b5afd9149882b5982892d928c17"
         },
         {
           "id": "base-agents/engineering",
           "name": "engineering",
           "package_path": "plugins/engineering",
-          "version": "2.1.5",
+          "version": "2.1.6",
           "description": "Selected engineering workflows, reviews and Git operations.",
           "status": "current",
           "platforms": [
@@ -121,13 +122,13 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:f92703645b69bdc19e44e6b1a8b0d6a54822706932d7703f0ffbc70675cf8446"
+          "digest": "sha256:1a582ff917b371629d7c3618f56a4beba75c138750fa4d41979b08690a37da54"
         },
         {
           "id": "base-agents/machine",
           "name": "machine",
           "package_path": "plugins/machine",
-          "version": "2.1.5",
+          "version": "2.1.6",
           "description": "Explicit harness, history and clipboard utilities.",
           "status": "current",
           "platforms": [
@@ -163,7 +164,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:714aba264860ff430d1be0019bfc8e7b55f7e3ffae8db17787f63a3151576287",
+          "digest": "sha256:c22f1d004ed4219b3480070ca21af93b0a9cb9fe62e541c44e11d25462d343a9",
           "digest_excludes": [
             "catalog/catalog.json"
           ]

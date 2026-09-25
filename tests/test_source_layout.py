@@ -36,7 +36,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(64, len(skills))
+        self.assertEqual(65, len(skills))
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
         })
@@ -60,6 +60,7 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/base/.agents/base/plan-artifacts/SKILL.md",
             output,
         )
+        self.assertIn("plugins/base/.agents/base/agent-files/SKILL.md", output)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
@@ -72,6 +73,7 @@ class SourceLayoutTests(unittest.TestCase):
     def test_generated_payloads_are_self_contained(self):
         _, output, _, _ = SYNC.build(self.root)
         for relative in (
+            "plugins/base/skills/agent-files/scripts/session-context.py",
             "plugins/base/skills/plan-artifacts/scripts/session-context.py",
             "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",

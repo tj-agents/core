@@ -18,6 +18,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/agent-files/scripts/session-context.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PreToolUse": [

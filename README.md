@@ -7,12 +7,13 @@ Stack standards remain in their stack plugins; Concertable policy stays with Con
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
 `base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
+`base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 The packaged SessionStart hook emits the same canonical contract to both hosts. Python 3.9+ must be available
 as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
 alone is insufficient. The skill documents an explicit generated native-instruction fallback.
 
-The split packages form the **2.1.5** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.6** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
