@@ -7,7 +7,7 @@
 - Branch: `Fix/MergeWorktreeCleanupFallback`
 - PR: not opened
 - Dependency/package gates: none
-- Last reconciled: 2026-09-25 after synchronizing current `origin/main`
+- Last reconciled: 2026-09-25 after resolving the full-review findings
 
 ## Current state
 
@@ -26,11 +26,14 @@
 - The implementation milestone is committed at `46af568`; current `origin/main` at `b8566eb`
   has been merged. Catalog conflicts were resolved from canonical source by recomputing all three
   package digests and regenerating distribution output.
+- Full-review findings MW1-MW3 are resolved in `715ff65` and `4b0166d`: helper discovery is bound to
+  the primary checkout, the fresh open-PR query has an exact command and empty result, and Phase 2
+  records its consumption contract. The incremental remediation review is approved at `4b0166d`.
 
 ## Next Steps
 
-Resolve the three findings from the completed immutable-candidate review, run an incremental review,
-and deliver through the normal PR workflow. Retry removal of Winwrap's exact empty residual directory
+Checkpoint the approved review state and deliver through the normal PR workflow. Retry removal of
+Winwrap's exact empty residual directory
 before terminal closeout; do not terminate the three owning Codex sessions without explicit authority.
 
 Scope: whole plan through all remaining phases and terminal delivery.
@@ -64,6 +67,8 @@ Done when: Winwrap cleanup and the reviewed, validated core workflow correction 
   open-PR query and empty result, and add the phase's required consumption contract.
 - The helper-selected read-only lenses could not launch because their fixed model is unsupported by this
   account; the owning session completed the documented parent fallback against the immutable bundle.
+- All three findings are resolved. Incremental review of `cbfec336..4b0166d` is approved with no new
+  findings; canonical work order: `reviews/Fix-MergeWorktreeCleanupFallback.md`.
 
 ## Decisions, discoveries, blockers, and deviations
 

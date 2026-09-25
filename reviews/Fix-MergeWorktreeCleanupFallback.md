@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `cbfec336ee70e6cc559ac0c2003b2bd64cc2b07e`  `(2026-09-25)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `4b0166d091550117b4e7c00e4882b44119255d95`  `(2026-09-25)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-25 — full
 
@@ -68,3 +68,29 @@ the documented parent fallback over the immutable bundle.
 - Canonical ownership and generated mirrors are correct; release metadata and catalog digests agree, and the
   bootstrap fixture repair derives its expected release instead of pinning the prior release.
 - No security-sensitive behavior, secrets, tokens, or machine-identifying content were introduced.
+
+## Review pass — 2026-09-25 — incremental
+
+**Candidate base:** `cbfec336ee70e6cc559ac0c2003b2bd64cc2b07e`
+**Candidate head:** `4b0166d091550117b4e7c00e4882b44119255d95`
+**Candidate branch:** `Fix/MergeWorktreeCleanupFallback`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:3d68913da8b825f3adcd96fa7871cf01c6335000a1d49dde44aea218adc90010` `(8 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\tj-agents\core\.git\agent-workflow\runs\worktree-cleanup-merge-workflow-20260925\review\2dea080e3aca85bca2fc227fc0dbd52f51615a6d730df83c787139481baa7518`
+**Candidate bundle identity:** `sha256:3cc2cf39347238ccef604071e25633d098275506acf30b01004b207517bd3ac3`
+**Work-order path:** `reviews/Fix-MergeWorktreeCleanupFallback.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The delta contains only the three recorded remediations, their focused contract
+assertions, generated mirror/catalog updates, and the review work order. The primary-checkout helper
+resolution and repository-bound open-PR query now have executable shapes, the native safety gates remain
+conservative, and the plan consumption contract agrees with the workflow's synchronous final inventory.
+Canonical and generated workflow files match, catalog and generation checks pass, and the focused process
+and plan-artifact suites are green.
+
+Fresh `native-general` and `workflow` lens processes were unavailable because their fixed model is not
+supported by this account; the owning session completed the documented parent fallback over the immutable
+eight-path bundle.
