@@ -4,7 +4,7 @@ description: Pull the latest changes for the current branch, and when the pull f
 
 kind: operation
 domain: process
-model: gpt-5.5
+model: gpt-6-luna
 ---
 
 # Pulling, and recovering a failed pull

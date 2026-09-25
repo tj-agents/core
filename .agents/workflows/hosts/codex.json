@@ -35,31 +35,31 @@
   ],
   "semantic_stages": {
     "strategic": {
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "reasoning_effort": "high",
       "unavailable": "decision"
     },
     "implementation": {
-      "model": "gpt-5.6-terra",
-      "reasoning_effort": "high",
+      "model": "gpt-6-sol",
+      "reasoning_effort": "medium",
       "unavailable": "typed-parent-fallback"
     },
     "mechanical": {
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "medium",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
       "unavailable": "typed-parent-fallback"
     },
     "review": {
       "model": "gpt-5.3-codex-spark",
       "specialist": "gpt-5.3-codex-spark",
       "fallback_models": [
-        "gpt-5.6-terra"
+        "gpt-6-sol"
       ],
       "reasoning_effort": "medium",
       "unavailable": "decision"
     },
     "critical": {
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "reasoning_effort": "xhigh",
       "unavailable": "decision"
     }
@@ -82,8 +82,8 @@
         "mechanical",
         "critical"
       ],
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "medium",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
       "sandbox_mode": "read-only",
       "kind": "review"
     },
@@ -98,8 +98,8 @@
         "mechanical",
         "critical"
       ],
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "medium",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
       "sandbox_mode": "read-only",
       "kind": "review"
     },
@@ -113,8 +113,8 @@
         "implementation",
         "review"
       ],
-      "model": "gpt-5.6-terra",
-      "reasoning_effort": "high",
+      "model": "gpt-6-sol",
+      "reasoning_effort": "medium",
       "sandbox_mode": "read-only",
       "kind": "review"
     },
@@ -141,8 +141,8 @@
       "allowed_stages": [
         "mechanical"
       ],
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "medium",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
       "sandbox_mode": "workspace-write",
       "kind": "worker"
     }
