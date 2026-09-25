@@ -3,78 +3,75 @@
 - Plan: `plans/merge-worktree-cleanup/MERGE_WORKTREE_CLEANUP_PLAN.md`
 - Roadmap: `plans/merge-worktree-cleanup/MERGE_WORKTREE_CLEANUP_ROADMAP.md`
 - Roadmap item: `merge-worktree-cleanup/fallback`
-- Worktree: `C:\Users\tommy\source\repos\tj-agents\core`
-- Branch: `Fix/MergeWorktreeCleanupFallback`
-- PR: not opened
+- Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Docs-CloseMergeWorktreeCleanup`
+- Branch: `Docs/CloseMergeWorktreeCleanup`
+- PR: not opened for the host-retarget repair
 - Dependency/package gates: none
-- Last reconciled: 2026-09-25 after resolving the full-review findings
+- Last reconciled: 2026-09-25 at the focused-green host-retarget implementation milestone
 
 ## Current state
 
-- Winwrap fetched `origin/main` at `e8db4f857527c9ce8f30ddcca6a2bf8d84b14eae`.
-- `52e65d3381aff7cd4633cf1076c55628ba6fbdff` and
-  `404b795b4cd30283682193c86d453dcd6d82694a` are ancestors of that commit; GitHub reported no
-  open Winwrap PRs.
-- The primary Winwrap checkout is fast-forwarded to `main`; both local merged branches are
-  deleted. Its pre-existing untracked `.codex/agents/*.toml` files were preserved.
-- Git unregistered and emptied the linked `Refactor-Winwrap-Structure` worktree, but three older
-  Codex sessions launched with that directory as their working directory (PIDs `40852`, `40216`,
-  and `36192`) still hold its empty root open. No force or process termination has been attempted.
-- Core's canonical `engineering:merge` Step 5 now includes a native-Git fallback, explicit safety
-  gates, final inventory evidence, and a blocking transition before Step 6. A focused regression
-  test protects that contract, release metadata is `2.1.5`, and generated outputs are current.
-- The implementation milestone is committed at `46af568`; current `origin/main` at `b8566eb`
-  has been merged. Catalog conflicts were resolved from canonical source by recomputing all three
-  package digests and regenerating distribution output.
-- Full-review findings MW1-MW3 are resolved in `715ff65` and `4b0166d`: helper discovery is bound to
-  the primary checkout, the fresh open-PR query has an exact command and empty result, and Phase 2
-  records its consumption contract. The incremental remediation review is approved at `4b0166d`.
+- The exact Winwrap `Refactor-Value-Window-Factories` residual directory is empty, unregistered, and has no
+  remaining topic branch, but a fresh non-recursive removal still fails because another process holds it.
+- Winwrap's primary checkout and other linked worktrees now contain unrelated active work and must not be
+  changed by this plan.
+- Core PR #35 merged as `fb1be0a4e2663b34de4cad7f9d08501a367f431c`; exact post-merge CI run
+  `36080559767` completed successfully. Core has no publish workflow, so no version-sync PR was created.
+- The remaining root cause is host ordering: `engineering:merge` removes the linked worktree before applying
+  `base:cd`, while per-command `workdir`, shell `cd`, and `git -C` do not retarget Codex or Claude.
+- The packaged canonical `.agents/machine/handoff-codex/scripts` launcher cannot find the package-root
+  `resources/machine/scripts/agent-cli.ps1`; the shallower host `skills` copies can.
+- The implementation is complete in the working tree: `base:cd`, `handoff`, and merge Step 5 transfer active
+  directory removal to a confirmed native retarget or one successor; all three shared launchers resolve the
+  deeper packaged canonical layout; the nine generated layouts are exercised; release metadata is 2.1.7.
+- This branch is synchronized with `origin/main` at `ce038fb`; the implementation, generated outputs, tests,
+  and resumed plan state are the only uncommitted changes.
 
 ## Next Steps
 
-Checkpoint the approved review state and deliver through the normal PR workflow. Retry removal of
-Winwrap's exact empty residual directory
-before terminal closeout; do not terminate the three owning Codex sessions without explicit authority.
-
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: synchronize, review, and deliver the validated core correction.
-Remaining scope: remove the empty Winwrap residual directory when its external handles clear, then close the plan.
-Done when: Winwrap cleanup and the reviewed, validated core workflow correction are both terminal.
+Current slice: open the approved standards PR, bind it to the exact remote head, and wait for its checks to
+reach a terminal state without merging it.
+Remaining scope: retry the exact empty Winwrap residual after its external handle clears; obtain Tommy's
+explicit approval before merging the standards PR; then complete normal merge and plan closeout.
+Done when: the residual directory is absent, the approved standards PR and plan closeout are merged, and
+core's base and worktree inventory are clean.
 
 ## Completed work
 
-- Winwrap Git cleanup completed through branch deletion and linked-worktree unregistration; only
-  an empty externally locked directory remains.
-- Core implementation, focused regression coverage, release metadata, catalog digests, and generated
-  outputs completed in this commit.
+- Winwrap Git cleanup completed through merged-branch deletion and linked-worktree unregistration.
+- Core workflow correction, release metadata, generated outputs, and review remediations landed in PR #35.
+- PR #35 cleanup returned core's primary checkout to clean current `main` and deleted its merged local branch.
+- Host-retarget ordering, directory-release handoff ownership, packaged launcher resolution, focused coverage,
+  2.1.7 metadata, and generated outputs are complete in this commit.
 
 ## Verification
 
-- Fresh `git merge-base --is-ancestor` returned zero for both merged heads against current
-  `origin/main`; `gh pr list --state open` returned `[]`.
-- Winwrap primary checkout reports `main` at `e8db4f8`, tracking `origin/main` with `+0 -0`.
-- Core focused process standards: 15 passed. Complete hook suite: 558 passed, 8 skipped.
-- Capability bootstrap after fixture repair: 31 passed. Complete repository suite: 118 passed.
-- Catalog digest check and `pwsh .agents/sync-generated.ps1 -Check`: passed.
-- After merging `origin/main`: 15 process-standard tests passed, 9 catalog unit tests passed,
-  catalog digest check passed, and generated-output check passed.
+- Winwrap heads `52e65d3` and `404b795` are ancestors of `origin/main`; no open PR owns either branch.
+- Current candidate: 17 focused process-standard tests; all nine generated launcher layouts; packaging
+  self-containment; CLI session recovery; 176 repository tests; 564 shared-runtime tests with 8 expected
+  platform skips; generated-output check; and working-tree catalog digest check all pass.
+- The committed-tree catalog check remains pending until the immutable candidate commit exists, because its
+  `--source-revision HEAD` input intentionally excludes working-tree changes.
 
 ## Reviews
 
-- Full frozen review completed at `cbfec336ee70e6cc559ac0c2003b2bd64cc2b07e` with judgment
-  `changes-requested`; work order: `reviews/Fix-MergeWorktreeCleanupFallback.md`.
-- Findings: resolve and invoke the preferred helper under the primary checkout, specify the exact fresh
-  open-PR query and empty result, and add the phase's required consumption contract.
-- The helper-selected read-only lenses could not launch because their fixed model is unsupported by this
-  account; the owning session completed the documented parent fallback against the immutable bundle.
-- All three findings are resolved. Incremental review of `cbfec336..4b0166d` is approved with no new
-  findings; canonical work order: `reviews/Fix-MergeWorktreeCleanupFallback.md`.
+- Full review of `a47cea8` is complete with judgment `changes-requested`; canonical work order:
+  `reviews/Docs-CloseMergeWorktreeCleanup.md`. MW4 requires limiting host retarget/handoff to a linked active
+  target that differs from the primary checkout. The fixed-model lenses were unavailable, so the owning
+  session completed the documented parent fallback over the immutable bundle.
+- MW4 is resolved in `2f9a5ea`; the incremental pass over `a47cea8..2f9a5ea` found no new issues and moved
+  the canonical work order to `approved` at watermark `2f9a5ea`. The same unavailable fixed-model lenses used
+  the documented parent fallback over the immutable eight-path remediation bundle.
 
 ## Decisions, discoveries, blockers, and deviations
 
-- The first `git worktree remove` unregistered and emptied the clean linked worktree but Windows
-  could not delete its root because three older Codex processes hold it. The exact empty directory is
-  `C:\Users\tommy\source\repos\cpp\windows\winwrap\.worktrees\Refactor-Winwrap-Structure`.
-- Repository skill-recording failed before implementation because `workflow_ops.py skills` looked
-  for `.agents/skills/plan-execution/SKILL.md` instead of the canonical kind-based path; execution
-  continued with the loaded canonical lifecycle per its fallback rule.
+- Never force-remove the residual directory or terminate an owning process without explicit authority.
+- Do not treat an empty residual directory as cleanup success or let the predecessor continue removal after
+  a handoff; the successor owns physical removal and final verification after host release.
+- Do not merge the standards PR without Tommy's explicit approval.
+- `workflow_ops.py skills` still looks for the obsolete flat `.agents/skills/...` path for kind-based skills;
+  resolve when skill recording locates canonical kind paths and its regression coverage passes.
+- Repository-wide `plan_graph.py` is currently red only for the pre-existing
+  `plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md`, which has its own active sibling worktree;
+  this plan does not edit or adopt that unrelated owner.
