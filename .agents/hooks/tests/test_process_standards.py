@@ -318,7 +318,11 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(cleanup.split())
 
         for required in (
-            "Apply `base:cd` before invoking either cleanup path below",
+            "Compare the recorded target checkout in the delivery binding with the resolved primary checkout",
+            "When the target is the primary checkout, or the session is already attached to the primary checkout, do not retarget or hand off",
+            "continue cleanup and branch deletion in the current session",
+            "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
+            "apply `base:cd` and retarget the host **before** a helper or native Git unregisters or removes it",
             "retarget the host **before** a helper or native Git unregisters or removes it",
             "shell `cd`, or `git -C` does not retarget Codex or Claude",
             "invoke `/cd <primary-checkout>` there",
@@ -330,9 +334,9 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        self.assertLess(cleanup.index("Apply `base:cd`"), cleanup.index("$worktreeHelper"))
+        self.assertLess(cleanup.index("apply `base:cd`"), cleanup.index("$worktreeHelper"))
         self.assertLess(
-            cleanup.index("Apply `base:cd`"),
+            cleanup.index("apply `base:cd`"),
             cleanup.index("worktree remove -- <target-worktree>"),
         )
 

@@ -50,11 +50,12 @@ absent and no registered worktree, branch, or unrelated user-owned content was c
 
 ### 2. Retarget before merged-worktree removal
 
-- Amend Step 5 of `engineering:merge` so it resolves whether the target is the active host checkout
-  before either the repository helper or native Git can remove it.
-- When native host retargeting is exposed, invoke `/cd <primary-checkout>` through that interface and
-  continue only after the host confirms the new attachment.
-- When it is not exposed, invoke the canonical `handoff` workflow once with the primary checkout and
+- Amend Step 5 of `engineering:merge` so it resolves whether the target is a linked active host checkout
+  that differs from the primary before either the repository helper or native Git can remove it. A branch
+  developed directly in the primary checkout stays in the current session.
+- For an active linked target, when native host retargeting is exposed, invoke `/cd <primary-checkout>`
+  through that interface and continue only after the host confirms the new attachment.
+- For an active linked target when native retargeting is not exposed, invoke the canonical `handoff` workflow once with the primary checkout and
   exact delivery/cleanup binding. After verified launcher submission, the predecessor releases the
   writer and host attachment; the successor waits for that release, then owns helper/native-Git removal,
   residual-path verification, and every remaining delivery step.

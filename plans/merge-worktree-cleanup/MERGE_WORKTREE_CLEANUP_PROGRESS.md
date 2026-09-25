@@ -30,8 +30,8 @@
 ## Next Steps
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: commit the focused-green candidate, complete review and any required remediation, then open
-the standards PR.
+Current slice: resolve review finding MW4, validate and commit the repair, complete incremental review, then
+open the standards PR.
 Remaining scope: retry the exact empty Winwrap residual after its external handle clears; obtain Tommy's
 explicit approval before merging the standards PR; then complete normal merge and plan closeout.
 Done when: the residual directory is absent, the approved standards PR and plan closeout are merged, and
@@ -56,8 +56,10 @@ core's base and worktree inventory are clean.
 
 ## Reviews
 
-- `reviews/Fix-MergeWorktreeCleanupFallback.md` is complete for PR #35 through watermark `4d57819`; it does
-  not cover the newly authorized host-retarget and launcher repair. A fresh full review is required.
+- Full review of `a47cea8` is complete with judgment `changes-requested`; canonical work order:
+  `reviews/Docs-CloseMergeWorktreeCleanup.md`. MW4 requires limiting host retarget/handoff to a linked active
+  target that differs from the primary checkout. The fixed-model lenses were unavailable, so the owning
+  session completed the documented parent fallback over the immutable bundle.
 
 ## Decisions, discoveries, blockers, and deviations
 
