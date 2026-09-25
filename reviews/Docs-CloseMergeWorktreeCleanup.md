@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `a47cea8d9c7300e0ae7195146a253dfac3b9479c`  `(2026-09-25)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `2f9a5eae284230c0efebaad9e3ba141d73542c51`  `(2026-09-25)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-25 — full
 
@@ -38,3 +38,27 @@ The helper-selected `review-lens` contexts could not launch because their fixed 
 account. The owning session performed the documented parent fallback over the immutable bundle for both
 native-general and workflow coverage. No changed path matched the merge gate's security inventory, so no
 security marker is required.
+
+## Review pass — 2026-09-25 — incremental
+
+**Candidate base:** `a47cea8d9c7300e0ae7195146a253dfac3b9479c`
+**Candidate head:** `2f9a5eae284230c0efebaad9e3ba141d73542c51`
+**Candidate branch:** `Docs/CloseMergeWorktreeCleanup`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:5fe05a00b9019ad5659f63e51ec5eb925afe2f2089c8b355b543f6108e5bf9d7` `(8 paths)`
+**Candidate bundle:** `C:\Users\tommy\source\repos\tj-agents\core\.git\agent-workflow\runs\merge-worktree-host-retarget-incremental-20260925\review\65161a72603ba7d7cab1cb95b52a3f68c77b0f905890141f2cbd82810a2089c1`
+**Candidate bundle identity:** `sha256:5adf2d384326fe9d136fa75baf0fada51890a4ee975f90e07588383367b965c5`
+**Work-order path:** `reviews/Docs-CloseMergeWorktreeCleanup.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The remediation correctly keeps primary-checkout work in the current session and limits
+`base:cd` to a delivery-bound linked target that differs from the primary while the host is attached there.
+The canonical source, generated mirror, package digests, plan, and static regression contract stay aligned.
+
+The helper-selected `native-general` and `workflow` lens processes remain unavailable because their fixed
+model is not supported by this account; the owning session completed the documented parent fallback over
+the immutable eight-path bundle. No changed path matched the merge gate's security inventory, so no security
+marker is required.
