@@ -29,6 +29,13 @@ instructions; do not guess a sibling-plugin or author-checkout path.
    distinction, release writing ownership after launch, and let the successor acknowledge in the goal.
    Never keep two implementation writers active.
 
+For a transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted,
+put that exact operation and its final filesystem verification in the successor's `## Next Steps`. The
+predecessor must not perform the operation after launch: it ends repository-scoped activity and releases the
+host session. The successor waits until that host attachment is gone, then performs the operation from the
+target checkout and treats a command error or residual path as incomplete rather than accepting partial Git
+cleanup.
+
 If discovery cannot resolve the launcher, report the missing capability and required selection. Continue
 independent authorized work where possible. Never claim transfer occurred or silently substitute a
 prompt-only response. Installing or changing a normal profile requires its own authorization.
