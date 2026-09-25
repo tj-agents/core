@@ -4,7 +4,7 @@ description: Automatically own authorized long-term or multi-phase work through 
 
 kind: workflow
 domain: process
-model: gpt-5.6-terra
+model: gpt-6-sol
 ---
 
 # Execute a plan continuously

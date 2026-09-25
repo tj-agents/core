@@ -4,7 +4,7 @@ description: Compatibility entry for asking what to plan next on an epic roadmap
 
 kind: workflow
 domain: process
-model: gpt-5.6-sol
+model: gpt-6-sol
 ---
 
 # Select a roadmap item for plan authoring

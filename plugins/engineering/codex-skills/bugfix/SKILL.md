@@ -4,7 +4,7 @@ description: Diagnose and fix a defect, regression, crash, or incorrect existing
 
 kind: workflow
 domain: process
-model: gpt-5.6-terra
+model: gpt-6-sol
 ---
 
 # Diagnose and repair a bug

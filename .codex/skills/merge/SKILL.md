@@ -4,7 +4,7 @@ description: Land the current branch's PR through the merge queue and return to 
 
 kind: workflow
 domain: process
-model: gpt-5.6-sol
+model: gpt-6-sol
 ---
 
 # Landing a PR through the merge queue
