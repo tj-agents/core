@@ -20,9 +20,28 @@ if ([string]::IsNullOrWhiteSpace($raw)) {
     throw "Draft file is empty: $Path"
 }
 
+# A fenced block has to come out before any inline handling. The inline regex below
+# pairs a fence's third backtick with the closing fence's first: it wraps the right
+# text but strands two backticks each side, which then re-pair with the next inline
+# span and invert code/non-code for the whole rest of the message.
+$fenceBodies = [System.Collections.Generic.List[string]]::new()
+$marker = [char]0x001F
+$masked = if ($PlainOnly) { $raw } else {
+    [regex]::Replace($raw, '(?ms)^```[^\n]*\n(.*?)\n?^```[ \t]*$', {
+            param($m)
+            $fenceBodies.Add($m.Groups[1].Value)
+            "$marker$($fenceBodies.Count - 1)$marker"
+        })
+}
+
 # Backticks are markup, not content. The plain flavour is what an app that cannot
 # take HTML receives, so they come out of it.
-$plain = if ($PlainOnly) { $raw } else { $raw -replace '`([^`]+)`', '$1' }
+$plain = if ($PlainOnly) { $raw } else {
+    $inlineStripped = $masked -replace '`([^`]+)`', '$1'
+    [regex]::Replace($inlineStripped, "$marker(\d+)$marker", {
+            param($m) $fenceBodies[[int]$m.Groups[1].Value]
+        })
+}
 
 if ($PlainOnly) {
     Set-Clipboard -Value $plain
@@ -33,14 +52,32 @@ if ($PlainOnly) {
     return
 }
 
-$escaped = $raw.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;')
+$codeOpen = '<code style="font-family:Consolas,''Courier New'',monospace;">'
+
+$escaped = $masked.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;')
 $withCode = [regex]::Replace($escaped, '`([^`]+)`', {
         param($m)
-        '<code style="font-family:Consolas,''Courier New'',monospace;">' + $m.Groups[1].Value + '</code>'
+        $codeOpen + $m.Groups[1].Value + '</code>'
     })
 # No block elements: Teams gives <p> and <div> their own margins/indent on paste,
 # so paragraphs are separated with breaks instead.
 $fragment = (($withCode -split "`n{2,}") | ForEach-Object { $_ -replace "`n", '<br>' }) -join '<br><br>'
+
+# Fences go back last, so their own newlines never became paragraph breaks above.
+# One <code> run per block, lines joined with <br>, matching the inline treatment.
+$fragment = [regex]::Replace($fragment, "$marker(\d+)$marker", {
+        param($m)
+        $body = $fenceBodies[[int]$m.Groups[1].Value]
+        $body = $body.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;')
+        $codeOpen + ($body -replace "`n", '<br>') + '</code>'
+    })
+
+if ($fragment.Contains($marker)) {
+    throw 'Fence placeholder left in the output — a fenced block was not restored.'
+}
+if ($fragment.Contains('`')) {
+    throw 'A stray backtick survived into the HTML flavour — check for an unclosed span or fence.'
+}
 
 $pre = '<html><body><!--StartFragment-->'
 $post = '<!--EndFragment--></body></html>'
