@@ -309,6 +309,57 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertNotIn("worktree remove --force", cleanup)
         self.assertNotIn("branch -D", cleanup)
 
+    def test_merge_retargets_the_host_before_active_worktree_removal(self):
+        body = authored_skill("merge").read_text(encoding="utf-8")
+        cleanup = body.split(
+            "### 5. Return to a clean base, and remove the merged worktree immediately",
+            maxsplit=1,
+        )[1].split("### 6. Follow the publish", maxsplit=1)[0]
+        flat = " ".join(cleanup.split())
+
+        for required in (
+            "Apply `base:cd` before invoking either cleanup path below",
+            "retarget the host **before** a helper or native Git unregisters or removes it",
+            "shell `cd`, or `git -C` does not retarget Codex or Claude",
+            "invoke `/cd <primary-checkout>` there",
+            "invoke the unqualified `handoff` workflow once with the primary checkout",
+            "The successor is the sole cleanup owner",
+            "requires the physical target path to be absent",
+            "Do not make the user choose between these paths",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, flat)
+
+        self.assertLess(cleanup.index("Apply `base:cd`"), cleanup.index("$worktreeHelper"))
+        self.assertLess(
+            cleanup.index("Apply `base:cd`"),
+            cleanup.index("worktree remove -- <target-worktree>"),
+        )
+
+    def test_cd_and_handoff_transfer_active_directory_removal_to_the_successor(self):
+        cd = " ".join(authored_skill("cd").read_text(encoding="utf-8").split())
+        handoff = " ".join(
+            authored_skill("handoff").read_text(encoding="utf-8").split()
+        )
+
+        self.assertIn("Retarget the host **before** any helper or native command", cd)
+        self.assertIn(
+            "the successor the sole owner of the removal and final filesystem verification",
+            cd,
+        )
+        self.assertIn(
+            "the original stops repository-scoped work and releases its host session", cd
+        )
+        self.assertIn(
+            "put that exact operation and its final filesystem verification in the "
+            "successor's `## Next Steps`",
+            handoff,
+        )
+        self.assertIn(
+            "The predecessor must not perform the operation after launch", handoff
+        )
+        self.assertIn("a command error or residual path as incomplete", handoff)
+
 
 if __name__ == "__main__":
     unittest.main()
