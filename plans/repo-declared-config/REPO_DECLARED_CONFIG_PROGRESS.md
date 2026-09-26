@@ -38,6 +38,11 @@ PR: none yet.
   updater deleted their 2.1.11 targets. No local cache alias is a supported fix. The currently
   installed core plugin release is 2.1.12; a live-session update regression still needs a
   repository-owned repair and acceptance test.
+- Core branch now includes a first phase-2 generator beside `bootstrap-capabilities`: it derives
+  `.claude/settings.json` and `.codex/config.toml` from a committed capability lock, requires
+  core's three plugins, rejects sources outside the four `tj-agents` repositories, preserves
+  unrelated project settings, and has `write`/`check` modes. Its focused tests and package
+  sync check pass. No consumer has adopted it yet; core's release catalog still pins 2.1.4.
 
 ## Phase 1 inventory (2026-09-23)
 
