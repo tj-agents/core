@@ -1,5 +1,5 @@
 name = "lane_l2"
-description = "Bounded delegated work at L2."
+description = "Runs one delegated task at lane L2. Open-ended judgement at the top of the ladder, where the answer is not yet known."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"

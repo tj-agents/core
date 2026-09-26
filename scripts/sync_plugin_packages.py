@@ -443,8 +443,10 @@ def agent_payload(role: dict, body: str, host: str) -> str:
     values = {
         "name": role["agent_name"],
         "description": role["description"],
-        "model": role["model"],
     }
+    if role.get("kind"):
+        values["kind"] = role["kind"]
+    values["model"] = role["model"]
     if role.get("effort"):
         values["effort"] = role["effort"]
     values.update(
@@ -492,7 +494,8 @@ def emit_workflow_agents(root: Path, config: dict, emit):
         for lane, rung in table["lanes"].items():
             role = {
                 "agent_name": f"lane-{lane.lower()}" if host == "claude" else f"lane_{lane.lower()}",
-                "description": f"Bounded delegated work at {lane}.",
+                "description": f"Runs one delegated task at lane {lane}. {rung['summary']}",
+                "kind": "lane",
                 "tools": ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
                 "sandbox_mode": "workspace-write",
                 **rung,
