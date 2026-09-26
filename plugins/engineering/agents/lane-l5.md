@@ -1,6 +1,7 @@
 ---
 name: lane-l5
-description: Bounded delegated work at L5.
+description: Runs one delegated task at lane L5. Clerical work with a small input and no judgement to make.
+kind: lane
 model: claude-haiku-4-5
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent

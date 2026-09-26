@@ -1,5 +1,5 @@
 name = "lane_l3"
-description = "Bounded delegated work at L3."
+description = "Runs one delegated task at lane L3. Ordinary specified work that a compiler or a test suite will catch."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"

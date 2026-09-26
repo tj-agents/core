@@ -1,5 +1,5 @@
 name = "lane_l1"
-description = "Bounded delegated work at L1."
+description = "Runs one delegated task at lane L1. Irreversible work at the top of the ladder, where a mistake cannot be taken back."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"

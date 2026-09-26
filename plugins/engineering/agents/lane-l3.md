@@ -1,6 +1,7 @@
 ---
 name: lane-l3
-description: Bounded delegated work at L3.
+description: Runs one delegated task at lane L3. Ordinary specified work that a compiler or a test suite will catch.
+kind: lane
 model: claude-sonnet-5
 effort: high
 tools: Read, Glob, Grep, Write, Edit, Bash

@@ -566,6 +566,15 @@ def resolved_skill(name, harness, following_alias=False):
     return resolved_skill(current, harness, True) if current else None
 
 
+def invocable_name(name, skill_path):
+    """Use the installed plugin qualifier when a qualified route resolves elsewhere."""
+    wanted_plugin, _, bare = name.rpartition(":")
+    if skill_path is None or not wanted_plugin:
+        return name
+    plugin = plugin_of(skill_path.parent.parent)
+    return f"{plugin}:{bare}" if plugin and plugin != wanted_plugin else name
+
+
 def description_of(body):
     """The one parse of a skill's front-matter description. Both callers below go through it."""
     m = re.search(r"^description:[ \t]*(.+?)(?=^\w+:|^---)", body, re.M | re.S)

@@ -1,6 +1,7 @@
 ---
 name: lane-l1
-description: Bounded delegated work at L1.
+description: Runs one delegated task at lane L1. Irreversible work at the top of the ladder, where a mistake cannot be taken back.
+kind: lane
 model: claude-opus-5
 effort: xhigh
 tools: Read, Glob, Grep, Write, Edit, Bash
