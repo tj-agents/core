@@ -22,6 +22,82 @@ def load(path: Path):
     return json.loads(read(path))
 
 
+def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[str]) -> None:
+    known_roots = ("${PLUGIN_ROOT}", "%PLUGIN_ROOT%", "${CLAUDE_PLUGIN_ROOT}", "os.environ['PLUGIN_ROOT']")
+    host_fields = {
+        "codex": (
+            ("command", "${PLUGIN_ROOT}", re.compile(r"\$\{PLUGIN_ROOT\}/([^\"']+)")),
+            (
+                "commandWindows",
+                "${PLUGIN_ROOT}",
+                re.compile(r"\$\{PLUGIN_ROOT\}/([^\"']+)"),
+            ),
+        ),
+        "claude": (
+            ("command", "${CLAUDE_PLUGIN_ROOT}", re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"']+)")),
+        ),
+    }
+    declarations = config.get("host_hook_sources", {})
+    for plugin in plugins:
+        declared = declarations.get(plugin, {})
+        shipped = set()
+        for path, data in output.items():
+            if path.startswith(f"plugins/{plugin}/hooks/") and path.endswith(".json"):
+                payload = json.loads(data)
+                if isinstance(payload, dict) and isinstance(payload.get("hooks"), dict):
+                    shipped.add(path)
+        expected = {f"plugins/{plugin}/hooks/{host}.json" for host in declared}
+        if shipped != expected:
+            raise ValueError(f"{plugin}: shipped hooks disagree with source map")
+        for host, fields in host_fields.items():
+            manifest_path = f"plugins/{plugin}/.{host}-plugin/plugin.json"
+            manifest = json.loads(output[manifest_path])
+            pointer = manifest.get("hooks")
+            if host not in declared:
+                if pointer is not None:
+                    raise ValueError(f"{manifest_path}: undeclared hook pointer")
+                continue
+            expected_pointer = f"./hooks/{host}.json"
+            if pointer != expected_pointer:
+                raise ValueError(f"{manifest_path}: hook pointer must be {expected_pointer}")
+            relative_pointer = PurePosixPath(pointer)
+            if relative_pointer.is_absolute() or ".." in relative_pointer.parts:
+                raise ValueError(f"{manifest_path}: hook pointer escapes package")
+            hook_path = f"plugins/{plugin}/{relative_pointer.as_posix()}"
+            if hook_path not in output:
+                raise ValueError(f"{manifest_path}: hook pointer target is missing")
+            payload = json.loads(output[hook_path])
+            events = payload.get("hooks")
+            if not isinstance(events, dict) or not events:
+                raise ValueError(f"{hook_path}: no hook events")
+            for groups in events.values():
+                if not isinstance(groups, list) or not groups:
+                    raise ValueError(f"{hook_path}: hook event has no groups")
+                for group in groups:
+                    hooks = group.get("hooks") if isinstance(group, dict) else None
+                    if not isinstance(hooks, list) or not hooks:
+                        raise ValueError(f"{hook_path}: hook group has no commands")
+                    for hook in hooks:
+                        if hook.get("type") != "command":
+                            continue
+                        for field, root_token, script_pattern in fields:
+                            command = hook.get(field)
+                            if not isinstance(command, str) or not command:
+                                raise ValueError(f"{hook_path}: command hook is missing {field}")
+                            wrong_roots = [token for token in known_roots if token != root_token and token in command]
+                            if wrong_roots:
+                                raise ValueError(f"{hook_path}: {field} uses the wrong plugin root")
+                            match = script_pattern.search(command)
+                            if match is None:
+                                raise ValueError(f"{hook_path}: {field} has no package-relative script")
+                            script = PurePosixPath(match.group(1))
+                            if script.is_absolute() or ".." in script.parts:
+                                raise ValueError(f"{hook_path}: {field} script escapes package")
+                            target = f"plugins/{plugin}/{script.as_posix()}"
+                            if target not in output:
+                                raise ValueError(f"{hook_path}: {field} script target is missing: {script}")
+
+
 def catalog_index(catalog: dict) -> tuple[dict[str, dict], dict[str, dict]]:
     if catalog.get("schema_version") != 1 or catalog.get("digest_format") != "sha256-tree-v1":
         raise ValueError("Unsupported capability catalog schema or digest format")
@@ -671,6 +747,8 @@ def build(root: Path, validate_catalog_digests: bool = True):
         resolved = "/".join(parts)
         if resolved not in output:
             raise ValueError(f"{path}: missing packaged canonical definition {resolved}")
+
+    validate_hook_outputs(output, config, plugins)
 
     for plugin in sorted(plugins):
         plugin_id = f"base-agents/{plugin}"

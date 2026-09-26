@@ -94,9 +94,18 @@ After a new commit lands on `main`, pick it up with:
 /plugin marketplace update base-agents
 ```
 
-Codex: adding the marketplace (`.agents/plugins/marketplace.json`) installs all three packages
-automatically; each declares `INSTALLED_BY_DEFAULT`. Refresh Codex's copy of the marketplace the same way
-to pick up a new commit.
+Codex treats `INSTALLED_BY_DEFAULT` as marketplace policy, not a CLI dependency resolver. Register the
+marketplace, then install all three packages explicitly:
+
+```powershell
+codex plugin marketplace add tj-agents/core
+codex plugin add base@base-agents
+codex plugin add engineering@base-agents
+codex plugin add machine@base-agents
+```
+
+Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
+resolve and verify its complete dependency closure reproducibly.
 
 Codex does not load agent definitions directly from plugins. After installing or updating the marketplace,
 install the engineering package's shared agents once into the active Codex profile. The installer defaults
