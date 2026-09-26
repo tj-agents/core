@@ -97,6 +97,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
     def test_host_manifests_register_supported_router_and_red_run_events(self):
         codex = json.loads((self.package / "hooks/codex.json").read_text(encoding="utf-8"))
         claude = json.loads((self.package / "hooks/claude.json").read_text(encoding="utf-8"))
+        base_codex = json.loads((ROOT / "plugins/base/hooks/codex.json").read_text(encoding="utf-8"))
+        base_claude = json.loads((ROOT / "plugins/base/hooks/claude.json").read_text(encoding="utf-8"))
 
         def commands(manifest, event):
             return [
@@ -105,9 +107,16 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 for hook in registration.get("hooks", [])
             ]
 
-        self.assertTrue(any("skill_router.py" in command for command in commands(codex, "PreToolUse")))
+        self.assertTrue(any("skill_router.py" in command for command in commands(base_codex, "PreToolUse")))
+        codex_router = next(
+            registration for registration in base_codex["hooks"]["PreToolUse"]
+            if any("skill_router.py" in hook["command"] for hook in registration["hooks"])
+        )
+        self.assertIn("functions\\.exec", codex_router["matcher"])
+        self.assertFalse(any("skill_router.py" in command for command in commands(codex, "PreToolUse")))
         self.assertFalse(any("red_run_gate.py" in command for event in codex["hooks"] for command in commands(codex, event)))
-        self.assertTrue(any("skill_router.py" in command for command in commands(claude, "PreToolUse")))
+        self.assertTrue(any("skill_router.py" in command for command in commands(base_claude, "PreToolUse")))
+        self.assertFalse(any("skill_router.py" in command for command in commands(claude, "PreToolUse")))
         for event in ("PostToolUse", "PostToolUseFailure", "Stop"):
             self.assertTrue(
                 any("red_run_gate.py" in command for command in commands(claude, event)), event

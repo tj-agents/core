@@ -48,7 +48,8 @@ prints which skills a set of changed files obliges a reader to load. That is wha
 review cannot miss what its author was required to load - the other half of the failure above, where
 the follow-up review repeated the identical blind spot and returned clean.
 
-Ships in the `engineering` plugin, so both harnesses run this one file. They share the exit-2 block
+Ships in the ubiquitous `base` plugin, so both harnesses run this one file. `engineering` also packages
+it for review-time queries. They share the exit-2 block
 contract but NOT the payload: Claude sends a PascalCase tool name and one path under `file_path`,
 while Codex sends `apply_patch` with the paths named inside the patch body. Matching only Claude's
 shape is not a partial rollout - it is a hook that allows every Codex write while looking wired. A
@@ -68,6 +69,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import shlex
 import subprocess
 import sys
@@ -114,6 +116,8 @@ CLAUDE_WRITE_TOOLS = {
     "powershell",
 }
 CODEX_WRITE_TOOLS = {
+    "functions.exec",
+    "exec",
     "apply_patch",
     "edit_file",
     "write_file",
@@ -149,41 +153,41 @@ LINKED_SKILL_ROOTS = {
     "claude": ("skills",),
     "codex": (".agents/skills", ".codex/skills"),
 }
-CODEX_PLUGIN_CACHE = ".codex/plugins/cache"
-# Some uninstall paths leave the cache directory behind carrying this marker. It is a useful hint but
-# NOT a reliable one: removing a marketplace dropped its plugins from the manifest while leaving the
-# whole payload in the cache with no marker at all. So the manifest below is the authority where one
-# exists, and this only filters what the directory walk turns up.
-ORPHAN_MARKER = ".orphaned_at"
-
-
-def claude_config_root(home):
-    configured = os.environ.get("CLAUDE_CONFIG_DIR")
-    return Path(configured) if configured else home / ".claude"
-
-
-def manifest_install_roots(home):
-    """Claude's authoritative installed set. None when unreadable, meaning fall back to walking.
-
-    A cache directory is evidence a plugin WAS installed, never that it still is.
-    """
-    manifest = claude_config_root(home) / "plugins" / "installed_plugins.json"
+@functools.lru_cache(maxsize=2)
+def native_install_roots(harness):
+    binary = shutil.which(harness)
+    if binary is None:
+        return ()
     try:
-        data = json.loads(manifest.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
-        return None
-    plugins = data.get("plugins")
-    if not isinstance(plugins, dict):
-        return None
+        result = subprocess.run(
+            [binary, "plugin", "list", "--json"], capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=8, check=False,
+        )
+        if result.returncode != 0:
+            return ()
+        data = json.loads(result.stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return ()
+    plugins = data.get("installed", []) if harness == "codex" and isinstance(data, dict) else data
+    if not isinstance(plugins, list):
+        return ()
     roots = []
-    for installs in plugins.values():
-        if not isinstance(installs, list):
+    for plugin in plugins:
+        if not isinstance(plugin, dict) or not plugin.get("enabled"):
             continue
-        for install in installs:
-            path = install.get("installPath") if isinstance(install, dict) else None
-            if path:
-                roots.append(Path(path))
-    return roots
+        if harness == "codex":
+            marketplace = plugin.get("marketplaceName")
+            name = plugin.get("name")
+            version = plugin.get("version")
+            if not all(isinstance(value, str) for value in (marketplace, name, version)):
+                continue
+            codex_root = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+            path = codex_root / "plugins" / "cache" / marketplace / name / version
+        else:
+            path = plugin.get("installPath")
+        if isinstance(path, (str, Path)):
+            roots.append(Path(path))
+    return tuple(roots)
 
 
 def active_harness(tool_name):
@@ -207,30 +211,14 @@ def skill_search_dirs(harness):
     # PLUGIN_ROOT; Claude injects CLAUDE_PLUGIN_ROOT; a vendored copy resolves beside itself.
     yield own_payload_root(__file__) / "skills"
 
-    linked_base = claude_config_root(home) if harness == "claude" else home
+    configured = os.environ.get("CLAUDE_CONFIG_DIR")
+    linked_base = Path(configured) if configured and harness == "claude" else (
+        home / ".claude" if harness == "claude" else home
+    )
     for relative in LINKED_SKILL_ROOTS[harness]:
         yield linked_base / relative
-
-    if harness == "claude":
-        manifest_roots = manifest_install_roots(home)
-        if manifest_roots is not None:
-            for root in manifest_roots:
-                yield root / "skills"
-            return
-        cache = claude_config_root(home) / "plugins" / "cache"
-    else:
-        cache = home / CODEX_PLUGIN_CACHE
-
-    if not cache.is_dir():
-        return
-    try:
-        versions = sorted(cache.glob("*/*/*"))
-    except OSError:
-        return
-    for version in versions:
-        if (version / ORPHAN_MARKER).exists():
-            continue
-        yield version / "skills"
+    for root in native_install_roots(harness):
+        yield root / "skills"
 
 
 def repo_relative(path, cwd):
@@ -1142,21 +1130,9 @@ def query(argv):
     return 0
 
 
-def standards_corpus_absent(routes, harness):
-    """True only when the WHOLE corpus is unreachable - not one missing skill, every one.
-
-    A partially missing plugin is left to the per-route block below, which names the exact skill and
-    keeps that route blocked. This is the catastrophe check: the standards plugin did not load at all,
-    so a routed path finds no owner and an un-routed path would otherwise slip through unenforced. It
-    short-circuits the moment any skill resolves, so the common (loaded) case costs one lookup.
-    """
+def missing_routed_skills(routes, harness):
     names = {name for route in routes for name in route.get("skills") or []}
-    if not names:
-        return False
-    for name in names:
-        if skill_description(name, harness) is not None:
-            return False
-    return True
+    return sorted(name for name in names if skill_description(name, harness) is None)
 
 
 def verify_install(argv):
@@ -1220,9 +1196,6 @@ def main():
     else:
         shell_writes = []
         targets = written_targets(tool_input)
-    if not targets:
-        sys.exit(0)
-
     cwd = data.get("cwd") or os.getcwd()
     root = find_repo_root(cwd)
     if root is None:
@@ -1241,6 +1214,18 @@ def main():
         )
         sys.exit(2)
     if not routes:
+        sys.exit(0)
+
+    missing_install = missing_routed_skills(routes, harness)
+    if missing_install:
+        sys.stderr.write(
+            "SKILL ROUTER - blocked, this repository requires unavailable standards:\n\n"
+            + "\n".join(f"  {name}" for name in missing_install)
+            + f"\n\nInstall or enable the owning plugin(s) for {harness}, then start a new "
+            "session. This tool call was NOT run.\n"
+        )
+        sys.exit(2)
+    if not targets:
         sys.exit(0)
 
     rules = enforcement_rules(root) or []
@@ -1297,21 +1282,6 @@ def main():
         for route in matching_routes(routes, rel, content):
             matched.append((rel, route))
     if not matched:
-        # No route owns this path, so the per-route block below never sees it. That is safe only while
-        # the corpus is actually loaded; if not one routed skill resolves, the plugin did not load and
-        # an un-routed write is the last unguarded way to produce code against absent standards.
-        if standards_corpus_absent(routes, harness):
-            sys.stderr.write(
-                "SKILL ROUTER - blocked, the standards corpus is not loaded:\n\n"
-                f"  Not one skill named by {ROUTES_FILE} resolves for {harness}, so the agents\n"
-                "  plugin did not load. This repo's conventions, routes and guardrails are all absent, so\n"
-                "  writing code now is blind and unenforced - the exact failure externalising the corpus\n"
-                "  was meant to prevent.\n\n"
-                "  Install or enable the owning plugin, then start a new session. The file was NOT\n"
-                "  written, and every write stays blocked until the corpus\n"
-                "  resolves.\n"
-            )
-            sys.exit(2)
         sys.exit(0)
 
     if not claim_invocation(data, "skill-router"):
