@@ -34,6 +34,16 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\"",
+            "timeout": 15
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\"",
             "timeout": 10
           }
