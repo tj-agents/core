@@ -95,7 +95,8 @@ On the default branch, or with no PR for this branch, **stop** — there is noth
   git rev-list --left-right --count origin/main...HEAD   # -> "<behind-base>	<ahead>"
   ```
 
-  Before final review, behind by anything means merge base in, rebuild the affected scope, push, freeze the
+  Before final review, behind by anything means merge base in with exactly
+  `git -C "<absolute-worktree>" merge --no-edit origin/<default>`, rebuild the affected scope, push, freeze the
   candidate, and review. After the review watermark exists, run `workflow_ops.py review-reconcile` against
   its descriptor. Disjoint base-only movement preserves the exact reviewed head and proceeds to merge-group
   validation. Relevant movement, including a platform pin or routed rule change, requires an update, focused
@@ -261,7 +262,8 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
 4. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
-   the old local branch with the same lowercase `-d` only after it is no longer checked out.
+   the old local branch with the same lowercase `-d` only after it is no longer checked out. Double-quote each
+   path and run each command on its own; that exact form is what the plugin's harness grant approves.
 5. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
    target must be absent, the local merged branch must be gone, the primary checkout must be current on the
    remote default, and pre-existing user files must remain. Treat any removal error or residual target path
