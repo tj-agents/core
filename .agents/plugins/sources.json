@@ -121,6 +121,21 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/harness-trust.json",
+      "destination": "hooks/harness-trust.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/harness_grant.py",
+      "destination": "hooks/harness_grant.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/denial_prompt.py",
+      "destination": "hooks/denial_prompt.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/merge_review_gate.py",
       "destination": "hooks/merge_review_gate.py"
     },

@@ -122,7 +122,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:e50c47ea80a2cc3877576d438b9dc14add7b3456960107c077b464b409e6a037"
+          "digest": "sha256:26ef3bf45155a74e650f3716bbf620f13bab7b5c8041ac2fbf2d4c6c21f2226f"
         },
         {
           "id": "base-agents/machine",
