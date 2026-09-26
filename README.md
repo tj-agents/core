@@ -9,9 +9,11 @@ The repository also owns explicit PowerShell profile and CLI session-recovery in
 `base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
-The packaged SessionStart hook emits the same canonical contract to both hosts. Python 3.9+ must be available
-as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
-alone is insufficient. The skill documents an explicit generated native-instruction fallback.
+Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Python 3.9+ must be
+available as `python` on PATH. Codex skips new or changed plugin hooks until they are reviewed and trusted
+in `/hooks`; a fresh missing-marketplace write probe is required before claiming enforcement. The host
+coverage limit is tracked in `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents
+a generated native-instruction fallback.
 
 The split packages form the **2.1.11** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
