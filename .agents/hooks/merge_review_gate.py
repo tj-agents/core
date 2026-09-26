@@ -43,7 +43,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hook_runtime import claim_invocation
+from hook_runtime import claim_invocation, grant, is_trusted_checkout
 
 # This message is what the agent acts on, and Windows defaults these streams to cp1252,
 # which turns the punctuation in it into mojibake.
@@ -626,6 +626,8 @@ def main():
                 "since it, up to " + head[:12] + ". Re-run /security-review, then merge."
             )
 
+    grant_if_trusted(data, canonical_target)
+    grant_if_trusted(data, canonical_target)
     sys.exit(0)  # reviewed, current, clean → allow the merge
 
 
