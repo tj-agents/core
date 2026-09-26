@@ -101,6 +101,31 @@ diverged tests (`test_skill_router`, `test_red_run_gate`, `test_merge_review_gat
 
 ### Retirement order
 
+### Additional authored-source audit (2026-09-26)
+
+Compared `Concertable/agents` `origin/main` blobs with this core branch, then inspected every
+divergent shared workflow file. All four `.agents/lanes` sources and the other shared workflow
+contract, runtime, role, and fixture files have identical blobs. The divergent workflow files
+are core-ahead except `workflow_ops.run_process`, where Concertable explicitly decodes UTF-8;
+that fix is now in core with a non-ASCII output test. Concertable's `kind: lens` fixture/host
+values differ from core's `kind: review`; the latter matches core's role taxonomy. Its Codex
+project agent install and host probe differ from core's profile delivery; phase 2 must settle
+repository-owned Codex agent delivery rather than copying either local installer.
+
+| Source | Classification | Action |
+|---|---|---|
+| `.agents/plugins/marketplace.json`, `payloads.json`, `install-roster.json`, `install-helpers.ps1` | Concertable product marketplace and its local installer | keep marketplace payload; retire local roster/install behavior after repo config adoption |
+| `scripts/provision-agents.ps1`, `provision-project-capabilities.ps1`, `start-concertable-agent.ps1` | product provisioning and host launch built around local capability state | replace with core generator/bootstrap and repository declarations in phase 2; do not copy to core |
+| `scripts/docker-health.ps1` | Concertable product test infrastructure | keep with Concertable |
+| `scripts/worktrees.ps1`, `delivery-continuation.ps1` | generic mechanisms coupled to Concertable delivery policy | compare against core's worktree and workflow delivery utilities before retirement; not a hook duplicate |
+| `.claude/.codex` hook wiring and agents | generated/product adapters containing the duplicate shared hooks and ten agents already inventoried | retire shared entries only after core is enabled in the project; keep product hooks |
+| `standards/process`, `standards/rules`, `standards/dotnet`, `standards/react`, `.agents/skills` | Concertable product and stack contracts | keep product rules; compare named .NET/React skills against scope repos during consumer adoption |
+| `.agents/routes`, profile, enforcement and standards manifest | Concertable repository policy | migrate its capability selection to repo-declared config; never move its rules into core |
+
+The shared-name `.agents/skills` in Concertable and `tj-agents/dotnet`/`react` have no
+byte-identical source files; names alone are insufficient evidence for deletion. They require
+behavioral comparison when the Concertable consumer is migrated.
+
 1. Core releases with the ports above.
 2. The Concertable repository enables core (`base`, `engineering`, `machine@base-agents`) plus
    `concertable` in its own project settings, so it is never without lanes or gates.

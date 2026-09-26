@@ -99,6 +99,8 @@ def run_process(arguments, cwd, text=True, check=True):
         cwd=str(cwd),
         capture_output=True,
         text=text,
+        encoding="utf-8" if text else None,
+        errors="replace" if text else None,
     )
     if check and completed.returncode:
         stderr = completed.stderr if text else completed.stderr.decode("utf-8", errors="replace")
