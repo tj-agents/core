@@ -3,17 +3,17 @@
 Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).
 Select exact releases in a project's `.agents/capabilities.lock.json`; do not copy definitions between repositories.
 
-## base-agents 2.1.11
+## base-agents 2.1.12
 
-Owner: [`tj-agents/core`](https://github.com/tj-agents/core) · immutable revision `v2.1.11`
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core) · immutable revision `v2.1.12`
 
 - **`base-agents/base`** — Maintained plans and common agent behavior.
 - **`base-agents/engineering`** — Selected engineering workflows, reviews and Git operations.
 - **`base-agents/machine`** — Explicit harness, history and clipboard utilities.
 
-## cpp-agents 0.3.1
+## cpp-agents 0.3.2
 
-Owner: [`tj-agents/cpp`](https://github.com/tj-agents/cpp) · immutable revision `v0.3.1`
+Owner: [`tj-agents/cpp`](https://github.com/tj-agents/cpp) · immutable revision `v0.3.2`
 
 - **`cpp-agents/cpp`** — Platform-neutral modern C++ contracts and learning guidance.
 - **`cpp-agents/gpp`** — G++, GCC, GDB, and Linux guidance layered on cpp.
