@@ -35,10 +35,8 @@ the applicable filesystem-backed `SKILL.md`, recorded as an `exec` call and its 
 route no longer trusts a single nag forever - it re-checks the transcript on every write and only lets one
 through once every owed skill has its harness's successful proof. A name the transcript shows was invoked
 and rejected blocks with a distinct message (restart the session - a stale registry is a session problem,
-not a fixable classification) instead of the ordinary "go invoke this" nag. Where no `transcript_path`
-is supplied at all (undocumented for some caller), this layer cannot run and the route falls back to the
-pre-existing single-nag-then-trust behaviour, so a caller that cannot supply the proof is not wedged shut
-by demanding one.
+not a fixable classification) instead of the ordinary "go invoke this" nag. A caller without a readable
+transcript cannot prove the standard was loaded, so its routed writes remain blocked.
 
 Contract: exit 0 = allow, exit 2 = block with stderr fed back to the agent. Anything unexpected exits
 0 - a broken router must not wedge every write, since a build gate is the tier that guarantees.
@@ -1225,6 +1223,12 @@ def main():
             "session. This tool call was NOT run.\n"
         )
         sys.exit(2)
+    if tool_name.lower() == "functions.exec":
+        sys.stderr.write(
+            "SKILL ROUTER - blocked, functions.exec can execute nested writes that this hook cannot "
+            "inspect. Use a directly hooked tool; this wrapper call was NOT run.\n"
+        )
+        sys.exit(2)
     if not targets:
         sys.exit(0)
 
@@ -1348,16 +1352,9 @@ def main():
             if descriptions[name] is None:
                 missing.add(name)
 
-    # Proof, not a filesystem check alone: a name present on disk can still be `Unknown skill` in THIS
-    # session's own registry (a plugin enabled after the session started never hot-reloads into it).
-    # `missing` alone already forces the permanent block below, so the transcript is only worth reading
-    # when every name at least resolves on disk. No transcript -> outcomes is None -> reproduce the
-    # pre-existing single-nag-then-trust behaviour exactly, so a caller that cannot supply the proof is
-    # not wedged shut by demanding one.
     outcomes = None if missing else transcript_skill_outcomes(
         data.get("transcript_path"), codex_skills
     )
-    fallback = not missing and outcomes is None
     rejected, unproven = set(), set()
     if not missing and outcomes is not None:
         for name in descriptions:
@@ -1366,8 +1363,10 @@ def main():
                 rejected.add(name)
             elif outcome is not True:
                 unproven.add(name)
+    elif not missing:
+        unproven.update(descriptions)
 
-    if not missing and not fallback and not rejected and not unproven:
+    if not missing and not rejected and not unproven:
         for _, route in pending:
             seen.add(route.get("path"))
         save_seen(session, seen)
@@ -1418,28 +1417,17 @@ def main():
             "The file was NOT written. This route stays blocked on every attempt until every owning "
             "skill records a successful invocation in this session's transcript.",
         ]
-    elif fallback:
-        # No transcript to prove anything either way - reproduce the pre-existing behaviour verbatim
-        # rather than demanding proof a caller was never able to supply.
-        for _, route in pending:
-            seen.add(route.get("path"))
-        save_seen(session, seen)
-        lines += [
-            "",
-            "Invoke the skill(s) above, then repeat this write. The file was NOT written. This fires "
-            "once per path pattern per session, so it will not interrupt you again for this route.",
-        ]
     else:
         lines += [
             "",
             (
                 "Read each file named above in full with one command that completes, then repeat this "
-                "write. The file was NOT written. This route stays blocked on every attempt until this "
-                "session's transcript records that read for every owning skill."
+                "write. The file was NOT written. This route stays blocked until a readable session "
+                "transcript records that read for every owning skill."
                 if harness == "codex" else
                 "Invoke the skill(s) above, then repeat this write. The file was NOT written. This route "
-                "stays blocked on every attempt until a successful invocation of every owning skill is "
-                "recorded in this session's transcript - not merely attempted once."
+                "stays blocked until a readable session transcript records a successful invocation of "
+                "every owning skill."
             ),
         ]
     sys.stderr.write("\n".join(lines))
