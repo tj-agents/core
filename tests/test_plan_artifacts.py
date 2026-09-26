@@ -83,7 +83,8 @@ class PlanArtifactTests(unittest.TestCase):
             self.skipTest("No Bash/sh installed; native host probe must cover shell execution")
         for host in ("claude", "codex"):
             hooks = json.loads((self.plugin / self.manifest(host)["hooks"]).read_text())
-            command = hooks['hooks']['SessionStart'][0]['hooks'][0]['command']
+            hook = hooks['hooks']['SessionStart'][0]['hooks'][0]
+            command = hook.get('commandWindows', hook['command']) if os.name == 'nt' else hook['command']
             env = dict(os.environ, CLAUDE_PLUGIN_ROOT=self.plugin.as_posix(),
                        PLUGIN_ROOT=self.plugin.as_posix())
             result = subprocess.run([shell, "-c", command], cwd=self.cwd, env=env,

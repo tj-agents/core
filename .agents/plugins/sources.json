@@ -55,6 +55,21 @@
   ],
   "resources": [
     {
+      "plugin": "base",
+      "source": ".agents/hooks/skill_router.py",
+      "destination": "hooks/skill_router.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/hook_runtime.py",
+      "destination": "hooks/hook_runtime.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/plugins/compatibility.json",
+      "destination": "hooks/compatibility.json"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/lanes",
       "destination": ".agents/lanes"

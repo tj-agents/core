@@ -450,6 +450,18 @@ def block(reason):
     sys.exit(2)
 
 
+def grant_if_trusted(data, canonical_target):
+    """Approve a merge that passed every check, but only the exact Claude envelope.
+
+    A PreToolUse allow covers the whole tool call, so anything but the single-command envelope
+    could carry an unrelated command through on the review's approval.
+    """
+    if canonical_target is None or is_codex_invocation(data):
+        return
+    if is_trusted_checkout(__file__, canonical_target):
+        grant("merge-review-gate: the review is current and clean in a trusted repository.")
+
+
 def main():
     try:
         data = json.load(sys.stdin)
