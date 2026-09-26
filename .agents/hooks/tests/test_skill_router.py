@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 
 HOOKS = Path(__file__).resolve().parents[1]
@@ -92,6 +93,21 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("table exists", result.stdout)
 
+    def test_write_outside_repo_does_not_consult_its_broken_routes(self):
+        (self.repo / ".agents" / "skill-routes.json").write_text("{", encoding="utf-8")
+        result = self.run_router(
+            payload={
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": str(uuid.uuid4()),
+                "session_id": str(uuid.uuid4()),
+                "cwd": str(self.repo),
+                "tool_name": "Write",
+                "tool_input": {"file_path": str(self.base / "outside.py"), "content": "value = 2\n"},
+            }
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual("", result.stderr)
+
     def test_first_routed_write_blocks_with_the_owning_skill(self):
         result = self.run_router(
             payload={
@@ -121,6 +137,34 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stderr)
 
+    def test_quoted_arrow_in_inline_python_is_not_a_redirect(self):
+        result = self.run_router(
+            payload={
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": str(uuid.uuid4()),
+                "session_id": str(uuid.uuid4()),
+                "cwd": str(self.repo),
+                "tool_name": "Bash",
+                "tool_input": {"command": "python -c \"print('value -> src/item.py')\""},
+            }
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stderr)
+
+    def test_redirect_in_inline_shell_still_routes_the_write(self):
+        result = self.run_router(
+            payload={
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": str(uuid.uuid4()),
+                "session_id": str(uuid.uuid4()),
+                "cwd": str(self.repo),
+                "tool_name": "Bash",
+                "tool_input": {"command": "bash -c 'echo value > src/item.py'"},
+            }
+        )
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("feature", result.stderr)
+
     def test_repository_without_a_route_table_is_silent(self):
         (self.repo / ".agents" / "skill-routes.json").unlink()
         result = self.run_router(
@@ -141,13 +185,24 @@ class SkillRouterTests(unittest.TestCase):
             json.dumps({"skills": mapping}), encoding="utf-8"
         )
 
-    def test_a_superseded_qualified_name_resolves_nowhere_without_the_table(self):
+    def test_a_moved_qualified_name_resolves_at_its_only_installed_provider(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
 
         result = self.run_router(["--verify-install", "claude"])
 
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("base:feature", result.stdout)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        write = self.run_router(
+            payload={
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": str(uuid.uuid4()),
+                "session_id": str(uuid.uuid4()),
+                "cwd": str(self.repo),
+                "tool_name": "Write",
+                "tool_input": {"file_path": "src/item.py", "content": "value = 2\n"},
+            }
+        )
+        self.assertEqual(2, write.returncode, write.stderr)
+        self.assertIn("engineering:feature", write.stderr)
 
     def test_the_alias_table_resolves_it_to_the_plugin_that_now_owns_it(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
@@ -157,6 +212,26 @@ class SkillRouterTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertIn("resolves all 1 routed skill", result.stdout)
+
+    def test_a_qualified_name_with_two_other_providers_stays_unresolved(self):
+        import importlib.util
+
+        sys.path.insert(0, str(HOOKS))
+        self.addCleanup(sys.path.remove, str(HOOKS))
+        spec = importlib.util.spec_from_file_location("router_with_two_providers", ROUTER)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        roots = []
+        for plugin in ("first", "second"):
+            root = self.base / "cache" / "marketplace" / plugin / "1.0" / "skills"
+            skill = root / "feature"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                "---\nname: feature\ndescription: Feature work.\n---\n", encoding="utf-8"
+            )
+            roots.append(root)
+        with patch.object(module, "skill_search_dirs", return_value=roots):
+            self.assertIsNone(module.resolved_skill("missing:feature", "claude"))
 
     def test_an_alias_to_a_skill_that_is_genuinely_absent_still_reports_missing(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["base:feature"]}]})
