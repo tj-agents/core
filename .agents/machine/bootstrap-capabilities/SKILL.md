@@ -9,6 +9,23 @@ route: infer
 
 # Bootstrap locked capabilities
 
+## Generate repository host settings
+
+Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
+from `base-agents` alongside the project's stack plugins. Generate the two host settings files from
+that lock and the bundled catalog:
+
+```powershell
+python -B '<skill-directory>\scripts\repo_config.py' `
+  --lock C:\path\to\project\.agents\capabilities.lock.json --mode write
+```
+
+CI uses the same command with `--mode check`; it exits nonzero if either generated file drifts.
+Only the `tj-agents/core`, `cpp`, `dotnet`, and `react` GitHub sources are accepted. The generator
+owns Claude's marketplace and enabled-plugin keys and Codex's marketplace and plugin tables;
+other project settings remain in place. Release commits are selected by the lock, while host
+settings declare the corresponding GitHub marketplace and enabled plugins.
+
 Use the packaged Python entry point. The lock is project-owned; the catalog is release-owned and ships
 with this skill's plugin. `--profile` is the actual Codex or Claude configuration directory, not a label.
 
