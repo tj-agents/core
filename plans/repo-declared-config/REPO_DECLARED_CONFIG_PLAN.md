@@ -14,12 +14,19 @@ differently on different machines and drifts on this one. Observed on 2026-09-23
 - A plugin installed mid-session could not be used until a restart.
 - `concertable@agent-standards` is enabled at user scope, so Concertable product skills and the
   generic harness hooks it happens to carry load in every repository.
+- On 2026-09-26, an active Codex session loaded hooks from `base-agents` 2.1.8, then a
+  marketplace refresh removed that plugin cache path during the session. The hooks' script paths
+  became stale. A machine-local `notify` command also launched a console executable from AppData
+  and had a recorded Windows error 206. Neither a profile edit nor a cache junction is a durable
+  repair for these failures.
 
 ## Rule
 
-Everything that affects agent behaviour is committed in a repository. A machine holds only
-derived caches (downloaded plugins) and credentials. Cloning a repository on any machine gives
-identical behaviour.
+Everything that affects agent behaviour is committed in a repository. Core owns the generic
+harness and its host adapters; consumer repositories declare which released capabilities they use.
+A machine holds only derived caches, credentials and runtime data. Cloning a repository on any
+machine gives identical agent behaviour without hand-edited user hook, plugin, agent, marketplace
+or notification settings. A plugin refresh must not break hooks already loaded by a live session.
 
 ## Design
 
@@ -52,8 +59,15 @@ identical behaviour.
    - Codex user-config equivalents, `~/.codex/agents` and `~/.codex/skills`; move anything
      still needed into a repository.
    - Per-repository local marketplace overrides.
+   - User-scope hook and notification commands, temporary cache aliases and manually placed
+     harness scripts. A desired notification belongs in a declared host adapter and must be
+     launched without an unwanted console window; otherwise omit it.
    Core ships a read-only verifier that reports remaining machine-local behavioural state, so
    every machine can be checked the same way.
+5. **Live-session cache safety.** Exercise a marketplace update while an old session is active.
+   Keep the scripts used by that session callable until it ends, or have core's host adapter
+   resolve the currently installed released package without a machine-specific path. The repair
+   and its regression test live in core; never create a local junction as part of normal operation.
 
 ## Marketplaces come only from tj-agents
 
@@ -95,10 +109,13 @@ plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md and do what the ledg
 
 ## Scope of this plan
 
-Adoption is **`sandbox-hwid` only**. Other consumers (cpp-agents, the Concertable repository,
-dotagents, react-agents, winwrap, note-cli, icon-dropper, wifi-toggle) are follow-ups, adopted
-one at a time after this plan closes. Concertable must move `concertable@agent-standards` to
-project scope before user-scope removal on any machine that works on it.
+Adopt `sandbox-hwid` first, then every known consumer: cpp-agents, the Concertable repository,
+dotagents, react-agents, winwrap, note-cli, icon-dropper and wifi-toggle. Discover any additional
+consumer during the inventory and add it here. Adopt consumers one at a time with a green host
+check before removing their user-scope fallback. Concertable must move
+`concertable@agent-standards` to project scope before user-scope removal on any machine that works
+on it. This plan closes only after all known consumers and machines pass the verifier; a single
+consumer or PC is a checkpoint, not the end of the goal.
 
 ## Acceptance, for Claude and Codex each
 
@@ -108,7 +125,9 @@ project scope before user-scope removal on any machine that works on it.
    with no restart (or, for a host that cannot inject, one SessionStart repair and a plain
    notice).
 3. A `sandbox-hwid` session loads no Concertable skills or hooks.
-4. The machine verifier reports no machine-local behavioural state on this PC.
+4. The machine verifier reports no machine-local behavioural state on each migrated PC.
+5. A live Codex and Claude session continues to run its installed hooks across a marketplace
+   update without stale-path failures or empty console windows.
 
 ## Phases
 
@@ -116,3 +135,5 @@ project scope before user-scope removal on any machine that works on it.
 2. Repo-config generator and consumer drift check; release.
 3. Self-heal in the router and SessionStart for both hosts; release.
 4. Adopt in `sandbox-hwid`; clean this PC; run acceptance.
+5. Adopt every remaining consumer and machine, remove user-scope behavioural state, and run the
+   same acceptance checks after each migration.
