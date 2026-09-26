@@ -263,7 +263,7 @@
           "id": "cpp-agents/msvc",
           "name": "msvc",
           "package_path": "plugins/msvc",
-          "version": "0.3.2",
+          "version": "0.3.3",
           "description": "MSVC and clang-cl toolchain guidance and project scaffold layered on cpp.",
           "status": "current",
           "platforms": [
@@ -412,7 +412,7 @@
           "id": "cpp-agents/windows",
           "name": "windows",
           "package_path": "plugins/windows",
-          "version": "0.8.2",
+          "version": "0.8.3",
           "description": "Deprecated combined MSVC and Win32 compatibility package; split explicitly before 2027-03-31.",
           "status": "deprecated",
           "platforms": [
