@@ -55,7 +55,7 @@ class PlanArtifactTests(unittest.TestCase):
             if host == "codex":
                 self.assertEqual(
                     handler["commandWindows"],
-                    f'python -B "${{PLUGIN_ROOT}}/{script}"',
+                    f'python -B "%PLUGIN_ROOT%/{script}"',
                 )
             self.assertTrue((self.plugin / script).is_file())
             self.assertTrue((self.plugin / '.agents/base/plan-artifacts/templates/PLAN.md').is_file())
@@ -87,7 +87,9 @@ class PlanArtifactTests(unittest.TestCase):
             command = hook.get('commandWindows', hook['command']) if os.name == 'nt' else hook['command']
             env = dict(os.environ, CLAUDE_PLUGIN_ROOT=self.plugin.as_posix(),
                        PLUGIN_ROOT=self.plugin.as_posix())
-            result = subprocess.run([shell, "-c", command], cwd=self.cwd, env=env,
+            native_codex = os.name == "nt" and host == "codex"
+            argv = command if native_codex else [shell, "-c", command]
+            result = subprocess.run(argv, shell=native_codex, cwd=self.cwd, env=env,
                                     input='{}', text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('additionalContext', json.loads(result.stdout)['hookSpecificOutput'])
