@@ -3,12 +3,20 @@
 import hashlib
 import json
 import os
+import re
+import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
 
 
 PLUGIN_ROOT_VARIABLES = ("PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
+TRUST_FILE = "harness-trust.json"
+_GITHUB_OWNER_RE = re.compile(
+    r"\A(?:https://(?:[^@/\s]+@)?github\.com/|ssh://git@github\.com/|git@github\.com:)"
+    r"(?P<owner>[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)/[^/\s]+?(?:\.git)?/?\Z"
+)
 CLAIM_PREFIX = "agents-hook-"
 CLAIM_RETENTION_SECONDS = 7 * 24 * 60 * 60
 CLAIM_PRUNE_INTERVAL_SECONDS = 60 * 60
@@ -38,6 +46,58 @@ def own_payload_root(hook_file):
     if root is not None:
         return root
     return Path(hook_file).resolve().parent.parent
+
+
+def trusted_owners(hook_file):
+    """GitHub owners whose repositories receive the plugin's harness grants.
+
+    The list ships beside the hooks, never in the repository being worked on, so a checkout cannot
+    grant itself permissions. A missing or malformed list grants nothing.
+    """
+    try:
+        parsed = json.loads((Path(hook_file).resolve().parent / TRUST_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return frozenset()
+    owners = parsed.get("trusted_owners") if isinstance(parsed, dict) else None
+    if not isinstance(owners, list):
+        return frozenset()
+    return frozenset(owner.casefold() for owner in owners if isinstance(owner, str) and owner)
+
+
+def origin_owner(checkout):
+    """The GitHub owner of ``checkout``'s origin, or None for another host or no origin."""
+    try:
+        url = subprocess.run(
+            ["git", "-C", str(checkout), "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    match = _GITHUB_OWNER_RE.match(url)
+    return match.group("owner").casefold() if match else None
+
+
+def is_trusted_checkout(hook_file, checkout):
+    owner = origin_owner(checkout)
+    return owner is not None and owner in trusted_owners(hook_file)
+
+
+def grant(reason):
+    """Approve the current PreToolUse call and exit. A sibling hook's deny still wins."""
+    sys.stdout.write(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
+    sys.exit(0)
 
 
 def _invocation_identity(data, hook_name):

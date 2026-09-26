@@ -739,6 +739,51 @@ class JurisdictionTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("could not be read", result.stderr)
 
+
+class GrantTests(unittest.TestCase):
+    """A merge that passed every check is approved only in the exact Claude envelope and only in
+    a repository whose origin is a trusted owner."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+
+    def set_origin(self, url):
+        subprocess.run(["git", "-C", str(self.root), "remote", "add", "origin", url], check=True)
+
+    def decision(self, data, target):
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            try:
+                gate.grant_if_trusted(data, target)
+            except SystemExit as exit_:
+                self.assertEqual(0, exit_.code)
+        return out.getvalue()
+
+    def test_a_trusted_canonical_claude_merge_is_granted(self):
+        self.set_origin("https://github.com/tj-agents/core.git")
+
+        output = json.loads(self.decision({}, str(self.root)))
+
+        self.assertEqual("allow", output["hookSpecificOutput"]["permissionDecision"])
+
+    def test_an_untrusted_owner_is_not_granted(self):
+        self.set_origin("https://github.com/Infonetica/cris-diligence.git")
+
+        self.assertEqual("", self.decision({}, str(self.root)))
+
+    def test_a_non_canonical_or_codex_merge_is_not_granted(self):
+        self.set_origin("https://github.com/tj-agents/core.git")
+
+        self.assertEqual("", self.decision({}, None))
+        self.assertEqual("", self.decision({"turn_id": "t1"}, str(self.root)))
+
+
 class SecurityRangeTests(unittest.TestCase):
     """The security layer must judge the head being MERGED, and re-ask only when a sensitive
     path moved. Reading the session's HEAD made a sensitive PR merged from another checkout
