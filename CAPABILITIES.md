@@ -11,9 +11,9 @@ Owner: [`tj-agents/core`](https://github.com/tj-agents/core) · immutable revisi
 - **`base-agents/engineering`** — Selected engineering workflows, reviews and Git operations.
 - **`base-agents/machine`** — Explicit harness, history and clipboard utilities.
 
-## cpp-agents 0.1.1
+## cpp-agents 0.3.1
 
-Owner: [`tj-agents/cpp`](https://github.com/tj-agents/cpp) · immutable revision `v0.1.1`
+Owner: [`tj-agents/cpp`](https://github.com/tj-agents/cpp) · immutable revision `v0.3.1`
 
 - **`cpp-agents/cpp`** — Platform-neutral modern C++ contracts and learning guidance.
 - **`cpp-agents/gpp`** — G++, GCC, GDB, and Linux guidance layered on cpp.
