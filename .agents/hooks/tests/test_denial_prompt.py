@@ -76,6 +76,16 @@ class DenialPromptTests(unittest.TestCase):
         self.assertIsNone(self.run_hook("PostToolUse"))
         self.assertEqual([], self.records())
 
+    def test_a_new_denial_prunes_records_nobody_retried(self):
+        self.run_hook("PermissionDenied", command="never retried")
+        stale = self.records()[0]
+        os.utime(stale, (0, 0))
+
+        self.run_hook("PermissionDenied")
+
+        self.assertFalse(stale.exists())
+        self.assertEqual(1, len(self.records()))
+
 
 if __name__ == "__main__":
     unittest.main()
