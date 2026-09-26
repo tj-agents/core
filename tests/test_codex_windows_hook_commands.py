@@ -27,10 +27,11 @@ class CodexWindowsHookCommands(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt", "Windows shell compatibility test")
     def test_missing_marketplace_and_hook_failure_block_in_windows_shells(self):
-        if not shutil.which("pwsh") or not shutil.which("powershell.exe"):
-            self.skipTest("PowerShell is unavailable")
+        shells = [shell for shell in ("pwsh", "powershell.exe", "cmd.exe") if shutil.which(shell)]
+        if not shells:
+            self.skipTest("No Windows shell is available")
 
-        with tempfile.TemporaryDirectory(prefix="codex windows hook ") as temporary:
+        with tempfile.TemporaryDirectory(prefix="codex windows hook ", dir=ROOT) as temporary:
             root = Path(temporary)
             plugin = root / "plugin with spaces"
             repo = root / "repo"
@@ -56,7 +57,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
             adapter = plugin / "hooks" / "pre_tool_use_adapter.py"
             failed_command = f'python -B "{adapter}" "{crash}"'
 
-            for shell in ("pwsh", "powershell.exe", "cmd.exe"):
+            for shell in shells:
                 for active_command, expected_reason in (
                     (expanded, "missing-marketplace:never-shipped"),
                     (failed_command, "failed with exit code 1"),
