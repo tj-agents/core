@@ -1,13 +1,15 @@
 # Repo-declared agent configuration — progress
 
-Plan: `REPO_DECLARED_CONFIG_PLAN.md`
-Status: phase 1 in progress; handed off for the full deduplication (2026-09-23).
+- Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
+- Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
+- Roadmap item: `repo-declared-config/migrate-agent-state`
+Status: phase 1 in progress; full repo-declared migration remains open (2026-09-26).
 
 Branch: `Refactor/repo-declared-config_harness-move`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
 PR: none yet.
 
-## Current state (2026-09-23)
+## Current state (2026-09-26)
 
 - The plan is on `main`, amended with the tj-agents-only source rule, the per-machine migration
   procedure and (PR #30) the retire-duplicates framing of phase 1.
@@ -28,6 +30,14 @@ PR: none yet.
     the plan must decide how this stays repository-declared.
 - `sandbox-hwid` (first consumer): routes resolve for Claude and Codex after cpp-agents v0.3.0
   adoption, but through user-scope installs.
+- User clarified that the goal is to remove machine-local hook, harness, plugin and agent
+  configuration across all known consumers and machines, with core as the generic source owner.
+  The plan now covers that full migration; `sandbox-hwid` is only the first adoption checkpoint.
+- On this PC, Codex's failing user-scope `notify` entry was removed from `~/.codex/config.toml`.
+  Temporary 2.1.8 plugin-cache junctions created during diagnosis were removed after the
+  updater deleted their 2.1.11 targets. No local cache alias is a supported fix. The currently
+  installed core plugin release is 2.1.12; a live-session update regression still needs a
+  repository-owned repair and acceptance test.
 
 ## Phase 1 inventory (2026-09-23)
 
@@ -106,6 +116,15 @@ Concertable-product content; core contains no Concertable reference in code, nam
 (user decision, 2026-09-23). The currency gate, enforcement gate and marketplace refresh are **not**
 moved into core; phase 3 rebuilds currency as self-heal.
 
+Scope: whole plan: core-owned generic harness and repo-declared configuration for every known
+consumer and machine in the plan.
+Current slice: finish phase 1's duplicate audit and generic ports on this branch; include the
+live-session cache-path failure in the subsequent host-adapter work.
+Remaining scope: release core; retire Concertable duplicates; generate consumer config; add
+self-heal and live-update safety; migrate each consumer and machine; remove local behavioural state.
+Done when: every migrated host and consumer passes the plan's acceptance checks and the machine
+verifier reports no local behavioural configuration.
+
 Done already on this branch: inventory above; `hook_runtime.run_command` with timeout-bearing
 `gh`/`git` calls in `merge_review_gate`, `persistent_workflow_merge_gate` and
 `delivery_binding_gate`, plus `test_hook_runtime`. The hook suite's only failures are the two
@@ -123,7 +142,7 @@ pre-existing `CanonicalEnvelopeShellTests`, which cannot find Git Bash on this m
    `26941b7` (settle foreign paths before any gate) and `f5d2b7e` (qualifier fallback; reconcile with
    core's `skill_aliases` from `45506cb`); `red_run_gate`'s `invocable_name`; the rung-specific lane agent
    `description`s and `kind` into core's authored agent sources for both hosts. Replay commit by commit
-   (Concertable history since `7ab1028`); a three-way merge against `c68ff55` gives 29 conflicts. Skip the
+   (Concertable history since `7ab1028`); a three-way reconciliation against `c68ff55` gives 29 conflicts. Skip the
    currency-coupled commits (`62c3887`, `de88e59`, `ee7f228`). After source changes run
    `python -B scripts/update_catalog_digests.py`, `pwsh .agents/sync-generated.ps1` and
    `pwsh .agents/sync-generated.ps1 -Check`, and the hook suite
