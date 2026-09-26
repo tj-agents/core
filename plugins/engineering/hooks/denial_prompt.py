@@ -38,11 +38,22 @@ def on_denied(data):
     path = record_path(data)
     if path is None:
         sys.exit(0)
+    prune_expired(path.parent)
     try:
         path.write_text(json.dumps({"denied_at": time.time()}), encoding="utf-8")
     except OSError:
         sys.exit(0)
     respond("PermissionDenied", {"retry": True})
+
+
+def prune_expired(directory):
+    cutoff = time.time() - RECORD_TTL_SECONDS
+    for stale in directory.glob(RECORD_PREFIX + "*.json"):
+        try:
+            if stale.stat().st_mtime < cutoff:
+                stale.unlink()
+        except OSError:
+            continue
 
 
 def on_pre_tool_use(data):
