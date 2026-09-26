@@ -78,8 +78,9 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                     if not isinstance(hooks, list) or not hooks:
                         raise ValueError(f"{hook_path}: hook group has no commands")
                     for hook in hooks:
-                        if hook.get("type") != "command":
-                            continue
+                        hook_type = hook.get("type") if isinstance(hook, dict) else None
+                        if hook_type != "command":
+                            raise ValueError(f"{hook_path}: unsupported hook type: {hook_type!r}")
                         for field, root_token, script_pattern in fields:
                             command = hook.get(field)
                             if not isinstance(command, str) or not command:
@@ -87,15 +88,16 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                             wrong_roots = [token for token in known_roots if token != root_token and token in command]
                             if wrong_roots:
                                 raise ValueError(f"{hook_path}: {field} uses the wrong plugin root")
-                            match = script_pattern.search(command)
-                            if match is None:
+                            matches = list(script_pattern.finditer(command))
+                            if not matches:
                                 raise ValueError(f"{hook_path}: {field} has no package-relative script")
-                            script = PurePosixPath(match.group(1))
-                            if script.is_absolute() or ".." in script.parts:
-                                raise ValueError(f"{hook_path}: {field} script escapes package")
-                            target = f"plugins/{plugin}/{script.as_posix()}"
-                            if target not in output:
-                                raise ValueError(f"{hook_path}: {field} script target is missing: {script}")
+                            for match in matches:
+                                script = PurePosixPath(match.group(1))
+                                if script.is_absolute() or ".." in script.parts:
+                                    raise ValueError(f"{hook_path}: {field} script escapes package")
+                                target = f"plugins/{plugin}/{script.as_posix()}"
+                                if target not in output:
+                                    raise ValueError(f"{hook_path}: {field} script target is missing: {script}")
 
 
 def catalog_index(catalog: dict) -> tuple[dict[str, dict], dict[str, dict]]:

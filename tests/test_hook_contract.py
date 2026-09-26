@@ -44,6 +44,27 @@ class HookContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "script target is missing"):
             self.validate(output)
 
+    def test_missing_second_windows_hook_script_target_is_rejected(self) -> None:
+        output = copy.deepcopy(self.output)
+        path = "plugins/base/hooks/codex.json"
+        payload = json.loads(output[path])
+        command = payload["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
+        payload["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"] = command.replace(
+            "hooks/skill_router.py", "hooks/does-not-exist.py"
+        )
+        output[path] = json.dumps(payload).encode()
+        with self.assertRaisesRegex(ValueError, "script target is missing"):
+            self.validate(output)
+
+    def test_unknown_hook_type_is_rejected(self) -> None:
+        output = copy.deepcopy(self.output)
+        path = "plugins/base/hooks/codex.json"
+        payload = json.loads(output[path])
+        payload["hooks"]["SessionStart"][0]["hooks"][0]["type"] = "commnad"
+        output[path] = json.dumps(payload).encode()
+        with self.assertRaisesRegex(ValueError, "unsupported hook type"):
+            self.validate(output)
+
     def test_codex_windows_host_root_expansion_is_enforced(self) -> None:
         output = copy.deepcopy(self.output)
         path = "plugins/base/hooks/codex.json"
