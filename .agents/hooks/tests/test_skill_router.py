@@ -163,6 +163,32 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(2, result.returncode, result.stderr)
         self.assertIn("missing-marketplace:never-shipped", result.stderr)
 
+    def test_codex_exec_wrapper_blocks_opaque_nested_write_with_installed_skill(self):
+        result = self.run_router(payload={
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": str(uuid.uuid4()),
+            "session_id": str(uuid.uuid4()),
+            "cwd": str(self.repo),
+            "tool_name": "functions.exec",
+            "tool_input": {"code": "await tools.exec_command({cmd: command})"},
+        })
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("nested writes", result.stderr)
+
+    def test_missing_transcript_never_trusts_a_repeated_routed_write(self):
+        session = str(uuid.uuid4())
+        for _ in range(2):
+            result = self.run_router(payload={
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": str(uuid.uuid4()),
+                "session_id": session,
+                "cwd": str(self.repo),
+                "tool_name": "Write",
+                "tool_input": {"file_path": "src/item.py", "content": "value = 2\n"},
+            })
+            self.assertEqual(2, result.returncode, result.stderr)
+            self.assertIn("readable session transcript", result.stderr)
+
 
     def aliases(self, mapping):
         (self.plugin / "hooks" / "compatibility.json").write_text(
