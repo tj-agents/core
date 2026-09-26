@@ -42,7 +42,7 @@
             "timeout": 15
           }
         ],
-        "matcher": "functions\\.exec|exec|apply_patch|edit_file|write_file|multi_edit|exec_command|unified_exec|local_shell|shell"
+        "matcher": "Bash|apply_patch|edit_file|write_file|multi_edit|exec_command|unified_exec|local_shell|shell"
       },
       {
         "hooks": [
