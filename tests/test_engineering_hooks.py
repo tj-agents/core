@@ -112,7 +112,9 @@ class PackagedEngineeringHooks(unittest.TestCase):
             registration for registration in base_codex["hooks"]["PreToolUse"]
             if any("skill_router.py" in hook["command"] for hook in registration["hooks"])
         )
-        self.assertIn("functions\\.exec", codex_router["matcher"])
+        self.assertIn("Bash", codex_router["matcher"])
+        self.assertIn("apply_patch", codex_router["matcher"])
+        self.assertNotIn("functions", codex_router["matcher"])
         self.assertFalse(any("skill_router.py" in command for command in commands(codex, "PreToolUse")))
         self.assertFalse(any("red_run_gate.py" in command for event in codex["hooks"] for command in commands(codex, event)))
         self.assertTrue(any("skill_router.py" in command for command in commands(base_claude, "PreToolUse")))

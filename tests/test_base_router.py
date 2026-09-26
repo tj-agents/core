@@ -27,7 +27,7 @@ class BaseRouterTests(unittest.TestCase):
             environment = dict(os.environ, PLUGIN_ROOT=str(plugin), CLAUDE_PLUGIN_ROOT=str(plugin),
                                HOME=str(root / "home"), USERPROFILE=str(root / "home"))
             for host, tool, tool_input in (
-                ("codex", "functions.exec", {"code": "await tools.apply_patch(patch)"}),
+                ("codex", "apply_patch", {"patch": "*** Begin Patch\n*** Add File: src/item.cpp\n+int x;\n*** End Patch"}),
                 ("claude", "Write", {"file_path": "src/item.cpp", "content": "int x;"}),
             ):
                 with self.subTest(host=host):
