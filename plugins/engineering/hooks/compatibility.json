@@ -1,6 +1,6 @@
 {
   "previous_release": "1.2.0",
-  "replacement_release": "2.1.9",
+  "replacement_release": "2.1.10",
   "equivalent_selection": [
     "base@base-agents",
     "engineering@base-agents",
