@@ -18,16 +18,6 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\""
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 15,
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
           }
         ],
