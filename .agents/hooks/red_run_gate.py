@@ -377,7 +377,7 @@ def skill_lines(names, resolved, harness):
     lines = []
     for name in names:
         description, path = resolved[name]
-        lines.append(f"  * {name}")
+        lines.append(f"  * {skill_router.invocable_name(name, path)}")
         if description is None:
             lines.append(
                 f"      NOT INSTALLED FOR {harness.upper()} - no SKILL.md is available to the active"

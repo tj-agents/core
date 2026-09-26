@@ -1,6 +1,7 @@
 ---
 name: lane-l4
-description: Bounded delegated work at L4.
+description: Runs one delegated task at lane L4. Mechanical work whose shape is already decided.
+kind: lane
 model: claude-sonnet-5
 effort: medium
 tools: Read, Glob, Grep, Write, Edit, Bash

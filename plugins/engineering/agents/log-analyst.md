@@ -1,6 +1,7 @@
 ---
 name: log-analyst
 description: Read-only analyst for reducing supplied logs into evidence without diagnosing the fix.
+kind: review
 model: claude-sonnet-5
 effort: medium
 tools: Read, Glob, Grep
