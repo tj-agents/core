@@ -114,8 +114,6 @@ CLAUDE_WRITE_TOOLS = {
     "powershell",
 }
 CODEX_WRITE_TOOLS = {
-    "functions.exec",
-    "exec",
     "apply_patch",
     "edit_file",
     "write_file",
@@ -188,8 +186,10 @@ def native_install_roots(harness):
     return tuple(roots)
 
 
-def active_harness(tool_name):
+def active_harness(tool_name, data):
     lowered = tool_name.lower()
+    if lowered == "bash" and data.get("turn_id"):
+        return "codex"
     if lowered in CLAUDE_WRITE_TOOLS:
         return "claude"
     if lowered in CODEX_WRITE_TOOLS:
@@ -1179,7 +1179,7 @@ def main():
     tool_name = data.get("tool_name")
     if not isinstance(tool_name, str):
         sys.exit(0)
-    harness = active_harness(tool_name)
+    harness = active_harness(tool_name, data)
     if harness is None:
         sys.exit(0)
 
@@ -1221,12 +1221,6 @@ def main():
             + "\n".join(f"  {name}" for name in missing_install)
             + f"\n\nInstall or enable the owning plugin(s) for {harness}, then start a new "
             "session. This tool call was NOT run.\n"
-        )
-        sys.exit(2)
-    if tool_name.lower() == "functions.exec":
-        sys.stderr.write(
-            "SKILL ROUTER - blocked, functions.exec can execute nested writes that this hook cannot "
-            "inspect. Use a directly hooked tool; this wrapper call was NOT run.\n"
         )
         sys.exit(2)
     if not targets:

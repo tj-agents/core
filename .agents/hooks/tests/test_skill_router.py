@@ -150,30 +150,44 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(2, result.returncode, result.stderr)
         self.assertIn("missing-marketplace:never-shipped", result.stderr)
 
-    def test_missing_marketplace_blocks_codex_exec_wrapper(self):
+    def test_missing_marketplace_blocks_nested_codex_edit(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
         result = self.run_router(payload={
             "hook_event_name": "PreToolUse",
             "tool_use_id": str(uuid.uuid4()),
             "session_id": str(uuid.uuid4()),
             "cwd": str(self.repo),
-            "tool_name": "functions.exec",
-            "tool_input": {"code": "await tools.apply_patch(patch);"},
+            "tool_name": "apply_patch",
+            "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/item.py\n+value = 2\n*** End Patch"},
         })
         self.assertEqual(2, result.returncode, result.stderr)
         self.assertIn("missing-marketplace:never-shipped", result.stderr)
 
-    def test_codex_exec_wrapper_blocks_opaque_nested_write_with_installed_skill(self):
+    def test_nested_codex_shell_write_needs_skill_proof(self):
         result = self.run_router(payload={
             "hook_event_name": "PreToolUse",
             "tool_use_id": str(uuid.uuid4()),
             "session_id": str(uuid.uuid4()),
             "cwd": str(self.repo),
-            "tool_name": "functions.exec",
-            "tool_input": {"code": "await tools.exec_command({cmd: command})"},
+            "tool_name": "exec_command",
+            "tool_input": {"cmd": "echo value > src/item.py"},
         })
         self.assertEqual(2, result.returncode, result.stderr)
-        self.assertIn("nested writes", result.stderr)
+        self.assertIn("readable session transcript", result.stderr)
+
+    def test_codex_canonical_bash_uses_codex_registry(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
+        result = self.run_router(payload={
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": str(uuid.uuid4()),
+            "session_id": str(uuid.uuid4()),
+            "turn_id": str(uuid.uuid4()),
+            "cwd": str(self.repo),
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo value > src/item.py"},
+        })
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("for codex", result.stderr)
 
     def test_missing_transcript_never_trusts_a_repeated_routed_write(self):
         session = str(uuid.uuid4())
