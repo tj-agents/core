@@ -55,7 +55,7 @@ class PlanArtifactTests(unittest.TestCase):
             if host == "codex":
                 self.assertEqual(
                     handler["commandWindows"],
-                    f'python -B "%PLUGIN_ROOT%/{script}"',
+                    f'python -B "${{PLUGIN_ROOT}}/{script}"',
                 )
             self.assertTrue((self.plugin / script).is_file())
             self.assertTrue((self.plugin / '.agents/base/plan-artifacts/templates/PLAN.md').is_file())
@@ -74,7 +74,6 @@ class PlanArtifactTests(unittest.TestCase):
         self.assertEqual(before, snapshot(self.root))
 
     def test_shell_command_runs_from_unrelated_path_with_spaces(self):
-        # Codex and Claude export this compatibility variable. Exercise the actual shell form.
         shell = shutil.which("sh")
         if os.name == "nt" and shutil.which("git"):
             git_bash = Path(shutil.which("git")).resolve().parents[1] / "bin/bash.exe"
@@ -85,6 +84,8 @@ class PlanArtifactTests(unittest.TestCase):
             hooks = json.loads((self.plugin / self.manifest(host)["hooks"]).read_text())
             hook = hooks['hooks']['SessionStart'][0]['hooks'][0]
             command = hook.get('commandWindows', hook['command']) if os.name == 'nt' else hook['command']
+            if host == "codex":
+                command = command.replace("${PLUGIN_ROOT}", self.plugin.as_posix())
             env = dict(os.environ, CLAUDE_PLUGIN_ROOT=self.plugin.as_posix(),
                        PLUGIN_ROOT=self.plugin.as_posix())
             native_codex = os.name == "nt" and host == "codex"
