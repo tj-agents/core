@@ -9,6 +9,7 @@ The repository also owns explicit PowerShell profile and CLI session-recovery in
 `base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
+Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Python 3.9+ must be
 available as `python` on PATH. Codex skips new or changed plugin hooks until they are reviewed and trusted
 in `/hooks`; a fresh missing-marketplace write probe is required before claiming enforcement. The host
