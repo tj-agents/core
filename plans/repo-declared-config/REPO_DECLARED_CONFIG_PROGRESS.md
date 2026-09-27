@@ -7,9 +7,11 @@ Status: phase 1 in progress; full repo-declared migration remains open (2026-09-
 
 Branch: `Refactor/RepoDeclaredConfigHarnessMove`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
-PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48). CI passed at `fe46ff6`;
-the new machine-verifier edit requires a fresh run. Binding reports no standing merge
-authorization; `v2.1.13` remains unpublished.
+PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48), ready and mergeable.
+CI `verify` passed at `284d014` (run `36318559193`); review watermark matches that head.
+Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27; the
+authorization checkpoint below requires a fresh exact-head review and CI run. `v2.1.13`
+remains unpublished.
 
 ## Current state (2026-09-26)
 
@@ -32,33 +34,29 @@ authorization; `v2.1.13` remains unpublished.
     the plan must decide how this stays repository-declared.
 - `sandbox-hwid` (first consumer): routes resolve for Claude and Codex after cpp-agents v0.3.0
   adoption, but through user-scope installs.
-- User clarified that the goal is to remove machine-local hook, harness, plugin and agent
-  configuration across all known consumers and machines, with core as the generic source owner.
-  The plan now covers that full migration; `sandbox-hwid` is only the first adoption checkpoint.
-- On this PC, Codex's failing user-scope `notify` entry was removed from `~/.codex/config.toml`.
-  Temporary 2.1.8 plugin-cache junctions created during diagnosis were removed after the
-  updater deleted their 2.1.11 targets. No local cache alias is a supported fix. The currently
-  installed core plugin release is 2.1.12; a live-session update regression still needs a
-  repository-owned repair and acceptance test.
-- Core branch now includes a first phase-2 generator beside `bootstrap-capabilities`: it derives
-  `.claude/settings.json` and `.codex/config.toml` from a committed capability lock, requires
-  core's three plugins, rejects sources outside the four `tj-agents` repositories, preserves
-  unrelated project settings, and has `write`/`check` modes. Its focused tests and package
-  sync check pass. No consumer has adopted it yet. The candidate catalog is now 2.1.13,
-  pending merge and tag; consumer locks still need updating after publication.
+- On this PC, Codex's failing user-scope `notify` entry and temporary plugin-cache junctions
+  were removed. Core 2.1.12 is installed; a live-session update still needs a repository-owned
+  repair and acceptance test. No local cache alias is supported.
+- The phase-2 generator derives both host configs from a capability lock, requires core's
+  plugins, rejects non-`tj-agents` sources, preserves unrelated settings, and supports
+  `write`/`check`. Tests and package sync pass; adoption awaits the 2.1.13 release.
 - Merged current `origin/main` (which released 2.1.12 and added native plugin activation checks).
   Reconciled the router: moved skills require explicit aliases, so disabled plugins stay
   unavailable. Core's Windows hook smoke test passes. The `codex.CMD` probe and shared hook
   runner use `CREATE_NO_WINDOW`; live-session popup acceptance remains pending.
-- Product migration is not yet safe to delete wholesale: Concertable's `always_on_instructions`
-  and commit/push enforcement hooks import its duplicate router, and its generator emits shared
-  lane agents from local lane tables. The tj-agents-only marketplace rule also conflicts with
-  enabling `concertable@agents` in generated project settings; settle that source boundary
-  before the product cutover.
+- Concertable migration cannot delete duplicates wholesale: product hooks import its router,
+  its generator emits shared agents, and the tj-agents-only source rule conflicts with enabling
+  `concertable@agents`. Settle that boundary before cutover.
 - Core now has a read-only machine verifier under `bootstrap-capabilities`. Focused tests pass;
   on this PC it finds 34 own-agent profile entries (2 settings groups, 5 marketplaces,
   15 plugins, 12 loose agents/skills). Host-bundled runtime marketplaces are excluded.
   No user-scope cleanup is safe until the corresponding consumers adopt project settings.
+- Tommy authorized the whole repo-declared configuration plan through every repository's
+  normal merge path. The plan now explicitly includes standards-owned harness manifests,
+  generated project permission rules, CI enforcement of manifest/config drift, phase-2-first
+  adoption in winwrap and sandbox-hwid, and a permanent always-on authoring rule. The separate
+  `plans/conditional-skill-routes/` plan owns route conditionality and does not replace this
+  plan's harness-installation contract.
 
 ## Phase 1 inventory (2026-09-23)
 
@@ -163,7 +161,8 @@ Concertable-product content; core contains no Concertable reference in code, nam
 moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
-Current slice: review and publish the 2.1.13 core candidate, then retire Concertable's shared copies.
+Current slice: checkpoint the new authorization and sibling plan, re-review and publish the
+2.1.13 core candidate, then retire Concertable's shared copies.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
 Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no
 machine-local behavioural state on each machine.
@@ -176,8 +175,9 @@ inventory above distinguishes generic duplicates from product content. The merge
 repository suite's Windows shell test passed on focused rerun after sandbox denial and one transient
 PowerShell startup timeout.
 
-1. Finish this branch's review, open a PR, merge it, and publish the 2.1.13 core release. Confirm the
-   immutable tag, plugin packages, and catalog digest against the published commit.
+1. Commit and push the 2026-09-27 authorization/permissions checkpoint, refresh exact-head review
+   and CI on PR #48, merge it, and publish the 2.1.13 core release. Confirm the immutable tag,
+   plugin packages, and catalog digest against the published commit.
 2. In a fresh `Concertable/agents` worktree from `origin/main`, select the released `base`,
    `engineering`, and `machine@base-agents` alongside `concertable` in project settings. Then remove
    its duplicated hooks, ten agents in both host forms, and `persistent-workflow` skill. Preserve
