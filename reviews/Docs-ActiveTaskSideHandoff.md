@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `5ccafdc1428641bbae6ac5f23dea740645aa2a2f`  `(2026-09-27)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `b9ea7665c0e9054a92fc238c53d3f0665d1149ea`  `(2026-09-27)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-27 — full
 
@@ -25,3 +25,20 @@
 
 - [x] **R1 — MEDIUM — native-general** — `.agents/hooks/workflow_route.py:31`
   The side-workstream trigger did not recognize the requested “side thing; do a handoff” wording, so that explicit side task did not load the handoff workflow. Added that action and noun form with `test_side_thing_handoff_routes_with_the_requested_wording`.
+
+## Review pass — 2026-09-27 — incremental
+
+**Candidate base:** `5ccafdc1428641bbae6ac5f23dea740645aa2a2f`
+**Candidate head:** `b9ea7665c0e9054a92fc238c53d3f0665d1149ea`
+**Candidate branch:** `Docs/ActiveTaskSideHandoff`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:c61c571841c68be1f5941261b0cd87c42398e46a52871aea92388cd003b616ea` `(7 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\base-agents\.git\agent-workflow\runs\core-side-task-handoff-20260927\review\a97895ba1376bea209deb2fbd6fcd1fb017d50ef78230c3c9afc10a2d9d23731`
+**Candidate bundle identity:** `sha256:9cad5b6dd72e86775d951eaa1c10327869a1e53f150f8863043585959d570985`
+**Work-order path:** `reviews/Docs-ActiveTaskSideHandoff.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No findings.

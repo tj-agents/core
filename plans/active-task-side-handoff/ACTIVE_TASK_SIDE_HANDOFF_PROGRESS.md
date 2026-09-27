@@ -11,14 +11,14 @@
 
 ## Current state
 
-The first review completed at `5ccafdc1428641bbae6ac5f23dea740645aa2a2f` with one trigger-wording finding. Its repair is validated locally and awaits commit plus incremental review. The unrelated `shell/cr.ps1` change remains in the primary checkout and is not part of this branch. The existing `workflow_ops.py skills` recorder cannot resolve canonical kind paths; its active owner recorded that pre-existing defect, so this slice does not change it.
+Full review and its incremental remediation pass are approved through `b9ea7665c0e9054a92fc238c53d3f0665d1149ea`. The final review-record and ledger delta needs its own incremental pass before the candidate can be pushed. The unrelated `shell/cr.ps1` change remains in the primary checkout and is not part of this branch. The existing `workflow_ops.py skills` recorder cannot resolve canonical kind paths; its active owner recorded that pre-existing defect, so this slice does not change it.
 
 ## Next Steps
 
-Regenerate the repaired package output, commit the review finding repair, complete incremental review, then push and open the personal GitHub PR without merging.
+Commit the review completion and ledger transition, incrementally review that final documentation delta, then push and open the personal GitHub PR without merging.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: regenerate, commit, complete incremental review, push, and open the isolated documentation/workflow PR.
+Current slice: commit the review transition, complete the final incremental review, push, and open the isolated documentation/workflow PR.
 Remaining scope: PR review, explicit merge authorization, merge, and plan closeout.
 Done when: the behavior is merged to the default branch and its plan artifacts are closed out.
 
@@ -35,7 +35,7 @@ Done when: the behavior is merged to the default branch and its plan artifacts a
 
 ## Reviews
 
-- Full review completed at `5ccafdc1428641bbae6ac5f23dea740645aa2a2f` in `reviews/Docs-ActiveTaskSideHandoff.md`; R1 is resolved locally and needs incremental review after its commit.
+- Full review and incremental remediation review are approved through `b9ea7665c0e9054a92fc238c53d3f0665d1149ea` in `reviews/Docs-ActiveTaskSideHandoff.md`; the final review-record and ledger delta needs incremental review.
 
 ## Decisions, discoveries, blockers, and deviations
 
