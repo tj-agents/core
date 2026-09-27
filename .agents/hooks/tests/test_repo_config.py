@@ -99,7 +99,7 @@ class RepoConfigTests(unittest.TestCase):
             "required_skills": [], "path_scopes": [], "exceptions": [],
         })
         self.save_lock()
-        self.assertEqual(project_catalog, repo_config.bootstrap.catalog_for_lock(self.lock, SCRIPT))
+        self.assertEqual(project_catalog.resolve(), repo_config.bootstrap.catalog_for_lock(self.lock, SCRIPT))
         repo_config.run(self.lock, project_catalog, "write")
         claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
         self.assertEqual(
