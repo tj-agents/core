@@ -4,7 +4,7 @@ description: Create, inspect, or close one isolated git worktree so every in-fli
 
 kind: operation
 domain: process
-model: gpt-5.5
+model: gpt-6-luna
 ---
 
 # One checkout per in-flight branch

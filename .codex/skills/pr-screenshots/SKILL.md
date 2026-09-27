@@ -4,7 +4,7 @@ description: Capturing and attaching real visual evidence to a PR that touches U
 
 kind: contract
 domain: process
-model: gpt-5.6-luna
+model: gpt-6-luna
 ---
 
 # Visual evidence for a PR

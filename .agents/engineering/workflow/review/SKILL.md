@@ -24,7 +24,8 @@ defined by `review-lifecycle`.
   `high` and `max` broaden coverage and may retain lower-confidence findings when their uncertainty and
   concrete fix are explicit. With no value, reuse the last review effort.
 - No target means the current worktree's branch. A PR resolves its base, head branch, and head SHA through the
-  forge. A branch resolves from its default-branch merge base. A path scopes the current branch candidate.
+  forge. Resolve a branch's actual base from its open PR or owning stack map: the immediate parent for
+  a stack child, otherwise the trunk. A path scopes that same branch candidate.
 - `--comment` posts finalized findings to the target PR after the work order is complete.
 - `--fix` explicitly authorizes the combined review -> `address-review` -> `incremental-review` lifecycle.
   The same transition is authorized when this review is a stage of an implementation workflow whose original
@@ -41,8 +42,12 @@ remote base exactly once, immediately before this final review, while the worktr
 shared deterministic review preparation operation:
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id <id> review-prepare --base origin/main --head HEAD --synchronize
+python .agents/workflows/workflow_ops.py --workflow-run-id <id> review-prepare --base <actual-base> --head HEAD --synchronize
 ```
+
+Use the same resolved actual base for preparation, reconciliation and PR preflight. A stack child's
+review covers its layer against the parent; its tests still validate the cumulative tree. Do not merge
+main directly into each child as a substitute for reconciling the stack from its bottom.
 
 A review-only request over an already immutable remote or commit candidate omits `--synchronize`. The helper
 returns one compact descriptor and Git-private bundle containing the binary patch and NUL path manifest. It

@@ -4,7 +4,7 @@ description: Design or phase multi-step work and create or update its implementa
 
 kind: workflow
 domain: process
-lane: L3
+lane: L1
 ---
 
 # Author a durable plan
@@ -43,7 +43,10 @@ For a request to choose the next roadmap item, let the
    gather independent evidence; the parent owns design and scope.
 2. Apply the `plans` implementation-examples and standards contract. When phasing delivery, design
    independently shippable phases that each end green, with an exact consumption contract and verification
-   gate for every phase that exposes a capability.
+   gate for every phase that exposes a capability. Apply `engineering:git-branching` to map large phases
+   into reviewable PR slices before implementation: purpose, actual base/parent, dependencies, expected
+   size and verification. Prefer a stack for dependent slices. Do not equate one phase with one PR or
+   defer decomposition until the accumulated implementation is ready to merge.
 3. Write the owned artifact in the repository's current format. For a plan, create or update its compact
    ledger with its roadmap path and stable item key; the plan does not cite the roadmap. A standing reference
    keeps the bare-stem shape defined by `plans` and creates no competing phase owner.

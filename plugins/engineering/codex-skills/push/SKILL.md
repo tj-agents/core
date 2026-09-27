@@ -4,7 +4,7 @@ description: Push one stable substantive candidate and prove the remote actually
 
 kind: operation
 domain: process
-model: gpt-5.5
+model: gpt-6-luna
 ---
 
 # Pushing a verified head

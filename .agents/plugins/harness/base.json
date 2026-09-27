@@ -5,7 +5,7 @@
     ".agents/base"
   ],
   "source_excludes": [],
-  "source_digest": "sha256:9d1efa8240f7a7b56641e4b7329a85da10afda3beabd0931cc8939c32ba8248a",
+  "source_digest": "sha256:83ccebda187d30339237e80627dca607cc6a9666e348e43a21c487cd674238c7",
   "requires": {
     "marketplaces": [
       {

@@ -4,7 +4,7 @@ description: Implement an explicitly requested new or changed behavior from disc
 
 kind: workflow
 domain: process
-model: gpt-5.6-terra
+model: gpt-6-sol
 ---
 
 # Deliver a feature

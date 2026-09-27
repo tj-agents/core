@@ -3,18 +3,18 @@
   "digest_format": "sha256-tree-v1",
   "releases": [
     {
-      "id": "base-agents@2.1.13",
+      "id": "base-agents@2.1.16",
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "base-agents",
-      "revision": "v2.1.13",
-      "version": "2.1.13",
+      "revision": "v2.1.16",
+      "version": "2.1.16",
       "plugins": [
         {
           "id": "base-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "2.1.13",
+          "version": "2.1.16",
           "description": "Maintained plans and common agent behavior.",
           "status": "current",
           "platforms": [
@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:194228649f2f927810994de4755feea944cc5961377a88909f21cac6340fdacd",
+          "digest": "sha256:505bd28c50038189b6c874132b66ac2e03a6ff2d7ac4b825b468fe15d3efcb65",
           "harness": {
             "marketplaces": [
               {
@@ -95,7 +95,7 @@
           "id": "base-agents/engineering",
           "name": "engineering",
           "package_path": "plugins/engineering",
-          "version": "2.1.13",
+          "version": "2.1.16",
           "description": "Selected engineering workflows, reviews and Git operations.",
           "status": "current",
           "platforms": [
@@ -173,7 +173,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:3afbac71f6aad4b92bde5dbbea7bfed2a56f847432e9514ba334e20282ed56a0",
+          "digest": "sha256:88eb8c62a98566846a928e1956bb4fb0fb667f5996aaca6f72384fc38a8bc9a8",
           "harness": {
             "marketplaces": [
               {
@@ -287,7 +287,7 @@
           "id": "base-agents/machine",
           "name": "machine",
           "package_path": "plugins/machine",
-          "version": "2.1.13",
+          "version": "2.1.16",
           "description": "Explicit harness, history and clipboard utilities.",
           "status": "current",
           "platforms": [
@@ -323,7 +323,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:2d71dab807fa58537e078433dac41dadeaee1ae23ac2813c375abeb4f0a69df4",
+          "digest": "sha256:e106c166fb5227c274d2262cefa0bfa745ce431a02d130779e50839d108483a5",
           "digest_excludes": [
             "catalog/catalog.json"
           ],

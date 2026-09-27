@@ -1,6 +1,6 @@
 ---
 name: lane-l1
-description: Runs one delegated task at lane L1. Irreversible work with wide reach, where a mistake compounds beyond the repository.
+description: Runs one delegated task at lane L1. Plans and design decisions of any size, where the work decides how something should be built.
 kind: lane
 model: claude-fable-5
 effort: xhigh
