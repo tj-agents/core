@@ -50,7 +50,10 @@ class VerifyMachineTests(unittest.TestCase):
                 '[hooks.custom]\ncommand = "python hook.py"\n',
                 encoding="utf-8",
             )
-            self.assertEqual(1, len(verify_machine.audit(home)))
+            hooks = codex / "hooks"
+            hooks.mkdir()
+            (hooks / "local.py").write_text("", encoding="utf-8")
+            self.assertEqual(2, len(verify_machine.audit(home)))
 
 
 if __name__ == "__main__":

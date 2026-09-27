@@ -55,7 +55,10 @@ def audit(home: Path) -> list[str]:
                         findings.append(f"{codex}: user-scope [{section}]")
                 elif not section and ROOT_SETTING.match(line):
                     findings.append(f"{codex}: user-scope {line.split('=', 1)[0].strip()}")
-    for relative in (".codex/agents", ".codex/skills", ".claude/agents", ".claude/skills"):
+    for relative in (
+        ".codex/agents", ".codex/skills", ".codex/hooks",
+        ".claude/agents", ".claude/skills", ".claude/hooks",
+    ):
         directory = home / relative
         if directory.is_dir():
             try:
@@ -66,7 +69,7 @@ def audit(home: Path) -> list[str]:
             for child in children:
                 if child.name.startswith("."):
                     continue
-                findings.append(f"{child}: user-scope agent or skill")
+                findings.append(f"{child}: user-scope agent, skill, or hook")
     return findings
 
 
