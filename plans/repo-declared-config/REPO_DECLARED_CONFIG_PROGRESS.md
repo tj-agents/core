@@ -5,10 +5,10 @@
 - Roadmap item: `repo-declared-config/transitive-core`
 - Worktree: `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Feature-Repo-Declared-Config`
 - Branch: `Feature/Repo-Declared-Config`
-- Base: `origin/main` at `81b3340181c7f41e72035216c1243106c129df34`
+- Base: `origin/main` at `a7925eadfd7007e6923d1dbf4e13414ebfb9d648`
 - PR: not opened
 - Dependency/package gates: plugin-contained Codex dispatch needs native proof before migration.
-- Last reconciled: 2026-09-27; native-host evidence and focused audit/bootstrap tests.
+- Last reconciled: 2026-09-27; audit review complete, cold-start evidence and overlapping PR discovered.
 
 ## Authorization
 
@@ -21,13 +21,17 @@ review gate. The current request explicitly resumed this plan through its Next S
 ## Current state
 
 The September 26 plan, ledger and roadmap were carried from the main checkout into this fresh
-delivery worktree. It is now the sole live owner. The original sandbox-only scope was reconciled
+delivery worktree. It owns this audit and host investigation. Another migration owner was discovered
+in PR #48; ownership of the shared plan and bootstrap generator needs reconciliation before
+publishing further migration changes. The original sandbox-only scope was reconciled
 with the newer winwrap and Concertable authorization.
 
 `bootstrap_capabilities.py --mode audit` is implemented with focused tests and skill documentation.
 It reads user plugin/marketplace declarations, user skills/agents, repository Codex agents and local
 marketplace overrides, including Claude local settings. It performs no installation or cleanup.
-Package generation and the repository Python suite passed; review and publication remain.
+Package generation and all 200 repository Python tests passed. The audit was committed as
+`982eeb3e8aeb9883ce5cad71f941154b575b610c`; synchronization with main produced reviewed head
+`93fd8054385e561b34a99f69b4db4d71d7247e1c`. Publication remains pending ownership reconciliation.
 
 No normal machine configuration or consumer repository was changed. Migration and self-heal
 have not been implemented. The audit does not supply the separate plugin-write prevention guard.
@@ -42,7 +46,9 @@ Domain catalogs can enumerate core packages, but cannot make the native agent lo
 A real isolated Codex `exec` successfully consumed core's L7 role via per-invocation developer
 instructions/model/effort, with no profile config or agent files. A plugin-contained dispatcher is
 therefore viable; its integration and repository-only plugin activation still need implementation
-and proof. Native registration is not an added user requirement.
+and proof. Native registration is not an added user requirement. Explicit repository plugin
+enablement still left the Codex fixture uninstalled after native thread startup; its skill was
+absent. The initial domain-plugin installation boundary remains unresolved.
 
 ## Machine inventory
 
@@ -59,6 +65,27 @@ Read-only audit on this PC reported:
 Raw reports are in ignored `.machine-audit-codex.tmp` and `.machine-audit-claude.tmp` in this
 worktree. Counts describe entries, not skill/role totals.
 
+## Earlier machine record
+
+The September 23 ledger described a separate checkout under `C:\Users\tommy`: all four
+canonical repositories were present; an older `base-agents` checkout was 87 commits behind with
+uncommitted plan-artifact changes and live worktrees. Claude had interim user-scope core installs,
+stale domain sources, and auto-mode environment text naming Concertable globally. Codex used
+profile-installed shared agents. That machine has not been reverified or marked converged. Retain
+its old checkout until its work is preserved, and include the product-specific environment text
+in eventual cleanup; the new audit does not inspect arbitrary environment values.
+
+## Concurrent migration ownership
+
+[PR #48](https://github.com/tj-agents/core/pull/48), branch
+`Refactor/RepoDeclaredConfigHarnessMove`, was discovered during preflight. At inspected head
+`fe46ff642d044fd4b5fca99e66904e0b2b36c504`, it ports shared hooks and adds a `repo_config.py`
+generator under the same bootstrap skill, with a 2.1.13 release candidate. It also changes this
+plan, ledger and roadmap. Its description requires consumers to name core's three plugins,
+which conflicts with this session's newer domain-only authorization. Do not silently adopt that
+policy or rewrite the other branch. Tommy was asked whether that session remains the owner or
+this session should consolidate the migration. Audit code and host evidence remain preserved here.
+
 ## Concertable inventory
 
 `Concertable/agents` was on `Fix/StandardsCurrencyAutoRefresh`, seven commits ahead of its tracking
@@ -74,7 +101,9 @@ during adoption. Core's separate hook activation work has now merged as PR #46.
 - 11 audit tests passed: read-only behavior, sanitized errors, disabled plugin detection,
   local source detection and CLI exit status.
 - 31 existing capability-bootstrap tests passed.
-- The full repository Python test suite passed after synchronization with PR #46.
+- All 200 repository Python tests passed after synchronization with PR #46.
+- PowerShell skill packaging tests passed; generated-file and paired AGENTS/CLAUDE checks
+  also passed after synchronization with PR #47.
 - Generated package and catalog checks passed.
 - Native Claude fixture installation and component inventory succeeded; no model-session acceptance
   or Codex replacement delivery has been claimed.
@@ -83,19 +112,25 @@ during adoption. Core's separate hook activation work has now merged as PR #46.
 
 ## Reviews
 
-Pending immutable candidate review after generation and remaining validation.
+`reviews/Feature-Repo-Declared-Config.md` records approval at
+`93fd8054385e561b34a99f69b4db4d71d7247e1c`, with no actionable findings. Both configured review
+agents were unavailable because their Spark model is unsupported for this account; the parent
+completed both frozen lenses under the workflow fallback. The merge gate identified no
+security-sensitive changed path. Later checkpoint-only documentation updates need incremental
+review before publication.
 
 ## Next Steps
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: finish generation, validation, review and authorized delivery of the read-only audit.
+Current slice: reconcile ownership with PR #48 before publishing the completed read-only audit.
 Remaining scope: native delivery gate, domain dependencies, Concertable deduplication, generator,
 consumer adoption, self-heal, machine cleanup, plugin-write guard and per-machine acceptance.
 Done when: authorized consumers load domain and core capabilities transitively in both hosts,
 machine-local behavior is removed after acceptance, guards pass and delivery gates complete.
 
-1. Generate packages and catalog digests, run required checks, commit and independently review the
-   audit candidate. Open its PR and own validation through the authorized repository delivery gate.
+1. Resolve the requested ownership clarification for PR #48, then consolidate compatible source
+   and plan changes without losing the domain-only requirement or the other owner’s work. Review
+   the checkpoint documentation delta and publish the independent audit through the selected owner.
 2. Prove a plugin-contained dispatcher using supported per-run Codex arguments and core's semantic
    role/lane definitions. The plan anticipated unsupported native plugin agents; native registration
    is not an added requirement. Keep ownership and investigate this adapter inside core before any

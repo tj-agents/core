@@ -89,8 +89,24 @@ Additional fixture probes found:
   the domain plugin with `dependency-unsatisfied`. A cache entry alone is insufficient.
 - Codex read repository marketplace configuration after native project trust was set. Its
   app-server discovered a fixture plugin marked `INSTALLED_BY_DEFAULT`, but after `thread/start`
-  it remained uninstalled and disabled. The fixture had no explicit domain plugin enablement;
-  that is the next case to test. Home-only plugin CLI listing was not a repository-load proof.
+  it remained uninstalled and disabled. Adding an explicit domain plugin enablement changed
+  the result to `enabled=true`, `installed=false`; `skills/list` still omitted the fixture skill.
+  The profile held only native project trust, no plugin or marketplace tables. Home-only plugin
+  CLI listing was not a repository-load proof.
 
 Do not conclude that these observations rule out a generated domain bundle or plugin-contained
 adapter. The original authorization requires investigating those paths inside the marketplace owners.
+
+## Installation boundary (2026-09-27)
+
+The exact release's [plugin CLI implementation](https://raw.githubusercontent.com/openai/codex/rust-v0.157.0/codex-rs/cli/src/plugin_cmd.rs)
+separates listing from explicit `install_plugin` calls. `INSTALLED_BY_DEFAULT` is installation
+policy metadata; it does not materialize an arbitrary repository-declared Git plugin at thread
+startup. Native installation changes profile plugin state. No project-scoped install option was
+found in the inspected CLI or app-server contract.
+
+The successful per-invocation role proof therefore resolves role transport only. A fully cold
+repository session still needs a supported way to install its declared domain plugin before any
+plugin-owned hook or dispatcher can run. Existing cached installs must not be mistaken for this
+cold-start acceptance. Domain package composition can address transitive payload delivery, but
+cannot itself execute before that domain plugin has been materialized.
