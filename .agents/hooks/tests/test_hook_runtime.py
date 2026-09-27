@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,16 @@ class DuplicateRegistrationTests(unittest.TestCase):
         }
 
     def test_duplicate_skill_router_registration_blocks_once(self):
+        plugin = self.root / "installed-plugin"
+        hooks = plugin / "hooks"
+        hooks.mkdir(parents=True)
+        for source in (SKILL_ROUTER, HOOK_ROOT / "hook_runtime.py"):
+            shutil.copy2(source, hooks / source.name)
+        skill = plugin / "skills" / "git-branching"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            "---\nname: git-branching\ndescription: Branch rules.\n---\n", encoding="utf-8"
+        )
         (self.root / ".agents" / "skill-routes.json").write_text(
             json.dumps({"routes": [{"path": r"\.cs$", "skills": ["git-branching"]}]}),
             encoding="utf-8",
@@ -181,12 +192,13 @@ class DuplicateRegistrationTests(unittest.TestCase):
         )
         environment = os.environ.copy()
         environment["AGENT_STANDARDS_STATE_DIRECTORY"] = str(state)
+        environment["PLUGIN_ROOT"] = str(plugin)
 
-        first = self.run_hook(SKILL_ROUTER, payload, environment)
-        second = self.run_hook(SKILL_ROUTER, payload, environment)
+        first = self.run_hook(hooks / "skill_router.py", payload, environment)
+        second = self.run_hook(hooks / "skill_router.py", payload, environment)
 
-        self.assertEqual(2, first.returncode)
-        self.assertEqual(0, second.returncode)
+        self.assertEqual(2, first.returncode, first.stdout + first.stderr)
+        self.assertEqual(0, second.returncode, second.stdout + second.stderr)
         self.assertEqual("", second.stderr)
 
     def test_duplicate_merge_gate_registration_blocks_once(self):

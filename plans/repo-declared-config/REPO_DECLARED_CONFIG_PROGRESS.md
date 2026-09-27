@@ -7,7 +7,9 @@ Status: phase 1 in progress; full repo-declared migration remains open (2026-09-
 
 Branch: `Refactor/RepoDeclaredConfigHarnessMove`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
-PR: none yet.
+PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48), draft. First Windows CI
+failed because a duplicate-router fixture relied on the developer machine's installed skill;
+it now constructs its own plugin. Binding reports no standing merge authorization.
 
 ## Current state (2026-09-26)
 
