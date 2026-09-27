@@ -7,11 +7,10 @@ Status: phase 1 in progress; full repo-declared migration remains open (2026-09-
 
 Branch: `Refactor/RepoDeclaredConfigHarnessMove`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
-PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48), ready and mergeable.
-CI `verify` passed at `284d014` (run `36318559193`); review watermark matches that head.
-Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27; the
-authorization checkpoint below requires a fresh exact-head review and CI run. `v2.1.13`
-remains unpublished.
+PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48), being reconciled with current main.
+CI `verify` passed at the prior remote head `284d014` (run `36318559193`); new review and CI are pending.
+Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27. Main has
+published `v2.1.15`; this branch now targets the unpublished `v2.1.16` candidate.
 
 ## Current state (2026-09-27)
 
@@ -145,7 +144,7 @@ moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
 Current slice: implement the declared harness manifests, permission composition and enforcement
-on the 2.1.13 core candidate with core-only release ownership; then re-review and push PR #48.
+on the 2.1.16 core candidate with core-only release ownership; then re-review and push PR #48.
 Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before publishing the
 core-only bundled catalog, so existing consumers do not lose their non-core selections.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
