@@ -31,9 +31,9 @@ closure.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines this source/adapter/distribution boundary.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared open taxonomy used by every agent marketplace repo.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
-- `.agents/catalog/catalog.json` records immutable cross-repository releases and package digests. The generated
-  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index; project selections live in one
-  `.agents/capabilities.lock.json` governed by the shipped lock schema.
+- `.agents/catalog/catalog.json` records this repository's immutable releases and package digests. The generated
+  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers selecting other standards
+  commit a composed catalog of owner-published release records beside their capability lock.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.

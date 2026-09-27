@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "plugin": "base-agents/machine",
+  "source_roots": [
+    ".agents/machine"
+  ],
+  "source_excludes": [
+    ".agents/catalog/catalog.json"
+  ],
+  "source_digest": "sha256:840dd34304571938431281ecfbdfca6a113cb8be28f436b0307dccae03d4d595",
+  "requires": {
+    "marketplaces": [
+      {
+        "id": "base-agents",
+        "repository": "tj-agents/core"
+      }
+    ],
+    "plugins": [
+      "base-agents/base",
+      "base-agents/machine"
+    ],
+    "hooks": [
+      {
+        "path": ".agents/machine/peer-cli/scripts/register_session.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "resources/machine/scripts/prune_plugin_cache.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "resources/machine/scripts/reap_orphans.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      }
+    ],
+    "permissions": {
+      "claude_allow": [
+        "PowerShell(& *\\handoff-codex\\scripts\\launch-codex.ps1 *)",
+        "PowerShell(& *\\handoff-claude\\scripts\\launch-claude.ps1 *)"
+      ],
+      "codex_prefix_rules": []
+    }
+  }
+}

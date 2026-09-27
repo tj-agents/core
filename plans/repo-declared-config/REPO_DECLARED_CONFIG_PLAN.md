@@ -41,8 +41,9 @@ or notification settings. A plugin refresh must not break hooks already loaded b
 2. **Generated repo config.** A core generator reads a repository's `.agents/` profile and
    routes and writes its `.claude/settings.json` (`extraKnownMarketplaces` with GitHub sources
    plus `enabledPlugins`, always including core) and `.codex/config.toml` (same, no local
-   sources). Consumer CI fails when these drift from the generator. Child marketplaces (cpp,
-   react, dotagents) always pull in core.
+   sources). Consumer CI fails when these drift from the generator. Each standards repository
+   publishes its own release catalog and harness requirements; consumers commit a composed
+   catalog covering the plugins they select.
 3. **Self-heal.** When a route's skill is missing, stale or not loaded, core's hook updates the
    declared GitHub marketplace, installs the pinned release, injects the skill's `SKILL.md`
    through hook output and records that as the session proof, so no restart is needed.
@@ -151,7 +152,11 @@ Adding or changing a skill, workflow, hook, host
 adapter, or package resource therefore makes `sync_harness_manifests.py --check` fail until the
 same change refreshes the declaration. The validator also proves every declared hook is wired by
 both host manifests where its `hosts` list requires that, every required plugin exists in the
-catalog, and every marketplace repository is one of the four `tj-agents` sources.
+catalog, and every marketplace repository matches its own release owner and GitHub source.
+Core's authored catalog contains only core releases; each other standards repository maintains
+its own release records and digest sync. A consumer combines the selected owner catalogs in
+its committed `.agents/catalog/catalog.json`, passed to the generic bootstrap and config generator.
+Core must not carry a roster, source map, or digest ledger for another standards repository.
 
 `repo_config.py` reads the selected catalog plugins, unions their `requires` objects, and fails if
 the committed capability lock omits a required plugin. It owns these generated fields and files:
@@ -205,13 +210,13 @@ the generated ones. Confirm in a real session that a project-scope allow rule sa
 auto-mode classifier; if it does not, record the limitation and the minimal user-scope
 remainder instead of claiming the machine is clean.
 
-## Marketplaces come only from tj-agents
+## Marketplace declarations belong to their owners
 
-The canonical repositories are `tj-agents/core`, `tj-agents/cpp`, `tj-agents/react` and
-`tj-agents/dotnet`. Every marketplace a generated repository config references must use one of
-these GitHub sources; the generator refuses any other source and consumer CI checks it.
-Marketplace IDs stay stable (`base-agents`, `cpp-agents`, `react-agents`, `dotagents`), so
-existing installs keep resolving; only the source changes.
+Each standards repository publishes its own release identity, GitHub source, package digests,
+and harness requirements. Core publishes only `base-agents`. A consuming repository commits
+the release records for its selected standards in `.agents/catalog/catalog.json` and checks
+that catalog alongside its lock and generated host settings. The generic generator validates
+that each source matches its release owner; it contains no list of other repositories.
 
 Stale sources observed on this PC (2026-09-23): `tomjseery/dotagents`, `tomjseery/react-agents`
 and `Concertable/agent-standards` in `~/.claude/settings.json`; `tj-agents/core` was not
