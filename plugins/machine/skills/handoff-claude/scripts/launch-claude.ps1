@@ -15,8 +15,6 @@ param(
 
     [switch] $Frontier,
 
-    [switch] $UserAuthorizedLane,
-
     [switch] $DangerouslySkipPermissions
 )
 
@@ -54,12 +52,14 @@ if ($DangerouslySkipPermissions) {
 if ($Frontier -and ($Lane -or $Model)) {
     throw '-Frontier rejects -Lane and -Model beside it: the frontier tier is an explicit user request, not one selection among several.'
 }
+$tier = ''
 if ($Frontier) {
     $Model = (Resolve-AgentLaneModel -Frontier -Harness 'claude').Model
+    $tier = 'frontier -> '
 }
-elseif ($Lane) {
-    $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'claude' -UserAuthorized:$UserAuthorizedLane
-    if (-not $Model) { $Model = $laneModel.Model }
+elseif (-not $Model -and $Lane) {
+    $Model = (Resolve-AgentLaneModel -Lane $Lane -Harness 'claude').Model
+    $tier = "lane $Lane -> "
 }
 
 if ($Model) {
@@ -80,4 +80,5 @@ Invoke-AgentTerminalTab `
     -Arguments $arguments `
     -ForceEnvironment @{ FORCE_COLOR = '1'; TERM = 'xterm-256color' }
 
-Write-Host "Launched claude handoff tab '$Title' in $resolvedWorkingDirectory with prompt $resolvedPromptPath"
+$selection = if ($Model) { "$tier$Model" } else { 'the CLI default model' }
+Write-Host "Launched claude handoff tab '$Title' in $resolvedWorkingDirectory on $selection with prompt $resolvedPromptPath"

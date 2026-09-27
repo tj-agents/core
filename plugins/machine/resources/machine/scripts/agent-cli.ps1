@@ -146,8 +146,7 @@ function Invoke-AgentTerminalTab {
 # Resolution never picks the lane: a caller that supplies neither -Lane nor -Model gets the CLI's own
 # configured default, because guessing a lane from a prompt is how an expensive model ends up serving a
 # rename. -Frontier resolves the tier above the ladder, which no lane resolves to: its selection is the
-# user's explicit request, never task shape. A rung the table marks requires_user_authorization resolves
-# only with -UserAuthorized, the same provenance: a model that judged its own job critical cannot reach it.
+# user's explicit request, never task shape.
 function Resolve-AgentLaneModel {
     [CmdletBinding()]
     param(
@@ -157,9 +156,7 @@ function Resolve-AgentLaneModel {
 
         [string] $Lane,
 
-        [switch] $Frontier,
-
-        [switch] $UserAuthorized
+        [switch] $Frontier
     )
 
     if (-not $Lane -and -not $Frontier) { throw 'Resolve-AgentLaneModel needs a -Lane or -Frontier.' }
@@ -176,9 +173,6 @@ function Resolve-AgentLaneModel {
         $known = @($table.lanes.PSObject.Properties.Name) -join ' '
         $asked = if ($Frontier) { 'the frontier tier' } else { "lane '$Lane'" }
         throw "The $Harness lane table at $tablePath does not price $asked; it has $known."
-    }
-    if (-not $Frontier -and $entry.requires_user_authorization -and -not $UserAuthorized) {
-        throw "Lane $Lane is reserved for critical design decisions and needs the user's explicit authorization (-UserAuthorizedLane). A merge, push or publish at the end of a job never raises its lane."
     }
 
     $effortKey = if ($table.effort_key) { $table.effort_key } else { 'effort' }
