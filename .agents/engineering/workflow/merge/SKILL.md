@@ -102,9 +102,9 @@ required review and checks. A green persistent-delivery action alone does not ov
   git rev-list --left-right --count <actual-base>...HEAD   # -> "<behind-base>	<ahead>"
   ```
 
-  Before final review, behind by anything means merge base in with exactly
-  `git -C "<absolute-worktree>" merge --no-edit origin/<default>`, rebuild the affected scope, push, freeze the
-  candidate, and review. After the review watermark exists, run `workflow_ops.py review-reconcile` against
+  Before final review, reconcile any movement in the actual base, rebuild the affected scope, push,
+  freeze the candidate, and review. A standalone branch may merge `origin/<default>`; a stack child
+  follows the verified restacking procedure against its immediate parent. After the review watermark exists, run `workflow_ops.py review-reconcile` against
   its descriptor. Disjoint base-only movement preserves the exact reviewed head and proceeds to merge-group
   validation. Relevant movement, including a platform pin or routed rule change, requires an update, focused
   validation, push, and incremental review.
@@ -206,8 +206,9 @@ unchanged observations remain silent and never create a model turn or user-facin
 Before removing persistent state, inspect the completed delivery binding. A standalone PR removes its
 continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
 the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
-stage creates the successor worktree and PR before the same task is rebound to its exact head and runs. Never
-carry the completed PR's review watermark or merge authorization into the successor.
+stage reconciles an existing successor layer or creates its worktree and PR when none exists, before
+rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
+watermark or merge authorization into the successor.
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
 remove that path. Move it to the fetched remote default before closing any linked worktree:
