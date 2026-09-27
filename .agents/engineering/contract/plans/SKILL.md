@@ -98,6 +98,19 @@ service — to a named later phase or plan; you may **never** defer the *output 
 undecided output is not a shippable phase: it cannot be named, typed, or tested against a consumer, and the
 gap resurfaces downstream as naming churn over a thing whose job was never fixed.
 
+## Delivery slices within a phase
+
+A phase can require several PRs. Apply `engineering:git-branching` before implementing or expanding a
+large change; its split assessment and atomicity exceptions govern the delivery map. Record each PR
+slice's purpose, included code/tests, base or parent, dependency, size estimate and validation gate.
+Dependent slices default to a stack; independent slices start from the remote default. Keep a single
+goal and one current ledger, with branch/PR links and exact base/head SHAs as the stack materializes.
+
+Review a child against its actual parent while validating the cumulative tree. Reconcile descendants
+after parent changes. After a lower PR lands, continue from the reconciled next layer rather than
+starting a duplicate slice from main. Every landed state must work; never separate tests or security
+repairs from the behavior they are required to qualify merely to meet a line budget.
+
 ## Implementation examples and their standards
 
 **Mechanism clauses carry code.** Whenever prose leaves an implementation choice open, give concrete code

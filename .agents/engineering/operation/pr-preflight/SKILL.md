@@ -41,11 +41,13 @@ index, or any branch.
 Run the deterministic local pass once:
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id <id> delivery-preflight --descriptor <review-descriptor> --base origin/main
+python .agents/workflows/workflow_ops.py --workflow-run-id <id> delivery-preflight --descriptor <review-descriptor> --base <actual-base>
 ```
 
 It returns branch and exact-head identity, upstream and base currency, code versus documentation dirtiness,
 review reconciliation, and every local blocker. Do not reconstruct those fields with separate shell calls.
+Resolve `<actual-base>` from the intended PR target: the stack parent for a child, otherwise the trunk.
+The local runtime pass does not establish the delivery-slice assessment below; check that separately.
 
 1. **On a real feature branch.**
 
@@ -107,6 +109,12 @@ review reconciliation, and every local blocker. Do not reconstruct those fields 
    invariant checks, the smallest affected build, and focused unit tests. **Do not run a full solution build
    or integration matrix here** — exact-head PR CI owns those, per
    `engineering:remote-validation`.
+
+9. **A reviewable delivery slice.** Apply `engineering:git-branching` to the measured diff against the
+   actual PR base. An oversized or multi-concern candidate without a recorded split assessment and
+   justified atomic exception is a blocker: decompose and validate it before adding scope or requesting
+   final review. For a stack, verify parent/base/head identities, the layer's scope, and CI/protection
+   coverage. A green top-of-stack build does not establish that lower layers can land independently.
 
 ## Verdict
 
