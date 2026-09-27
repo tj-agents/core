@@ -28,14 +28,15 @@ identical behaviour.
    agents, and self-heal. Core's `engineering` package already ships the router, the gates and
    the agents; `concertable@agent-standards` (`Concertable/agent-standards`,
    `plugins/concertable`) carries duplicates of them. Retire those duplicates so concertable keeps
-   only Concertable-product skills and rules. Order: the Concertable repository first enables
-   core plus concertable in its own project settings, then the duplicates are deleted, so it is
-   never without lanes or gates.
+   only Concertable-product skills and rules. Order: the Concertable repositories first declare
+   the concertable marketplace (which depends on core), then the duplicates are deleted, so
+   they are never without lanes or gates.
 2. **Generated repo config.** A core generator reads a repository's `.agents/` profile and
-   routes and writes its `.claude/settings.json` (`extraKnownMarketplaces` with GitHub sources
-   plus `enabledPlugins`, always including core) and `.codex/config.toml` (same, no local
-   sources). Consumer CI fails when these drift from the generator. Child marketplaces (cpp,
-   react, dotagents) always pull in core.
+   routes and writes its `.claude/settings.json` and `.codex/config.toml` declaring only the
+   repository's domain marketplace (GitHub sources, no local sources). A repository never names
+   core, lanes or core's agents directly: every child marketplace (cpp, react, dotagents,
+   concertable) depends on core, so core arrives transitively. Consumer CI fails when these
+   drift from the generator.
 3. **Self-heal.** When a route's skill is missing, stale or not loaded, core's hook updates the
    declared GitHub marketplace, installs the pinned release, injects the skill's `SKILL.md`
    through hook output and records that as the session proof, so no restart is needed.
@@ -57,9 +58,10 @@ identical behaviour.
 
 ## Marketplaces come only from tj-agents
 
-The canonical repositories are `tj-agents/core`, `tj-agents/cpp`, `tj-agents/react` and
-`tj-agents/dotnet`. Every marketplace a generated repository config references must use one of
-these GitHub sources; the generator refuses any other source and consumer CI checks it.
+The generic canonical repositories are `tj-agents/core`, `tj-agents/cpp`, `tj-agents/react` and
+`tj-agents/dotnet`. The September 26 authorization additionally selects `Concertable/agents`
+only for Concertable consumers. Generated repository configuration uses its domain's GitHub
+source; the generator refuses other sources and consumer CI checks it.
 Marketplace IDs stay stable (`base-agents`, `cpp-agents`, `react-agents`, `dotagents`), so
 existing installs keep resolving; only the source changes.
 
@@ -95,24 +97,53 @@ plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md and do what the ledg
 
 ## Scope of this plan
 
-Adoption is **`sandbox-hwid` only**. Other consumers (cpp-agents, the Concertable repository,
-dotagents, react-agents, winwrap, note-cli, icon-dropper, wifi-toggle) are follow-ups, adopted
-one at a time after this plan closes. Concertable must move `concertable@agent-standards` to
-project scope before user-scope removal on any machine that works on it.
+The September 26 authorization supersedes the original sandbox-only adoption scope. Adopt
+`cpp/windows/{winwrap,sandbox-hwid}` and the Concertable repositories. The cpp, react, dotnet
+and Concertable marketplaces must supply core transitively. Other product consumers remain
+follow-ups. Remove machine settings only after replacement delivery passes native-host tests.
+
+## Independent audit implementation
+
+Extend the existing `bootstrap_capabilities.py` entry point with `--mode audit`. It accepts
+the existing required `--harness` and `--profile`, plus repeatable `--repository` paths, and
+requires no lock, catalog, network or host CLI. Existing preview/apply/verify retain their
+lock requirement. Audit parses Claude JSON or Codex TOML, reports user plugin/marketplace
+settings, user-authored skills and agents, repository agent copies and local marketplace
+overrides. Host-provided `.system` skills and downloaded plugin caches are derived state.
+Malformed or unreadable inputs fail explicitly without returning their contents. Audit never
+repairs or deletes anything; `--report` is the sole optional write.
+
+The deciding entry-point branch is:
+
+```python
+report = audit_configuration(arguments) if arguments.mode == "audit" else execute(arguments)
+```
+
+Reports use the existing JSON envelope with `findings` containing diagnostic code, path and
+setting name, never setting values. Exit zero means no findings; findings or read errors exit
+one. Tests use isolated profiles to prove read-only behavior, rejection of malformed settings,
+detection of disabled as well as enabled plugin entries, and preservation of bootstrap modes.
+This audit can ship while transitive loading is being established; it does not satisfy the
+separate plugin-write prevention or migration acceptance gates.
 
 ## Acceptance, for Claude and Codex each
 
-1. With empty user plugin config, cloning `sandbox-hwid` and starting a session yields the
-   declared plugins, and a C++ write succeeds.
+1. With empty user plugin config, sessions in winwrap, sandbox-hwid and the adopted Concertable
+   repositories load their domain and core's skills, hooks and agents transitively. A routed
+   write succeeds in a C++ consumer and a Concertable consumer.
 2. Uninstalling a route's plugin mid-session, then writing, succeeds after one logged repair
    with no restart (or, for a host that cannot inject, one SessionStart repair and a plain
    notice).
-3. A `sandbox-hwid` session loads no Concertable skills or hooks.
+3. Sessions in winwrap and sandbox-hwid load no Concertable skills or hooks.
 4. The machine verifier reports no machine-local behavioural state on this PC.
 
 ## Phases
 
-1. Move the generic harness hooks into core; release.
+0. Prove transitive delivery in the installed hosts before consumer changes or cleanup.
+1. Port missing generic harness behavior to core, adopt Concertable declarations, retire its
+   duplicate generic delivery, routing and gates; release.
 2. Repo-config generator and consumer drift check; release.
 3. Self-heal in the router and SessionStart for both hosts; release.
-4. Adopt in `sandbox-hwid`; clean this PC; run acceptance.
+4. Adopt the authorized consumers; back up and clean this PC; run acceptance and the audit.
+5. Enforce absence of repository agent writes and user-scope plugin enablement. Keep per-machine
+   migration open until each available machine is verified, recording unavailable machines.

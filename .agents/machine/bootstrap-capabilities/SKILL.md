@@ -1,6 +1,6 @@
 ---
 name: bootstrap-capabilities
-description: Preview, apply or verify an exact project capability lock in an isolated Codex or Claude profile. Use when installing the repository's selected agent plugins, checking a reproducible installation, or diagnosing lock/catalog drift.
+description: Preview, apply or verify an exact project capability lock, or audit a Codex or Claude profile for machine-local agent configuration. Use when installing selected plugins, checking reproducibility, or diagnosing configuration drift.
 
 kind: utility
 domain: machine
@@ -32,6 +32,22 @@ The modes have deliberately different authority:
   marketplace, plugin or setting.
 - `verify` is offline-safe. It does not fetch, install, update or refresh. It verifies checkout commits, package
   digests, completed managed state, and the host's installed versions and package digests, then emits a report.
+- `audit` reads one host profile and optional repositories without a lock, catalog or host CLI. It reports
+  user plugin/marketplace settings, user agents and skills, repository Codex agent files, and local marketplace
+  overrides. Disabled and empty user plugin tables also count. Codex's host-provided `skills/.system` and plugin
+  caches are excluded. Model preferences, credentials and unrelated settings are outside this audit.
+
+```powershell
+python -B '<skill-directory>\scripts\bootstrap_capabilities.py' `
+  --mode audit --harness codex --profile C:\path\to\codex-home `
+  --repository C:\path\to\project
+```
+
+Repeat `--repository` for additional consumers and run separately with `--harness claude` for its profile.
+Codex TOML auditing requires Python 3.11 or newer. Findings contain paths and setting names, never values.
+Exit zero means no findings; drift, malformed files or unreadable inputs exit nonzero. Audit never changes
+settings or installs packages. `--report` explicitly writes a JSON report. This is an inventory check;
+it does not prove native-host loading or prevent arbitrary plugin code from writing files.
 
 The bootstrap uses argument arrays for Git and host CLIs. A failed operation leaves completed checkouts and
 host registrations in place and records the failing step; rerunning `apply` resumes from observable state.

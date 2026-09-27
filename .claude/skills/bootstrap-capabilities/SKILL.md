@@ -1,6 +1,6 @@
 ---
 name: bootstrap-capabilities
-description: Preview, apply or verify an exact project capability lock in an isolated Codex or Claude profile. Use when installing the repository's selected agent plugins, checking a reproducible installation, or diagnosing lock/catalog drift.
+description: Preview, apply or verify an exact project capability lock, or audit a Codex or Claude profile for machine-local agent configuration. Use when installing selected plugins, checking reproducibility, or diagnosing configuration drift.
 
 kind: utility
 domain: machine

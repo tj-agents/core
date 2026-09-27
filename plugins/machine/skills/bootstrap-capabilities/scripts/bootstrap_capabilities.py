@@ -1042,21 +1042,143 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
         raise BootstrapRunError(report) from error
 
 
+def audit_settings(path: Path) -> dict[str, Any]:
+    try:
+        contents = path.read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeError) as error:
+        raise BootstrapError(f"Cannot read configuration at {path} ({type(error).__name__})") from error
+    if path.suffix == ".toml":
+        try:
+            import tomllib
+        except ImportError as error:
+            raise BootstrapError("Codex configuration audit requires Python 3.11 or newer") from error
+        try:
+            value = tomllib.loads(contents)
+        except tomllib.TOMLDecodeError as error:
+            raise BootstrapError(f"Invalid TOML configuration at {path}") from error
+    else:
+        try:
+            value = json.loads(contents)
+        except json.JSONDecodeError as error:
+            raise BootstrapError(f"Invalid JSON configuration at {path}") from error
+    if not isinstance(value, dict):
+        raise BootstrapError(f"Expected a configuration object at {path}")
+    return value
+
+
+def audit_directory(path: Path, excluded: tuple[str, ...] = ()) -> list[Path]:
+    try:
+        if path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction()):
+            return [path]
+        return sorted((entry for entry in path.iterdir() if entry.name not in excluded), key=str)
+    except FileNotFoundError:
+        return []
+    except OSError as error:
+        raise BootstrapError(f"Cannot inspect configuration directory at {path} ({type(error).__name__})") from error
+
+
+def audit_configuration(arguments: argparse.Namespace) -> dict[str, Any]:
+    profile = arguments.profile.expanduser().resolve()
+    if not profile.is_dir():
+        raise BootstrapError(f"Profile directory does not exist: {profile}")
+    harness = arguments.harness
+    settings_name = "config.toml" if harness == "codex" else "settings.json"
+    settings_path = profile / settings_name
+    settings = audit_settings(settings_path)
+    findings: list[dict[str, str]] = []
+
+    def finding(code: str, path: Path, setting: str) -> None:
+        findings.append({"code": code, "path": str(path), "setting": setting})
+
+    def profile_settings(value: dict[str, Any], prefix: str = "") -> None:
+        keys = ("plugins", "marketplaces", "agents") if harness == "codex" else (
+            "enabledPlugins", "extraKnownMarketplaces"
+        )
+        for key in keys:
+            if key in value:
+                finding("user-scope-configuration", settings_path, prefix + key)
+        if harness == "codex" and "profiles" in value:
+            profiles = value["profiles"]
+            if not isinstance(profiles, dict) or any(not isinstance(item, dict) for item in profiles.values()):
+                raise BootstrapError(f"Expected profile tables at {settings_path}")
+            for name, item in sorted(profiles.items()):
+                profile_settings(item, f"{prefix}profiles.{name}.")
+
+    profile_settings(settings)
+    for name in ("agents", "skills"):
+        excluded = (".system",) if harness == "codex" and name == "skills" else ()
+        for path in audit_directory(profile / name, excluded):
+            finding("user-scope-files", path, name)
+
+    repositories = sorted({path.expanduser().resolve() for path in arguments.repository}, key=str)
+    for repository in repositories:
+        if not repository.is_dir():
+            raise BootstrapError(f"Repository directory does not exist: {repository}")
+        if harness == "codex":
+            for path in audit_directory(repository / ".codex/agents"):
+                finding("repository-agent-files", path, ".codex/agents")
+        filenames = (settings_name,) if harness == "codex" else (settings_name, "settings.local.json")
+        for filename in filenames:
+            config_path = repository / f".{harness}" / filename
+            config = audit_settings(config_path)
+            key = "marketplaces" if harness == "codex" else "extraKnownMarketplaces"
+            marketplaces = config.get(key, {})
+            if not isinstance(marketplaces, dict):
+                raise BootstrapError(f"Expected marketplace tables at {config_path}")
+            for name, entry in sorted(marketplaces.items()):
+                if not isinstance(entry, dict):
+                    raise BootstrapError(f"Expected a marketplace object at {config_path}")
+                source = entry if harness == "codex" else entry.get("source", {})
+                if not isinstance(source, dict):
+                    raise BootstrapError(f"Expected a marketplace source object at {config_path}")
+                source_type = source.get("source_type") if harness == "codex" else source.get("source")
+                location = source.get("source", "") if harness == "codex" else source.get("url", "")
+                local = source_type in ("local", "directory", "file") or (
+                    isinstance(location, str) and bool(re.match(r"^(?:file:|[A-Za-z]:[\\/]|[./\\])", location))
+                )
+                if local:
+                    finding("local-marketplace-override", config_path, f"{key}.{name}")
+
+    return {
+        "schema_version": 1,
+        "mode": "audit",
+        "harness": harness,
+        "profile": str(profile),
+        "repositories": [str(path) for path in repositories],
+        "status": "drift" if findings else "clean",
+        "planned": [],
+        "applied": [],
+        "checks": ["user-settings", "user-agents", "user-skills", "repository-overrides"],
+        "findings": findings,
+        "errors": [],
+    }
+
+
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--lock", type=Path, required=True)
+    parser.add_argument("--lock", type=Path)
     parser.add_argument("--harness", choices=("codex", "claude"), required=True)
     parser.add_argument("--profile", type=Path, required=True)
-    parser.add_argument("--mode", choices=("preview", "apply", "verify"), required=True)
+    parser.add_argument("--mode", choices=("preview", "apply", "verify", "audit"), required=True)
+    parser.add_argument("--repository", type=Path, action="append", default=[])
     parser.add_argument("--catalog", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--report", type=Path)
-    return parser.parse_args(argv)
+    arguments = parser.parse_args(argv)
+    if arguments.mode != "audit" and arguments.lock is None:
+        parser.error("--lock is required for preview, apply and verify")
+    if arguments.mode != "audit" and arguments.repository:
+        parser.error("--repository is only supported by audit")
+    if arguments.mode == "audit" and (arguments.lock is not None or arguments.catalog is not None):
+        parser.error("audit does not use --lock or --catalog")
+    return arguments
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     try:
-        report = execute(arguments)
+        report = audit_configuration(arguments) if arguments.mode == "audit" else execute(arguments)
     except BootstrapRunError as error:
         report = error.report
         if arguments.report:
@@ -1082,7 +1204,7 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.report:
         write_json(arguments.report.expanduser().resolve(), report)
     print(json.dumps(report, indent=2))
-    return 0
+    return 1 if report.get("findings") else 0
 
 
 if __name__ == "__main__":

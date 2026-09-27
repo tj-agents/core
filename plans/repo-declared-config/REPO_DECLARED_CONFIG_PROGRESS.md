@@ -1,37 +1,105 @@
 # Repo-declared agent configuration — progress
 
-Plan: `REPO_DECLARED_CONFIG_PLAN.md`
-Status: planned; no phase started.
+- Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
+- Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
+- Roadmap item: `repo-declared-config/transitive-core`
+- Worktree: `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Feature-Repo-Declared-Config`
+- Branch: `Feature/Repo-Declared-Config`
+- Base: `origin/main` at `81b3340181c7f41e72035216c1243106c129df34`
+- PR: not opened
+- Dependency/package gates: plugin-contained Codex dispatch needs native proof before migration.
+- Last reconciled: 2026-09-27; native-host evidence and focused audit/bootstrap tests.
 
-## Current state (2026-09-23)
+## Authorization
 
-- The plan is on `main`, amended with the tj-agents-only source rule and the per-machine
-  migration procedure. No implementation branch exists yet.
-- This PC (first machine):
-  - All four canonical repositories are cloned under
-    `C:\Users\tommy\source\repos\tj-agents\{core,cpp,react,dotnet}`.
-  - The older `C:\Users\tommy\source\repos\base-agents` checkout is 87 commits behind with
-    uncommitted `plan-artifacts` edits and live worktrees; it is not retired.
-  - Claude now has `base`, `engineering` and `machine@base-agents` (source `tj-agents/core`)
-    at user scope, and `concertable@agent-standards` is disabled at user scope, so Claude's
-    lanes and gates come from core. This is an interim user-scope state until phase 4.
-  - `~/.claude/settings.json` still has other user-scope plugins, `tomjseery/*` sources for
-    `dotagents` and `react-agents`, and `cpp-agents` without `autoUpdate`. Its auto-mode
-    environment text names `Concertable/concertable` as the trusted repo for every session;
-    that belongs in the Concertable repository's project settings (user decision).
-  - `~/.codex/agents` holds the ten shared Codex agents installed by core's engineering
-    package (owned via `.base-agents-delivery.json`); Codex cannot load agents from plugins, so
-    the plan must decide how this stays repository-declared.
-- `sandbox-hwid` (first consumer): routes resolve for Claude and Codex after cpp-agents v0.3.0
-  adoption, but through user-scope installs.
+Tommy authorized the whole plan on September 26: domain marketplaces supply core transitively;
+consumers never name core, lanes or its agents directly; remove machine-local agent settings
+after replacement delivery works; Concertable loads only in Concertable repositories; retire its
+duplicate delivery and add a guard. Commit, push and open PRs; merges follow each repository's
+review gate. The current request explicitly resumed this plan through its Next Steps.
+
+## Current state
+
+The September 26 plan, ledger and roadmap were carried from the main checkout into this fresh
+delivery worktree. It is now the sole live owner. The original sandbox-only scope was reconciled
+with the newer winwrap and Concertable authorization.
+
+`bootstrap_capabilities.py --mode audit` is implemented with focused tests and skill documentation.
+It reads user plugin/marketplace declarations, user skills/agents, repository Codex agents and local
+marketplace overrides, including Claude local settings. It performs no installation or cleanup.
+Package generation and the repository Python suite passed; review and publication remain.
+
+No normal machine configuration or consumer repository was changed. Migration and self-heal
+have not been implemented. The audit does not supply the separate plugin-write prevention guard.
+
+## Host findings
+
+[HOST_EVIDENCE.md](HOST_EVIDENCE.md) owns the versions, native probe and exact upstream source links.
+Claude 2.1.282 installed a local fixture dependency at project scope and exposed its skill and agent,
+but wrote the dependency into project settings. Fresh-clone loading is not yet proven.
+Codex 0.157.0 has neither plugin-agent loading nor a native marketplace dependency resolver.
+Domain catalogs can enumerate core packages, but cannot make the native agent loader consume them.
+A real isolated Codex `exec` successfully consumed core's L7 role via per-invocation developer
+instructions/model/effort, with no profile config or agent files. A plugin-contained dispatcher is
+therefore viable; its integration and repository-only plugin activation still need implementation
+and proof. Native registration is not an added user requirement.
+
+## Machine inventory
+
+Read-only audit on this PC reported:
+
+- Codex: two user configuration tables (`plugins`, `marketplaces`), 13 user file entries,
+  and 30 repository agent files.
+- Claude: two user configuration tables (`enabledPlugins`, `extraKnownMarketplaces`) and
+  one user file entry.
+- No local marketplace overrides were reported among the existing requested consumer paths.
+- `Concertable/concertable` is absent at the expected path. The other 12 Concertable registry
+  entries and both C++ consumers were inspected. Other machines remain unverified.
+
+Raw reports are in ignored `.machine-audit-codex.tmp` and `.machine-audit-claude.tmp` in this
+worktree. Counts describe entries, not skill/role totals.
+
+## Concertable inventory
+
+`Concertable/agents` was on `Fix/StandardsCurrencyAutoRefresh`, seven commits ahead of its tracking
+branch. Do not modify or adopt that checkout's work. Its registry names agents, auth, b2b,
+concertable, config, customer, docs, infra, payment, pipeline, platform-dotnet, search and system.
+Generic generated hooks/workflows overlap core but many differ; semantic comparison is still needed.
+Its `codex_delivery.py` and `codex-agents` remain pending retirement after replacement delivery.
+Consumer stack profile drift (b2b/customer missing react versus the registry) remains to reconcile
+during adoption. Core's separate hook activation work has now merged as PR #46.
+
+## Verification
+
+- 11 audit tests passed: read-only behavior, sanitized errors, disabled plugin detection,
+  local source detection and CLI exit status.
+- 31 existing capability-bootstrap tests passed.
+- The full repository Python test suite passed after synchronization with PR #46.
+- Generated package and catalog checks passed.
+- Native Claude fixture installation and component inventory succeeded; no model-session acceptance
+  or Codex replacement delivery has been claimed.
+- Existing workflow helper source-layout and porcelain parsing defects are recorded in
+  `docs/workflows/TECH_DEBT.md`. Lifecycle instructions were loaded directly; test capture works.
+
+## Reviews
+
+Pending immutable candidate review after generation and remaining validation.
 
 ## Next Steps
 
-Start phase 1 in a fresh worktree from `origin/main`: inventory `Concertable/agent-standards`
-`plugins/concertable` (hooks, Claude agents, `codex-agents`, generic skills) against core's
-`engineering` and `base` packages, and record here which items are duplicates of core and which
-are Concertable-specific. Port anything generic that core lacks. Then, in the Concertable
-repository, enable core plus concertable in its project settings, and only after that delete the
-duplicates from `Concertable/agent-standards`. Phase 3 (self-heal: automatic
-marketplace refresh and in-session skill injection for Claude and Codex) follows the generator
-in phase 2.
+Scope: whole plan through all remaining phases and terminal delivery.
+Current slice: finish generation, validation, review and authorized delivery of the read-only audit.
+Remaining scope: native delivery gate, domain dependencies, Concertable deduplication, generator,
+consumer adoption, self-heal, machine cleanup, plugin-write guard and per-machine acceptance.
+Done when: authorized consumers load domain and core capabilities transitively in both hosts,
+machine-local behavior is removed after acceptance, guards pass and delivery gates complete.
+
+1. Generate packages and catalog digests, run required checks, commit and independently review the
+   audit candidate. Open its PR and own validation through the authorized repository delivery gate.
+2. Prove a plugin-contained dispatcher using supported per-run Codex arguments and core's semantic
+   role/lane definitions. The plan anticipated unsupported native plugin agents; native registration
+   is not an added requirement. Keep ownership and investigate this adapter inside core before any
+   decision to request changed constraints. Do not delete agent files before replacement acceptance.
+3. Once proven, follow the remaining phases in fresh worktrees from fetched `origin/main`.
+   Declare domains before deleting duplicate delivery. Back up profiles before cleanup and run
+   real Claude/Codex sessions in winwrap and a Concertable consumer before declaring convergence.
