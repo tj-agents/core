@@ -12,7 +12,7 @@ domain: process
 the default branch or to an unrelated one. Planning-only authoring may start in the normal checkout; once
 delivery begins, the owning branch carries the plan and ledger with its substantive work.
 
-## Fetch first, and branch from the remote default — never from local `main`
+## Fetch first; use the remote default or the recorded stack parent
 
 ```bash
 git fetch origin --quiet && git checkout -b <Type>/<Name> origin/main
@@ -23,8 +23,12 @@ tree. **That staleness is invisible locally: the build is green, because it is g
 tree.** It is how work that has already merged gets reinvented, and how a PR later trips the
 current-with-base rule in the `merging` skill — by which point the wasted work is already done.
 
+For a dependent stack layer, branch from its recorded parent's current tip instead of `origin/main`.
+The parent must already contain the dependency; changing a PR's base does not transplant commits.
+
 **Reusing an existing branch or worktree?** At session start, fetch and check
-`git rev-list --count HEAD..origin/main`; sync before working, and never build on a stale tip. Don't
+`git rev-list --count HEAD..<actual-base>` against the PR's default or stack-parent base; sync before
+working, and never build on a stale tip. Don't
 reflex-merge the default branch every turn: it will not refresh already-loaded instructions (only a fresh
 session does), and mutating a dirty tree mid-task invites conflicts. Merge when you are behind and the
 tree is clean.
@@ -37,29 +41,69 @@ both `feature/x` and `Feature/x` breaks `git fetch` and `git pull` **for everyon
 `cannot lock ref … File exists`. Before creating a branch, match the casing of any existing branch of the
 same name exactly.
 
-## Don't branch to refactor code from the feature you are already on
+## Large changes default to reviewable PR slices
 
-If the code only lives on the current feature branch and is not yet in the default branch, the refactor is
-part of that feature — stay on the branch and commit there. A fresh `Refactor/*` branch is only for code
-**already merged**. Branching off an in-flight feature fragments it across two PRs and orphans the
-original.
+A goal, feature, refactor or plan phase is not automatically one PR. Before implementing a large or
+multi-concern change, divide it into focused delivery slices. Prefer stacked PRs for dependent slices;
+put independent slices on branches from the remote default. Keep one goal and owner across them.
 
-## Stack only for a real dependency
+Record each slice's purpose, included code and tests, base/parent, dependencies, expected size and
+verification gate in the existing plan or PR description. When branches exist, record their exact base
+and head SHAs and PR links. This delivery map is required before growing a large change, not something
+to reconstruct at merge time. Re-evaluate it when a new concern, review repair or integration failure
+would expand the current PR.
 
-Stack a branch on another only when the child cannot build or pass without the parent's unmerged code —
-never to enforce merge order alone (independent PRs land correctly in sequence without a shared branch;
-confirm with `git merge-tree`) — and only by branching the child from the parent's tip once the parent's
-commits exist; retargeting an already-diverged PR needs a manual rebase and force-push, not just a base
-change.
+Measure the proposed PR against its actual base with `git diff --numstat <base>...HEAD` and
+`git diff --shortstat <base>...HEAD`. Count the proposed uncommitted work too. Report generated files,
+lockfiles, documentation and mechanical moves separately from substantive code and tests; do not hide
+their total. Line counts are a review warning, not a target or proof of safety. Unless the repository
+sets a stricter budget, around 1,000 substantive added/deleted lines or 40 substantive changed files
+requires an explicit split assessment before adding more scope, requesting final review or publishing
+another candidate. Smaller changes spanning unrelated concerns need that assessment too.
 
-GitHub retargets a stacked PR's base automatically only when the parent's head branch is deleted on
-merge — check that repo's `delete_branch_on_merge` setting first; it's off on several of Tommy's repos.
-Retargeting just moves the base pointer, so the child's diff stays clean only when the parent landed as a
-merge commit (same SHAs on `origin/main`, the `merging` skill's `--merge` strategy); a squashed or
-rebase-merged parent gives new SHAs, so rebase the child with `git rebase --onto origin/main
-<old-parent-tip> <child>` before trusting its diff again. GitHub has no stacking beyond that — keep a
-dependent stack to one parent→child pair without Graphite or `spr`, and confirm CI's base-branch
-allowlist covers it.
+Choose coherent boundaries, not equal-sized batches of files. Each landed slice must build, retain
+working exposed behavior, preserve security invariants and include its relevant tests. Keep an atomic
+schema/API/caller cutover together when splitting it would break those guarantees. Do not create dead
+APIs, compatibility adapters forbidden by the project, or failing intermediate branches just to shrink
+the displayed diff. Where possible, extract tested preparatory refactors or independent infrastructure
+first. A large exception needs a recorded concrete reason, rejected split boundaries, measured size and
+validation plan; "same feature", "same phase", or "already on this branch" is not sufficient.
+
+Small repairs to the current slice stay with it. A substantial next slice may stack on code that has
+not merged yet, including a refactor of that code. Do not orphan the parent or create an independent
+branch that loses its dependency. If a PR is already oversized, preserve its exact head and working
+changes and assess recovery before rewriting history. Map possible boundaries and compare the benefit
+of smaller reviews with the cost of reconstructing and qualifying new intermediate states. An already
+reviewed, validated candidate may warrant a frozen-scope exception, with its exact evidence and rejected
+split options recorded; sunk effort alone is not a reason. When splitting, validate each layer and prove
+the final stack tree preserves the intended result before superseding or rewriting the original PR.
+
+## Maintain a dependent stack
+
+Each child targets its immediate parent's branch; only the bottom PR targets the stack trunk, normally
+`main`. Review each layer against that parent and validate its cumulative tree. Keep the stack map,
+base/head SHAs and remaining scope in the one owning ledger. New slices continue the authorized goal;
+they do not require routine permission or a new session.
+
+Use verified native forge stack support or already-installed tooling where available. Do not assume
+that a website feature is enabled locally, install tooling without authorization, or cap a necessary
+stack at one parent-child pair merely because no stack tool is installed. Native Git and the forge CLI
+can manage a recorded stack; check CI base-branch filters and equivalent merge protection for every
+layer. Never bypass checks because a child targets another feature branch.
+
+For manually managed GitHub branches, confirm base retargeting after the parent lands; branch deletion
+settings affect it. A merge commit preserves the parent's SHAs. A squash or rebase merge usually needs
+the child's own commits replayed onto the new base, using the recorded old parent tip rather than
+replaying the whole parent. Inspect the resulting diff and rerun affected checks. Native stack support
+may automate this; verify the result rather than applying a second manual rebase.
+
+Land from the bottom up. Never merge a child into its unmerged parent's feature branch and call that
+independent delivery. Parent edits require reconciling descendants and their exact-head review/CI
+evidence. A stack improves review boundaries; it does not remove integration or deployment gates.
+
+Research basis: [Google's small-change guidance](https://google.github.io/eng-practices/review/developer/small-cls.html)
+and [GitHub's stacked PR documentation](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs).
+The numeric assessment triggers above are this workflow's heuristic, not a universal research cutoff.
 
 ## Working docs ride along; durable guidance does not
 
