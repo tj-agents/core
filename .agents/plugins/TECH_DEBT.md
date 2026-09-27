@@ -9,3 +9,14 @@ Codex plugin installation and updates do not trust new or changed hook definitio
 Resolve when Codex provides trusted, fail-closed host policy for every local write path, including hook launch failures, changed definitions and specialized tools. Bind the shared router to that policy and require a fresh-session missing-marketplace write probe as a release gate. Until then, verify live activation after every release that changes a hook definition.
 
 Upstream behavior: https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks and https://github.com/openai/codex/issues/41979.
+
+## Conditional route advice reaches Codex only inside a block
+
+The skill router delivers a route's `conditional` tier on an allowed write through Claude's PreToolUse
+`hookSpecificOutput.additionalContext`. Codex publishes no equivalent for an allowed PreToolUse call, so a
+Codex session sees conditional advice only when the same write is also blocked on a required skill. A route
+with no required skill gives Codex no advice at all. Unit tests prove the router's output; a live host probe
+that the Claude context reaches the model has not been recorded.
+
+Resolve when Codex supports context on an allowed PreToolUse call and the router emits it there, and when a
+fresh Claude and Codex session each record the advice for a conditional-only route.
