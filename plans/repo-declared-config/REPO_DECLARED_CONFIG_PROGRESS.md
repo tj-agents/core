@@ -20,15 +20,11 @@ remains unpublished.
 - This PC (first machine):
   - All four canonical repositories are cloned under
     `C:\Users\tommy\source\repos\tj-agents\{core,cpp,react,dotnet}`.
-  - The older `C:\Users\tommy\source\repos\base-agents` checkout is 87 commits behind with
-    uncommitted `plan-artifacts` edits and live worktrees; it is not retired.
-  - Claude has `base`, `engineering` and `machine@base-agents` (source `tj-agents/core`)
-    at user scope. A fresh read on 2026-09-27 shows `concertable@agents` enabled there too;
-    user-scope product hooks still load in unrelated repositories.
-  - `~/.claude/settings.json` still has other user-scope plugins, `tomjseery/*` sources for
-    `dotagents` and `react-agents`, and `cpp-agents` without `autoUpdate`. Its auto-mode
-    environment text names `Concertable/concertable` as the trusted repo for every session;
-    that belongs in the Concertable repository's project settings (user decision).
+  - The old `base-agents` checkout has uncommitted work/live worktrees and is not retired.
+  - Claude has core plus `concertable@agents` at user scope, so product hooks still load in
+    unrelated repositories.
+  - Claude user settings retain `tomjseery/*` sources, plugins and global Concertable trust text;
+    migrate those declarations into their owning repositories.
   - `~/.codex/agents` holds the ten shared Codex agents installed by core's engineering
     package (owned via `.base-agents-delivery.json`); Codex cannot load agents from plugins, so
     the plan must decide how this stays repository-declared.
@@ -57,6 +53,10 @@ remains unpublished.
   adoption in winwrap and sandbox-hwid, and a permanent always-on authoring rule. The separate
   `plans/conditional-skill-routes/` plan owns route conditionality and does not replace this
   plan's harness-installation contract.
+- Documentation review resolved the harness mechanism: per-plugin authored manifests feed the
+  catalog and generated packages; `repo_config.py` composes selected requirements into Claude
+  settings and Codex rules; digest, wiring, catalog and consumer-drift checks enforce the rule.
+  This mechanism is designed but not yet implemented.
 
 ## Phase 1 inventory (2026-09-23)
 
@@ -161,8 +161,8 @@ Concertable-product content; core contains no Concertable reference in code, nam
 moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
-Current slice: checkpoint the new authorization and sibling plan, re-review and publish the
-2.1.13 core candidate, then retire Concertable's shared copies.
+Current slice: implement the declared harness manifests, permission composition and enforcement
+on the 2.1.13 core candidate; then re-review, publish it, and adopt winwrap and sandbox-hwid.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
 Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no
 machine-local behavioural state on each machine.
@@ -175,18 +175,20 @@ inventory above distinguishes generic duplicates from product content. The merge
 repository suite's Windows shell test passed on focused rerun after sandbox denial and one transient
 PowerShell startup timeout.
 
-1. Commit and push the 2026-09-27 authorization/permissions checkpoint, refresh exact-head review
-   and CI on PR #48, merge it, and publish the 2.1.13 core release. Confirm the immutable tag,
-   plugin packages, and catalog digest against the published commit.
-2. In a fresh `Concertable/agents` worktree from `origin/main`, select the released `base`,
+1. Implement `.agents/plugins/harness.schema.json`, the three core manifests, their validator and
+   catalog/package sync, permission-aware `repo_config.py`, standing guidance, and focused tests on
+   PR #48. Refresh exact-head review and CI, merge, publish 2.1.13, and verify the tag and digests.
+2. Adopt the released generator and manifests in winwrap and sandbox-hwid first. Commit generated
+   Claude/Codex config plus consumer drift checks, and prove the Claude launcher allow rule in a
+   real trusted auto-mode session; record any host limitation honestly.
+3. In a fresh `Concertable/agents` worktree from `origin/main`, select the released `base`,
    `engineering`, and `machine@base-agents` alongside `concertable` in project settings. Then remove
    its duplicated hooks, ten agents in both host forms, and `persistent-workflow` skill. Preserve
    product-only rules, hooks, and stack contracts. Compare its generic worktree and delivery scripts
    with core utilities before retiring them. Verify each host loads one copy of every shared gate,
    lane, and skill.
-3. Extend the generator with consumer CI drift checks, migrate consumer locks to the published core
-   release, and add the repository-owned repair path for missing or stale skills. Keep plugin refresh
+4. Add the repository-owned repair path for missing or stale skills. Keep plugin refresh
    safe for a live session, including stale hook paths and invisible Windows child processes.
-4. Adopt `sandbox-hwid` first, then the other consumers named in the plan. After each host passes,
+5. Adopt the other consumers named in the plan. After each host passes,
    remove obsolete user-scope behavioral entries on this PC, run the machine verifier, and record
    acceptance. Repeat the same procedure on every other machine until the plan closes.
