@@ -17,45 +17,45 @@
     },
     "L2": {
       "summary": "High-stakes judgement that is not design, where a wrong call is costly or hard to undo.",
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "reasoning_effort": "xhigh",
       "context_ceiling": null,
       "why": "top general family at the setting above `high`. Judgement with a lot riding on it that designs nothing: a diagnosis of a production failure, a security or migration review. Delivering a change never selects it; merge, push and publish are governed by the delivery gates."
     },
     "L3": {
       "summary": "Open-ended judgement that is not design, where the answer is not yet known.",
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "reasoning_effort": "high",
       "context_ceiling": null,
       "why": "top general family at its default setting. Open-ended judgement that designs nothing: a diagnosis with no known answer, an investigation, weighing evidence a test cannot settle."
     },
     "L4": {
       "summary": "Ordinary specified work that a compiler or a test suite will catch, delivery included.",
-      "model": "gpt-5.6-terra",
-      "reasoning_effort": "high",
+      "model": "gpt-6-sol",
+      "reasoning_effort": "medium",
       "context_ceiling": null,
-      "why": "the workhorse. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses, and the review, CI and merge that deliver them."
+      "why": "the general family at reduced effort. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses, and the review, CI and merge that deliver them."
     },
     "L5": {
       "summary": "Mechanical work whose shape is already decided.",
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "medium",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
       "context_ceiling": null,
-      "why": "the small family at its default setting. Mechanical work whose shape is already decided: scripted edits, docs, ledger upkeep."
+      "why": "the small family at high effort. Mechanical work whose shape is already decided: scripted edits, docs, ledger upkeep."
     },
     "L6": {
       "summary": "Bulk clerical work whose input is too large for the cheapest rung.",
-      "model": "gpt-5.6-luna",
-      "reasoning_effort": "low",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "medium",
       "context_ceiling": null,
-      "why": "the small family at its lowest setting. Clerical loops and bulk passes -- a monitor, a long transcript, a big diff -- that outgrow the floor rung."
+      "why": "the small family at medium effort. Clerical loops and bulk passes -- a monitor, a long transcript, a big diff -- that outgrow the floor rung."
     },
     "L7": {
       "summary": "Clerical work with a small input and no judgement to make.",
-      "model": "gpt-5.5",
+      "model": "gpt-6-luna",
       "reasoning_effort": "low",
       "context_ceiling": null,
-      "why": "the proven previous-generation floor. Clerical work with a small input: commit, push, pull, sync, one poll."
+      "why": "the small family at low effort. Clerical work with a small input: commit, push, pull, sync, one poll."
     }
   },
 

@@ -4,7 +4,7 @@ description: What to do when a test run comes back red — enter the run/diagnos
 
 kind: workflow
 domain: process
-model: gpt-5.6-terra
+model: gpt-6-sol
 ---
 
 # A failing test is never just reported

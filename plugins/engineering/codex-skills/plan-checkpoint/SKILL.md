@@ -4,7 +4,7 @@ description: Keep plan-managed work resumable with a compact current-state ledge
 
 kind: contract
 domain: process
-model: gpt-5.6-luna
+model: gpt-6-luna
 ---
 
 # The plan-progress checkpoint

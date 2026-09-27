@@ -4,7 +4,7 @@ description: Read-only readiness gate answering whether the current branch is cl
 
 kind: operation
 domain: process
-model: gpt-5.6-luna
+model: gpt-6-luna
 ---
 
 # Is this branch clear to PR?
