@@ -3,13 +3,13 @@
 - Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 - Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
 - Roadmap item: `repo-declared-config/migrate-agent-state`
-Status: phase 1 in progress; full repo-declared migration remains open (2026-09-26).
+Status: phase 1 in progress; full repo-declared migration remains open (2026-09-27).
 
 Branch: `Refactor/RepoDeclaredConfigHarnessMove`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
-PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48), draft. First Windows CI
-failed because a duplicate-router fixture relied on the developer machine's installed skill;
-it now constructs its own plugin. Binding reports no standing merge authorization.
+PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48). CI passed at `fe46ff6`;
+the new machine-verifier edit requires a fresh run. Binding reports no standing merge
+authorization; `v2.1.13` remains unpublished.
 
 ## Current state (2026-09-26)
 
@@ -20,9 +20,9 @@ it now constructs its own plugin. Binding reports no standing merge authorizatio
     `C:\Users\tommy\source\repos\tj-agents\{core,cpp,react,dotnet}`.
   - The older `C:\Users\tommy\source\repos\base-agents` checkout is 87 commits behind with
     uncommitted `plan-artifacts` edits and live worktrees; it is not retired.
-  - Claude now has `base`, `engineering` and `machine@base-agents` (source `tj-agents/core`)
-    at user scope, and `concertable@agent-standards` is disabled at user scope, so Claude's
-    lanes and gates come from core. This is an interim user-scope state until phase 4.
+  - Claude has `base`, `engineering` and `machine@base-agents` (source `tj-agents/core`)
+    at user scope. A fresh read on 2026-09-27 shows `concertable@agents` enabled there too;
+    user-scope product hooks still load in unrelated repositories.
   - `~/.claude/settings.json` still has other user-scope plugins, `tomjseery/*` sources for
     `dotagents` and `react-agents`, and `cpp-agents` without `autoUpdate`. Its auto-mode
     environment text names `Concertable/concertable` as the trusted repo for every session;
@@ -50,6 +50,15 @@ it now constructs its own plugin. Binding reports no standing merge authorizatio
   Reconciled the router: moved skills require explicit aliases, so disabled plugins stay
   unavailable. Core's Windows hook smoke test passes. The `codex.CMD` probe and shared hook
   runner use `CREATE_NO_WINDOW`; live-session popup acceptance remains pending.
+- Product migration is not yet safe to delete wholesale: Concertable's `always_on_instructions`
+  and commit/push enforcement hooks import its duplicate router, and its generator emits shared
+  lane agents from local lane tables. The tj-agents-only marketplace rule also conflicts with
+  enabling `concertable@agents` in generated project settings; settle that source boundary
+  before the product cutover.
+- Core now has a read-only machine verifier under `bootstrap-capabilities`. Focused tests pass;
+  on this PC it finds 34 own-agent profile entries (2 settings groups, 5 marketplaces,
+  15 plugins, 12 loose agents/skills). Host-bundled runtime marketplaces are excluded.
+  No user-scope cleanup is safe until the corresponding consumers adopt project settings.
 
 ## Phase 1 inventory (2026-09-23)
 
