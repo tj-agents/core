@@ -21,9 +21,9 @@ both harnesses, which is the whole point: one declaration, two resolutions.
 
 | Lane | For | Resolves to |
 |---|---|---|
-| **L1** | a critical design decision — a one-way choice reaching beyond the repository that later work builds on, such as a foundational architecture or a contract other teams build on; never implementation, review or delivery | the frontier family, on the ladder only for this shape of work |
-| **L2** | a one-way design decision of ordinary reach — stored data shape, a published contract | top general family, the setting above its default |
-| **L3** | open-ended judgement — architecture, plan authoring, a mechanism design a test will check, a diagnosis with no known answer | top general family, default setting |
+| **L1** | planning and design of any size — authoring a plan that takes a design position, architecture, a data model or contract, a mechanism choice; never implementation, review or delivery | the frontier family, on the ladder only for this shape of work |
+| **L2** | high-stakes judgement that designs nothing — a diagnosis of a production failure, a security or migration review | top general family, the setting above its default |
+| **L3** | open-ended judgement that designs nothing — a diagnosis with no known answer, an investigation | top general family, default setting |
 | **L4** | specified work a compiler or suite will catch — features, bugfixes, review lenses, and the review, CI and merge that deliver them | the workhorse family, high setting |
 | **L5** | mechanical work whose shape is already decided — scripted edits, docs, ledger upkeep | the workhorse family, reduced setting |
 | **L6** | bulk clerical work whose input outgrows the cheapest rung — a monitor loop, a long transcript, a big diff | the cheapest model that still holds the input |
@@ -45,11 +45,11 @@ L4 is what ordinary work declares; declare it explicitly rather than relying on 
 
 ## Choosing a rung — four questions, in this order
 
-1. **Reversibility.** Can the decision be taken back? A one-way design decision — stored data shape, a
-   published contract — is never below L2 whatever else is true. This grades what the work decides, never
-   how it is delivered.
-2. **Blast radius.** How far does a mistake reach — one file, a module, a service, production? Service or
-   production reach lifts the rung by one; on a one-way design decision that lift is what selects L1.
+1. **Design.** Does the work decide how something should be built — author a plan that takes a design
+   position, choose an architecture, a data model, a contract or a mechanism? Then it is L1, whatever its
+   size. The agent makes this call on its own judgement; a small plan that settles a design is still L1.
+2. **Stakes.** For work that designs nothing: how costly, and how hard to undo, is a wrong call? A
+   diagnosis or review with a lot riding on it — production, security, stored data — is L2.
 3. **Ambiguity.** Is the answer known and this is typing, or is the problem open? Open is never below L3;
    fully specified is never above L4.
 4. **Verifiability.** What catches the mistake — a compiler, a test suite, or only human judgement?
@@ -59,20 +59,19 @@ L4 is what ordinary work declares; declare it explicitly rather than relying on 
 never from the operations at its end. Nearly every change ends in a merge, push, publish or release, so
 reading that as irreversibility would put almost every job on L1. Those steps are governed by the delivery
 gates — review, CI, the merge queue, release checks — never by model tier. Implementation, review and
-delivery are never above L3, and L1 is only ever a critical design decision.
+delivery are never above L3, and L1 is only ever planning or design.
 
-Nothing here says "how hard does this feel". A long mechanical edit is still L5; a three-line change to a
-published contract is still L2. One extra axis applies at the floor alone: clerical work is L7 only while
+Nothing here says "how hard does this feel". A long mechanical edit is still L5; a one-paragraph plan that
+picks a mechanism is still L1. One extra axis applies at the floor alone: clerical work is L7 only while
 its input fits the cheapest rung, and an input that outgrows it selects L6.
 
 **The frontier tier is above the ladder and is not a rung.** Each table carries a `frontier` entry the
 four questions can never select: it is priced by provenance — the user explicitly asking for that tier or
-its model by name — not by task shape. L1 prices the frontier family for one narrow task shape, so the
+its model by name — not by task shape. L1 prices the frontier family for planning and design, so the
 guard is the pair, not the model: a test asserts no rung resolves to the frontier's exact model *and*
 effort, which sits one step above L1's, so lane inflation cannot reach the tier. Consumers that expose it
 (the handoff launchers' `-Frontier`) make selecting it a distinct visible act rather than one lane value
-among others. L1 carries `requires_user_authorization`, so the launchers also refuse it without the user's
-explicit authorization.
+among others.
 
 **Re-route per phase.** One task is usually open/judgement while it is being designed, then specified and
 test-caught while it is built, then clerical to commit and push. Route each phase. Running the whole task
@@ -98,7 +97,7 @@ in the rung its cleanup needed is how a bad design gets built efficiently.
   — but the pin is the value the runtime reads.
 - **A handoff launcher** (`machine:handoff-claude`, `machine:handoff-codex`) takes `-Lane` (or
   `-Frontier`) per dispatch: the calling agent judges the lane by the four questions and the launcher only
-  prices it, never inferring one from the prompt. It refuses `-Lane L1` without `-UserAuthorizedLane`.
+  prices it, never inferring one from the prompt.
 
 ## Where the two ladders are not level — know these before trusting parity
 
