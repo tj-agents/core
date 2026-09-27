@@ -5,7 +5,7 @@ kind: workflow
 domain: process
 ---
 
-# Transfer the current context
+# Transfer a context or bounded side workstream
 
 Read and follow the [canonical shared definition](../../../.agents/engineering/workflow/handoff/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.
