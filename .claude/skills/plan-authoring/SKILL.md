@@ -4,8 +4,8 @@ description: Design or phase multi-step work and create or update its implementa
 
 kind: workflow
 domain: process
-model: claude-opus-5-5
-effort: high
+model: claude-fable-5
+effort: xhigh
 ---
 
 # Author a durable plan
