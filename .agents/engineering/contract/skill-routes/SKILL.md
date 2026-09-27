@@ -1,6 +1,6 @@
 ---
 name: skill-routes
-description: Building a repo's `.agents/skill-routes.json` — the layered floor-plus-route model where every matching row fires and the floors always apply, why a row keyed on a top-level directory cannot port to a carved repo while one keyed on architecture ports verbatim, the row fields (path, skills, content_requires, note, deny), and the registry that ships a carved service repo's table inside the plugin instead of committing one per repo. Use when adding or changing a route, building a new repo's route table, carving a service repo, or deciding how to key a row's path.
+description: Building a repo's `.agents/skill-routes.json` — the layered floor-plus-route model where every matching row fires and the floors always apply, why a row keyed on a top-level directory cannot port to a carved repo while one keyed on architecture ports verbatim, the row fields (path, skills, conditional, content_requires, note, deny), the required tier that blocks versus the conditional tier that only advises, and the registry that ships a carved service repo's table inside the plugin instead of committing one per repo. Use when adding or changing a route, building a new repo's route table, carving a service repo, or deciding how to key a row's path.
 
 kind: contract
 domain: process
@@ -80,6 +80,29 @@ stack's rows. Kinds:
   matches (a `.csproj` routes to the testing skills only when it declares `<IsTestProject>true`).
 - `note` — shown when the row fires. For why a row exists, never for restating the rule it points at.
 - `deny` — a content regex whose hit is a hard block, not a nudge. Only mechanically-decidable violations.
+- `conditional` — optional `[{"skill": "...", "when": "..."}]`. Named with its condition the first time
+  the row fires in a session and never blocks. Both fields are required; a malformed entry makes the table
+  unusable, exactly like invalid JSON.
+
+## Required and conditional tiers
+
+`skills` is the **required** tier: the write stays blocked until every one is proven loaded. A table with
+only `skills` keeps that meaning, so nothing changes before a pack regenerates. Put a skill there only when
+it governs every file the row matches, such as a language's style standard.
+
+`conditional` is advice for a standard that governs only some changes to those files, such as a
+mixin standard that matters only when mixins are being composed. Claude receives it as context on the
+allowed call. Codex receives it only inside a block message. A conditional skill already loaded is not
+repeated, and a missing one is reported without blocking. A row with no `skills` never blocks.
+
+To make a standard mandatory for a narrow layout, give it its own row keyed on that path with the skill
+under `skills`. Every matching row fires, so the narrow row adds the requirement and leaves the broad row
+advisory.
+
+```json
+{"path": "\\.(h|hpp|cpp)$", "skills": ["cpp:style"],
+ "conditional": [{"skill": "cpp:mixins", "when": "composing or changing mixins or CRTP providers"}]}
+```
 
 Route-local `deny` rules belong to one path classification, such as a unit test booting a host. A decidable
 rule that applies across route kinds belongs once in `.agents/enforcement-rules.json`. The router evaluates

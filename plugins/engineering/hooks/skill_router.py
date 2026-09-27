@@ -12,9 +12,13 @@ Two behaviours, and the difference matters:
 
 - **First write into a routed path in a session -> block** with the owning skills and their own
   descriptions, then allow a later write to that route once its skills are *proven* loaded - see the
-  session-proof paragraph below. PreToolUse has no way to add context without stopping the call, and
+  session-proof paragraph below. Context attached to an allowed call is advice the agent may skip, and
   stopping is the point: it puts the standard in context *before* the file exists, which costs one tool
   call.
+- **Only the required tier blocks.** A route's `skills` are required; its `conditional` entries name a
+  standard with the condition under which it applies. Those are advice, shown once per route per session
+  (Claude receives them on an allowed call as PreToolUse context) and never demanded, so a header of free
+  functions is not held hostage to a mixin standard. The skill-routes contract owns the schema.
 - **A deny pattern -> block every time.** Those are mechanically decidable violations, so they are not
   advice. A repo whose rules are also expressible in its build should enforce them there too - a hook
   matcher is per-tool and never sees `dotnet new`, a shell heredoc or an MCP write.
@@ -784,7 +788,7 @@ def registry_routes(root):
     routes = parsed.get("routes")
     if not isinstance(routes, list):
         raise RoutesUnusable(f"the shipped {kind}.json has no usable `routes` list.")
-    return routes
+    return validate_routes(routes, f"the shipped {kind}.json")
 
 
 def load_routes(root):
@@ -807,7 +811,7 @@ def load_routes(root):
         raise RoutesUnusable(f"{ROUTES_FILE} has no `routes` key.")
     if not isinstance(routes, list):
         raise RoutesUnusable(f"{ROUTES_FILE} `routes` must be a list, got {type(routes).__name__}.")
-    return routes
+    return validate_routes(routes, ROUTES_FILE)
 
 
 def matching_routes(routes, rel, content):
@@ -820,6 +824,94 @@ def matching_routes(routes, rel, content):
         if needle and not re.search(needle, content):
             continue
         yield route
+
+
+def required_skills(route):
+    """The tier that blocks: every name in `skills`, exactly as a legacy table always meant it."""
+    return list(route.get("skills") or [])
+
+
+def conditional_skills(route):
+    """`(skill, when)` pairs named with their condition and never demanded.
+
+    A name the same route already requires is dropped here: requiring it is the stronger statement.
+    """
+    required = set(required_skills(route))
+    return [
+        (entry["skill"], entry["when"])
+        for entry in route.get("conditional") or []
+        if entry["skill"] not in required
+    ]
+
+
+def route_key(route):
+    return route.get("path")
+
+
+def advisory_key(route):
+    return f"conditional:{route_key(route)}"
+
+
+def validate_routes(routes, source):
+    """Reject a route whose tiers cannot be read, so a malformed entry stops as loudly as bad JSON.
+
+    `skills` stays the required list and needs no migration. `conditional` is optional; each entry
+    must name a skill and the condition under which it applies, because a bare name with no `when`
+    is either a required skill mislabelled or advice nobody can act on.
+    """
+    for index, route in enumerate(routes):
+        where = f"{source} route {index}"
+        if not isinstance(route, dict):
+            raise RoutesUnusable(f"{where} is not an object.")
+        skills = route.get("skills", [])
+        if not isinstance(skills, list) or not all(isinstance(name, str) and name for name in skills):
+            raise RoutesUnusable(f"{where} `skills` must be a list of skill names.")
+        conditional = route.get("conditional", [])
+        if not isinstance(conditional, list):
+            raise RoutesUnusable(f"{where} `conditional` must be a list.")
+        for entry in conditional:
+            if not (
+                isinstance(entry, dict)
+                and isinstance(entry.get("skill"), str) and entry["skill"]
+                and isinstance(entry.get("when"), str) and entry["when"].strip()
+            ):
+                raise RoutesUnusable(
+                    f"{where} has a conditional entry without both `skill` and `when`: {entry!r}"
+                )
+    return routes
+
+
+def advisory_lines(advisories, descriptions, resolved_paths, outcomes, harness):
+    """The conditional tier as text, or [] when every conditional skill is already loaded."""
+    lines = []
+    for rel, route in advisories:
+        entries = []
+        for name, when in conditional_skills(route):
+            if outcomes and outcomes.get(name.rpartition(":")[2] or name) is True:
+                continue
+            entries.append(f"  * {name}")
+            desc = descriptions.get(name)
+            if desc:
+                entries.append(f"      {desc}")
+            else:
+                entries.append(f"      NOT INSTALLED FOR {harness.upper()} - advisory only.")
+            entries.append(f"      WHEN: {when}")
+            if harness == "codex" and name in resolved_paths:
+                entries.append(f"      READ WHEN IT APPLIES: {resolved_paths[name]}")
+        if entries:
+            lines += [f"  {rel}", "", *entries]
+            if route.get("note"):
+                lines.append(f"      NOTE: {route['note']}")
+    if not lines:
+        return []
+    return [
+        "SKILL ROUTER - conditional standards for this path (advice, never required):",
+        "",
+        *lines,
+        "",
+        "Load one only when its condition describes this change. Each route's advice is shown once "
+        "per session.",
+    ]
 
 
 def deny_hits(route, rel, content):
@@ -1095,7 +1187,7 @@ def query(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no skill is owed")
         return 0
 
-    owed, violations = {}, []
+    owed, conditional, violations = {}, {}, []
     for given in paths:
         rel = repo_relative(given, cwd)
         try:
@@ -1103,19 +1195,29 @@ def query(argv):
         except OSError:
             content = ""  # deleted or unreadable: the path still routes, the content gates cannot
         for route in matching_routes(routes, rel, content):
-            for name in route.get("skills") or []:
+            for name in required_skills(route):
                 files = owed.setdefault(name, [])
                 if rel not in files:
                     files.append(rel)
+            for name, when in conditional_skills(route):
+                entry = conditional.setdefault(name, {"when": [], "files": []})
+                if when not in entry["when"]:
+                    entry["when"].append(when)
+                if rel not in entry["files"]:
+                    entry["files"].append(rel)
             violations.extend(deny_hits(route, rel, content))
+    for name in owed:
+        conditional.pop(name, None)
 
     if "--json" in argv:
-        json.dump({"skills": owed, "violations": violations}, sys.stdout, indent=2)
+        json.dump(
+            {"skills": owed, "conditional": conditional, "violations": violations}, sys.stdout, indent=2
+        )
         sys.stdout.write("\n")
         return 0
 
     if not owed:
-        print(f"no routed paths among the {len(paths)} given - no skill is owed")
+        print(f"no required skill is owed by the {len(paths)} path(s) given")
     else:
         print("skill-routes.json owns these changed paths. Load each skill before judging its files:")
         for name in sorted(owed):
@@ -1123,13 +1225,20 @@ def query(argv):
             print(f"\n  * {name}  ({len(files)} file(s))")
             for rel in files:
                 print(f"      {rel}")
+    if conditional:
+        print("\nConditional standards - load one only when its condition describes the change:")
+        for name in sorted(conditional):
+            entry = conditional[name]
+            print(f"\n  * {name}  when: {'; '.join(entry['when'])}")
+            for rel in sorted(entry["files"]):
+                print(f"      {rel}")
     for rel, reason in violations:
         print(f"\nDENY PATTERN HIT - a decidable violation in the tree, report it:\n  {rel}\n      {reason}")
     return 0
 
 
 def missing_routed_skills(routes, harness):
-    names = {name for route in routes for name in route.get("skills") or []}
+    names = {name for route in routes for name in required_skills(route)}
     return sorted(name for name in names if skill_description(name, harness) is None)
 
 
@@ -1151,8 +1260,12 @@ def verify_install(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no installation to verify")
         return 2
 
-    names = sorted({name for route in routes for name in route.get("skills") or []})
+    names = sorted({name for route in routes for name in required_skills(route)})
     missing = [name for name in names if skill_description(name, harness) is None]
+    optional = sorted({
+        name for route in routes for name, _ in conditional_skills(route) if name not in names
+    })
+    absent = [name for name in optional if skill_description(name, harness) is None]
     if missing:
         print(f"{harness} is missing {len(missing)} of {len(names)} routed skill(s):")
         for name in missing:
@@ -1160,6 +1273,10 @@ def verify_install(argv):
         return 2
 
     print(f"{harness} resolves all {len(names)} routed skill(s) from {ROUTES_FILE}")
+    if absent:
+        print(f"{len(absent)} conditional skill(s) are not installed; they are advice and never block:")
+        for name in absent:
+            print(f"  {name}")
     return 0
 
 
@@ -1291,7 +1408,7 @@ def main():
             sys.stderr.write(
                 "SKILL ROUTER - blocked, this is a rule violation, not a reminder:\n\n"
                 f"  {rel}\n  {reason}\n\n"
-                f"Read the {', '.join(route.get('skills') or []) or 'owning'} skill and fix the "
+                f"Read the {', '.join(required_skills(route)) or 'owning'} skill and fix the "
                 "classification before writing this file. The file was NOT written."
             )
             sys.exit(2)
@@ -1317,59 +1434,88 @@ def main():
 
     session = data.get("session_id")
     seen = load_seen(session)
-    pending = []
+    # Only the required tier gates the write. A route whose `skills` is empty never blocks; its
+    # conditional entries are advice, offered once per route per session and never demanded.
+    pending = [
+        (rel, route) for rel, route in matched
+        if required_skills(route) and route_key(route) not in seen
+    ]
+    advisories, advised_keys = [], set()
     for rel, route in matched:
-        key = route.get("path")
-        if key in seen:
-            continue
-        pending.append((rel, route))
+        key = advisory_key(route)
+        if conditional_skills(route) and key not in seen and key not in advised_keys:
+            advised_keys.add(key)
+            advisories.append((rel, route))
 
-    if not pending:
+    if not pending and not advisories:
         sys.exit(0)
+
+    required_names = []
+    for _, route in pending:
+        for name in required_skills(route):
+            if name not in required_names:
+                required_names.append(name)
+    conditional_names = []
+    for _, route in advisories:
+        for name, _ in conditional_skills(route):
+            if name not in conditional_names and name not in required_names:
+                conditional_names.append(name)
 
     descriptions = {}
     resolved_paths = {}
     codex_skills = []
-    missing = set()
-    for _, route in pending:
-        for name in route.get("skills") or []:
-            if name not in descriptions:
-                resolved = resolved_skill(name, harness)
-                if resolved is None:
-                    descriptions[name] = None
-                else:
-                    skill, body = resolved
-                    descriptions[name] = description_of(body)
-                    resolved_paths[name] = skill
-                    if harness == "codex" and descriptions[name] is not None:
-                        codex_skills.append((name.rpartition(":")[2] or name, skill, body))
-            if descriptions[name] is None:
-                missing.add(name)
+    for name in required_names + conditional_names:
+        resolved = resolved_skill(name, harness)
+        if resolved is None:
+            descriptions[name] = None
+            continue
+        skill, body = resolved
+        descriptions[name] = description_of(body)
+        resolved_paths[name] = skill
+        if harness == "codex" and descriptions[name] is not None:
+            codex_skills.append((name.rpartition(":")[2] or name, skill, body))
+    missing = {name for name in required_names if descriptions[name] is None}
 
     outcomes = None if missing else transcript_skill_outcomes(
         data.get("transcript_path"), codex_skills
     )
     rejected, unproven = set(), set()
     if not missing and outcomes is not None:
-        for name in descriptions:
+        for name in required_names:
             outcome = outcomes.get(name.rpartition(":")[2] or name)
             if outcome is False:
                 rejected.add(name)
             elif outcome is not True:
                 unproven.add(name)
     elif not missing:
-        unproven.update(descriptions)
+        unproven.update(required_names)
+
+    advisory = advisory_lines(advisories, descriptions, resolved_paths, outcomes, harness)
 
     if not missing and not rejected and not unproven:
         for _, route in pending:
-            seen.add(route.get("path"))
+            seen.add(route_key(route))
+        # Advice counts as shown only where it is delivered; Codex keeps it for its next block.
+        if harness == "claude":
+            seen.update(advised_keys)
         save_seen(session, seen)
+        # PreToolUse can add context to an allowed call only through Claude's structured output.
+        # Codex receives the advisory solely inside a block message; see .agents/plugins/TECH_DEBT.md.
+        if advisory and harness == "claude":
+            sys.stdout.write(json.dumps({
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "additionalContext": "\n".join(advisory),
+                }
+            }, ensure_ascii=False) + "\n")
         sys.exit(0)
+    seen.update(advised_keys)
+    save_seen(session, seen)
 
     lines = ["SKILL ROUTER - a standard owns this path, and it is not proven loaded this session:", ""]
     for rel, route in pending:
         lines += [f"  {rel}", ""]
-        for name in route.get("skills") or []:
+        for name in required_skills(route):
             desc = descriptions[name]
             lines.append(f"  * {name}")
             if name in missing:
@@ -1424,6 +1570,8 @@ def main():
                 "every owning skill."
             ),
         ]
+    if advisory:
+        lines += ["", *advisory]
     sys.stderr.write("\n".join(lines))
     sys.exit(2)
 
