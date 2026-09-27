@@ -22,17 +22,19 @@ a PR whose checks or merge queue have not settled unless a persistent-workflow b
 the continuation first, or wait for the checks to finish and merge without `--auto`.
 ## Synchronize once before final review
 
-Immediately before final review, update the branch against base in its own checkout and rebuild the affected
-scope. Record that base and the resulting candidate head in the review descriptor. This is the single
-implementation synchronization point.
+Immediately before final review, resolve the actual PR base to its fetched remote-tracking ref:
+`origin/<parent-branch>` for a stack child, otherwise `origin/<default-branch>`. Check currency in the
+branch's own checkout:
 
 ```bash
 git fetch origin --quiet
-behind=$(git rev-list --count HEAD..origin/main)
-[ "$behind" -gt 0 ] && { echo ">>> $behind commits behind main — update before enabling auto-merge"; \
-  git merge origin/main --no-edit && <rebuild affected projects to 0 errors> && git push; }
-# only when $behind is 0 AND the rebuild is green → freeze and review the candidate
+git rev-list --count HEAD..<actual-base>
 ```
+
+Reconcile missing base commits before freezing the candidate. A standalone branch may merge the remote
+default; a child follows the verified restacking procedure against its parent. Rebuild the affected scope,
+push the stable candidate, and record the actual base and resulting head in the review descriptor. This
+is the single implementation synchronization point; do not substitute a direct main merge into every child.
 
 After final review, preserve the exact reviewed head. If base moves, run `workflow_ops.py review-reconcile`.
 Disjoint base-only movement does not restart source review or require a candidate merge; the merge-group run
