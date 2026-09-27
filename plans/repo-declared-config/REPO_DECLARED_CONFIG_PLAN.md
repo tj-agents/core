@@ -90,12 +90,103 @@ user-scope installs. Concretely:
    always-on standing guidance (the instructions every standards-managed repository loads) and
    in the skill/package authoring guidance: *never add or change a skill, hook, workflow or
    marketplace package without, in the same change, updating the harness manifest it requires,
-   so that every repository that pulls in that marketplace gets its harness updated.* Whatever
-   the mechanism turns out to be, it must be enforced, not remembered: a standards-repo CI check
+   so that every repository that pulls in that marketplace gets its harness updated.* The
+   mechanism below is enforced, not remembered: a standards-repo CI check
    fails when a package's skills/hooks/workflows need harness (plugins, hooks, permissions) that
    its manifest does not declare, and consumer CI fails when a repository's committed settings
    drift from the generated harness. A machine's local configuration must never be what makes a
    standard work.
+
+### Phase-2 harness manifest mechanism
+
+Core owns the schema at `.agents/plugins/harness.schema.json`. Each standards repository owns one
+manifest per published plugin at `.agents/plugins/harness/<plugin>.json`; core starts with
+`base.json`, `engineering.json`, and `machine.json`. `scripts/sync_harness_manifests.py` validates
+and refreshes the manifests, and `scripts/update_catalog_digests.py` copies the validated `requires`
+object into the matching plugin entry in `.agents/catalog/catalog.json`. The generated package also
+ships the manifest as `plugins/<plugin>/harness.json`, so its package digest covers the declaration.
+The catalog schema makes `harness` required for every current plugin release.
+
+The manifest shape is fixed:
+
+```json
+{
+  "schema_version": 1,
+  "plugin": "base-agents/machine",
+  "source_roots": [".agents/machine"],
+  "source_excludes": [".agents/catalog/catalog.json"],
+  "source_digest": "sha256:<digest of sorted authored source paths, lengths, and bytes>",
+  "requires": {
+    "marketplaces": [{"id": "base-agents", "repository": "tj-agents/core"}],
+    "plugins": ["base-agents/base", "base-agents/machine"],
+    "hooks": [
+      {"path": "hooks/example.py", "hosts": ["claude", "codex"]}
+    ],
+    "permissions": {
+      "claude_allow": [
+        "PowerShell(& *\\handoff-codex\\scripts\\launch-codex.ps1 *)",
+        "PowerShell(& *\\handoff-claude\\scripts\\launch-claude.ps1 *)"
+      ],
+      "codex_prefix_rules": [
+        {
+          "pattern": ["example", "safe-subcommand"],
+          "justification": "Required by the packaged workflow.",
+          "match": ["example safe-subcommand --flag"],
+          "not_match": ["example unsafe-subcommand"]
+        }
+      ]
+    }
+  }
+}
+```
+
+`hooks[].path` is the package-relative generated destination and `hosts` is a non-empty subset of
+`claude` and `codex`. Each Codex rule is an allow decision; the generator supplies
+`decision = "allow"` and requires non-empty pattern, justification, match and not-match arrays.
+`source_digest` covers every file below `source_roots`, a canonical record of that plugin's
+entries in `.agents/plugins/sources.json`, and every authored resource source those entries name.
+`source_excludes` is normally empty; only `base-agents/machine` may exclude
+`.agents/catalog/catalog.json`, which avoids the existing catalog/package digest self-reference.
+Adding or changing a skill, workflow, hook, host
+adapter, or package resource therefore makes `sync_harness_manifests.py --check` fail until the
+same change refreshes the declaration. The validator also proves every declared hook is wired by
+both host manifests where its `hosts` list requires that, every required plugin exists in the
+catalog, and every marketplace repository is one of the four `tj-agents` sources.
+
+`repo_config.py` reads the selected catalog plugins, unions their `requires` objects, and fails if
+the committed capability lock omits a required plugin. It owns these generated fields and files:
+
+- `.claude/settings.json`: `extraKnownMarketplaces`, `enabledPlugins`, and
+  `permissions.allow`, sorted and deduplicated. Repository-specific additions use a committed
+  `.agents/repository-harness.json` shaped as
+  `{"schema_version": 1, "requires": {<same requires object>}}` and validated through the
+  schema's `$defs/requires`; hand-edited values in those generated fields are drift.
+- `.codex/config.toml`: the managed marketplace/plugin section already generated today.
+- `.codex/rules/agent-harness.rules`: deterministic Starlark `prefix_rule` entries from
+  `codex_prefix_rules`, including inline `match`/`not_match` examples. Empty declarations remove
+  the generated file. Codex project rules load only for trusted projects and cannot safely express
+  a machine-varying plugin-cache script path, so the machine launcher currently declares no Codex
+  prefix rule; the existing hook/sandbox approval remains the honest minimum until a stable
+  repository-relative command exists.
+
+Claude's committed project `permissions.allow` supports `PowerShell(...)` rules and takes effect
+after workspace trust. The phase-4 acceptance session must prove that the two launcher patterns
+above satisfy the auto-mode classifier; if an `ask`/`deny` rule or managed policy still wins, record
+that external policy as the minimal non-repository remainder instead of broadening the patterns.
+
+The permanent prose rule lives in `.agents/base/stack-tiers/SKILL.md` (always loaded) and
+`PACKAGING.md` (package authoring). Enforcement lives in code: standards CI runs
+`python -B scripts/sync_harness_manifests.py --check`, catalog/schema tests and
+`pwsh .agents/sync-generated.ps1 -Check`; consumer CI runs `repo_config.py --mode check` and
+host-config parsing tests. `test_harness_manifests.py` covers stale digests, missing hook wiring,
+foreign marketplaces, absent required plugins and catalog drift; `test_repo_config.py` covers
+multi-package composition, permission deduplication, preservation of unrelated settings, stale
+generated-rule deletion, and check-mode drift.
+
+Implementation-path standards: root `AGENTS.md` and `SOURCE_LAYOUT.md` govern the authored versus
+generated split; `PACKAGING.md` governs shipped runtime closure; the existing Python and JSON style
+in `repo_config.py`, `sync_plugin_packages.py`, and their tests governs the new validator and schema.
+No stack-specific standard applies to these paths.
 
 ## Gap: permissions and auto-mode rules (observed 2026-09-27)
 
