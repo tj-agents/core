@@ -31,7 +31,7 @@ The side-workstream predicate requires an explicit handoff action plus wording t
 ## Phases
 
 1. [x] Update the handoff owner, plan-execution route, UserPromptSubmit hook, and focused tests.
-2. Regenerate package output, update the 2.1.14 release metadata and catalog digests, run focused and repository checks, review, commit, push, and open a personal GitHub PR without merging.
+2. [x] Regenerate package output, update the 2.1.14 release metadata and catalog digests, run focused and repository checks, review, commit, push, and open a personal GitHub PR without merging.
 
 ## Acceptance criteria
 
