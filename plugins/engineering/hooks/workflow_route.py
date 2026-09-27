@@ -28,6 +28,24 @@ LONG_RUNNING = re.compile(
     r"\bP\d+\s*(?:-|\u2013)\s*P\d+\b",
     re.IGNORECASE,
 )
+SIDE_WORKSTREAM = re.compile(
+    r"\b(?:side\s+(?:task|work(?:stream)?)|separate\s+(?:task|workstream)|"
+    r"distinct(?:ly)?\s+(?:actionable\s+)?(?:task|workstream))\b",
+    re.IGNORECASE,
+)
+ACTIVE_WORK = re.compile(
+    r"\b(?:active|current|original|main|primary)\s+(?:goal|task|work(?:stream)?)\b",
+    re.IGNORECASE,
+)
+HANDOFF_ACTION = re.compile(
+    r"\b(?:hand\s*off|delegate|dispatch|launch|invoke)\b[^.!?\n]{0,80}"
+    r"\b(?:side\s+(?:task|work(?:stream)?)|separate\s+(?:task|workstream)|"
+    r"distinct(?:ly)?\s+(?:actionable\s+)?(?:task|workstream))\b|"
+    r"\b(?:side\s+(?:task|work(?:stream)?)|separate\s+(?:task|workstream)|"
+    r"distinct(?:ly)?\s+(?:actionable\s+)?(?:task|workstream))\b[^.!?\n]{0,80}"
+    r"\b(?:hand\s*off|delegate|dispatch|launch|invoke)\b",
+    re.IGNORECASE,
+)
 COMPLETE_STATUS = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?status\s*:?\s*(?:complete|completed|done|closed)\b"
 )
@@ -60,32 +78,42 @@ def selects_plan_execution(prompt: str, cwd: Path) -> bool:
     )
 
 
-def contract_path(script: Path) -> Path:
+def selects_side_workstream_handoff(prompt: str, cwd: Path) -> bool:
+    if not prompt.strip() or PLANNING_ONLY.search(prompt):
+        return False
+    return (
+        SIDE_WORKSTREAM.search(prompt) is not None
+        and HANDOFF_ACTION.search(prompt) is not None
+        and (active_goal(cwd) or ACTIVE_WORK.search(prompt) is not None)
+    )
+
+
+def contract_path(script: Path, relative_path: str, name: str) -> Path:
     payload_root = script.resolve().parent.parent
     candidates = (
-        payload_root / ".agents/engineering/workflow/plan-execution/SKILL.md",
-        payload_root / "engineering/workflow/plan-execution/SKILL.md",
+        payload_root / ".agents" / relative_path,
+        payload_root / relative_path,
     )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
     raise RuntimeError(
-        "cannot read plan-execution contract; expected one of: "
+        f"cannot read {name} contract; expected one of: "
         + ", ".join(str(path) for path in candidates)
     )
 
 
-def load_context(script: Path) -> str:
-    contract = contract_path(script)
+def load_context(script: Path, relative_path: str, name: str) -> str:
+    contract = contract_path(script, relative_path, name)
     try:
         text = contract.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as error:
-        raise RuntimeError(f"cannot read plan-execution contract at {contract}: {error}") from error
+        raise RuntimeError(f"cannot read {name} contract at {contract}: {error}") from error
     if not text.startswith("---\n") or "\n---\n" not in text or not text.strip():
-        raise RuntimeError(f"cannot read plan-execution contract at {contract}: invalid SKILL.md")
+        raise RuntimeError(f"cannot read {name} contract at {contract}: invalid SKILL.md")
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     return (
-        f"engineering:plan-execution automatically selected "
+        f"engineering:{name} automatically selected "
         f"(source SHA-256 {digest})\nSource: {contract}\n\n{text.strip()}"
     )
 
@@ -104,9 +132,16 @@ def main() -> int:
         if not isinstance(prompt, str) or not isinstance(cwd_value, str):
             raise RuntimeError("UserPromptSubmit payload requires string prompt and cwd fields")
         cwd = Path(cwd_value).resolve()
-        if not selects_plan_execution(prompt, cwd):
+        if selects_side_workstream_handoff(prompt, cwd):
+            context = load_context(
+                Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff"
+            )
+        elif selects_plan_execution(prompt, cwd):
+            context = load_context(
+                Path(__file__), "engineering/workflow/plan-execution/SKILL.md", "plan-execution"
+            )
+        else:
             return 0
-        context = load_context(Path(__file__))
     except (json.JSONDecodeError, OSError, RuntimeError, TypeError, ValueError) as error:
         print(f"workflow-route: {error}", file=sys.stderr)
         return 2
