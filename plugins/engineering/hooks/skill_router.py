@@ -1473,11 +1473,9 @@ def main():
         # a bare `grep`/`cat`/`sed -n` naming a routed path falls straight through to exit 0 below.
         shell_writes = shell_write_targets("\n".join(strings(tool_input)))
         targets = [path for path, _, _ in shell_writes]
-        commands = shell_commands(shell_command_text(tool_input))
     else:
         shell_writes = []
         targets = written_targets(tool_input)
-        commands = []
     cwd = data.get("cwd") or os.getcwd()
     root = find_repo_root(cwd)
     if root is None:
@@ -1507,6 +1505,12 @@ def main():
             "session. This tool call was NOT run.\n"
         )
         sys.exit(2)
+    # Only a table that declares command routes pays for parsing a shell call as commands, so an
+    # ordinary read keeps exiting here exactly as it did before command routes existed.
+    commands = (
+        shell_commands(shell_command_text(tool_input))
+        if is_shell and any(route.get("command") for route in routes) else []
+    )
     if not targets and not commands:
         sys.exit(0)
 
