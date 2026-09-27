@@ -155,9 +155,8 @@ if ($Frontier) {
     if (-not $ReasoningEffort) { $ReasoningEffort = $frontierModel.Effort }
 }
 elseif ($Lane -and -not ($Model -and $ReasoningEffort)) {
-    $tier = "lane $Lane -> "
     $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'codex'
-    if (-not $Model) { $Model = $laneModel.Model }
+    if (-not $Model) { $Model = $laneModel.Model; $tier = "lane $Lane -> " }
     if (-not $ReasoningEffort) { $ReasoningEffort = $laneModel.Effort }
 }
 
