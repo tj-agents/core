@@ -268,6 +268,26 @@ class Stub {
         if (-not $rejected) { throw "launch-claude.ps1 accepted -Frontier together with $($conflict.Keys -join ',')." }
     }
 
+    # --- both launchers refuse L1 unless the user authorized it, and launch nothing ---
+    foreach ($launcher in @($claudeLauncher, $codexLauncher)) {
+        if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
+        $rejected = $false
+        try { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' | Out-Null }
+        catch { $rejected = $true }
+        if (-not $rejected) { throw "$(Split-Path -Leaf $launcher) resolved -Lane L1 without -UserAuthorizedLane." }
+        if (Test-Path -LiteralPath $wtLog) { throw "$(Split-Path -Leaf $launcher) opened a tab for an unauthorized L1." }
+    }
+
+    Remove-Item -LiteralPath $wtLog -Force -ErrorAction SilentlyContinue
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' -UserAuthorizedLane
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.lanes.L1.model)) { throw 'launch-claude.ps1 did not resolve an authorized L1.' }
+
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' -UserAuthorizedLane | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L1.reasoning_effort)") { throw 'launch-codex.ps1 did not resolve an authorized L1.' }
+
     # --- handoff-codex: -Lane resolves both model and effort ---
     Remove-Item -LiteralPath $wtLog -Force
     & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' | Out-Null
