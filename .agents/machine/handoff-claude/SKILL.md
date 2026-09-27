@@ -51,9 +51,9 @@ govern:
 
 | Lane | For |
 |---|---|
-| `L1` | Critical design decisions, where the hardest judgement in the work sets a direction that later work builds on. |
-| `L2` | One-way design decisions of ordinary reach, where a choice cannot be taken back once work builds on it. |
-| `L3` | Open-ended judgement at the top of the ladder, where the answer is not yet known. |
+| `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
+| `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
+| `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
 | `L4` | Ordinary specified work that a compiler or a test suite will catch, delivery included. |
 | `L5` | Mechanical work whose shape is already decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
