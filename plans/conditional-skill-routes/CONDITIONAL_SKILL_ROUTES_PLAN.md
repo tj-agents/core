@@ -71,7 +71,3 @@ separate PR per consumer if the user asks.
    states its dependency on the core PR.
 4. Record progress, verification and PR links in a `CONDITIONAL_SKILL_ROUTES_PROGRESS.md` beside this
    plan, and report back.
-
-## Progress
-
-- 2026-09-27: Goal written from a winwrap session; handed off to Codex. Not started.
