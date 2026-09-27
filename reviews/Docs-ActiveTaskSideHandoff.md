@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `b9ea7665c0e9054a92fc238c53d3f0665d1149ea`  `(2026-09-27)`
+**Reviewed up to commit:** `e0fd111bf64f9bbf8872b5fc55a66d60b4a4b99f`  `(2026-09-27)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-09-27 — full
@@ -35,6 +35,23 @@
 **Candidate path-set:** `sha256:c61c571841c68be1f5941261b0cd87c42398e46a52871aea92388cd003b616ea` `(7 paths)`
 **Candidate bundle:** `C:\Users\TommySeery\source\repos\base-agents\.git\agent-workflow\runs\core-side-task-handoff-20260927\review\a97895ba1376bea209deb2fbd6fcd1fb017d50ef78230c3c9afc10a2d9d23731`
 **Candidate bundle identity:** `sha256:9cad5b6dd72e86775d951eaa1c10327869a1e53f150f8863043585959d570985`
+**Work-order path:** `reviews/Docs-ActiveTaskSideHandoff.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No findings.
+
+## Review pass — 2026-09-27 — incremental
+
+**Candidate base:** `b9ea7665c0e9054a92fc238c53d3f0665d1149ea`
+**Candidate head:** `e0fd111bf64f9bbf8872b5fc55a66d60b4a4b99f`
+**Candidate branch:** `Docs/ActiveTaskSideHandoff`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:2b70403b9c4338b8c8a45415f3659d0ce199e379e0e8277683f84349cd5b8439` `(2 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\base-agents\.git\agent-workflow\runs\core-side-task-handoff-20260927\review\89183707b45c34d7b4d3667699e46504f56399625ee20006d96e8a8d28f5c044`
+**Candidate bundle identity:** `sha256:45cf8af07d7e025b6661023bce3288fd069d07f45cdb6eaad5631d661285d9cc`
 **Work-order path:** `reviews/Docs-ActiveTaskSideHandoff.md`
 **Work-order mode:** `append`
 **Pass judgment:** `approved`
