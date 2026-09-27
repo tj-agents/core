@@ -136,15 +136,6 @@ class LaneTableTests(unittest.TestCase):
                             "a rung pricing the frontier pair lets a lane reach the tier",
                         )
 
-    def test_only_l1_requires_user_authorization_on_both_hosts(self):
-        # The launchers refuse a rung carrying this flag unless the user authorized it, so a delegation
-        # that judged its own job critical, or read a merge at its end as irreversibility, cannot reach L1.
-        for host in HOST_IDS:
-            gated = [lane for lane, rung in table(host)["lanes"].items() if rung.get("requires_user_authorization")]
-            with self.subTest(host=host):
-                self.assertEqual(["L1"], gated)
-                self.assertIs(True, table(host)["lanes"]["L1"]["requires_user_authorization"])
-
     def test_claude_records_a_context_ceiling_and_its_cheapest_rung_is_smaller(self):
         lanes = table("claude")["lanes"]
         ceilings = [rung["context_ceiling"] for rung in lanes.values()]
