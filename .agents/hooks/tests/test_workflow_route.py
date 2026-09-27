@@ -70,6 +70,13 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_side_thing_handoff_routes_with_the_requested_wording(self):
+        result = self.run_hook(
+            "This is a side thing; do a handoff and retain the current task in this session."
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:handoff automatically selected", result.stdout)
     def test_planning_only_prompt_stays_silent_even_with_an_active_goal(self):
         self.write_goal()
         result = self.run_hook("Planning only: revise the plan, but do not implement it.")
