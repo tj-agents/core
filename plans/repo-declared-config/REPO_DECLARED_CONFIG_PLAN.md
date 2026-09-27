@@ -69,6 +69,51 @@ or notification settings. A plugin refresh must not break hooks already loaded b
    resolve the currently installed released package without a machine-specific path. The repair
    and its regression test live in core; never create a local junction as part of normal operation.
 
+## Priority and authorization (Tommy, 2026-09-27)
+
+Machine-agnostic agent behaviour is the priority and is authorized end to end: implement,
+test, open PRs and deliver through each repository's normal merge path. Tommy's requirement,
+verbatim in substance: if the standards require certain harnesses, the standards declare them
+and every consuming repository gets them committed. No reliance on local permissions or
+user-scope installs. Concretely:
+
+1. Each standards package (core, cpp, react, ...) declares the harness it requires — plugins,
+   marketplaces, hooks and the permission rules its own workflows need — in a committed manifest.
+2. The phase 2 generator composes those manifests for a repository's selected stacks and writes
+   its committed `.claude/settings.json` and `.codex/config.toml`; consumer CI fails on drift.
+3. Do phase 2 (including the permissions gap below) first for the C++ consumers
+   (`cpp/windows/winwrap`, `sandbox-hwid`). Phase 1's Concertable ordering constraint still
+   applies to Concertable; it does not block phase 2 elsewhere.
+4. Keep the sibling plan `plans/conditional-skill-routes/` separate but compatible: routes stay
+   the "which skills must be loaded" contract; this plan owns "which harness is installed".
+5. **Make it a permanent, fundamental rule — not just this plan's outcome.** Codify it in core's
+   always-on standing guidance (the instructions every standards-managed repository loads) and
+   in the skill/package authoring guidance: *never add or change a skill, hook, workflow or
+   marketplace package without, in the same change, updating the harness manifest it requires,
+   so that every repository that pulls in that marketplace gets its harness updated.* Whatever
+   the mechanism turns out to be, it must be enforced, not remembered: a standards-repo CI check
+   fails when a package's skills/hooks/workflows need harness (plugins, hooks, permissions) that
+   its manifest does not declare, and consumer CI fails when a repository's committed settings
+   drift from the generated harness. A machine's local configuration must never be what makes a
+   standard work.
+
+## Gap: permissions and auto-mode rules (observed 2026-09-27)
+
+The design above covers plugins and marketplaces but not permission rules, which also change
+agent behaviour per machine. In `cpp/windows/winwrap` on this machine, Claude Code's auto-mode
+classifier denied the packaged `machine:handoff-codex` launcher (`launch-codex.ps1 ...
+-BypassHookTrust`) as "Create Unsafe Agents". The same handoff works on Tommy's other machine,
+where a user-scope allow rule presumably exists. The handoff skill is standard workflow, so
+its launch permission must not depend on which machine runs it.
+
+**Extend phase 2:** the generator also writes the permission allow rules that the standards'
+own workflows need (at minimum the packaged handoff launchers) into the repository's
+`.claude/settings.json`, and the equivalent Codex approval policy where one exists. The
+machine verifier (phase 4) reports user-scope permission rules that duplicate or contradict
+the generated ones. Confirm in a real session that a project-scope allow rule satisfies the
+auto-mode classifier; if it does not, record the limitation and the minimal user-scope
+remainder instead of claiming the machine is clean.
+
 ## Marketplaces come only from tj-agents
 
 The canonical repositories are `tj-agents/core`, `tj-agents/cpp`, `tj-agents/react` and
