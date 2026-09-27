@@ -80,6 +80,13 @@ gh pr view --json number,state,title,url --jq '{number,state,title,url}'
 On the default branch, or with no PR for this branch, **stop** — there is nothing to land
 (`engineering:open-pr` opens one). Already `MERGED` → skip to step 5. `CLOSED` → stop and report.
 
+For a manually managed stack, resolve the PR's current base and the stack trunk before enabling merge.
+A child targeting an unmerged parent's branch is not eligible: continue the lower layer's delivery and
+record that dependency instead of merging the child into the parent. After the parent lands, verify
+retargeting/restacking, rerun affected checks and refresh the child's delivery binding. Verified native
+stack merging may handle the chain atomically; follow its documented semantics and confirm every layer's
+required review and checks. A green persistent-delivery action alone does not override this base gate.
+
 ### 2. Prove the branch is pushed and preserve the final-review synchronization
 
 `engineering:merging` owns the rule; two mechanical traps belong here.
@@ -92,7 +99,7 @@ On the default branch, or with no PR for this branch, **stop** — there is noth
 
   ```bash
   git fetch origin --quiet
-  git rev-list --left-right --count origin/main...HEAD   # -> "<behind-base>	<ahead>"
+  git rev-list --left-right --count <actual-base>...HEAD   # -> "<behind-base>	<ahead>"
   ```
 
   Before final review, behind by anything means merge base in with exactly
@@ -275,8 +282,10 @@ inventory above.** The
 worktree-cleanup audit gate is a backstop that makes a missed cleanup visible, not a substitute for doing it
 immediately.
 
-If plan work remains, create its next PR-scoped worktree from the updated base and resume the same ledger. If
-only remote gates remain, use a fresh close-out worktree.
+If plan work remains, reconcile and continue an existing successor stack layer, including its base,
+head, review evidence and delivery binding. Create a new PR-scoped worktree from the updated base only
+when no successor exists, and resume the same ledger. If only remote gates remain and no active slice
+owns them, use a fresh close-out worktree.
 
 ### 6. Follow the publish and version-sync consequence to a terminal state
 

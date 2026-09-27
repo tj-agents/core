@@ -114,6 +114,9 @@ is already complete, reviewed, and exact-head-CI-ready.
 ### 6. Bind the delivery owner
 
 A PR with nothing owning its wait is what turns every later transition into a question for the user.
+For a stack child, record its parent dependency in the owning ledger. A binding may monitor its checks,
+but `engineering:merge` must verify that its base is eligible before acting. After a parent lands,
+reconcile the child and refresh this binding so the continuation does not rely on stale topology.
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind
