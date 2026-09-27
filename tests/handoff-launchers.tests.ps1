@@ -279,8 +279,9 @@ class Stub {
 
     # --- handoff-codex: an explicit -Model survives a -Lane, which still fills the effort half ---
     Remove-Item -LiteralPath $wtLog -Force
-    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' -Model 'explicitly-named-model' | Out-Null
+    $launched = & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' -Model 'explicitly-named-model' 6>&1 | Out-String
     $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($launched -notmatch [regex]::Escape("on explicitly-named-model at $($codexTable.lanes.L4.reasoning_effort)")) { throw 'launch-codex.ps1 labelled an explicit -Model as the lane model.' }
     if ($capturedArgs -notmatch 'explicitly-named-model') { throw 'launch-codex.ps1 let -Lane override an explicit -Model.' }
     if ($capturedArgs -match [regex]::Escape($codexTable.lanes.L4.model)) { throw 'launch-codex.ps1 passed the lane model alongside an explicit -Model.' }
     if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L4.reasoning_effort)") { throw 'launch-codex.ps1 did not fill the effort half from the lane beside an explicit -Model.' }
