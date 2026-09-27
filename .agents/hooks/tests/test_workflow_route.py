@@ -49,9 +49,45 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         result = self.run_hook("Resume the plan and carry it through delivery.")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("engineering:plan-execution", result.stdout)
+
+    def test_active_side_workstream_handoff_loads_the_full_canonical_workflow(self):
+        self.write_goal()
+        result = self.run_hook(
+            "Hand off this distinct side task while keeping the active goal in this session."
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+        canonical = (ROOT / ".agents/engineering/workflow/handoff/SKILL.md").read_text(
+            encoding="utf-8"
+        ).strip()
+        self.assertIn("engineering:handoff automatically selected", context)
+        self.assertNotIn("engineering:plan-execution automatically selected", context)
+        self.assertEqual(canonical, context.split("\n\n", 1)[1])
+
+    def test_side_workstream_handoff_with_an_explicit_active_task_routes_without_a_goal(self):
+        result = self.run_hook(
+            "Delegate the separate workstream and retain the original task in this session."
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_side_thing_handoff_routes_with_the_requested_wording(self):
+        result = self.run_hook(
+            "This is a side thing; do a handoff and retain the current task in this session."
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:handoff automatically selected", result.stdout)
     def test_planning_only_prompt_stays_silent_even_with_an_active_goal(self):
         self.write_goal()
         result = self.run_hook("Planning only: revise the plan, but do not implement it.")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+
+    def test_planning_only_side_workstream_prompt_stays_silent(self):
+        self.write_goal()
+        result = self.run_hook(
+            "Planning only: hand off this side task, but do not implement it."
+        )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
 
