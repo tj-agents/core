@@ -28,24 +28,24 @@ stopping after the checkout exists is the failure this sentence prevents.
 | Planning-only authoring with no delivery branch | Use the normal checkout; **do not create a worktree** |
 | Create or restore one branch checkout | **Create**, below |
 | Resume plan-managed work | The repository's plan floor — its ledger owns the branch, PR and worktree identity |
-| Read-only inventory | `./scripts/worktrees.ps1 audit` |
-| Close a merged PR's worktree | `./scripts/worktrees.ps1 close` |
-| Retire a superseded no-PR branch | `./scripts/worktrees.ps1 retire` |
+| Read-only inventory | `./scripts/worktrees.ps1 audit` when the repository ships it; otherwise `git worktree list --porcelain` and each entry's `git -C "<worktree>" status --porcelain` |
+| Close a merged PR's worktree | `engineering:merge` Step 5's cleanup, which uses the helper when present and native Git otherwise |
+| Retire a superseded no-PR branch | `./scripts/worktrees.ps1 retire` when the repository ships it; otherwise report the worktree and leave it |
 
-**`worktrees.ps1` is a vendored constant, not a per-repo path.** Its body carries no repo-specific value — no
-suite name, no project path, no service roster — so it is generated into every consumer beside the hooks and
-may be named outright. Cleanup is repository automation and needs no agent judgment: the script classifies
-registered worktrees from Git evidence and **never deletes**, refusing dirty, detached, mismatched, post-PR,
-case-colliding, persistent and missing-ledger states. **Never substitute a manual deletion for `retire`.**
+**`scripts/worktrees.ps1` is repository-vendored, not plugin-shipped.** Where a repository carries it, the
+script classifies registered worktrees from Git evidence and **never deletes**, refusing dirty, detached,
+mismatched, post-PR, case-colliding, persistent and missing-ledger states; trust its refusal. Where it is
+absent, use the fallbacks above. **Never substitute a manual deletion for `retire`.**
 
 ## Create
 
 1. **Apply the repository's worktree identity gate first.** Read its guidance and state whether the task
    matches the current branch directly, or is branch-local work because it changes code not yet on the default
    branch. Verify against the dirty paths and the other registered worktrees rather than matching on a shared
-   refactor name. **If neither basis holds, stop and ask.** Do not split code that exists only on the current
-   feature branch onto a new branch. A planning-only task never reaches this creation procedure; active
-   plan-managed delivery continues in its ledger's owning worktree.
+   refactor name. An explicitly planned dependent stack slice also matches: record its parent and branch
+   from that parent's tip under `engineering:git-branching`. Do not treat all unmerged feature code as
+   one mandatory PR. **If none of these bases holds, stop and resolve ownership.** A planning-only task
+   never reaches this creation procedure; active delivery continues in the ledger's recorded slice.
 2. **Confirm no open red generated-sync PR before starting new work** — `engineering:merging` owns
    that gate and the reason it is a branch-time check rather than a per-prompt one. A red one means the
    platform is mid-break; clear it first.
@@ -56,7 +56,8 @@ case-colliding, persistent and missing-ledger states. **Never substitute a manua
    $repository = [IO.Path]::GetDirectoryName($commonDirectory.Trim())
    ```
 
-4. **Fetch with pruning, and start new branches at the fetched remote default — never at local default**,
+4. **Fetch with pruning. Independent branches start at the fetched remote default; dependent stack
+   layers start at their recorded parent's current tip. Never start from a stale local default**,
    which is routinely stale. Naming is `engineering:git-branching`'s: the repository's capitalized
    `<Type>/<Name>` form, and **never a second casing of an existing name** — a case-insensitive filesystem
    cannot hold both, and the remote then breaks fetch for everyone. Match an existing branch's casing rather
@@ -69,13 +70,15 @@ case-colliding, persistent and missing-ledger states. **Never substitute a manua
    git -C $repository worktree add $path -b $branch origin/<default>
    ```
 
+   For a dependent stack layer, replace `origin/<default>` with the verified parent ref and record its
+   SHA. Do not merge main separately into each layer as a substitute for reconciling the stack.
+
    For an existing local branch, omit `-b` and the start point. For a remote-only branch, create its matching
    local tracking ref with `-b $branch --track "origin/$branch"`.
 
 5. **Flatten `/` to `-` in the folder name.** A branch hierarchy left unflattened creates nested worktree
-   roots, which are ambiguous to every tool that walks the tree. `worktrees.ps1 audit` recognises both a
-   `.worktrees` directory inside the repository and a `<repo>.worktrees` sibling, so either placement is
-   inventoried — but **never** place one under a directory the agent harness reserves for its own ephemeral
+   roots, which are ambiguous to every tool that walks the tree. Inventory covers both a `.worktrees` directory
+   inside the repository and a `<repo>.worktrees` sibling, so either placement is found — but **never** place one under a directory the agent harness reserves for its own ephemeral
    worktrees, where manual trees collide with it and land as stray gitlinks that break submodule-aware
    checkouts.
 6. **Verify** the resulting path, branch, HEAD, base or existing remote head, and clean status. Use absolute

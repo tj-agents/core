@@ -4,7 +4,7 @@ description: Land the current branch's PR through the merge queue and return to 
 
 kind: workflow
 domain: process
-lane: L2
+lane: L4
 ---
 
 # Landing a PR through the merge queue
@@ -80,6 +80,13 @@ gh pr view --json number,state,title,url --jq '{number,state,title,url}'
 On the default branch, or with no PR for this branch, **stop** — there is nothing to land
 (`engineering:open-pr` opens one). Already `MERGED` → skip to step 5. `CLOSED` → stop and report.
 
+For a manually managed stack, resolve the PR's current base and the stack trunk before enabling merge.
+A child targeting an unmerged parent's branch is not eligible: continue the lower layer's delivery and
+record that dependency instead of merging the child into the parent. After the parent lands, verify
+retargeting/restacking, rerun affected checks and refresh the child's delivery binding. Verified native
+stack merging may handle the chain atomically; follow its documented semantics and confirm every layer's
+required review and checks. A green persistent-delivery action alone does not override this base gate.
+
 ### 2. Prove the branch is pushed and preserve the final-review synchronization
 
 `engineering:merging` owns the rule; two mechanical traps belong here.
@@ -92,11 +99,12 @@ On the default branch, or with no PR for this branch, **stop** — there is noth
 
   ```bash
   git fetch origin --quiet
-  git rev-list --left-right --count origin/main...HEAD   # -> "<behind-base>	<ahead>"
+  git rev-list --left-right --count <actual-base>...HEAD   # -> "<behind-base>	<ahead>"
   ```
 
-  Before final review, behind by anything means merge base in, rebuild the affected scope, push, freeze the
-  candidate, and review. After the review watermark exists, run `workflow_ops.py review-reconcile` against
+  Before final review, reconcile any movement in the actual base, rebuild the affected scope, push,
+  freeze the candidate, and review. A standalone branch may merge `origin/<default>`; a stack child
+  follows the verified restacking procedure against its immediate parent. After the review watermark exists, run `workflow_ops.py review-reconcile` against
   its descriptor. Disjoint base-only movement preserves the exact reviewed head and proceeds to merge-group
   validation. Relevant movement, including a platform pin or routed rule change, requires an update, focused
   validation, push, and incremental review.
@@ -198,8 +206,9 @@ unchanged observations remain silent and never create a model turn or user-facin
 Before removing persistent state, inspect the completed delivery binding. A standalone PR removes its
 continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
 the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
-stage creates the successor worktree and PR before the same task is rebound to its exact head and runs. Never
-carry the completed PR's review watermark or merge authorization into the successor.
+stage reconciles an existing successor layer or creates its worktree and PR when none exists, before
+rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
+watermark or merge authorization into the successor.
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
 remove that path. Move it to the fetched remote default before closing any linked worktree:
@@ -261,7 +270,8 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
 4. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
-   the old local branch with the same lowercase `-d` only after it is no longer checked out.
+   the old local branch with the same lowercase `-d` only after it is no longer checked out. Double-quote each
+   path and run each command on its own; that exact form is what the plugin's harness grant approves.
 5. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
    target must be absent, the local merged branch must be gone, the primary checkout must be current on the
    remote default, and pre-existing user files must remain. Treat any removal error or residual target path
@@ -273,8 +283,10 @@ inventory above.** The
 worktree-cleanup audit gate is a backstop that makes a missed cleanup visible, not a substitute for doing it
 immediately.
 
-If plan work remains, create its next PR-scoped worktree from the updated base and resume the same ledger. If
-only remote gates remain, use a fresh close-out worktree.
+If plan work remains, reconcile and continue an existing successor stack layer, including its base,
+head, review evidence and delivery binding. Create a new PR-scoped worktree from the updated base only
+when no successor exists, and resume the same ledger. If only remote gates remain and no active slice
+owns them, use a fresh close-out worktree.
 
 ### 6. Follow the publish and version-sync consequence to a terminal state
 
