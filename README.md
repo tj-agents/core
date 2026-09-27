@@ -16,7 +16,7 @@ in `/hooks`; a fresh missing-marketplace write probe is required before claiming
 coverage limit is tracked in `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents
 a generated native-instruction fallback.
 
-The split packages form the **2.1.12** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.13** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.

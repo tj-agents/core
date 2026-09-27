@@ -96,8 +96,9 @@ Enter merge only when the recorded authorization permits it. Never approve, merg
 deploy, delete, widen scope, or create another continuation without authority.
 
 On an intermediate merge with a workflow handoff, close the completed PR binding, checkpoint it, resume the
-recorded next stage through plan-execution, create the successor delivery, and update this same Scheduled Task
-to its exact PR/head/worktree/check binding. The successor has independent review and authorization gates.
+recorded next stage through plan-execution, reconcile the existing recorded successor or create it when
+absent, and update this same Scheduled Task to its refreshed exact PR/head/worktree/check binding. The
+successor has independent review and authorization gates.
 
 On terminal merge, closure, supersession, external head replacement, missing authorization, exhausted
 product/model/role capability, or another genuine human gate, remove this task, delete
