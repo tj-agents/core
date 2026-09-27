@@ -196,6 +196,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/command-routes.json",
+      "destination": "hooks/command-routes.json"
+    },
+    {
+      "plugin": "engineering",
       "source": ".codex/adapters/pre_tool_use.py",
       "destination": "hooks/pre_tool_use_adapter.py"
     },

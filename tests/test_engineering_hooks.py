@@ -115,10 +115,18 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("Bash", codex_router["matcher"])
         self.assertIn("apply_patch", codex_router["matcher"])
         self.assertNotIn("functions", codex_router["matcher"])
-        self.assertFalse(any("skill_router.py" in command for command in commands(codex, "PreToolUse")))
+        # Engineering runs the router only over its own command routes; the path router is base's.
+        self.assertTrue(all(
+            command.endswith("--package-routes")
+            for command in commands(codex, "PreToolUse") if "skill_router.py" in command
+        ))
         self.assertFalse(any("red_run_gate.py" in command for event in codex["hooks"] for command in commands(codex, event)))
         self.assertTrue(any("skill_router.py" in command for command in commands(base_claude, "PreToolUse")))
-        self.assertFalse(any("skill_router.py" in command for command in commands(claude, "PreToolUse")))
+        # Engineering runs the router only over its own command routes; the path router is base's.
+        self.assertTrue(all(
+            command.endswith("--package-routes")
+            for command in commands(claude, "PreToolUse") if "skill_router.py" in command
+        ))
         for event in ("PostToolUse", "PostToolUseFailure", "Stop"):
             self.assertTrue(
                 any("red_run_gate.py" in command for command in commands(claude, event)), event

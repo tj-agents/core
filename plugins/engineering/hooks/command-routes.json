@@ -1,0 +1,35 @@
+{
+  "description": "Delivery commands owned by engineering procedures. Shipped only by the engineering package and evaluated by its `skill_router.py --package-routes` hook; each `command` regex matches one normalized simple command (bare program name, single spaces). The skill-routes contract owns the schema.",
+  "routes": [
+    {
+      "command": "^gh(?: \\S+)*? pr (?:create|new)(?: |$)",
+      "skills": ["engineering:open-pr"],
+      "note": "open-pr owns the PR title and the ## Why / ## What body template."
+    },
+    {
+      "command": "^gh(?: \\S+)*? pr edit(?: \\S+)*? (?:--body|--body-file|--title|-b|-F|-t)(?:[ =]|$)",
+      "skills": ["engineering:open-pr"],
+      "note": "Rewriting a PR title or body follows the same open-pr template."
+    },
+    {
+      "command": "^gh(?: \\S+)*? pr merge(?: |$)",
+      "skills": ["engineering:merge"],
+      "note": "merge owns the terminal-check, queue and cleanup loop; merge-docs' admin merge relies on it too."
+    },
+    {
+      "command": "^gh(?: \\S+)*? api .*\\b(?:enqueuePullRequest|mergePullRequest)\\b",
+      "skills": ["engineering:merge"],
+      "note": "A GraphQL enqueue or merge is a merge."
+    },
+    {
+      "command": "^gh(?: \\S+)*? api (?=.*/pulls/[0-9]+/merge\\b)(?=.*(?:-X|--method)[ =]?PUT\\b)",
+      "skills": ["engineering:merge"],
+      "note": "A REST PUT to a pull's merge endpoint is a merge."
+    },
+    {
+      "command": "^(?:launch-(?:claude|codex)\\.ps1|(?i:pwsh|powershell)(?: -(?!(?i:c|command)\\b)\\S+(?: [^-'\" ]\\S*)?)* ['\"]?[^ '\"]*launch-(?:claude|codex)\\.ps1['\"]?)(?: |$)",
+      "skills": ["engineering:handoff"],
+      "note": "handoff checkpoints the goal before a launcher transfers or side-launches work."
+    }
+  ]
+}

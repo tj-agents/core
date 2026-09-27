@@ -19,6 +19,10 @@ Two behaviours, and the difference matters:
   standard with the condition under which it applies. Those are advice, shown once per route per session
   (Claude receives them on an allowed call as PreToolUse context) and never demanded, so a header of free
   functions is not held hostage to a mixin standard. The skill-routes contract owns the schema.
+- **A delivery command is routed like a path.** A route keyed on `command` instead of `path` matches one
+  simple command inside a shell call, so `gh pr create` cannot run without the procedure that owns the PR
+  body. The owning package declares those routes beside this file (`command-routes.json`, shipped by
+  `engineering`) and its hook runs this router with `--package-routes`; a repo table may add its own.
 - **A deny pattern -> block every time.** Those are mechanically decidable violations, so they are not
   advice. A repo whose rules are also expressible in its build should enforce them there too - a hook
   matcher is per-tool and never sees `dotnet new`, a shell heredoc or an MCP write.
@@ -144,6 +148,10 @@ PATCH_FILE_BLOCK = re.compile(
     re.IGNORECASE | re.MULTILINE | re.DOTALL,
 )
 QUERY_FLAG = "--skills-for"
+PACKAGE_FLAG = "--package-routes"
+# Routes a package declares for the procedures it owns. Only the package that ships this file beside the
+# router evaluates it, so a repo cannot drop or duplicate the rule by forgetting to copy it.
+PACKAGE_ROUTES_FILE = Path(__file__).resolve().parent / "command-routes.json"
 VERIFY_FLAG = "--verify-install"
 DIFF_FLAG = "--check-diff"
 ENFORCEMENT_RULES_FILE = "enforcement-rules.json"
@@ -421,6 +429,90 @@ def shell_write_targets(command):
     return [(path, text, replaces) for path, (text, replaces) in writes.items()]
 
 
+_COMMAND_SEPARATOR_RE = re.compile(r"&&|\|\||[;|\n]")
+_POWERSHELL_HERESTRING_RE = re.compile(r"@(['\"])\r?\n.*?\r?\n\1@", re.DOTALL)
+_ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_INLINE_SHELLS = {"sh", "bash", "zsh", "pwsh", "powershell"}
+_INLINE_FLAGS = {"-c", "-lc", "-command", "--command"}
+_EXECUTABLE_SUFFIXES = (".exe", ".cmd", ".bat")
+
+
+def _quote_masked(text):
+    """`text` with every balanced quoted interior blanked at the same offsets, so a separator or a
+    command name inside a string argument can never split or match."""
+    chars = list(text)
+    index = 0
+    while index < len(text):
+        quote = text[index]
+        if quote in "\"'":
+            close = text.find(quote, index + 1)
+            if close != -1:
+                for position in range(index + 1, close):
+                    chars[position] = "x"
+                index = close + 1
+                continue
+        index += 1
+    return "".join(chars)
+
+
+def _normalized_command(segment):
+    tokens = _shell_tokens(segment.strip().lstrip("&({").strip())
+    if not tokens:
+        return None
+    while tokens and _ENV_ASSIGNMENT_RE.match(tokens[0]):
+        tokens = tokens[1:]
+    if not tokens:
+        return None
+    program = _strip_quotes(tokens[0]).replace("\\", "/").rsplit("/", 1)[-1].lower()
+    for suffix in _EXECUTABLE_SUFFIXES:
+        if program.endswith(suffix):
+            program = program[: -len(suffix)]
+    return program, [program, *tokens[1:]]
+
+
+def shell_commands(command, depth=0):
+    """Every simple command a shell call runs, each normalized to single-spaced text whose first word
+    is the bare program name (no directory, no `.exe`, no leading `VAR=value`).
+
+    A heredoc or here-string body is content, not a command, so it is removed first. An inline script
+    (`bash -c "..."`, `pwsh -Command "..."`) is followed into, so wrapping a command in a shell does not
+    hide it.
+    """
+    if not command:
+        return []
+    command = _HEREDOC_RE.sub(lambda match: match.group("rest") + "\n", command)
+    command = _POWERSHELL_HERESTRING_RE.sub("''", command)
+    masked = _quote_masked(command)
+    found, cursor = [], 0
+    for separator in [*_COMMAND_SEPARATOR_RE.finditer(masked), None]:
+        end = separator.start() if separator else len(command)
+        normalized = _normalized_command(command[cursor:end])
+        cursor = separator.end() if separator else end
+        if normalized is None:
+            continue
+        program, tokens = normalized
+        found.append(" ".join(tokens))
+        if program in _INLINE_SHELLS and depth < 2:
+            for index, token in enumerate(tokens[1:-1], start=1):
+                if token.lower() in _INLINE_FLAGS:
+                    found.extend(shell_commands(_strip_quotes(tokens[index + 1]), depth + 1))
+                    break
+    return found
+
+
+def shell_command_text(tool_input):
+    """The command a shell tool will run - not its description or other metadata."""
+    for key in ("command", "cmd", "script"):
+        value = tool_input.get(key)
+        if isinstance(value, str):
+            return value
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+            if len(value) >= 3 and value[-2].lower() in _INLINE_FLAGS:
+                return value[-1]
+            return " ".join(value)
+    return "\n".join(strings({k: v for k, v in tool_input.items() if k != "description"}))
+
+
 def removed_content_by_target(tool_input, cwd):
     direct = [tool_input.get("old_string"), tool_input.get("old_source")]
     for edit in tool_input.get("edits") or []:
@@ -679,21 +771,21 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
     return outcomes
 
 
-def state_path(session_id):
-    key = hashlib.sha256((session_id or "nosession").encode()).hexdigest()[:16]
+def state_path(session_id, namespace=""):
+    key = hashlib.sha256(f"{namespace}{session_id or 'nosession'}".encode()).hexdigest()[:16]
     return Path(tempfile.gettempdir()) / f"skill-router-{key}.json"
 
 
-def load_seen(session_id):
+def load_seen(session_id, namespace=""):
     try:
-        return set(json.loads(state_path(session_id).read_text(encoding="utf-8")))
+        return set(json.loads(state_path(session_id, namespace).read_text(encoding="utf-8")))
     except (OSError, ValueError):
         return set()
 
 
-def save_seen(session_id, seen):
+def save_seen(session_id, seen, namespace=""):
     try:
-        state_path(session_id).write_text(json.dumps(sorted(seen)), encoding="utf-8")
+        state_path(session_id, namespace).write_text(json.dumps(sorted(seen)), encoding="utf-8")
     except OSError:
         pass  # a router that cannot persist should nag, never crash
 
@@ -814,6 +906,18 @@ def load_routes(root):
     return validate_routes(routes, ROUTES_FILE)
 
 
+def matching_command_routes(routes, commands):
+    """`(command, route)` for each command route matched by one simple command of this call."""
+    for route in routes:
+        pattern = route.get("command")
+        if not pattern:
+            continue
+        for command in commands:
+            if re.search(pattern, command):
+                yield command, route
+                break
+
+
 def matching_routes(routes, rel, content):
     """One matcher for both callers, so a review resolves a path exactly as the write-time block did."""
     for route in routes:
@@ -845,7 +949,7 @@ def conditional_skills(route):
 
 
 def route_key(route):
-    return route.get("path")
+    return route.get("path") if route.get("path") else f"command:{route.get('command')}"
 
 
 def advisory_key(route):
@@ -863,6 +967,20 @@ def validate_routes(routes, source):
         where = f"{source} route {index}"
         if not isinstance(route, dict):
             raise RoutesUnusable(f"{where} is not an object.")
+        command = route.get("command")
+        if command is not None:
+            if route.get("path"):
+                raise RoutesUnusable(f"{where} carries both `path` and `command`; a route matches one.")
+            if not isinstance(command, str) or not command:
+                raise RoutesUnusable(f"{where} `command` must be a non-empty regex.")
+            try:
+                re.compile(command)
+            except re.error as error:
+                raise RoutesUnusable(f"{where} `command` is not a valid regex: {error}") from error
+            if route.get("deny") or route.get("content_requires"):
+                raise RoutesUnusable(
+                    f"{where} is a command route; `deny` and `content_requires` are path-only."
+                )
         skills = route.get("skills", [])
         if not isinstance(skills, list) or not all(isinstance(name, str) and name for name in skills):
             raise RoutesUnusable(f"{where} `skills` must be a list of skill names.")
@@ -1280,7 +1398,54 @@ def verify_install(argv):
     return 0
 
 
+def package_routes():
+    """The routes shipped beside this file by the package that owns their procedures, or None."""
+    if not PACKAGE_ROUTES_FILE.is_file():
+        return None
+    try:
+        parsed = json.loads(PACKAGE_ROUTES_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RoutesUnusable(f"the shipped {PACKAGE_ROUTES_FILE.name} is unusable: {error}") from error
+    routes = parsed.get("routes") if isinstance(parsed, dict) else None
+    if not isinstance(routes, list):
+        raise RoutesUnusable(f"the shipped {PACKAGE_ROUTES_FILE.name} has no usable `routes` list.")
+    return validate_routes(routes, f"the shipped {PACKAGE_ROUTES_FILE.name}")
+
+
+def package_gate():
+    """`--package-routes`: gate shell commands on the package's own command routes, in any repo.
+
+    Kept apart from the repo table so the two never evaluate the same route twice: the base hook reads
+    the repo's table, the owning package's hook reads only what that package ships.
+    """
+    try:
+        data = json.load(sys.stdin)
+    except ValueError:
+        return 0
+    tool_name = data.get("tool_name")
+    if not isinstance(tool_name, str) or tool_name.lower() not in SHELL_TOOLS:
+        return 0
+    harness = active_harness(tool_name, data)
+    if harness is None:
+        return 0
+    try:
+        routes = package_routes()
+    except RoutesUnusable as error:
+        sys.stderr.write(f"SKILL ROUTER - blocked, {error}\nThis is a packaging fault; report it.\n")
+        return 2
+    if not routes:
+        return 0
+    commands = shell_commands(shell_command_text(data.get("tool_input") or {}))
+    matched = list(matching_command_routes(routes, commands))
+    if not matched or not claim_invocation(data, "skill-router-package"):
+        return 0
+    gate(matched, data, harness, namespace="package:")
+    return 0
+
+
 def main():
+    if PACKAGE_FLAG in sys.argv[1:]:
+        sys.exit(package_gate())
     if DIFF_FLAG in sys.argv[1:]:
         sys.exit(check_diff(sys.argv[1:]))
     if QUERY_FLAG in sys.argv[1:]:
@@ -1308,9 +1473,11 @@ def main():
         # a bare `grep`/`cat`/`sed -n` naming a routed path falls straight through to exit 0 below.
         shell_writes = shell_write_targets("\n".join(strings(tool_input)))
         targets = [path for path, _, _ in shell_writes]
+        commands = shell_commands(shell_command_text(tool_input))
     else:
         shell_writes = []
         targets = written_targets(tool_input)
+        commands = []
     cwd = data.get("cwd") or os.getcwd()
     root = find_repo_root(cwd)
     if root is None:
@@ -1340,7 +1507,7 @@ def main():
             "session. This tool call was NOT run.\n"
         )
         sys.exit(2)
-    if not targets:
+    if not targets and not commands:
         sys.exit(0)
 
     rules = enforcement_rules(root) or []
@@ -1396,6 +1563,7 @@ def main():
         rel = repo_relative(target, cwd)
         for route in matching_routes(routes, rel, content):
             matched.append((rel, route))
+    matched.extend(matching_command_routes(routes, commands))
     if not matched:
         sys.exit(0)
 
@@ -1404,6 +1572,8 @@ def main():
 
     # Deny patterns first: a decidable violation blocks every time, not once per session.
     for rel, route in matched:
+        if route.get("command"):
+            continue
         for _, reason in deny_hits(route, rel, content):
             sys.stderr.write(
                 "SKILL ROUTER - blocked, this is a rule violation, not a reminder:\n\n"
@@ -1432,8 +1602,16 @@ def main():
             )
             sys.exit(2)
 
+    gate(matched, data, harness)
+
+
+def gate(matched, data, harness, namespace=""):
+    """Block on unproven required skills and advise conditional ones for matched `(label, route)` pairs.
+
+    A label is a repo-relative path or a normalized command. Always exits.
+    """
     session = data.get("session_id")
-    seen = load_seen(session)
+    seen = load_seen(session, namespace)
     # Only the required tier gates the write. A route whose `skills` is empty never blocks; its
     # conditional entries are advice, offered once per route per session and never demanded.
     pending = [
@@ -1498,7 +1676,7 @@ def main():
         # Advice counts as shown only where it is delivered; Codex keeps it for its next block.
         if harness == "claude":
             seen.update(advised_keys)
-        save_seen(session, seen)
+        save_seen(session, seen, namespace)
         # PreToolUse can add context to an allowed call only through Claude's structured output.
         # Codex receives the advisory solely inside a block message; see .agents/plugins/TECH_DEBT.md.
         if advisory and harness == "claude":
@@ -1510,7 +1688,7 @@ def main():
             }, ensure_ascii=False) + "\n")
         sys.exit(0)
     seen.update(advised_keys)
-    save_seen(session, seen)
+    save_seen(session, seen, namespace)
 
     lines = ["SKILL ROUTER - a standard owns this path, and it is not proven loaded this session:", ""]
     for rel, route in pending:
@@ -1572,7 +1750,14 @@ def main():
         ]
     if advisory:
         lines += ["", *advisory]
-    sys.stderr.write("\n".join(lines))
+    message = "\n".join(lines)
+    if any(route.get("command") for _, route in pending):
+        message = (
+            message.replace("a standard owns this path", "a procedure owns this command")
+            .replace("The file was NOT written", "The command was NOT run")
+            .replace("then repeat this write", "then repeat this command")
+        )
+    sys.stderr.write(message)
     sys.exit(2)
 
 
