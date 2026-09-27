@@ -5,7 +5,7 @@
 - Roadmap item: `repo-declared-config/migrate-agent-state`
 Status: phase 1 in progress; full repo-declared migration remains open (2026-09-26).
 
-Branch: `Refactor/repo-declared-config_harness-move`
+Branch: `Refactor/RepoDeclaredConfigHarnessMove`
 Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
 PR: none yet.
 
