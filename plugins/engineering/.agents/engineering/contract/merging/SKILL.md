@@ -22,8 +22,9 @@ a PR whose checks or merge queue have not settled unless a persistent-workflow b
 the continuation first, or wait for the checks to finish and merge without `--auto`.
 ## Synchronize once before final review
 
-Immediately before final review, resolve the actual PR base: its immediate parent for a stack child,
-otherwise the remote default. Check currency in the branch's own checkout:
+Immediately before final review, resolve the actual PR base to its fetched remote-tracking ref:
+`origin/<parent-branch>` for a stack child, otherwise `origin/<default-branch>`. Check currency in the
+branch's own checkout:
 
 ```bash
 git fetch origin --quiet
