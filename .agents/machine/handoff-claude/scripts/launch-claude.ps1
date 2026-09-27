@@ -15,6 +15,8 @@ param(
 
     [switch] $Frontier,
 
+    [switch] $UserAuthorizedLane,
+
     [switch] $DangerouslySkipPermissions
 )
 
@@ -56,7 +58,7 @@ if ($Frontier) {
     $Model = (Resolve-AgentLaneModel -Frontier -Harness 'claude').Model
 }
 elseif (-not $Model -and $Lane) {
-    $Model = (Resolve-AgentLaneModel -Lane $Lane -Harness 'claude').Model
+    $Model = (Resolve-AgentLaneModel -Lane $Lane -Harness 'claude' -UserAuthorized:$UserAuthorizedLane).Model
 }
 
 if ($Model) {
