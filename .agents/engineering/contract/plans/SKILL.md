@@ -48,9 +48,10 @@ copy in the normal checkout and never edit one logical ledger from two worktrees
 Naming or opening a plan, ledger, or roadmap obliges **reading its active owner's current state before
 acting**. The copy in another checkout may be stale, and remembered state is not current state.
 
-After a delivery PR merges, the default branch inherits its planning state. Any remaining work starts a fresh
-worktree from that current remote default and continues the same plan. An in-flight sibling reads the owning
-branch or PR when it needs newer evidence; it does not create a competing ledger copy.
+After a delivery PR merges, the default branch inherits its planning state. Reconcile and continue an
+already-recorded successor stack layer. Only when no successor exists does remaining work start a fresh
+worktree from the current remote default. An in-flight sibling reads the owning branch or PR when it
+needs newer evidence; it does not create a competing ledger copy.
 
 **A plan must not cite its roadmap — but an agent working the plan may read it.** The document dependency
 runs one way: a plan is spun off *from* an item and reports completion back to it, and a plan that cites the
@@ -97,6 +98,19 @@ needs, not from what is convenient to emit. You may defer the *consumer itself* 
 service — to a named later phase or plan; you may **never** defer the *output contract*. A producer with an
 undecided output is not a shippable phase: it cannot be named, typed, or tested against a consumer, and the
 gap resurfaces downstream as naming churn over a thing whose job was never fixed.
+
+## Delivery slices within a phase
+
+A phase can require several PRs. Apply `engineering:git-branching` before implementing or expanding a
+large change; its split assessment and atomicity exceptions govern the delivery map. Record each PR
+slice's purpose, included code/tests, base or parent, dependency, size estimate and validation gate.
+Dependent slices default to a stack; independent slices start from the remote default. Keep a single
+goal and one current ledger, with branch/PR links and exact base/head SHAs as the stack materializes.
+
+Review a child against its actual parent while validating the cumulative tree. Reconcile descendants
+after parent changes. After a lower PR lands, continue from the reconciled next layer rather than
+starting a duplicate slice from main. Every landed state must work; never separate tests or security
+repairs from the behavior they are required to qualify merely to meet a line budget.
 
 ## Implementation examples and their standards
 
@@ -290,15 +304,16 @@ alone does not require that transfer; the context-transfer decision is owned by
 1. **Write the plan and ledger** when the work spans multiple commits or PRs or needs design first. Before
    creating them, check plans, branches, worktrees, and PRs for the same work, then assign each logical
    workstream exactly one ledger.
-2. **Branch, then work a delivery slice** from the current remote default. That branch and worktree own the
-   plan's current state for one PR-sized slice.
+2. **Branch, then work a delivery slice** from the current remote default or the recorded stack parent's
+   tip. That branch and worktree own the plan's current state for one PR-sized slice.
 3. **At a material milestone, update the plan and compact ledger before the substantive commit.** Check off
    or strike shipped phases, retain only current recovery state, and stage those edits with the work.
 4. **Keep both artifacts after the last local phase while delivery is live.** Make the ledger's exact next
    action the gate that now owns progress — **review comes first: never write a merge as the next step until
    a review is recorded** (a `## Reviews` entry or a review watermark); then PR, merge, publication,
    dependency, or platform sync. `plan_graph.py` enforces this. Once the PR merges, close its worktree; if
-   work remains, create a fresh one from the current remote default and resume the same ledger.
+   work remains, reconcile and continue its existing successor layer, or create a fresh worktree from
+   the current remote default when no successor exists. Resume the same ledger.
 5. **Close out only after the entire lifecycle is terminal.** Planning-only work is terminal only when its
    reviewed artifacts are merged to the default branch through `merge-docs`; planning artifacts updated with
    implementation are terminal only when that delivery PR merges. A local commit, pushed branch, or open PR
@@ -309,8 +324,9 @@ alone does not require that transfer; the context-transfer decision is owned by
 ### Plans outlive PR worktrees
 
 A worktree owns one PR-sized delivery slice, while the plan survives through the commits merged to the
-default branch. Once the PR merges, remove the worktree and create a fresh one from the current remote default
-if work remains. Never reopen a merged branch to append observations; the forge owns remote evidence until a
+default branch. Once the PR merges, remove its worktree and continue the reconciled successor layer.
+Create a fresh worktree from the current remote default only when remaining work has no existing slice.
+Never reopen a merged branch to append observations; the forge owns remote evidence until a
 later substantive commit or final closeout needs it.
 
 ### Check `git status` before the close-out commit
@@ -345,8 +361,8 @@ for a handoff or ask the user to name the next phase merely because one phase co
 Transfer to a fresh context only when at least one of these conditions is true:
 
 - the user explicitly asks to clear, restart, or hand the work to another context;
-- the next action changes owner, worktree, PR, or logical workstream, or a workflow deliberately requires an
-  independent context for unbiased review or isolated judgment;
+- the next action changes owner, repository, worktree, PR, or logical workstream, or a workflow deliberately
+  requires an independent context for unbiased review or isolated judgment;
 - the next plan section is materially separate and the earlier reasoning would distract from, rather than
   help with, the new work;
 - the context is genuinely degraded: repeated compaction has lost needed detail, important facts are being
@@ -354,8 +370,9 @@ Transfer to a fresh context only when at least one of these conditions is true:
   the next slice safely.
 
 Age, transcript length, an actionable ledger, or a phase boundary by itself is not evidence that context is
-degraded. When a transfer condition does apply, make the checkpoint durable and emit the exact handoff from
-the `handoff` skill; do not emit one as routine phase-ending ceremony.
+degraded. When a transfer condition does apply, make the checkpoint durable and execute the `handoff` workflow.
+It prepares the exact `handoff-format` pointer and invokes one selected launcher; a pointer in the response alone
+does not transfer ownership. Do not select a handoff as routine phase-ending ceremony.
 
 ## Finishing, superseding, abandoning
 

@@ -90,10 +90,11 @@ head may enter `merge`, and only under the recorded authorization.
 
 When a bound PR merges with no workflow handoff, remove the continuation normally. When it merges with a
 workflow handoff, close the completed PR binding without removing the continuation, checkpoint the merge,
-and enter the recorded next stage through `plan-execution`. The parent resolves the plan's next owned work,
-creates its branch, worktree, PR, and exact initial head binding, then rebinds the same continuation to that
-successor. Only the parent may perform this transfer, and the repository, workflow ID, and state artifact must
-remain identical.
+and enter the recorded next stage through `plan-execution`. The parent resolves the plan's next owned work
+and reconciles its existing recorded branch, worktree and PR, including the actual base and current head.
+Create those only when the successor does not yet exist. Refresh its exact delivery binding and rebind
+the same continuation to it. Only the parent may perform this transfer, and the repository, workflow ID,
+and state artifact must remain identical.
 
 The successor is a new delivery binding with its own checks, review watermark, and merge authorization.
 Authorization for the completed PR never silently authorizes the successor. The continuation may implement,

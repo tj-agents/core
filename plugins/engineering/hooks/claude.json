@@ -12,16 +12,26 @@
         ]
       }
     ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py\""
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "hooks": [
           {
             "type": "command",
             "timeout": 15,
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\""
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py\""
           }
-        ],
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
+        ]
       },
       {
         "hooks": [
@@ -69,6 +79,16 @@
             "type": "command",
             "timeout": 15,
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py\""
           }
         ],
         "matcher": "Bash|PowerShell"

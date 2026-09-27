@@ -8,8 +8,10 @@ domain: process
 
 # Handoff
 
-**This doc is the continuation pointer's exact shape** — nothing else defines it. The context-transfer
-criteria that decide whether an actionable non-terminal plan needs one are in `engineering:plans`.
+**This doc is the continuation pointer's exact shape** — nothing else defines it. It does not select or perform
+a transfer: `engineering:plans` decides when one is needed, and `engineering:handoff` performs the selected
+transfer by invoking one launcher. The context-transfer criteria that decide whether an actionable non-terminal
+plan needs one are in `engineering:plans`.
 
 **Hard final-response gate for a selected plan context transfer:** if the turn elects to move an owned or
 explicitly targeted actionable `_PROGRESS.md` ledger to another context, the response is incomplete until it

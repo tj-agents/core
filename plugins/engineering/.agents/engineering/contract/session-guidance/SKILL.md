@@ -26,6 +26,14 @@ Load a referenced skill when its stage is actually entered, never because a docu
 it. A procedure step, table row or route line says which skill owns that stage. Do not load the corpus
 transitively. Use the host's native skill invocation when available or read its advertised source file.
 
+## Keep large changes reviewable
+
+Before implementing or expanding a large refactor or multi-concern change, apply
+`engineering:git-branching` to define and measure PR-sized delivery slices. Dependent slices default to
+stacked PRs; independent slices use separate branches. One goal may span many PRs. A phase label or
+an existing open PR never justifies accumulating the whole goal in one diff. Reassess an oversized
+candidate before adding more scope; preserve atomic behavior and security when choosing boundaries.
+
 ## Preserve one owner through completion
 
 Act on authorized reversible work and keep the canonical plan aligned with observed results. A phase,

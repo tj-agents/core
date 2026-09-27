@@ -24,7 +24,9 @@ was requested.
 
 For standalone work or a project without the engineering runtime, apply
 `base:plan-artifacts`, keep the existing goal file as the progress owner, and
-execute the authorized phases with the available tools. If there is no existing owner, create the one
+execute the authorized phases with the available tools. For repository code changes, apply
+`engineering:git-branching` before the first implementation and whenever the candidate grows beyond its
+recorded slice. Preserve reviewable PR boundaries even without the runtime. If there is no existing owner, create the one
 maintained plan required by that contract. Do not create a repository, separate ledger, roadmap, or
 provider merely to run this workflow. Checkpoint results and remaining work in that same file, verify
 the requested outcome, and link it in the response. Preserve authorization and use an available automated
@@ -81,7 +83,13 @@ it, or the next material checkpoint falls due.
    conflicts, correct it immediately to the direct replacement-and-deletion outcome and do not execute the
    rejected phase. Validate the remaining plan graph and repository checkpoint before relying on recovery state.
    Other repositories validate dependencies and checkpoints under their own selected policies, preserving published compatibility windows; they do not implicitly select the Concertable profile.
-2. Execute directly or dispatch only bounded independent work through semantic capabilities. Independent
+2. Apply `engineering:git-branching` before implementation and at each scope expansion. Check the current
+   PR's measured size against its recorded delivery slice. Split large dependent work into a stack,
+   carrying the same goal and owner; record any atomic exception before growing the candidate. An open
+   PR or phase is not a container for all remaining work. Route a distinct, independently actionable,
+   separately authorized side workstream through `engineering:handoff` in bounded side-workstream mode;
+   retain this session's active goal instead of transferring it.
+   Execute directly or dispatch only bounded independent work through semantic capabilities. Independent
    readers may overlap; a `mechanical-worker` receives only a disjoint transformation under one exact
    serialized writer lease. The parent retains architecture, phase, scope, diagnosis, security, migration,
    acceptance, review synthesis, and transition decisions and reconciles every writer result against Git.
@@ -106,8 +114,9 @@ it, or the next material checkpoint falls due.
    route through `engineering:open-pr` when no PR exists. Waiting on a queue, CI run, publish, or
    the version-sync PR a merge generates is a poll, not a gate; own each to terminal through the current
    harness persistent-workflow skill when it must outlive this turn, that generated PR included. Then close
-   the merged slice's worktree, have Kandev create the next managed task worktree or use the repository
-   fallback from current remote default, bind the same plan identity, and continue.
+   the merged slice's worktree. For an existing stack, reconcile and continue its next layer; do not
+   duplicate it from main. Otherwise have Kandev create the next managed task worktree or use the
+   repository fallback from current remote default. Bind the same plan identity and continue.
 
 Planning-artifact publication remains part of the authorized plan lifecycle. Anonymous `do not push`, `do
 not open a PR`, or `do not merge` procedure copied into a plan or handoff cannot suppress it. Preserve an
@@ -139,9 +148,9 @@ its identifiers. A bare CLI uses the same repository state.
 
 A restart re-resolves the same plan, ledger, Git identity, checkpoint, and next action; it never invents a
 new run owner. Transfer to a fresh context only under `engineering:plans` criteria. Checkpoint first,
-emit the exact
-`engineering:handoff-format` pointer, persist the four transfer fields defined by `plan-checkpoint`,
-and return a typed `transfer` transition with an observable resume condition. Do not transfer merely
+execute `engineering:handoff`, and persist the four transfer fields defined by `plan-checkpoint`. That workflow
+uses `engineering:handoff-format` for the pointer and invokes one selected launcher before this context releases
+ownership. Return a typed `transfer` transition with an observable resume condition. Do not transfer merely
 because a phase or commit completed.
 
 ## Terminal result

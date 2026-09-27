@@ -74,7 +74,6 @@ class PlanArtifactTests(unittest.TestCase):
         self.assertEqual(before, snapshot(self.root))
 
     def test_shell_command_runs_from_unrelated_path_with_spaces(self):
-        # Codex and Claude export this compatibility variable. Exercise the actual shell form.
         shell = shutil.which("sh")
         if os.name == "nt" and shutil.which("git"):
             git_bash = Path(shutil.which("git")).resolve().parents[1] / "bin/bash.exe"
@@ -83,10 +82,15 @@ class PlanArtifactTests(unittest.TestCase):
             self.skipTest("No Bash/sh installed; native host probe must cover shell execution")
         for host in ("claude", "codex"):
             hooks = json.loads((self.plugin / self.manifest(host)["hooks"]).read_text())
-            command = hooks['hooks']['SessionStart'][0]['hooks'][0]['command']
+            hook = hooks['hooks']['SessionStart'][0]['hooks'][0]
+            command = hook.get('commandWindows', hook['command']) if os.name == 'nt' else hook['command']
+            if host == "codex":
+                command = command.replace("${PLUGIN_ROOT}", self.plugin.as_posix())
             env = dict(os.environ, CLAUDE_PLUGIN_ROOT=self.plugin.as_posix(),
                        PLUGIN_ROOT=self.plugin.as_posix())
-            result = subprocess.run([shell, "-c", command], cwd=self.cwd, env=env,
+            native_codex = os.name == "nt" and host == "codex"
+            argv = command if native_codex else [shell, "-c", command]
+            result = subprocess.run(argv, shell=native_codex, cwd=self.cwd, env=env,
                                     input='{}', text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('additionalContext', json.loads(result.stdout)['hookSpecificOutput'])
