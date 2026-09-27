@@ -10,7 +10,7 @@
     "workflow",
     "git"
   ],
-  "version": "2.1.14",
+  "version": "2.1.15",
   "skills": "./codex-skills/",
   "interface": {
     "displayName": "Engineering process",
