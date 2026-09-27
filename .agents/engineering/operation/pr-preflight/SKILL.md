@@ -112,7 +112,8 @@ The local runtime pass does not establish the delivery-slice assessment below; c
 
 9. **A reviewable delivery slice.** Apply `engineering:git-branching` to the measured diff against the
    actual PR base. An oversized or multi-concern candidate without a recorded split assessment and
-   justified atomic exception is a blocker: decompose and validate it before adding scope or requesting
+   justified exception permitted by that contract (atomicity or frozen-scope recovery) is a blocker:
+   decompose and validate it before adding scope or requesting
    final review. For a stack, verify parent/base/head identities, the layer's scope, and CI/protection
    coverage. A green top-of-stack build does not establish that lower layers can land independently.
 
