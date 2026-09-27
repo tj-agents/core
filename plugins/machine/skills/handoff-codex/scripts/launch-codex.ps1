@@ -154,7 +154,7 @@ if ($Frontier) {
     $Model = $frontierModel.Model
     if (-not $ReasoningEffort) { $ReasoningEffort = $frontierModel.Effort }
 }
-elseif ($Lane -and -not ($Model -and $ReasoningEffort)) {
+elseif ($Lane) {
     $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'codex' -UserAuthorized:$UserAuthorizedLane
     if (-not $Model) { $Model = $laneModel.Model }
     if (-not $ReasoningEffort) { $ReasoningEffort = $laneModel.Effort }
