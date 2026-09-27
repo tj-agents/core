@@ -42,7 +42,10 @@ def add_path(root: Path, relative: str, members: dict[str, bytes], excludes: set
             raise ValueError(f"Harness source escapes repository: {path}")
         name = path.relative_to(root).as_posix()
         if name not in excludes:
-            members[name] = path.read_bytes()
+            data = path.read_bytes()
+            # Git may check out text as CRLF or LF. Bind the declaration to the same
+            # authored content on both hosts without rewriting opaque binary assets.
+            members[name] = data.replace(b"\r\n", b"\n") if b"\0" not in data else data
 
 
 def source_projection(config: dict, plugin: str) -> dict:

@@ -42,6 +42,25 @@ class HarnessManifestTests(unittest.TestCase):
             source.write_text("second", encoding="utf-8")
             self.assertNotEqual(first, HARNESS.source_digest(root, manifest, config, "base"))
 
+    def test_source_digest_ignores_checkout_line_endings(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            source = root / ".agents/base/example.txt"
+            source.parent.mkdir(parents=True)
+            config = {
+                "scopes": [{"plugin": "base", "root": ".agents/base"}],
+                "host_adapter_roots": {},
+                "host_manifest_roots": {},
+                "host_hook_sources": {},
+                "resources": [],
+                "prerequisites": {"base": []},
+            }
+            manifest = {"source_roots": [".agents/base"], "source_excludes": []}
+            source.write_bytes(b"first\nsecond\n")
+            lf = HARNESS.source_digest(root, manifest, config, "base")
+            source.write_bytes(b"first\r\nsecond\r\n")
+            self.assertEqual(lf, HARNESS.source_digest(root, manifest, config, "base"))
+
     def test_declared_hook_hosts_must_match_host_wiring(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
