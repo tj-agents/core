@@ -1,8 +1,9 @@
 ---
 name: lane-l5
-description: Runs one delegated task at lane L5. Clerical work with a small input and no judgement to make.
+description: Runs one delegated task at lane L5. Mechanical work whose shape is already decided.
 kind: lane
-model: claude-haiku-4-5
+model: claude-sonnet-5
+effort: medium
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
 ---

@@ -29,19 +29,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/skill_router.py\""
-          }
-        ],
-        "matcher": "apply_patch|edit_file|write_file|multi_edit|exec_command|unified_exec|local_shell|shell"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
@@ -52,7 +41,7 @@
             "type": "command",
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
@@ -63,7 +52,7 @@
             "type": "command",
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\""
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\""
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"

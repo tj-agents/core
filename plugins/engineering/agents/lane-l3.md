@@ -1,8 +1,8 @@
 ---
 name: lane-l3
-description: Runs one delegated task at lane L3. Ordinary specified work that a compiler or a test suite will catch.
+description: Runs one delegated task at lane L3. Open-ended judgement at the top of the ladder, where the answer is not yet known.
 kind: lane
-model: claude-sonnet-5
+model: claude-opus-5-5
 effort: high
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent

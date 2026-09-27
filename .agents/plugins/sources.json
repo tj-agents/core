@@ -55,6 +55,26 @@
   ],
   "resources": [
     {
+      "plugin": "base",
+      "source": ".agents/hooks/skill_router.py",
+      "destination": "hooks/skill_router.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".codex/adapters/pre_tool_use.py",
+      "destination": "hooks/pre_tool_use_adapter.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/hook_runtime.py",
+      "destination": "hooks/hook_runtime.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/plugins/compatibility.json",
+      "destination": "hooks/compatibility.json"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/lanes",
       "destination": ".agents/lanes"
@@ -63,6 +83,11 @@
       "plugin": "machine",
       "source": ".agents/machine/scripts",
       "destination": "resources/machine/scripts"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/lanes",
+      "destination": "resources/lanes"
     },
     {
       "plugin": "machine",
@@ -116,6 +141,21 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/harness-trust.json",
+      "destination": "hooks/harness-trust.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/harness_grant.py",
+      "destination": "hooks/harness_grant.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/denial_prompt.py",
+      "destination": "hooks/denial_prompt.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/merge_review_gate.py",
       "destination": "hooks/merge_review_gate.py"
     },
@@ -156,6 +196,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".codex/adapters/pre_tool_use.py",
+      "destination": "hooks/pre_tool_use_adapter.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/red_run_gate.py",
       "destination": "hooks/red_run_gate.py"
     },
@@ -163,6 +208,21 @@
       "plugin": "engineering",
       "source": ".agents/hooks/docs_reachability.py",
       "destination": "hooks/docs_reachability.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/tiers/base.json",
+      "destination": "tier.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/tiers/engineering.json",
+      "destination": "tier.json"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/tiers/machine.json",
+      "destination": "tier.json"
     }
   ],
   "prerequisites": {

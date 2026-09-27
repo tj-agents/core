@@ -9,6 +9,46 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\" --session-context",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/agent-files/scripts/session-context.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\"",
+            "timeout": 15
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\"",
+            "timeout": 10
+          }
+        ],
+        "matcher": "Skill|Bash|PowerShell"
       }
     ]
   }

@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 # End-to-end validation of the generated handoff launchers, per PACKAGING.md: neither must require a
 # machine-local file this plugin does not ship. Runs against the actual generated package
@@ -8,13 +8,20 @@ $ErrorActionPreference = 'Stop'
 # (which executes candidates directly, not through the terminal) has something real to run.
 
 $repository = Split-Path -Parent $PSScriptRoot
+$pluginRoot = Join-Path $repository 'plugins\machine'
 $claudeLauncher = Join-Path $repository 'plugins\machine\skills\handoff-claude\scripts\launch-claude.ps1'
 $codexLauncher = Join-Path $repository 'plugins\machine\skills\handoff-codex\scripts\launch-codex.ps1'
 $openLauncher = Join-Path $repository 'plugins\machine\skills\open-claude\scripts\open-claude.ps1'
-$packagedLaunchers = @(Get-ChildItem -LiteralPath (Join-Path $repository 'plugins\machine\skills') -Recurse -File -Filter '*.ps1' |
+$packagedLaunchers = @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Filter '*.ps1' |
     Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'agent-cli\.ps1' } |
     Select-Object -ExpandProperty FullName)
-$expectedLaunchers = @($claudeLauncher, $codexLauncher, $openLauncher) | Sort-Object
+$expectedLaunchers = @(
+    foreach ($tree in @('.agents\machine', 'codex-skills', 'skills')) {
+        Join-Path $pluginRoot "$tree\handoff-claude\scripts\launch-claude.ps1"
+        Join-Path $pluginRoot "$tree\handoff-codex\scripts\launch-codex.ps1"
+        Join-Path $pluginRoot "$tree\open-claude\scripts\open-claude.ps1"
+    }
+) | Sort-Object
 if (Compare-Object $expectedLaunchers ($packagedLaunchers | Sort-Object)) {
     throw 'The generated launcher dependency inventory changed; every agent-cli.ps1 consumer must be exercised or resolved here.'
 }
@@ -70,16 +77,83 @@ try {
     $oldRouting = Join-Path $fakeProfile '.claude\routing\route.py'
     if (Test-Path -LiteralPath $oldRouting) { throw 'Test setup is broken: the old routing file should not exist.' }
 
+    # Windows Terminal is stubbed twice over. WT_STUB_LOG keeps the raw argument list the launcher handed
+    # it, which is what the flag assertions below read. WT_STUB_DELIVERED_LOG keeps what the tab process
+    # would actually receive, because Windows Terminal does not hand its arguments over untouched: it
+    # splits its own command line on `;` into subcommands (unescaping `\;` to a literal `;` by dropping
+    # one backslash), then re-joins the tab's command into a single string, quoting a token only when that
+    # token contains a space and escaping nothing inside it, and the tab process parses that string with
+    # CommandLineToArgvW. Both stages are reproduced here; each was checked against a real wt.exe.
     $wtSource = @'
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
+
 class Stub {
+    [DllImport("shell32.dll", SetLastError = true)]
+    static extern IntPtr CommandLineToArgvW([MarshalAs(UnmanagedType.LPWStr)] string commandLine, out int count);
+
+    static List<List<string>> SplitSubcommands(string[] args) {
+        var commands = new List<List<string>>();
+        var current = new List<string>();
+        var token = new StringBuilder();
+        foreach (var arg in args) {
+            token.Length = 0;
+            foreach (var character in arg) {
+                if (character != ';') { token.Append(character); continue; }
+                if (token.Length > 0 && token[token.Length - 1] == (char)92) {
+                    token.Length -= 1;
+                    token.Append(';');
+                    continue;
+                }
+                if (token.Length > 0) { current.Add(token.ToString()); token.Length = 0; }
+                commands.Add(current);
+                current = new List<string>();
+            }
+            if (token.Length > 0) { current.Add(token.ToString()); }
+        }
+        commands.Add(current);
+        return commands;
+    }
+
+    static string[] Deliver(List<string> command) {
+        var start = command.IndexOf("--suppressApplicationTitle");
+        if (start < 0) { return new string[0]; }
+
+        var joined = new StringBuilder("stub.exe");
+        for (var i = start + 1; i < command.Count; i++) {
+            joined.Append(' ');
+            if (command[i].Contains(" ")) { joined.Append('"').Append(command[i]).Append('"'); }
+            else { joined.Append(command[i]); }
+        }
+
+        int count;
+        var argv = CommandLineToArgvW(joined.ToString(), out count);
+        if (argv == IntPtr.Zero) { throw new InvalidOperationException("CommandLineToArgvW failed."); }
+        var delivered = new string[count - 1];
+        for (var i = 1; i < count; i++) {
+            delivered[i - 1] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(argv, i * IntPtr.Size));
+        }
+        Marshal.FreeHGlobal(argv);
+        return delivered;
+    }
+
     static void Main(string[] args) {
         string log = Environment.GetEnvironmentVariable("WT_STUB_LOG");
         if (!string.IsNullOrEmpty(log)) {
             File.WriteAllText(log, string.Join("\u001f", args), Encoding.UTF8);
         }
+
+        string deliveredLog = Environment.GetEnvironmentVariable("WT_STUB_DELIVERED_LOG");
+        if (!string.IsNullOrEmpty(deliveredLog)) {
+            var commands = SplitSubcommands(args);
+            var body = new List<string> { commands.Count.ToString() };
+            body.AddRange(Deliver(commands[0]));
+            File.WriteAllText(deliveredLog, string.Join("\u001f", body.ToArray()), Encoding.UTF8);
+        }
+
         Environment.Exit(0);
     }
 }
@@ -111,6 +185,23 @@ class Stub {
     $env:PATH = "$binDir;$env:SystemRoot\System32;$env:SystemRoot"
     $env:USERPROFILE = $fakeProfile
     $env:LOCALAPPDATA = $fakeLocalAppData
+    $env:WT_STUB_LOG = $wtLog
+
+    # Every generated discovery layout must load the shipped shared library and reach the stub terminal.
+    # The packaged canonical `.agents/machine/.../scripts` copy is one directory deeper than the host
+    # `skills` and `codex-skills` copies; exercising all nine catches a resolver that supports only one.
+    foreach ($launcher in $packagedLaunchers) {
+        if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
+        switch (Split-Path -Leaf $launcher) {
+            'launch-codex.ps1' { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'layout test' | Out-Null }
+            'launch-claude.ps1' { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'layout test' | Out-Null }
+            'open-claude.ps1' { & $launcher -WorkingDirectory $workDir -Title 'layout test' | Out-Null }
+            default { throw "Unexpected generated launcher: $launcher" }
+        }
+        if (-not (Test-Path -LiteralPath $wtLog)) {
+            throw "The generated launcher did not reach the stub terminal: $launcher"
+        }
+    }
 
     # --- handoff-claude: no -Model means the harness picks its own default ---
     $env:WT_STUB_LOG = $wtLog
@@ -145,6 +236,83 @@ class Stub {
     $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
     if ($capturedArgs -notmatch 'gpt-5-codex') { throw 'launch-codex.ps1 did not pass an explicit -Model through.' }
     if ($capturedArgs -notmatch 'model_reasoning_effort=high') { throw 'launch-codex.ps1 did not pass -ReasoningEffort through.' }
+    # Lane and frontier expectations come from the tables the plugin actually ships, so a retiering there
+    # can never silently disagree with what these launchers pass through.
+    $claudeTable = Get-Content -LiteralPath (Join-Path $repository 'plugins\machine\resources\lanes\claude.json') -Raw | ConvertFrom-Json
+    $codexTable = Get-Content -LiteralPath (Join-Path $repository 'plugins\machine\resources\lanes\codex.json') -Raw | ConvertFrom-Json
+
+    # --- handoff-claude: -Lane resolves through the shipped lane table ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L3'
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.lanes.L3.model)) { throw 'launch-claude.ps1 did not resolve -Lane L3 through the shipped table.' }
+
+    # --- handoff-claude: an explicit -Model still beats -Lane ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L3' -Model 'explicitly-named-model'
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'explicitly-named-model') { throw 'launch-claude.ps1 let -Lane override an explicit -Model.' }
+    if ($capturedArgs -match [regex]::Escape($claudeTable.lanes.L3.model)) { throw 'launch-claude.ps1 passed the lane model alongside an explicit -Model.' }
+
+    # --- handoff-claude: -Frontier resolves the tier above the ladder ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.frontier.model)) { throw 'launch-claude.ps1 did not resolve -Frontier to the frontier model.' }
+
+    # --- handoff-claude: -Frontier rejects a competing selection instead of ranking it ---
+    foreach ($conflict in @(@{ Lane = 'L1' }, @{ Model = 'explicitly-named-model' })) {
+        $rejected = $false
+        try { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier @conflict }
+        catch { $rejected = $true }
+        if (-not $rejected) { throw "launch-claude.ps1 accepted -Frontier together with $($conflict.Keys -join ',')." }
+    }
+
+    # --- handoff-codex: -Lane resolves both model and effort ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($codexTable.lanes.L4.model)) { throw 'launch-codex.ps1 did not resolve -Lane L4 through the shipped table.' }
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L4.reasoning_effort)") { throw 'launch-codex.ps1 did not resolve -Lane L4 to its effort.' }
+
+    # --- handoff-codex: an explicit -Model survives a -Lane, which still fills the effort half ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' -Model 'explicitly-named-model' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch 'explicitly-named-model') { throw 'launch-codex.ps1 let -Lane override an explicit -Model.' }
+    if ($capturedArgs -match [regex]::Escape($codexTable.lanes.L4.model)) { throw 'launch-codex.ps1 passed the lane model alongside an explicit -Model.' }
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L4.reasoning_effort)") { throw 'launch-codex.ps1 did not fill the effort half from the lane beside an explicit -Model.' }
+
+    # --- handoff-codex: an explicit -ReasoningEffort survives a -Lane that would have set it ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' -ReasoningEffort 'xhigh' | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($codexTable.lanes.L4.model)) { throw 'launch-codex.ps1 dropped the lane model when effort was explicit.' }
+    if ($capturedArgs -notmatch 'model_reasoning_effort=xhigh') { throw 'launch-codex.ps1 let -Lane override an explicit -ReasoningEffort.' }
+
+    # --- handoff-codex: -Frontier resolves the tier's model and effort as a pair ---
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($codexTable.frontier.model)) { throw 'launch-codex.ps1 did not resolve -Frontier to the frontier model.' }
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.frontier.reasoning_effort)") { throw 'launch-codex.ps1 did not resolve -Frontier to its effort.' }
+
+    # --- an out-of-ladder lane is rejected at the parameter surface, never silently defaulted ---
+    foreach ($undefined in @('L0', 'L9')) {
+        $rejected = $false
+        try { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane $undefined }
+        catch { $rejected = $true }
+        if (-not $rejected) { throw "launch-claude.ps1 accepted the undefined lane $undefined." }
+    }
+
+    # --- the resolver's own guard also rejects a lane its table does not price: ValidateSet reaches the
+    # binder before the table lookup, so this calls the shipped shared library directly ---
+    . (Join-Path $repository 'plugins\machine\resources\machine\scripts\agent-cli.ps1')
+    $rejected = $false
+    try { Resolve-AgentLaneModel -Harness 'claude' -Lane 'L9' | Out-Null }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'Resolve-AgentLaneModel accepted a lane its table does not price.' }
+
     # --- open-claude: no prompt, no session - just a CLI on a directory ---
     Remove-Item -LiteralPath $wtLog -Force
     & $openLauncher -WorkingDirectory $workDir -Title 'test open'
@@ -169,18 +337,42 @@ class Stub {
         throw 'open-claude.ps1 did not pass the session id through.'
     }
 
+    # --- open-claude: a prompt survives Windows Terminal's command line intact ---
+    # The defect this covers: an unescaped semicolon ended the tab's command there and turned the rest of
+    # the prompt into a second wt subcommand, so a 914-character handoff arrived as its first 265
+    # characters and nothing anywhere reported the loss.
+    Remove-Item -LiteralPath $wtLog -Force
+    $deliveredLog = Join-Path $scratch 'wt-delivered.log'
+    $env:WT_STUB_DELIVERED_LOG = $deliveredLog
+    $prompt = "Phase one: migrate Auth; then Search.`nPhase two: verify `"end to end`"; report back."
+    & $openLauncher -WorkingDirectory $workDir -Title 'test open' -Prompt $prompt
+    if (-not (Test-Path -LiteralPath $deliveredLog)) { throw 'The stubbed terminal recorded no delivered command line.' }
+    $delivered = [System.IO.File]::ReadAllText($deliveredLog) -split "`u{001f}"
+    if ($delivered[0] -ne '1') {
+        throw "The prompt's semicolons split the terminal command line into $($delivered[0]) subcommands; the tab would have run only the first."
+    }
+    if ($delivered[-1] -cne $prompt) {
+        throw "The prompt did not reach the launched process whole.`nSent:      $prompt`nDelivered: $($delivered[-1])"
+    }
+    if ($delivered[1] -cne (Join-Path $claudeBin 'claude.exe')) {
+        throw 'The spaced executable path did not reach the launched process whole.'
+    }
+    Remove-Item Env:\WT_STUB_DELIVERED_LOG
+
+    # --- open-claude: a long prompt belongs in a file, not on a command line ---
+    $rejected = $false
+    try { & $openLauncher -WorkingDirectory $workDir -Title 'test open' -Prompt ('x' * 501) }
+    catch { $rejected = $true }
+    if (-not $rejected) { throw 'open-claude.ps1 accepted an inline -Prompt too long to belong on a command line.' }
+
     # --- open-claude: -Resume and -Continue are mutually exclusive ---
     $rejected = $false
     try { & $openLauncher -WorkingDirectory $workDir -Resume 'abc' -Continue }
     catch { $rejected = $true }
     if (-not $rejected) { throw 'open-claude.ps1 accepted -Resume together with -Continue.' }
 
-    # --- every generated launcher that names the shared library can resolve the shipped dependency ---
+    # --- every generated launcher still names the shared library it just resolved and executed ---
     foreach ($launcher in $packagedLaunchers) {
-        $shared = Join-Path (Split-Path -Parent $launcher) '..\..\..\resources\machine\scripts\agent-cli.ps1'
-        if (-not (Test-Path -LiteralPath $shared -PathType Leaf)) {
-            throw "The packaged $(Split-Path -Leaf $launcher) cannot reach the shared agent-cli.ps1."
-        }
         if ((Get-Content -LiteralPath $launcher -Raw) -notmatch 'agent-cli\.ps1') {
             throw "$(Split-Path -Leaf $launcher) no longer loads the shared agent-cli.ps1."
         }
@@ -191,6 +383,7 @@ class Stub {
     $env:USERPROFILE = $originalUserProfile
     $env:LOCALAPPDATA = $originalLocalAppData
     if ($null -eq $originalWtLog) { Remove-Item Env:\WT_STUB_LOG -ErrorAction SilentlyContinue } else { $env:WT_STUB_LOG = $originalWtLog }
+    Remove-Item Env:\WT_STUB_DELIVERED_LOG -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
 }
 

@@ -265,6 +265,25 @@ class RepoResidentPlanTests(WorkboardHarness):
         self.assertIn('live 1/2', output)
         self.assertIn('carve the reader', output)
 
+    def test_a_wrapped_item_is_reported_past_its_first_line(self):
+        """Real roadmap items wrap over several source lines; stopping at the newline reports a
+        fragment that ends mid-clause and tells the reader nothing."""
+        self.repo_plan('plans/payments-split/ROADMAP.md',
+                       '# payments roadmap\n\n'
+                       '- [ ] `payments-split/ledger` - carve the ledger reader out of\n'
+                       '  the settlement module and give it its own contract\n')
+        output = self.board('payments')
+        self.assertIn('give it its own contract', output)
+
+    def test_a_sibling_item_is_not_swallowed_into_the_one_above(self):
+        self.repo_plan('plans/payments-split/ROADMAP.md',
+                       '# payments roadmap\n\n'
+                       '- [ ] carve the ledger reader\n'
+                       '- [ ] then rewire settlement\n')
+        output = self.board('payments')
+        self.assertIn('carve the ledger reader', output)
+        self.assertNotIn('then rewire settlement', output)
+
     def test_a_repo_with_no_plan_tree_contributes_nothing(self):
         self.plan('demo/LOCAL_PAYMENTS.md')
         self.assertEqual({'LOCAL_PAYMENTS.md'}, self.listed('payments'))

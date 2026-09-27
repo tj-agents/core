@@ -4,7 +4,7 @@ description: Land a documentation or meta-only change as its own fast PR, bypass
 
 kind: workflow
 domain: process
-lane: L4
+lane: L5
 ---
 
 # Landing a meta-only change
@@ -101,11 +101,8 @@ force past a red check.**
 git checkout main && git pull --ff-only origin main
 ```
 
-```powershell
-./scripts/worktrees.ps1 close -Worktree <path> -PullRequest <n>
-```
-
-The worktree-cleanup audit gate makes any skipped merged-worktree cleanup visible at session end.
+Close the merged worktree with `engineering:merge` Step 5's cleanup, including its native-Git path when the
+repository ships no worktree helper. The worktree-cleanup audit gate makes any skipped merged-worktree cleanup visible at session end.
 
 ### 7. Confirm no publish fired
 

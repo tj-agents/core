@@ -4,7 +4,7 @@ description: Turn the working tree into clean, logical git commits — survey st
 
 kind: operation
 domain: process
-lane: L5
+lane: L7
 ---
 
 # Committing the working tree as curated slices

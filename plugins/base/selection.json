@@ -5,7 +5,9 @@
   ],
   "prerequisites": [],
   "skills": [
+    "agent-files",
     "cd",
-    "plan-artifacts"
+    "plan-artifacts",
+    "stack-tiers"
   ]
 }
