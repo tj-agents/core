@@ -57,8 +57,9 @@ if ($Frontier -and ($Lane -or $Model)) {
 if ($Frontier) {
     $Model = (Resolve-AgentLaneModel -Frontier -Harness 'claude').Model
 }
-elseif (-not $Model -and $Lane) {
-    $Model = (Resolve-AgentLaneModel -Lane $Lane -Harness 'claude' -UserAuthorized:$UserAuthorizedLane).Model
+elseif ($Lane) {
+    $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'claude' -UserAuthorized:$UserAuthorizedLane
+    if (-not $Model) { $Model = $laneModel.Model }
 }
 
 if ($Model) {

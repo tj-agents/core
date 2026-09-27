@@ -268,14 +268,22 @@ class Stub {
         if (-not $rejected) { throw "launch-claude.ps1 accepted -Frontier together with $($conflict.Keys -join ',')." }
     }
 
-    # --- both launchers refuse L1 unless the user authorized it, and launch nothing ---
-    foreach ($launcher in @($claudeLauncher, $codexLauncher)) {
+    # --- both launchers refuse L1 unless the user authorized it, even beside an explicit selection ---
+    $unauthorized = @(
+        @{ Launcher = $claudeLauncher; Selection = @{} },
+        @{ Launcher = $claudeLauncher; Selection = @{ Model = 'explicitly-named-model' } },
+        @{ Launcher = $codexLauncher; Selection = @{} },
+        @{ Launcher = $codexLauncher; Selection = @{ Model = 'explicitly-named-model'; ReasoningEffort = 'xhigh' } }
+    )
+    foreach ($case in $unauthorized) {
+        $selection = $case.Selection
+        $label = "$(Split-Path -Leaf $case.Launcher) -Lane L1 $($selection.Keys -join ',')"
         if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
         $rejected = $false
-        try { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' | Out-Null }
+        try { & $case.Launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' @selection | Out-Null }
         catch { $rejected = $true }
-        if (-not $rejected) { throw "$(Split-Path -Leaf $launcher) resolved -Lane L1 without -UserAuthorizedLane." }
-        if (Test-Path -LiteralPath $wtLog) { throw "$(Split-Path -Leaf $launcher) opened a tab for an unauthorized L1." }
+        if (-not $rejected) { throw "$label launched without -UserAuthorizedLane." }
+        if (Test-Path -LiteralPath $wtLog) { throw "$label opened a tab for an unauthorized L1." }
     }
 
     Remove-Item -LiteralPath $wtLog -Force -ErrorAction SilentlyContinue
