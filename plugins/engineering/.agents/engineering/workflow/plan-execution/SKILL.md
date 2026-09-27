@@ -4,7 +4,7 @@ description: Automatically own authorized long-term or multi-phase work through 
 
 kind: workflow
 domain: process
-lane: L3
+lane: L4
 ---
 
 # Execute a plan continuously
@@ -139,9 +139,9 @@ its identifiers. A bare CLI uses the same repository state.
 
 A restart re-resolves the same plan, ledger, Git identity, checkpoint, and next action; it never invents a
 new run owner. Transfer to a fresh context only under `engineering:plans` criteria. Checkpoint first,
-emit the exact
-`engineering:handoff-format` pointer, persist the four transfer fields defined by `plan-checkpoint`,
-and return a typed `transfer` transition with an observable resume condition. Do not transfer merely
+execute `engineering:handoff`, and persist the four transfer fields defined by `plan-checkpoint`. That workflow
+uses `engineering:handoff-format` for the pointer and invokes one selected launcher before this context releases
+ownership. Return a typed `transfer` transition with an observable resume condition. Do not transfer merely
 because a phase or commit completed.
 
 ## Terminal result

@@ -7,12 +7,16 @@ Stack standards remain in their stack plugins; Concertable policy stays with Con
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
 `base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
+`base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
-The packaged SessionStart hook emits the same canonical contract to both hosts. Python 3.9+ must be available
-as `python` on PATH. Enable and trust the hook in the host before claiming automatic delivery; installation
-alone is insufficient. The skill documents an explicit generated native-instruction fallback.
+Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
+Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Python 3.9+ must be
+available as `python` on PATH. Codex skips new or changed plugin hooks until they are reviewed and trusted
+in `/hooks`; a fresh missing-marketplace write probe is required before claiming enforcement. The host
+coverage limit is tracked in `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents
+a generated native-instruction fallback.
 
-The split packages form the **2.1.4** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.13** release. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
@@ -90,9 +94,18 @@ After a new commit lands on `main`, pick it up with:
 /plugin marketplace update base-agents
 ```
 
-Codex: adding the marketplace (`.agents/plugins/marketplace.json`) installs all three packages
-automatically; each declares `INSTALLED_BY_DEFAULT`. Refresh Codex's copy of the marketplace the same way
-to pick up a new commit.
+Codex treats `INSTALLED_BY_DEFAULT` as marketplace policy, not a CLI dependency resolver. Register the
+marketplace, then install all three packages explicitly:
+
+```powershell
+codex plugin marketplace add tj-agents/core
+codex plugin add base@base-agents
+codex plugin add engineering@base-agents
+codex plugin add machine@base-agents
+```
+
+Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
+resolve and verify its complete dependency closure reproducibly.
 
 Codex does not load agent definitions directly from plugins. After installing or updating the marketplace,
 install the engineering package's shared agents once into the active Codex profile. The installer defaults

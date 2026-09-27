@@ -10,6 +10,50 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\" --session-context",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\" --session-context",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/base/agent-files/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/base/agent-files/scripts/session-context.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
+            "timeout": 15
+          }
+        ],
+        "matcher": "Bash|apply_patch|edit_file|write_file|multi_edit|exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\"",
+            "timeout": 10
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
       }
     ]
   }

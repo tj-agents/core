@@ -42,7 +42,12 @@ PR: none yet.
   `.claude/settings.json` and `.codex/config.toml` from a committed capability lock, requires
   core's three plugins, rejects sources outside the four `tj-agents` repositories, preserves
   unrelated project settings, and has `write`/`check` modes. Its focused tests and package
-  sync check pass. No consumer has adopted it yet; core's release catalog still pins 2.1.4.
+  sync check pass. No consumer has adopted it yet. The candidate catalog is now 2.1.13,
+  pending merge and tag; consumer locks still need updating after publication.
+- Merged current `origin/main` (which released 2.1.12 and added native plugin activation checks).
+  Reconciled the router: moved skills require explicit aliases, so disabled plugins stay
+  unavailable. Core's Windows hook smoke test passes. The `codex.CMD` probe and shared hook
+  runner use `CREATE_NO_WINDOW`; live-session popup acceptance remains pending.
 
 ## Phase 1 inventory (2026-09-23)
 

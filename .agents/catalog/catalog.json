@@ -3,18 +3,18 @@
   "digest_format": "sha256-tree-v1",
   "releases": [
     {
-      "id": "base-agents@2.1.4",
+      "id": "base-agents@2.1.13",
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "base-agents",
-      "revision": "v2.1.4",
-      "version": "2.1.4",
+      "revision": "v2.1.13",
+      "version": "2.1.13",
       "plugins": [
         {
           "id": "base-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "2.1.4",
+          "version": "2.1.13",
           "description": "Maintained plans and common agent behavior.",
           "status": "current",
           "platforms": [
@@ -23,8 +23,10 @@
             "macos"
           ],
           "skills": [
+            "agent-files",
             "cd",
-            "plan-artifacts"
+            "plan-artifacts",
+            "stack-tiers"
           ],
           "dependencies": {
             "required": [],
@@ -36,13 +38,13 @@
             ],
             "optional": []
           },
-          "digest": "sha256:0a4473f35557772372bc7192ec02ae1a654bdf361c5f491f41ff7703c134e327"
+          "digest": "sha256:8769ae0c8b9d3689611fe46a8557fc85dafe26b547009f2c17e09486c032d851"
         },
         {
           "id": "base-agents/engineering",
           "name": "engineering",
           "package_path": "plugins/engineering",
-          "version": "2.1.4",
+          "version": "2.1.13",
           "description": "Selected engineering workflows, reviews and Git operations.",
           "status": "current",
           "platforms": [
@@ -120,13 +122,13 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:8eb9ccd34706e27ea2c3f43896c17c32e43b951da0ea5e080505a16eb88af079"
+          "digest": "sha256:64d51bf52a25ffdcab643d6ddb2ac6c488825b695fa7c9bd8dd69199348eece1"
         },
         {
           "id": "base-agents/machine",
           "name": "machine",
           "package_path": "plugins/machine",
-          "version": "2.1.4",
+          "version": "2.1.13",
           "description": "Explicit harness, history and clipboard utilities.",
           "status": "current",
           "platforms": [
@@ -162,7 +164,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:134839929c995f325658b8d7b8bc9db6afe18086293ba6f18b86a5f852e4994f",
+          "digest": "sha256:b1d421a2dcf8fbff7c12d5e1f60c6c6fc0517dfdfd089648083b756b9f7f2143",
           "digest_excludes": [
             "catalog/catalog.json"
           ]
@@ -170,18 +172,18 @@
       ]
     },
     {
-      "id": "cpp-agents@0.1.1",
+      "id": "cpp-agents@0.3.2",
       "owner_repository": "tj-agents/cpp",
       "source": "https://github.com/tj-agents/cpp.git",
       "marketplace": "cpp-agents",
-      "revision": "v0.1.1",
-      "version": "0.1.1",
+      "revision": "v0.3.2",
+      "version": "0.3.2",
       "plugins": [
         {
           "id": "cpp-agents/cpp",
           "name": "cpp",
           "package_path": "plugins/cpp",
-          "version": "0.1.1",
+          "version": "0.4.3",
           "description": "Platform-neutral modern C++ contracts and learning guidance.",
           "status": "current",
           "platforms": [
@@ -190,6 +192,7 @@
             "macos"
           ],
           "skills": [
+            "build",
             "cpp-build",
             "cpp-direction",
             "cpp-knowledge",
@@ -197,7 +200,16 @@
             "cpp-libraries",
             "cpp-structure",
             "cpp-style",
-            "cpp-testing"
+            "cpp-testing",
+            "direction",
+            "domain-design",
+            "knowledge",
+            "learning",
+            "libraries",
+            "mixins",
+            "structure",
+            "style",
+            "testing"
           ],
           "dependencies": {
             "required": [],
@@ -210,13 +222,13 @@
               "c++20-compiler"
             ]
           },
-          "digest": "sha256:1600f7aa5963ead4587b2c49424066e32c426cc9389206d334745f4a6bcc55e0"
+          "digest": "sha256:1a643e650b319c68d04f0657a96195f43f359bc1aed16b687de203afdccd7576"
         },
         {
           "id": "cpp-agents/gpp",
           "name": "gpp",
           "package_path": "plugins/gpp",
-          "version": "0.1.1",
+          "version": "0.3.2",
           "description": "G++, GCC, GDB, and Linux guidance layered on cpp.",
           "status": "current",
           "platforms": [
@@ -225,7 +237,9 @@
           ],
           "skills": [
             "gpp-scaffold",
-            "gpp-toolchain"
+            "gpp-toolchain",
+            "scaffold",
+            "toolchain"
           ],
           "dependencies": {
             "required": [
@@ -243,13 +257,13 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:7010876f92bb35c78b3a0d17fb6847978b1891fa6b1b5c20b42e9926a0b8addc"
+          "digest": "sha256:31fa00e2e23a22b22ca5d04cb5446b34e1136ee40908bd5e3adcef5b3ee0cf12"
         },
         {
           "id": "cpp-agents/msvc",
           "name": "msvc",
           "package_path": "plugins/msvc",
-          "version": "0.1.1",
+          "version": "0.3.3",
           "description": "MSVC and clang-cl toolchain guidance and project scaffold layered on cpp.",
           "status": "current",
           "platforms": [
@@ -257,7 +271,9 @@
           ],
           "skills": [
             "msvc-scaffold",
-            "msvc-toolchain"
+            "msvc-toolchain",
+            "scaffold",
+            "toolchain"
           ],
           "dependencies": {
             "required": [
@@ -276,19 +292,23 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:4c79950d6503fa9b3954e448cf3d42378c2c4dbbba9cb2d0c1ca658953e024fa"
+          "digest": "sha256:d60d132458cec3e51707be5dd05ed309b98d20a1a04d0b911f57efdddc8abd36"
         },
         {
           "id": "cpp-agents/win32",
           "name": "win32",
           "package_path": "plugins/win32",
-          "version": "0.1.1",
+          "version": "0.3.2",
           "description": "User-mode Win32, Unicode, WIL, and Windows resource guidance layered on cpp.",
           "status": "current",
           "platforms": [
             "windows"
           ],
           "skills": [
+            "knowledge",
+            "overview",
+            "scaffold",
+            "style",
             "win32-style",
             "windows-cpp-knowledge",
             "windows-overview"
@@ -308,13 +328,13 @@
               "wil"
             ]
           },
-          "digest": "sha256:f75924992bf75d609aace599c2d59583e92ba284d34365542eb85697ee82b888"
+          "digest": "sha256:2a1c3114edd4432c134663796f94c576227adb03651e6a1362ba8c52e494ce21"
         },
         {
           "id": "cpp-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "0.4.1",
+          "version": "0.7.3",
           "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -330,7 +350,9 @@
             "cpp-libraries",
             "cpp-structure",
             "cpp-style",
-            "cpp-testing"
+            "cpp-testing",
+            "domain-design",
+            "mixins"
           ],
           "dependencies": {
             "required": [],
@@ -343,7 +365,7 @@
               "c++20-compiler"
             ]
           },
-          "digest": "sha256:92fe3567b29b2836092482834304eee8839fbd04bdfd74116ec5b69c7b9df54a",
+          "digest": "sha256:1e40775335ece0a8bb02edbe17cbb4cbe78951786e14217542618f7c4ca582cc",
           "replacement": [
             "cpp-agents/cpp"
           ],
@@ -353,7 +375,7 @@
           "id": "cpp-agents/gcc",
           "name": "gcc",
           "package_path": "plugins/gcc",
-          "version": "0.4.1",
+          "version": "0.5.1",
           "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -380,7 +402,7 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:ea1ba9207e8dcf7a286103d7f7067c1c828d677dd9656f37f70480da6b4cbc3e",
+          "digest": "sha256:de7f1a0aed797a29acf856d46d74e8c91a412152ae57ae4692ac480633d5f5c0",
           "replacement": [
             "cpp-agents/gpp"
           ],
@@ -390,7 +412,7 @@
           "id": "cpp-agents/windows",
           "name": "windows",
           "package_path": "plugins/windows",
-          "version": "0.6.1",
+          "version": "0.8.3",
           "description": "Deprecated combined MSVC and Win32 compatibility package; split explicitly before 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -399,6 +421,7 @@
           "skills": [
             "msvc-scaffold",
             "msvc-toolchain",
+            "win32-scaffold",
             "win32-style",
             "windows-cpp-knowledge",
             "windows-overview"
@@ -422,7 +445,7 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:8cedba0b00f680b27dea8bfbe754cab81ce5f44215bcf73a2da30fb63e33701d",
+          "digest": "sha256:dc26710939ebd80e40ec78d496f6a4ef52b43d881fd65cd7d7e8c5e44722f00b",
           "replacement": [
             "cpp-agents/msvc",
             "cpp-agents/win32"
@@ -433,7 +456,7 @@
           "id": "cpp-agents/cpp-standards",
           "name": "cpp-standards",
           "package_path": "plugins/cpp-standards",
-          "version": "0.4.1",
+          "version": "0.7.3",
           "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -449,7 +472,9 @@
             "cpp-libraries",
             "cpp-structure",
             "cpp-style",
-            "cpp-testing"
+            "cpp-testing",
+            "domain-design",
+            "mixins"
           ],
           "dependencies": {
             "required": [],
@@ -462,7 +487,7 @@
               "c++20-compiler"
             ]
           },
-          "digest": "sha256:16842a0f0c2911aa1b3be2eb7dfffd4ef3340d398bb07c5a85ab358b36370fc1",
+          "digest": "sha256:fb07a3c8e1d6d66ff99cfc4af8df931297000edaca92c85e1ec0b6d702ebcff1",
           "replacement": [
             "cpp-agents/cpp"
           ],
@@ -472,7 +497,7 @@
           "id": "cpp-agents/gpp-standards",
           "name": "gpp-standards",
           "package_path": "plugins/gpp-standards",
-          "version": "0.4.1",
+          "version": "0.5.1",
           "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
           "status": "deprecated",
           "platforms": [
@@ -499,7 +524,7 @@
               "exe:ninja"
             ]
           },
-          "digest": "sha256:ae75b4d3912657938384ae56aedd5e23636f24655ea2e269c3f0764f169c30c8",
+          "digest": "sha256:ae6c3768be213b1acd4677c933d350ec2fe0249586f893ecd51b44cfab41f8dd",
           "replacement": [
             "cpp-agents/gpp"
           ],

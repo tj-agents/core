@@ -42,7 +42,13 @@ import re
 import sys
 from pathlib import Path
 
-from hook_runtime import NETWORK_COMMAND_TIMEOUT_SECONDS, claim_invocation, run_command
+from hook_runtime import (
+    NETWORK_COMMAND_TIMEOUT_SECONDS,
+    claim_invocation,
+    grant,
+    is_trusted_checkout,
+    run_command,
+)
 
 # This message is what the agent acts on, and Windows defaults these streams to cp1252,
 # which turns the punctuation in it into mojibake.
@@ -450,6 +456,18 @@ def block(reason):
     sys.exit(2)
 
 
+def grant_if_trusted(data, canonical_target):
+    """Approve a merge that passed every check, but only the exact Claude envelope.
+
+    A PreToolUse allow covers the whole tool call, so anything but the single-command envelope
+    could carry an unrelated command through on the review's approval.
+    """
+    if canonical_target is None or is_codex_invocation(data):
+        return
+    if is_trusted_checkout(__file__, canonical_target):
+        grant("merge-review-gate: the review is current and clean in a trusted repository.")
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -626,6 +644,8 @@ def main():
                 "since it, up to " + head[:12] + ". Re-run /security-review, then merge."
             )
 
+    grant_if_trusted(data, canonical_target)
+    grant_if_trusted(data, canonical_target)
     sys.exit(0)  # reviewed, current, clean → allow the merge
 
 

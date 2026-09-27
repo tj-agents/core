@@ -61,6 +61,20 @@ class DocsReachabilityTests(unittest.TestCase):
 
         self.assertTrue(any("app/AGENTS.md" in error and "sibling CLAUDE.md" in error for error in report["errors"]))
 
+    def test_claude_md_without_agents_sibling_is_an_error(self):
+        self.write("CLAUDE.md", "@AGENTS.md\n")
+        self.write("AGENTS.md", "# Root\n")
+        self.write("app/CLAUDE.md", "@AGENTS.md\n")
+        report = repository_report(self.root)
+        self.assertTrue(any("app/CLAUDE.md" in error and "sibling AGENTS.md" in error for error in report["errors"]))
+
+    def test_hidden_instruction_directory_is_checked(self):
+        self.write("CLAUDE.md", "@AGENTS.md\n")
+        self.write("AGENTS.md", "# Root\n")
+        self.write(".claude/CLAUDE.md", "@AGENTS.md\n")
+        report = repository_report(self.root)
+        self.assertTrue(any(".claude/CLAUDE.md" in error and "sibling AGENTS.md" in error for error in report["errors"]))
+
     def test_claude_md_with_wrong_body_is_an_error(self):
         self.write("CLAUDE.md", "@AGENTS.md\n")
         self.write("AGENTS.md", "# Root\n")

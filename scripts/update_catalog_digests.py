@@ -61,6 +61,16 @@ def git_tree_digest(repository: Path, revision: str, package_path: str, excluded
     return "sha256:" + digest.hexdigest()
 
 
+def validate_package_version(plugin: dict, manifest: dict, revision: str) -> None:
+    actual = manifest.get("version")
+    expected = plugin.get("version")
+    if actual != expected:
+        raise ValueError(
+            f"{plugin['id']}: catalog version {expected!r} disagrees with "
+            f"{revision} manifest version {actual!r}"
+        )
+
+
 def parse_sources(values: list[str]) -> dict[str, Path]:
     sources: dict[str, Path] = {}
     for value in values:
@@ -97,9 +107,18 @@ def update(root: Path, source_values: list[str], revision_values: list[str], che
         marketplace = release["marketplace"]
         for plugin in release["plugins"]:
             if marketplace in sources:
+                revision = revisions.get(marketplace, release["revision"])
+                manifest = json.loads(
+                    git(
+                        sources[marketplace],
+                        "show",
+                        f"{revision}:{plugin['package_path']}/.codex-plugin/plugin.json",
+                    )
+                )
+                validate_package_version(plugin, manifest, revision)
                 actual = git_tree_digest(
                     sources[marketplace],
-                    revisions.get(marketplace, release["revision"]),
+                    revision,
                     plugin["package_path"],
                     plugin.get("digest_excludes", []),
                 )
