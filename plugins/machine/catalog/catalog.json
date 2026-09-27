@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:c8b88f3edb520cc15b3ce495a0f5ef632746fd7b9239598c946ede6b61d6c720"
+          "digest": "sha256:85a315220bcc7d1350fa0066da1977ce0a8bc01123e08dc6acf6a59c6335af7f"
         },
         {
           "id": "base-agents/engineering",
@@ -122,7 +122,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:0149fb24a7084c2181f5ba17ec0ef888b0eb81e48072d62b918ee9f9682cc226"
+          "digest": "sha256:f0e33932b048bf3ccf90a3b87302c7cfe3158d90ec872c77ca0ade248ee25676"
         },
         {
           "id": "base-agents/machine",
