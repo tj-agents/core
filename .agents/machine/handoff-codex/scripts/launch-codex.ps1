@@ -18,8 +18,6 @@ param(
 
     [switch] $Frontier,
 
-    [switch] $UserAuthorizedLane,
-
     [string] $MinimumVersion = '0.154.0',
 
     [switch] $BypassHookTrust
@@ -149,13 +147,16 @@ $arguments = @('--cd', $resolvedWorkingDirectory)
 if ($Frontier -and ($Lane -or $Model)) {
     throw '-Frontier rejects -Lane and -Model beside it: the frontier tier is an explicit user request, not one selection among several.'
 }
+$tier = ''
 if ($Frontier) {
+    $tier = 'frontier -> '
     $frontierModel = Resolve-AgentLaneModel -Frontier -Harness 'codex'
     $Model = $frontierModel.Model
     if (-not $ReasoningEffort) { $ReasoningEffort = $frontierModel.Effort }
 }
-elseif ($Lane) {
-    $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'codex' -UserAuthorized:$UserAuthorizedLane
+elseif ($Lane -and -not ($Model -and $ReasoningEffort)) {
+    $tier = "lane $Lane -> "
+    $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'codex'
     if (-not $Model) { $Model = $laneModel.Model }
     if (-not $ReasoningEffort) { $ReasoningEffort = $laneModel.Effort }
 }
@@ -187,4 +188,6 @@ Invoke-AgentTerminalTab `
     -Arguments $arguments `
     -ClearEnvironment @('TERM')
 
-Write-Host "Launched codex-cli $($codex.Version.Text) from $($codex.Path)"
+$selection = if ($Model) { "$tier$Model" } else { 'the CLI default model' }
+if ($ReasoningEffort) { $selection += " at $ReasoningEffort" }
+Write-Host "Launched codex-cli $($codex.Version.Text) from $($codex.Path) on $selection"
