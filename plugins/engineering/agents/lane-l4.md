@@ -1,9 +1,9 @@
 ---
 name: lane-l4
-description: Runs one delegated task at lane L4. Mechanical work whose shape is already decided.
+description: Runs one delegated task at lane L4. Ordinary specified work that a compiler or a test suite will catch.
 kind: lane
 model: claude-sonnet-5
-effort: medium
+effort: high
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
 ---

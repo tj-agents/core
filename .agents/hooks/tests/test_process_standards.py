@@ -202,6 +202,23 @@ class ProcessStandardsTests(unittest.TestCase):
             flat,
         )
 
+    def test_ownership_or_repository_change_selects_a_real_handoff(self):
+        plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
+        execution = " ".join(
+            authored_skill("plan-execution").read_text(encoding="utf-8").split()
+        )
+        formatting = " ".join(
+            authored_skill("handoff-format").read_text(encoding="utf-8").split()
+        )
+
+        self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
+        self.assertIn("execute the `handoff` workflow", plans)
+        self.assertIn("a pointer in the response alone does not transfer ownership", plans)
+        self.assertIn("execute `engineering:handoff`", execution)
+        self.assertIn("invokes one selected launcher before this context releases ownership", execution)
+        self.assertIn("It does not select or perform a transfer", formatting)
+        self.assertIn("`engineering:handoff` performs the selected transfer", formatting)
+
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
         authoring = authored_skill("plan-authoring").read_text(
@@ -280,6 +297,89 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn(
             "do not create a second branch solely to change the type prefix to `Docs`", flat
         )
+
+    def test_merge_requires_safe_cleanup_when_the_repository_helper_is_absent(self):
+        body = authored_skill("merge").read_text(encoding="utf-8")
+        cleanup = body.split(
+            "### 5. Return to a clean base, and remove the merged worktree immediately",
+            maxsplit=1,
+        )[1].split("### 6. Follow the publish", maxsplit=1)[0]
+        flat = " ".join(cleanup.split())
+
+        for required in (
+            "Join-Path <primary-checkout> 'scripts/worktrees.ps1'",
+            "Test-Path -LiteralPath $worktreeHelper -PathType Leaf",
+            "If that exact primary-checkout helper path is absent, do not skip cleanup",
+            "status --porcelain=v2 --untracked-files=all",
+            "git merge-base --is-ancestor",
+            "gh pr list --repo <owner/repo> --state open --head <branch> --json number,url",
+            "fresh query returns exactly `[]`",
+            "worktree remove -- <target-worktree>",
+            "branch -d <branch>",
+            "Step 5 is a blocking post-merge gate",
+            "Do not enter Step 6",
+            "never remove that path",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, flat)
+
+        self.assertNotIn("worktree remove --force", cleanup)
+        self.assertNotIn("branch -D", cleanup)
+
+    def test_merge_retargets_the_host_before_active_worktree_removal(self):
+        body = authored_skill("merge").read_text(encoding="utf-8")
+        cleanup = body.split(
+            "### 5. Return to a clean base, and remove the merged worktree immediately",
+            maxsplit=1,
+        )[1].split("### 6. Follow the publish", maxsplit=1)[0]
+        flat = " ".join(cleanup.split())
+
+        for required in (
+            "Compare the recorded target checkout in the delivery binding with the resolved primary checkout",
+            "When the target is the primary checkout, or the session is already attached to the primary checkout, do not retarget or hand off",
+            "continue cleanup and branch deletion in the current session",
+            "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
+            "apply `base:cd` and retarget the host **before** a helper or native Git unregisters or removes it",
+            "retarget the host **before** a helper or native Git unregisters or removes it",
+            "shell `cd`, or `git -C` does not retarget Codex or Claude",
+            "invoke `/cd <primary-checkout>` there",
+            "invoke the unqualified `handoff` workflow once with the primary checkout",
+            "The successor is the sole cleanup owner",
+            "requires the physical target path to be absent",
+            "Do not make the user choose between these paths",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, flat)
+
+        self.assertLess(cleanup.index("apply `base:cd`"), cleanup.index("$worktreeHelper"))
+        self.assertLess(
+            cleanup.index("apply `base:cd`"),
+            cleanup.index("worktree remove -- <target-worktree>"),
+        )
+
+    def test_cd_and_handoff_transfer_active_directory_removal_to_the_successor(self):
+        cd = " ".join(authored_skill("cd").read_text(encoding="utf-8").split())
+        handoff = " ".join(
+            authored_skill("handoff").read_text(encoding="utf-8").split()
+        )
+
+        self.assertIn("Retarget the host **before** any helper or native command", cd)
+        self.assertIn(
+            "the successor the sole owner of the removal and final filesystem verification",
+            cd,
+        )
+        self.assertIn(
+            "the original stops repository-scoped work and releases its host session", cd
+        )
+        self.assertIn(
+            "put that exact operation and its final filesystem verification in the "
+            "successor's `## Next Steps`",
+            handoff,
+        )
+        self.assertIn(
+            "The predecessor must not perform the operation after launch", handoff
+        )
+        self.assertIn("a command error or residual path as incomplete", handoff)
 
 
 if __name__ == "__main__":

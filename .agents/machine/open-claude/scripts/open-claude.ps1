@@ -22,7 +22,8 @@ $ErrorActionPreference = 'Stop'
 # The shared launch primitives, from the authored source layout or the installed package layout.
 $agentCli = @(
     (Join-Path $PSScriptRoot '..\..\scripts\agent-cli.ps1'),
-    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1')
+    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '..\..\..\..\resources\machine\scripts\agent-cli.ps1')
 ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if (-not $agentCli) { throw "The shared agent-cli.ps1 library was not found relative to $PSScriptRoot." }
 . $agentCli
@@ -33,6 +34,13 @@ if ($Resume -and $Continue) {
 
 if ($Prompt -and $PromptPath) {
     throw 'Pass -Prompt for a short instruction or -PromptPath for a prepared file, not both.'
+}
+
+# A prompt this long is no longer the short instruction -Prompt exists for, and a command line is the
+# worst place to keep one: nothing on the receiving end can report a prompt that arrived damaged, and
+# once the tab is gone the text is gone with it. handoff-claude takes only -PromptPath for this reason.
+if ($Prompt.Length -gt 500) {
+    throw "The inline -Prompt is $($Prompt.Length) characters. Write it to a file and pass -PromptPath instead; -Prompt is for a short instruction."
 }
 
 $resolvedWorkingDirectory = (Resolve-Path -LiteralPath $WorkingDirectory -ErrorAction Stop).Path

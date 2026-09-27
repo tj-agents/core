@@ -4,7 +4,7 @@ description: Read-only readiness gate answering whether the current branch is cl
 
 kind: operation
 domain: process
-lane: L4
+lane: L5
 ---
 
 # Is this branch clear to PR?

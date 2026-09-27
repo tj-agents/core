@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)]
     [string] $WorkingDirectory,
@@ -13,6 +13,11 @@ param(
     [ValidateSet('low', 'medium', 'high', 'xhigh', 'max', 'ultra')]
     [string] $ReasoningEffort,
 
+    [ValidateSet('L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7')]
+    [string] $Lane,
+
+    [switch] $Frontier,
+
     [string] $MinimumVersion = '0.154.0',
 
     [switch] $BypassHookTrust
@@ -23,7 +28,8 @@ $ErrorActionPreference = 'Stop'
 # The shared launch primitives, from the authored source layout or the installed package layout.
 $agentCli = @(
     (Join-Path $PSScriptRoot '..\..\scripts\agent-cli.ps1'),
-    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1')
+    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '..\..\..\..\resources\machine\scripts\agent-cli.ps1')
 ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if (-not $agentCli) { throw "The shared agent-cli.ps1 library was not found relative to $PSScriptRoot." }
 . $agentCli
@@ -132,6 +138,25 @@ $inventory
 }
 
 $arguments = @('--cd', $resolvedWorkingDirectory)
+
+# An explicit -Model or -ReasoningEffort wins; a -Lane fills whichever of them the caller left out, from the
+# same shipped lane table handoff-claude reads. Effort is part of the lane here because a Codex model is
+# priced and paced by the pair, not by the model alone. The lane is never guessed from the prompt. -Frontier
+# is the tier no lane resolves to and tolerates no competing model selection beside it; an explicit
+# -ReasoningEffort still wins, because the user who named the tier may also have named its pace.
+if ($Frontier -and ($Lane -or $Model)) {
+    throw '-Frontier rejects -Lane and -Model beside it: the frontier tier is an explicit user request, not one selection among several.'
+}
+if ($Frontier) {
+    $frontierModel = Resolve-AgentLaneModel -Frontier -Harness 'codex'
+    $Model = $frontierModel.Model
+    if (-not $ReasoningEffort) { $ReasoningEffort = $frontierModel.Effort }
+}
+elseif ($Lane -and -not ($Model -and $ReasoningEffort)) {
+    $laneModel = Resolve-AgentLaneModel -Lane $Lane -Harness 'codex'
+    if (-not $Model) { $Model = $laneModel.Model }
+    if (-not $ReasoningEffort) { $ReasoningEffort = $laneModel.Effort }
+}
 
 if ($Model) {
     $arguments += @('--model', $Model)

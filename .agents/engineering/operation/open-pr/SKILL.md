@@ -4,7 +4,7 @@ description: Open or update the pull request for the current branch with the for
 
 kind: operation
 domain: process
-lane: L3
+lane: L4
 ---
 
 # Opening a pull request
@@ -65,24 +65,34 @@ Only when there is no upstream, or the branch is ahead of its remote.
   git diff --stat origin/main...HEAD
   ```
 
-- **Body** — factual, about the change and nothing else:
+- **Body** — written for a reviewer who has never seen the branch: why it exists, then what it does. Draw
+  it from the diff and commits, grouped by behaviour, never commit by commit:
 
   ```text
-  ## Summary
-  <1–3 sentences: what this does and why>
+  ## Why
+  <the problem or gap this closes, what prompted it, and what was true before; link the PR or issue it
+  follows>
 
-  ## What changed
-  - <area / behaviour bullets, drawn from the commits>
+  ## What
+  - **<area or behaviour>** — <what changed, with its reason wherever the diff alone would not say>
 
-  ## Test coverage
-  - <targeted checks completed locally, plus the exact-head gates delegated to PR CI>
+  ### Decisions worth the reviewer's attention
+  <each non-obvious choice, the alternative it rejected, and why>
+
+  ## Not in this PR
+  - <deliberately excluded scope, known follow-ups, pre-existing failures a reviewer will hit>
+
+  ## Test plan
+  - [x] <checks run locally and passed>
+  - [ ] <what a reviewer or the exact-head PR CI still has to confirm>
 
   ## Notes
-  - <a non-default end-to-end tier and why; a version-sync consequence if publishable source changed;
-    anything a reviewer needs>
+  - <a non-default end-to-end tier and why; a version-sync consequence if publishable source changed>
   ```
 
-  Drop a section with nothing to say. Keep the mandated attribution footer.
+  A small change collapses to two paragraphs, `**What:**` then `**Why:**`, with no headings. Drop a section
+  with nothing to say. State what was verified and what was not; never claim an unobserved result. A visible
+  UI change attaches screenshots per `engineering:pr-screenshots`. Keep the mandated attribution footer.
 
 ### 5. Create the PR
 

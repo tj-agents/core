@@ -1,8 +1,8 @@
 ---
 name: lane-l1
-description: Runs one delegated task at lane L1. Irreversible work at the top of the ladder, where a mistake cannot be taken back.
+description: Runs one delegated task at lane L1. Irreversible work with wide reach, where a mistake compounds beyond the repository.
 kind: lane
-model: claude-opus-5
+model: claude-fable-5
 effort: xhigh
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent

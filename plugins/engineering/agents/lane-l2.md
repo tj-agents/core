@@ -1,9 +1,9 @@
 ---
 name: lane-l2
-description: Runs one delegated task at lane L2. Open-ended judgement at the top of the ladder, where the answer is not yet known.
+description: Runs one delegated task at lane L2. Irreversible work of ordinary reach, where a mistake cannot be taken back.
 kind: lane
-model: claude-opus-5
-effort: high
+model: claude-opus-5-5
+effort: xhigh
 tools: Read, Glob, Grep, Write, Edit, Bash
 disallowedTools: Agent
 ---

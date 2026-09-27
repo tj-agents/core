@@ -9,12 +9,20 @@ import unittest
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 HOOK_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HOOK_ROOT))
 
 import hook_runtime
+
+
+@unittest.skipUnless(os.name == "nt", "Windows console window behavior")
+class HiddenCommandTests(unittest.TestCase):
+    def test_hook_child_process_has_no_console_window(self):
+        with patch.object(hook_runtime.subprocess, "run", return_value=Mock(returncode=0)) as run:
+            hook_runtime.run_command(["git", "status"])
+        self.assertEqual(subprocess.CREATE_NO_WINDOW, run.call_args.kwargs["creationflags"])
 
 
 SKILL_ROUTER = HOOK_ROOT / "skill_router.py"

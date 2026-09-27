@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)]
     [string] $WorkingDirectory,
@@ -10,6 +10,11 @@ param(
 
     [string] $Model,
 
+    [ValidateSet('L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7')]
+    [string] $Lane,
+
+    [switch] $Frontier,
+
     [switch] $DangerouslySkipPermissions
 )
 
@@ -18,7 +23,8 @@ $ErrorActionPreference = 'Stop'
 # The shared launch primitives, from the authored source layout or the installed package layout.
 $agentCli = @(
     (Join-Path $PSScriptRoot '..\..\scripts\agent-cli.ps1'),
-    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1')
+    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '..\..\..\..\resources\machine\scripts\agent-cli.ps1')
 ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if (-not $agentCli) { throw "The shared agent-cli.ps1 library was not found relative to $PSScriptRoot." }
 . $agentCli
@@ -38,8 +44,21 @@ if ($DangerouslySkipPermissions) {
     $arguments += '--dangerously-skip-permissions'
 }
 
-# Model selection is the caller's job, not this transport's: omit -Model and claude.exe falls back to
-# its own configured default, same as an interactively launched session.
+# An explicit -Model wins, a -Lane resolves through the shipped lane table, and neither leaves claude.exe
+# on its own configured default, same as an interactively launched session. The lane is never guessed here:
+# a transport that inferred one from the prompt would quietly decide the cost of every handoff. -Frontier is
+# the tier no lane resolves to and tolerates no competing selection beside it, so passing it alongside
+# -Lane or -Model is a contradiction to reject rather than an ambiguity to rank.
+if ($Frontier -and ($Lane -or $Model)) {
+    throw '-Frontier rejects -Lane and -Model beside it: the frontier tier is an explicit user request, not one selection among several.'
+}
+if ($Frontier) {
+    $Model = (Resolve-AgentLaneModel -Frontier -Harness 'claude').Model
+}
+elseif (-not $Model -and $Lane) {
+    $Model = (Resolve-AgentLaneModel -Lane $Lane -Harness 'claude').Model
+}
+
 if ($Model) {
     $arguments += @('--model', $Model)
 }

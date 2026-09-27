@@ -4,7 +4,7 @@ description: Land the current branch's PR through the merge queue and return to 
 
 kind: workflow
 domain: process
-lane: L1
+lane: L2
 ---
 
 # Landing a PR through the merge queue
@@ -95,7 +95,8 @@ On the default branch, or with no PR for this branch, **stop** — there is noth
   git rev-list --left-right --count origin/main...HEAD   # -> "<behind-base>	<ahead>"
   ```
 
-  Before final review, behind by anything means merge base in, rebuild the affected scope, push, freeze the
+  Before final review, behind by anything means merge base in with exactly
+  `git -C "<absolute-worktree>" merge --no-edit origin/<default>`, rebuild the affected scope, push, freeze the
   candidate, and review. After the review watermark exists, run `workflow_ops.py review-reconcile` against
   its descriptor. Disjoint base-only movement preserves the exact reviewed head and proceeds to merge-group
   validation. Relevant movement, including a platform pin or routed rule change, requires an update, focused
@@ -201,21 +202,78 @@ the merged PR binding, checkpoints the merge, and transfers to the recorded `pla
 stage creates the successor worktree and PR before the same task is rebound to its exact head and runs. Never
 carry the completed PR's review watermark or merge authorization into the successor.
 
+Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
+remove that path. Move it to the fetched remote default before closing any linked worktree:
+
 ```bash
-git checkout main && git pull --ff-only origin main
+git -C <primary-checkout> checkout <default>
+git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
-From another checkout, close a worktree-developed branch with the repository's own worktree command rather
-than by hand. It refuses every unsafe state and handles the platform details — junctions, long paths, Git
-administration, branch deletion — and the repository's own docs own that list, so trust the refusal instead
-of second-guessing it:
+Compare the recorded target checkout in the delivery binding with the resolved primary checkout and the
+current host attachment before invoking either cleanup path below. When the target is the primary checkout,
+or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
+and branch deletion in the current session.
+
+Only when the recorded target is a linked worktree, the host is attached to that target, and the target
+differs from the primary checkout, apply `base:cd` and retarget the host **before** a helper or native Git
+unregisters or removes it. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude
+and is not evidence that the old directory can be deleted.
+
+- If the harness exposes its native host command interface, invoke `/cd <primary-checkout>` there and
+  continue only after the host confirms that the session is attached to the primary checkout.
+- If that interface is unavailable, invoke the unqualified `handoff` workflow once with the primary
+  checkout. Checkpoint the exact repository, merged PR, branch, remote head, target worktree, primary
+  checkout, and remote default. Put the remaining Step 5 cleanup and final inventory in the successor's
+  `## Next Steps`. After verified launcher submission the predecessor stops repository-scoped work and
+  releases its host session; it does not run either cleanup path. The successor is the sole cleanup owner:
+  after the predecessor no longer holds the target, it selects the helper or native-Git path below, requires
+  the physical target path to be absent, and then continues this delivery.
+
+Do not make the user choose between these paths or teach them this lifecycle detail. Only the final manual
+`/cd` pause already defined by `base:cd` applies when the automatic handoff capability is genuinely
+unavailable or its diagnosed launcher fails.
+
+Resolve the repository's own worktree command under the primary checkout and prefer it for a
+worktree-developed branch. It refuses every unsafe state and handles the platform details — junctions, long
+paths, Git administration, branch deletion — and the repository's own docs own that list, so trust the
+refusal instead of second-guessing it:
 
 ```powershell
-./scripts/worktrees.ps1 close -Worktree <path> -PullRequest <n> [-PlanManaged]
+$worktreeHelper = Join-Path <primary-checkout> 'scripts/worktrees.ps1'
+if (Test-Path -LiteralPath $worktreeHelper -PathType Leaf) {
+    & $worktreeHelper close -Worktree <path> -PullRequest <n> [-PlanManaged]
+}
 ```
 
-Add `-PlanManaged` when a plan owns the work. A branch developed in the main checkout has no worktree to
-close; apply the same evidence by hand. The worktree-cleanup audit gate makes any skipped merged-worktree cleanup visible at session end.
+Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout helper path is absent, do not
+skip cleanup. Apply the same gates with native Git from the primary checkout:
+
+1. Record the target worktree's branch and head from `git worktree list --porcelain`. Refuse the primary
+   checkout, a detached target, or a target that does not exactly match the completed PR's recorded branch
+   and remote head.
+2. Run `git -C <target-worktree> status --porcelain=v2 --untracked-files=all`. Any output means stop: do not
+   remove a dirty worktree or discard tracked or untracked files.
+3. Fetch current refs. Require the completed PR to be `MERGED`, require
+   `git merge-base --is-ancestor <target-head> origin/<default>` to succeed, then run
+   `gh pr list --repo <owner/repo> --state open --head <branch> --json number,url`. Continue only when that
+   fresh query returns exactly `[]`. A closed-unmerged PR, unmerged head, or open PR preserves both the
+   worktree and branch.
+4. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
+   `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
+   developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
+   the old local branch with the same lowercase `-d` only after it is no longer checked out. Double-quote each
+   path and run each command on its own; that exact form is what the plugin's harness grant approves.
+5. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
+   target must be absent, the local merged branch must be gone, the primary checkout must be current on the
+   remote default, and pre-existing user files must remain. Treat any removal error or residual target path
+   as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
+
+**Step 5 is a blocking post-merge gate. Do not enter Step 6, report terminal delivery, or leave the cleanup
+for a later session until host retargeting plus the helper or native-Git path has produced the final
+inventory above.** The
+worktree-cleanup audit gate is a backstop that makes a missed cleanup visible, not a substitute for doing it
+immediately.
 
 If plan work remains, create its next PR-scoped worktree from the updated base and resume the same ledger. If
 only remote gates remain, use a fresh close-out worktree.

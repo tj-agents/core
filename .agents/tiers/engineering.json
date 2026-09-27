@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "tier": "engineering",
+  "stack": "any project",
+  "applies": "always"
+}
