@@ -4,7 +4,7 @@ description: Open or update the pull request for the current branch with the for
 
 kind: operation
 domain: process
-model: gpt-5.6-terra
+model: gpt-6-sol
 ---
 
 # Opening a pull request
