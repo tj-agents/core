@@ -29,7 +29,7 @@ LONG_RUNNING = re.compile(
     re.IGNORECASE,
 )
 SIDE_WORKSTREAM = re.compile(
-    r"\b(?:side\s+(?:task|work(?:stream)?)|separate\s+(?:task|workstream)|"
+    r"\b(?:side\s+(?:task|thing|work(?:stream)?)|separate\s+(?:task|workstream)|"
     r"distinct(?:ly)?\s+(?:actionable\s+)?(?:task|workstream))\b",
     re.IGNORECASE,
 )
@@ -38,12 +38,12 @@ ACTIVE_WORK = re.compile(
     re.IGNORECASE,
 )
 HANDOFF_ACTION = re.compile(
-    r"\b(?:hand\s*off|delegate|dispatch|launch|invoke)\b[^.!?\n]{0,80}"
-    r"\b(?:side\s+(?:task|work(?:stream)?)|separate\s+(?:task|workstream)|"
+    r"\b(?:hand\s*off|delegate|dispatch|launch|invoke|do\s+(?:a\s+)?handoff)\b[^.!?\n]{0,80}"
+    r"\b(?:side\s+(?:task|thing|work(?:stream)?)|separate\s+(?:task|workstream)|"
     r"distinct(?:ly)?\s+(?:actionable\s+)?(?:task|workstream))\b|"
-    r"\b(?:side\s+(?:task|work(?:stream)?)|separate\s+(?:task|workstream)|"
+    r"\b(?:side\s+(?:task|thing|work(?:stream)?)|separate\s+(?:task|workstream)|"
     r"distinct(?:ly)?\s+(?:actionable\s+)?(?:task|workstream))\b[^.!?\n]{0,80}"
-    r"\b(?:hand\s*off|delegate|dispatch|launch|invoke)\b",
+    r"\b(?:hand\s*off|delegate|dispatch|launch|invoke|do\s+(?:a\s+)?handoff)\b",
     re.IGNORECASE,
 )
 COMPLETE_STATUS = re.compile(

@@ -11,14 +11,14 @@
 
 ## Current state
 
-The bounded side-workstream contract, exclusive prompt route, focused regression coverage, package regeneration, and 2.1.14 metadata are implemented. The candidate is ready for its first local commit and independent review. The unrelated `shell/cr.ps1` change remains in the primary checkout and is not part of this branch. The existing `workflow_ops.py skills` recorder cannot resolve canonical kind paths; its active owner recorded that pre-existing defect, so this slice does not change it.
+The first review completed at `5ccafdc1428641bbae6ac5f23dea740645aa2a2f` with one trigger-wording finding. Its repair is validated locally and awaits commit plus incremental review. The unrelated `shell/cr.ps1` change remains in the primary checkout and is not part of this branch. The existing `workflow_ops.py skills` recorder cannot resolve canonical kind paths; its active owner recorded that pre-existing defect, so this slice does not change it.
 
 ## Next Steps
 
-Commit the verified candidate, run the independent workflow review, resolve any findings, and open the personal GitHub PR without merging.
+Regenerate the repaired package output, commit the review finding repair, complete incremental review, then push and open the personal GitHub PR without merging.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: commit, review, push, and open the isolated documentation/workflow PR.
+Current slice: regenerate, commit, complete incremental review, push, and open the isolated documentation/workflow PR.
 Remaining scope: PR review, explicit merge authorization, merge, and plan closeout.
 Done when: the behavior is merged to the default branch and its plan artifacts are closed out.
 
@@ -35,7 +35,7 @@ Done when: the behavior is merged to the default branch and its plan artifacts a
 
 ## Reviews
 
-- Pending focused implementation review.
+- Full review completed at `5ccafdc1428641bbae6ac5f23dea740645aa2a2f` in `reviews/Docs-ActiveTaskSideHandoff.md`; R1 is resolved locally and needs incremental review after its commit.
 
 ## Decisions, discoveries, blockers, and deviations
 
