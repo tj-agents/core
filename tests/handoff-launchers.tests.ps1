@@ -268,6 +268,34 @@ class Stub {
         if (-not $rejected) { throw "launch-claude.ps1 accepted -Frontier together with $($conflict.Keys -join ',')." }
     }
 
+    # --- both launchers refuse L1 unless the user authorized it, even beside an explicit selection ---
+    $unauthorized = @(
+        @{ Launcher = $claudeLauncher; Selection = @{} },
+        @{ Launcher = $claudeLauncher; Selection = @{ Model = 'explicitly-named-model' } },
+        @{ Launcher = $codexLauncher; Selection = @{} },
+        @{ Launcher = $codexLauncher; Selection = @{ Model = 'explicitly-named-model'; ReasoningEffort = 'xhigh' } }
+    )
+    foreach ($case in $unauthorized) {
+        $selection = $case.Selection
+        $label = "$(Split-Path -Leaf $case.Launcher) -Lane L1 $($selection.Keys -join ',')"
+        if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
+        $rejected = $false
+        try { & $case.Launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' @selection | Out-Null }
+        catch { $rejected = $true }
+        if (-not $rejected) { throw "$label launched without -UserAuthorizedLane." }
+        if (Test-Path -LiteralPath $wtLog) { throw "$label opened a tab for an unauthorized L1." }
+    }
+
+    Remove-Item -LiteralPath $wtLog -Force -ErrorAction SilentlyContinue
+    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' -UserAuthorizedLane
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.lanes.L1.model)) { throw 'launch-claude.ps1 did not resolve an authorized L1.' }
+
+    Remove-Item -LiteralPath $wtLog -Force
+    & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L1' -UserAuthorizedLane | Out-Null
+    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
+    if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L1.reasoning_effort)") { throw 'launch-codex.ps1 did not resolve an authorized L1.' }
+
     # --- handoff-codex: -Lane resolves both model and effort ---
     Remove-Item -LiteralPath $wtLog -Force
     & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' | Out-Null
