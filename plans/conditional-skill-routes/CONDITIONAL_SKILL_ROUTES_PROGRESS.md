@@ -9,7 +9,7 @@ Status: in progress (2026-09-27, Claude). Slice 1 committed; slice 2 (command ro
 Worktree: `.worktrees/Feature-Conditional-Skill-Routes` (core).
 Branches: `Feature/ConditionalSkillRoutes` (slice 1, requirements 1-5); `Feature/CommandSkillRoutes`
 (slice 2, requirement 7, stacked on slice 1); `tj-agents/cpp` branch for requirement 6 after slice 1.
-PRs: none yet.
+PRs: slice 1 tj-agents/core#54 (draft); requirement 6 tj-agents/cpp#32 (draft, depends on #54); slice 2 pending.
 
 ## Current state
 

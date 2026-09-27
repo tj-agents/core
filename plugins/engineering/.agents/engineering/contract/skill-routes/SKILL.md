@@ -84,6 +84,15 @@ stack's rows. Kinds:
   the row fires in a session and never blocks. Both fields are required; a malformed entry makes the table
   unusable, exactly like invalid JSON.
 
+Route-local `deny` rules belong to one path classification, such as a unit test booting a host. A decidable
+rule that applies across route kinds belongs once in `.agents/enforcement-rules.json`. The router evaluates
+that registry before the route reminder, and the delivery-boundary gate repeats it over the Git diff before a
+commit, push, or PR creation so a shell write cannot bypass it. Every rule names its owning standard and skill.
+
+An exception is valid only when the owning standard defines one and the repository records its evidence in
+`.agents/standards-exceptions.json` with the rule id and a narrow path regex. The exception file is repo data;
+never copy or weaken the shared rule for one repository.
+
 ## Required and conditional tiers
 
 `skills` is the **required** tier: the write stays blocked until every one is proven loaded. A table with
@@ -103,15 +112,6 @@ advisory.
 {"path": "\\.(h|hpp|cpp)$", "skills": ["cpp:style"],
  "conditional": [{"skill": "cpp:mixins", "when": "composing or changing mixins or CRTP providers"}]}
 ```
-
-Route-local `deny` rules belong to one path classification, such as a unit test booting a host. A decidable
-rule that applies across route kinds belongs once in `.agents/enforcement-rules.json`. The router evaluates
-that registry before the route reminder, and the delivery-boundary gate repeats it over the Git diff before a
-commit, push, or PR creation so a shell write cannot bypass it. Every rule names its owning standard and skill.
-
-An exception is valid only when the owning standard defines one and the repository records its evidence in
-`.agents/standards-exceptions.json` with the rule id and a narrow path regex. The exception file is repo data;
-never copy or weaken the shared rule for one repository.
 
 ## Prove coverage, do not assume it
 
