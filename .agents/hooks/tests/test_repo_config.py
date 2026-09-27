@@ -50,6 +50,7 @@ class RepoConfigTests(unittest.TestCase):
         self.assertEqual("tj-agents/core", c["extraKnownMarketplaces"]["base-agents"]["source"]["repo"])
         self.assertEqual(3, len(c["enabledPlugins"]))
         self.assertNotIn("old@other", c["enabledPlugins"])
+        self.assertEqual(2, len(c["permissions"]["allow"]))
         d = codex.read_text(encoding="utf-8")
         self.assertIn('model = "test"', d)
         self.assertIn('source = "https://github.com/tj-agents/core.git"', d)
@@ -59,9 +60,99 @@ class RepoConfigTests(unittest.TestCase):
         self.catalog["releases"][0]["source"] = "https://github.com/foreign/core.git"
         catalog = self.root / "catalog.json"
         catalog.write_text(json.dumps(self.catalog), encoding="utf-8")
-        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "Unapproved marketplace source"):
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "source disagrees with catalog owner"):
             repo_config.run(self.lock, catalog, "write")
         self.assertFalse((self.root / ".claude").exists())
+
+    def test_uses_consumer_catalog_without_core_source_roster(self):
+        local = self.catalog["releases"][0]
+        external = json.loads(json.dumps(local))
+        external.update({
+            "id": "sample-market@1.0.0",
+            "marketplace": "sample-market",
+            "owner_repository": "sample-org/sample-standards",
+            "source": "https://github.com/sample-org/sample-standards.git",
+            "version": "1.0.0",
+            "revision": "v1.0.0",
+            "plugins": [external["plugins"][0]],
+        })
+        external["plugins"][0].update({
+            "id": "sample-market/sample",
+            "name": "sample",
+            "version": "1.0.0",
+            "package_path": "plugins/sample",
+            "skills": ["sample-skill"],
+            "dependencies": {"required": [], "optional": []},
+            "harness": {
+                "marketplaces": [{"id": "sample-market", "repository": "sample-org/sample-standards"}],
+                "plugins": ["sample-market/sample"],
+                "hooks": [],
+                "permissions": {"claude_allow": ["Bash(sample-command)"], "codex_prefix_rules": []},
+            },
+        })
+        self.catalog["releases"].append(external)
+        project_catalog = self.root / ".agents" / "catalog" / "catalog.json"
+        project_catalog.parent.mkdir()
+        project_catalog.write_text(json.dumps(self.catalog), encoding="utf-8")
+        self.selections.append({
+            "id": "sample-market/sample", "release": external["id"], "commit": "b" * 40,
+            "required_skills": [], "path_scopes": [], "exceptions": [],
+        })
+        self.save_lock()
+        self.assertEqual(project_catalog, repo_config.bootstrap.catalog_for_lock(self.lock, SCRIPT))
+        repo_config.run(self.lock, project_catalog, "write")
+        claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            "sample-org/sample-standards",
+            claude["extraKnownMarketplaces"]["sample-market"]["source"]["repo"],
+        )
+        self.assertIn("Bash(sample-command)", claude["permissions"]["allow"])
+
+    def test_overlay_composes_permissions_and_removes_stale_rules(self):
+        overlay = self.root / ".agents" / "repository-harness.json"
+        rule = {
+            "pattern": ["sample", "safe"],
+            "justification": "Required for a repository workflow.",
+            "match": ["sample safe --check"],
+            "not_match": ["sample unsafe"],
+        }
+        overlay.write_text(json.dumps({
+            "schema_version": 1,
+            "requires": {
+                "marketplaces": [{"id": "base-agents", "repository": "tj-agents/core"}],
+                "plugins": ["base-agents/base"],
+                "hooks": [],
+                "permissions": {
+                    "claude_allow": ["PowerShell(& *\\handoff-codex\\scripts\\launch-codex.ps1 *)", "Bash(sample safe)"],
+                    "codex_prefix_rules": [rule],
+                },
+            },
+        }), encoding="utf-8")
+        self.assertIn(".codex/rules/agent-harness.rules", repo_config.run(self.lock, CATALOG, "check"))
+        repo_config.run(self.lock, CATALOG, "write")
+        self.assertEqual([], repo_config.run(self.lock, CATALOG, "check"))
+        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(3, len(claude["permissions"]["allow"]))
+        path = self.root / ".codex/rules/agent-harness.rules"
+        self.assertIn('decision = "allow"', path.read_text(encoding="utf-8"))
+        overlay.unlink()
+        self.assertEqual([".claude/settings.json", ".codex/rules/agent-harness.rules"], repo_config.run(self.lock, CATALOG, "check"))
+        repo_config.run(self.lock, CATALOG, "write")
+        self.assertFalse(path.exists())
+
+    def test_overlay_required_plugin_must_be_selected(self):
+        overlay = self.root / ".agents" / "repository-harness.json"
+        overlay.write_text(json.dumps({
+            "schema_version": 1,
+            "requires": {
+                "marketplaces": [{"id": "base-agents", "repository": "tj-agents/core"}],
+                "plugins": ["sample-market/sample"],
+                "hooks": [],
+                "permissions": {"claude_allow": [], "codex_prefix_rules": []},
+            },
+        }), encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "harness-required plugins"):
+            repo_config.run(self.lock, CATALOG, "write")
 
     def test_requires_core_selection(self):
         self.selections.pop()

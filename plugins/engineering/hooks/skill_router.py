@@ -594,7 +594,7 @@ def resolved_skill(name, harness, following_alias=False):
     A name may be plugin-qualified (`product:persistence`). It has to be able to be: a local roster and
     its generic counterpart deliberately share a skill name, so an unqualified lookup returns whichever
     root is walked first and silently hides the other - the same shadowing that once made
-    agents' PERSISTENCE.md resolve to dotagents'. Unqualified still works for a skill with one
+    one plugin's instructions resolve to another's. Unqualified still works for a skill with one
     home, which is every utility and every route that names only one side.
     """
     wanted_plugin, _, bare = name.rpartition(":")

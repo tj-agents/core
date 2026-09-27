@@ -615,7 +615,13 @@ def build(root: Path, validate_catalog_digests: bool = True):
     payloads = load(root / ".agents/plugins/payloads.json")["payloads"]
     compatibility = load(root / ".agents/plugins/compatibility.json")
     catalog = load(root / ".agents/catalog/catalog.json")
+    if any(release["owner_repository"] != "tj-agents/core" for release in catalog["releases"]):
+        raise ValueError("Core's authored catalog may contain only core releases")
     _, catalog_plugins = catalog_index(catalog)
+    harnesses = {
+        path.stem: load(path)
+        for path in (root / ".agents/plugins/harness").glob("*.json")
+    }
     skills = discover(root, config)
     adapters = validate_adapters(root, config, skills)
     plugins = validate_configuration(root, config)
@@ -683,6 +689,10 @@ def build(root: Path, validate_catalog_digests: bool = True):
 
     manifests: dict[str, dict[str, dict]] = {plugin: {} for plugin in plugins}
     for plugin in sorted(plugins):
+        harness = harnesses.get(plugin)
+        if harness is None or harness.get("plugin") != f"base-agents/{plugin}":
+            raise ValueError(f"Missing or mismatched harness manifest: {plugin}")
+        emit(f"plugins/{plugin}/harness.json", json.dumps(harness, indent=2) + "\n")
         for host, tree in (("codex", "codex-skills"), ("claude", "skills")):
             manifest_path = inside(root, f"{config['host_manifest_roots'][host]}/{plugin}.json")
             manifest = load(manifest_path)
@@ -767,6 +777,8 @@ def build(root: Path, validate_catalog_digests: bool = True):
             raise ValueError(f"Catalog skill roster drift: {plugin_id}")
         if entry["package_path"] != f"plugins/{plugin}":
             raise ValueError(f"Catalog package path drift: {plugin_id}")
+        if entry.get("harness") != harnesses[plugin]["requires"]:
+            raise ValueError(f"Catalog harness drift: {plugin_id}")
         allowed_excludes = ["catalog/catalog.json"] if plugin_id == "base-agents/machine" else []
         if entry.get("digest_excludes", []) != allowed_excludes:
             raise ValueError(f"Catalog digest exclusion drift: {plugin_id}")
