@@ -28,15 +28,14 @@ stopping after the checkout exists is the failure this sentence prevents.
 | Planning-only authoring with no delivery branch | Use the normal checkout; **do not create a worktree** |
 | Create or restore one branch checkout | **Create**, below |
 | Resume plan-managed work | The repository's plan floor — its ledger owns the branch, PR and worktree identity |
-| Read-only inventory | `./scripts/worktrees.ps1 audit` |
-| Close a merged PR's worktree | `./scripts/worktrees.ps1 close` |
-| Retire a superseded no-PR branch | `./scripts/worktrees.ps1 retire` |
+| Read-only inventory | `./scripts/worktrees.ps1 audit` when the repository ships it; otherwise `git worktree list --porcelain` and each entry's `git -C "<worktree>" status --porcelain` |
+| Close a merged PR's worktree | `engineering:merge` Step 5's cleanup, which uses the helper when present and native Git otherwise |
+| Retire a superseded no-PR branch | `./scripts/worktrees.ps1 retire` when the repository ships it; otherwise report the worktree and leave it |
 
-**`worktrees.ps1` is a vendored constant, not a per-repo path.** Its body carries no repo-specific value — no
-suite name, no project path, no service roster — so it is generated into every consumer beside the hooks and
-may be named outright. Cleanup is repository automation and needs no agent judgment: the script classifies
-registered worktrees from Git evidence and **never deletes**, refusing dirty, detached, mismatched, post-PR,
-case-colliding, persistent and missing-ledger states. **Never substitute a manual deletion for `retire`.**
+**`scripts/worktrees.ps1` is repository-vendored, not plugin-shipped.** Where a repository carries it, the
+script classifies registered worktrees from Git evidence and **never deletes**, refusing dirty, detached,
+mismatched, post-PR, case-colliding, persistent and missing-ledger states; trust its refusal. Where it is
+absent, use the fallbacks above. **Never substitute a manual deletion for `retire`.**
 
 ## Create
 
@@ -73,9 +72,8 @@ case-colliding, persistent and missing-ledger states. **Never substitute a manua
    local tracking ref with `-b $branch --track "origin/$branch"`.
 
 5. **Flatten `/` to `-` in the folder name.** A branch hierarchy left unflattened creates nested worktree
-   roots, which are ambiguous to every tool that walks the tree. `worktrees.ps1 audit` recognises both a
-   `.worktrees` directory inside the repository and a `<repo>.worktrees` sibling, so either placement is
-   inventoried — but **never** place one under a directory the agent harness reserves for its own ephemeral
+   roots, which are ambiguous to every tool that walks the tree. Inventory covers both a `.worktrees` directory
+   inside the repository and a `<repo>.worktrees` sibling, so either placement is found — but **never** place one under a directory the agent harness reserves for its own ephemeral
    worktrees, where manual trees collide with it and land as stray gitlinks that break submodule-aware
    checkouts.
 6. **Verify** the resulting path, branch, HEAD, base or existing remote head, and clean status. Use absolute
