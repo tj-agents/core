@@ -1,6 +1,6 @@
 ---
 name: lanes
-description: Pick the model and thinking effort a piece of work is worth by declaring an ordinal lane (L1 most capable to L7 cheapest) that each harness resolves to its own model, so no skill, agent or workflow stage ever names a model. Covers the ladder and what each rung is for, the four questions that choose a rung, re-routing per phase rather than running a whole task in its highest lane, where a lane is applied (skill front matter, a delegated lane agent, a workflow stage), and the three places the Claude and Codex ladders are deliberately not level. Use when adding or reviewing a skill or agent, when clerical work is running on an expensive model, when tempted to write a model name anywhere, or when a new model needs pricing into the ladder.
+description: Pick the model and thinking effort a piece of work is worth by declaring an ordinal lane (L1 most capable to L7 cheapest) that each harness resolves to its own model, so no skill, agent or workflow stage ever names a model. Covers the ladder and what each rung is for, the four questions that choose a rung, why a merge or publish never raises a lane, re-routing per phase rather than running a whole task in its highest lane, where a lane is applied (skill front matter, a delegated lane agent, a workflow stage), and the three places the Claude and Codex ladders are deliberately not level. Use when adding or reviewing a skill or agent, when clerical work is running on an expensive model, when tempted to write a model name anywhere, or when a new model needs pricing into the ladder.
 
 kind: contract
 domain: process
@@ -21,10 +21,10 @@ both harnesses, which is the whole point: one declaration, two resolutions.
 
 | Lane | For | Resolves to |
 |---|---|---|
-| **L1** | the mistake cannot be taken back *and* reaches beyond the repository — a schema migration that ships, a contract other teams build on | the frontier family, on the ladder only for this shape of work |
-| **L2** | the mistake cannot be taken back, ordinary reach — stored data shape, a published contract, a merge that lands | top general family, the setting above its default |
-| **L3** | open-ended judgement — architecture, plan authoring, a diagnosis with no known answer | top general family, default setting |
-| **L4** | specified work a compiler or suite will catch — features, bugfixes, review lenses | the workhorse family, high setting |
+| **L1** | planning and design of any size — authoring a plan that takes a design position, architecture, a data model or contract, a mechanism choice; never implementation, review or delivery | the frontier family, on the ladder only for this shape of work |
+| **L2** | high-stakes judgement that designs nothing — a diagnosis of a production failure, a security or migration review | top general family, the setting above its default |
+| **L3** | open-ended judgement that designs nothing — a diagnosis with no known answer, an investigation | top general family, default setting |
+| **L4** | specified work a compiler or suite will catch — features, bugfixes, review lenses, and the review, CI and merge that deliver them | the workhorse family, high setting |
 | **L5** | mechanical work whose shape is already decided — scripted edits, docs, ledger upkeep | the workhorse family, reduced setting |
 | **L6** | bulk clerical work whose input outgrows the cheapest rung — a monitor loop, a long transcript, a big diff | the cheapest model that still holds the input |
 | **L7** | clerical work with a small input — commit, push, pull, sync, one poll | the cheapest usable model |
@@ -45,22 +45,29 @@ L4 is what ordinary work declares; declare it explicitly rather than relying on 
 
 ## Choosing a rung — four questions, in this order
 
-1. **Reversibility.** Can the mistake be taken back? A one-way change — stored data shape, a published
-   contract, a merge — is never below L2 whatever else is true. Undo cost dominates every other signal.
-2. **Blast radius.** How far does a mistake reach — one file, a module, a service, production? Service or
-   production reach lifts the rung by one; on irreversible work that lift is what selects L1.
+1. **Design.** Does the work decide how something should be built — author a plan that takes a design
+   position, choose an architecture, a data model, a contract or a mechanism? Then it is L1, whatever its
+   size. The agent makes this call on its own judgement; a small plan that settles a design is still L1.
+2. **Stakes.** For work that designs nothing: how costly, and how hard to undo, is a wrong call? A
+   diagnosis or review with a lot riding on it — production, security, stored data — is L2.
 3. **Ambiguity.** Is the answer known and this is typing, or is the problem open? Open is never below L3;
    fully specified is never above L4.
 4. **Verifiability.** What catches the mistake — a compiler, a test suite, or only human judgement?
    Compiler-caught work drops a rung; judgement-only work does not.
 
-Nothing here says "how hard does this feel". A long mechanical edit is still L5; a three-line change to a
-published contract is still L2. One extra axis applies at the floor alone: clerical work is L7 only while
+**Delivery never raises a lane.** Take the rung from the hardest judgement inside the delegated work,
+never from the operations at its end. Nearly every change ends in a merge, push, publish or release, so
+reading that as irreversibility would put almost every job on L1. Those steps are governed by the delivery
+gates — review, CI, the merge queue, release checks — never by model tier. Implementation, review and
+delivery are never above L3, and L1 is only ever planning or design.
+
+Nothing here says "how hard does this feel". A long mechanical edit is still L5; a one-paragraph plan that
+picks a mechanism is still L1. One extra axis applies at the floor alone: clerical work is L7 only while
 its input fits the cheapest rung, and an input that outgrows it selects L6.
 
 **The frontier tier is above the ladder and is not a rung.** Each table carries a `frontier` entry the
 four questions can never select: it is priced by provenance — the user explicitly asking for that tier or
-its model by name — not by task shape. L1 prices the frontier family for one narrow task shape, so the
+its model by name — not by task shape. L1 prices the frontier family for planning and design, so the
 guard is the pair, not the model: a test asserts no rung resolves to the frontier's exact model *and*
 effort, which sits one step above L1's, so lane inflation cannot reach the tier. Consumers that expose it
 (the handoff launchers' `-Frontier`) make selecting it a distinct visible act rather than one lane value
@@ -113,6 +120,8 @@ in the rung its cleanup needed is how a bad design gets built efficiently.
   file: every one of those is a place that has to be found again at the next model release.
 - **A lane picked by how the work feels** rather than by the four questions. That is how every rung drifts
   to L1 and the ladder stops meaning anything.
+- **A lane raised by delivery.** "It ends in a merge, so it is irreversible" is the same drift; the
+  delivery gates own that risk.
 - **An alias where an ID belongs.** The tables carry exact model IDs because `ANTHROPIC_DEFAULT_*_MODEL`
   re-points a family alias — an alias can silently resolve to a different, dearer model than intended.
 - **A new rung for a model that is merely different.** Rungs are ordinal. A model that is cheaper *and*

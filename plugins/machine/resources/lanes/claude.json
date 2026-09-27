@@ -8,32 +8,32 @@
 
   "lanes": {
     "L1": {
-      "summary": "Irreversible work with wide reach, where a mistake compounds beyond the repository.",
+      "summary": "Plans and design decisions of any size, where the work decides how something should be built.",
       "model": "claude-fable-5",
       "effort": "xhigh",
       "context_ceiling": 1000000,
-      "why": "frontier family at the setting above `high`. Irreversible work whose blast radius reaches a service or production: a schema migration that ships, a contract other teams build on."
+      "why": "frontier family at the setting above `high`. Planning and design: authoring a plan, large or small, that takes a design position; architecture; a data model or contract; a mechanism choice. The agent picks it on its own judgement. Never implementation, review or delivery; a merge, push or publish at the end of a job never raises its lane."
     },
     "L2": {
-      "summary": "Irreversible work of ordinary reach, where a mistake cannot be taken back.",
+      "summary": "High-stakes judgement that is not design, where a wrong call is costly or hard to undo.",
       "model": "claude-opus-5-5",
       "effort": "xhigh",
       "context_ceiling": 1000000,
-      "why": "top general family at the setting above `high`. For work whose mistake cannot be taken back: stored data shape, a published contract, a merge that lands."
+      "why": "top general family at the setting above `high`. Judgement with a lot riding on it that designs nothing: a diagnosis of a production failure, a security or migration review. Delivering a change never selects it; merge, push and publish are governed by the delivery gates."
     },
     "L3": {
-      "summary": "Open-ended judgement at the top of the ladder, where the answer is not yet known.",
+      "summary": "Open-ended judgement that is not design, where the answer is not yet known.",
       "model": "claude-opus-5-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "top general family at its default setting. Open-ended judgement: architecture, plan authoring, a diagnosis with no known answer."
+      "why": "top general family at its default setting. Open-ended judgement that designs nothing: a diagnosis with no known answer, an investigation, weighing evidence a test cannot settle."
     },
     "L4": {
-      "summary": "Ordinary specified work that a compiler or a test suite will catch.",
+      "summary": "Ordinary specified work that a compiler or a test suite will catch, delivery included.",
       "model": "claude-sonnet-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "the workhorse. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses."
+      "why": "the workhorse. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses, and the review, CI and merge that deliver them."
     },
     "L5": {
       "summary": "Mechanical work whose shape is already decided.",

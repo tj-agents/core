@@ -10,7 +10,9 @@ lane: L4
 # Opening a pull request
 
 Open or update the PR for the current branch. **During implementation, open a draft PR at the first stable
-candidate that needs remote validation**; later stable candidates push to that same PR. This procedure does
+candidate that needs remote validation**; later stable candidates within that slice push to the same
+PR. A new substantive slice gets its own PR under `engineering:git-branching`, stacked when dependent.
+An existing draft is not permission to keep expanding its scope. This procedure does
 **not** enqueue, choose the end-to-end tier, or wait for a merge — that is
 `engineering:merge`.
 
@@ -61,28 +63,41 @@ Only when there is no upstream, or the branch is ahead of its remote.
 - Read the branch to draft from, dropping merge commits:
 
   ```bash
-  git log --oneline origin/main..HEAD
-  git diff --stat origin/main...HEAD
+  git log --oneline <actual-base>..HEAD
+  git diff --stat <actual-base>...HEAD
   ```
 
-- **Body** — factual, about the change and nothing else:
+- For a stack, use the immediate parent's branch as `<actual-base>` and `--base`; link the parent,
+  owning delivery map and next layer when present. Show this layer's delta and its cumulative checks.
+
+- **Body** — written for a reviewer who has never seen the branch: why it exists, then what it does. Draw
+  it from the diff and commits, grouped by behaviour, never commit by commit:
 
   ```text
-  ## Summary
-  <1–3 sentences: what this does and why>
+  ## Why
+  <the problem or gap this closes, what prompted it, and what was true before; link the PR or issue it
+  follows>
 
-  ## What changed
-  - <area / behaviour bullets, drawn from the commits>
+  ## What
+  - **<area or behaviour>** — <what changed, with its reason wherever the diff alone would not say>
 
-  ## Test coverage
-  - <targeted checks completed locally, plus the exact-head gates delegated to PR CI>
+  ### Decisions worth the reviewer's attention
+  <each non-obvious choice, the alternative it rejected, and why>
+
+  ## Not in this PR
+  - <deliberately excluded scope, known follow-ups, pre-existing failures a reviewer will hit>
+
+  ## Test plan
+  - [x] <checks run locally and passed>
+  - [ ] <what a reviewer or the exact-head PR CI still has to confirm>
 
   ## Notes
-  - <a non-default end-to-end tier and why; a version-sync consequence if publishable source changed;
-    anything a reviewer needs>
+  - <a non-default end-to-end tier and why; a version-sync consequence if publishable source changed>
   ```
 
-  Drop a section with nothing to say. Keep the mandated attribution footer.
+  A small change collapses to two paragraphs, `**What:**` then `**Why:**`, with no headings. Drop a section
+  with nothing to say. State what was verified and what was not; never claim an unobserved result. A visible
+  UI change attaches screenshots per `engineering:pr-screenshots`. Keep the mandated attribution footer.
 
 ### 5. Create the PR
 
@@ -99,6 +114,9 @@ is already complete, reviewed, and exact-head-CI-ready.
 ### 6. Bind the delivery owner
 
 A PR with nothing owning its wait is what turns every later transition into a question for the user.
+For a stack child, record its parent dependency in the owning ledger. A binding may monitor its checks,
+but `engineering:merge` must verify that its base is eligible before acting. After a parent lands,
+reconcile the child and refresh this binding so the continuation does not rely on stale topology.
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind

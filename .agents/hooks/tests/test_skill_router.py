@@ -49,6 +49,8 @@ class SkillRouterTests(unittest.TestCase):
         env["PLUGIN_ROOT"] = str(self.plugin)
         env["HOME"] = str(self.base / "home")
         env["USERPROFILE"] = str(self.base / "home")
+        env["CODEX_HOME"] = str(self.base / "home" / ".codex")
+        env["CLAUDE_CONFIG_DIR"] = str(self.base / "home" / ".claude")
         return env
 
     def run_router(self, arguments=(), payload=None):
@@ -135,6 +137,72 @@ class SkillRouterTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_missing_marketplace_blocks_unrouted_claude_write(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
+        result = self.run_router(payload={
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": str(uuid.uuid4()),
+            "session_id": str(uuid.uuid4()),
+            "cwd": str(self.repo),
+            "tool_name": "Write",
+            "tool_input": {"file_path": "notes.txt", "content": "new\n"},
+        })
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("missing-marketplace:never-shipped", result.stderr)
+
+    def test_missing_marketplace_blocks_nested_codex_edit(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
+        result = self.run_router(payload={
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": str(uuid.uuid4()),
+            "session_id": str(uuid.uuid4()),
+            "cwd": str(self.repo),
+            "tool_name": "apply_patch",
+            "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/item.py\n+value = 2\n*** End Patch"},
+        })
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("missing-marketplace:never-shipped", result.stderr)
+
+    def test_nested_codex_shell_write_needs_skill_proof(self):
+        result = self.run_router(payload={
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": str(uuid.uuid4()),
+            "session_id": str(uuid.uuid4()),
+            "cwd": str(self.repo),
+            "tool_name": "exec_command",
+            "tool_input": {"cmd": "echo value > src/item.py"},
+        })
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("readable session transcript", result.stderr)
+
+    def test_codex_canonical_bash_uses_codex_registry(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]})
+        result = self.run_router(payload={
+            "hook_event_name": "PreToolUse",
+            "tool_use_id": str(uuid.uuid4()),
+            "session_id": str(uuid.uuid4()),
+            "turn_id": str(uuid.uuid4()),
+            "cwd": str(self.repo),
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo value > src/item.py"},
+        })
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertIn("for codex", result.stderr)
+
+    def test_missing_transcript_never_trusts_a_repeated_routed_write(self):
+        session = str(uuid.uuid4())
+        for _ in range(2):
+            result = self.run_router(payload={
+                "hook_event_name": "PreToolUse",
+                "tool_use_id": str(uuid.uuid4()),
+                "session_id": session,
+                "cwd": str(self.repo),
+                "tool_name": "Write",
+                "tool_input": {"file_path": "src/item.py", "content": "value = 2\n"},
+            })
+            self.assertEqual(2, result.returncode, result.stderr)
+            self.assertIn("readable session transcript", result.stderr)
+
 
     def aliases(self, mapping):
         (self.plugin / "hooks" / "compatibility.json").write_text(
@@ -166,6 +234,33 @@ class SkillRouterTests(unittest.TestCase):
 
         self.assertEqual(2, result.returncode)
         self.assertIn("base:feature", result.stdout)
+
+    def test_stale_codex_cache_does_not_count_as_an_enabled_plugin(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["disabled:feature"]}]})
+        skill = self.base / "home/.codex/plugins/cache/disabled/feature/1.0/skills/feature"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: feature\n---\n", encoding="utf-8")
+
+        result = self.run_router(["--verify-install", "codex"])
+
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("disabled:feature", result.stdout)
+
+    def test_stale_claude_manifest_does_not_count_as_an_enabled_plugin(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["disabled:feature"]}]})
+        plugin = self.base / "home/.claude/plugins/cache/disabled/feature/1.0"
+        skill = plugin / "skills/feature"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: feature\n---\n", encoding="utf-8")
+        manifest = self.base / "home/.claude/plugins/installed_plugins.json"
+        manifest.write_text(json.dumps({"plugins": {"feature@disabled": [
+            {"installPath": str(plugin)}
+        ]}}), encoding="utf-8")
+
+        result = self.run_router(["--verify-install", "claude"])
+
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("disabled:feature", result.stdout)
 
     def test_an_alias_chain_is_followed_exactly_one_hop(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["oldest:feature"]}]})
