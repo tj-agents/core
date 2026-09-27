@@ -13,10 +13,9 @@ Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-2
 authorization checkpoint below requires a fresh exact-head review and CI run. `v2.1.13`
 remains unpublished.
 
-## Current state (2026-09-26)
+## Current state (2026-09-27)
 
-- The plan is on `main`, amended with the tj-agents-only source rule, the per-machine migration
-  procedure and (PR #30) the retire-duplicates framing of phase 1.
+- The plan covers per-machine migration and retirement of duplicated shared hooks and agents.
 - This PC (first machine):
   - All four canonical repositories are cloned under
     `C:\Users\tommy\source\repos\tj-agents\{core,cpp,react,dotnet}`.
@@ -33,16 +32,14 @@ remains unpublished.
 - On this PC, Codex's failing user-scope `notify` entry and temporary plugin-cache junctions
   were removed. Core 2.1.12 is installed; a live-session update still needs a repository-owned
   repair and acceptance test. No local cache alias is supported.
-- The phase-2 generator derives both host configs from a capability lock, requires core's
-  plugins, rejects non-`tj-agents` sources, preserves unrelated settings, and supports
-  `write`/`check`. Tests and package sync pass; adoption awaits the 2.1.13 release.
+- The phase-2 generator derives both host configs from a lock and owner-authored catalog,
+  requires core's plugins, validates GitHub sources against release owners, and checks drift.
 - Merged current `origin/main` (which released 2.1.12 and added native plugin activation checks).
   Reconciled the router: moved skills require explicit aliases, so disabled plugins stay
   unavailable. Core's Windows hook smoke test passes. The `codex.CMD` probe and shared hook
   runner use `CREATE_NO_WINDOW`; live-session popup acceptance remains pending.
-- Concertable migration cannot delete duplicates wholesale: product hooks import its router,
-  its generator emits shared agents, and the tj-agents-only source rule conflicts with enabling
-  `concertable@agents`. Settle that boundary before cutover.
+- Concertable migration cannot delete duplicates wholesale: product hooks import its router
+  and its generator emits shared agents. Settle those boundaries before cutover.
 - Core now has a read-only machine verifier under `bootstrap-capabilities`. Focused tests pass;
   on this PC it finds 34 own-agent profile entries (2 settings groups, 5 marketplaces,
   15 plugins, 12 loose agents/skills). Host-bundled runtime marketplaces are excluded.
@@ -53,10 +50,9 @@ remains unpublished.
   adoption in winwrap and sandbox-hwid, and a permanent always-on authoring rule. The separate
   `plans/conditional-skill-routes/` plan owns route conditionality and does not replace this
   plan's harness-installation contract.
-- Documentation review resolved the harness mechanism: per-plugin authored manifests feed the
-  catalog and generated packages; `repo_config.py` composes selected requirements into Claude
-  settings and Codex rules; digest, wiring, catalog and consumer-drift checks enforce the rule.
-  This mechanism is designed but not yet implemented.
+- Tommy corrected the ownership boundary on 2026-09-27: core must not name or synchronize
+  other standards repositories. Its catalog now holds only its own release; consumers commit
+  the selected owners' records and the generator reads those without a source roster.
 
 ## Phase 1 inventory (2026-09-23)
 
@@ -118,18 +114,12 @@ diverged tests (`test_skill_router`, `test_red_run_gate`, `test_merge_review_gat
 | `skills/persistent-workflow` (+ `codex-skills`) | duplicate of `engineering:persistent-workflow`; core is the newer canonical form | retire |
 | `skills/always-on-instructions`, `skills/reset-test-explorer`, and every other skill | Concertable-product or .NET/React stack contracts | stay |
 
-### Retirement order
-
 ### Additional authored-source audit (2026-09-26)
 
-Compared `Concertable/agents` `origin/main` blobs with this core branch, then inspected every
-divergent shared workflow file. All four `.agents/lanes` sources and the other shared workflow
-contract, runtime, role, and fixture files have identical blobs. The divergent workflow files
-are core-ahead except `workflow_ops.run_process`, where Concertable explicitly decodes UTF-8;
-that fix is now in core with a non-ASCII output test. Concertable's `kind: lens` fixture/host
-values differ from core's `kind: review`; the latter matches core's role taxonomy. Its Codex
-project agent install and host probe differ from core's profile delivery; phase 2 must settle
-repository-owned Codex agent delivery rather than copying either local installer.
+The shared lanes and workflow contract/runtime/role/fixture blobs match this core branch.
+Core is ahead on other workflow files; Concertable's explicit UTF-8 decoding was ported with
+a non-ASCII test. Its `kind: lens` differs from core's `kind: review`. Its Codex project-agent
+installer differs from core's profile delivery; phase 2 must settle repository-owned delivery.
 
 | Source | Classification | Action |
 |---|---|---|
@@ -145,13 +135,6 @@ The shared-name `.agents/skills` in Concertable and `tj-agents/dotnet`/`react` h
 byte-identical source files; names alone are insufficient evidence for deletion. They require
 behavioral comparison when the Concertable consumer is migrated.
 
-1. Core releases with the ports above.
-2. The Concertable repository enables core (`base`, `engineering`, `machine@base-agents`) plus
-   `concertable` in its own project settings, so it is never without lanes or gates.
-3. Only then delete the duplicates (both tables of hooks above, their wiring, the ten agents in
-   both forms, and `persistent-workflow`) from `Concertable/agents`, keeping the "Not moved" product
-   hooks and product skills.
-
 ## Next Steps
 
 **Goal: every capability has exactly one copy.** Remove all duplication between `Concertable/agents`
@@ -162,7 +145,9 @@ moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
 Current slice: implement the declared harness manifests, permission composition and enforcement
-on the 2.1.13 core candidate; then re-review, publish it, and adopt winwrap and sandbox-hwid.
+on the 2.1.13 core candidate with core-only release ownership; then re-review and push PR #48.
+Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before publishing the
+core-only bundled catalog, so existing consumers do not lose their non-core selections.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
 Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no
 machine-local behavioural state on each machine.
@@ -175,10 +160,22 @@ inventory above distinguishes generic duplicates from product content. The merge
 repository suite's Windows shell test passed on focused rerun after sandbox denial and one transient
 PowerShell startup timeout.
 
-1. Implement `.agents/plugins/harness.schema.json`, the three core manifests, their validator and
-   catalog/package sync, permission-aware `repo_config.py`, standing guidance, and focused tests on
-   PR #48. Refresh exact-head review and CI, merge, publish 2.1.13, and verify the tag and digests.
-2. Adopt the released generator and manifests in winwrap and sandbox-hwid first. Commit generated
+The current core worktree now has three authored harness manifests, a source-digest and hook-wiring
+validator, catalog/package harness copies, composed Claude permissions and Codex rules, a consumer
+catalog lookup beside the lock, and no hard-coded non-core marketplace roster in runtime source.
+The core catalog contains only `base-agents`; each other standards owner must publish and check its
+own release records. Focused validation: 31 bootstrap integration tests, 6 config tests, 4 harness
+tests, 16 source-layout tests and the Windows shell hook regression passed. The 632-test shared
+runtime suite had one failure because its fixture copied the catalog before the final digest refresh;
+that exact workflow-generation test passed when rerun against the refreshed catalog. The other
+631 completed without failure (8 skipped). Harness and catalog drift checks pass. Generated sync
+`-Check` and committed-head digest checks remain to run after the final commit.
+
+1. Finish the core-only catalog and harness slice: run generated sync `-Check`, commit, review the
+   new diff, push PR #48, and verify its CI. Do not publish the core-only catalog until the first
+   consumers have committed their own composed catalogs.
+2. Add owner-authored release and harness records in each selected standards repository, then adopt
+   the generator and manifests in winwrap and sandbox-hwid first. Commit generated
    Claude/Codex config plus consumer drift checks, and prove the Claude launcher allow rule in a
    real trusted auto-mode session; record any host limitation honestly.
 3. In a fresh `Concertable/agents` worktree from `origin/main`, select the released `base`,
