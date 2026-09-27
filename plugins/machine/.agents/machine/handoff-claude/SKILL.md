@@ -44,24 +44,24 @@ user named outright. Supply neither and the CLI keeps its own configured default
 interactively launched session would.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
-lane from the prompt would quietly decide the cost of every handoff. Choose by reversibility, blast
-radius, ambiguity and verifiability, from the hardest judgement inside the delegated work — never by how
+lane from the prompt would quietly decide the cost of every handoff. Choose by design, stakes, ambiguity
+and verifiability, from the hardest judgement inside the delegated work — never by how
 hard the work feels, and never raised by a merge, push or publish at its end, which the delivery gates
 govern:
 
 | Lane | For |
 |---|---|
-| `L1` | Critical design decisions, where the hardest judgement in the work sets a direction that later work builds on. |
-| `L2` | One-way design decisions of ordinary reach, where a choice cannot be taken back once work builds on it. |
-| `L3` | Open-ended judgement at the top of the ladder, where the answer is not yet known. |
+| `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
+| `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
+| `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
 | `L4` | Ordinary specified work that a compiler or a test suite will catch, delivery included. |
 | `L5` | Mechanical work whose shape is already decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
 | `L7` | Clerical work with a small input and no judgement to make. |
 
-`-Lane L1` also needs `-UserAuthorizedLane`, and the launcher throws without it. **Pass it only when the
-user's own instruction asked for L1 or named the work a critical design decision.** Implementation,
-review and delivery never qualify.
+**Split a job that designs and then delivers.** Hand the plan or design off on `L1`, then its execution on
+the rung the build needs, working from that plan. One handoff carrying both runs the delivery on the design
+rung, or the design on the delivery rung.
 
 `-Frontier` selects the tier above the ladder from the same table. **Pass it only when the user
 explicitly asked for that tier or its model by name.** No lane resolves to the tier — L1 prices the same
