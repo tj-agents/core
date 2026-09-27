@@ -26,6 +26,17 @@ owns Claude's marketplace and enabled-plugin keys and Codex's marketplace and pl
 other project settings remain in place. Release commits are selected by the lock, while host
 settings declare the corresponding GitHub marketplace and enabled plugins.
 
+After each repository has adopted its generated project settings, audit the machine before removing
+old user-profile behavior:
+
+```powershell
+python -B '<skill-directory>\scripts\verify_machine.py' --home C:\Users\name
+```
+
+The verifier is read-only. It reports user-scope plugin selections, marketplaces, hooks,
+notification commands, and loose agents or skills. Codex's recorded hook trust hashes and host
+preferences are runtime state and are not reported. Exit status 1 means findings remain.
+
 Use the packaged Python entry point. The lock is project-owned; the catalog is release-owned and ships
 with this skill's plugin. `--profile` is the actual Codex or Claude configuration directory, not a label.
 
