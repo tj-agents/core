@@ -4,7 +4,7 @@ description: Design or phase multi-step work and create or update its implementa
 
 kind: workflow
 domain: process
-model: gpt-5.6-sol
+model: gpt-6-astra
 ---
 
 # Author a durable plan
