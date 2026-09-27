@@ -143,8 +143,7 @@ Concertable-product content; core contains no Concertable reference in code, nam
 moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
-Current slice: implement the declared harness manifests, permission composition and enforcement
-on the 2.1.16 core candidate with core-only release ownership; then re-review and push PR #48.
+Current slice: finish exact-head CI for PR #48's 2.1.16 core-only harness candidate.
 Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before publishing the
 core-only bundled catalog, so existing consumers do not lose their non-core selections.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
@@ -159,7 +158,7 @@ inventory above distinguishes generic duplicates from product content. The merge
 repository suite's Windows shell test passed on focused rerun after sandbox denial and one transient
 PowerShell startup timeout.
 
-The current core worktree now has three authored harness manifests, a source-digest and hook-wiring
+The core branch now has three authored harness manifests, a source-digest and hook-wiring
 validator, catalog/package harness copies, composed Claude permissions and Codex rules, a consumer
 catalog lookup beside the lock, and no hard-coded non-core marketplace roster in runtime source.
 The core catalog contains only `base-agents`; each other standards owner must publish and check its
@@ -167,11 +166,12 @@ own release records. Focused validation: 31 bootstrap integration tests, 6 confi
 tests, 16 source-layout tests and the Windows shell hook regression passed. The 632-test shared
 runtime suite had one failure because its fixture copied the catalog before the final digest refresh;
 that exact workflow-generation test passed when rerun against the refreshed catalog. The other
-631 completed without failure (8 skipped). Harness and catalog drift checks pass. Generated sync
-`-Check` and committed-head digest checks remain to run after the final commit.
+631 completed without failure (8 skipped). PR #48's first exact-head CI found that the new source
+digest varied between LF and CRLF checkouts; it now normalizes text line endings, with a regression
+test. Local drift checks pass; committed-head validation, incremental review, push, and CI remain.
 
-1. Finish the core-only catalog and harness slice: run generated sync `-Check`, commit, review the
-   new diff, push PR #48, and verify its CI. Do not publish the core-only catalog until the first
+1. Finish the core-only catalog and harness slice: commit the line-ending fix, run committed-head
+   checks, incrementally review, push PR #48, and verify its CI. Do not publish the core-only catalog until the first
    consumers have committed their own composed catalogs.
 2. Add owner-authored release and harness records in each selected standards repository, then adopt
    the generator and manifests in winwrap and sandbox-hwid first. Commit generated
