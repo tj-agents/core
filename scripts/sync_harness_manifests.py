@@ -31,6 +31,7 @@ def inside(root: Path, relative: str) -> Path:
 
 
 def add_path(root: Path, relative: str, members: dict[str, bytes], excludes: set[str]) -> None:
+    root = root.resolve()
     source = inside(root, relative)
     if not source.exists():
         raise ValueError(f"Missing harness source: {relative}")

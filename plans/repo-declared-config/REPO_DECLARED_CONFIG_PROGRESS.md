@@ -167,10 +167,11 @@ tests, 16 source-layout tests and the Windows shell hook regression passed. The 
 runtime suite had one failure because its fixture copied the catalog before the final digest refresh;
 that exact workflow-generation test passed when rerun against the refreshed catalog. The other
 631 completed without failure (8 skipped). PR #48's first exact-head CI found that the new source
-digest varied between LF and CRLF checkouts; it now normalizes text line endings, with a regression
-test. Local drift checks pass; committed-head validation, incremental review, push, and CI remain.
+digest varied between LF and CRLF checkouts; it now normalizes text line endings. Its next CI
+found a Windows 8.3 temp-path alias in the new digest tests; the walker now resolves its root.
+Both have regression tests; local drift checks pass. Review, push, and CI remain.
 
-1. Finish the core-only catalog and harness slice: commit the line-ending fix, run committed-head
+1. Finish the core-only catalog and harness slice: commit the path-alias fix, run committed-head
    checks, incrementally review, push PR #48, and verify its CI. Do not publish the core-only catalog until the first
    consumers have committed their own composed catalogs.
 2. Add owner-authored release and harness records in each selected standards repository, then adopt
