@@ -48,6 +48,16 @@
           {
             "type": "command",
             "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\" --package-routes"
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
           }
         ],

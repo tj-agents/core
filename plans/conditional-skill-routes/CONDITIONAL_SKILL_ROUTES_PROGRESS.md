@@ -4,12 +4,13 @@
 - Roadmap: `plans/conditional-skill-routes/CONDITIONAL_SKILL_ROUTES_ROADMAP.md`
 - Roadmap item: `conditional-skill-routes/required-and-conditional-tiers`
 
-Status: in progress (2026-09-27, Claude). Slice 1 committed; slice 2 (command routes) next.
+Status: in progress (2026-09-27, Claude). All three PRs open as drafts; merge and publish await authorization.
 
-Worktree: `.worktrees/Feature-Conditional-Skill-Routes` (core).
+Worktrees: core `.worktrees/Feature-Conditional-Skill-Routes` (slice 1) and
+`.worktrees/Feature-Command-Skill-Routes` (slice 2); cpp `.worktrees/Feature-Conditional-Skill-Routes`.
 Branches: `Feature/ConditionalSkillRoutes` (slice 1, requirements 1-5); `Feature/CommandSkillRoutes`
 (slice 2, requirement 7, stacked on slice 1); `tj-agents/cpp` branch for requirement 6 after slice 1.
-PRs: slice 1 tj-agents/core#54 (draft); requirement 6 tj-agents/cpp#32 (draft, depends on #54); slice 2 pending.
+PRs: slice 1 tj-agents/core#54 (draft); requirement 6 tj-agents/cpp#32 (draft, depends on #54); slice 2 opened stacked on #54 (see its PR).
 
 ## Current state
 
@@ -22,6 +23,18 @@ PRs: slice 1 tj-agents/core#54 (draft); requirement 6 tj-agents/cpp#32 (draft, d
 - Verification: `tests/` 189 OK; `.agents/hooks/tests` 616 run, 2 failures in
   `test_merge_review_gate.CanonicalEnvelopeShellTests` only under Git Bash (it derives `bash.exe` from a
   `git` on PATH that resolves to `mingw64/bin`); the same class passes under PowerShell, which CI uses.
+- Slice 2: a route may carry `command` instead of `path`. The router normalizes each simple command of a
+  shell call (quotes, heredoc and here-string bodies ignored; `bash -c`/`pwsh -Command` followed). The
+  engineering package ships `.agents/hooks/command-routes.json` and runs `skill_router.py --package-routes`
+  from its Claude and Codex hook manifests: `gh pr create`/`new` and title/body `gh pr edit` require
+  `engineering:open-pr`; `gh pr merge` and API merges/enqueues require `engineering:merge`; the handoff
+  launchers require `engineering:handoff`. Read-only `gh pr view`/`checks` never block. Tests:
+  `.agents/hooks/tests/test_skill_router_commands.py`; hooks suite 628 OK under PowerShell.
+- cpp (requirement 6): sources require `cpp:style` (+ `win32:style`); domain-design, mixins, structure,
+  the toolchain skill and win32:overview are conditional on sources; toolchain skills stay required on
+  build files; `cpp:libraries` conditional on build files. gpp 0.3.3, msvc 0.3.4, win32 0.3.3.
+- Rebase note: if PR #48 lands first, its `relative_targets` early exit in `main()` must not exit before
+  command routes are evaluated for a shell call with no write target.
 - Authorization covers implementation, tests and opening the core and C++ PRs. It does not
   authorize merging, publishing, or hand-editing generated consumer routes.
 
