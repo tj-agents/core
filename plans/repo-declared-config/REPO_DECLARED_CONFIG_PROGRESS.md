@@ -151,42 +151,31 @@ Concertable-product content; core contains no Concertable reference in code, nam
 (user decision, 2026-09-23). The currency gate, enforcement gate and marketplace refresh are **not**
 moved into core; phase 3 rebuilds currency as self-heal.
 
-Scope: whole plan: core-owned generic harness and repo-declared configuration for every known
-consumer and machine in the plan.
-Current slice: finish phase 1's duplicate audit and generic ports on this branch; include the
-live-session cache-path failure in the subsequent host-adapter work.
-Remaining scope: release core; retire Concertable duplicates; generate consumer config; add
-self-heal and live-update safety; migrate each consumer and machine; remove local behavioural state.
-Done when: every migrated host and consumer passes the plan's acceptance checks and the machine
-verifier reports no local behavioural configuration.
+Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
+Current slice: review and publish the 2.1.13 core candidate, then retire Concertable's shared copies.
+Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
+Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no
+machine-local behavioural state on each machine.
 
-Done already on this branch: inventory above; `hook_runtime.run_command` with timeout-bearing
-`gh`/`git` calls in `merge_review_gate`, `persistent_workflow_merge_gate` and
-`delivery_binding_gate`, plus `test_hook_runtime`. The hook suite's only failures are the two
-pre-existing `CanonicalEnvelopeShellTests`, which cannot find Git Bash on this machine.
+Completed on this branch: shared hook timeouts and Windows no-console launches; quote-aware and
+foreign-path-safe router writes; explicit moved-skill aliases; red-run invocation names; lane metadata;
+UTF-8 workflow output; and the first lock-to-host-config generator. The Concertable authored-source
+inventory above distinguishes generic duplicates from product content. The merged hook suite passed
+625 tests with 8 skips; package sync, plan graph, and committed-head catalog checks passed. The
+repository suite's Windows shell test passed on focused rerun after sandbox denial and one transient
+PowerShell startup timeout.
 
-1. **Finish the audit.** The inventory above covers hooks, agents and two skills only. Compare
-   everything else in Concertable's authored sources (`.agents/lanes` lane tables, `.agents/workflows`,
-   `.agents/plugins` install roster/payloads, `scripts/`, `standards/`, `codex-skills`,
-   `enforcement-rules.json`, `.claude/` and `.codex/` adapters) against core's `base`, `engineering` and
-   `machine` sources and against `tj-agents/dotnet` and `tj-agents/react` (Concertable's .NET/React
-   stack skills may duplicate those). Compare content, not names. Record each item as duplicate
-   (which side is ahead), product-only, or generic-missing-from-core in the inventory above.
-2. **Port Concertable-ahead generic fixes into core, rewritten in core's terms**, each commit with its
-   tests: router commits `ff903b3` (quoted `>` is not a redirect; foreign paths; first writes),
-   `26941b7` (settle foreign paths before any gate) and `f5d2b7e` (qualifier fallback; reconcile with
-   core's `skill_aliases` from `45506cb`); `red_run_gate`'s `invocable_name`; the rung-specific lane agent
-   `description`s and `kind` into core's authored agent sources for both hosts. Replay commit by commit
-   (Concertable history since `7ab1028`); a three-way reconciliation against `c68ff55` gives 29 conflicts. Skip the
-   currency-coupled commits (`62c3887`, `de88e59`, `ee7f228`). After source changes run
-   `python -B scripts/update_catalog_digests.py`, `pwsh .agents/sync-generated.ps1` and
-   `pwsh .agents/sync-generated.ps1 -Check`, and the hook suite
-   (`python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py'`).
-3. `/review` this branch, open the PR, merge and release core.
-4. **In `Concertable/agents`** (its own worktree from `origin/main`; the local checkout
-   `C:\Users\tommy\source\repos\agent-standards-fresh` is on another branch): first enable `base`,
-   `engineering`, `machine@base-agents` plus `concertable` in the Concertable product repository's
-   project settings, then delete every duplicate recorded above (hooks and their wiring, the ten agents
-   in both forms, `persistent-workflow`, and whatever step 1 adds), keeping the "Not moved" product
-   pieces. Verify a Concertable session in both hosts loads one copy of each lane, gate and skill.
-5. Record the result here, then continue with phase 2 (repo-config generator).
+1. Finish this branch's review, open a PR, merge it, and publish the 2.1.13 core release. Confirm the
+   immutable tag, plugin packages, and catalog digest against the published commit.
+2. In a fresh `Concertable/agents` worktree from `origin/main`, select the released `base`,
+   `engineering`, and `machine@base-agents` alongside `concertable` in project settings. Then remove
+   its duplicated hooks, ten agents in both host forms, and `persistent-workflow` skill. Preserve
+   product-only rules, hooks, and stack contracts. Compare its generic worktree and delivery scripts
+   with core utilities before retiring them. Verify each host loads one copy of every shared gate,
+   lane, and skill.
+3. Extend the generator with consumer CI drift checks, migrate consumer locks to the published core
+   release, and add the repository-owned repair path for missing or stale skills. Keep plugin refresh
+   safe for a live session, including stale hook paths and invisible Windows child processes.
+4. Adopt `sandbox-hwid` first, then the other consumers named in the plan. After each host passes,
+   remove obsolete user-scope behavioral entries on this PC, run the machine verifier, and record
+   acceptance. Repeat the same procedure on every other machine until the plan closes.
