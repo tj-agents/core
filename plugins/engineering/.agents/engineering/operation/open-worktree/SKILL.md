@@ -42,9 +42,10 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
 1. **Apply the repository's worktree identity gate first.** Read its guidance and state whether the task
    matches the current branch directly, or is branch-local work because it changes code not yet on the default
    branch. Verify against the dirty paths and the other registered worktrees rather than matching on a shared
-   refactor name. **If neither basis holds, stop and ask.** Do not split code that exists only on the current
-   feature branch onto a new branch. A planning-only task never reaches this creation procedure; active
-   plan-managed delivery continues in its ledger's owning worktree.
+   refactor name. An explicitly planned dependent stack slice also matches: record its parent and branch
+   from that parent's tip under `engineering:git-branching`. Do not treat all unmerged feature code as
+   one mandatory PR. **If none of these bases holds, stop and resolve ownership.** A planning-only task
+   never reaches this creation procedure; active delivery continues in the ledger's recorded slice.
 2. **Confirm no open red generated-sync PR before starting new work** — `engineering:merging` owns
    that gate and the reason it is a branch-time check rather than a per-prompt one. A red one means the
    platform is mid-break; clear it first.
@@ -55,7 +56,8 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    $repository = [IO.Path]::GetDirectoryName($commonDirectory.Trim())
    ```
 
-4. **Fetch with pruning, and start new branches at the fetched remote default — never at local default**,
+4. **Fetch with pruning. Independent branches start at the fetched remote default; dependent stack
+   layers start at their recorded parent's current tip. Never start from a stale local default**,
    which is routinely stale. Naming is `engineering:git-branching`'s: the repository's capitalized
    `<Type>/<Name>` form, and **never a second casing of an existing name** — a case-insensitive filesystem
    cannot hold both, and the remote then breaks fetch for everyone. Match an existing branch's casing rather
@@ -67,6 +69,9 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
    git -C $repository fetch origin --prune
    git -C $repository worktree add $path -b $branch origin/<default>
    ```
+
+   For a dependent stack layer, replace `origin/<default>` with the verified parent ref and record its
+   SHA. Do not merge main separately into each layer as a substitute for reconciling the stack.
 
    For an existing local branch, omit `-b` and the start point. For a remote-only branch, create its matching
    local tracking ref with `-b $branch --track "origin/$branch"`.

@@ -52,9 +52,10 @@ review-state change, not merge authorization.
 The diff shows *what* changed; the message carries the *why* — the incident, the root cause, the alternatives
 considered. That is what keeps it out of the code as running commentary.
 
-## Use the fewest safe merges
+## Keep commits within a reviewable delivery slice
 
-Complete a piece of work in the fewest PRs its real dependencies allow. Numbered steps, commits, and phases
-do not each need their own PR; keep coherent work together. Split only where a merge, a package publication,
-a generated sync, or a runtime deployment must finish before the next work can build or run — and group all
-the work possible on each side of that gate.
+Use `engineering:git-branching` to choose PR boundaries. A phase may span several focused PRs, stacked
+when dependent. Keep related repairs and tests with their behavior, and split a substantial next concern
+before it grows the current candidate. Publication and deployment dependencies are additional boundaries;
+they are not the only reasons to separate PRs. Commit cadence and one verified push per slice do not
+require combining the entire goal into one PR.
