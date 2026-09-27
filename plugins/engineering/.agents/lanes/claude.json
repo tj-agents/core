@@ -8,26 +8,25 @@
 
   "lanes": {
     "L1": {
-      "summary": "Critical design decisions, where the hardest judgement in the work sets a direction that later work builds on.",
+      "summary": "Plans and design decisions of any size, where the work decides how something should be built.",
       "model": "claude-fable-5",
       "effort": "xhigh",
       "context_ceiling": 1000000,
-      "why": "frontier family at the setting above `high`. Reserved for critical design decisions and work of that weight: a foundational architecture, a data model or contract other teams build on. Never implementation, review or delivery; a merge, push or publish at the end of a job never raises its lane. A launcher resolves this rung only with the user's explicit authorization.",
-      "requires_user_authorization": true
+      "why": "frontier family at the setting above `high`. Planning and design: authoring a plan, large or small, that takes a design position; architecture; a data model or contract; a mechanism choice. The agent picks it on its own judgement. Never implementation, review or delivery; a merge, push or publish at the end of a job never raises its lane."
     },
     "L2": {
-      "summary": "One-way design decisions of ordinary reach, where a choice cannot be taken back once work builds on it.",
+      "summary": "High-stakes judgement that is not design, where a wrong call is costly or hard to undo.",
       "model": "claude-opus-5-5",
       "effort": "xhigh",
       "context_ceiling": 1000000,
-      "why": "top general family at the setting above `high`. For a decision whose content cannot be taken back: a stored data shape, a published contract. Delivering a change never selects it; merge, push and publish are governed by the delivery gates."
+      "why": "top general family at the setting above `high`. Judgement with a lot riding on it that designs nothing: a diagnosis of a production failure, a security or migration review. Delivering a change never selects it; merge, push and publish are governed by the delivery gates."
     },
     "L3": {
-      "summary": "Open-ended judgement at the top of the ladder, where the answer is not yet known.",
+      "summary": "Open-ended judgement that is not design, where the answer is not yet known.",
       "model": "claude-opus-5-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "top general family at its default setting. Open-ended judgement: architecture, plan authoring, a mechanism design a test will check, a diagnosis with no known answer."
+      "why": "top general family at its default setting. Open-ended judgement that designs nothing: a diagnosis with no known answer, an investigation, weighing evidence a test cannot settle."
     },
     "L4": {
       "summary": "Ordinary specified work that a compiler or a test suite will catch, delivery included.",

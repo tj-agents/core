@@ -23,6 +23,7 @@ instructions; do not guess a sibling-plugin or author-checkout path.
    to a UTF-8 file and invoke the selected launcher's packaged script once, following its loaded
    instructions. Preserve a user-selected model, effort or frontier request; otherwise choose the lane the
    remaining work is worth per `engineering:lanes` and pass it, or inherit defaults when no lane is clear.
+   Record the lane and a one-line reason beside the next action in the goal.
    Never launch a second successor because startup is slow or acknowledgement is delayed.
 4. Verify the launch result. On failure ownership stays here: diagnose and preserve the checkpoint.
    Successful launcher submission proves launch, not that the successor has read the plan. Report that
