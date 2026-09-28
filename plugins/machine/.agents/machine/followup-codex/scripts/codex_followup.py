@@ -35,6 +35,7 @@ class Proxy:
         self.deadline = deadline
         self.responses = queue.Queue()
         self.sequence = 0
+        self.writer = None
         env = dict(os.environ, CODEX_HOME=str(profile))
         self.process = subprocess.Popen(
             [executable, 'app-server', 'proxy'], env=env,
@@ -62,10 +63,29 @@ class Proxy:
             ))
 
     def _write(self, message):
+        payload = json.dumps(message) + '\n'
+        completed = queue.Queue(maxsize=1)
+
+        def write():
+            try:
+                self.process.stdin.write(payload)
+                self.process.stdin.flush()
+            except (BrokenPipeError, OSError, ValueError) as error:
+                completed.put(error)
+            else:
+                completed.put(None)
+
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise FollowupError('Timed out; delivery has not been verified')
+        self.writer = threading.Thread(target=write, daemon=True)
+        self.writer.start()
         try:
-            self.process.stdin.write(json.dumps(message) + '\n')
-            self.process.stdin.flush()
-        except (BrokenPipeError, OSError) as error:
+            error = completed.get(timeout=remaining)
+        except queue.Empty as error:
+            raise FollowupError('Timed out writing to Codex; delivery has not been verified') from error
+        self.writer.join()
+        if error:
             raise FollowupError('Codex proxy disconnected') from error
 
     def request(self, method, params):
@@ -113,6 +133,8 @@ class Proxy:
             self.process.kill()
             self.process.wait(timeout=3)
         self.reader.join(timeout=3)
+        if self.writer:
+            self.writer.join(timeout=3)
         self.process.stdin.close()
         self.process.stdout.close()
 
