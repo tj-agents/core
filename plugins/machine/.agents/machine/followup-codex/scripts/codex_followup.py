@@ -85,10 +85,10 @@ class Proxy:
             if isinstance(response, Exception):
                 raise response
             if 'method' in response:
-                self._write({'id': response['id'], 'error': {
-                    'code': -32601, 'message': 'Follow-up helper does not handle server requests'
-                }})
-                continue
+                raise FollowupError(
+                    'Recipient requires a server request handled by its owning UI; '
+                    'closing this helper without answering it'
+                )
             if response['id'] != request_id:
                 continue
             if 'error' in response:
