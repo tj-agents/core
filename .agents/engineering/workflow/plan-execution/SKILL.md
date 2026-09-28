@@ -151,7 +151,8 @@ new run owner. Transfer to a fresh context only under `engineering:plans` criter
 execute `engineering:handoff`, and persist the four transfer fields defined by `plan-checkpoint`. That workflow
 uses `engineering:handoff-format` for the pointer and invokes one selected launcher before this context releases
 ownership. Return a typed `transfer` transition with an observable resume condition. Do not transfer merely
-because a phase or commit completed.
+because a phase or commit completed. A massive plan whose substantial design phase produced a durable
+phased execution plan normally has a separate transfer reason under `engineering:plans`.
 
 ## Terminal result
 
