@@ -1,4 +1,7 @@
 # Repo-declared agent configuration — progress
+## Cross-PC startup refresh checkpoint (2026-09-28)
+
+Tommy clarified that a standards push on another PC must reach the next Claude and Codex CLI sessions on every developer PC. Current committed release pins do not advance from a push alone. Claude first-session refresh and live-cache safety were handed to an independent Claude CLI in `Fix/ClaudeStandardsSync`. The Codex branch `Fix/CodexStandardsSync` adds a pre-launch marketplace refresh for the PowerShell CLI wrapper and native handoff launcher, then refreshes enabled Git plugins. An isolated Codex probe found the full Git marketplace clone timed out, while sparse checkout succeeded, so the generated marketplace config now declares package sparse paths. The focused startup sync, launcher, and config tests passed. The generated package was refreshed. The remaining decision is the update channel: auto-review rejected changing every generated ref from an immutable release to moving `main`, citing unreviewed executable code. Installed-host acceptance, exact package checks, review, and delivery remain. Neither host can yet be claimed to load latest pushes on every PC.
 
 - Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 - Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
