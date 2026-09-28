@@ -61,6 +61,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/tier_gate.py",
       "destination": "hooks/tier_gate.py"
     },
@@ -98,6 +103,11 @@
       "plugin": "machine",
       "source": ".agents/machine/scripts",
       "destination": "resources/machine/scripts"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
     },
     {
       "plugin": "machine",
@@ -213,6 +223,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/skill_router.py",
       "destination": "hooks/skill_router.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
     },
     {
       "plugin": "engineering",
