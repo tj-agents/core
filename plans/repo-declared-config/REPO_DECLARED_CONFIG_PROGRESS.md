@@ -3,14 +3,13 @@
 - Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 - Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
 - Roadmap item: `repo-declared-config/migrate-agent-state`
-Status: phase 1 in progress; full repo-declared migration remains open (2026-09-27).
+Status: phase 1 in progress; full repo-declared migration remains open (2026-09-28).
 
-Branch: `Refactor/RepoDeclaredConfigHarnessMove`
-Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
-PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48), being reconciled with current main.
-CI `verify` passed at the prior remote head `284d014` (run `36318559193`); new review and CI are pending.
-Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27. Main has
-published `v2.1.15`; this branch now targets the unpublished `v2.1.16` candidate.
+PR #48 merged at `1f7a928` and Codex hook snapshots (#59) at `531c0fd`; `v2.1.15` is the latest
+release. Neither refreshes Claude before plugin load. Active slices: `Fix/ClaudeStandardsSync`
+([`CLAUDE_STANDARDS_SYNC.md`](CLAUDE_STANDARDS_SYNC.md)) and `Fix/CodexStandardsSync`, each in its own
+worktree under `core\.worktrees\Fix-CodexHookRefresh\`.
+Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27.
 
 ## Current state (2026-09-27)
 
@@ -143,9 +142,9 @@ Concertable-product content; core contains no Concertable reference in code, nam
 moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
-Current slice: finish exact-head CI for PR #48's 2.1.16 core-only harness candidate.
-Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before publishing the
-core-only bundled catalog, so existing consumers do not lose their non-core selections.
+Current slice: Claude pre-load standards refresh (`Fix/ClaudeStandardsSync`).
+Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before tagging a release with
+the core-only bundled catalog; main-tracking installs already carry it since PR #48.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
 Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no
 machine-local behavioural state on each machine.
@@ -171,9 +170,8 @@ digest varied between LF and CRLF checkouts; it now normalizes text line endings
 found a Windows 8.3 temp-path alias in the new digest tests; the walker now resolves its root.
 Both have regression tests; local drift checks pass. Review, push, and CI remain.
 
-1. Finish the core-only catalog and harness slice: commit the path-alias fix, run committed-head
-   checks, incrementally review, push PR #48, and verify its CI. Do not publish the core-only catalog until the first
-   consumers have committed their own composed catalogs.
+1. Done: PR #48 merged the core-only catalog and harness slice. Do not tag a release with it until the
+   first consumers have committed their own composed catalogs.
 2. Add owner-authored release and harness records in each selected standards repository, then adopt
    the generator and manifests in winwrap and sandbox-hwid first. Commit generated
    Claude/Codex config plus consumer drift checks, and prove the Claude launcher allow rule in a
@@ -186,6 +184,8 @@ Both have regression tests; local drift checks pass. Review, push, and CI remain
    lane, and skill.
 4. Add the repository-owned repair path for missing or stale skills. Keep plugin refresh
    safe for a live session, including stale hook paths and invisible Windows child processes.
+   Claude's pre-load refresh and 14-day orphan window are delivered by `Fix/ClaudeStandardsSync`;
+   Codex's equivalent is owned by `Fix/CodexStandardsSync`.
 5. Adopt the other consumers named in the plan. After each host passes,
    remove obsolete user-scope behavioral entries on this PC, run the machine verifier, and record
    acceptance. Repeat the same procedure on every other machine until the plan closes.

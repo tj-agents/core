@@ -40,6 +40,9 @@ $promptDir = Join-Path $scratch 'prompt files'
 $wtLog = Join-Path $scratch 'wt-args.log'
 
 $originalPath = $env:PATH
+$pythonDir = Split-Path -Parent (Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+$gitDir = Split-Path -Parent (Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+$originalClaudeConfig = $env:CLAUDE_CONFIG_DIR
 $originalUserProfile = $env:USERPROFILE
 $originalLocalAppData = $env:LOCALAPPDATA
 $originalWtLog = $env:WT_STUB_LOG
@@ -176,13 +179,21 @@ class Stub {
 
     $claudeBin = Join-Path $fakeProfile '.local\bin'
     New-Item -ItemType Directory -Force -Path $claudeBin | Out-Null
-    # Never executed directly - only referenced by path in the (stubbed) wt.exe argument list.
-    New-Item -ItemType File -Force -Path (Join-Path $claudeBin 'claude.exe') | Out-Null
+    New-Stub -ExePath (Join-Path $claudeBin 'claude.exe') -BuildScratch $scratch -CSharpSource @'
+using System;
+using System.IO;
+class Stub {
+    static void Main(string[] args) {
+        File.AppendAllText(Environment.GetEnvironmentVariable("CLAUDE_STUB_LOG"), string.Join(" ", args) + "\n");
+    }
+}
+'@
 
     $promptPath = Join-Path $promptDir 'draft prompt.md'
     [System.IO.File]::WriteAllText($promptPath, "Read this and continue.`n")
 
     $env:PATH = "$binDir;$env:SystemRoot\System32;$env:SystemRoot"
+    Remove-Item Env:\CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue
     $env:USERPROFILE = $fakeProfile
     $env:LOCALAPPDATA = $fakeLocalAppData
     $env:WT_STUB_LOG = $wtLog
@@ -374,6 +385,50 @@ class Stub {
     catch { $rejected = $true }
     if (-not $rejected) { throw 'open-claude.ps1 accepted -Resume together with -Continue.' }
 
+    # --- every Claude session start checks the registered standards first and still opens when that fails ---
+    $fakePlugins = Join-Path $fakeProfile '.claude\plugins'
+    New-Item -ItemType Directory -Force -Path $fakePlugins | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $fakeProfile '.claude\settings.json'), '{"enabledPlugins":{"base@core":true}}')
+    [System.IO.File]::WriteAllText((Join-Path $fakePlugins 'known_marketplaces.json'), (ConvertTo-Json -Depth 5 @{
+        core = @{ source = @{ source = 'git'; url = (Join-Path $scratch 'missing remote.git') }; installLocation = (Join-Path $fakePlugins 'marketplaces\core') }
+    }))
+    [System.IO.File]::WriteAllText((Join-Path $fakePlugins 'installed_plugins.json'), (ConvertTo-Json -Depth 6 @{
+        version = 2
+        plugins = @{ 'base@core' = @(@{ scope = 'user'; version = '0123456789ab'; installPath = (Join-Path $fakePlugins 'cache\core\base\0123456789ab') }) }
+    }))
+    $env:PATH = "$binDir;$pythonDir;$gitDir;$env:SystemRoot\System32;$env:SystemRoot"
+    foreach ($start in @(
+            { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test sync' },
+            { & $openLauncher -WorkingDirectory $workDir -Title 'test sync' })) {
+        if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
+        $output = & $start 6>&1 | Out-String
+        if ($output -notmatch 'standards: could not check core .*this session loads base 0123456789ab') {
+            throw "A Claude launcher did not report the unreachable standards before launching:`n$output"
+        }
+        if (-not (Test-Path -LiteralPath $wtLog)) { throw 'A failed standards check stopped a Claude launch.' }
+    }
+
+    $claudeStubLog = Join-Path $scratch 'claude-stub.log'
+    $env:CLAUDE_STUB_LOG = $claudeStubLog
+    $env:PATH = "$claudeBin;$env:PATH"
+    $shellAgents = Join-Path $repository 'shell\agents.ps1'
+    . $shellAgents
+    $output = claude plugin list 6>&1 | Out-String
+    if ($output -match 'standards:') { throw "The shell claude function checked standards for a plain subcommand:`n$output" }
+    $output = claude --resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875 6>&1 | Out-String
+    if ($output -notmatch 'standards: could not check core') { throw "The shell claude function did not check standards before a session:`n$output" }
+
+    $restore = Join-Path $repository 'cli-session-recovery\start-saved-cli.ps1'
+    $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $output = & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -Command "& { . '$shellAgents'; & '$restore' -Tool claude -SessionId 'b2bcd5c4-bf6d-4087-95e3-d7ba7f711875' -WindowGroup test }" 2>&1 | Out-String
+    if ($output -notmatch 'standards: could not check core') { throw "Session recovery did not check standards before resuming:`n$output" }
+
+    $stubCalls = [System.IO.File]::ReadAllLines($claudeStubLog)
+    $expectedCalls = 'plugin list|--resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875|--resume b2bcd5c4-bf6d-4087-95e3-d7ba7f711875'
+    if (($stubCalls -join '|') -ne $expectedCalls) {
+        throw "The shell and recovery launchers did not pass their arguments through: $($stubCalls -join '|')"
+    }
+
     # --- every generated launcher still names the shared library it just resolved and executed ---
     foreach ($launcher in $packagedLaunchers) {
         if ((Get-Content -LiteralPath $launcher -Raw) -notmatch 'agent-cli\.ps1') {
@@ -385,6 +440,8 @@ class Stub {
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalUserProfile
     $env:LOCALAPPDATA = $originalLocalAppData
+    if ($null -ne $originalClaudeConfig) { $env:CLAUDE_CONFIG_DIR = $originalClaudeConfig }
+    Remove-Item Env:\CLAUDE_STUB_LOG -ErrorAction SilentlyContinue
     if ($null -eq $originalWtLog) { Remove-Item Env:\WT_STUB_LOG -ErrorAction SilentlyContinue } else { $env:WT_STUB_LOG = $originalWtLog }
     Remove-Item Env:\WT_STUB_DELIVERED_LOG -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }

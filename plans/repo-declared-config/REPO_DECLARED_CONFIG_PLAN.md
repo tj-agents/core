@@ -69,6 +69,7 @@ or notification settings. A plugin refresh must not break hooks already loaded b
    Keep the scripts used by that session callable until it ends, or have core's host adapter
    resolve the currently installed released package without a machine-specific path. The repair
    and its regression test live in core; never create a local junction as part of normal operation.
+   Claude's pre-load refresh and orphan-window evidence: [`CLAUDE_STANDARDS_SYNC.md`](CLAUDE_STANDARDS_SYNC.md).
 
 ## Priority and authorization (Tommy, 2026-09-27)
 
