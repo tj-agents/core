@@ -266,6 +266,17 @@ class StandardsSyncTests(StandardsSyncHarness):
         self.assertEqual(code, 0, output)
         self.assertFalse((self.state / SYNC.LOCK_FILE).exists())
 
+    def test_lock_is_renewed_before_every_host_call(self):
+        self.install()
+        self.publish('second')
+        os.environ['FAKE_CLAUDE_AGE_LOCK'] = str(self.state / SYNC.LOCK_FILE)
+        self.addCleanup(os.environ.pop, 'FAKE_CLAUDE_AGE_LOCK', None)
+        code, output = self.sync()
+        self.assertEqual(code, 0, output)
+        ages = [entry['lock_age'] for entry in self.invocations()]
+        self.assertEqual(len(ages), 2)
+        self.assertTrue(all(age < SYNC.STALE_LOCK_SECONDS for age in ages), ages)
+
     def test_command_line_runs_against_the_configured_profile(self):
         self.install()
         pushed = self.publish('second')

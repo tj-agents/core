@@ -52,8 +52,9 @@ Authorized scope: implementation, tests, live acceptance on this PC, review, PR 
    - Update, serialized by a lock under `~/.agents-state/`: marketplace update when its checkout
      lags, then `plugin update --scope <scope> --json` for each stale install, from the install's
      project directory. State is recorded only after success.
-   - Output: silent when current; one line per updated marketplace; one warning when a remote is
-     unreachable or an update fails, naming the version the session will load. Launch continues.
+   - Output: silent when current; a start and a result line per updated marketplace; one warning
+     when a remote is unreachable or an update fails, naming the version the session will load.
+     Launch continues.
 2. Launch integration: the profile `claude` function in `shell/agents.ps1`, the `handoff-claude`
    and `open-claude` launchers through `agent-cli.ps1`, and `cli-session-recovery` resume. Each runs
    the sync before starting a session; plain subcommands such as `claude plugin` skip it.
