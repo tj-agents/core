@@ -95,6 +95,11 @@
       "destination": "catalog"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/plugins/harness.schema.json",
+      "destination": "plugins/harness.schema.json"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/workflows",
       "destination": "workflows"

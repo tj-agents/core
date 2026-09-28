@@ -14,12 +14,19 @@ differently on different machines and drifts on this one. Observed on 2026-09-23
 - A plugin installed mid-session could not be used until a restart.
 - `concertable@agent-standards` is enabled at user scope, so Concertable product skills and the
   generic harness hooks it happens to carry load in every repository.
+- On 2026-09-26, an active Codex session loaded hooks from `base-agents` 2.1.8, then a
+  marketplace refresh removed that plugin cache path during the session. The hooks' script paths
+  became stale. A machine-local `notify` command also launched a console executable from AppData
+  and had a recorded Windows error 206. Neither a profile edit nor a cache junction is a durable
+  repair for these failures.
 
 ## Rule
 
-Everything that affects agent behaviour is committed in a repository. A machine holds only
-derived caches (downloaded plugins) and credentials. Cloning a repository on any machine gives
-identical behaviour.
+Everything that affects agent behaviour is committed in a repository. Core owns the generic
+harness and its host adapters; consumer repositories declare which released capabilities they use.
+A machine holds only derived caches, credentials and runtime data. Cloning a repository on any
+machine gives identical agent behaviour without hand-edited user hook, plugin, agent, marketplace
+or notification settings. A plugin refresh must not break hooks already loaded by a live session.
 
 ## Design
 
@@ -34,8 +41,9 @@ identical behaviour.
 2. **Generated repo config.** A core generator reads a repository's `.agents/` profile and
    routes and writes its `.claude/settings.json` (`extraKnownMarketplaces` with GitHub sources
    plus `enabledPlugins`, always including core) and `.codex/config.toml` (same, no local
-   sources). Consumer CI fails when these drift from the generator. Child marketplaces (cpp,
-   react, dotagents) always pull in core.
+   sources). Consumer CI fails when these drift from the generator. Each standards repository
+   publishes its own release catalog and harness requirements; consumers commit a composed
+   catalog covering the plugins they select.
 3. **Self-heal.** When a route's skill is missing, stale or not loaded, core's hook updates the
    declared GitHub marketplace, installs the pinned release, injects the skill's `SKILL.md`
    through hook output and records that as the session proof, so no restart is needed.
@@ -52,16 +60,163 @@ identical behaviour.
    - Codex user-config equivalents, `~/.codex/agents` and `~/.codex/skills`; move anything
      still needed into a repository.
    - Per-repository local marketplace overrides.
+   - User-scope hook and notification commands, temporary cache aliases and manually placed
+     harness scripts. A desired notification belongs in a declared host adapter and must be
+     launched without an unwanted console window; otherwise omit it.
    Core ships a read-only verifier that reports remaining machine-local behavioural state, so
    every machine can be checked the same way.
+5. **Live-session cache safety.** Exercise a marketplace update while an old session is active.
+   Keep the scripts used by that session callable until it ends, or have core's host adapter
+   resolve the currently installed released package without a machine-specific path. The repair
+   and its regression test live in core; never create a local junction as part of normal operation.
 
-## Marketplaces come only from tj-agents
+## Priority and authorization (Tommy, 2026-09-27)
 
-The canonical repositories are `tj-agents/core`, `tj-agents/cpp`, `tj-agents/react` and
-`tj-agents/dotnet`. Every marketplace a generated repository config references must use one of
-these GitHub sources; the generator refuses any other source and consumer CI checks it.
-Marketplace IDs stay stable (`base-agents`, `cpp-agents`, `react-agents`, `dotagents`), so
-existing installs keep resolving; only the source changes.
+Machine-agnostic agent behaviour is the priority and is authorized end to end: implement,
+test, open PRs and deliver through each repository's normal merge path. Tommy's requirement,
+verbatim in substance: if the standards require certain harnesses, the standards declare them
+and every consuming repository gets them committed. No reliance on local permissions or
+user-scope installs. Concretely:
+
+1. Each standards package (core, cpp, react, ...) declares the harness it requires — plugins,
+   marketplaces, hooks and the permission rules its own workflows need — in a committed manifest.
+2. The phase 2 generator composes those manifests for a repository's selected stacks and writes
+   its committed `.claude/settings.json` and `.codex/config.toml`; consumer CI fails on drift.
+3. Do phase 2 (including the permissions gap below) first for the C++ consumers
+   (`cpp/windows/winwrap`, `sandbox-hwid`). Phase 1's Concertable ordering constraint still
+   applies to Concertable; it does not block phase 2 elsewhere.
+4. Keep the sibling plan `plans/conditional-skill-routes/` separate but compatible: routes stay
+   the "which skills must be loaded" contract; this plan owns "which harness is installed".
+5. **Make it a permanent, fundamental rule — not just this plan's outcome.** Codify it in core's
+   always-on standing guidance (the instructions every standards-managed repository loads) and
+   in the skill/package authoring guidance: *never add or change a skill, hook, workflow or
+   marketplace package without, in the same change, updating the harness manifest it requires,
+   so that every repository that pulls in that marketplace gets its harness updated.* The
+   mechanism below is enforced, not remembered: a standards-repo CI check
+   fails when a package's skills/hooks/workflows need harness (plugins, hooks, permissions) that
+   its manifest does not declare, and consumer CI fails when a repository's committed settings
+   drift from the generated harness. A machine's local configuration must never be what makes a
+   standard work.
+
+### Phase-2 harness manifest mechanism
+
+Core owns the schema at `.agents/plugins/harness.schema.json`. Each standards repository owns one
+manifest per published plugin at `.agents/plugins/harness/<plugin>.json`; core starts with
+`base.json`, `engineering.json`, and `machine.json`. `scripts/sync_harness_manifests.py` validates
+and refreshes the manifests, and `scripts/update_catalog_digests.py` copies the validated `requires`
+object into the matching plugin entry in `.agents/catalog/catalog.json`. The generated package also
+ships the manifest as `plugins/<plugin>/harness.json`, so its package digest covers the declaration.
+The catalog schema makes `harness` required for every current plugin release.
+
+The manifest shape is fixed:
+
+```json
+{
+  "schema_version": 1,
+  "plugin": "base-agents/machine",
+  "source_roots": [".agents/machine"],
+  "source_excludes": [".agents/catalog/catalog.json"],
+  "source_digest": "sha256:<digest of sorted authored source paths, lengths, and bytes>",
+  "requires": {
+    "marketplaces": [{"id": "base-agents", "repository": "tj-agents/core"}],
+    "plugins": ["base-agents/base", "base-agents/machine"],
+    "hooks": [
+      {"path": "hooks/example.py", "hosts": ["claude", "codex"]}
+    ],
+    "permissions": {
+      "claude_allow": [
+        "PowerShell(& *\\handoff-codex\\scripts\\launch-codex.ps1 *)",
+        "PowerShell(& *\\handoff-claude\\scripts\\launch-claude.ps1 *)"
+      ],
+      "codex_prefix_rules": [
+        {
+          "pattern": ["example", "safe-subcommand"],
+          "justification": "Required by the packaged workflow.",
+          "match": ["example safe-subcommand --flag"],
+          "not_match": ["example unsafe-subcommand"]
+        }
+      ]
+    }
+  }
+}
+```
+
+`hooks[].path` is the package-relative generated destination and `hosts` is a non-empty subset of
+`claude` and `codex`. Each Codex rule is an allow decision; the generator supplies
+`decision = "allow"` and requires non-empty pattern, justification, match and not-match arrays.
+`source_digest` covers every file below `source_roots`, a canonical record of that plugin's
+entries in `.agents/plugins/sources.json`, and every authored resource source those entries name.
+`source_excludes` is normally empty; only `base-agents/machine` may exclude
+`.agents/catalog/catalog.json`, which avoids the existing catalog/package digest self-reference.
+Adding or changing a skill, workflow, hook, host
+adapter, or package resource therefore makes `sync_harness_manifests.py --check` fail until the
+same change refreshes the declaration. The validator also proves every declared hook is wired by
+both host manifests where its `hosts` list requires that, every required plugin exists in the
+catalog, and every marketplace repository matches its own release owner and GitHub source.
+Core's authored catalog contains only core releases; each other standards repository maintains
+its own release records and digest sync. A consumer combines the selected owner catalogs in
+its committed `.agents/catalog/catalog.json`, passed to the generic bootstrap and config generator.
+Core must not carry a roster, source map, or digest ledger for another standards repository.
+
+`repo_config.py` reads the selected catalog plugins, unions their `requires` objects, and fails if
+the committed capability lock omits a required plugin. It owns these generated fields and files:
+
+- `.claude/settings.json`: `extraKnownMarketplaces`, `enabledPlugins`, and
+  `permissions.allow`, sorted and deduplicated. Repository-specific additions use a committed
+  `.agents/repository-harness.json` shaped as
+  `{"schema_version": 1, "requires": {<same requires object>}}` and validated through the
+  schema's `$defs/requires`; hand-edited values in those generated fields are drift.
+- `.codex/config.toml`: the managed marketplace/plugin section already generated today.
+- `.codex/rules/agent-harness.rules`: deterministic Starlark `prefix_rule` entries from
+  `codex_prefix_rules`, including inline `match`/`not_match` examples. Empty declarations remove
+  the generated file. Codex project rules load only for trusted projects and cannot safely express
+  a machine-varying plugin-cache script path, so the machine launcher currently declares no Codex
+  prefix rule; the existing hook/sandbox approval remains the honest minimum until a stable
+  repository-relative command exists.
+
+Claude's committed project `permissions.allow` supports `PowerShell(...)` rules and takes effect
+after workspace trust. The phase-4 acceptance session must prove that the two launcher patterns
+above satisfy the auto-mode classifier; if an `ask`/`deny` rule or managed policy still wins, record
+that external policy as the minimal non-repository remainder instead of broadening the patterns.
+
+The permanent prose rule lives in `.agents/base/stack-tiers/SKILL.md` (always loaded) and
+`PACKAGING.md` (package authoring). Enforcement lives in code: standards CI runs
+`python -B scripts/sync_harness_manifests.py --check`, catalog/schema tests and
+`pwsh .agents/sync-generated.ps1 -Check`; consumer CI runs `repo_config.py --mode check` and
+host-config parsing tests. `test_harness_manifests.py` covers stale digests, missing hook wiring,
+foreign marketplaces, absent required plugins and catalog drift; `test_repo_config.py` covers
+multi-package composition, permission deduplication, preservation of unrelated settings, stale
+generated-rule deletion, and check-mode drift.
+
+Implementation-path standards: root `AGENTS.md` and `SOURCE_LAYOUT.md` govern the authored versus
+generated split; `PACKAGING.md` governs shipped runtime closure; the existing Python and JSON style
+in `repo_config.py`, `sync_plugin_packages.py`, and their tests governs the new validator and schema.
+No stack-specific standard applies to these paths.
+
+## Gap: permissions and auto-mode rules (observed 2026-09-27)
+
+The design above covers plugins and marketplaces but not permission rules, which also change
+agent behaviour per machine. In `cpp/windows/winwrap` on this machine, Claude Code's auto-mode
+classifier denied the packaged `machine:handoff-codex` launcher (`launch-codex.ps1 ...
+-BypassHookTrust`) as "Create Unsafe Agents". The same handoff works on Tommy's other machine,
+where a user-scope allow rule presumably exists. The handoff skill is standard workflow, so
+its launch permission must not depend on which machine runs it.
+
+**Extend phase 2:** the generator also writes the permission allow rules that the standards'
+own workflows need (at minimum the packaged handoff launchers) into the repository's
+`.claude/settings.json`, and the equivalent Codex approval policy where one exists. The
+machine verifier (phase 4) reports user-scope permission rules that duplicate or contradict
+the generated ones. Confirm in a real session that a project-scope allow rule satisfies the
+auto-mode classifier; if it does not, record the limitation and the minimal user-scope
+remainder instead of claiming the machine is clean.
+
+## Marketplace declarations belong to their owners
+
+Each standards repository publishes its own release identity, GitHub source, package digests,
+and harness requirements. Core publishes only `base-agents`. A consuming repository commits
+the release records for its selected standards in `.agents/catalog/catalog.json` and checks
+that catalog alongside its lock and generated host settings. The generic generator validates
+that each source matches its release owner; it contains no list of other repositories.
 
 Stale sources observed on this PC (2026-09-23): `tomjseery/dotagents`, `tomjseery/react-agents`
 and `Concertable/agent-standards` in `~/.claude/settings.json`; `tj-agents/core` was not
@@ -95,10 +250,13 @@ plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md and do what the ledg
 
 ## Scope of this plan
 
-Adoption is **`sandbox-hwid` only**. Other consumers (cpp-agents, the Concertable repository,
-dotagents, react-agents, winwrap, note-cli, icon-dropper, wifi-toggle) are follow-ups, adopted
-one at a time after this plan closes. Concertable must move `concertable@agent-standards` to
-project scope before user-scope removal on any machine that works on it.
+Adopt `sandbox-hwid` first, then every known consumer: cpp-agents, the Concertable repository,
+dotagents, react-agents, winwrap, note-cli, icon-dropper and wifi-toggle. Discover any additional
+consumer during the inventory and add it here. Adopt consumers one at a time with a green host
+check before removing their user-scope fallback. Concertable must move
+`concertable@agent-standards` to project scope before user-scope removal on any machine that works
+on it. This plan closes only after all known consumers and machines pass the verifier; a single
+consumer or PC is a checkpoint, not the end of the goal.
 
 ## Acceptance, for Claude and Codex each
 
@@ -108,7 +266,9 @@ project scope before user-scope removal on any machine that works on it.
    with no restart (or, for a host that cannot inject, one SessionStart repair and a plain
    notice).
 3. A `sandbox-hwid` session loads no Concertable skills or hooks.
-4. The machine verifier reports no machine-local behavioural state on this PC.
+4. The machine verifier reports no machine-local behavioural state on each migrated PC.
+5. A live Codex and Claude session continues to run its installed hooks across a marketplace
+   update without stale-path failures or empty console windows.
 
 ## Phases
 
@@ -116,3 +276,5 @@ project scope before user-scope removal on any machine that works on it.
 2. Repo-config generator and consumer drift check; release.
 3. Self-heal in the router and SessionStart for both hosts; release.
 4. Adopt in `sandbox-hwid`; clean this PC; run acceptance.
+5. Adopt every remaining consumer and machine, remove user-scope behavioural state, and run the
+   same acceptance checks after each migration.

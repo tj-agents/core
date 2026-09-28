@@ -158,6 +158,7 @@ def native_install_roots(harness):
         result = subprocess.run(
             [binary, "plugin", "list", "--json"], capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=8, check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         if result.returncode != 0:
             return ()
@@ -220,7 +221,7 @@ def skill_search_dirs(harness):
 
 
 def repo_relative(path, cwd):
-    """POSIX repo-relative path, so a route regex never has to know about drive letters.
+    """POSIX repo-relative path, or None when the path lies outside this repository.
 
     Resolved against the payload's cwd, not the hook process's - a patch body names its files
     relative to the session, and `Path.resolve()` alone would anchor them wherever python started.
@@ -237,7 +238,7 @@ def repo_relative(path, cwd):
             try:
                 return p.relative_to(base).as_posix()
             except ValueError:
-                break
+                return None
     return p.as_posix()
 
 
@@ -317,12 +318,46 @@ _TEE_RE = re.compile(r"\btee\b([^\n;|&)]*)")
 _SED_RE = re.compile(r"\bsed\b([^\n;|&)]*)")
 _CP_MV_RE = re.compile(r"\b(?:cp|mv)\b([^\n;|&)]*)")
 _IGNORED_TARGETS = {"/dev/null", "nul", "&1", "&2"}
+_INLINE_SCRIPT_RE = re.compile(
+    r"""(?:^|[\s;|&(])
+        (?:[^\s;|&()<>'"]*[/\\])?
+        (?P<name>python[0-9.]*|sh|bash|zsh|dash|ksh|node|deno|perl|ruby|php|pwsh|powershell)
+        (?:\.exe)?
+        (?:\s+-[^\s;|&]+)*?
+        \s+(?:-c|-e|-E|--command|--eval)\b\s*
+        (?P<body>"[^"]*"|'[^']*'|[^\s;|&]+)""",
+    re.IGNORECASE | re.VERBOSE,
+)
+_SHELL_INTERPRETERS = {"sh", "bash", "zsh", "dash", "ksh", "pwsh", "powershell"}
+_MAX_INLINE_SCRIPT_DEPTH = 3
 
 
 def _strip_quotes(token):
     if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'":
         return token[1:-1]
     return token
+
+
+def _blank(chars, start, end):
+    for index in range(start, end):
+        if chars[index] != "\n":
+            chars[index] = "x"
+
+
+def _mask_quoted(text):
+    """Mask balanced quoted interiors without changing match offsets."""
+    chars = list(text)
+    index = 0
+    while index < len(text):
+        quote = text[index]
+        if quote in "\"'":
+            close = text.find(quote, index + 1)
+            if close != -1:
+                _blank(chars, index + 1, close)
+                index = close + 1
+                continue
+        index += 1
+    return "".join(chars)
 
 
 def _shell_tokens(args):
@@ -340,7 +375,7 @@ def _shell_tokens(args):
         return None
 
 
-def shell_write_targets(command):
+def shell_write_targets(command, depth=0):
     """Every path this shell command line actually writes, paired with its best-known added text
     and whether the write fully replaces that path's content (a plain `>` redirect, a heredoc
     feeding one, `tee` without `-a`, or `cp`/`mv`) rather than merely touching it (`>>` append,
@@ -368,6 +403,15 @@ def shell_write_targets(command):
     skeleton = "".join(skeleton)
     heredoc_text = "\n".join(heredoc_bodies)
 
+    inline_shell_bodies = []
+    chars = list(skeleton)
+    for match in _INLINE_SCRIPT_RE.finditer(skeleton):
+        if match.group("name").casefold() in _SHELL_INTERPRETERS and depth < _MAX_INLINE_SCRIPT_DEPTH:
+            inline_shell_bodies.append(_strip_quotes(match.group("body")))
+        _blank(chars, *match.span("body"))
+    skeleton = "".join(chars)
+    masked = _mask_quoted(skeleton)
+
     writes = {}
 
     def record(raw_path, text, replaces=False):
@@ -378,13 +422,16 @@ def shell_write_targets(command):
         merged = "\n".join(part for part in (existing_text, text) if part)
         writes[path] = (merged, existing_replaces or replaces)
 
-    for op, target in _REDIRECT_RE.findall(skeleton):
-        record(target, heredoc_text, replaces=(op == ">"))
-    for text, op, target in _ECHO_RE.findall(skeleton):
-        record(target, text, replaces=(op == ">"))
+    def captured(match, group):
+        return skeleton[slice(*match.span(group))]
 
-    for args in _TEE_RE.findall(skeleton):
-        tokens = _shell_tokens(args)
+    for match in _REDIRECT_RE.finditer(masked):
+        record(captured(match, 2), heredoc_text, replaces=(match.group(1) == ">"))
+    for match in _ECHO_RE.finditer(masked):
+        record(captured(match, 3), captured(match, 1), replaces=(match.group(2) == ">"))
+
+    for match in _TEE_RE.finditer(masked):
+        tokens = _shell_tokens(captured(match, 1))
         if not tokens:
             continue
         appends = any(t in ("-a", "--append") for t in tokens)
@@ -392,8 +439,8 @@ def shell_write_targets(command):
             if not token.startswith("-"):
                 record(token, None, replaces=not appends)
 
-    for args in _SED_RE.findall(skeleton):
-        tokens = _shell_tokens(args)
+    for match in _SED_RE.finditer(masked):
+        tokens = _shell_tokens(captured(match, 1))
         if not tokens:
             continue
         in_place = any(
@@ -406,13 +453,17 @@ def shell_write_targets(command):
         if non_flags:
             record(non_flags[-1], None)
 
-    for args in _CP_MV_RE.findall(skeleton):
-        tokens = _shell_tokens(args)
+    for match in _CP_MV_RE.finditer(masked):
+        tokens = _shell_tokens(captured(match, 1))
         if not tokens:
             continue
         non_flags = [t for t in tokens if not t.startswith("-")]
         if len(non_flags) >= 2:
             record(non_flags[-1], None, replaces=True)
+
+    for body in inline_shell_bodies:
+        for path, text, replaces in shell_write_targets(body, depth + 1):
+            record(path, text, replaces=replaces)
 
     return [(path, text, replaces) for path, (text, replaces) in writes.items()]
 
@@ -426,12 +477,13 @@ def removed_content_by_target(tool_input, cwd):
     targets = written_targets(tool_input)
     if len(targets) == 1:
         rel = repo_relative(targets[0], cwd)
-        removed[rel] = "\n".join(part for part in direct if isinstance(part, str))
+        if rel is not None:
+            removed[rel] = "\n".join(part for part in direct if isinstance(part, str))
     for blob in strings(tool_input):
         for target, body in PATCH_FILE_BLOCK.findall(blob):
             rel = repo_relative(target.strip().strip("\"'"), cwd)
             lines = PATCH_REMOVED_LINE.findall(body)
-            if lines:
+            if rel is not None and lines:
                 removed[rel] = "\n".join(filter(None, (removed.get(rel), *lines)))
     return removed
 
@@ -511,24 +563,8 @@ def skill_aliases():
     return {}
 
 
-def resolved_skill(name, harness, following_alias=False):
-    """The installed skill file and body, or ``None`` when it cannot be read.
-
-    The FIRST readable copy wins, deliberately: nearest delivery answers, and every later root holds a
-    generated copy of the same bytes. A copy with no parsable `description:` is skipped rather than
-    accepted, because the description is what decides whether a skill loads at all - accepting a
-    malformed first copy would report a correctly-installed skill as NOT INSTALLED.
-
-    A name may be plugin-qualified (`product:persistence`). It has to be able to be: a local roster and
-    its generic counterpart deliberately share a skill name, so an unqualified lookup returns whichever
-    root is walked first and silently hides the other - the same shadowing that once made
-    agents' PERSISTENCE.md resolve to dotagents'. Unqualified still works for a skill with one
-    home, which is every utility and every route that names only one side.
-    """
-    wanted_plugin, _, bare = name.rpartition(":")
-    # A descriptionless copy is the last resort, not the answer: the description is what decides whether
-    # a skill loads at all, so a malformed nearest copy must not mask a good one behind it. Keeping it as
-    # a fallback still reports the skill present, which is honest - it IS installed, just unparsable.
+def _readable_skill(bare, harness, wanted_plugin):
+    """Find a readable skill in the selected plugin, or the nearest unqualified copy."""
     first = None
     for root in skill_search_dirs(harness):
         if wanted_plugin and plugin_of(root) != wanted_plugin:
@@ -544,12 +580,42 @@ def resolved_skill(name, harness, following_alias=False):
             first = first or (skill, text)
             continue
         return skill, text
-    if first is not None:
-        return first
+    return first
+
+
+def resolved_skill(name, harness, following_alias=False):
+    """The installed skill file and body, or ``None`` when it cannot be read.
+
+    The FIRST readable copy wins, deliberately: nearest delivery answers, and every later root holds a
+    generated copy of the same bytes. A copy with no parsable `description:` is skipped rather than
+    accepted, because the description is what decides whether a skill loads at all - accepting a
+    malformed first copy would report a correctly-installed skill as NOT INSTALLED.
+
+    A name may be plugin-qualified (`product:persistence`). It has to be able to be: a local roster and
+    its generic counterpart deliberately share a skill name, so an unqualified lookup returns whichever
+    root is walked first and silently hides the other - the same shadowing that once made
+    one plugin's instructions resolve to another's. Unqualified still works for a skill with one
+    home, which is every utility and every route that names only one side.
+    """
+    wanted_plugin, _, bare = name.rpartition(":")
+    found = _readable_skill(bare, harness, wanted_plugin)
+    if found is not None:
+        return found
     # Nothing answers to this name anywhere, which is what a rename looks like from here. One hop only:
     # the alias table is a rename record, not a chain to walk.
     current = None if following_alias else skill_aliases().get(name)
-    return resolved_skill(current, harness, True) if current else None
+    if current:
+        return resolved_skill(current, harness, True)
+    return None
+
+
+def invocable_name(name, skill_path):
+    """Use the installed plugin qualifier when a qualified route resolves elsewhere."""
+    wanted_plugin, _, bare = name.rpartition(":")
+    if skill_path is None or not wanted_plugin:
+        return name
+    plugin = plugin_of(skill_path.parent.parent)
+    return f"{plugin}:{bare}" if plugin and plugin != wanted_plugin else name
 
 
 def description_of(body):
@@ -1098,6 +1164,8 @@ def query(argv):
     owed, violations = {}, []
     for given in paths:
         rel = repo_relative(given, cwd)
+        if rel is None:
+            continue
         try:
             content = (root / rel).read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -1198,6 +1266,11 @@ def main():
     root = find_repo_root(cwd)
     if root is None:
         sys.exit(0)
+    relative_targets = [
+        rel for rel in (repo_relative(target, cwd) for target in targets) if rel is not None
+    ]
+    if not relative_targets:
+        sys.exit(0)
     try:
         routes = load_routes(root)
     except RoutesUnusable as error:
@@ -1237,7 +1310,10 @@ def main():
         "\n".join(text for _, text, _ in shell_writes if text) if is_shell else written_content(tool_input)
     )
     removed_by_rel = removed_content_by_target(tool_input, cwd)
-    deleted = {repo_relative(target, cwd) for target in deleted_targets(tool_input)}
+    deleted = {
+        rel for rel in (repo_relative(target, cwd) for target in deleted_targets(tool_input))
+        if rel is not None
+    }
     replaces = tool_name.casefold() in {"write", "write_file"}
     # A shell write that fully replaces its target's content (a plain `>`/heredoc redirect, `tee`
     # without `-a`, `cp`/`mv`) proves a `require_clean` violation cleared the same way the `Write`
@@ -1245,11 +1321,11 @@ def main():
     # `old_string`/`edits` to diff. Without this, once a routed file had one require_clean hit, no
     # shell write could ever satisfy it again - not even the write that overwrote the file clean.
     replaces_by_rel = (
-        {repo_relative(path, cwd): full for path, _, full in shell_writes} if is_shell else {}
+        {rel: full for path, _, full in shell_writes
+         if (rel := repo_relative(path, cwd)) is not None} if is_shell else {}
     )
 
-    for target in targets:
-        rel = repo_relative(target, cwd)
+    for rel in relative_targets:
         try:
             existing = (root / rel).read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -1275,8 +1351,7 @@ def main():
             sys.exit(2)
 
     matched = []
-    for target in targets:
-        rel = repo_relative(target, cwd)
+    for rel in relative_targets:
         for route in matching_routes(routes, rel, content):
             matched.append((rel, route))
     if not matched:
@@ -1371,7 +1446,7 @@ def main():
         lines += [f"  {rel}", ""]
         for name in route.get("skills") or []:
             desc = descriptions[name]
-            lines.append(f"  * {name}")
+            lines.append(f"  * {invocable_name(name, resolved_paths.get(name))}")
             if name in missing:
                 lines.append(
                     f"      NOT INSTALLED FOR {harness.upper()} - no SKILL.md is available to the "
