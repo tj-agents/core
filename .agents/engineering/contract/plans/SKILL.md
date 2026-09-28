@@ -353,10 +353,17 @@ carrying forward written into the doc that owns it. Anything you'd be annoyed to
 worked, a gotcha hit — belongs in the commit message or that doc, not left implicit in the context. A phase
 boundary makes the conversation disposable; it does not require disposing of it.
 
-**Continue in the current context by default** when the next action belongs to the same logical workstream,
-the loaded goals, constraints, decisions, and evidence remain relevant and coherent, and the user's existing
-authorization covers the next phase. Move directly into that work after the durable checkpoint; do not stop
-for a handoff or ask the user to name the next phase merely because one phase completed.
+**Continue in the current context by default for small and medium plans** when the next action belongs to
+the same logical workstream, the loaded goals, constraints, decisions, and evidence remain relevant and
+coherent, and the user's existing authorization covers the next phase. The parent may delegate bounded work
+to an appropriate lane agent while retaining ownership. Move directly into that work after the durable
+checkpoint; do not stop for a handoff merely because planning or another phase completed.
+
+For a massive plan whose design was a substantial phase of its own, write a durable phased execution plan
+and normally hand execution to one fresh harness, even when the checkout stays the same. The successor
+resumes that plan as its owner. Judge plans between these cases by the size and complexity of the remaining
+execution, how much planning context is useful, and whether a fresh owner can act from the checkpoint.
+Record the reason when choosing the less usual path; plan length alone is not a mechanical threshold.
 
 Transfer to a fresh context only when at least one of these conditions is true:
 
@@ -365,6 +372,8 @@ Transfer to a fresh context only when at least one of these conditions is true:
   requires an independent context for unbiased review or isolated judgment;
 - the next plan section is materially separate and the earlier reasoning would distract from, rather than
   help with, the new work;
+- a massive plan has completed substantial design and its durable phased plan makes execution ready for a
+  fresh owner, even when the repository and worktree stay the same;
 - the context is genuinely degraded: repeated compaction has lost needed detail, important facts are being
   re-derived, conflicting stale assumptions remain loaded, or too little usable capacity remains to execute
   the next slice safely.
