@@ -41,7 +41,7 @@ def validate_requires(requires: dict, label: str) -> None:
         bootstrap.require_string(rule["justification"], f"{label}.justification")
 
 
-def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, str], list[str], list[str], list[dict]]:
+def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
     catalog = bootstrap.load_json(catalog_path)
     releases, plugins = bootstrap.catalog_index(catalog)
     selections = bootstrap.validate_lock(bootstrap.load_json(lock_path), releases, plugins)
@@ -49,8 +49,7 @@ def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, str], l
     missing = sorted(CORE_PLUGINS - selected)
     if missing:
         raise bootstrap.BootstrapError("Repository lock omits core plugins: " + ", ".join(missing))
-    sources: dict[str, str] = {}
-    identities: list[str] = []
+    sources: dict[str, dict] = {}
     required_plugins: set[str] = set()
     claude_allow: set[str] = set()
     codex_rules: dict[str, dict] = {}
@@ -65,8 +64,10 @@ def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, str], l
         source = release["source"].removesuffix(".git")
         if source != f"https://github.com/{expected}":
             raise bootstrap.BootstrapError(f"Marketplace source disagrees with catalog owner: {source}")
-        sources[marketplace] = expected
-        identities.append(f"{plugin['name']}@{marketplace}")
+        prior = sources.get(marketplace)
+        if prior is not None and prior["id"] != release["id"]:
+            raise bootstrap.BootstrapError(f"Conflicting marketplace releases: {marketplace}")
+        sources[marketplace] = release
         requires = plugin.get("harness")
         validate_requires(requires, selection["id"])
         requirements.append(requires)
@@ -82,7 +83,8 @@ def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, str], l
         for marketplace in requires["marketplaces"]:
             if not isinstance(marketplace, dict) or set(marketplace) != {"id", "repository"}:
                 raise bootstrap.BootstrapError("Invalid required marketplace")
-            if sources.get(marketplace["id"]) != marketplace["repository"]:
+            source_release = sources.get(marketplace["id"])
+            if source_release is None or source_release["owner_repository"] != marketplace["repository"]:
                 raise bootstrap.BootstrapError(f"Required marketplace disagrees with selected release: {marketplace['id']}")
         claude_allow.update(requires["permissions"]["claude_allow"])
         for rule in requires["permissions"]["codex_prefix_rules"]:
@@ -90,19 +92,30 @@ def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, str], l
     missing = sorted(required_plugins - selected)
     if missing:
         raise bootstrap.BootstrapError("Repository lock omits harness-required plugins: " + ", ".join(missing))
-    return dict(sorted(sources.items())), sorted(identities), sorted(claude_allow), [codex_rules[key] for key in sorted(codex_rules)]
+    identities = {
+        f"{plugin['name']}@{marketplace}": plugin["id"] in selected
+        for marketplace, release in sorted(sources.items())
+        for plugin in release["plugins"]
+    }
+    return dict(sorted(sources.items())), dict(sorted(identities.items())), sorted(claude_allow), [codex_rules[key] for key in sorted(codex_rules)]
 
 
-def claude_settings(path: Path, sources: dict[str, str], identities: list[str], allow: list[str]) -> str:
+def claude_settings(path: Path, sources: dict[str, dict], identities: dict[str, bool], allow: list[str]) -> str:
     settings = bootstrap.load_json(path) if path.is_file() else {}
     settings["extraKnownMarketplaces"] = {
-        name: {"source": {"source": "github", "repo": source}, "autoUpdate": False}
-        for name, source in sources.items()
+        name: {"source": {"source": "github", "repo": release["owner_repository"], "ref": release["revision"]}, "autoUpdate": False}
+        for name, release in sources.items()
     }
-    settings["enabledPlugins"] = {identity: True for identity in identities}
+    settings["enabledPlugins"] = identities
     permissions = settings.get("permissions", {})
     if not isinstance(permissions, dict):
         raise bootstrap.BootstrapError(f"{path}: permissions must be an object")
+    existing_allow = permissions.get("allow", [])
+    if not isinstance(existing_allow, list) or any(not isinstance(entry, str) for entry in existing_allow):
+        raise bootstrap.BootstrapError(f"{path}: permissions.allow must be a string list")
+    unmanaged_allow = sorted(set(existing_allow) - set(allow))
+    if unmanaged_allow:
+        raise bootstrap.BootstrapError(f"{path}: unmanaged permissions.allow entries: " + ", ".join(unmanaged_allow))
     permissions["allow"] = allow
     settings["permissions"] = permissions
     return json.dumps(settings, indent=2, ensure_ascii=False) + "\n"
@@ -126,15 +139,16 @@ def unmanaged_codex(text: str) -> str:
     return "".join(kept).rstrip()
 
 
-def codex_settings(path: Path, sources: dict[str, str], identities: list[str]) -> str:
+def codex_settings(path: Path, sources: dict[str, dict], identities: dict[str, bool]) -> str:
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""
     prefix = unmanaged_codex(existing)
     lines = [MANAGED_START]
-    for marketplace, source in sources.items():
+    for marketplace, release in sources.items():
         lines += [f"[marketplaces.{marketplace}]", 'source_type = "git"',
-                  f'source = "https://github.com/{source}.git"', ""]
-    for identity in identities:
-        lines += [f'[plugins."{identity}"]', "enabled = true", ""]
+                  f'source = "https://github.com/{release["owner_repository"]}.git"',
+                  f'ref = "{release["revision"]}"', ""]
+    for identity, enabled in identities.items():
+        lines += [f'[plugins."{identity}"]', f"enabled = {str(enabled).lower()}", ""]
     lines.append(MANAGED_END)
     return (prefix + "\n\n" if prefix else "") + "\n".join(lines) + "\n"
 

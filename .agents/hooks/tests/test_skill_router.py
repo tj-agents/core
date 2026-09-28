@@ -80,6 +80,11 @@ class SkillRouterTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual({"feature": ["src/item.py"]}, json.loads(result.stdout)["skills"])
 
+    def test_query_ignores_a_path_outside_the_repository(self):
+        result = self.run_router(("--skills-for", "--json", "src/item.py", str(self.base / "outside.py")))
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual({"feature": ["src/item.py"]}, json.loads(result.stdout)["skills"])
+
     def test_malformed_opt_in_table_fails_closed(self):
         (self.repo / ".agents" / "skill-routes.json").write_text("{", encoding="utf-8")
         result = subprocess.run(
