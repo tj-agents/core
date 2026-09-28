@@ -58,4 +58,5 @@ if (-not $blocked) { throw 'Failed marketplace refresh did not block startup' }
 if ($script:calls.Count -ne 1) { throw 'Refresh failure continued to plugin installation' }
 if ((Get-Location).Path -ne $before) { throw 'Failed sync changed the caller directory' }
 
+$global:LASTEXITCODE = 0
 Write-Output 'Codex marketplace startup sync tests passed.'
