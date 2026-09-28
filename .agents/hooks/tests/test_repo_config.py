@@ -48,12 +48,16 @@ class RepoConfigTests(unittest.TestCase):
         c = json.loads(claude.read_text(encoding="utf-8"))
         self.assertEqual("test", c["env"]["MODE"])
         self.assertEqual("tj-agents/core", c["extraKnownMarketplaces"]["base-agents"]["source"]["repo"])
+        self.assertEqual("v2.1.16", c["extraKnownMarketplaces"]["base-agents"]["source"]["ref"])
+        self.assertEqual("v2.1.16", c["extraKnownMarketplaces"]["base-agents"]["source"]["ref"])
         self.assertEqual(3, len(c["enabledPlugins"]))
         self.assertNotIn("old@other", c["enabledPlugins"])
         self.assertEqual(2, len(c["permissions"]["allow"]))
         d = codex.read_text(encoding="utf-8")
         self.assertIn('model = "test"', d)
         self.assertIn('source = "https://github.com/tj-agents/core.git"', d)
+        self.assertIn('ref = "v2.1.16"', d)
+        self.assertIn('ref = "v2.1.16"', d)
         self.assertEqual(3, d.count('[plugins."'))
 
     def test_rejects_foreign_source(self):
@@ -90,6 +94,9 @@ class RepoConfigTests(unittest.TestCase):
                 "permissions": {"claude_allow": ["Bash(sample-command)"], "codex_prefix_rules": []},
             },
         })
+        optional = json.loads(json.dumps(external["plugins"][0]))
+        optional.update({"id": "sample-market/optional", "name": "optional", "package_path": "plugins/optional"})
+        external["plugins"].append(optional)
         self.catalog["releases"].append(external)
         project_catalog = self.root / ".agents" / "catalog" / "catalog.json"
         project_catalog.parent.mkdir()
@@ -107,6 +114,11 @@ class RepoConfigTests(unittest.TestCase):
             claude["extraKnownMarketplaces"]["sample-market"]["source"]["repo"],
         )
         self.assertIn("Bash(sample-command)", claude["permissions"]["allow"])
+        self.assertIs(claude["enabledPlugins"]["sample@sample-market"], True)
+        self.assertIs(claude["enabledPlugins"]["optional@sample-market"], False)
+        codex = (self.root / ".codex" / "config.toml").read_text(encoding="utf-8")
+        self.assertIn('[plugins."optional@sample-market"]\nenabled = false', codex)
+        self.assertIn('ref = "v1.0.0"', codex)
 
     def test_overlay_composes_permissions_and_removes_stale_rules(self):
         overlay = self.root / ".agents" / "repository-harness.json"
@@ -136,9 +148,25 @@ class RepoConfigTests(unittest.TestCase):
         path = self.root / ".codex/rules/agent-harness.rules"
         self.assertIn('decision = "allow"', path.read_text(encoding="utf-8"))
         overlay.unlink()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "unmanaged permissions.allow entries: Bash\\(sample safe\\)"):
+            repo_config.run(self.lock, CATALOG, "check")
+        claude["permissions"]["allow"].remove("Bash(sample safe)")
+        (self.root / ".claude/settings.json").write_text(json.dumps(claude), encoding="utf-8")
         self.assertEqual([".claude/settings.json", ".codex/rules/agent-harness.rules"], repo_config.run(self.lock, CATALOG, "check"))
         repo_config.run(self.lock, CATALOG, "write")
         self.assertFalse(path.exists())
+
+    def test_hand_written_allow_rule_blocks_check_and_write_without_mutation(self):
+        settings = self.root / ".claude" / "settings.json"
+        settings.parent.mkdir()
+        original = json.dumps({"permissions": {"allow": ["Bash(hand-written-rule)"]}})
+        settings.write_text(original, encoding="utf-8")
+        for mode in ("check", "write"):
+            with self.subTest(mode=mode):
+                with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "Bash\\(hand-written-rule\\)"):
+                    repo_config.run(self.lock, CATALOG, mode)
+                self.assertEqual(original, settings.read_text(encoding="utf-8"))
+                self.assertFalse((self.root / ".codex").exists())
 
     def test_overlay_required_plugin_must_be_selected(self):
         overlay = self.root / ".agents" / "repository-harness.json"
