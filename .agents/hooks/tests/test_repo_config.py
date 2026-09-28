@@ -135,7 +135,7 @@ class RepoConfigTests(unittest.TestCase):
                 "plugins": ["base-agents/base"],
                 "hooks": [],
                 "permissions": {
-                    "claude_allow": ["PowerShell(& *\\handoff-codex\\scripts\\launch-codex.ps1 *)", "Bash(sample safe)"],
+                    "claude_allow": [r"PowerShell(& *\.claude\plugins\cache\base-agents\machine\*\handoff-codex\scripts\launch-codex.ps1 *)", "Bash(sample safe)"],
                     "codex_prefix_rules": [rule],
                 },
             },
