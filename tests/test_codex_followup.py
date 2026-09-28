@@ -346,6 +346,17 @@ for line in sys.stdin:
         self.assertLess(time.monotonic() - started, 5)
         self.assertIsNotNone(proxy.process.poll())
 
+    def test_large_write_to_nonreading_proxy_obeys_deadline(self):
+        proxy = self.create_proxy('import time; time.sleep(30)', timeout=0.2)
+        started = time.monotonic()
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'Timed out'):
+            proxy.request('turn/start', {'input': [{'type': 'text', 'text': 'x' * 1000000}]})
+        proxy.close()
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertIsNotNone(proxy.process.poll())
+        if proxy.writer:
+            self.assertFalse(proxy.writer.is_alive())
+
     def test_expired_deadline_does_not_write_request(self):
         proxy = self.create_proxy('import time; time.sleep(30)')
         proxy.deadline = time.monotonic() - 1
