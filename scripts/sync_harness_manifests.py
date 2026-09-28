@@ -154,6 +154,9 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
         raise ValueError(f"{plugin}: invalid permissions declaration")
     if len(permissions["claude_allow"]) != len(set(permissions["claude_allow"])):
         raise ValueError(f"{plugin}: duplicate Claude permission")
+    for command in permissions["claude_allow"]:
+        if re.match(r"^PowerShell\(&\s+\*\\", command, re.IGNORECASE):
+            raise ValueError(f"{plugin}: wildcard script path in Claude permission: {command}")
     for rule in permissions["codex_prefix_rules"]:
         if set(rule) != {"pattern", "justification", "match", "not_match"}:
             raise ValueError(f"{plugin}: invalid Codex prefix rule")

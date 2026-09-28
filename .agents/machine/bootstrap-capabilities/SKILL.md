@@ -23,9 +23,12 @@ python -B '<skill-directory>\scripts\repo_config.py' `
 
 CI uses the same command with `--mode check`; it exits nonzero if either generated file drifts.
 Each GitHub source must match the owner in its catalog release. The generator
-owns Claude's marketplace and enabled-plugin keys and Codex's marketplace and plugin tables;
-other project settings remain in place. Release commits are selected by the lock, while host
-settings declare the corresponding GitHub marketplace and enabled plugins.
+owns Claude's marketplace, enabled-plugin, and `permissions.allow` keys, plus Codex's
+marketplace and plugin tables and `.codex/rules/agent-harness.rules`. Existing Claude allow
+entries outside the declared harness must be moved into `.agents/repository-harness.json`
+before generation. Other project settings remain in place. Release commits are selected by
+the lock, while host settings pin the corresponding GitHub marketplace revision and plugin
+selection.
 
 After each repository has adopted its generated project settings, audit the machine before removing
 old user-profile behavior:
