@@ -14,7 +14,7 @@ Tommy explicitly authorized a stacked follow-up on PR #48 and a fresh Codex hand
 - Open PR #58 is about verified delivery of messages to existing Codex sessions, not hook refresh. PR #55 adds command routes and identifies a possible conflict with PR #48's early exit; do not accidentally absorb those unrelated branches. Recheck their state if relevant.
 
 ## Completion
-Use meaningful tests for recovery and tier gating, run `pwsh .agents/sync-generated.ps1` and its `-Check` gate, refresh/check catalog digests as required, and follow core's review and PR workflow. Commit in logical units, push and open a plain GitHub stacked PR targeting `Refactor/RepoDeclaredConfigHarnessMove`. Report exact behavior, limits, and PR link. Do not merge either PR merely because this worktree exists. If the skill naming and runtime fix need separate PRs, preserve the parent stack and use separate focused layers.
+Use meaningful tests for recovery and tier gating, run `pwsh .agents/sync-generated.ps1` and its `-Check` gate, refresh/check catalog digests as required, and follow core's review and PR workflow. Commit in logical units, push and open a plain GitHub stacked PR targeting `Refactor/RepoDeclaredConfigHarnessMove`. Report exact behavior, limits, and PR link. Tommy subsequently authorized merging both PRs once complete. If the skill naming and runtime fix need separate PRs, preserve the parent stack and use separate focused layers.
 
 ## Next Steps
 1. Read `AGENTS.md`, `README.md`, this goal, PR #48's plan, and relevant hook/skill generation sources. Verify parent PR state and current branch status.
@@ -41,4 +41,17 @@ Handoff lane: L3, because host recovery behavior requires open-ended investigati
 - Mid-session routed skill injection remains unresolved. An isolated Codex CLI probe of combined `deny` and `additionalContext` never reached its hook because the local process policy blocked the tool call. The router still blocks until a successful skill load is proven; `.agents/plugins/TECH_DEBT.md` records the host-level proof and pinned-install repair needed before this can safely change.
 - The final focused suites and generation checks passed. Commits `ba5742e`, `edac04b`, and `f16d796` were pushed on `Fix/CodexHookRefresh`. Draft PR [#59](https://github.com/tj-agents/core/pull/59) is open with base `Refactor/RepoDeclaredConfigHarnessMove` and head `f16d7961b7f8980fafd0cf34b9a996991d7e3449`. Its `verify` check was in progress when observed.
 - The first PR CI run failed two `test_plan_artifacts` assertions: the test still expected a direct Codex script command and invoked the new verified loader from a package path outside its cache layout without `PLUGIN_DATA`. Updated the fixture to exercise the generated command in a valid cache layout; the eight focused plan-artifact, snapshot, and Windows-command tests pass locally.
-- Next: push the test correction and monitor the new exact-head PR check to completion, then run installed-host acceptance after the package is released and trusted. The routed-skill injection proof remains tracked in `.agents/plugins/TECH_DEBT.md`. Do not merge either PR.
+- The test correction was pushed as `d60f682`. Exact-head CI run [36428208729](https://github.com/tj-agents/core/actions/runs/36428208729) passed every `verify` stage, including source layout/package and shared runtime tests. Draft PR #59 remains open and targets `Refactor/RepoDeclaredConfigHarnessMove`.
+- Next: run installed-host acceptance after the package is released and trusted. The routed-skill injection proof remains tracked in `.agents/plugins/TECH_DEBT.md`. Do not merge either PR.
+
+## Merge checkpoint (2026-09-28)
+
+- Tommy authorized landing both stacked PRs if complete. PR #48 review findings were resolved, its exact-head CI passed, and it merged into `main` at `1f7a9280176858c2bc8e269a94e85f135ec4ff9f`.
+- Merged `origin/main` into this branch. Digest-only conflicts were regenerated from the combined source; the parent's removal of unsafe Claude launcher wildcard grants was retained. Harness, catalog, and generated package checks pass.
+- The combined focused suite passed 39 tests in the root tests package and 7 repository-config tests in `.agents/hooks/tests`. Remaining: commit and push the restack, retarget PR #59 to `main`, run exact-head CI and final review, then merge if clean.
+
+## Merge checkpoint (2026-09-28)
+
+- Tommy subsequently authorized landing both stacked PRs if complete. PR #48 review findings were resolved, its exact-head CI passed, and it merged into `main` at `1f7a9280176858c2bc8e269a94e85f135ec4ff9f`.
+- Merged `origin/main` into this branch. Digest-only conflicts were regenerated from the combined source; the parent's removal of unsafe Claude launcher wildcard grants was retained. Harness, catalog, and generated package checks pass.
+- The combined focused suite passed 39 tests in the root tests package and 7 repository-config tests in `.agents/hooks/tests`. Remaining: commit and push the restack, retarget PR #59 to `main`, run exact-head CI and final review, then merge if clean.
