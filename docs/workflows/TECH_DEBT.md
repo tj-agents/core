@@ -11,3 +11,9 @@ Resolve when preflight reads the canonical work order's continuous completed rev
 L1 now owns planning and design, but the workflow contract's `strategic` stage (architecture, major planning) is still derived from L3 in `.agents/workflows/hosts/*.json` and `STAGE_LANES`. Draft #39 repins the same stages for Codex, so the two changes would collide.
 
 Resolve when `strategic` is derived from L1 on both hosts, `STAGE_LANES` and the host pins agree, and the workflow contract tests pass.
+
+## Skill identity defaults use the retired source layout
+
+`workflow_ops.py skills --lifecycle bugfix` resolves `.agents/skills/bugfix/SKILL.md`, which no longer exists after canonical skills moved under their scope and kind. Explicit `name=path` identities work and were used for verified Codex follow-up validation.
+
+Resolve when bare lifecycle and routed technical names resolve through the canonical source map, and regression tests cover the current scope/kind layout.
