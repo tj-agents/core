@@ -96,8 +96,13 @@ Authorized scope: implementation, tests, live acceptance on this PC, review, PR 
 - The first live run found that `~/.claude` is itself a git repository here and the official
   marketplace is a downloaded copy with no `.git`; `git -C` read the enclosing repository. Marketplaces
   whose location is not its own checkout are now left to the host, with a regression test.
-- Next: this PC's profile loads the retired `base-agents` checkout at `71afb60`, which has Tommy's
-  uncommitted `shell/cr.ps1` change and none of this code. The launchers self-update through the
-  machine plugin once this merges; the bare `claude` function needs the profile rewired to
-  `tj-agents/core` by `install.ps1`, which is Tommy's call on that uncommitted change. Then commit,
-  review, PR, CI, merge, and repeat the live check at the merge commit.
+- 2026-09-28: PR #61 merged at `3a647a5`. The next refresh moved core `531c0fd` to `3a647a5` in 29 s,
+  and the installed machine plugin now ships the refresher. That installed copy, run in `winwrap`,
+  moved the project-scope cpp installs 0.4.2 to 0.4.6, and a new session loaded
+  `base-agents/*/3a647a5014c0`. Result lines now label project and local installs, which printed
+  as duplicates.
+- Remaining on this PC, awaiting Tommy: the profile still loads the retired `base-agents` checkout at
+  `71afb60`, whose uncommitted `shell/cr.ps1` change is his and whose `claude` function predates this
+  work. The primary `tj-agents/core` checkout cannot fast-forward past its own uncommitted plan edits and
+  untracked roadmap. Once he settles those, `git pull` there and `install.ps1` rewire the bare `claude`
+  command; the launchers and session recovery already refresh through the installed plugin.
