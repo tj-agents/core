@@ -205,6 +205,33 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
     return "sha256:" + digest.hexdigest()
 
 
+def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
+    loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
+    if "'" in loader:
+        raise ValueError("Codex hook snapshot loader must use only double-quoted strings")
+    expression = "exec(" + repr(loader).replace('"', r'\x22') + ")"
+    for plugin in sorted(plugins):
+        hook_path = f"plugins/{plugin}/hooks/codex.json"
+        excluded = ["hooks/codex.json"]
+        if plugin == "machine":
+            excluded.append("catalog/catalog.json")
+        expected = output_tree_digest(output, f"plugins/{plugin}", excluded)
+        payload = json.loads(output[hook_path])
+        for groups in payload["hooks"].values():
+            for group in groups:
+                for hook in group["hooks"]:
+                    for field in ("command", "commandWindows"):
+                        command = hook[field]
+                        prefix = "python3 -B " if field == "command" else "python -B "
+                        if not command.startswith(prefix + '"${PLUGIN_ROOT}/'):
+                            raise ValueError(f"Unsupported Codex {field} for {plugin}: {command}")
+                        hook[field] = (
+                            prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
+                            f'"{plugin}" ' + command[len(prefix):]
+                        )
+        output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
+
+
 def inside(root: Path, relative: str | PurePosixPath) -> Path:
     candidate = (root / Path(*PurePosixPath(relative).parts)).resolve()
     if not candidate.is_relative_to(root.resolve()):
@@ -763,6 +790,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
         if resolved not in output:
             raise ValueError(f"{path}: missing packaged canonical definition {resolved}")
 
+    bind_codex_hook_snapshots(root, output, plugins)
     validate_hook_outputs(output, config, plugins)
 
     for plugin in sorted(plugins):
