@@ -7,7 +7,7 @@
   "source_excludes": [
     ".agents/catalog/catalog.json"
   ],
-  "source_digest": "sha256:de2353537aeac49577e51b43599dcc0d31170bbc62e7762b4d18dd3f703bce4d",
+  "source_digest": "sha256:d2a125a40a5c89c300406e6a503870d94d9b5b8499ee1f0b097b4d857ab96e19",
   "requires": {
     "marketplaces": [
       {
@@ -25,6 +25,12 @@
         "hosts": [
           "claude",
           "codex"
+        ]
+      },
+      {
+        "path": "resources/machine/scripts/claude_terminal_profile.py",
+        "hosts": [
+          "claude"
         ]
       },
       {
