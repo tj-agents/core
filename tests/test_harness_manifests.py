@@ -94,6 +94,14 @@ class HarnessManifestTests(unittest.TestCase):
                 HARNESS.expected_hooks(root, config, "base"),
             )
 
+    def test_bare_wildcard_claude_permission_is_rejected(self):
+        catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
+        config = HARNESS.load(ROOT / ".agents/plugins/sources.json")
+        requires = json.loads((ROOT / ".agents/plugins/harness/machine.json").read_text(encoding="utf-8"))["requires"]
+        requires["permissions"]["claude_allow"][0] = r"PowerShell(& *\handoff-codex\scripts\launch-codex.ps1 *)"
+        with self.assertRaisesRegex(ValueError, "bare wildcard Claude permission"):
+            HARNESS.validate_requires(ROOT, config, catalog, "machine", requires)
+
     def test_foreign_marketplace_owner_is_rejected(self):
         catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
         config = HARNESS.load(ROOT / ".agents/plugins/sources.json")

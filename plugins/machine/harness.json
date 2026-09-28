@@ -7,7 +7,7 @@
   "source_excludes": [
     ".agents/catalog/catalog.json"
   ],
-  "source_digest": "sha256:ba2bf9a9f60a72c80a4eacb258fb14891494e4a9b207a1d43b4204c9fc4d4401",
+  "source_digest": "sha256:b3d23a4570010d729bf827663ac269b99dc8de193b09321fcefd35c55b222246",
   "requires": {
     "marketplaces": [
       {
@@ -43,8 +43,8 @@
     ],
     "permissions": {
       "claude_allow": [
-        "PowerShell(& *\\handoff-codex\\scripts\\launch-codex.ps1 *)",
-        "PowerShell(& *\\handoff-claude\\scripts\\launch-claude.ps1 *)"
+        "PowerShell(& *\\.claude\\plugins\\cache\\base-agents\\machine\\*\\handoff-codex\\scripts\\launch-codex.ps1 *)",
+        "PowerShell(& *\\.claude\\plugins\\cache\\base-agents\\machine\\*\\handoff-claude\\scripts\\launch-claude.ps1 *)"
       ],
       "codex_prefix_rules": []
     }

@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 
 HOOK = Path(__file__).resolve().parents[1] / "delivery_binding_gate.py"
@@ -41,6 +42,12 @@ class CreatedPullRequestTests(unittest.TestCase):
     def test_a_pr_url_in_the_command_is_never_read_as_a_result(self):
         data = {"tool_input": {"command": CREATE + " --body https://github.com/o/r/pull/9"}}
         self.assertIsNone(gate.created_pr(data))
+
+
+class BindTests(unittest.TestCase):
+    def test_timeout_returns_an_actionable_failure(self):
+        with patch.object(gate, "run_command", side_effect=gate.CommandTimeout("delivery-bind timed out")):
+            self.assertEqual((None, "delivery-bind timed out"), gate.bind(Path("."), 42))
 
 
 class AuthorizationMessageTests(unittest.TestCase):

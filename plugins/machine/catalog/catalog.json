@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:d8043a74024b90dea91417699369354cccbd7187ea9bd189d87830073df7b4d5",
+          "digest": "sha256:cd974b156aa456b28f4c80ce3c0a88f6b56957c187bf18ba76ac15191749c6f4",
           "harness": {
             "marketplaces": [
               {
@@ -173,7 +173,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:b546e2b6bf6e22df5247c58d8351a02d87253654ca31034d5ef516684ad03e13",
+          "digest": "sha256:35a3b753ce385acbb8c5125e9a0a6696db33b1df2c1bbb0a66f11e49de780c82",
           "harness": {
             "marketplaces": [
               {
@@ -323,7 +323,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:32630d04cb21dc4bd20c369e1dbda74ea5657244d58865e6eef57e02c1327e41",
+          "digest": "sha256:5ae9b5d040943b03717b592cb52a3dcb3db820a0db011338f8c63da3909c5fea",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -362,8 +362,8 @@
             ],
             "permissions": {
               "claude_allow": [
-                "PowerShell(& *\\handoff-codex\\scripts\\launch-codex.ps1 *)",
-                "PowerShell(& *\\handoff-claude\\scripts\\launch-claude.ps1 *)"
+                "PowerShell(& *\\.claude\\plugins\\cache\\base-agents\\machine\\*\\handoff-codex\\scripts\\launch-codex.ps1 *)",
+                "PowerShell(& *\\.claude\\plugins\\cache\\base-agents\\machine\\*\\handoff-claude\\scripts\\launch-claude.ps1 *)"
               ],
               "codex_prefix_rules": []
             }
