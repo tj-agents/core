@@ -284,7 +284,10 @@ def short(commit: str | None) -> str:
 
 
 def describe(members: list[Install]) -> str:
-    return ", ".join(f"{install.name} {install.version}" for install in members)
+    return ", ".join(
+        f"{install.name} {install.version}" + ("" if install.scope == "user" else f" ({install.scope})")
+        for install in members
+    )
 
 
 def current(install: Install, remote: str, state: dict[str, str]) -> bool:
