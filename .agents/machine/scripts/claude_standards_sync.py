@@ -258,7 +258,7 @@ def exclusive(root: Path, wait: float):
     try:
         os.write(descriptor, str(os.getpid()).encode("ascii"))
         os.close(descriptor)
-        yield
+        yield lambda: os.utime(path)
     finally:
         try:
             path.unlink()
@@ -296,11 +296,13 @@ def default_claude() -> str | None:
     return str(native) if native.is_file() else shutil.which("claude")
 
 
-def update(market: Marketplace, remote: str, executable: str, project: Path, plugins: Path, state: dict[str, str], out) -> int:
+def update(market: Marketplace, remote: str, executable: str, project: Path, plugins: Path, state: dict[str, str],
+           renew, out) -> int:
     pending = [install for install in market.installs if not current(install, remote, state)]
     before = checkout_head(market)
     print(f"standards: updating {market.name} to {short(remote)} (installed: {describe(pending or market.installs)})", file=out, flush=True)
     if before != remote:
+        renew()
         ok, detail = claude(executable, ["plugin", "marketplace", "update", market.name], project, MARKETPLACE_TIMEOUT_SECONDS)
         if not ok:
             print(f"standards: {market.name} was not refreshed ({detail}); this session loads {describe(market.installs)}", file=out)
@@ -312,6 +314,7 @@ def update(market: Marketplace, remote: str, executable: str, project: Path, plu
             state[install.key] = reached
             continue
         arguments = ["plugin", "update", install.identity, "--scope", install.scope, "--json"]
+        renew()
         ok, detail = claude(executable, arguments, install.project or project, PLUGIN_TIMEOUT_SECONDS)
         if ok:
             state[install.key] = reached
@@ -350,10 +353,10 @@ def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, exe
         print("standards: the claude executable was not found; this session loads the installed plugins", file=out)
         return 1
     try:
-        with exclusive(state_dir, lock_wait):
+        with exclusive(state_dir, lock_wait) as renew:
             state = load_state(state_dir)
             for market, remote in stale:
-                problems += update(market, remote, executable, project, plugins, state, out)
+                problems += update(market, remote, executable, project, plugins, state, renew, out)
                 save_state(state_dir, state)
     except TimeoutError as error:
         print(f"standards: {error}; this session loads the installed plugins", file=out)

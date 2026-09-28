@@ -14,8 +14,14 @@ def git(checkout, *arguments):
 def main(arguments):
     config = Path(os.environ["CLAUDE_CONFIG_DIR"])
     plugins = config / "plugins"
+    entry = {"argv": arguments, "cwd": os.getcwd()}
+    lock = os.environ.get("FAKE_CLAUDE_AGE_LOCK")
+    if lock:
+        entry["lock_age"] = time.time() - os.stat(lock).st_mtime
+        aged = time.time() - 10_000
+        os.utime(lock, (aged, aged))
     with open(os.environ["FAKE_CLAUDE_LOG"], "a", encoding="utf-8") as log:
-        log.write(json.dumps({"argv": arguments, "cwd": os.getcwd()}) + "\n")
+        log.write(json.dumps(entry) + "\n")
     if arguments[:3] == ["plugin", "marketplace", "update"]:
         known = json.loads((plugins / "known_marketplaces.json").read_text(encoding="utf-8"))
         if os.environ.get("FAKE_CLAUDE_FAIL") == arguments[3]:
