@@ -59,9 +59,11 @@ govern:
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
 | `L7` | Clerical work with a small input and no judgement to make. |
 
-**Split a job that designs and then delivers.** Hand the plan or design off on `L1`, then its execution on
-the rung the build needs, working from that plan. One handoff carrying both runs the delivery on the design
-rung, or the design on the delivery rung.
+Choose the launch lane for the work assigned to this independent session. If the successor later reaches
+a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
+Completing a plan in the current owning session does not call for this launcher; continue the same
+authorized work there, directly or with a bounded lane agent. Use the `engineering:plans` transfer
+criteria to decide whether another session should own the work.
 
 `-Frontier` selects the tier above the ladder from the same table. **Pass it only when the user
 explicitly asked for that tier or its model by name.** No lane resolves to the tier — L1 prices the same
