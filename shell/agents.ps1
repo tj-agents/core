@@ -15,6 +15,19 @@ function claude {
     & $target -n $label
 }
 
+function codex {
+    $exe = @(Get-Command codex -CommandType Application, ExternalScript -ErrorAction SilentlyContinue)[0]
+    if (-not $exe) { throw 'codex executable not found on PATH' }
+    $target = $exe.Source
+    if ($args.Count -eq 0 -or $args[0] -ne 'plugin') {
+        $sync = Join-Path $PSScriptRoot '..\.agents\machine\scripts\codex_marketplace_sync.ps1'
+        if (-not (Test-Path -LiteralPath $sync -PathType Leaf)) { throw "Codex sync script missing: $sync" }
+        . $sync
+        Sync-CodexStandards -CodexExecutable $target -WorkingDirectory (Get-Location).Path | Out-Null
+    }
+    & $target @args
+}
+
 # "I closed the terminal, put me back in what I was doing" - from ANY directory, any project on this
 # machine. Takes the most recently touched conversation across all of ~/.claude/projects, moves to the
 # directory that session was rooted in, and resumes it. `cl -Pick` opens the cross-project picker instead.
