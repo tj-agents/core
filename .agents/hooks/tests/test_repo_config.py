@@ -56,6 +56,8 @@ class RepoConfigTests(unittest.TestCase):
         self.assertIn('model = "test"', d)
         self.assertIn('source = "https://github.com/tj-agents/core.git"', d)
         self.assertIn('ref = "v2.1.16"', d)
+        self.assertIn('sparse_paths = [".agents/plugins", ".claude-plugin", "plugins"]', d)
+        self.assertIn('sparse_paths = [".agents/plugins", ".claude-plugin", "plugins"]', d)
         self.assertEqual(3, d.count('[plugins."'))
 
     def test_rejects_foreign_source(self):
