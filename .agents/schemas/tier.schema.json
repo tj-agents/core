@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tomjseery/base-agents/base/stack-tiers/tier.schema.json",
+  "$id": "https://github.com/tj-agents/core/blob/main/.agents/schemas/tier.schema.json",
   "title": "Plugin tier declaration",
   "description": "Ships at the root of a plugin payload as tier.json and states whether that plugin is ubiquitous or gated on a stack. The plugin and marketplace identity is taken from the installed path, never declared here.",
   "type": "object",

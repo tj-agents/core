@@ -61,6 +61,21 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/tier_gate.py",
+      "destination": "hooks/tier_gate.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/schemas/tier.schema.json",
+      "destination": "tiers/tier.schema.json"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/tiers/README.md",
+      "destination": "tiers/README.md"
+    },
+    {
+      "plugin": "base",
       "source": ".codex/adapters/pre_tool_use.py",
       "destination": "hooks/pre_tool_use_adapter.py"
     },

@@ -25,8 +25,7 @@
           "skills": [
             "agent-files",
             "cd",
-            "plan-artifacts",
-            "stack-tiers"
+            "plan-artifacts"
           ],
           "dependencies": {
             "required": [],
@@ -38,7 +37,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:d8043a74024b90dea91417699369354cccbd7187ea9bd189d87830073df7b4d5",
+          "digest": "sha256:5f6a93617367b2127031b331a1e25503475d361bcf7f202b8ee303e7f008fc21",
           "harness": {
             "marketplaces": [
               {
@@ -65,13 +64,6 @@
                 ]
               },
               {
-                "path": ".agents/base/stack-tiers/scripts/tier_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
                 "path": "hooks/pre_tool_use_adapter.py",
                 "hosts": [
                   "codex"
@@ -79,6 +71,13 @@
               },
               {
                 "path": "hooks/skill_router.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/tier_gate.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -148,6 +147,7 @@
             "review-lifecycle",
             "session-guidance",
             "skill-routes",
+            "stack",
             "sync",
             "sync-all",
             "sync-checkout",
@@ -173,7 +173,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:b546e2b6bf6e22df5247c58d8351a02d87253654ca31034d5ef516684ad03e13",
+          "digest": "sha256:12f21cd062280e566e8e3265623196613d57edc7453b3a2224bac9707efe89d2",
           "harness": {
             "marketplaces": [
               {
