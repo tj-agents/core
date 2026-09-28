@@ -182,6 +182,7 @@ class StandardsSyncTests(StandardsSyncHarness):
         updates = [entry for entry in self.invocations() if entry['argv'][:2] == ['plugin', 'update']]
         self.assertEqual(len(updates), 1)
         self.assertEqual(os.path.normcase(updates[0]['cwd']), os.path.normcase(str(self.project)))
+        self.assertIn(f'core at {pushed[:12]}: base {pushed[:12]} (project)', output)
         versions = {record['projectPath']: record['version'] for record in self.records()}
         self.assertEqual(versions[str(self.project)], pushed[:12])
         self.assertNotEqual(versions[str(other)], pushed[:12])
