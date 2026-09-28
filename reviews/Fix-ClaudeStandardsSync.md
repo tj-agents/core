@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `826b883`  `(2026-09-28)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `0c6a9b5`  `(2026-09-28)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-28 — full
 
@@ -43,3 +43,20 @@ is not a packaging breach — `shell/` only runs from a checkout wired by that c
 installed plugin's refresher. The shell function omitting `-Claude $target` is deliberate: `$target`
 may be the npm `claude.ps1` shim, which Python cannot execute, while the script's resolver prefers the
 native `claude.exe`.
+
+## Review pass — 2026-09-28 — incremental
+
+**Candidate base:** `826b8835d30bcbb6c3bc17ee0659e530dde1adb2`
+**Candidate head:** `0c6a9b5`
+**Candidate branch:** `Fix/ClaudeStandardsSync`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Fix-ClaudeStandardsSync.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No finding retained. CS1's renewal runs before the marketplace refresh and before each plugin update,
+so a live holder's lock is never older than one host call's timeout (at most 180 s against the 900 s
+staleness bound); `test_lock_is_renewed_before_every_host_call` fails without it. CS2 and CS3 wording
+matches the code. Regenerated packages, harness and catalog digests are consistent.
