@@ -3,18 +3,18 @@
   "digest_format": "sha256-tree-v1",
   "releases": [
     {
-      "id": "base-agents@2.1.15",
+      "id": "base-agents@2.1.16",
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "base-agents",
-      "revision": "v2.1.15",
-      "version": "2.1.15",
+      "revision": "v2.1.16",
+      "version": "2.1.16",
       "plugins": [
         {
           "id": "base-agents/base",
           "name": "base",
           "package_path": "plugins/base",
-          "version": "2.1.15",
+          "version": "2.1.16",
           "description": "Maintained plans and common agent behavior.",
           "status": "current",
           "platforms": [
@@ -38,13 +38,64 @@
             ],
             "optional": []
           },
-          "digest": "sha256:4794fe41f519eabe8cba61388ef95b6fbb4740ee8adb77dbdab0a92bdd8fcdcb"
+          "digest": "sha256:cd974b156aa456b28f4c80ce3c0a88f6b56957c187bf18ba76ac15191749c6f4",
+          "harness": {
+            "marketplaces": [
+              {
+                "id": "base-agents",
+                "repository": "tj-agents/core"
+              }
+            ],
+            "plugins": [
+              "base-agents/base"
+            ],
+            "hooks": [
+              {
+                "path": ".agents/base/agent-files/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": ".agents/base/plan-artifacts/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": ".agents/base/stack-tiers/scripts/tier_gate.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/pre_tool_use_adapter.py",
+                "hosts": [
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/skill_router.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              }
+            ],
+            "permissions": {
+              "claude_allow": [],
+              "codex_prefix_rules": []
+            }
+          }
         },
         {
           "id": "base-agents/engineering",
           "name": "engineering",
           "package_path": "plugins/engineering",
-          "version": "2.1.15",
+          "version": "2.1.16",
           "description": "Selected engineering workflows, reviews and Git operations.",
           "status": "current",
           "platforms": [
@@ -122,13 +173,121 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:4ec88721194d40d9f112050a9ba9492e9de5a41f300c20943d2a5bfa2d1d9d42"
+          "digest": "sha256:907fc39b295948a07d04bf79d3e132871ed2e319fc6c6c4d8065ff03d3a33f07",
+          "harness": {
+            "marketplaces": [
+              {
+                "id": "base-agents",
+                "repository": "tj-agents/core"
+              }
+            ],
+            "plugins": [
+              "base-agents/base",
+              "base-agents/engineering"
+            ],
+            "hooks": [
+              {
+                "path": ".agents/engineering/contract/session-guidance/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/compact_output_gate.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/delivery_binding_gate.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/denial_prompt.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/forge_poll_gate.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/git_auth_scope_gate.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/harness_grant.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/merge_review_gate.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/persistent_workflow_merge_gate.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/plan_handoff_stop_launcher.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/pre_tool_use_adapter.py",
+                "hosts": [
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/red_run_gate.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/workflow_route.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/worktree_cleanup_gate.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              }
+            ],
+            "permissions": {
+              "claude_allow": [],
+              "codex_prefix_rules": []
+            }
+          }
         },
         {
           "id": "base-agents/machine",
           "name": "machine",
           "package_path": "plugins/machine",
-          "version": "2.1.15",
+          "version": "2.1.16",
           "description": "Explicit harness, history and clipboard utilities.",
           "status": "current",
           "platforms": [
@@ -164,486 +323,48 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:77168a874a4474e7bae573c543207a9c7d36d7f78104203ed85b46df17c964b9",
+          "digest": "sha256:6d3daa2a420329cd1839e4eef209307db641a548f40e2f0693a4ce291d0d4e84",
           "digest_excludes": [
             "catalog/catalog.json"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "cpp-agents@0.3.2",
-      "owner_repository": "tj-agents/cpp",
-      "source": "https://github.com/tj-agents/cpp.git",
-      "marketplace": "cpp-agents",
-      "revision": "v0.3.2",
-      "version": "0.3.2",
-      "plugins": [
-        {
-          "id": "cpp-agents/cpp",
-          "name": "cpp",
-          "package_path": "plugins/cpp",
-          "version": "0.4.3",
-          "description": "Platform-neutral modern C++ contracts and learning guidance.",
-          "status": "current",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
           ],
-          "skills": [
-            "build",
-            "cpp-build",
-            "cpp-direction",
-            "cpp-knowledge",
-            "cpp-learning",
-            "cpp-libraries",
-            "cpp-structure",
-            "cpp-style",
-            "cpp-testing",
-            "direction",
-            "domain-design",
-            "knowledge",
-            "learning",
-            "libraries",
-            "mixins",
-            "structure",
-            "style",
-            "testing"
-          ],
-          "dependencies": {
-            "required": [],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [],
-            "optional": [
-              "exe:cmake",
-              "c++20-compiler"
-            ]
-          },
-          "digest": "sha256:1a643e650b319c68d04f0657a96195f43f359bc1aed16b687de203afdccd7576"
-        },
-        {
-          "id": "cpp-agents/gpp",
-          "name": "gpp",
-          "package_path": "plugins/gpp",
-          "version": "0.3.2",
-          "description": "G++, GCC, GDB, and Linux guidance layered on cpp.",
-          "status": "current",
-          "platforms": [
-            "windows",
-            "linux"
-          ],
-          "skills": [
-            "gpp-scaffold",
-            "gpp-toolchain",
-            "scaffold",
-            "toolchain"
-          ],
-          "dependencies": {
-            "required": [
-              "cpp-agents/cpp"
+          "harness": {
+            "marketplaces": [
+              {
+                "id": "base-agents",
+                "repository": "tj-agents/core"
+              }
             ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "exe:g++",
-              "exe:cmake"
+            "plugins": [
+              "base-agents/base",
+              "base-agents/machine"
             ],
-            "optional": [
-              "exe:gdb",
-              "exe:ninja"
-            ]
-          },
-          "digest": "sha256:31fa00e2e23a22b22ca5d04cb5446b34e1136ee40908bd5e3adcef5b3ee0cf12"
-        },
-        {
-          "id": "cpp-agents/msvc",
-          "name": "msvc",
-          "package_path": "plugins/msvc",
-          "version": "0.3.3",
-          "description": "MSVC and clang-cl toolchain guidance and project scaffold layered on cpp.",
-          "status": "current",
-          "platforms": [
-            "windows"
-          ],
-          "skills": [
-            "msvc-scaffold",
-            "msvc-toolchain",
-            "scaffold",
-            "toolchain"
-          ],
-          "dependencies": {
-            "required": [
-              "cpp-agents/cpp"
+            "hooks": [
+              {
+                "path": ".agents/machine/peer-cli/scripts/register_session.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "resources/machine/scripts/prune_plugin_cache.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "resources/machine/scripts/reap_orphans.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              }
             ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "platform:windows",
-              "exe:powershell",
-              "exe:cmake"
-            ],
-            "optional": [
-              "visual-studio-build-tools",
-              "exe:ninja"
-            ]
-          },
-          "digest": "sha256:d60d132458cec3e51707be5dd05ed309b98d20a1a04d0b911f57efdddc8abd36"
-        },
-        {
-          "id": "cpp-agents/win32",
-          "name": "win32",
-          "package_path": "plugins/win32",
-          "version": "0.3.2",
-          "description": "User-mode Win32, Unicode, WIL, and Windows resource guidance layered on cpp.",
-          "status": "current",
-          "platforms": [
-            "windows"
-          ],
-          "skills": [
-            "knowledge",
-            "overview",
-            "scaffold",
-            "style",
-            "win32-style",
-            "windows-cpp-knowledge",
-            "windows-overview"
-          ],
-          "dependencies": {
-            "required": [
-              "cpp-agents/cpp"
-            ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "platform:windows"
-            ],
-            "optional": [
-              "windows-sdk",
-              "wil"
-            ]
-          },
-          "digest": "sha256:2a1c3114edd4432c134663796f94c576227adb03651e6a1362ba8c52e494ce21"
-        },
-        {
-          "id": "cpp-agents/base",
-          "name": "base",
-          "package_path": "plugins/base",
-          "version": "0.7.3",
-          "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
-          "status": "deprecated",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
-          ],
-          "skills": [
-            "cpp-build",
-            "cpp-direction",
-            "cpp-knowledge",
-            "cpp-learning",
-            "cpp-libraries",
-            "cpp-structure",
-            "cpp-style",
-            "cpp-testing",
-            "domain-design",
-            "mixins"
-          ],
-          "dependencies": {
-            "required": [],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [],
-            "optional": [
-              "exe:cmake",
-              "c++20-compiler"
-            ]
-          },
-          "digest": "sha256:1e40775335ece0a8bb02edbe17cbb4cbe78951786e14217542618f7c4ca582cc",
-          "replacement": [
-            "cpp-agents/cpp"
-          ],
-          "remove_after": "2027-03-31"
-        },
-        {
-          "id": "cpp-agents/gcc",
-          "name": "gcc",
-          "package_path": "plugins/gcc",
-          "version": "0.5.1",
-          "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
-          "status": "deprecated",
-          "platforms": [
-            "windows",
-            "linux"
-          ],
-          "skills": [
-            "gcc-toolchain",
-            "gpp-scaffold"
-          ],
-          "dependencies": {
-            "required": [
-              "cpp-agents/base"
-            ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "exe:g++",
-              "exe:cmake"
-            ],
-            "optional": [
-              "exe:gdb",
-              "exe:ninja"
-            ]
-          },
-          "digest": "sha256:de7f1a0aed797a29acf856d46d74e8c91a412152ae57ae4692ac480633d5f5c0",
-          "replacement": [
-            "cpp-agents/gpp"
-          ],
-          "remove_after": "2027-03-31"
-        },
-        {
-          "id": "cpp-agents/windows",
-          "name": "windows",
-          "package_path": "plugins/windows",
-          "version": "0.8.3",
-          "description": "Deprecated combined MSVC and Win32 compatibility package; split explicitly before 2027-03-31.",
-          "status": "deprecated",
-          "platforms": [
-            "windows"
-          ],
-          "skills": [
-            "msvc-scaffold",
-            "msvc-toolchain",
-            "win32-scaffold",
-            "win32-style",
-            "windows-cpp-knowledge",
-            "windows-overview"
-          ],
-          "dependencies": {
-            "required": [
-              "cpp-agents/base"
-            ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "platform:windows",
-              "exe:powershell",
-              "exe:cmake"
-            ],
-            "optional": [
-              "visual-studio-build-tools",
-              "windows-sdk",
-              "wil",
-              "exe:ninja"
-            ]
-          },
-          "digest": "sha256:dc26710939ebd80e40ec78d496f6a4ef52b43d881fd65cd7d7e8c5e44722f00b",
-          "replacement": [
-            "cpp-agents/msvc",
-            "cpp-agents/win32"
-          ],
-          "remove_after": "2027-03-31"
-        },
-        {
-          "id": "cpp-agents/cpp-standards",
-          "name": "cpp-standards",
-          "package_path": "plugins/cpp-standards",
-          "version": "0.7.3",
-          "description": "Deprecated compatibility package for cpp@cpp-agents; remove after 2027-03-31.",
-          "status": "deprecated",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
-          ],
-          "skills": [
-            "cpp-build",
-            "cpp-direction",
-            "cpp-knowledge",
-            "cpp-learning",
-            "cpp-libraries",
-            "cpp-structure",
-            "cpp-style",
-            "cpp-testing",
-            "domain-design",
-            "mixins"
-          ],
-          "dependencies": {
-            "required": [],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [],
-            "optional": [
-              "exe:cmake",
-              "c++20-compiler"
-            ]
-          },
-          "digest": "sha256:fb07a3c8e1d6d66ff99cfc4af8df931297000edaca92c85e1ec0b6d702ebcff1",
-          "replacement": [
-            "cpp-agents/cpp"
-          ],
-          "remove_after": "2027-03-31"
-        },
-        {
-          "id": "cpp-agents/gpp-standards",
-          "name": "gpp-standards",
-          "package_path": "plugins/gpp-standards",
-          "version": "0.5.1",
-          "description": "Deprecated compatibility package for gpp@cpp-agents; remove after 2027-03-31.",
-          "status": "deprecated",
-          "platforms": [
-            "windows",
-            "linux"
-          ],
-          "skills": [
-            "gpp-scaffold",
-            "gpp-toolchain"
-          ],
-          "dependencies": {
-            "required": [
-              "cpp-agents/cpp-standards"
-            ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "exe:g++",
-              "exe:cmake"
-            ],
-            "optional": [
-              "exe:gdb",
-              "exe:ninja"
-            ]
-          },
-          "digest": "sha256:ae6c3768be213b1acd4677c933d350ec2fe0249586f893ecd51b44cfab41f8dd",
-          "replacement": [
-            "cpp-agents/gpp"
-          ],
-          "remove_after": "2027-03-31"
-        }
-      ]
-    },
-    {
-      "id": "dotagents@1.1.1",
-      "owner_repository": "tj-agents/dotnet",
-      "source": "https://github.com/tj-agents/dotnet.git",
-      "marketplace": "dotagents",
-      "revision": "v1.1.1",
-      "version": "1.1.1",
-      "plugins": [
-        {
-          "id": "dotagents/dotnet",
-          "name": "dotnet",
-          "package_path": "plugins/dotnet",
-          "version": "1.1.1",
-          "description": "Generic C# and .NET engineering standards.",
-          "status": "current",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
-          ],
-          "skills": [
-            "comments",
-            "csharp-naming",
-            "csharp-style",
-            "dependency-injection",
-            "domain-events",
-            "dotnet-stack",
-            "e2e-api-debug",
-            "e2e-debug",
-            "e2e-scenarios",
-            "e2e-ui-debug",
-            "http-api",
-            "integration-debug",
-            "integration-testing",
-            "keyed-strategies",
-            "keyed-unions",
-            "logging",
-            "microservice-boundaries",
-            "module-structure",
-            "multitenancy",
-            "persistence",
-            "proto",
-            "result-carriers",
-            "result-errors",
-            "result-terminals",
-            "seeding",
-            "unit-testing",
-            "validation"
-          ],
-          "dependencies": {
-            "required": [],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [],
-            "optional": [
-              "exe:dotnet",
-              "exe:powershell"
-            ]
-          },
-          "digest": "sha256:1a93e69f765b91a68158658ecacd2860baefda23e8d911cc916291a5644723cc"
-        }
-      ]
-    },
-    {
-      "id": "react-agents@1.0.1",
-      "owner_repository": "tj-agents/react",
-      "source": "https://github.com/tj-agents/react.git",
-      "marketplace": "react-agents",
-      "revision": "v1.0.1",
-      "version": "1.0.1",
-      "plugins": [
-        {
-          "id": "react-agents/react",
-          "name": "react",
-          "package_path": "plugins/react",
-          "version": "1.0.1",
-          "description": "Generic React and TypeScript engineering standards.",
-          "status": "current",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
-          ],
-          "skills": [
-            "client-state",
-            "contract-naming",
-            "data-tables",
-            "date-formatting",
-            "frontend-testing",
-            "http-layer",
-            "react-structure",
-            "routing",
-            "server-state",
-            "stack-defaults",
-            "tiered-shared-code",
-            "typescript-style",
-            "ui-components",
-            "write-boundary"
-          ],
-          "dependencies": {
-            "required": [],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [],
-            "optional": [
-              "exe:node",
-              "exe:tsc"
-            ]
-          },
-          "digest": "sha256:55fee8585aad43c664500c00223f55693f405198c179bb98491609d1462100a3"
+            "permissions": {
+              "claude_allow": [],
+              "codex_prefix_rules": []
+            }
+          }
         }
       ]
     }

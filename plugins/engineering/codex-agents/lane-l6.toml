@@ -1,5 +1,5 @@
 name = "lane_l6"
-description = "Bounded delegated work at L6."
+description = "Runs one delegated task at lane L6. Bulk clerical work whose input is too large for the cheapest rung."
 model = "gpt-6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"

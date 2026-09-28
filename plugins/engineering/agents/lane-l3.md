@@ -1,6 +1,7 @@
 ---
 name: lane-l3
-description: Bounded delegated work at L3.
+description: Runs one delegated task at lane L3. Open-ended judgement that is not design, where the answer is not yet known.
+kind: lane
 model: claude-opus-5-5
 effort: high
 tools: Read, Glob, Grep, Write, Edit, Bash

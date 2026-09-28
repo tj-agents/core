@@ -96,6 +96,7 @@
         "skills",
         "dependencies",
         "external_prerequisites",
+        "harness",
         "digest"
       ],
       "properties": {
@@ -141,6 +142,9 @@
         },
         "external_prerequisites": {
           "$ref": "#/$defs/dependencies"
+        },
+        "harness": {
+          "$ref": "../plugins/harness.schema.json#/$defs/requires"
         },
         "digest": {
           "type": "string",
