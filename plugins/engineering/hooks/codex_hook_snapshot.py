@@ -76,8 +76,7 @@ def main():
         finally:
             if temporary.is_dir():
                 shutil.rmtree(temporary)
-    selected = root if root.is_dir() else snapshot
-    verified(selected, expected, plugin)
+    selected = snapshot
     verified(snapshot, expected, plugin)
     target = selected / relative
     if not target.is_file():
