@@ -97,7 +97,7 @@ Claude Code:
 Claude loads installed plugins at session start and `/plugin marketplace update` refreshes only the
 catalog. The profile's `claude` function, `open-claude`, `handoff-claude` and session recovery run
 `.agents/machine/scripts/claude_standards_sync.py` first, so a session started through them loads the
-latest registered commit of every plugin the directory enables. Run it directly from any other shell:
+latest registered commit of every plugin the directory enables. From a core checkout, run it directly:
 
 ```powershell
 python -B .agents/machine/scripts/claude_standards_sync.py --project <directory>

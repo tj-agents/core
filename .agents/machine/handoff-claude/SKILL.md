@@ -24,7 +24,7 @@ checkout.
 ## One tab, and never a second
 
 The launcher **throws** on failure and prints `Launched claude handoff tab '<title>' …` on success. Those
-are the only two outcomes. A `standards:` line before them reports the pre-launch plugin refresh and
+are the only two outcomes. `standards:` lines before them report the pre-launch plugin refresh, which
 never blocks the launch.
 
 **Never verify a launch by listing processes, and never re-run the launcher because one looked absent.**
