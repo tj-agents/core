@@ -179,8 +179,8 @@ after workspace trust. The phase-4 acceptance session must prove that the two la
 above satisfy the auto-mode classifier; if an `ask`/`deny` rule or managed policy still wins, record
 that external policy as the minimal non-repository remainder instead of broadening the patterns.
 
-The permanent prose rule lives in `.agents/base/stack-tiers/SKILL.md` (always loaded) and
-`PACKAGING.md` (package authoring). Enforcement lives in code: standards CI runs
+The permanent prose rule lives in `PACKAGING.md` (package authoring) and the shipped
+`base:plan-artifacts` standing contract. Enforcement lives in code: standards CI runs
 `python -B scripts/sync_harness_manifests.py --check`, catalog/schema tests and
 `pwsh .agents/sync-generated.ps1 -Check`; consumer CI runs `repo_config.py --mode check` and
 host-config parsing tests. `test_harness_manifests.py` covers stale digests, missing hook wiring,
