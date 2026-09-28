@@ -323,7 +323,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:5166b2abfc70bcadbdd2caeb2155094b74cfbc9dfa445e95cf9521b79d40eba7",
+          "digest": "sha256:d6caeeacec68075b220f1b29cb93f50135cc97cbf32fd96b321f90b79ba00c5f",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
