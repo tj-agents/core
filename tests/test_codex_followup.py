@@ -275,7 +275,7 @@ class ProxyTests(unittest.TestCase):
         self.assertEqual(temp.name, calls[0][1]['CODEX_HOME'])
         return proxy
 
-    def test_real_stdio_framing_initialization_and_server_requests(self):
+    def test_real_stdio_framing_initialization_and_notifications(self):
         proxy = self.create_proxy('''import json, sys
 for line in sys.stdin:
     request = json.loads(line)
@@ -283,14 +283,53 @@ for line in sys.stdin:
         print(json.dumps({'id': request['id'], 'result': {}}), flush=True)
     elif request.get('method') == 'probe':
         print(json.dumps({'method': 'notification', 'params': {}}), flush=True)
-        print(json.dumps({'id': 'server-request', 'method': 'approval', 'params': {}}), flush=True)
-        rejection = json.loads(sys.stdin.readline())
-        print(json.dumps({'id': request['id'], 'result': {'rejection': rejection}}), flush=True)
+        print(json.dumps({'id': request['id'], 'result': {'probe': True}}), flush=True)
 ''')
         proxy.initialize()
         result = proxy.request('probe', {})
-        self.assertEqual(-32601, result['rejection']['error']['code'])
+        self.assertTrue(result['probe'])
         proxy.close()
+        self.assertIsNotNone(proxy.process.poll())
+
+    def test_server_request_after_submission_gets_no_response_or_duplicate_turn(self):
+        directory = tempfile.TemporaryDirectory(prefix='followup approval ')
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        message = root / 'message.txt'
+        message.write_text('exact message', encoding='utf-8')
+        receipt = root / 'receipt.json'
+        thread = {'id': THREAD, 'cwd': str(root), 'status': {'type': 'idle'},
+                  'canAcceptDirectInput': True}
+        source = 'import json, sys\nthread = ' + repr(thread) + """
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get('method')
+    if method == 'initialized':
+        continue
+    if method == 'turn/start':
+        print(json.dumps({'id': 'approval', 'method': 'item/commandExecution/requestApproval', 'params': {}}), flush=True)
+        continue
+    result = {}
+    if method == 'thread/read':
+        result = {'thread': thread}
+    elif method == 'thread/loaded/list':
+        result = {'data': [thread['id']]}
+    print(json.dumps({'id': request['id'], 'result': result}), flush=True)
+"""
+        proxy = self.create_proxy(source)
+        output = io.StringIO()
+        with patch.object(FOLLOWUP, 'Proxy', return_value=proxy), \
+                patch.object(proxy, '_write', wraps=proxy._write) as write, \
+                contextlib.redirect_stdout(output):
+            code = FOLLOWUP.main(['send', '--thread', THREAD, '--cwd', str(root),
+                                  '--codex-home', str(root), '--message-file', str(message),
+                                  '--receipt', str(receipt)])
+        self.assertEqual(2, code)
+        self.assertEqual('unverified', json.loads(output.getvalue())['status'])
+        self.assertTrue(receipt.is_file())
+        emitted = [call.args[0] for call in write.call_args_list]
+        self.assertFalse(any(item.get('id') == 'approval' for item in emitted))
+        self.assertEqual(1, sum(item.get('method', '').startswith('turn/') for item in emitted))
         self.assertIsNotNone(proxy.process.poll())
 
     def test_disconnect_error_is_not_delivery(self):
