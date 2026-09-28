@@ -78,12 +78,14 @@ test-caught while it is built, then clerical to commit and push. Route each phas
 in the rung its hardest phase needed is the waste this ladder exists to stop, and running the design phase
 in the rung its cleanup needed is how a bad design gets built efficiently.
 
-Lane selection does not transfer task ownership. After planning the same authorized work in the current
-checkout, the parent continues and may give a bounded implementation or review task to a lane agent.
+Lane selection does not itself transfer task ownership. For small and medium plans, the parent normally
+continues in the same checkout and may give a bounded implementation or review task to a lane agent.
 Give that agent explicit path and responsibility ownership, avoid overlapping writers, and reconcile its
 result in the parent. A small follow-up can stay with the parent. If delegation is unavailable, use the
 current owner's supported fallback; do not open an independent session solely to change model or cost.
-An actual transfer follows the `engineering:plans` context criteria, not a lane or phase boundary.
+For a massive plan whose design is a substantial phase, `engineering:plans` normally transfers execution
+to a fresh harness after a durable phased checkpoint. That decision is about the work and its context,
+not a lane change.
 
 ## Where a lane is applied
 

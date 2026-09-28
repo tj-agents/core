@@ -61,9 +61,10 @@ govern:
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
-Completing a plan in the current owning session does not call for this launcher; continue the same
-authorized work there, directly or with a bounded lane agent. Use the `engineering:plans` transfer
-criteria to decide whether another session should own the work.
+After a small or medium plan, the current owner normally continues directly or with a bounded lane agent;
+planning alone does not call for this launcher. After a massive plan that was a substantial design phase,
+`engineering:plans` normally transfers execution to one fresh harness from a durable phased plan, even in
+the same checkout. Apply its context criteria and judgment to cases between those sizes.
 
 `-Frontier` selects the tier above the ladder from the same table. **Pass it only when the user
 explicitly asked for that tier or its model by name.** No lane resolves to the tier — L1 prices the same
