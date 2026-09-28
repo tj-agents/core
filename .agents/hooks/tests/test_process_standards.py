@@ -219,6 +219,41 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("It does not select or perform a transfer", formatting)
         self.assertIn("`engineering:handoff` performs the selected transfer", formatting)
 
+    def test_planning_to_execution_uses_scale_and_context(self):
+        lanes = " ".join(authored_skill("lanes").read_text(encoding="utf-8").split())
+        plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
+        execution = " ".join(
+            authored_skill("plan-execution").read_text(encoding="utf-8").split()
+        )
+        self.assertIn("Lane selection does not itself transfer task ownership", lanes)
+        self.assertIn("small and medium plans, the parent normally continues", lanes)
+        self.assertIn("explicit path and responsibility ownership", lanes)
+        self.assertIn("A small follow-up can stay with the parent", lanes)
+        self.assertIn("If delegation is unavailable", lanes)
+        self.assertIn("Continue in the current context by default for small and medium plans", plans)
+        self.assertIn("parent may delegate bounded work", plans)
+        self.assertIn("massive plan whose design was a substantial phase", plans)
+        self.assertIn("normally hand execution to one fresh harness", plans)
+        self.assertIn("even when the checkout stays the same", plans)
+        self.assertIn("Judge plans between these cases", plans)
+        self.assertIn("plan length alone is not a mechanical threshold", plans)
+        self.assertIn("changes owner, repository, worktree, PR, or logical workstream", plans)
+        self.assertIn("Do not transfer merely because a phase or commit completed", execution)
+        self.assertIn("A massive plan whose substantial design phase", execution)
+
+        for host in ("codex", "claude"):
+            with self.subTest(host=host):
+                launcher = (
+                    self.root / f".agents/machine/handoff-{host}/SKILL.md"
+                ).read_text(encoding="utf-8")
+                flat_launcher = " ".join(launcher.split())
+                self.assertIn("After a small or medium plan", flat_launcher)
+                self.assertIn("planning alone does not call for this launcher", flat_launcher)
+                self.assertIn("After a massive plan", flat_launcher)
+                self.assertIn("normally transfers execution to one fresh harness", flat_launcher)
+                self.assertIn("even in the same checkout", flat_launcher)
+                self.assertNotIn("Split a job that designs and then delivers", launcher)
+
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
         authoring = authored_skill("plan-authoring").read_text(
