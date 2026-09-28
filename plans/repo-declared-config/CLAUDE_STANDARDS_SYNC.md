@@ -55,9 +55,15 @@ Authorized scope: implementation, tests, live acceptance on this PC, review, PR 
    - Output: silent when current; a start and a result line per updated marketplace; one warning
      when a remote is unreachable or an update fails, naming the version the session will load.
      Launch continues.
-2. Launch integration: the profile `claude` function in `shell/agents.ps1`, the `handoff-claude`
-   and `open-claude` launchers through `agent-cli.ps1`, and `cli-session-recovery` resume. Each runs
-   the sync before starting a session; plain subcommands such as `claude plugin` skip it.
+2. Launch integration: the typed `claude` command, the `handoff-claude` and `open-claude`
+   launchers through `agent-cli.ps1`, and `cli-session-recovery` resume. Each runs the sync before
+   starting a session; plain subcommands such as `claude plugin` skip it.
+   - Tommy, 2026-09-28: typing `claude` must refresh with no `git pull` or other manual step on any
+     developer's machine. The `claude` function therefore ships in the machine plugin
+     (`resources/machine/scripts/claude-profile.ps1`), not in a checkout. A machine SessionStart hook
+     keeps one fixed, marked block in both PowerShell profiles that loads that script from the
+     currently installed `machine@base-agents`, so every later terminal gets the wrapper and the sync
+     updates the wrapper along with the rest of the plugin. `BASE_AGENTS_CLAUDE_PROFILE=off` opts out.
 3. Running sessions: the host's orphan retention keeps loaded hook paths valid. The sync deletes
    nothing, and `prune_plugin_cache.py --apply` keeps host-orphaned directories younger than
    14 days so it never shortens that window.
@@ -74,8 +80,9 @@ Authorized scope: implementation, tests, live acceptance on this PC, review, PR 
 
 - Offline, or a private remote without a stored credential: the session loads what is installed
   and the warning says so.
-- Launches that bypass the integrations (desktop app, IDE extension, a raw `claude.exe`) keep
-  host behaviour.
+- Launches that bypass the integrations (desktop app, IDE extension, a raw `claude.exe`, `cmd` or
+  Git Bash) keep host behaviour. On a new machine the first session after installing the plugin
+  wires the profile; terminals opened after that refresh first.
 - A committed project marketplace source or ref change is applied by Claude after workspace trust,
   in the background; that first session needs `/reload-plugins`.
 - A plugin whose update needs command or `headersHelper` acceptance is reported, not accepted.
