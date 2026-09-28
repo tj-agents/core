@@ -140,6 +140,7 @@
             "auto-memory",
             "bootstrap-capabilities",
             "clip",
+            "followup-codex",
             "handoff-claude",
             "handoff-codex",
             "last-conversation",
@@ -164,7 +165,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:a2717ca7bc75c17831b4d24fcc701ae3747ea269af04d3b7b3dae23670ac1cc4",
+          "digest": "sha256:b4b4b1e755e2edaefc88370d07d44be5ae86d29c19ed2215c62424fb4ebf8eb0",
           "digest_excludes": [
             "catalog/catalog.json"
           ]
