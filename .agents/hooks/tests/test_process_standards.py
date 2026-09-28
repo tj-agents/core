@@ -219,6 +219,30 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("It does not select or perform a transfer", formatting)
         self.assertIn("`engineering:handoff` performs the selected transfer", formatting)
 
+    def test_lane_changes_keep_same_work_in_the_parent_session(self):
+        lanes = " ".join(authored_skill("lanes").read_text(encoding="utf-8").split())
+        plans = " ".join(authored_skill("plans").read_text(encoding="utf-8").split())
+        execution = " ".join(
+            authored_skill("plan-execution").read_text(encoding="utf-8").split()
+        )
+        self.assertIn("Lane selection does not transfer task ownership", lanes)
+        self.assertIn("parent continues", lanes)
+        self.assertIn("explicit path and responsibility ownership", lanes)
+        self.assertIn("A small follow-up can stay with the parent", lanes)
+        self.assertIn("If delegation is unavailable", lanes)
+        self.assertIn("continue in the current context by default", plans.lower())
+        self.assertIn("Do not transfer merely because a phase or commit completed", execution)
+
+        for host in ("codex", "claude"):
+            with self.subTest(host=host):
+                launcher = (
+                    self.root / f".agents/machine/handoff-{host}/SKILL.md"
+                ).read_text(encoding="utf-8")
+                flat_launcher = " ".join(launcher.split())
+                self.assertIn("does not call for this launcher", flat_launcher)
+                self.assertIn("engineering:plans` transfer criteria", flat_launcher)
+                self.assertNotIn("Split a job that designs and then delivers", launcher)
+
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
         authoring = authored_skill("plan-authoring").read_text(
