@@ -97,7 +97,7 @@ def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, dict], 
         for marketplace, release in sorted(sources.items())
         for plugin in release["plugins"]
     }
-    return sources, dict(sorted(identities.items())), sorted(claude_allow), [codex_rules[key] for key in sorted(codex_rules)]
+    return dict(sorted(sources.items())), dict(sorted(identities.items())), sorted(claude_allow), [codex_rules[key] for key in sorted(codex_rules)]
 
 
 def claude_settings(path: Path, sources: dict[str, dict], identities: dict[str, bool], allow: list[str]) -> str:
