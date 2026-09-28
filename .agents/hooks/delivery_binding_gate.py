@@ -38,6 +38,7 @@ import sys
 from pathlib import Path
 
 from hook_runtime import (
+    CommandTimeout,
     NETWORK_COMMAND_TIMEOUT_SECONDS,
     claim_invocation,
     own_payload_root,
@@ -139,24 +140,27 @@ def workflow_ops(root):
 
 
 def bind(root, pr):
-    completed = run_command(
-        [
-            sys.executable,
-            "-B",
-            str(workflow_ops(root)),
-            "--root",
-            str(root),
-            "--workflow-run-id",
-            f"delivery-bind-pr-{pr}",
-            "delivery-bind",
-            "--pr",
-            str(pr),
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(root),
-        timeout=NETWORK_COMMAND_TIMEOUT_SECONDS,
-    )
+    try:
+        completed = run_command(
+            [
+                sys.executable,
+                "-B",
+                str(workflow_ops(root)),
+                "--root",
+                str(root),
+                "--workflow-run-id",
+                f"delivery-bind-pr-{pr}",
+                "delivery-bind",
+                "--pr",
+                str(pr),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(root),
+            timeout=NETWORK_COMMAND_TIMEOUT_SECONDS,
+        )
+    except CommandTimeout as error:
+        return None, str(error)
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "").strip()[:800]
         return None, detail or f"delivery-bind exited {completed.returncode}"

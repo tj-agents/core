@@ -1164,6 +1164,8 @@ def query(argv):
     owed, violations = {}, []
     for given in paths:
         rel = repo_relative(given, cwd)
+        if rel is None:
+            continue
         try:
             content = (root / rel).read_text(encoding="utf-8", errors="replace")
         except OSError:
