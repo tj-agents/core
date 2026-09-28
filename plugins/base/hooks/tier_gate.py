@@ -302,7 +302,7 @@ def statement(root, found=None):
     if not applicable and not blocked:
         return ""
 
-    lines = ["base:stack-tiers - which standards apply in this project"]
+    lines = ["Tier gate - which standards apply in this project"]
     if ubiquitous:
         names = ", ".join(declaration.tier for declaration in ubiquitous)
         lines.append("Ubiquitous, always applies: " + names + ".")
@@ -348,7 +348,7 @@ def refusal(declaration, subject, root):
     patterns = ", ".join(str(marker) for marker in markers) or "its declared markers"
     owner = declaration.owner_repositories[0] if declaration.owner_repositories else declaration.id
     return (
-        "base:stack-tiers blocked " + subject + ".\n"
+        "Tier gate blocked " + subject + ".\n"
         "It belongs to the `" + declaration.tier + "` tier, which applies only to projects with "
         + declaration.stack + ". " + str(root) + " has no match for " + patterns + ", so that "
         "standard describes code this project does not contain. Use the ubiquitous core standards "
@@ -392,7 +392,7 @@ def main():
     arguments = parser.parse_args()
 
     if sys.version_info < (3, 9):
-        print("stack-tiers: Python 3.9 or newer is required.", file=sys.stderr)
+        print("tier gate: Python 3.9 or newer is required.", file=sys.stderr)
         return 0
 
     emitting = arguments.session_context or arguments.instruction_fragment
@@ -417,7 +417,7 @@ def main():
         if not context:
             return 0
         if arguments.instruction_fragment:
-            print("<!-- BEGIN base:stack-tiers -->\n" + context + "\n<!-- END base:stack-tiers -->")
+            print("<!-- BEGIN tier-gate -->\n" + context + "\n<!-- END tier-gate -->")
         else:
             print(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "SessionStart", "additionalContext": context

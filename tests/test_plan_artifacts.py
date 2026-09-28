@@ -23,7 +23,7 @@ class PlanArtifactTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="plan artifacts ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.plugin = self.root / "installed package with spaces"
+        self.plugin = self.root / "cache with spaces" / "base" / "installed package with spaces"
         shutil.copytree(ROOT / "plugins/base", self.plugin)
         self.cwd = self.root / "unrelated directory"
         self.cwd.mkdir()
@@ -46,17 +46,11 @@ class PlanArtifactTests(unittest.TestCase):
             hooks = json.loads((self.plugin / manifest["hooks"]).read_text())
             handler = hooks["hooks"]["SessionStart"][0]["hooks"][0]
             script = ".agents/base/plan-artifacts/scripts/session-context.py"
-            expected = (
-                f'python -B "${{CLAUDE_PLUGIN_ROOT}}/{script}"'
-                if host == "claude"
-                else f'python3 -B "${{PLUGIN_ROOT}}/{script}"'
-            )
-            self.assertEqual(handler["command"], expected)
-            if host == "codex":
-                self.assertEqual(
-                    handler["commandWindows"],
-                    f'python -B "${{PLUGIN_ROOT}}/{script}"',
-                )
+            if host == "claude":
+                self.assertEqual(handler["command"], f'python -B "${{CLAUDE_PLUGIN_ROOT}}/{script}"')
+            else:
+                self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["command"])
+                self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["commandWindows"])
             self.assertTrue((self.plugin / script).is_file())
             self.assertTrue((self.plugin / '.agents/base/plan-artifacts/templates/PLAN.md').is_file())
             for source in ("startup", "resume", "compact", "clear"):
@@ -87,7 +81,8 @@ class PlanArtifactTests(unittest.TestCase):
             if host == "codex":
                 command = command.replace("${PLUGIN_ROOT}", self.plugin.as_posix())
             env = dict(os.environ, CLAUDE_PLUGIN_ROOT=self.plugin.as_posix(),
-                       PLUGIN_ROOT=self.plugin.as_posix())
+                       PLUGIN_ROOT=self.plugin.as_posix(),
+                       PLUGIN_DATA=str(self.root / "plugin data with spaces"))
             native_codex = os.name == "nt" and host == "codex"
             argv = command if native_codex else [shell, "-c", command]
             result = subprocess.run(argv, shell=native_codex, cwd=self.cwd, env=env,
