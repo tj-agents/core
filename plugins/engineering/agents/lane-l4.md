@@ -1,6 +1,7 @@
 ---
 name: lane-l4
-description: Bounded delegated work at L4.
+description: Runs one delegated task at lane L4. Ordinary specified work that a compiler or a test suite will catch, delivery included.
+kind: lane
 model: claude-sonnet-5
 effort: high
 tools: Read, Glob, Grep, Write, Edit, Bash

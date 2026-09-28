@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "plugin": "base-agents/machine",
+  "source_roots": [
+    ".agents/machine"
+  ],
+  "source_excludes": [
+    ".agents/catalog/catalog.json"
+  ],
+  "source_digest": "sha256:1e8afd98467aadd3704ba51f29715cc5eb20d82bbcdbb59f48e58403eb98954d",
+  "requires": {
+    "marketplaces": [
+      {
+        "id": "base-agents",
+        "repository": "tj-agents/core"
+      }
+    ],
+    "plugins": [
+      "base-agents/base",
+      "base-agents/machine"
+    ],
+    "hooks": [
+      {
+        "path": ".agents/machine/peer-cli/scripts/register_session.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "resources/machine/scripts/prune_plugin_cache.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "resources/machine/scripts/reap_orphans.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      }
+    ],
+    "permissions": {
+      "claude_allow": [],
+      "codex_prefix_rules": []
+    }
+  }
+}

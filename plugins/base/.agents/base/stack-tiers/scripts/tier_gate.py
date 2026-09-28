@@ -10,8 +10,8 @@ per consuming repository. Both were ruled out: the rule has to travel inside the
 machine picks it up by syncing, with nothing hand-placed anywhere.
 
 So each tier ships the condition itself, as `tier.json` at the root of its own plugin payload, and
-this script reads whatever declarations are installed. A tier repository added later - `cpp` is not
-even cloned yet - is gated the moment it is installed, with no change here and no release of `base`.
+this script reads whatever declarations are installed. A tier repository added later is gated
+the moment it is installed, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
@@ -25,8 +25,8 @@ Two modes, one detection:
   cache path *and* `SKILL.md` is the same event in the other host's shape. Matching only Claude's
   shape would be a gate that looks wired while allowing every Codex read.
 
-A tier's own authoring repository is exempt. `dotagents` contains no .NET, so without that exemption
-the gate would refuse to read the very standards being edited there.
+A tier's own authoring repository is exempt, even when its source files do not contain the
+stack's normal project markers.
 
 Contract: exit 0 allows, exit 2 blocks with stderr fed back to the agent. Anything unexpected exits 0.
 A gate that wedges a session is worse than a gate that misses one call.

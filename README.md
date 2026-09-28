@@ -16,7 +16,7 @@ in `/hooks`; a fresh missing-marketplace write probe is required before claiming
 coverage limit is tracked in `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents
 a generated native-instruction fallback.
 
-The split packages form the **2.1.15** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.16** release candidate. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
@@ -31,9 +31,9 @@ closure.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines this source/adapter/distribution boundary.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared open taxonomy used by every agent marketplace repo.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
-- `.agents/catalog/catalog.json` records immutable cross-repository releases and package digests. The generated
-  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index; project selections live in one
-  `.agents/capabilities.lock.json` governed by the shipped lock schema.
+- `.agents/catalog/catalog.json` records this repository's immutable releases and package digests. The generated
+  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers selecting other standards
+  commit a composed catalog of owner-published release records beside their capability lock.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.

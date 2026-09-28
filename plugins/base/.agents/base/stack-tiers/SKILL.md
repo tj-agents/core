@@ -7,6 +7,13 @@ domain: behavior
 
 # Stack tiers
 
+Each standards package declares its own required harness in a shipped manifest: plugins,
+marketplaces, hooks, and host permissions needed by its skills and workflows. Update that
+manifest in the same change as a new or changed requirement. A consuming repository commits
+the composed catalog and generated host settings for its selected packages; local machine
+configuration cannot supply a missing standard. The package owner checks its declaration,
+and the consumer checks settings drift. Core owns only its own package declarations.
+
 The corpus is layered. `base`, `engineering` and `machine` are stack-agnostic process, method and
 behavior, so they are **ubiquitous**: they apply in every project, on every machine. `dotnet`, `react`
 and `cpp` are **stack tiers**. A stack tier applies only where that stack is present, because its
@@ -31,11 +38,11 @@ installed. A tier repository cloned later is gated the moment it is installed, w
 ```json
 {
   "schema_version": 1,
-  "tier": "dotnet",
-  "stack": ".NET",
+  "tier": "example-stack",
+  "stack": "Example Stack",
   "applies": "stack-present",
-  "owner_repository": "tomjseery/dotagents",
-  "detect": { "globs": ["*.sln", "*.csproj"], "files": ["global.json"] }
+  "owner_repository": "example-org/example-standards",
+  "detect": { "globs": ["*.exampleproj"], "files": ["example.config"] }
 }
 ```
 
@@ -48,8 +55,8 @@ name someone chose.
 Plugin and marketplace identity are taken from the installed path, so a declaration cannot claim to be
 a plugin it is not, and the skill prefix the gate blocks is always the plugin's real name.
 
-`owner_repository` exempts the tier's own authoring repository. `dotagents` contains no .NET, so
-without it the gate would refuse to read the standards being edited there.
+`owner_repository` exempts the tier's own authoring repository when its source files do not
+contain the stack's normal project markers.
 
 ## What the gate does
 
