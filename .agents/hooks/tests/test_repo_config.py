@@ -51,7 +51,7 @@ class RepoConfigTests(unittest.TestCase):
         self.assertEqual("v2.1.16", c["extraKnownMarketplaces"]["base-agents"]["source"]["ref"])
         self.assertEqual(3, len(c["enabledPlugins"]))
         self.assertNotIn("old@other", c["enabledPlugins"])
-        self.assertEqual(2, len(c["permissions"]["allow"]))
+        self.assertEqual([], c["permissions"]["allow"])
         d = codex.read_text(encoding="utf-8")
         self.assertIn('model = "test"', d)
         self.assertIn('source = "https://github.com/tj-agents/core.git"', d)
@@ -133,7 +133,7 @@ class RepoConfigTests(unittest.TestCase):
                 "plugins": ["base-agents/base"],
                 "hooks": [],
                 "permissions": {
-                    "claude_allow": [r"PowerShell(& *\.claude\plugins\cache\base-agents\machine\*\handoff-codex\scripts\launch-codex.ps1 *)", "Bash(sample safe)"],
+                    "claude_allow": ["Bash(sample safe)"],
                     "codex_prefix_rules": [rule],
                 },
             },
@@ -142,7 +142,7 @@ class RepoConfigTests(unittest.TestCase):
         repo_config.run(self.lock, CATALOG, "write")
         self.assertEqual([], repo_config.run(self.lock, CATALOG, "check"))
         claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
-        self.assertEqual(3, len(claude["permissions"]["allow"]))
+        self.assertEqual(1, len(claude["permissions"]["allow"]))
         path = self.root / ".codex/rules/agent-harness.rules"
         self.assertIn('decision = "allow"', path.read_text(encoding="utf-8"))
         overlay.unlink()

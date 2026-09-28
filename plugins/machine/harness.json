@@ -42,10 +42,7 @@
       }
     ],
     "permissions": {
-      "claude_allow": [
-        "PowerShell(& *\\.claude\\plugins\\cache\\base-agents\\machine\\*\\handoff-codex\\scripts\\launch-codex.ps1 *)",
-        "PowerShell(& *\\.claude\\plugins\\cache\\base-agents\\machine\\*\\handoff-claude\\scripts\\launch-claude.ps1 *)"
-      ],
+      "claude_allow": [],
       "codex_prefix_rules": []
     }
   }
