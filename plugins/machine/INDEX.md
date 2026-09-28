@@ -5,6 +5,7 @@ Generated from canonical `.agents/` definitions.
 - `auto-memory` — utility — `.agents/machine/auto-memory/SKILL.md`
 - `bootstrap-capabilities` — utility — `.agents/machine/bootstrap-capabilities/SKILL.md`
 - `clip` — utility — `.agents/machine/clip/SKILL.md`
+- `followup-codex` — utility — `.agents/machine/followup-codex/SKILL.md`
 - `handoff-claude` — utility — `.agents/machine/handoff-claude/SKILL.md`
 - `handoff-codex` — utility — `.agents/machine/handoff-codex/SKILL.md`
 - `last-conversation` — utility — `.agents/machine/last-conversation/SKILL.md`

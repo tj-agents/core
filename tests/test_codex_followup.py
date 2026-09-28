@@ -1,0 +1,330 @@
+import contextlib
+import hashlib
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from unittest.mock import patch
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location(
+    'codex_followup', ROOT / '.agents/machine/followup-codex/scripts/codex_followup.py'
+)
+FOLLOWUP = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(FOLLOWUP)
+THREAD = '00000000-0000-4000-8000-000000000001'
+CLIENT = '00000000-0000-4000-8000-000000000002'
+
+
+class Session:
+    def __init__(self, receipt, state='active', delivered=True):
+        self.deadline = time.monotonic() + 0.2
+        self.receipt = receipt
+        self.calls = []
+        self.thread = {'id': THREAD, 'cwd': receipt['cwd'], 'status': {'type': state},
+                       'canAcceptDirectInput': True}
+        self.loaded = [THREAD]
+        self.delivered = delivered
+        self.submitted = False
+        self.item_client = CLIENT
+        self.fail_submit = False
+        self.item_pages = False
+        self.turns = [{'id': 'active-turn', 'status': 'inProgress'}]
+
+    def request(self, method, params):
+        self.calls.append((method, params))
+        if method == 'thread/read':
+            return {'thread': self.thread}
+        if method == 'thread/loaded/list':
+            return {'data': self.loaded}
+        if method == 'thread/turns/list':
+            return {'data': self.turns}
+        if method in ('turn/steer', 'turn/start'):
+            self.submitted = True
+            self.item_client = params['clientUserMessageId']
+            if self.fail_submit:
+                raise FOLLOWUP.FollowupError('Disconnected after submission')
+            return {'turnId': 'active-turn'}
+        if method == 'thread/items/list':
+            if self.item_pages and not params.get('cursor'):
+                return {'data': [{'turnId': 'x', 'item': {'type': 'agentMessage',
+                         'id': 'agent', 'text': CLIENT}}], 'nextCursor': 'next'}
+            data = [{'turnId': 'active-turn', 'item': {'type': 'userMessage',
+                     'clientId': self.item_client, 'id': 'received',
+                     'content': [{'type': 'text', 'text': 'exact message'}]}}]
+            return {'data': data if self.delivered else []}
+        raise AssertionError(method)
+
+    def initialize(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class FollowupTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='followup tests ')
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.receipt_path = self.root / 'receipt.json'
+        self.message = self.root / 'message.txt'
+        self.message.write_text('exact message', encoding='utf-8')
+        self.receipt = {'version': 1, 'thread_id': THREAD, 'client_id': CLIENT,
+                        'cwd': FOLLOWUP.path_key(self.root),
+                        'codex_home': FOLLOWUP.path_key(self.root),
+                        'message_sha256': hashlib.sha256(b'exact message').hexdigest()}
+
+    def submit(self, proxy):
+        return FOLLOWUP.send(proxy, self.receipt, self.receipt_path, 'exact message')
+
+    def test_active_session_steers_exact_turn_and_verifies_client_id(self):
+        proxy = Session(self.receipt)
+        result = self.submit(proxy)
+        self.assertEqual('delivered', result['status'])
+        self.assertFalse(result['acknowledged'])
+        mutation = [call for call in proxy.calls if call[0].startswith('turn/')]
+        self.assertEqual([('turn/steer', {
+            'threadId': THREAD, 'clientUserMessageId': CLIENT,
+            'expectedTurnId': 'active-turn',
+            'input': [{'type': 'text', 'text': 'exact message', 'text_elements': []}],
+        })], mutation)
+        self.assertEqual(self.receipt, json.loads(self.receipt_path.read_text()))
+
+    def test_idle_session_uses_same_loaded_thread_without_overrides(self):
+        proxy = Session(self.receipt, state='idle')
+        self.assertEqual('delivered', self.submit(proxy)['status'])
+        mutations = [call for call in proxy.calls if call[0].startswith('turn/')]
+        self.assertEqual('turn/start', mutations[0][0])
+        self.assertEqual({'threadId', 'clientUserMessageId', 'input'}, set(mutations[0][1]))
+        self.assertFalse(any(call[0] in ('thread/start', 'thread/resume') for call in proxy.calls))
+
+    def test_queue_acceptance_without_recipient_message_is_not_delivery(self):
+        result = self.submit(Session(self.receipt, delivered=False))
+        self.assertEqual('accepted', result['status'])
+        self.assertFalse(result['acknowledged'])
+
+    def test_wrong_thread_or_cwd_prevents_submission(self):
+        for field, value in [('id', CLIENT), ('cwd', str(self.root / 'different'))]:
+            with self.subTest(field=field):
+                proxy = Session(self.receipt)
+                proxy.thread[field] = value
+                with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'does not match'):
+                    self.submit(proxy)
+                self.assertFalse(proxy.submitted)
+                self.assertFalse(self.receipt_path.exists())
+
+    def test_unloaded_or_unsupported_recipient_cannot_create_an_owner(self):
+        for variant in ('unloaded', 'unsupported', 'missing-capability', 'bad-status'):
+            with self.subTest(variant=variant):
+                proxy = Session(self.receipt)
+                if variant == 'unloaded':
+                    proxy.loaded = []
+                elif variant == 'unsupported':
+                    proxy.thread['canAcceptDirectInput'] = False
+                elif variant == 'missing-capability':
+                    del proxy.thread['canAcceptDirectInput']
+                else:
+                    proxy.thread['status']['type'] = 'systemError'
+                with self.assertRaises(FOLLOWUP.FollowupError):
+                    self.submit(proxy)
+                self.assertFalse(proxy.submitted)
+                self.assertFalse(self.receipt_path.exists())
+
+    def test_ambiguous_active_turn_is_rejected_before_receipt(self):
+        proxy = Session(self.receipt)
+        proxy.turns.append({'id': 'other-turn', 'status': 'inProgress'})
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'exactly one'):
+            self.submit(proxy)
+        self.assertFalse(proxy.submitted)
+        self.assertFalse(self.receipt_path.exists())
+
+    def test_receipt_is_durable_before_transport_and_retry_never_resends(self):
+        proxy = Session(self.receipt, delivered=False)
+        proxy.fail_submit = True
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'Disconnected'):
+            self.submit(proxy)
+        self.assertTrue(self.receipt_path.is_file())
+        retry = Session(self.receipt, delivered=False)
+        result = self.submit(retry)
+        self.assertEqual('unverified', result['status'])
+        self.assertFalse(retry.submitted)
+
+    def test_foreign_receipt_prevents_a_concurrent_sender(self):
+        foreign = dict(self.receipt, message_sha256='different')
+        self.receipt_path.write_text(json.dumps(foreign))
+        proxy = Session(self.receipt)
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'different target'):
+            self.submit(proxy)
+        self.assertFalse(proxy.submitted)
+
+    def test_pagination_finds_user_message_but_not_an_assistant_quote(self):
+        proxy = Session(self.receipt)
+        proxy.item_pages = True
+        self.assertEqual('delivered', FOLLOWUP.delivery(proxy, self.receipt)['status'])
+        proxy.item_client = 'someone-else'
+        self.assertIsNone(FOLLOWUP.delivery(proxy, self.receipt))
+
+    def test_matching_client_id_with_wrong_content_is_not_delivery(self):
+        proxy = Session(self.receipt)
+        receipt = dict(self.receipt, message_sha256='different')
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'different message'):
+            FOLLOWUP.delivery(proxy, receipt)
+
+    def test_turn_race_rejection_never_falls_back_to_another_send(self):
+        class RacingSession(Session):
+            def request(self, method, params):
+                if method == 'turn/steer':
+                    self.calls.append((method, params))
+                    raise FOLLOWUP.Rejected('Expected turn is no longer active')
+                return super().request(method, params)
+        proxy = RacingSession(self.receipt)
+        code, result = self.run_main(self.arguments(), proxy)
+        self.assertEqual(2, code)
+        self.assertEqual('rejected', result['status'])
+        self.assertEqual(1, sum(method.startswith('turn/') for method, _ in proxy.calls))
+        self.assertTrue(self.receipt_path.exists())
+
+    def test_cyclic_pagination_is_an_error(self):
+        class Cyclic:
+            def request(self, method, params):
+                return {'data': [], 'nextCursor': 'again'}
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'repeated'):
+            list(FOLLOWUP.pages(Cyclic(), 'thread/items/list', {}))
+
+    def test_windows_extended_paths_match(self):
+        self.assertEqual(FOLLOWUP.path_key(r'\\?\C:\Work\Repo'),
+                         FOLLOWUP.path_key('c:/work/repo/'))
+        self.assertEqual(FOLLOWUP.path_key(r'\\?\UNC\Server\Share\Repo'),
+                         FOLLOWUP.path_key(r'\\server\share\repo'))
+
+    def run_main(self, arguments, proxy):
+        output = io.StringIO()
+        with patch.object(FOLLOWUP, 'Proxy', return_value=proxy), contextlib.redirect_stdout(output):
+            code = FOLLOWUP.main(arguments)
+        return code, json.loads(output.getvalue())
+
+    def arguments(self):
+        return ['--timeout', '0.1', 'send', '--thread', THREAD, '--cwd', str(self.root),
+                '--codex-home', str(self.root), '--message-file', str(self.message),
+                '--receipt', str(self.receipt_path)]
+
+    def test_cli_retry_checks_history_without_writing_again(self):
+        self.receipt_path.write_text(json.dumps(self.receipt))
+        proxy = Session(self.receipt)
+        code, result = self.run_main(self.arguments(), proxy)
+        self.assertEqual(0, code)
+        self.assertEqual('delivered', result['status'])
+        self.assertFalse(proxy.submitted)
+
+    def test_status_is_read_only(self):
+        self.receipt_path.write_text(json.dumps(self.receipt))
+        original = self.receipt_path.read_bytes()
+        proxy = Session(self.receipt, delivered=False)
+        code, result = self.run_main(['status', '--receipt', str(self.receipt_path)], proxy)
+        self.assertEqual(2, code)
+        self.assertEqual('unverified', result['status'])
+        self.assertFalse(proxy.submitted)
+        self.assertEqual(original, self.receipt_path.read_bytes())
+
+    def test_unavailable_proxy_never_claims_sent(self):
+        output = io.StringIO()
+        with patch.object(FOLLOWUP, 'Proxy', side_effect=OSError('No proxy')), \
+                contextlib.redirect_stdout(output):
+            code = FOLLOWUP.main(self.arguments())
+        result = json.loads(output.getvalue())
+        self.assertEqual(2, code)
+        self.assertEqual('unavailable', result['status'])
+        self.assertIn('paste', result['next_action'])
+        self.assertFalse(self.receipt_path.exists())
+
+    def test_message_change_with_same_receipt_is_rejected(self):
+        self.receipt_path.write_text(json.dumps(self.receipt))
+        self.message.write_text('changed', encoding='utf-8')
+        proxy = Session(self.receipt)
+        code, result = self.run_main(self.arguments(), proxy)
+        self.assertEqual(2, code)
+        self.assertIn('different target', result['detail'])
+        self.assertEqual([], proxy.calls)
+
+
+class ProxyTests(unittest.TestCase):
+    def create_proxy(self, source, timeout=3):
+        temp = tempfile.TemporaryDirectory(prefix='followup proxy ')
+        self.addCleanup(temp.cleanup)
+        script = Path(temp.name) / 'proxy.py'
+        script.write_text(source, encoding='utf-8')
+        original = subprocess.Popen
+        calls = []
+
+        def launch(command, **kwargs):
+            calls.append((command, kwargs['env']))
+            return original([sys.executable, '-u', str(script)], **kwargs)
+
+        with patch.object(FOLLOWUP.subprocess, 'Popen', side_effect=launch):
+            proxy = FOLLOWUP.Proxy('codex-native', temp.name, time.monotonic() + timeout)
+        self.addCleanup(proxy.close)
+        self.assertEqual(['codex-native', 'app-server', 'proxy'], calls[0][0])
+        self.assertEqual(temp.name, calls[0][1]['CODEX_HOME'])
+        return proxy
+
+    def test_real_stdio_framing_initialization_and_server_requests(self):
+        proxy = self.create_proxy('''import json, sys
+for line in sys.stdin:
+    request = json.loads(line)
+    if request.get('method') == 'initialize':
+        print(json.dumps({'id': request['id'], 'result': {}}), flush=True)
+    elif request.get('method') == 'probe':
+        print(json.dumps({'method': 'notification', 'params': {}}), flush=True)
+        print(json.dumps({'id': 'server-request', 'method': 'approval', 'params': {}}), flush=True)
+        rejection = json.loads(sys.stdin.readline())
+        print(json.dumps({'id': request['id'], 'result': {'rejection': rejection}}), flush=True)
+''')
+        proxy.initialize()
+        result = proxy.request('probe', {})
+        self.assertEqual(-32601, result['rejection']['error']['code'])
+        proxy.close()
+        self.assertIsNotNone(proxy.process.poll())
+
+    def test_disconnect_error_is_not_delivery(self):
+        proxy = self.create_proxy('pass')
+        with self.assertRaises(FOLLOWUP.FollowupError):
+            proxy.initialize()
+
+    def test_unresponsive_existing_proxy_is_bounded_and_cleaned_up(self):
+        proxy = self.create_proxy('import time; time.sleep(30)', timeout=0.1)
+        started = time.monotonic()
+        with self.assertRaisesRegex(FOLLOWUP.FollowupError, 'Timed out'):
+            proxy.initialize()
+        proxy.close()
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertIsNotNone(proxy.process.poll())
+
+    def test_expired_deadline_does_not_write_request(self):
+        proxy = self.create_proxy('import time; time.sleep(30)')
+        proxy.deadline = time.monotonic() - 1
+        with patch.object(proxy, '_write') as write:
+            with self.assertRaises(FOLLOWUP.FollowupError):
+                proxy.request('turn/start', {})
+        write.assert_not_called()
+
+    def test_rpc_rejection_and_malformed_output_fail_explicitly(self):
+        for source in [
+            "import json, sys; r=json.loads(sys.stdin.readline()); print(json.dumps({'id':r['id'],'error':{'code':-1,'message':'unsupported'}}),flush=True)",
+            "print('not JSON',flush=True)",
+        ]:
+            with self.subTest(source=source):
+                proxy = self.create_proxy(source)
+                with self.assertRaises(FOLLOWUP.FollowupError):
+                    proxy.initialize()
+
+
+if __name__ == '__main__':
+    unittest.main()
