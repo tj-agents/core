@@ -25,8 +25,7 @@
           "skills": [
             "agent-files",
             "cd",
-            "plan-artifacts",
-            "stack-tiers"
+            "plan-artifacts"
           ],
           "dependencies": {
             "required": [],
@@ -38,7 +37,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:cd974b156aa456b28f4c80ce3c0a88f6b56957c187bf18ba76ac15191749c6f4",
+          "digest": "sha256:11782586d67644f84a6396e2649619f79a14a75a99b14e385bd11c81b58927cd",
           "harness": {
             "marketplaces": [
               {
@@ -65,13 +64,6 @@
                 ]
               },
               {
-                "path": ".agents/base/stack-tiers/scripts/tier_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
                 "path": "hooks/pre_tool_use_adapter.py",
                 "hosts": [
                   "codex"
@@ -79,6 +71,13 @@
               },
               {
                 "path": "hooks/skill_router.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/tier_gate.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -148,6 +147,7 @@
             "review-lifecycle",
             "session-guidance",
             "skill-routes",
+            "stack",
             "sync",
             "sync-all",
             "sync-checkout",
@@ -173,7 +173,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:907fc39b295948a07d04bf79d3e132871ed2e319fc6c6c4d8065ff03d3a33f07",
+          "digest": "sha256:818fc235d0bf94732afaa3e331f3f8be4889b48b32bd2cd7b25a67077705520a",
           "harness": {
             "marketplaces": [
               {
@@ -323,7 +323,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:6d3daa2a420329cd1839e4eef209307db641a548f40e2f0693a4ce291d0d4e84",
+          "digest": "sha256:f97a0280f1bf21b6e7d58597bac66ad05bf85828ad75768406af79e2321fb210",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
