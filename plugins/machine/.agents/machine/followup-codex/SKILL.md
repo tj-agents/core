@@ -31,7 +31,9 @@ python -B "<skill-directory>/scripts/codex_followup.py" --codex "<codex-executab
 
 The helper checks the server's thread identity, cwd, loaded membership and direct-input capability.
 It steers the identified active turn using `expectedTurnId`, or starts a turn on the same loaded idle
-thread. It preserves the recipient's model, permissions, working directory and configuration.
+thread. It preserves the recipient's model, permissions, working directory and configuration. If the server
+requests an approval or another client action, the helper closes without answering it; the recipient UI
+remains responsible.
 Before submission it exclusively creates a receipt containing a client message ID and message hash.
 It then checks recipient history for that client ID. Receipt files are private runtime evidence.
 
