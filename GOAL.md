@@ -1,0 +1,40 @@
+# Codex hook refresh and stack workflow
+
+## Objective
+Deliver a focused core follow-up stacked on PR #48 (`Refactor/RepoDeclaredConfigHarnessMove`) that repairs Codex skill-routing recovery, makes the stacked-PR workflow discoverable as `engineering:stack`, and removes the exposed `base:stack-tiers` skill while preserving tier gating.
+
+## Authorization and checkout
+Tommy explicitly authorized a stacked follow-up on PR #48 and a fresh Codex handoff. He then asked to get rid of `stack-tiers`. Work only in `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-CodexHookRefresh` on `Fix/CodexHookRefresh`. The verified parent head at creation is `279790686f21ddc062230798fd462fe2b978354d`; PR #48 is open and targets `main`. This worktree was clean at creation. Do not edit the existing PR #48 worktree or Concertable Party Foundation worktree. The previous Party Foundation continuation was launched separately.
+
+## Evidence and scope
+- PR #48 declares/generates the core harness, but its plan `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md` leaves consumer adoption and live session refresh for later phases. Current Codex route failure still tells the agent to read the whole skill and retry. Determine whether host hooks can inject refreshed content mid-session; otherwise implement a supported SessionStart repair path and describe the real host limit.
+- Claude has a marketplace-refresh SessionStart path. Establish the exact Codex/Claude consistency gap from source and a reproducible probe before editing. A failed hook must have a useful repair path; do not silently bypass the gate.
+- `base:stack-tiers` is currently listed as a skill, but its folder also contains `tier_gate.py` and `tier.schema.json`. The gate runs in Claude and Codex hooks. Tommy wants the **skill** removed. Relocate the runtime/schema and any necessary authoritative tier contract so tier enforcement remains intact; remove its skill exposure/catalog/selection entries and update references and generated outputs. The reason for its existence was to document the tier gate and house its script, not a stacked-PR procedure.
+- `engineering:stack` should name the stacked PR workflow. Inspect existing `engineering:git-branching`, `open-worktree`, PR and merge guidance, then add a discoverable `stack` entry/route without conflating it with tier gating. Keep the useful existing guidance and avoid duplicate authored bodies.
+- Open PR #58 is about verified delivery of messages to existing Codex sessions, not hook refresh. PR #55 adds command routes and identifies a possible conflict with PR #48's early exit; do not accidentally absorb those unrelated branches. Recheck their state if relevant.
+
+## Completion
+Use meaningful tests for recovery and tier gating, run `pwsh .agents/sync-generated.ps1` and its `-Check` gate, refresh/check catalog digests as required, and follow core's review and PR workflow. Commit in logical units, push and open a plain GitHub stacked PR targeting `Refactor/RepoDeclaredConfigHarnessMove`. Report exact behavior, limits, and PR link. Do not merge either PR merely because this worktree exists. If the skill naming and runtime fix need separate PRs, preserve the parent stack and use separate focused layers.
+
+## Next Steps
+1. Read `AGENTS.md`, `README.md`, this goal, PR #48's plan, and relevant hook/skill generation sources. Verify parent PR state and current branch status.
+2. Remove the exposed `stack-tiers` skill while preserving the tier gate; add the stacked-PR `engineering:stack` skill; diagnose and implement the Codex refresh repair.
+3. Validate, review, commit, push and open the correctly based stacked PR; update this goal with evidence and outcome.
+
+Handoff lane: L3, because host recovery behavior requires open-ended investigation and a verified implementation.
+
+## Current checkpoint (2026-09-28)
+
+- PR #48 is open against `main`; this branch starts at its recorded head `279790686f21ddc062230798fd462fe2b978354d` and was current with `origin/Refactor/RepoDeclaredConfigHarnessMove` when checked.
+- Delivery slice: one focused child PR for tier runtime relocation, the `engineering:stack` discovery entry, and Codex hook recovery. Base: `Refactor/RepoDeclaredConfigHarnessMove`; head: `Fix/CodexHookRefresh`. The three changes share the generated package and hook manifests. Reassess the size before review.
+- The exposed `stack-tiers` directory contains the tier gate's script and schema. Move those to shared runtime/resources; keep tier hook wiring and test behavior.
+- The router currently blocks missing skills with a restart instruction and asks Codex to read a skill file before retry. Codex's documented `PreToolUse` hook output supports model-visible `additionalContext`, but a blocked write must be retried after receiving it. Verify actual host output behavior before claiming live recovery.
+- Remaining: implement, run focused tests and generated/catalog gates, review, commit, push, and open the child PR. Do not merge either PR.
+
+## Implementation checkpoint (2026-09-28)
+
+- Removed the `base:stack-tiers` skill and its Codex/Claude discovery entries. The tier gate remains in `.agents/hooks/tier_gate.py`; its schema and contract moved to `.agents/schemas/` and `.agents/tiers/`. Both host manifests still invoke the gate from the generated base package.
+- Added `engineering:stack` as a thin discoverable entry that routes stacked PR work to the existing branching, worktree, PR, and merge procedures.
+- Refreshed harness manifests, catalog digests, and generated packages. `test_stack_tiers`, `test_hook_contract`, `test_harness_manifests`, `test_engineering_hooks`, `test_source_layout`, `test_catalog_digests`, `test_codex_windows_hook_commands`, `test_base_router`, `test_plan_artifacts`, and `skill-packaging.tests.ps1` passed. Harness, catalog, and generated package checks passed.
+- Codex's documented `PreToolUse` hook can emit `additionalContext`, but a denied write still needs a retry. The stale hook command path after a marketplace refresh is unresolved. Automatic approval review rejected both a newest-cache-version dispatcher and an unverified executable snapshot in `PLUGIN_DATA`, citing arbitrary code selection and integrity risk. A decision on an integrity-checked snapshot is pending; no rejected dispatcher remains in the tree.
+- Next: settle the refresh repair within the approved boundary, review the final diff, commit, push, and open the child PR. Do not claim hook refresh is fixed until a removed-cache-path probe passes.

@@ -5,7 +5,7 @@
     ".agents/base"
   ],
   "source_excludes": [],
-  "source_digest": "sha256:11c367474047a970f290c7b2643ebd59422491dd082cd5997e30b3d76f5965cb",
+  "source_digest": "sha256:ef58fd0a20056c7fdc2ae23b62ca450e749a3defb66cc2d5911b13fa3988206f",
   "requires": {
     "marketplaces": [
       {
@@ -32,13 +32,6 @@
         ]
       },
       {
-        "path": ".agents/base/stack-tiers/scripts/tier_gate.py",
-        "hosts": [
-          "claude",
-          "codex"
-        ]
-      },
-      {
         "path": "hooks/pre_tool_use_adapter.py",
         "hosts": [
           "codex"
@@ -46,6 +39,13 @@
       },
       {
         "path": "hooks/skill_router.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/tier_gate.py",
         "hosts": [
           "claude",
           "codex"
