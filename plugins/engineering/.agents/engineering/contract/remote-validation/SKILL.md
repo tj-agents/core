@@ -54,7 +54,7 @@ out, every test in a suite failing at once) rather than as the defect itself.
 
 ## The delivery loop
 
-1. Implement in the branch's own worktree.
+1. Implement in the branch's owning checkout, selected under `engineering:git-branching`.
 2. Run the cheapest checks that directly cover the changed code: required generators and invariants, the
    smallest buildable project or surface, focused unit tests. **Coverage is set by what consumes the change,
    not by the files you opened.** A changed signature is covered only by building its construction sites, a
