@@ -2,26 +2,31 @@
 ## Typed Codex launcher checkpoint (2026-09-29)
 
 Claude's pre-load refresh and plugin-owned typed launcher merged in PRs #61 and #63, with a real
-PowerShell acceptance run. Codex PR #60's original typed wrapper still depended on a checkout.
-This branch now moves the `codex` wrapper into the machine plugin. A Codex SessionStart hook wires
-both PowerShell profiles to resolve that plugin from Codex's active installed version. The typed
-command and native handoff refresh enabled Git plugins before launching a session. Synthetic
-PowerShell and profile tests pass; packaged hooks, exact-head CI and real installed-host acceptance
-remain. Project release pins still bound what the refresh can load.
+PowerShell acceptance run. Codex's equivalent merged in PR #60 at `dfbd7c1`. Its SessionStart
+hook installs a PowerShell profile block that loads `codex-profile.ps1` from the active installed
+`machine@base-agents` plugin. The typed command and native handoff refresh enabled Git plugins
+before launching a session. Synthetic PowerShell and profile tests and exact-head CI passed.
+On this PC, the base-agents marketplace was upgraded after the merge and the machine plugin was
+installed from that fetched commit. Both PowerShell editions resolve the typed `codex` function
+from the installed plugin, both profiles retain the Claude block, and a fresh typed
+`codex --version` completed after its pre-launch refresh (`codex-cli 0.158.0`). The installed
+package matches the merged source after Windows line-ending normalization. Project release pins
+still bind what the refresh can load; this acceptance does not prove latest-push sync in pinned
+consumer repositories or on other developer PCs.
 
 ## Cross-PC startup refresh checkpoint (2026-09-28)
 
-Tommy clarified that a standards push on another PC must reach the next Claude and Codex CLI sessions on every developer PC. Current committed release pins do not advance from a push alone. Claude first-session refresh and live-cache safety were handed to an independent Claude CLI in `Fix/ClaudeStandardsSync`. The Codex branch `Fix/CodexStandardsSync` adds a pre-launch marketplace refresh for the PowerShell CLI wrapper and native handoff launcher, then refreshes enabled Git plugins. An isolated Codex probe found the full Git marketplace clone timed out, while sparse checkout succeeded, so the generated marketplace config now declares package sparse paths. The focused startup sync, launcher, and config tests passed. The generated package was refreshed. The remaining decision is the update channel: auto-review rejected changing every generated ref from an immutable release to moving `main`, citing unreviewed executable code. Installed-host acceptance, exact package checks, review, and delivery remain. Neither host can yet be claimed to load latest pushes on every PC.
+Tommy clarified that a standards push on another PC must reach the next Claude and Codex CLI sessions on every developer PC. Current committed release pins do not advance from a push alone. Claude's first-session refresh and live-cache safety are merged in PRs #61–#64. Codex's pre-launch marketplace refresh and sparse checkout config are merged in PR #60. Both typed commands passed installed-host acceptance on this PC. The remaining decision is the update channel: auto-review rejected changing every generated ref from an immutable release to moving `main`, citing unreviewed executable code. Neither host can yet be claimed to load latest pushes in pinned consumer repositories on every PC.
 
 - Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 - Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
 - Roadmap item: `repo-declared-config/migrate-agent-state`
-Status: phase 1 in progress; full repo-declared migration remains open (2026-09-28).
+Status: phase 1 in progress; full repo-declared migration remains open (2026-09-29).
 
 PR #48 merged at `1f7a928` and Codex hook snapshots (#59) at `531c0fd`. Claude's pre-load
 refresh and plugin-owned terminal wrapper merged in PRs #61 and #63 and passed live acceptance on
-this PC. Codex's matching launcher is in open PR #60. A repository's committed release pin still
-limits the version either host may load.
+this PC. Codex's matching launcher merged in PR #60 and passed live typed-command acceptance here.
+A repository's committed release pin still limits the version either host may load.
 Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27.
 
 ## Current state (2026-09-27)
@@ -155,7 +160,7 @@ Concertable-product content; core contains no Concertable reference in code, nam
 moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
-Current slice: Claude pre-load standards refresh (`Fix/ClaudeStandardsSync`).
+Current slice: first consumer adoption of the repo-declared catalog and generated host settings.
 Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before tagging a release with
 the core-only bundled catalog; main-tracking installs already carry it since PR #48.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
@@ -197,8 +202,9 @@ Both have regression tests; local drift checks pass. Review, push, and CI remain
    lane, and skill.
 4. Add the repository-owned repair path for missing or stale skills. Keep plugin refresh
    safe for a live session, including stale hook paths and invisible Windows child processes.
-   Claude's pre-load refresh and 14-day orphan window are delivered by `Fix/ClaudeStandardsSync`;
-   Codex's equivalent is owned by `Fix/CodexStandardsSync`.
+   Claude's pre-load refresh and 14-day orphan window merged in PRs #61–#64; Codex's typed
+   pre-launch refresh and hook snapshots merged in PRs #60 and #59. Pinned consumer releases
+   still need an approved update channel before a push to `main` can reach the next session.
 5. Adopt the other consumers named in the plan. After each host passes,
    remove obsolete user-scope behavioral entries on this PC, run the machine verifier, and record
    acceptance. Repeat the same procedure on every other machine until the plan closes.
