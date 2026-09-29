@@ -111,5 +111,10 @@ Authorized scope: implementation, tests, live acceptance on this PC, review, PR 
 - Tommy rejected the remaining manual step: typing `claude` depended on a profile checkout being
   pulled (this PC's profile loads the retired `base-agents` checkout at `71afb60`). The wrapper now
   ships in the machine plugin and a SessionStart hook wires both PowerShell profiles to it, so no
-  checkout or `git pull` is involved. Next: merge, refresh this PC, let the hook wire its profiles,
-  and prove a new terminal's `claude` refreshes before launch.
+  checkout or `git pull` is involved.
+- 2026-09-29: PR #63 merged at `1f23daa`. A refresh moved core to `1f23daa`; the next `claude -p`
+  session's SessionStart hook added the block to both PowerShell profiles with no manual step. In a
+  fresh pwsh 7 and Windows PowerShell 5.1 terminal on the real profile, `claude` resolved to
+  `cache/base-agents/machine/1f23daa35b1b/resources/machine/scripts/claude-profile.ps1` (not the retired
+  checkout's function), and the pwsh run refreshed a stale cpp install before the session started.
+  The Claude slice is delivered; Codex remains with `Fix/CodexStandardsSync`.
