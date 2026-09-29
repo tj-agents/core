@@ -1,4 +1,14 @@
 # Repo-declared agent configuration — progress
+## Typed Codex launcher checkpoint (2026-09-29)
+
+Claude's pre-load refresh and plugin-owned typed launcher merged in PRs #61 and #63, with a real
+PowerShell acceptance run. Codex PR #60's original typed wrapper still depended on a checkout.
+This branch now moves the `codex` wrapper into the machine plugin. A Codex SessionStart hook wires
+both PowerShell profiles to resolve that plugin from Codex's active installed version. The typed
+command and native handoff refresh enabled Git plugins before launching a session. Synthetic
+PowerShell and profile tests pass; packaged hooks, exact-head CI and real installed-host acceptance
+remain. Project release pins still bound what the refresh can load.
+
 ## Cross-PC startup refresh checkpoint (2026-09-28)
 
 Tommy clarified that a standards push on another PC must reach the next Claude and Codex CLI sessions on every developer PC. Current committed release pins do not advance from a push alone. Claude first-session refresh and live-cache safety were handed to an independent Claude CLI in `Fix/ClaudeStandardsSync`. The Codex branch `Fix/CodexStandardsSync` adds a pre-launch marketplace refresh for the PowerShell CLI wrapper and native handoff launcher, then refreshes enabled Git plugins. An isolated Codex probe found the full Git marketplace clone timed out, while sparse checkout succeeded, so the generated marketplace config now declares package sparse paths. The focused startup sync, launcher, and config tests passed. The generated package was refreshed. The remaining decision is the update channel: auto-review rejected changing every generated ref from an immutable release to moving `main`, citing unreviewed executable code. Installed-host acceptance, exact package checks, review, and delivery remain. Neither host can yet be claimed to load latest pushes on every PC.
@@ -6,14 +16,13 @@ Tommy clarified that a standards push on another PC must reach the next Claude a
 - Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 - Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
 - Roadmap item: `repo-declared-config/migrate-agent-state`
-Status: phase 1 in progress; full repo-declared migration remains open (2026-09-27).
+Status: phase 1 in progress; full repo-declared migration remains open (2026-09-28).
 
-Branch: `Refactor/RepoDeclaredConfigHarnessMove`
-Worktree: `C:\Users\tommy\source\repos\tj-agents\core\.worktrees\Refactor-repo-declared-config_harness-move`
-PR: [tj-agents/core #48](https://github.com/tj-agents/core/pull/48), being reconciled with current main.
-CI `verify` passed at the prior remote head `284d014` (run `36318559193`); new review and CI are pending.
-Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27. Main has
-published `v2.1.15`; this branch now targets the unpublished `v2.1.16` candidate.
+PR #48 merged at `1f7a928` and Codex hook snapshots (#59) at `531c0fd`. Claude's pre-load
+refresh and plugin-owned terminal wrapper merged in PRs #61 and #63 and passed live acceptance on
+this PC. Codex's matching launcher is in open PR #60. A repository's committed release pin still
+limits the version either host may load.
+Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27.
 
 ## Current state (2026-09-27)
 
@@ -146,9 +155,9 @@ Concertable-product content; core contains no Concertable reference in code, nam
 moved into core; phase 3 rebuilds currency as self-heal.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
-Current slice: finish exact-head CI for PR #48's 2.1.16 core-only harness candidate.
-Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before publishing the
-core-only bundled catalog, so existing consumers do not lose their non-core selections.
+Current slice: Claude pre-load standards refresh (`Fix/ClaudeStandardsSync`).
+Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before tagging a release with
+the core-only bundled catalog; main-tracking installs already carry it since PR #48.
 Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
 Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no
 machine-local behavioural state on each machine.
@@ -174,9 +183,8 @@ digest varied between LF and CRLF checkouts; it now normalizes text line endings
 found a Windows 8.3 temp-path alias in the new digest tests; the walker now resolves its root.
 Both have regression tests; local drift checks pass. Review, push, and CI remain.
 
-1. Finish the core-only catalog and harness slice: commit the path-alias fix, run committed-head
-   checks, incrementally review, push PR #48, and verify its CI. Do not publish the core-only catalog until the first
-   consumers have committed their own composed catalogs.
+1. Done: PR #48 merged the core-only catalog and harness slice. Do not tag a release with it until the
+   first consumers have committed their own composed catalogs.
 2. Add owner-authored release and harness records in each selected standards repository, then adopt
    the generator and manifests in winwrap and sandbox-hwid first. Commit generated
    Claude/Codex config plus consumer drift checks, and prove the Claude launcher allow rule in a
@@ -189,6 +197,8 @@ Both have regression tests; local drift checks pass. Review, push, and CI remain
    lane, and skill.
 4. Add the repository-owned repair path for missing or stale skills. Keep plugin refresh
    safe for a live session, including stale hook paths and invisible Windows child processes.
+   Claude's pre-load refresh and 14-day orphan window are delivered by `Fix/ClaudeStandardsSync`;
+   Codex's equivalent is owned by `Fix/CodexStandardsSync`.
 5. Adopt the other consumers named in the plan. After each host passes,
    remove obsolete user-scope behavioral entries on this PC, run the machine verifier, and record
    acceptance. Repeat the same procedure on every other machine until the plan closes.

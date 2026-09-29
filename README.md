@@ -94,10 +94,16 @@ Claude Code:
 /plugin install machine@base-agents
 ```
 
-After a new commit lands on `main`, pick it up with:
+Claude loads installed plugins at session start and `/plugin marketplace update` refreshes only the
+catalog. Typing `claude` in PowerShell, `open-claude`, `handoff-claude` and session recovery run
+`.agents/machine/scripts/claude_standards_sync.py` first, so a session started through them loads the
+latest registered commit of every plugin the directory enables. The machine plugin's SessionStart hook
+adds one marked block to both PowerShell profiles that loads its own `claude` wrapper, so the wrapper
+updates with the plugin and no checkout is pulled; set `BASE_AGENTS_CLAUDE_PROFILE=off` to opt out.
+From a core checkout, run it directly:
 
-```
-/plugin marketplace update base-agents
+```powershell
+python -B .agents/machine/scripts/claude_standards_sync.py --project <directory>
 ```
 
 Codex treats `INSTALLED_BY_DEFAULT` as marketplace policy, not a CLI dependency resolver. Register the
@@ -109,6 +115,14 @@ codex plugin add base@base-agents
 codex plugin add engineering@base-agents
 codex plugin add machine@base-agents
 ```
+
+Typing `codex` in PowerShell and using `handoff-codex` refresh configured Git marketplaces and
+enabled plugins before Codex loads them. The machine plugin's SessionStart hook adds a marked block
+to both PowerShell profiles. That block resolves the active installed machine package, so later
+terminals load its `codex` wrapper without pulling this checkout. The first session after installing
+the package wires the profiles; open a new terminal to use the wrapper. Set
+`BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. A project pinned to a release continues to
+use that release until its committed selection changes.
 
 Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
 resolve and verify its complete dependency closure reproducibly.

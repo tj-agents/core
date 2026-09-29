@@ -323,7 +323,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:265839f0be2591f92fb9f8d713642ff2cc6d4464d37f24661fbf0c053f8bd77a",
+          "digest": "sha256:3592505295dc25efd9e0752c09a0ff87be829c30aa3b461d36ee7b4d67c1d9b2",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -343,6 +343,18 @@
                 "path": ".agents/machine/peer-cli/scripts/register_session.py",
                 "hosts": [
                   "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "resources/machine/scripts/claude_terminal_profile.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "resources/machine/scripts/codex_terminal_profile.py",
+                "hosts": [
                   "codex"
                 ]
               },
