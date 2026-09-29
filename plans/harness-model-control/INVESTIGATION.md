@@ -10,7 +10,7 @@ the Concertable/repository-declared plugin migration; do not adopt, edit or clos
 - Branch: `Docs/ModelSwitchHandoffInvestigation`
 - Base: `a0fe999b3f2efc7380b87b1b6e9e25fbbd554f54` from fetched `origin/main`
 - Lane: L3, an open investigation without an implementation design yet. The canonical table resolves it to Sol.
-- Status: investigation merged in PR #65 at `17ac27a`; Tommy then directed implementation of the actionable correction on `Fix/HandoffSideWorkstreamRouting`.
+- Status: complete. Investigation merged in PR #65 at `17ac27a`; the handoff-routing correction merged in PR #66 at `838580a` after the full CI check passed.
 
 The user first suggested a core skill so Codex could change the main model through what they called
 `hardnessinject` / `harnessinject`. Determine the actual mechanism rather than assuming that spelling
@@ -76,10 +76,10 @@ and which requires a host feature or explicit user decision. Keep the migration 
 
 ## Next Steps
 
-Implement the bounded handoff-entry and prompt-router correction below with focused regression coverage.
-Regenerate and validate the shipped packages and harness manifests, review the exact branch head, then
-deliver the correction through the repository's meta-only PR path. Keep the Concertable migration separate.
-A main-chat model switch remains dependent on an exposed Codex host action.
+The core investigation and actionable handoff-routing correction are complete. The correction routes
+direct handoff requests, has focused regression coverage, and was delivered in PR #66. The Concertable
+migration remains with its original owner. A main-chat model switch remains dependent on an exposed
+Codex host action; do not simulate it through a profile change or substitute session.
 
 ## Findings — 2026-09-29
 
