@@ -430,13 +430,18 @@ class Stub {
     $output = claude --resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875 6>&1 | Out-String
     if ($output -notmatch 'standards: could not check core') { throw "The terminal claude function did not check standards before a session:`n$output" }
 
-    $restore = Join-Path $repository 'cli-session-recovery\start-saved-cli.ps1'
     $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $output = & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -Command "& { . '$windowsProfile'; claude plugin list; claude --resume c2bcd5c4-bf6d-4087-95e3-d7ba7f711875 }" 2>&1 | Out-String
+    if (([regex]::Matches($output, 'standards: could not check core')).Count -ne 1) {
+        throw "Windows PowerShell's claude function did not check standards exactly once, before the session:`n$output"
+    }
+
+    $restore = Join-Path $repository 'cli-session-recovery\start-saved-cli.ps1'
     $output = & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -Command "& { . '$windowsProfile'; & '$restore' -Tool claude -SessionId 'b2bcd5c4-bf6d-4087-95e3-d7ba7f711875' -WindowGroup test }" 2>&1 | Out-String
     if ($output -notmatch 'standards: could not check core') { throw "Session recovery did not check standards before resuming:`n$output" }
 
     $stubCalls = [System.IO.File]::ReadAllLines($claudeStubLog)
-    $expectedCalls = 'plugin list|--resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875|--resume b2bcd5c4-bf6d-4087-95e3-d7ba7f711875'
+    $expectedCalls = 'plugin list|--resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875|plugin list|--resume c2bcd5c4-bf6d-4087-95e3-d7ba7f711875|--resume b2bcd5c4-bf6d-4087-95e3-d7ba7f711875'
     if (($stubCalls -join '|') -ne $expectedCalls) {
         throw "The shell and recovery launchers did not pass their arguments through: $($stubCalls -join '|')"
     }

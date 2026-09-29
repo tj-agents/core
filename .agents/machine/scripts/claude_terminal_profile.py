@@ -44,11 +44,24 @@ def profile_paths(documents: Path) -> list[Path]:
     return [documents / edition / "Microsoft.PowerShell_profile.ps1" for edition in ("PowerShell", "WindowsPowerShell")]
 
 
+def profile_encoding(raw: bytes) -> str:
+    if raw.startswith(codecs.BOM_UTF8):
+        return "utf-8-sig"
+    if raw.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return "utf-16"
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return "mbcs" if os.name == "nt" else "latin-1"
+    return "utf-8"
+
+
 def ensure(path: Path) -> bool:
     raw = path.read_bytes() if path.is_file() else b""
-    bom = raw.startswith(codecs.BOM_UTF8)
-    text = raw[len(codecs.BOM_UTF8):].decode("utf-8") if bom else raw.decode("utf-8")
-    if text.count(START) != text.count(END) or text.count(START) > 1:
+    encoding = profile_encoding(raw)
+    text = raw.decode(encoding)
+    starts, ends = text.count(START), text.count(END)
+    if starts != ends or starts > 1 or (starts and text.index(END) < text.index(START)):
         raise ValueError(f"malformed launcher block in {path}")
     if START in text:
         before, rest = text.split(START, 1)
@@ -61,7 +74,7 @@ def ensure(path: Path) -> bool:
         updated = (prefix + "\r\n\r\n" if prefix else "") + BLOCK + "\r\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_bytes((codecs.BOM_UTF8 if bom else b"") + updated.encode("utf-8"))
+    temporary.write_bytes(updated.encode(encoding))
     os.replace(temporary, path)
     return True
 
@@ -74,10 +87,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         paths = profile_paths(arguments.documents or documents_directory())
-        changed = [path for path in paths if ensure(path)]
-    except (OSError, UnicodeError, ValueError) as error:
+    except OSError as error:
         print(f"standards: the PowerShell claude launcher was not installed ({error})")
         return 0
+    changed = []
+    for path in paths:
+        try:
+            if ensure(path):
+                changed.append(path)
+        except (OSError, UnicodeError, ValueError) as error:
+            print(f"standards: the PowerShell claude launcher was not installed in {path} ({error})")
     if changed:
         print(
             "standards: new PowerShell terminals now refresh Claude plugins before `claude` starts "
