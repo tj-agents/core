@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `bdeb4c3`  `(2026-09-29)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `89561a1`  `(2026-09-29)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-09-29 — full
 
@@ -35,3 +35,20 @@
 - [x] **CL3 — LOW — test-impact** — `tests/handoff-launchers.tests.ps1:428`
   Typing `claude` was exercised only under pwsh 7. Fix: repeat the plain-subcommand and session
   assertions under Windows PowerShell 5.1 through its own profile.
+
+## Review pass — 2026-09-29 — incremental
+
+**Candidate base:** `bdeb4c3`
+**Candidate head:** `89561a1`
+**Candidate branch:** `Fix/ClaudeLauncherFromPlugin`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Fix-ClaudeLauncherFromPlugin.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No finding retained. UTF-8-BOM, UTF-16 and code-page profiles decode, gain the ASCII block and are
+written back in their own encoding; each edition is handled independently; an END before START is
+malformed. Seven profile tests, the generator tests and `handoff-launchers.tests.ps1` (including
+Windows PowerShell 5.1) pass.
