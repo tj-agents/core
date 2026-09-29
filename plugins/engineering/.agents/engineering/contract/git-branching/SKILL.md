@@ -1,6 +1,6 @@
 ---
 name: git-branching
-description: Branch hygiene for agent work — planning-only authoring may begin without a delivery worktree, but active delivery branches carry their plan and ledger with substantive work. Covers branching from fetched `origin/main`, capitalized `<Type>/<Name>` casing, syncing reused worktrees, keeping branch-local refactors with their feature, when a stack is warranted, and splitting durable guidance from runtime work. Use before delivery work or when creating or reusing a branch/worktree.
+description: Branch hygiene and reviewable delivery slices — finish and merge one ready, authorized PR at a time by default; maintain a proper stack whenever work must build on an unmerged PR; allocate worktrees for active execution needs. Covers fresh bases, branch casing, measured scope and independent guidance changes. Use before creating or reusing a delivery branch or worktree.
 
 kind: contract
 domain: process
@@ -41,11 +41,35 @@ both `feature/x` and `Feature/x` breaks `git fetch` and `git pull` **for everyon
 `cannot lock ref … File exists`. Before creating a branch, match the casing of any existing branch of the
 same name exactly.
 
-## Large changes default to reviewable PR slices
+## Deliver one slice at a time
+
+The default is sequential delivery: implement the current focused slice, validate and review it, merge
+it as soon as it is ready and authorized, sync the remote default, then start the next slice from that
+updated base. Plan the full sequence while keeping one delivery slice active by default. A future
+dependency in a plan does not by itself require concurrent branches or open PRs.
+
+When the next slice must proceed before its required parent can land, record the concrete constraint
+preventing the parent from merging and why proceeding now is necessary. Use a stack for that overlap.
+**Every PR that builds on another unmerged PR must be stacked**: branch from the parent's verified tip,
+target the immediate parent, review the child-only delta and validate the cumulative tree. Once that
+dependency exists, stack handling is required. The `stack` skill owns the procedure.
+
+| Situation | Next action |
+|---|---|
+| Current slice is ready and authorized to land | Merge it, sync the default branch, then begin the next slice |
+| Current slice still needs implementation, checks or review | Finish that slice and resolve its delivery blockers |
+| A concrete constraint requires dependent work before the parent can land | Record the reason and maintain a proper parent/child stack |
+| An independently authorized task needs concurrent work | Branch from the remote default and isolate its active writer |
+
+Keep necessary stacks as small as the active work requires. Land ready parents promptly through the
+selected merge workflow and reconcile their children before continuing. Preserve user delivery holds;
+a hold is a constraint to resolve, not a reason to accumulate speculative descendants.
+
+## Reviewable PR boundaries
 
 A goal, feature, refactor or plan phase is not automatically one PR. Before implementing a large or
-multi-concern change, divide it into focused delivery slices. Prefer stacked PRs for dependent slices;
-put independent slices on branches from the remote default. Keep one goal and owner across them.
+multi-concern change, divide it into focused delivery slices. Deliver those slices sequentially by default;
+use the unmerged-dependency rule above when overlap is necessary. Keep one goal and owner across them.
 
 Record each slice's purpose, included code and tests, base/parent, dependencies, expected size and
 verification gate in the existing plan or PR description. When branches exist, record their exact base
@@ -69,9 +93,9 @@ the displayed diff. Where possible, extract tested preparatory refactors or inde
 first. A large exception needs a recorded concrete reason, rejected split boundaries, measured size and
 validation plan; "same feature", "same phase", or "already on this branch" is not sufficient.
 
-Small repairs to the current slice stay with it. A substantial next slice may stack on code that has
-not merged yet, including a refactor of that code. Do not orphan the parent or create an independent
-branch that loses its dependency. If a PR is already oversized, preserve its exact head and working
+Small repairs to the current slice stay with it. Complete and land that slice before beginning a
+substantial next slice by default. Necessary work on code that has not merged yet, including a refactor
+of that code, follows the required stack relationship above and retains its parent dependency. If a PR is already oversized, preserve its exact head and working
 changes and assess recovery before rewriting history. Map possible boundaries and compare the benefit
 of smaller reviews with the cost of reconstructing and qualifying new intermediate states. An already
 reviewed, validated candidate may warrant a frozen-scope exception, with its exact evidence and rejected
@@ -104,6 +128,18 @@ evidence. A stack improves review boundaries; it does not remove integration or 
 Research basis: [Google's small-change guidance](https://google.github.io/eng-practices/review/developer/small-cls.html)
 and [GitHub's stacked PR documentation](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs).
 The numeric assessment triggers above are this workflow's heuristic, not a universal research cutoff.
+
+## Worktrees follow active execution
+
+Branch/PR dependencies and checkout allocation are separate decisions. Reuse an available checkout for
+sequential work once its previous work is safely preserved and no writer, build, monitor or active session
+owns it. Verify the branch, status and task binding before switching. A separate worktree is appropriate
+for concurrent writers/builds, necessary checkout isolation or an explicit request.
+
+A stack can keep inactive layers as Git branches and use one active checkout. Allocate another checkout
+only for work that needs one now. Before another dependency restore or build, account for available disk
+space and the generated outputs already present in existing checkouts. Retire completed worktrees through
+`engineering:open-worktree` once their commits and required evidence are safely preserved.
 
 ## Working docs ride along; durable guidance does not
 
