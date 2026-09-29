@@ -68,6 +68,8 @@ if ($Model) {
 
 $arguments += "Read the file at $resolvedPromptPath and follow its instructions, working from the current directory."
 
+Sync-ClaudeStandards -WorkingDirectory $resolvedWorkingDirectory -Claude $claude
+
 # Forced, not merely un-cleared: an automation-spawned wt.exe/claude.exe is not the interactive shell a
 # human would have launched it from, so colour/terminal-capability auto-detection cannot be trusted to land
 # on a good value on its own. FORCE_COLOR is the de-facto Node CLI convention (chalk/supports-color) to
