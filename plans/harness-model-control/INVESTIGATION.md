@@ -10,7 +10,7 @@ the Concertable/repository-declared plugin migration; do not adopt, edit or clos
 - Branch: `Docs/ModelSwitchHandoffInvestigation`
 - Base: `a0fe999b3f2efc7380b87b1b6e9e25fbbd554f54` from fetched `origin/main`
 - Lane: L3, an open investigation without an implementation design yet. The canonical table resolves it to Sol.
-- Status: successor acknowledged ownership on 2026-09-29; investigation complete, with a bounded correction proposal below.
+- Status: investigation merged in PR #65 at `17ac27a`; Tommy then directed implementation of the actionable correction on `Fix/HandoffSideWorkstreamRouting`.
 
 The user first suggested a core skill so Codex could change the main model through what they called
 `hardnessinject` / `harnessinject`. Determine the actual mechanism rather than assuming that spelling
@@ -62,10 +62,10 @@ normal user profiles, credentials, or the migration's worktrees. Do not send mes
 Use local code as evidence first; if host contract verification needs browsing, use official primary
 sources pinned to the installed version. Record supported behavior separately from inference.
 
-This handoff authorizes investigation, isolated probes and a concrete correction proposal. The earlier
-request to add core support remains context for that proposal; do not turn this into broad implementation
-or model configuration changes before the actual supported mechanism is known. No new expensive session
-or Astra escalation is authorized by task difficulty. Keep the user's lower-model preference.
+The initial handoff authorized investigation, isolated probes and a concrete correction proposal. Tommy's
+subsequent instruction authorizes implementing and delivering the actionable handoff-routing correction.
+No host model-control action was exposed, so do not change normal model configuration or invent a main-chat
+switch. Keep the user's lower-model preference.
 
 ## Completion expectation
 
@@ -76,10 +76,10 @@ and which requires a host feature or explicit user decision. Keep the migration 
 
 ## Next Steps
 
-The investigation is complete. If Tommy authorizes a core correction, make the bounded changes described
-under "Actionable correction" below, validate them, and deliver them through the repository's normal
-documentation or code workflow. A host-level main-chat model switch remains dependent on an exposed
-Codex host capability; do not simulate it by changing a profile or launching a substitute session.
+Implement the bounded handoff-entry and prompt-router correction below with focused regression coverage.
+Regenerate and validate the shipped packages and harness manifests, review the exact branch head, then
+deliver the correction through the repository's meta-only PR path. Keep the Concertable migration separate.
+A main-chat model switch remains dependent on an exposed Codex host action.
 
 ## Findings — 2026-09-29
 
