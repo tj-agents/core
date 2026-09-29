@@ -28,6 +28,9 @@ A machine holds only derived caches, credentials and runtime data. Cloning a rep
 machine gives identical agent behaviour without hand-edited user hook, plugin, agent, marketplace
 or notification settings. A plugin refresh must not break hooks already loaded by a live session.
 
+## Cross-PC currency requirement (Tommy, 2026-09-28)
+
+After standards change on another PC and are pushed, the next Claude and Codex CLI sessions on every developer PC must load the current approved standards without manual cache repair. This requires a defined update channel, a startup refresh that completes before the host loads plugins, and acceptance runs in both installed hosts. The existing immutable release pins give repeatable behavior but do not advance after a push to `main`. Automatic approval review rejected changing all generated project marketplace refs to moving `main`, because it would execute code outside the reviewed release contract. Keep the pinned behavior until an approved update channel is chosen; do not report latest-push synchronization as complete from cache refresh alone.
 ## Design
 
 1. **Core owns the generic harness** for Claude and Codex: skill router, SessionStart check,

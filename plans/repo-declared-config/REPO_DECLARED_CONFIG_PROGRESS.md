@@ -1,14 +1,27 @@
 # Repo-declared agent configuration — progress
+## Typed Codex launcher checkpoint (2026-09-29)
+
+Claude's pre-load refresh and plugin-owned typed launcher merged in PRs #61 and #63, with a real
+PowerShell acceptance run. Codex PR #60's original typed wrapper still depended on a checkout.
+This branch now moves the `codex` wrapper into the machine plugin. A Codex SessionStart hook wires
+both PowerShell profiles to resolve that plugin from Codex's active installed version. The typed
+command and native handoff refresh enabled Git plugins before launching a session. Synthetic
+PowerShell and profile tests pass; packaged hooks, exact-head CI and real installed-host acceptance
+remain. Project release pins still bound what the refresh can load.
+
+## Cross-PC startup refresh checkpoint (2026-09-28)
+
+Tommy clarified that a standards push on another PC must reach the next Claude and Codex CLI sessions on every developer PC. Current committed release pins do not advance from a push alone. Claude first-session refresh and live-cache safety were handed to an independent Claude CLI in `Fix/ClaudeStandardsSync`. The Codex branch `Fix/CodexStandardsSync` adds a pre-launch marketplace refresh for the PowerShell CLI wrapper and native handoff launcher, then refreshes enabled Git plugins. An isolated Codex probe found the full Git marketplace clone timed out, while sparse checkout succeeded, so the generated marketplace config now declares package sparse paths. The focused startup sync, launcher, and config tests passed. The generated package was refreshed. The remaining decision is the update channel: auto-review rejected changing every generated ref from an immutable release to moving `main`, citing unreviewed executable code. Installed-host acceptance, exact package checks, review, and delivery remain. Neither host can yet be claimed to load latest pushes on every PC.
 
 - Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 - Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
 - Roadmap item: `repo-declared-config/migrate-agent-state`
 Status: phase 1 in progress; full repo-declared migration remains open (2026-09-28).
 
-PR #48 merged at `1f7a928` and Codex hook snapshots (#59) at `531c0fd`; `v2.1.15` is the latest
-release. Neither refreshes Claude before plugin load. Active slices: `Fix/ClaudeStandardsSync`
-([`CLAUDE_STANDARDS_SYNC.md`](CLAUDE_STANDARDS_SYNC.md)) and `Fix/CodexStandardsSync`, each in its own
-worktree under `core\.worktrees\Fix-CodexHookRefresh\`.
+PR #48 merged at `1f7a928` and Codex hook snapshots (#59) at `531c0fd`. Claude's pre-load
+refresh and plugin-owned terminal wrapper merged in PRs #61 and #63 and passed live acceptance on
+this PC. Codex's matching launcher is in open PR #60. A repository's committed release pin still
+limits the version either host may load.
 Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27.
 
 ## Current state (2026-09-27)
