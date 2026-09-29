@@ -70,6 +70,29 @@ class TerminalProfileTests(unittest.TestCase):
         self.assertIn('was not installed', output)
         self.assertEqual(self.paths[0].read_text(encoding='utf-8'), f'{PROFILE.START}\nunterminated\n')
 
+    def test_utf16_and_ansi_profiles_keep_their_encoding(self):
+        for path in self.paths:
+            path.parent.mkdir(parents=True)
+        self.paths[0].write_bytes('Write-Host "héllo"\r\n'.encode('utf-16'))
+        self.paths[1].write_bytes(b'Write-Host "caf\xe9"\r\n')
+        code, output = self.run_hook()
+        self.assertEqual(code, 0)
+        self.assertNotIn('was not installed', output)
+        first = self.paths[0].read_bytes()
+        self.assertTrue(first.startswith(codecs.BOM_UTF16_LE))
+        self.assertIn(PROFILE.BLOCK, first.decode('utf-16'))
+        second = self.paths[1].read_bytes()
+        self.assertTrue(second.startswith(b'Write-Host "caf\xe9"'))
+        self.assertIn(PROFILE.BLOCK.encode('ascii'), second)
+
+    def test_one_unusable_profile_does_not_block_the_other(self):
+        self.paths[0].parent.mkdir(parents=True)
+        self.paths[0].write_bytes(f'{PROFILE.END}\r\n{PROFILE.START}\r\n'.encode('utf-8'))
+        code, output = self.run_hook()
+        self.assertEqual(code, 0)
+        self.assertIn(f'was not installed in {self.paths[0]}', output)
+        self.assertEqual(self.paths[1].read_bytes().decode('utf-8'), PROFILE.BLOCK + '\r\n')
+
     def test_opt_out_writes_nothing(self):
         os.environ[PROFILE.OPT_OUT_ENV] = 'off'
         self.addCleanup(os.environ.pop, PROFILE.OPT_OUT_ENV, None)

@@ -108,8 +108,8 @@ Authorized scope: implementation, tests, live acceptance on this PC, review, PR 
   moved the project-scope cpp installs 0.4.2 to 0.4.6, and a new session loaded
   `base-agents/*/3a647a5014c0`. Result lines now label project and local installs, which printed
   as duplicates.
-- Remaining on this PC, awaiting Tommy: the profile still loads the retired `base-agents` checkout at
-  `71afb60`, whose uncommitted `shell/cr.ps1` change is his and whose `claude` function predates this
-  work. The primary `tj-agents/core` checkout cannot fast-forward past its own uncommitted plan edits and
-  untracked roadmap. Once he settles those, `git pull` there and `install.ps1` rewire the bare `claude`
-  command; the launchers and session recovery already refresh through the installed plugin.
+- Tommy rejected the remaining manual step: typing `claude` depended on a profile checkout being
+  pulled (this PC's profile loads the retired `base-agents` checkout at `71afb60`). The wrapper now
+  ships in the machine plugin and a SessionStart hook wires both PowerShell profiles to it, so no
+  checkout or `git pull` is involved. Next: merge, refresh this PC, let the hook wire its profiles,
+  and prove a new terminal's `claude` refreshes before launch.
