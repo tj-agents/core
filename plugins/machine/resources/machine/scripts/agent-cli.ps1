@@ -1,5 +1,5 @@
 # Shared launch primitives for the native agent CLIs. Dot-sourced by handoff-claude, handoff-codex,
-# open-claude and the shell profile so the terminal invocation and the parent-session environment scrub
+# open-claude and the terminal claude launcher so the terminal invocation and the parent-session environment scrub
 # have one owner: every one of them opens the same kind of Windows Terminal tab, and the differences
 # between them are narrow enough to pass in. Not runnable on its own.
 
