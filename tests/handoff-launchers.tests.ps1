@@ -21,6 +21,7 @@ $expectedLaunchers = @(
         Join-Path $pluginRoot "$tree\handoff-codex\scripts\launch-codex.ps1"
         Join-Path $pluginRoot "$tree\open-claude\scripts\open-claude.ps1"
     }
+    Join-Path $pluginRoot 'resources\machine\scripts\claude-profile.ps1'
 ) | Sort-Object
 if (Compare-Object $expectedLaunchers ($packagedLaunchers | Sort-Object)) {
     throw 'The generated launcher dependency inventory changed; every agent-cli.ps1 consumer must be exercised or resolved here.'
@@ -201,7 +202,7 @@ class Stub {
     # Every generated discovery layout must load the shipped shared library and reach the stub terminal.
     # The packaged canonical `.agents/machine/.../scripts` copy is one directory deeper than the host
     # `skills` and `codex-skills` copies; exercising all nine catches a resolver that supports only one.
-    foreach ($launcher in $packagedLaunchers) {
+    foreach ($launcher in @($packagedLaunchers | Where-Object { (Split-Path -Leaf $_) -ne 'claude-profile.ps1' })) {
         if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
         switch (Split-Path -Leaf $launcher) {
             'launch-codex.ps1' { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'layout test' | Out-Null }
@@ -394,7 +395,10 @@ class Stub {
     }))
     [System.IO.File]::WriteAllText((Join-Path $fakePlugins 'installed_plugins.json'), (ConvertTo-Json -Depth 6 @{
         version = 2
-        plugins = @{ 'base@core' = @(@{ scope = 'user'; version = '0123456789ab'; installPath = (Join-Path $fakePlugins 'cache\core\base\0123456789ab') }) }
+        plugins = @{
+            'base@core' = @(@{ scope = 'user'; version = '0123456789ab'; installPath = (Join-Path $fakePlugins 'cache\core\base\0123456789ab') })
+            'machine@base-agents' = @(@{ scope = 'user'; version = 'generated'; installPath = $pluginRoot })
+        }
     }))
     $env:PATH = "$binDir;$pythonDir;$gitDir;$env:SystemRoot\System32;$env:SystemRoot"
     foreach ($start in @(
@@ -411,20 +415,33 @@ class Stub {
     $claudeStubLog = Join-Path $scratch 'claude-stub.log'
     $env:CLAUDE_STUB_LOG = $claudeStubLog
     $env:PATH = "$claudeBin;$env:PATH"
-    $shellAgents = Join-Path $repository 'shell\agents.ps1'
-    . $shellAgents
+    $fakeDocuments = Join-Path $scratch 'fake documents'
+    $hookOutput = & (Join-Path $pythonDir 'python.exe') -B (Join-Path $pluginRoot 'resources\machine\scripts\claude_terminal_profile.py') --documents $fakeDocuments | Out-String
+    if ($hookOutput -notmatch 'new PowerShell terminals now refresh Claude plugins') { throw "The machine SessionStart hook did not wire the terminal profile:`n$hookOutput" }
+    $pwshProfile = Join-Path $fakeDocuments 'PowerShell\Microsoft.PowerShell_profile.ps1'
+    $windowsProfile = Join-Path $fakeDocuments 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'
+    . $pwshProfile
+    $claudeCommand = Get-Command claude -CommandType Function
+    if ($claudeCommand.ScriptBlock.File -ne (Join-Path $pluginRoot 'resources\machine\scripts\claude-profile.ps1')) {
+        throw "The terminal profile did not load claude from the installed machine plugin: $($claudeCommand.ScriptBlock.File)"
+    }
     $output = claude plugin list 6>&1 | Out-String
-    if ($output -match 'standards:') { throw "The shell claude function checked standards for a plain subcommand:`n$output" }
+    if ($output -match 'standards:') { throw "The terminal claude function checked standards for a plain subcommand:`n$output" }
     $output = claude --resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875 6>&1 | Out-String
-    if ($output -notmatch 'standards: could not check core') { throw "The shell claude function did not check standards before a session:`n$output" }
+    if ($output -notmatch 'standards: could not check core') { throw "The terminal claude function did not check standards before a session:`n$output" }
+
+    $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $output = & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -Command "& { . '$windowsProfile'; claude plugin list; claude --resume c2bcd5c4-bf6d-4087-95e3-d7ba7f711875 }" 2>&1 | Out-String
+    if (([regex]::Matches($output, 'standards: could not check core')).Count -ne 1) {
+        throw "Windows PowerShell's claude function did not check standards exactly once, before the session:`n$output"
+    }
 
     $restore = Join-Path $repository 'cli-session-recovery\start-saved-cli.ps1'
-    $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $output = & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -Command "& { . '$shellAgents'; & '$restore' -Tool claude -SessionId 'b2bcd5c4-bf6d-4087-95e3-d7ba7f711875' -WindowGroup test }" 2>&1 | Out-String
+    $output = & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -Command "& { . '$windowsProfile'; & '$restore' -Tool claude -SessionId 'b2bcd5c4-bf6d-4087-95e3-d7ba7f711875' -WindowGroup test }" 2>&1 | Out-String
     if ($output -notmatch 'standards: could not check core') { throw "Session recovery did not check standards before resuming:`n$output" }
 
     $stubCalls = [System.IO.File]::ReadAllLines($claudeStubLog)
-    $expectedCalls = 'plugin list|--resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875|--resume b2bcd5c4-bf6d-4087-95e3-d7ba7f711875'
+    $expectedCalls = 'plugin list|--resume a2bcd5c4-bf6d-4087-95e3-d7ba7f711875|plugin list|--resume c2bcd5c4-bf6d-4087-95e3-d7ba7f711875|--resume b2bcd5c4-bf6d-4087-95e3-d7ba7f711875'
     if (($stubCalls -join '|') -ne $expectedCalls) {
         throw "The shell and recovery launchers did not pass their arguments through: $($stubCalls -join '|')"
     }

@@ -323,7 +323,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:1fc676fe031b2340cfd40c1d015f5bee4dcdbd6f502f304986cbfb3ed83111fb",
+          "digest": "sha256:8e7926cf135407efc863b07ed73b18fccb3095444830d66d979eb59d037df1eb",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -344,6 +344,12 @@
                 "hosts": [
                   "claude",
                   "codex"
+                ]
+              },
+              {
+                "path": "resources/machine/scripts/claude_terminal_profile.py",
+                "hosts": [
+                  "claude"
                 ]
               },
               {
