@@ -279,3 +279,88 @@ consumer or PC is a checkpoint, not the end of the goal.
 4. Adopt in `sandbox-hwid`; clean this PC; run acceptance.
 5. Adopt every remaining consumer and machine, remove user-scope behavioural state, and run the
    same acceptance checks after each migration.
+
+
+## Immediate scope-isolation slice (2026-09-29)
+
+The existing Concertable plugin treats any `.agents/skill-routes.json` as product opt-in, including
+C++ routes. This slice prevents its current globally enabled payload from executing hooks in an
+unrelated repository. It is a prerequisite safety fix; repository declarations, duplicate retirement
+and user-scope cleanup remain required by this plan.
+
+Consumer implementation belongs to `Concertable/agents`, branch `Fix/PluginScopeIsolation`, worktree
+`C:\Users\TommySeery\source\repos\Concertable\agents\.worktrees\Fix-PluginScopeIsolation`, based on
+`eae6cc643c2b902b91b1321e12cd84b79c69784d`. Core retains this plan's owner. The slice is expected to touch
+about eight authored Python/manifest/test files plus generated mirrors; split assessment is required
+if it exceeds the normal substantive-change threshold. Root AGENTS.md, README architecture and
+write routes were read; the router returned no routed skill requirements for these Python/manifests.
+
+Measured after implementation: 12 authored code/test/manifest files, approximately 363 added/deleted
+lines, plus generated mirrors and the owning debt note. This remains one scope boundary: selector,
+dispatcher, all host wiring and direct-entry guards must land together to close every bypass. The
+measured candidate is below the 1,000-line/40-file assessment threshold and introduces no second concern.
+
+The existing `_standards_root` accepts a route file before examining product ownership. Replace
+that decision with a shared `dev_rules.managed_repo_root(project_dir, payload_root)` selector. It
+uses the nearest Git root, reads only that root's profile, and recognizes explicit
+`product == "concertable"` or exact membership in the shipped Concertable registry. A different
+explicit product takes precedence over registry fallback; malformed or unrelated local state must
+not inherit an ancestor profile. Registered consumers without their required profile still reach
+the existing diagnostic. A generic route table or lifecycle value does not select the product.
+
+```python
+root = _repo_root(project_dir)
+if root is None:
+    return None
+profile = _load_json(root / PROFILE_FILE)
+if isinstance(profile, dict) and "product" in profile:
+    return root if profile["product"] == "concertable" else None
+registry = _load_json(Path(payload_root).joinpath(*REGISTRY))
+repos = registry.get("repos", {}) if isinstance(registry, dict) else {}
+return root if isinstance(repos, dict) and _repository_slug(root) in repos else None
+```
+
+One packaged `.agents/hooks/scoped_hook.py` dispatcher guards every manifest-registered hook in
+both hosts before invoking its existing entry point. It reads and validates the event, uses its
+working directory to resolve product ownership, and returns zero without hook side effects outside
+scope. For owned repositories, it replays the original stdin through a text stream with a compatible
+binary `.buffer` for existing hooks, and runs
+the requested same-directory Python hook using `runpy.run_path(..., run_name="__main__")`, preserving
+its stdout, stderr and exit code. Reject arbitrary paths and recursion. Claude's existing Bash
+launcher forwards the target basename argument; Codex commands name the same dispatcher and target.
+No second subprocess or per-hook scope implementation is needed. The direct instruction and Codex
+agent-delivery entry points also use the selector, so bypassing the wrapper cannot reintroduce the
+observed repository writes. Constrain `find_profile` to the selected repository root.
+
+Acceptance: foreign C++-style route fixtures and nested unrelated repositories produce no product
+context, no agent files, no profile writes and no downstream hook invocation for either host.
+Explicit product profiles and exact registry entries retain their existing hook behavior, including
+block exit codes. Test actual Codex delivery and dispatcher calls, then run both existing hook suites
+and generated-package drift check. Native consumer acceptance and cleanup follow after release.
+
+## Machine-verifier continuation (2026-09-29)
+
+While native role acceptance is gated, strengthen the existing packaged `verify_machine.py` in this
+core delivery slice. Do not revive the earlier parallel bootstrap audit mode. Preserve its `audit(home)`
+list-of-strings API and existing command's 0/1 result while replacing line scanning with strict parsed
+configuration. A parse/read failure remains a finding and cannot produce a clean result. Error messages
+identify paths and error categories without printing configuration values or parser excerpts.
+
+Walk Codex's root and named `profiles` tables for plugin, marketplace, hook, agent, notify and instruction
+configuration. Preserve the exact built-in marketplace exceptions and hook trust-state exception.
+Do not classify all hidden entries as host-owned: only Codex skills `.system` has the existing explicit
+exception. Report directory links without traversing them, and report unreadable configuration paths.
+The TOML audit requires Python 3.11+; report that prerequisite clearly if unavailable.
+
+Add repeatable `--repository` paths to inspect repository `.codex/agents` and local marketplace sources
+in `.codex/config.toml`, `.claude/settings.json` and `.claude/settings.local.json`, including named Codex
+profiles. GitHub project declarations themselves are allowed. Add optional JSON stdout with stable
+finding codes, paths and setting names; keep the default human output and never print setting values.
+The verifier remains read-only and never invokes a host, installs packages, copies authentication,
+or deletes configuration. A nonexistent explicitly named repository is an inspection failure.
+
+Meaningful tests cover valid alternate TOML syntax, malformed/redacted inputs, named profiles,
+host-owned exceptions, hidden loose files, linked directories, repository-local overrides and read-only
+CLI behavior. Run the focused verifier suite and source/package generation checks; update the utility
+instructions and its generated harness manifest in the same candidate. Native host and consumer
+acceptance remain outstanding even after this verifier passes.
