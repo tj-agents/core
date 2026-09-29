@@ -24,7 +24,8 @@ BLOCK = "\r\n".join((
     "        if ($LASTEXITCODE -eq 0) {",
     "            $baseAgentsCodexMachine = @($baseAgentsCodexInventory.installed |"
     " Where-Object { $_.pluginId -eq 'machine@base-agents' -and $_.enabled })[0]",
-    "            if ($baseAgentsCodexMachine.version -match '^[A-Za-z0-9._-]+$') {",
+    "            if ($baseAgentsCodexMachine.version -match '^[A-Za-z0-9][A-Za-z0-9._-]*$' -and"
+    " $baseAgentsCodexMachine.version -notmatch '\\.\\.') {",
     "                $baseAgentsCodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME }"
     " else { Join-Path $env:USERPROFILE '.codex' }",
     "                $baseAgentsCodexProfile = Join-Path $baseAgentsCodexHome"
