@@ -166,7 +166,13 @@ class Stub {
 using System;
 class Stub {
     static void Main(string[] args) {
-        Console.WriteLine("codex-cli 0.160.0");
+        if (args.Length >= 4 && args[0] == "plugin" && args[1] == "marketplace" && args[2] == "upgrade") {
+            Console.WriteLine("{\"selectedMarketplaces\":[],\"upgradedRoots\":[],\"errors\":[]}");
+        } else if (args.Length >= 3 && args[0] == "plugin" && args[1] == "list") {
+            Console.WriteLine("{\"installed\":[],\"available\":[]}");
+        } else {
+            Console.WriteLine("codex-cli 0.160.0");
+        }
         Environment.Exit(0);
     }
 }
