@@ -177,5 +177,3 @@ new-session mechanisms for their respective scopes.
   mechanism separate.
 - `python -B -m unittest discover -s .agents/hooks/tests -p test_workflow_route.py`: 12 passed.
 - `pwsh .agents/sync-generated.ps1 -Check`: 385 package files checked, 0 changed, 0 pruned.
-- `python -B -m unittest discover -s .agents/hooks/tests -p test_workflow_route.py`: 12 passed.
-- `pwsh .agents/sync-generated.ps1 -Check`: 385 package files checked, 0 changed, 0 pruned.
