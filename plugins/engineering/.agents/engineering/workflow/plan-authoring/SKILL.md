@@ -45,8 +45,10 @@ For a request to choose the next roadmap item, let the
    independently shippable phases that each end green, with an exact consumption contract and verification
    gate for every phase that exposes a capability. Apply `engineering:git-branching` to map large phases
    into reviewable PR slices before implementation: purpose, actual base/parent, dependencies, expected
-   size and verification. Prefer a stack for dependent slices. Do not equate one phase with one PR or
-   defer decomposition until the accumulated implementation is ready to merge.
+   size and verification. Plan sequential delivery by default. When dependent work must begin before
+   its parent lands, record why and use the required stack relationship from `git-branching`. Allocate
+   checkouts for active work rather than pre-creating every planned branch. Do not equate one phase with
+   one PR or defer decomposition until the accumulated implementation is ready to merge.
 3. Write the owned artifact in the repository's current format. For a plan, create or update its compact
    ledger with its roadmap path and stable item key; the plan does not cite the roadmap. A standing reference
    keeps the bare-stem shape defined by `plans` and creates no competing phase owner.

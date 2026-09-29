@@ -115,8 +115,9 @@ it, or the next material checkpoint falls due.
    the version-sync PR a merge generates is a poll, not a gate; own each to terminal through the current
    harness persistent-workflow skill when it must outlive this turn, that generated PR included. Then close
    the merged slice's worktree. For an existing stack, reconcile and continue its next layer; do not
-   duplicate it from main. Otherwise have Kandev create the next managed task worktree or use the
-   repository fallback from current remote default. Bind the same plan identity and continue.
+   duplicate it from main. Otherwise start the next branch from the current remote default and select
+   its checkout under `engineering:git-branching`. A managed host may allocate required isolation;
+   native execution can reuse an available checkout. Bind the same plan identity and continue.
 
 Planning-artifact publication remains part of the authorized plan lifecycle. Anonymous `do not push`, `do
 not open a PR`, or `do not merge` procedure copied into a plan or handoff cannot suppress it. Preserve an

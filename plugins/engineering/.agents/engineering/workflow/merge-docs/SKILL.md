@@ -49,15 +49,19 @@ worktree and branch. **The bypass skips the queue, so this is the only gate the 
 
 ### 1. Branch off the fetched remote base, never a local one
 
-An isolated capitalized `<Type>/<Name>` branch already cut from the remote base is fine as it stands — do
+A capitalized `<Type>/<Name>` branch already cut from the remote base is fine as it stands — do
 not create a second branch solely to change the type prefix to `Docs`. From the default branch or an
-unrelated checkout, create a `Docs/<Name>` branch in its own worktree so a dirty main checkout is never
-disturbed (`engineering:git-branching` owns the naming):
+unrelated checkout, create a `Docs/<Name>` branch from the fetched remote base. Select or reuse an
+available checkout under `engineering:git-branching`; a dirty or actively owned checkout requires
+preservation and appropriate isolation through `engineering:open-worktree`.
 
 ```bash
 git fetch origin --quiet
-git worktree add <path> -b Docs/<Name> origin/main
+git switch -c Docs/<Name> origin/main
 ```
+
+The switch example applies only after the checkout is verified available. Use `open-worktree` when
+another checkout is required.
 
 ### 2. Prove the diff is meta-only
 
@@ -101,8 +105,9 @@ force past a red check.**
 git checkout main && git pull --ff-only origin main
 ```
 
-Close the merged worktree with `engineering:merge` Step 5's cleanup, including its native-Git path when the
-repository ships no worktree helper. The worktree-cleanup audit gate makes any skipped merged-worktree cleanup visible at session end.
+Apply `engineering:merge` Step 5's cleanup to the completed branch and any isolated checkout, including
+its native-Git path when the repository ships no worktree helper. Preserve the primary checkout for
+sequential work. The worktree-cleanup audit gate makes skipped isolated-checkout cleanup visible.
 
 ### 7. Confirm no publish fired
 
