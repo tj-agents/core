@@ -42,6 +42,12 @@ jobs:
       - name: Codex marketplace startup sync tests
         shell: pwsh
         run: ./tests/codex-marketplace-sync.tests.ps1
+      - name: Codex terminal profile tests
+        shell: pwsh
+        run: |
+          python -B -m unittest discover -s tests -p test_codex_terminal_profile.py
+          ./tests/codex-terminal-profile.tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/codex-terminal-profile.tests.ps1
 
       - name: source layout and package tests
         shell: pwsh
