@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Keep PowerShell profiles loading the installed machine plugin's Codex launcher."""
-
 from __future__ import annotations
 
 import argparse
@@ -66,7 +64,7 @@ def ensure(path: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--documents", type=Path)
     arguments = parser.parse_args(argv)
     if os.environ.get(OPT_OUT_ENV, "").strip().lower() == "off" or (os.name != "nt" and arguments.documents is None):
