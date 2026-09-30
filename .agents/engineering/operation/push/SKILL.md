@@ -9,7 +9,7 @@ lane: L7
 
 # Pushing a verified head
 
-Push the current branch and prove the remote actually carries the work. The happy path is one command; the job
+Push the resolved delivery branch and prove the remote actually carries the work. The happy path is one command; the job
 is to make the push land and to say plainly when it did not.
 
 **A command returning success is not evidence.** What counts is a refreshed ref comparison: the
@@ -19,7 +19,9 @@ reserved for stable candidates, real handoffs, and meaningful published checkpoi
 
 ## Step 1 — resolve the push state before mutating the remote
 
-Record the current branch, its upstream, the remote tip, the commits to send, and any open PR and its head.
+Resolve the slice and owning review through `engineering:git-branching` before choosing the push target.
+For corrections made elsewhere, complete its integration step and push from the review's branch.
+Record that branch, its upstream, the remote tip, the commits to send, and the owning PR and its head.
 Resolve whether the work is plan-managed. If a material checkpoint is due, it must already be part of the
 substantive candidate commit. Never manufacture a ledger-only tail in order to push.
 
