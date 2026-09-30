@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "bootstrap-capabilities" / "scripts" / "verify_machine.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "verify_machine.py"
 spec = importlib.util.spec_from_file_location("verify_machine", SCRIPT)
 verify_machine = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verify_machine)
