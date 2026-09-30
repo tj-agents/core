@@ -59,7 +59,7 @@ def main():
     if not data:
         fail("Codex hook data directory is unavailable")
     snapshot_dir = Path(data).resolve() / "hook-snapshots"
-    key = hashlib.sha256(str(root).encode("utf-8")).hexdigest()
+    key = hashlib.sha256((str(root) + "\0" + expected).encode("utf-8")).hexdigest()
     snapshot = snapshot_dir / key
     if not snapshot.is_dir():
         verified(root, expected, plugin)
