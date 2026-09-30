@@ -47,7 +47,7 @@ The source of truth is this repository. `install-cli-session-recovery.ps1` valid
 - `configure-cli-session-autosave.ps1` creates or repairs the recurring scheduled-task watchdog and can start the listener immediately.
 - `save-sessions.ps1 -AutoSave` reconciles live CLI writers and atomically prepares `autosave.json`; `save-sessions.ps1 -Pin` only copies the newest completed state to `pinned.json`.
 - `restore-sessions.ps1` validates a recovery set, deduplicates by `tool + session ID`, skips sessions already running, and invokes Windows Terminal.
-- `start-saved-cli.ps1` starts `codex resume <id>` or `claude --resume <id>` inside the normal Windows PowerShell profile.
+- `start-saved-cli.ps1` starts `codex resume <id>` or `claude --resume <id>` inside the normal Windows PowerShell profile, first running the profile's `Sync-ClaudeStandards` for Claude.
 - `probe-cli-window.ps1` maps CLI console processes to Windows Terminal windows.
 - `reconcile-live-sessions.ps1` is the explicit repair utility for the active registry.
 

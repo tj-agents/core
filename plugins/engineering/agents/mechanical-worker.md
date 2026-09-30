@@ -1,6 +1,7 @@
 ---
 name: mechanical-worker
 description: Serialized mechanical writer restricted to one parent-approved writer lease.
+kind: worker
 model: claude-sonnet-5
 effort: medium
 tools: Read, Glob, Grep, Write, Edit, Bash
