@@ -100,18 +100,18 @@ the same descriptor and bundle.
 Two mechanical rule sources; neither depends on anything wired into the reviewed repository.
 
 **Tier conventions — every repository.** Run the installed `base` plugin's tier gate in conventions
-mode against the reviewed repository root:
+mode against the reviewed repository root. Resolve the gate from the hook-provided plugin root when one
+is set, otherwise as the newest `<plugin cache>/<marketplace>/base/<version>/hooks/tier_gate.py` under
+`~/.claude/plugins/cache` or `~/.codex/plugins/cache`:
 
 ```bash
 python <installed base plugin>/hooks/tier_gate.py --conventions --project <repository-root>
 ```
 
-It lists, per tier that applies to this repository (multi-stack repositories list several), the
-conventions that tier's installed payload ships — its `kind: contract` skills — with their installed
-paths. Read every listed convention whose domain the frozen paths plainly touch, and check each changed
-file against the conventions of the tier(s) that own its language. Do not substitute the session's
-already-loaded skill list for this resolution; the gate reads the same installed declarations that
-gated the session.
+The base package's tiers README owns the output contract. Read every listed convention whose domain the
+frozen paths plainly touch, and check each changed file against the conventions of the tier(s) that own
+its language. Do not substitute the session's already-loaded skill list for this resolution; the gate
+reads the same installed declarations that gated the session.
 
 **Repository routes — repositories that carry them.** When the frozen tree ships
 `.agents/hooks/skill_router.py`, run it with its working directory set to `<candidate-bundle>/tree`,
