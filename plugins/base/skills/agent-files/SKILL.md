@@ -7,5 +7,5 @@ domain: behavior
 
 # Pair agent instruction files
 
-Read and follow the [canonical shared definition](../../.agents/base/agent-files/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../.agents/base/contract/agent-files/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.

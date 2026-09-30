@@ -37,7 +37,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:922f1b237ad006df5081f4373950b817a4f86862261f5cd7ffdbb8805b2a7a31",
+          "digest": "sha256:40f3d8c7a2788ee2e2a9d47c8f14d077a8c412e1a5e25c53647be6fcda328368",
           "harness": {
             "marketplaces": [
               {
@@ -50,14 +50,14 @@
             ],
             "hooks": [
               {
-                "path": ".agents/base/agent-files/scripts/session-context.py",
+                "path": ".agents/base/contract/agent-files/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
                 ]
               },
               {
-                "path": ".agents/base/plan-artifacts/scripts/session-context.py",
+                "path": ".agents/base/contract/plan-artifacts/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -323,7 +323,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:73dc773ada9a4eab11e710bd16ebcce7836396291a221d95234d85c4db338a09",
+          "digest": "sha256:3b3b71d0ae2ac7ad527d8b429499c5fa05633d1f1213ca7c39ea2349ef48d16c",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -340,7 +340,7 @@
             ],
             "hooks": [
               {
-                "path": ".agents/machine/peer-cli/scripts/register_session.py",
+                "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
                 "hosts": [
                   "claude",
                   "codex"

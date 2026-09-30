@@ -7,7 +7,7 @@
   "source_excludes": [
     ".agents/catalog/catalog.json"
   ],
-  "source_digest": "sha256:02aac5e04e47abf45e0cce32cc51ba7d6ce8e897b69cdf779972bdbf7383037f",
+  "source_digest": "sha256:a3214aee95a75924ff4b7847f12628f5851e2606338e81abf0e6e4ab89ca774d",
   "requires": {
     "marketplaces": [
       {
@@ -21,7 +21,7 @@
     ],
     "hooks": [
       {
-        "path": ".agents/machine/peer-cli/scripts/register_session.py",
+        "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
         "hosts": [
           "claude",
           "codex"

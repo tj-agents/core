@@ -244,7 +244,7 @@ class ProcessStandardsTests(unittest.TestCase):
         for host in ("codex", "claude"):
             with self.subTest(host=host):
                 launcher = (
-                    self.root / f".agents/machine/handoff-{host}/SKILL.md"
+                    self.root / f".agents/machine/utility/handoff-{host}/SKILL.md"
                 ).read_text(encoding="utf-8")
                 flat_launcher = " ".join(launcher.split())
                 self.assertIn("After a small or medium plan", flat_launcher)

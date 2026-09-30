@@ -5,7 +5,7 @@
     ".agents/base"
   ],
   "source_excludes": [],
-  "source_digest": "sha256:1a3f2562ca046823b307c45cb12af3794c71519f28885e1ed4a6fe581ec872f1",
+  "source_digest": "sha256:dde8d973c97560ad6a76659a74fae7bc8a8bb124c1de626cb2fc66afb63204fb",
   "requires": {
     "marketplaces": [
       {
@@ -18,14 +18,14 @@
     ],
     "hooks": [
       {
-        "path": ".agents/base/agent-files/scripts/session-context.py",
+        "path": ".agents/base/contract/agent-files/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"
         ]
       },
       {
-        "path": ".agents/base/plan-artifacts/scripts/session-context.py",
+        "path": ".agents/base/contract/plan-artifacts/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"

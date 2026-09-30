@@ -135,6 +135,14 @@ class PayloadTree(unittest.TestCase):
         problems = checker.check(self.root)
         self.assertTrue(any("names 'phantom'" in problem for problem in problems), problems)
 
+    def test_a_repo_authored_directly_as_its_payloads_needs_no_payloads_json(self):
+        self.payload("dotnet")
+        self.assertEqual(checker.check(self.root), [])
+
+        (self.root / "plugins" / "dotnet" / "tier.json").unlink()
+        problems = checker.check(self.root)
+        self.assertTrue(any("no tier.json" in problem for problem in problems), problems)
+
     def test_this_repository_conforms(self):
         self.assertEqual(checker.check(ROOT), [])
 

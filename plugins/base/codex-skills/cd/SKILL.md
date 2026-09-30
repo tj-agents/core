@@ -7,5 +7,5 @@ domain: behavior
 
 # Keep the session in the working repository
 
-Read and follow the [canonical shared definition](../../.agents/base/cd/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../.agents/base/contract/cd/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.
