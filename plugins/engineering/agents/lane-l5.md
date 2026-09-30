@@ -1,6 +1,7 @@
 ---
 name: lane-l5
-description: Bounded delegated work at L5.
+description: Runs one delegated task at lane L5. Mechanical work whose shape is already decided.
+kind: lane
 model: claude-sonnet-5
 effort: medium
 tools: Read, Glob, Grep, Write, Edit, Bash

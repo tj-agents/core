@@ -7,6 +7,11 @@ domain: behavior
 
 # Maintained plan artifacts
 
+When a standards package adds or changes a skill, hook, workflow, marketplace dependency, or
+host permission requirement, update that package's shipped harness manifest in the same change.
+Consumers commit the composed catalog and generated host settings; machine-local configuration
+cannot supply a missing standard.
+
 For a substantive plan intended for execution, write an actual Markdown file before presenting the plan
 as ready. Follow applicable project plan conventions and an existing canonical owner; otherwise choose a
 descriptive filename in the working directory. A standalone directory needs no repository, roadmap,

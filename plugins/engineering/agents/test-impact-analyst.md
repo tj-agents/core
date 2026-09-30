@@ -1,6 +1,7 @@
 ---
 name: test-impact-analyst
 description: Read-only analyst for affected tests, gaps, and repository-supported validation commands.
+kind: review
 model: claude-sonnet-5
 effort: high
 tools: Read, Glob, Grep

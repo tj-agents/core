@@ -17,11 +17,15 @@ jobs:
 
       - name: tier payloads conform to the shipped shape
         shell: pwsh
-        run: python -B plugins/base/skills/stack-tiers/scripts/check_tier_payload.py --root .
+        run: python -B .agents/hooks/check_tier_payload.py --root .
 
       - name: local capability catalog digests are current
         shell: pwsh
         run: python -B scripts/update_catalog_digests.py --check
+
+      - name: harness declarations cover authored sources
+        shell: pwsh
+        run: python -B scripts/sync_harness_manifests.py --check
 
       - name: committed release package digests are current
         shell: pwsh
@@ -38,6 +42,17 @@ jobs:
       - name: handoff launcher tests
         shell: pwsh
         run: ./tests/handoff-launchers.tests.ps1
+
+      - name: Codex marketplace startup sync tests
+        shell: pwsh
+        run: ./tests/codex-marketplace-sync.tests.ps1
+      - name: Codex terminal profile tests
+        shell: pwsh
+        run: |
+          python -B -m unittest discover -s tests -p test_codex_terminal_profile.py
+          ./tests/codex-terminal-profile.tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/codex-terminal-profile.tests.ps1
+
       - name: source layout and package tests
         shell: pwsh
         run: python -B -m unittest discover -s tests -p 'test_*.py' -v

@@ -1,6 +1,7 @@
 ---
 name: review-lens
 description: Read-only independent review lens over one immutable diff and bounded concern.
+kind: review
 model: claude-sonnet-5
 effort: high
 tools: Read, Glob, Grep

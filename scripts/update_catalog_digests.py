@@ -16,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("package_sync", ROOT / "scripts/sync_plugin_packages.py")
 SYNC = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SYNC)
+HARNESS_SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sync_harness_manifests.py")
+HARNESS = importlib.util.module_from_spec(HARNESS_SPEC)
+HARNESS_SPEC.loader.exec_module(HARNESS)
 
 
 def git(repository: Path, *arguments: str, binary: bool = False):
@@ -101,6 +104,22 @@ def update(root: Path, source_values: list[str], revision_values: list[str], che
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     sources = parse_sources(source_values)
     revisions = parse_revisions(revision_values)
+    if set(sources) - {"base-agents"} or set(revisions) - {"base-agents"}:
+        raise ValueError("Core digest sync accepts only its own base-agents marketplace")
+    harnesses = HARNESS.synchronize(root, check=True)
+    stale_harnesses: list[str] = []
+    for release in catalog["releases"]:
+        if release["owner_repository"] != "tj-agents/core":
+            raise ValueError("Core catalog may contain only core releases")
+        for plugin in release["plugins"]:
+            required = harnesses[plugin["name"]]["requires"]
+            if plugin.get("harness") != required:
+                stale_harnesses.append(plugin["id"])
+                plugin["harness"] = required
+    if check and stale_harnesses:
+        raise ValueError("Stale catalog harnesses: " + ", ".join(stale_harnesses))
+    if not check and stale_harnesses:
+        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
     _, output, _, _ = SYNC.build(root, validate_catalog_digests=False)
     changed: list[str] = []
     for release in catalog["releases"]:
