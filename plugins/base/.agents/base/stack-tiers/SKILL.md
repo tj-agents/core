@@ -41,9 +41,10 @@ installed. A tier repository cloned later is gated the moment it is installed, w
 
 [`tier.schema.json`](tier.schema.json) is the contract. `applies` is `always` for a ubiquitous package
 or `stack-present` for a stack tier. `detect` holds `files` (repository-relative paths), `globs`
-(filenames at any depth) and `content` (a `glob` whose text matches a `pattern`); any one match means
-the stack is present. Prefer a marker the stack cannot exist without — a project file, not a folder
-name someone chose.
+(filenames at any depth), `content` (a `glob` whose text matches a `pattern`) and, at `schema_version`
+2, `remote` (regexes against the origin identity `owner/name`, for a tier scoped to an organisation's
+repositories); any one match means the stack is present. Prefer a marker the stack cannot exist
+without — a project file, not a folder name someone chose.
 
 Plugin and marketplace identity are taken from the installed path, so a declaration cannot claim to be
 a plugin it is not, and the skill prefix the gate blocks is always the plugin's real name.
@@ -58,6 +59,19 @@ tiers apply in this project, and prints nothing when no stack tier is installed.
 blocks invoking a skill belonging to a tier whose stack is absent — Claude's `Skill` call by its
 qualified name, and Codex's shell read of that tier's `SKILL.md`, which is the same event in the other
 host's shape.
+
+`--conventions` lists, per applicable tier, the conventions its installed payload ships — the skills
+whose front matter declares `kind: contract`. A review loads exactly that: the applicable tiers'
+rules, resolved from the installed cache with nothing wired into the reviewed repository.
+
+## The payload shape is enforced, not remembered
+
+[`scripts/check_tier_payload.py`](scripts/check_tier_payload.py) verifies a tier repository's
+generated `plugins/` output: `tier.json` present and schema-valid in every payload declared by
+`.agents/plugins/payloads.json`, no undeclared payload directory, every `skills/*/SKILL.md` carrying
+`name:` and one-word `kind:` front matter, and `INDEX.md`/`selection.json` naming exactly the shipped
+skills. Every tier repository runs it in its own CI, so drift fails that repository's build instead of
+silently shipping a tier the gate cannot see or conventions the review cannot find.
 
 The gate does not remove a tier's skills from the session listing; no host mechanism can do that
 without per-repository or per-machine settings. It stops them being applied, not being offered.
