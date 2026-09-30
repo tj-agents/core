@@ -17,7 +17,7 @@ jobs:
 
       - name: tier payloads conform to the shipped shape
         shell: pwsh
-        run: python -B .agents/base/stack-tiers/scripts/check_tier_payload.py --root .
+        run: python -B plugins/base/skills/stack-tiers/scripts/check_tier_payload.py --root .
 
       - name: local capability catalog digests are current
         shell: pwsh
