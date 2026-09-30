@@ -15,10 +15,14 @@ even cloned yet - is gated the moment it is installed, with no change here and n
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
-Two modes, one detection:
+Three modes, one detection:
 
 - `--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
   all when no stack tier is installed, because a statement about an empty set is pure noise.
+- `--conventions` lists, for every tier that applies here, the conventions its installed payload
+  ships - the skills whose front matter declares `kind: contract`. This is what a review loads: the
+  applicable tiers' rules, resolved from the same installed declarations the gate reads, with nothing
+  wired into the reviewed repository.
 - No argument (PreToolUse) blocks invoking a skill that belongs to a tier whose stack is absent.
   Claude sends the `Skill` tool and the qualified name; Codex has no such tool, and its contract is a
   successful shell read of the tier's own `SKILL.md`, so a shell command naming a blocked plugin's
@@ -44,8 +48,11 @@ import subprocess
 import sys
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSIONS = (1, 2)
 DECLARATION_NAME = "tier.json"
+ORPHAN_MARKER = ".orphaned_at"
+FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z0-9-]+)[ \t]*$", re.MULTILINE)
+CONVENTION_KIND = "contract"
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 SHELL_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "exec", "local_shell"})
@@ -60,7 +67,7 @@ GIT_TIMEOUT = 10
 
 
 class Declaration:
-    def __init__(self, plugin, marketplace, data):
+    def __init__(self, plugin, marketplace, data, payload_dir=None, orphaned=False):
         self.plugin = plugin
         self.marketplace = marketplace
         self.tier = data["tier"]
@@ -70,6 +77,8 @@ class Declaration:
         owner = [owner] if isinstance(owner, str) else list(owner or [])
         self.owner_repositories = [_text(name).lower() for name in owner if _text(name)]
         self.detect = data.get("detect") or {}
+        self.payload_dir = payload_dir
+        self.orphaned = orphaned
 
     @property
     def id(self):
@@ -132,11 +141,15 @@ def declarations(roots=None):
                 data = json.loads(path.read_text(encoding="utf-8-sig"))
             except (OSError, UnicodeError, ValueError):
                 continue
-            if not isinstance(data, dict) or data.get("schema_version") != SCHEMA_VERSION:
+            if not isinstance(data, dict) or data.get("schema_version") not in SCHEMA_VERSIONS:
                 continue
             if not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
                 continue
-            declaration = Declaration(plugin, marketplace, data)
+            orphaned = (version_directory / ORPHAN_MARKER).exists()
+            declaration = Declaration(plugin, marketplace, data, version_directory, orphaned)
+            current = found.get(declaration.id)
+            if current is not None and not current.orphaned and declaration.orphaned:
+                continue
             found[declaration.id] = declaration
     return sorted(found.values(), key=lambda declaration: declaration.tier)
 
@@ -240,6 +253,18 @@ def stack_present(root, detect):
     if matches:
         return True, matches[0]
 
+    remote_patterns = [_text(pattern) for pattern in detect.get("remote") or [] if _text(pattern)]
+    if remote_patterns:
+        identity = repository_identity(root)
+        if identity:
+            for pattern in remote_patterns:
+                try:
+                    expression = re.compile(pattern, re.IGNORECASE)
+                except re.error:
+                    continue
+                if expression.search(identity):
+                    return True, "origin " + identity
+
     for rule in detect.get("content") or []:
         if not isinstance(rule, dict):
             continue
@@ -320,6 +345,54 @@ def statement(root, found=None):
     return "\n".join(lines)
 
 
+def front_matter(text):
+    if not text.startswith("---"):
+        return ""
+    end = text.find("\n---", 3)
+    return text[:end] if end != -1 else ""
+
+
+def contract_skills(payload_dir):
+    """Every convention the installed payload ships: (name, SKILL.md path), sorted by name.
+
+    A convention is a skill whose front matter declares `kind: contract` - the marker every tier
+    repository already uses. Front matter is the source of truth; INDEX.md is only a human index.
+    """
+    if payload_dir is None:
+        return []
+    try:
+        entries = sorted((Path(payload_dir) / "skills").iterdir())
+    except OSError:
+        return []
+    skills = []
+    for entry in entries:
+        skill = entry / "SKILL.md"
+        try:
+            text = skill.read_text(encoding="utf-8-sig")
+        except OSError:
+            continue
+        match = FRONT_MATTER_KIND.search(front_matter(text))
+        if match and match.group(1) == CONVENTION_KIND:
+            skills.append((entry.name, skill))
+    return skills
+
+
+def conventions(root, found=None):
+    """The review's rule source: each applicable stack tier's shipped conventions, as one listing."""
+    _, applicable, _ = assess(root, found)
+    if not applicable:
+        return "base:stack-tiers - no stack tier applies to this project; no tier conventions to load."
+
+    lines = ["base:stack-tiers - conventions of every tier that applies to this project."]
+    for declaration, reason in applicable:
+        skills = contract_skills(declaration.payload_dir)
+        lines.append("")
+        lines.append(declaration.tier + " (" + reason + "): " + str(len(skills)) + " convention(s)")
+        for name, path in skills:
+            lines.append("  " + name + " - " + str(path))
+    return "\n".join(lines)
+
+
 def requested_skill(payload):
     tool = _text(payload.get("tool_name") or payload.get("toolName"))
     if tool != "Skill":
@@ -344,7 +417,11 @@ def shell_command(payload):
 
 
 def refusal(declaration, subject, root):
-    markers = [*(declaration.detect.get("files") or []), *(declaration.detect.get("globs") or [])]
+    markers = [
+        *(declaration.detect.get("files") or []),
+        *(declaration.detect.get("globs") or []),
+        *(declaration.detect.get("remote") or []),
+    ]
     patterns = ", ".join(str(marker) for marker in markers) or "its declared markers"
     owner = declaration.owner_repositories[0] if declaration.owner_repositories else declaration.id
     return (
@@ -388,6 +465,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
     parser.add_argument("--instruction-fragment", action="store_true")
+    parser.add_argument("--conventions", action="store_true")
     parser.add_argument("--project", default=None)
     arguments = parser.parse_args()
 
@@ -395,7 +473,7 @@ def main():
         print("stack-tiers: Python 3.9 or newer is required.", file=sys.stderr)
         return 0
 
-    emitting = arguments.session_context or arguments.instruction_fragment
+    emitting = arguments.session_context or arguments.instruction_fragment or arguments.conventions
     payload = {}
     if not emitting:
         try:
@@ -411,6 +489,10 @@ def main():
 
     if arguments.project:
         payload["cwd"] = arguments.project
+
+    if arguments.conventions:
+        print(conventions(project_root(payload)))
+        return 0
 
     if emitting:
         context = statement(project_root(payload))
