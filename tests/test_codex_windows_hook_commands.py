@@ -33,7 +33,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix="codex windows hook ", dir=ROOT) as temporary:
             root = Path(temporary)
-            plugin = root / "plugin with spaces"
+            plugin = root / "cache with spaces" / "base-agents" / "base" / "2.1.16"
             repo = root / "repo"
             shutil.copytree(ROOT / "plugins" / "base", plugin)
             (repo / ".agents").mkdir(parents=True)
@@ -52,6 +52,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
             }
             environment = dict(os.environ)
             environment.pop("PLUGIN_ROOT", None)
+            environment["PLUGIN_DATA"] = str(root / "plugin data")
             crash = root / "crash.py"
             crash.write_text("raise RuntimeError('probe failure')\n", encoding="utf-8")
             adapter = plugin / "hooks" / "pre_tool_use_adapter.py"

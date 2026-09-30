@@ -1,6 +1,7 @@
 ---
 name: lane-l2
-description: Bounded delegated work at L2.
+description: Runs one delegated task at lane L2. High-stakes judgement that is not design, where a wrong call is costly or hard to undo.
+kind: lane
 model: claude-opus-5-5
 effort: xhigh
 tools: Read, Glob, Grep, Write, Edit, Bash

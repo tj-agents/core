@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\" --session-context",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context",
             "timeout": 10
           }
         ]
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\"",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py\"",
             "timeout": 10
           }
         ],

@@ -46,6 +46,7 @@ Generated from canonical `.agents/` definitions.
 - `review-lifecycle` — contract — `.agents/engineering/contract/review-lifecycle/SKILL.md`
 - `session-guidance` — contract — `.agents/engineering/contract/session-guidance/SKILL.md`
 - `skill-routes` — contract — `.agents/engineering/contract/skill-routes/SKILL.md`
+- `stack` — operation — `.agents/engineering/operation/stack/SKILL.md`
 - `sync` — utility — `.agents/engineering/utility/sync/SKILL.md`
 - `sync-all` — utility — `.agents/engineering/utility/sync-all/SKILL.md`
 - `sync-checkout` — operation — `.agents/engineering/operation/sync-checkout/SKILL.md`

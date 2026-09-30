@@ -1,20 +1,3 @@
-# Every bare `claude` launch gets a name, so the built-in /resume picker has something to print per row.
-# Without it every session shows up unlabeled and the only way back into one is knowing its uuid.
-# Any arguments at all (subcommands, -r, -p, --continue, an explicit -n) pass straight through untouched.
-function claude {
-    $exe = @(Get-Command claude -All -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandType -ne 'Function' -and $_.CommandType -ne 'Alias' })
-    if ($exe.Count -eq 0) { Write-Host "claude executable not found on PATH" -ForegroundColor Red; return }
-    $target = $exe[0].Source
-
-    if ($args.Count -gt 0) { & $target @args; return }
-
-    $label = Split-Path (Get-Location).Path -Leaf
-    $b = git branch --show-current 2>$null
-    if ($LASTEXITCODE -eq 0 -and $b) { $label = "$label/$b" }
-    & $target -n $label
-}
-
 # "I closed the terminal, put me back in what I was doing" - from ANY directory, any project on this
 # machine. Takes the most recently touched conversation across all of ~/.claude/projects, moves to the
 # directory that session was rooted in, and resumes it. `cl -Pick` opens the cross-project picker instead.

@@ -15,8 +15,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\" --session-context",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\" --session-context",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context",
             "timeout": 10
           }
         ]
@@ -48,8 +48,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/.agents/base/stack-tiers/scripts/tier_gate.py\"",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/tier_gate.py\"",
             "timeout": 10
           }
         ],

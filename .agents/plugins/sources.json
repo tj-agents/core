@@ -61,6 +61,31 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/tier_gate.py",
+      "destination": "hooks/tier_gate.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/check_tier_payload.py",
+      "destination": "hooks/check_tier_payload.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/schemas/tier.schema.json",
+      "destination": "tiers/tier.schema.json"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/tiers/README.md",
+      "destination": "tiers/README.md"
+    },
+    {
+      "plugin": "base",
       "source": ".codex/adapters/pre_tool_use.py",
       "destination": "hooks/pre_tool_use_adapter.py"
     },
@@ -86,6 +111,11 @@
     },
     {
       "plugin": "machine",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
+    },
+    {
+      "plugin": "machine",
       "source": ".agents/lanes",
       "destination": "resources/lanes"
     },
@@ -93,6 +123,11 @@
       "plugin": "machine",
       "source": ".agents/catalog",
       "destination": "catalog"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/plugins/harness.schema.json",
+      "destination": "plugins/harness.schema.json"
     },
     {
       "plugin": "engineering",
@@ -193,6 +228,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/skill_router.py",
       "destination": "hooks/skill_router.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/codex_hook_snapshot.py",
+      "destination": "hooks/codex_hook_snapshot.py"
     },
     {
       "plugin": "engineering",
