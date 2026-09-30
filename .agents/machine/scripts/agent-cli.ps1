@@ -1,7 +1,7 @@
-# Shared launch primitives for the native agent CLIs. Dot-sourced by handoff-claude, handoff-codex and
-# open-claude so the terminal invocation and the parent-session environment scrub have one owner: every
-# one of them opens the same kind of Windows Terminal tab, and the differences between them are narrow
-# enough to pass in. Not runnable on its own.
+# Shared launch primitives for the native agent CLIs. Dot-sourced by handoff-claude, handoff-codex,
+# open-claude and the terminal claude launcher so the terminal invocation and the parent-session environment scrub
+# have one owner: every one of them opens the same kind of Windows Terminal tab, and the differences
+# between them are narrow enough to pass in. Not runnable on its own.
 
 
 # Session state a Claude Code parent exports into anything it spawns. NO_COLOR=1 alone makes the child
@@ -35,6 +35,40 @@ function Resolve-ClaudeExecutable {
     if ($claude -and (Test-Path -LiteralPath $claude -PathType Leaf)) { return $claude }
 
     throw "The native Claude Code executable was not found. Looked for $env:USERPROFILE\.local\bin\claude.exe and claude.exe on PATH."
+}
+
+function Sync-ClaudeStandards {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $WorkingDirectory,
+        [string] $Claude
+    )
+
+    $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $python) {
+        Write-Host 'standards: python was not found; this session loads the installed plugins'
+        return
+    }
+
+    $config = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $env:USERPROFILE '.claude' }
+    $plugins = if ($env:CLAUDE_CODE_PLUGIN_CACHE_DIR) { $env:CLAUDE_CODE_PLUGIN_CACHE_DIR } else { Join-Path $config 'plugins' }
+    $candidates = @()
+    try {
+        $registry = Get-Content -LiteralPath (Join-Path $plugins 'installed_plugins.json') -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
+        $candidates += @($registry.plugins.'machine@base-agents' | Where-Object { $_.scope -eq 'user' -and $_.installPath } |
+            ForEach-Object { Join-Path $_.installPath 'resources\machine\scripts\claude_standards_sync.py' })
+    }
+    catch { }
+    $candidates += Join-Path $PSScriptRoot 'claude_standards_sync.py'
+    $script = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if (-not $script) {
+        Write-Host 'standards: claude_standards_sync.py was not found; this session loads the installed plugins'
+        return
+    }
+
+    $arguments = @('-B', $script, '--project', $WorkingDirectory)
+    if ($Claude) { $arguments += @('--claude', $Claude) }
+    & $python.Source @arguments | ForEach-Object { Write-Host $_ }
 }
 
 # Windows Terminal mangles argument values on the way to the tab process, and does it silently. It splits
