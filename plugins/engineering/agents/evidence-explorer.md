@@ -1,6 +1,7 @@
 ---
 name: evidence-explorer
 description: Read-only repository evidence explorer for one bounded workflow question.
+kind: review
 model: claude-sonnet-5
 effort: medium
 tools: Read, Glob, Grep

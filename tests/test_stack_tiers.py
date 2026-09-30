@@ -12,8 +12,8 @@ import unittest.mock
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / ".agents" / "base" / "contract" / "stack-tiers" / "scripts" / "tier_gate.py"
-SCHEMA = ROOT / ".agents" / "base" / "contract" / "stack-tiers" / "tier.schema.json"
+SCRIPT = ROOT / ".agents" / "hooks" / "tier_gate.py"
+SCHEMA = ROOT / ".agents" / "schemas" / "tier.schema.json"
 DECLARED = ROOT / ".agents" / "tiers"
 
 

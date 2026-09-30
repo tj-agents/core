@@ -9,8 +9,41 @@ route: infer
 
 # Bootstrap locked capabilities
 
-Use the packaged Python entry point. The lock is project-owned; the catalog is release-owned and ships
-with this skill's plugin. `--profile` is the actual Codex or Claude configuration directory, not a label.
+## Generate repository host settings
+
+Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
+from `base-agents` alongside the project's stack plugins. Commit the selected owners' release
+records as `.agents/catalog/catalog.json` when selecting plugins outside core. Generate host
+settings from that catalog and the lock:
+
+```powershell
+python -B '<skill-directory>\scripts\repo_config.py' `
+  --lock C:\path\to\project\.agents\capabilities.lock.json --mode write
+```
+
+CI uses the same command with `--mode check`; it exits nonzero if either generated file drifts.
+Each GitHub source must match the owner in its catalog release. The generator
+owns Claude's marketplace, enabled-plugin, and `permissions.allow` keys, plus Codex's
+marketplace and plugin tables and `.codex/rules/agent-harness.rules`. Existing Claude allow
+entries outside the declared harness must be moved into `.agents/repository-harness.json`
+before generation. Other project settings remain in place. Release commits are selected by
+the lock, while host settings pin the corresponding GitHub marketplace revision and plugin
+selection.
+
+After each repository has adopted its generated project settings, audit the machine before removing
+old user-profile behavior:
+
+```powershell
+python -B '<skill-directory>\scripts\verify_machine.py' --home C:\Users\name
+```
+
+The verifier is read-only. It reports user-scope plugin selections, marketplaces, hooks,
+notification commands, and loose agents or skills. Codex's recorded hook trust hashes and host
+preferences are runtime state and are not reported. Exit status 1 means findings remain.
+
+Use the packaged Python entry point. The lock and composed catalog are project-owned; core's
+bundled catalog covers only core packages. `--profile` is the actual Codex or Claude configuration
+directory, not a label.
 
 ```powershell
 python -B '<skill-directory>\scripts\bootstrap_capabilities.py' `

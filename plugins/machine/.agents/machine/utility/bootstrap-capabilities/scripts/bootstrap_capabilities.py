@@ -65,6 +65,11 @@ def find_catalog(script: Path) -> Path:
     raise BootstrapError("The packaged catalog/catalog.json could not be found beside this bootstrap.")
 
 
+def catalog_for_lock(lock_path: Path, script: Path) -> Path:
+    project_catalog = lock_path.resolve().parent / "catalog" / "catalog.json"
+    return project_catalog if project_catalog.is_file() else find_catalog(script)
+
+
 def require_string(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value:
         raise BootstrapError(f"{label} must be a non-empty string")
@@ -890,7 +895,7 @@ def plan_operations(selections: list[dict[str, Any]], plugins: dict[str, dict[st
 def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]:
     lock_path = arguments.lock.expanduser().resolve()
     profile = arguments.profile.expanduser().resolve()
-    catalog_path = arguments.catalog.expanduser().resolve() if arguments.catalog else find_catalog(Path(__file__).resolve())
+    catalog_path = arguments.catalog.expanduser().resolve() if arguments.catalog else catalog_for_lock(lock_path, Path(__file__).resolve())
     catalog = load_json(catalog_path)
     releases, plugins = catalog_index(catalog)
     selections = validate_lock(load_json(lock_path), releases, plugins)
@@ -1048,7 +1053,7 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--harness", choices=("codex", "claude"), required=True)
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--mode", choices=("preview", "apply", "verify"), required=True)
-    parser.add_argument("--catalog", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--catalog", type=Path, help="Committed project catalog; defaults to the lock's catalog or the bundled core catalog")
     parser.add_argument("--report", type=Path)
     return parser.parse_args(argv)
 

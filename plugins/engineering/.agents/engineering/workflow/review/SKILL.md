@@ -99,11 +99,11 @@ the same descriptor and bundle.
 
 Two mechanical rule sources; neither depends on anything wired into the reviewed repository.
 
-**Tier conventions — every repository.** Resolve the installed `base` plugin's `stack-tiers` skill
-directory and run its gate in conventions mode against the reviewed repository root:
+**Tier conventions — every repository.** Run the installed `base` plugin's tier gate in conventions
+mode against the reviewed repository root:
 
 ```bash
-python <stack-tiers skill dir>/scripts/tier_gate.py --conventions --project <repository-root>
+python <installed base plugin>/hooks/tier_gate.py --conventions --project <repository-root>
 ```
 
 It lists, per tier that applies to this repository (multi-stack repositories list several), the

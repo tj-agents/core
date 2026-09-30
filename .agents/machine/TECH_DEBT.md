@@ -19,20 +19,18 @@ entries are reconciled against the marketplaces it actually resolves so the inst
 trusted. When either holds, add a Codex registry reader behind the same report-by-default,
 fail-closed contract and delete this entry.
 
-## A session pin protects against this tool, not against the host's own update
+## Claude keeps a superseded plugin directory for 14 days, not for a session's lifetime
 
-`--pin` stops `prune_plugin_cache.py` from removing a version directory a running session resolved at
-startup. It does not stop Claude Code itself. The host updates a plugin in place and deletes the
-superseded directory while sessions are still bound to it, which is how every stop hook in a live
-session began failing with `Plugin directory does not exist` on 2026-09-22. Nothing in this repository
-sits between the host and its own cache, so that path is unchanged.
+On 2026-09-22 every stop hook in a live session failed with `Plugin directory does not exist` after an
+update. Claude Code 2.1.282 instead writes `.orphaned_at` into the superseded version directory and
+deletes it 14 days later, so hooks keep their loaded path
+([cleanup](https://code.claude.com/docs/en/plugins/loading#cleanup-of-previous-versions)); eight such
+directories per core plugin were still present on 2026-09-28. `prune_plugin_cache.py --apply` keeps them
+inside that window and `--pin` covers the live sessions it records. A session running longer than 14
+days can still lose its hooks, and nothing in this repository sits between the host and its own cleanup.
 
-What the pin does change: this repository is no longer a second cause of the same failure, and the pin
-file records what a session was bound to, which is the evidence a recovery would need.
-
-**Resolution condition.** The host pins a session's resolved plugin directory for that session's
-lifetime, or exposes the resolved set so a supervisor can. Until then, do not describe the pin as a
-fix for mid-session plugin updates — it bounds our own garbage collection only.
+**Resolution condition.** The host keeps a session's resolved plugin directory for that session's
+lifetime, or exposes the resolved set so a supervisor can.
 
 ## Codex records no pin
 
