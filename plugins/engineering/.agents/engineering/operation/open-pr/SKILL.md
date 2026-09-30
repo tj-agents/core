@@ -57,14 +57,15 @@ continue with its title and body. An assessed new slice publishes its selected b
 
 Push only when the delivery branch has no upstream or has unpublished commits.
 
-### 4. Draft the title and body from the branch itself
+### 4. Draft the title and body from the delivery head
 
 - **Title**: concise, under about seventy characters, stating the change — not "fix bug" but the actual fix.
-- Read the branch to draft from, dropping merge commits:
+- Read the resolved review branch, using its current head as `<delivery-head>`. For a new slice use
+  the candidate head being published. Drop merge commits:
 
   ```bash
-  git log --oneline <actual-base>..HEAD
-  git diff --stat <actual-base>...HEAD
+  git log --oneline <actual-base>..<delivery-head>
+  git diff --stat <actual-base>...<delivery-head>
   ```
 
 - For a stack, use the immediate parent's branch as `<actual-base>` and `--base`; link the parent,
@@ -113,13 +114,17 @@ is already complete, reviewed, and exact-head-CI-ready.
 
 ### 6. Bind the delivery owner
 
+For an existing review whose head is unchanged, retain its binding and continuation. A metadata update
+from a correction checkout returns that review's URL with its owner still active. When binding a new
+review or refreshing a pushed head, run from the review's delivery checkout with its explicit PR number.
+
 A PR with nothing owning its wait is what turns every later transition into a question for the user.
 For a stack child, record its parent dependency in the owning ledger. A binding may monitor its checks,
 but `engineering:merge` must verify that its base is eligible before acting. After a parent lands,
 reconcile the child and refresh this binding so the continuation does not rely on stale topology.
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind
+python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind --pr <n>
 ```
 
 It resolves the repository's recorded standing merge authorization against this head and writes the binding
