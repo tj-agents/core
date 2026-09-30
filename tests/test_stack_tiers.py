@@ -44,6 +44,13 @@ REACT = {
     "detect": {"content": [{"glob": "package.json", "pattern": r"\"react\"\s*:"}]},
 }
 BASE = {"schema_version": 1, "tier": "base", "stack": "any project", "applies": "always"}
+INFONETICA = {
+    "schema_version": 2,
+    "tier": "infonetica",
+    "stack": "Infonetica work",
+    "applies": "stack-present",
+    "detect": {"remote": [r"^infonetica/"]},
+}
 
 
 def declaration(plugin, marketplace, data):
@@ -76,6 +83,29 @@ class DeclarationDiscovery(unittest.TestCase):
                 (payload / "tier.json").write_text(body, encoding="utf-8")
 
             self.assertEqual(gate.declarations([cache]), [])
+
+    def test_schema_version_two_is_accepted(self):
+        with tempfile.TemporaryDirectory() as cache:
+            payload = Path(cache) / "infonetica" / "infonetica" / "1.0.0"
+            payload.mkdir(parents=True)
+            (payload / "tier.json").write_text(json.dumps(INFONETICA), encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.tier for item in found], ["infonetica"])
+
+    def test_an_orphaned_version_never_shadows_a_live_one(self):
+        with tempfile.TemporaryDirectory() as cache:
+            live = Path(cache) / "dotagents" / "dotnet" / "aaa-old"
+            orphaned = Path(cache) / "dotagents" / "dotnet" / "zzz-new"
+            for payload in (live, orphaned):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            (orphaned / ".orphaned_at").write_text("", encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.payload_dir for item in found], [live])
 
 
 class TemporaryProject(unittest.TestCase):
@@ -118,6 +148,28 @@ class Detection(TemporaryProject):
 
         other = self.populated(json.dumps({"dependencies": {"vue": "3"}}), ["package.json"])
         present, _ = gate.stack_present(other, REACT["detect"])
+        self.assertFalse(present)
+
+    def test_a_remote_matcher_reads_the_origin_identity_not_the_tree(self):
+        project = self.populated("", ["README.md"])
+        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/Infonetica/cris-preaward-app.git"],
+            cwd=project,
+            check=True,
+        )
+        present, evidence = gate.stack_present(project, INFONETICA["detect"])
+        self.assertTrue(present)
+        self.assertEqual(evidence, "origin infonetica/cris-preaward-app")
+
+        unrelated = self.populated("", ["README.md"])
+        subprocess.run(["git", "init", "-q"], cwd=unrelated, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/tj-agents/core.git"],
+            cwd=unrelated,
+            check=True,
+        )
+        present, _ = gate.stack_present(unrelated, INFONETICA["detect"])
         self.assertFalse(present)
 
 
@@ -181,6 +233,38 @@ class SessionStatement(TemporaryProject):
         self.assertIn("Applies here: `dotnet:*`", text)
         self.assertIn("Does not apply here: `react:*`", text)
         self.assertNotIn("Does not apply here: `dotnet", text)
+
+
+class Conventions(TemporaryProject):
+    def installed(self, skills):
+        cache = tempfile.TemporaryDirectory()
+        self.addCleanup(cache.cleanup)
+        payload = Path(cache.name) / "dotagents" / "dotnet" / "1.0.0"
+        for name, kind in skills:
+            skill = payload / "skills" / name
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                f"---\nname: {name}\ndescription: rule\nkind: {kind}\n---\n\n# {name}\n",
+                encoding="utf-8",
+            )
+        (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+        return gate.declarations([cache.name])
+
+    def test_an_applicable_tier_lists_only_its_contract_skills(self):
+        found = self.installed([("persistence", "contract"), ("e2e-debug", "operation")])
+        (self.project / "Api.csproj").write_text("", encoding="utf-8")
+
+        text = gate.conventions(self.project, found)
+
+        self.assertIn("dotnet (.NET detected (Api.csproj)): 1 convention(s)", text)
+        self.assertIn("persistence", text)
+        self.assertNotIn("e2e-debug", text)
+
+    def test_no_applicable_tier_is_said_explicitly(self):
+        found = self.installed([("persistence", "contract")])
+        text = gate.conventions(self.project, found)
+        self.assertIn("no stack tier applies", text)
+        self.assertNotIn("persistence", text)
 
 
 class Gate(TemporaryProject):

@@ -4,7 +4,7 @@
     {
       "name": "base",
       "root": ".agents/base",
-      "layout": "flat",
+      "layout": "kind",
       "plugin": "base",
       "domain": "behavior"
     },
@@ -18,7 +18,7 @@
     {
       "name": "machine",
       "root": ".agents/machine",
-      "layout": "flat",
+      "layout": "kind",
       "plugin": "machine",
       "domain": "machine"
     }
@@ -71,8 +71,13 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/check_tier_payload.py",
+      "destination": "hooks/check_tier_payload.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/schemas/tier.schema.json",
-      "destination": "tiers/tier.schema.json"
+      "destination": "schemas/tier.schema.json"
     },
     {
       "plugin": "base",
