@@ -77,7 +77,7 @@
     {
       "plugin": "base",
       "source": ".agents/schemas/tier.schema.json",
-      "destination": "tiers/tier.schema.json"
+      "destination": "schemas/tier.schema.json"
     },
     {
       "plugin": "base",
