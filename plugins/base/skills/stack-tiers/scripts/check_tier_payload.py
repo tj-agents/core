@@ -200,23 +200,30 @@ def check_selection(payload, skills, problems):
 
 
 def declared_payloads(root, problems):
+    """The payloads the repo declares, or None for a repo authored directly as its payloads.
+
+    A generator-backed repo carries payloads.json, which also proves no stale generator output sits in
+    plugins/. A repo without one ships whatever plugins/ holds, and every directory there is checked.
+    """
     path = root / PAYLOADS_FILE
+    if not path.is_file():
+        return None
     try:
         data = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeError, ValueError) as error:
         problems.append(f"{PAYLOADS_FILE.as_posix()} is unreadable: {error}")
-        return None
+        return []
     payloads = data.get("payloads") if isinstance(data, dict) else None
     if not isinstance(payloads, dict) or not payloads:
         problems.append(f"{PAYLOADS_FILE.as_posix()} has no usable 'payloads' mapping")
-        return None
+        return []
     return sorted(payloads)
 
 
 def check(root):
     problems = []
     expected = declared_payloads(root, problems)
-    if expected is None:
+    if problems:
         return problems
 
     plugins_dir = root / PLUGINS_DIR
@@ -229,6 +236,11 @@ def check(root):
         for entry in plugins_dir.iterdir()
         if entry.is_dir() and entry.name not in IGNORED_PAYLOAD_ENTRIES
     }
+    if expected is None:
+        expected = sorted(actual)
+        if not expected:
+            problems.append(f"{PLUGINS_DIR}/ contains no payload directory")
+            return problems
     for name in sorted(actual - set(expected)):
         problems.append(
             f"{PLUGINS_DIR}/{name} is not declared in {PAYLOADS_FILE.as_posix()} - stale output an "

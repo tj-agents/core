@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / ".agents" / "base" / "stack-tiers" / "scripts" / "check_tier_payload.py"
+SCRIPT = ROOT / ".agents" / "base" / "contract" / "stack-tiers" / "scripts" / "check_tier_payload.py"
 
 
 def load_module():

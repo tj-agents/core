@@ -16,7 +16,7 @@ $packagedLaunchers = @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Fi
     Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'agent-cli\.ps1' } |
     Select-Object -ExpandProperty FullName)
 $expectedLaunchers = @(
-    foreach ($tree in @('.agents\machine', 'codex-skills', 'skills')) {
+    foreach ($tree in @('.agents\machine\utility', 'codex-skills', 'skills')) {
         Join-Path $pluginRoot "$tree\handoff-claude\scripts\launch-claude.ps1"
         Join-Path $pluginRoot "$tree\handoff-codex\scripts\launch-codex.ps1"
         Join-Path $pluginRoot "$tree\open-claude\scripts\open-claude.ps1"
