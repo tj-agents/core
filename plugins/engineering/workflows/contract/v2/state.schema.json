@@ -45,6 +45,7 @@
         "plan": {"$ref": "#/$defs/non_empty_string"},
         "ledger": {"$ref": "#/$defs/non_empty_string"},
         "roadmap": {"$ref": "#/$defs/non_empty_string"},
+        "pull_request": {"type": ["string", "null"], "pattern": "^https://github\\.com/[^/\\s]+/[^/\\s]+/pull/[1-9][0-9]*$"},
         "reviews": {"$ref": "#/$defs/string_array"}
       }
     },
