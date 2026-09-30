@@ -9,5 +9,5 @@ route: infer
 
 # Codex handoff
 
-Read and follow the [canonical shared definition](../../../.agents/machine/handoff-codex/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../.agents/machine/utility/handoff-codex/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.

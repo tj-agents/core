@@ -12,7 +12,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": 1
+      "enum": [1, 2]
     },
     "tier": {
       "type": "string",
@@ -90,6 +90,15 @@
             }
           },
           "description": "A file whose name matches glob and whose text matches pattern."
+        },
+        "remote": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Regular expressions matched case-insensitively against the repository's origin identity as owner/name. Requires schema_version 2; a version-1 gate ignores the whole declaration."
         }
       }
     }

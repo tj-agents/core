@@ -33,7 +33,7 @@ class PlanArtifactTests(unittest.TestCase):
         return json.loads((self.plugin / f".{host}-plugin/plugin.json").read_text())
 
     def invoke(self, host, source="startup", extra=()):
-        script = self.plugin / ".agents/base/plan-artifacts/scripts/session-context.py"
+        script = self.plugin / ".agents/base/contract/plan-artifacts/scripts/session-context.py"
         return subprocess.run([sys.executable, "-B", str(script), *extra],
                               input=json.dumps({"hook_event_name": "SessionStart", "source": source}),
                               text=True, encoding="utf-8", capture_output=True, cwd=self.cwd)
@@ -45,14 +45,14 @@ class PlanArtifactTests(unittest.TestCase):
             manifest = self.manifest(host)
             hooks = json.loads((self.plugin / manifest["hooks"]).read_text())
             handler = hooks["hooks"]["SessionStart"][0]["hooks"][0]
-            script = ".agents/base/plan-artifacts/scripts/session-context.py"
+            script = ".agents/base/contract/plan-artifacts/scripts/session-context.py"
             if host == "claude":
                 self.assertEqual(handler["command"], f'python -B "${{CLAUDE_PLUGIN_ROOT}}/{script}"')
             else:
                 self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["command"])
                 self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["commandWindows"])
             self.assertTrue((self.plugin / script).is_file())
-            self.assertTrue((self.plugin / '.agents/base/plan-artifacts/templates/PLAN.md').is_file())
+            self.assertTrue((self.plugin / '.agents/base/contract/plan-artifacts/templates/PLAN.md').is_file())
             for source in ("startup", "resume", "compact", "clear"):
                 with self.subTest(host=host, source=source):
                     result = self.invoke(host, source)
@@ -61,7 +61,7 @@ class PlanArtifactTests(unittest.TestCase):
                     self.assertEqual(output["hookEventName"], "SessionStart")
                     self.assertEqual(result.stderr, "")
                     body = output["additionalContext"].split("\n\n", 1)[1]
-                    contract = (self.plugin / '.agents/base/plan-artifacts/SKILL.md').read_text(encoding='utf-8')
+                    contract = (self.plugin / '.agents/base/contract/plan-artifacts/SKILL.md').read_text(encoding='utf-8')
                     self.assertEqual(body, contract.split("\n---\n", 1)[1].strip())
                     bodies.append(body)
         self.assertEqual(len(set(bodies)), 1)
@@ -91,7 +91,7 @@ class PlanArtifactTests(unittest.TestCase):
             self.assertIn('additionalContext', json.loads(result.stdout)['hookSpecificOutput'])
 
     def test_missing_or_invalid_contract_reports_failure_without_mutation(self):
-        contract = self.plugin / ".agents/base/plan-artifacts/SKILL.md"
+        contract = self.plugin / ".agents/base/contract/plan-artifacts/SKILL.md"
         original = contract.read_bytes()
         for host in ("claude", "codex"):
             for content in (b"invalid contract", b"\xff"):
@@ -112,7 +112,7 @@ class PlanArtifactTests(unittest.TestCase):
         result = self.invoke('codex', extra=('--instruction-fragment',))
         self.assertEqual(result.returncode, 0, result.stderr)
         fragment = result.stdout
-        contract = self.plugin / '.agents/base/plan-artifacts/SKILL.md'
+        contract = self.plugin / '.agents/base/contract/plan-artifacts/SKILL.md'
         digest = hashlib.sha256(contract.read_text(encoding='utf-8-sig').encode('utf-8')).hexdigest()
         self.assertIn(f'sha256:{digest}', fragment)
         self.assertIn(contract.read_text().split('\n---\n', 1)[1].strip(), fragment)

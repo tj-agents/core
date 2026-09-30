@@ -15,6 +15,10 @@ jobs:
         shell: pwsh
         run: ./.agents/sync-generated.ps1 -Check
 
+      - name: tier payloads conform to the shipped shape
+        shell: pwsh
+        run: python -B .agents/hooks/check_tier_payload.py --root .
+
       - name: local capability catalog digests are current
         shell: pwsh
         run: python -B scripts/update_catalog_digests.py --check
