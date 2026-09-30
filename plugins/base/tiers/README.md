@@ -24,7 +24,9 @@ A review loads exactly that: the applicable tiers' rules, resolved from the inst
 nothing wired into the reviewed repository.
 
 `hooks/check_tier_payload.py` enforces the shipped payload shape a tier repository must generate:
-`tier.json` present and schema-valid in every payload declared by `.agents/plugins/payloads.json`,
+`tier.json` present and schema-valid in every payload declared by `.agents/plugins/payloads.json`
+(a repository authored directly as its payloads carries no payloads.json and is checked against
+every `plugins/` directory instead),
 no undeclared payload directory, every `skills/*/SKILL.md` carrying `name:` and one-word `kind:`
 front matter, and `INDEX.md`/`selection.json` naming exactly the shipped skills. Every tier
 repository runs it in its own CI, so drift fails that repository's build instead of silently
