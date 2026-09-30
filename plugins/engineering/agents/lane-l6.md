@@ -1,6 +1,7 @@
 ---
 name: lane-l6
-description: Bounded delegated work at L6.
+description: Runs one delegated task at lane L6. Bulk clerical work whose input is too large for the cheapest rung.
+kind: lane
 model: claude-sonnet-5
 effort: low
 tools: Read, Glob, Grep, Write, Edit, Bash

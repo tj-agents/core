@@ -64,6 +64,13 @@ class RepositoryFixture(unittest.TestCase):
 
 
 class CompactRunTests(RepositoryFixture):
+    def test_process_output_decodes_utf8_even_with_non_ascii_text(self):
+        result = ops.run_process(
+            [sys.executable, "-c", "import sys; sys.stdout.buffer.write('café'.encode('utf-8'))"],
+            self.root,
+        )
+        self.assertEqual("café", result.stdout)
+
     def test_success_returns_no_log_content_and_keeps_the_artifact(self):
         result = ops.compact_run(
             self.root,
