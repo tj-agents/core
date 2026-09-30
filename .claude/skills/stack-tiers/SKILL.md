@@ -7,5 +7,5 @@ domain: behavior
 
 # Stack tiers
 
-Read and follow the [canonical shared definition](../../../.agents/base/stack-tiers/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../.agents/base/contract/stack-tiers/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.
