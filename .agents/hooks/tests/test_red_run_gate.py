@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 import uuid
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -113,6 +114,20 @@ class RedRunGateTests(unittest.TestCase):
         result = self.result("pytest", "1 failed in 0.1s")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stderr)
+
+    def test_fallback_skill_is_named_by_its_installed_plugin(self):
+        sys.path.insert(0, str(HOOKS))
+        self.addCleanup(sys.path.remove, str(HOOKS))
+        import red_run_gate
+
+        path = self.base / "cache" / "marketplace" / "replacement" / "1.0" / "skills" / "failing-tests" / "SKILL.md"
+        with patch.object(red_run_gate.skill_router, "plugin_of", return_value="replacement"):
+            lines = red_run_gate.skill_lines(
+                ["engineering:failing-tests"],
+                {"engineering:failing-tests": ("Repair failed tests.", path)},
+                "claude",
+            )
+        self.assertIn("  * replacement:failing-tests", lines)
 
 
 if __name__ == "__main__":

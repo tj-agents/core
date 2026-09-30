@@ -189,6 +189,28 @@ class PluginCacheReconcileTests(ReconcileHarness):
         self.assertEqual(PRUNE.RETAINED, states[stale])
         self.assertEqual(PRUNE.ORPHAN, states[orphan])
 
+    def test_apply_keeps_what_claude_orphaned_inside_its_window(self):
+        import time
+
+        live = self.version('market', 'kept', 'aaaa')
+        recent = self.version('market', 'kept', 'bbbb')
+        expired = self.version('market', 'kept', 'cccc')
+        uninstalled = self.version('gone', 'renamed', 'dddd')
+        now_ms = int(time.time() * 1000)
+        (recent / PRUNE.HOST_ORPHAN_MARKER).write_text(str(now_ms), encoding='utf-8')
+        (uninstalled / PRUNE.HOST_ORPHAN_MARKER).write_text(str(now_ms), encoding='utf-8')
+        expired_ms = now_ms - (PRUNE.HOST_ORPHAN_GRACE_SECONDS + 60) * 1000
+        (expired / PRUNE.HOST_ORPHAN_MARKER).write_text(str(expired_ms), encoding='utf-8')
+        self.registry(live)
+
+        code, output = self.run_cli('--apply')
+
+        self.assertEqual(PRUNE.EXIT_OK, code)
+        self.assertTrue(recent.is_dir())
+        self.assertTrue(uninstalled.is_dir())
+        self.assertFalse(expired.exists())
+        self.assertIn("2 directory(s) inside Claude's 14-day orphan window", output)
+
     def test_a_removal_target_must_be_a_cached_version_directory(self):
         PRUNE.assert_within(self.cache, self.cache / 'market' / 'plugin' / 'version')
         with self.assertRaises(ValueError):

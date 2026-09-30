@@ -18,7 +18,11 @@ if ($Tool -eq 'codex') {
     }
     & $nativeCodex -c 'tui.alternate_screen=always' resume $SessionId
 } else {
-    & "$env:USERPROFILE\.local\bin\claude.exe" --resume $SessionId
+    $claude = "$env:USERPROFILE\.local\bin\claude.exe"
+    if (Get-Command Sync-ClaudeStandards -CommandType Function -ErrorAction SilentlyContinue) {
+        Sync-ClaudeStandards -WorkingDirectory (Get-Location).Path -Claude $claude
+    }
+    & $claude --resume $SessionId
 }
 
 exit $LASTEXITCODE

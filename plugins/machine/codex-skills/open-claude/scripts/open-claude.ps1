@@ -71,6 +71,8 @@ elseif ($Prompt) {
     $arguments += $Prompt
 }
 
+Sync-ClaudeStandards -WorkingDirectory $resolvedWorkingDirectory -Claude $claude
+
 Invoke-AgentTerminalTab `
     -WorkingDirectory $resolvedWorkingDirectory `
     -Executable $claude `
