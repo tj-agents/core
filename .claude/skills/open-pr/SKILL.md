@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: Open or update the pull request for the current branch with the forge's own CLI once a stable substantive candidate needs remote validation. Covers the read-only readiness gate, continuing actionable work after opening instead of stopping by default, drafting the title and body from committed history, keeping required attribution, why end-to-end labels belong to merge, and that marking a draft ready is not merge authorization. Use when the user says open a PR, raise a PR, create the PR, or PR this. Landing it is the merge procedure's job.
+description: Open or update the review that owns the resolved delivery slice, integrating corrections from other branches before publication. Use when opening a PR, publishing a correction, or showing the corrected review.
 
 kind: operation
 domain: process

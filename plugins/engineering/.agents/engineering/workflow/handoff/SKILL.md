@@ -28,7 +28,9 @@ session continues its independent active task.
 
 ## Full context transfer
 
-1. Resolve the current goal, worktree and branch. Update the existing canonical plan with observed state,
+1. Resolve the current goal and its owning review under `engineering:git-branching`, then its worktree
+   and branch. Preserve the review URL in the goal or ledger's `PR:` field when execution moves.
+   Update the existing canonical plan with observed state,
    verification, remaining scope, next action, authorization and transfer ownership. A standalone goal
    does not need a second ledger or an engineering runtime.
 2. Apply `engineering:handoff-format` for a selected engineering lifecycle. For a standalone goal, make a

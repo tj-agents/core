@@ -8,9 +8,34 @@ domain: process
 
 # Branching
 
-**Before starting delivery work, create a branch for it if you are not already on one.** Never commit code to
-the default branch or to an unrelated one. Planning-only authoring may start in the normal checkout; once
-delivery begins, the owning branch carries the plan and ledger with its substantive work.
+## Resolve the work before choosing its branch
+
+The authorized outcome defines the work; its delivery slice defines the review boundary. A plan or
+ledger preserves that identity, while branches and checkouts locate execution. Resolve the slice and
+its owning review from the request, canonical plan, handoff, PR history and Git evidence before choosing
+a publication branch. A branch lookup answers where a review runs; an empty result leaves work ownership
+to be established from that evidence.
+
+Corrections that complete or repair an existing slice return to its owning review, including corrections
+implemented on another branch. Verify the review's current head and base, compare the correction commits
+or equivalent patches with that head, and integrate only the missing changes into its branch. If that
+review already contains them, update its explanation and return its URL. Preserve its base relationship
+unless the actual dependency changed.
+
+Separately authorized work with its own outcome follows the slice assessment below and may receive its
+own review. Record that scope distinction in the existing plan or PR description. When the earlier review
+is closed or merged, reconcile its result before choosing the next slice. Conflicting ownership evidence
+leaves publication pending while safe local implementation and commits continue.
+
+For plan-managed work, the ledger's `PR:` field names the owning review URL; `not opened` means the
+assessed slice has no review yet. Update execution location separately during a handoff. The repository
+state provider carries this field as `artifacts.pull_request`; `delivery-preflight` resolves it against
+the forge, falling back to the current delivery binding and then the branch's review. Standalone work
+carries the same facts in its existing goal or handoff and may supply the owning URL to preflight.
+
+Once ownership is resolved, use a branch for that slice. The default branch and unrelated branches are
+not implementation targets because their commits would mix delivery scopes. Planning-only authoring may
+start in the normal checkout; the delivery branch carries its plan with its substantive work.
 
 ## Fetch first; use the remote default or the recorded stack parent
 
@@ -93,9 +118,9 @@ the displayed diff. Where possible, extract tested preparatory refactors or inde
 first. A large exception needs a recorded concrete reason, rejected split boundaries, measured size and
 validation plan; "same feature", "same phase", or "already on this branch" is not sufficient.
 
-Small repairs to the current slice stay with it. Complete and land that slice before beginning a
-substantial next slice by default. Necessary work on code that has not merged yet, including a refactor
-of that code, follows the required stack relationship above and retains its parent dependency. If a PR is already oversized, preserve its exact head and working
+Complete and land the current slice before beginning a substantial next slice by default. A separately
+scoped change that depends on unmerged code follows the stack relationship above. Corrections within
+the existing slice follow its owning review as resolved above. If a PR is already oversized, preserve its exact head and working
 changes and assess recovery before rewriting history. Map possible boundaries and compare the benefit
 of smaller reviews with the cost of reconstructing and qualifying new intermediate states. An already
 reviewed, validated candidate may warrant a frozen-scope exception, with its exact evidence and rejected
