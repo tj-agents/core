@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: Open or update the pull request for the current branch with the forge's own CLI once a stable substantive candidate needs remote validation. Covers the read-only readiness gate, continuing actionable work after opening instead of stopping by default, drafting the title and body from committed history, keeping required attribution, why end-to-end labels belong to merge, and that marking a draft ready is not merge authorization. Use when the user says open a PR, raise a PR, create the PR, or PR this. Landing it is the merge procedure's job.
+description: Open or update the review that owns the resolved delivery slice, integrating corrections from other branches before publication. Use when opening a PR, publishing a correction, or showing the corrected review.
 
 kind: operation
 domain: process
@@ -9,7 +9,7 @@ lane: L4
 
 # Opening a pull request
 
-Open or update the PR for the current branch. **During implementation, open a draft PR at the first stable
+Resolve the work and its owning review under `engineering:git-branching`. **During implementation, open a draft PR at the first stable
 candidate that needs remote validation**; later stable candidates within that slice push to the same
 PR. A new substantive slice gets its own PR under `engineering:git-branching`, stacked when dependent.
 An existing draft is not permission to keep expanding its scope. This procedure does
@@ -49,13 +49,13 @@ Docs dirty → fine, they ride the next commit. Any completed **code** → run i
 `engineering:remote-validation`, then commit it per
 `engineering:committing`. A PR contains only committed work.
 
-### 3. Push the branch
+### 3. Publish to the owning review
 
-```bash
-git push -u origin HEAD
-```
+Follow preflight's ownership action. Integrate corrections into the owning review's branch when needed,
+then use `engineering:push` for the stable candidate. If the review already contains the correction,
+continue with its title and body. An assessed new slice publishes its selected branch.
 
-Only when there is no upstream, or the branch is ahead of its remote.
+Push only when the delivery branch has no upstream or has unpublished commits.
 
 ### 4. Draft the title and body from the branch itself
 
@@ -99,13 +99,13 @@ Only when there is no upstream, or the branch is ahead of its remote.
   with nothing to say. State what was verified and what was not; never claim an unobserved result. A visible
   UI change attaches screenshots per `engineering:pr-screenshots`. Keep the mandated attribution footer.
 
-### 5. Create the PR
+### 5. Update the owning PR or create the assessed slice's review
+
+For an existing review, use `gh pr edit <owning-url> --title <title> --body-file <body-file>` and
+preserve its resolved base. For a slice whose scope assessment established a new review:
 
 ```bash
-gh pr create --draft --title "<title>" --body "$(cat <<'EOF'
-<body>
-EOF
-)"
+gh pr create --draft --head <delivery-branch> --title "<title>" --body-file <body-file>
 ```
 
 Add `--base <branch>` only when targeting something other than the default. Omit `--draft` only when the work
