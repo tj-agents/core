@@ -42,8 +42,8 @@ claim that adding instructions or an easily bypassed wrapper guarantees host enf
 
 ## Next Steps
 
-1. Commit the verified local repair and complete an incremental review in
-   `reviews/Docs-SequentialDelivery.md`, preserving the earlier pass. Resolve any findings locally.
+1. Complete the final incremental review of this committed repair in
+   `reviews/Docs-SequentialDelivery.md`, preserving the earlier passes.
 2. Publication remains pending identification of the owning core standards review. The current branch
    has no PR; open #32, #54, #55 and #58 have distinct recorded scopes. No evidence binds this correction
    to them. Once ownership is established, integrate the correction into that review and return its URL.
@@ -63,7 +63,7 @@ claim that adding instructions or an easily bypassed wrapper guarantees host enf
 - `docs-and-debt` owns the positive standards-authoring guidance. This repair changes existing owners
   rather than introducing a new registry, wrapper, hook or scope ledger. Guidance and its state/runtime
   implementation are one coupled repair; splitting them would deliver a contract without its decision path.
-- 202 targeted Python tests passed: workflow operations 43, workflow contracts 62, process standards 19,
+- 204 targeted Python tests passed: workflow operations 45, workflow contracts 62, process standards 19,
   plan/handoff ownership 10, delivery runtime 28, delivery binding hook 21, source layout 16, catalog 2,
   agent-file delivery 1. Tests include a correction on another branch, a successor in another worktree,
   preserved transfer state, existing binding, legitimate separate work, stack base, conflicting/foreign
@@ -108,3 +108,20 @@ Read that record only as evidence; do not edit it concurrently. Actual product r
 https://github.com/Concertable/b2b/pull/38. .NET naming/DDD review:
 https://github.com/tj-agents/dotnet/pull/31. Those repairs have their own tests and external CI/Docker
 gates; they are not this core task's implementation scope.
+
+## Review checkpoint
+
+The first repair is committed as ed583539a50284c21d15bc0750ccd064e9dc9707. Incremental review used a
+frozen 0550098..ed58353 candidate, including the synchronized main layout changes. The configured
+independent review-lens model is unsupported on this account; the parent completed the specified
+fallback and retains the findings in the original branch review artifact. No independent review is claimed.
+
+Two findings are repaired locally: exact Git status filenames now preserve untracked files, spaces,
+leading status whitespace and both rename paths; open-pr carries the owning review head into body
+drafting and retains an existing continuation for metadata-only updates. Binding a published head uses
+its explicit PR number from the delivery checkout. The full 44-case operations suite passed, followed by all 18 affected inspection/ownership cases
+(including the new 45th case) after the final parsing change. Generation, manifests, digests, links
+and payload checks pass. The final committed repair pass remains.
+
+A live preflight against this checkout returned `ownership.action: assess-scope`, confirming that the
+missing branch PR does not produce a create decision. Semantic ownership is still unresolved as above.

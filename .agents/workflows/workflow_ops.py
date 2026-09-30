@@ -262,7 +262,16 @@ def compact_run(root, workflow_run_id, label, command, summary_lines, failure_it
 def inspect_repository(root, workflow_run_id):
     branch = git(root, "branch", "--show-current")
     head = git(root, "rev-parse", "HEAD")
-    status = git(root, "status", "--porcelain=v1")
+    status = run_process(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all", "-z"], root
+    ).stdout
+    dirty_paths = []
+    entries = iter(status.split("\0"))
+    for entry in entries:
+        if entry:
+            dirty_paths.append(entry[3:])
+            if "R" in entry[:2] or "C" in entry[:2]:
+                dirty_paths.append(next(entries))
     upstream = run_process(
         ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
         root,
@@ -285,7 +294,7 @@ def inspect_repository(root, workflow_run_id):
         "upstream": upstream or None,
         "ahead": ahead,
         "behind": behind,
-        "dirty_paths": [line[3:] for line in status.splitlines() if len(line) >= 4],
+        "dirty_paths": dirty_paths,
         "progress_ledgers": plans,
         "review_work_orders": reviews,
     }

@@ -155,6 +155,16 @@ class InspectionAndSkillTests(RepositoryFixture):
         self.assertEqual(self.git("rev-parse", "HEAD"), result["head"])
         self.assertEqual([], result["dirty_paths"])
 
+    def test_inspection_preserves_modified_and_renamed_paths_with_spaces(self):
+        path = self.root / ".agents" / "skills" / "feature" / "SKILL.md"
+        path.write_text("# Changed guidance\n", encoding="utf-8")
+        self.git("mv", "src/mapping.txt", "src/renamed mapping.txt")
+        result = ops.inspect_repository(self.root, "paths")
+        self.assertCountEqual(
+            [".agents/skills/feature/SKILL.md", "src/renamed mapping.txt", "src/mapping.txt"],
+            result["dirty_paths"],
+        )
+
     def test_skill_identity_loads_once_and_survives_context_recovery(self):
         lifecycle = "feature"
         first = ops.skill_identities(self.root, "run-1", lifecycle, [])
@@ -357,6 +367,18 @@ class DeliveryOwnershipTests(RepositoryFixture):
         result = ops.delivery_preflight(self.root, "unknown", None, "origin/main")
         self.assertEqual("assess-scope", result["ownership"]["action"])
         self.assertFalse(result["ready"])
+
+    def test_untracked_document_directory_does_not_obscure_the_ownership_route(self):
+        path = self.root / "plans" / "notes"
+        path.mkdir(parents=True)
+        (path / "WORK PLAN.md").write_text("# Separate notes\n", encoding="utf-8")
+        result = ops.delivery_preflight(self.root, "notes", None, "origin/main")
+        self.assertEqual(["delivery-assess-scope"], result["blockers"])
+        self.assertEqual(["plans/notes/WORK PLAN.md"], result["documentation_dirty_paths"])
+        (path / "script.py").write_text("print('unfinished')\n", encoding="utf-8")
+        result = ops.delivery_preflight(self.root, "mixed", None, "origin/main")
+        self.assertIn("uncommitted-code", result["blockers"])
+        self.assertEqual(["plans/notes/script.py"], result["code_dirty_paths"])
 
     def test_current_review_is_reused_when_the_ledger_has_not_caught_up(self):
         ledger = self.ledger("not opened")
