@@ -39,11 +39,16 @@ everywhere and stay here.
 
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
-from hook_runtime import claim_invocation, grant, is_trusted_checkout
+from hook_runtime import (
+    NETWORK_COMMAND_TIMEOUT_SECONDS,
+    claim_invocation,
+    grant,
+    is_trusted_checkout,
+    run_command,
+)
 
 # This message is what the agent acts on, and Windows defaults these streams to cp1252,
 # which turns the punctuation in it into mojibake.
@@ -56,7 +61,7 @@ _GIT_CWD = ["."]
 
 
 def git(*args):
-    return subprocess.run(
+    return run_command(
         ["git", *args], capture_output=True, text=True, check=True, cwd=_GIT_CWD[0]
     ).stdout.strip()
 
@@ -271,8 +276,9 @@ def gh_json(*args):
     """Runs where the merge runs. `git` was already cwd-aware and this was not, so a
     `cd <other-repo> && gh pr merge <n>` resolved <n> against THIS repo - gating an
     unrelated repo's merge against a Concertable PR that merely shares the number."""
-    return subprocess.run(
-        ["gh", *args], capture_output=True, text=True, check=True, cwd=_GIT_CWD[0]
+    return run_command(
+        ["gh", *args], capture_output=True, text=True, check=True, cwd=_GIT_CWD[0],
+        timeout=NETWORK_COMMAND_TIMEOUT_SECONDS,
     ).stdout.strip()
 
 

@@ -77,6 +77,28 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_direct_handoff_request_routes_without_side_workstream_words(self):
+        for prompt in (
+            "Hand this off to another Codex session.",
+            "Can you hand off the model-control investigation? Keep the current goal here.",
+            "Please do a handoff of this investigation.",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_handoff_questions_and_negation_do_not_launch(self):
+        for prompt in (
+            "Why did you not hand it off?",
+            "Do not hand off this task.",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("", result.stdout)
+
     def test_planning_only_prompt_stays_silent_even_with_an_active_goal(self):
         self.write_goal()
         result = self.run_hook("Planning only: revise the plan, but do not implement it.")

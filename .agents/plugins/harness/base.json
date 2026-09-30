@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "plugin": "base-agents/base",
+  "source_roots": [
+    ".agents/base"
+  ],
+  "source_excludes": [],
+  "source_digest": "sha256:9f2daf92c14f6f41e023462f386601ba348fd2bff10c7d405cff0bd63ee76841",
+  "requires": {
+    "marketplaces": [
+      {
+        "id": "base-agents",
+        "repository": "tj-agents/core"
+      }
+    ],
+    "plugins": [
+      "base-agents/base"
+    ],
+    "hooks": [
+      {
+        "path": ".agents/base/contract/agent-files/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": ".agents/base/contract/plan-artifacts/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/pre_tool_use_adapter.py",
+        "hosts": [
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/skill_router.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/tier_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      }
+    ],
+    "permissions": {
+      "claude_allow": [],
+      "codex_prefix_rules": []
+    }
+  }
+}
