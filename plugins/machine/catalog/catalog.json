@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:92ee4cc163f18cc5b808dd1d27a84f687fcc36e412b061994dd2317dc3ba94b5"
+          "digest": "sha256:b83df298d0e67bcef08a0f51588ef97bece9525db87974b29ba9057116d1aa0e"
         },
         {
           "id": "base-agents/engineering",
@@ -164,7 +164,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:77168a874a4474e7bae573c543207a9c7d36d7f78104203ed85b46df17c964b9",
+          "digest": "sha256:10ac8d81c9cfc0823cbb4b7950b8287da90ac80d03948b5f9305b5a970ed5f88",
           "digest_excludes": [
             "catalog/catalog.json"
           ]

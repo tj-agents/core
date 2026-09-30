@@ -4,7 +4,7 @@
     {
       "name": "base",
       "root": ".agents/base",
-      "layout": "flat",
+      "layout": "kind",
       "plugin": "base",
       "domain": "behavior"
     },
@@ -18,7 +18,7 @@
     {
       "name": "machine",
       "root": ".agents/machine",
-      "layout": "flat",
+      "layout": "kind",
       "plugin": "machine",
       "domain": "machine"
     }

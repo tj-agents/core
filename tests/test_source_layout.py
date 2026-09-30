@@ -57,10 +57,10 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertFalse((self.root / "engineering").exists())
         self.assertFalse((self.root / "machine").exists())
         self.assertIn(
-            "plugins/base/.agents/base/plan-artifacts/SKILL.md",
+            "plugins/base/.agents/base/contract/plan-artifacts/SKILL.md",
             output,
         )
-        self.assertIn("plugins/base/.agents/base/agent-files/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/contract/agent-files/SKILL.md", output)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
@@ -88,18 +88,18 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertEqual(
             output["plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1"],
             SYNC.canonical_output_bytes(
-                (self.root / ".agents/machine/handoff-codex/scripts/launch-codex.ps1").read_bytes()
+                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes()
             ),
         )
 
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
-        source = self.root / ".agents/base/plan-artifacts/templates/PLAN.md"
+        source = self.root / ".agents/base/contract/plan-artifacts/templates/PLAN.md"
         lf = source.read_bytes().replace(b"\r\n", b"\n")
         source.write_bytes(lf.replace(b"\n", b"\r\n"))
 
         _, output, _, _ = SYNC.build(self.root)
 
-        generated = output["plugins/base/.agents/base/plan-artifacts/templates/PLAN.md"]
+        generated = output["plugins/base/.agents/base/contract/plan-artifacts/templates/PLAN.md"]
         self.assertEqual(lf, generated)
         self.assertNotIn(b"\r\n", generated)
 
@@ -159,8 +159,8 @@ class SourceLayoutTests(unittest.TestCase):
     def test_cd_routes_to_automatic_handoff_before_manual_fallback(self):
         _, output, _, _ = SYNC.build(self.root)
         bodies = [
-            (self.root / ".agents/base/cd/SKILL.md").read_text(encoding="utf-8"),
-            output["plugins/base/.agents/base/cd/SKILL.md"].decode("utf-8"),
+            (self.root / ".agents/base/contract/cd/SKILL.md").read_text(encoding="utf-8"),
+            output["plugins/base/.agents/base/contract/cd/SKILL.md"].decode("utf-8"),
         ]
         for body in bodies:
             normalized = body.replace("\r\n", "\n")
@@ -268,7 +268,7 @@ class SourceLayoutTests(unittest.TestCase):
             kinded.read_text(encoding="utf-8").replace("kind: workflow", "kind: utility"),
             encoding="utf-8",
         )
-        path = self.root / ".agents/machine/clip/SKILL.md"
+        path = self.root / ".agents/machine/utility/clip/SKILL.md"
         duplicate = self.root / ".agents/engineering/utility/clip"
         shutil.copytree(path.parent, duplicate)
         duplicate_skill = duplicate / "SKILL.md"
