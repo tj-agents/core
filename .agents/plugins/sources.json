@@ -71,6 +71,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/check_tier_payload.py",
+      "destination": "hooks/check_tier_payload.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/schemas/tier.schema.json",
       "destination": "tiers/tier.schema.json"
     },
