@@ -16,7 +16,7 @@ This is implementation authority for the core repair, not merely a request for a
 - Current branch observed: Docs/SequentialDelivery; previously recorded head 0550098bd3767d92f72e6227e0670c8a039e5759. Verify current identity before edits.
 - Preserve existing sequential-delivery work, reviews/Docs-SequentialDelivery.md, and unrelated untracked plans/in-session-lane-execution/.
 - This core successor exclusively owns generic workflow/standards changes in this checkout. A separate successor owns B2B/.NET naming and DDD; do not edit those checkouts or launch another owner.
-- Consumer installation and merge are held. Reuse an established owning review when publishing corrections; first inspect the actual repository/branch/PR relationship. A checkout without its own PR does not establish new work scope.
+- The user's explicit 2026-09-30 instruction to merge authorizes publication and landing of the completed sequential-delivery and ownership repair. Consumer installation remains held. Inspection found no established review owning this branch's work; publish this assessed slice's review.
 - Lane L1: selecting the smallest sound ownership model and its canonical enforcement boundary requires design judgment. One core successor only.
 
 ## Evidence and failure mechanism
@@ -42,12 +42,9 @@ claim that adding instructions or an easily bypassed wrapper guarantees host enf
 
 ## Next Steps
 
-1. Complete the final incremental review of this committed repair in
-   `reviews/Docs-SequentialDelivery.md`, preserving the earlier passes.
-2. Publication remains pending identification of the owning core standards review. The current branch
-   has no PR; open #32, #54, #55 and #58 have distinct recorded scopes. No evidence binds this correction
-   to them. Once ownership is established, integrate the correction into that review and return its URL.
-   Merge and consumer installation remain explicitly held.
+Complete exact-head CI and merge https://github.com/tj-agents/core/pull/72 into main under the user's
+explicit instruction. Open #32, #54, #55 and #58 have distinct scopes and do not own this work.
+Consumer installation remains held.
 
 ## Completed implementation and verification
 
@@ -93,8 +90,8 @@ the conflicts were derived digests/output, regenerated from the combined authore
 Sequential-delivery work and its review, and the unrelated in-session-lane-execution plan, are preserved.
 
 Publication ownership: Docs/SequentialDelivery has no PR in any state. The open core reviews are #32,
-#54, #55 and #58; their scopes do not establish an owning review for this correction. Finish and commit
-the local repair. A new PR is not inferred from the checkout's missing PR. Merge and installation remain held.
+#54, #55 and #58; their scopes do not establish an owning review for this correction. The user's subsequent
+explicit merge instruction authorizes delivery of this completed slice through its own review.
 
 Implementation decision: `git-branching` owns work/slice/review selection; branches and checkouts are
 execution locations. Reuse the ledger's existing `PR:` field in portable workflow state and resolve it
@@ -121,7 +118,23 @@ leading status whitespace and both rename paths; open-pr carries the owning revi
 drafting and retains an existing continuation for metadata-only updates. Binding a published head uses
 its explicit PR number from the delivery checkout. The full 44-case operations suite passed, followed by all 18 affected inspection/ownership cases
 (including the new 45th case) after the final parsing change. Generation, manifests, digests, links
-and payload checks pass. The final committed repair pass remains.
+and payload checks pass. The final incremental pass is complete and approved at 0cc2a7ab1d17dea8b9b58858c446dbbd2d89c34d; both findings are resolved.
 
 A live preflight against this checkout returned `ownership.action: assess-scope`, confirming that the
-missing branch PR does not produce a create decision. Semantic ownership is still unresolved as above.
+missing branch PR does not produce a create decision. Subsequent scope assessment and explicit user
+authorization establish this branch's completed work as its own delivery slice.
+
+Local repair is complete and committed in ed58353 and 0cc2a7a, after the base-sync commit 169b4c4.
+The canonical review is `reviews/Docs-SequentialDelivery.md`; its previous sequential-delivery evidence
+is preserved. The final committed catalog check passes. Publication and merge are now authorized;
+follow Next Steps to complete delivery. Consumer installation remains held.
+
+## Authorized delivery and CI repair
+
+The user explicitly instructed this session to merge the completed branch. PR #72 now owns this slice:
+https://github.com/tj-agents/core/pull/72. The first full CI run passed source/package checks and failed
+one of 660 shared runtime tests: the trusted-continuation test harness omitted the newly preserved
+pull_request artifact while its ledger explicitly declared PR: not opened. The harness now carries
+that null ownership value through its summary into restored state. Its full acceptance test module
+passes, and generation and catalog checks remain current. The exact artifact-equality assertion is
+unchanged. Review this correction and push it to #72, then complete CI and merge.
