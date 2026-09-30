@@ -50,7 +50,8 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(first.returncode, 0, first.stderr)
-            key = hashlib.sha256(str(payload).encode("utf-8")).hexdigest()
+            expected = SNAPSHOT.digest_tree(payload, "base")
+            key = hashlib.sha256((str(payload) + "\0" + expected).encode("utf-8")).hexdigest()
             snapshot = data / "hook-snapshots" / key
             self.assertTrue((snapshot / "hooks" / "codex_hook_snapshot.py").is_file())
 
@@ -85,6 +86,43 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(rejected.returncode, 2, rejected.stderr)
             self.assertIn("integrity check failed", rejected.stderr)
 
+    def test_same_version_refresh_keeps_each_trusted_package_callable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            payload = temporary / "cache" / "base-agents" / "base" / "2.1.16"
+            shutil.copytree(ROOT / "plugins" / "base", payload)
+            data = temporary / "data"
+            manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
+            template = manifest["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
+            template = template.replace("${PLUGIN_ROOT}", str(payload))
+            original = re.search(r"sha256:[0-9a-f]{64}", template).group()
+            environment = dict(os.environ, PLUGIN_DATA=str(data))
+            commands = []
+
+            for revision in ("first", "second"):
+                (payload / "revision.txt").write_text(revision, encoding="utf-8")
+                expected = SNAPSHOT.digest_tree(payload, "base")
+                command = template.replace(original, expected)
+                commands.append(command)
+                result = subprocess.run(
+                    command, shell=True, cwd=ROOT, env=environment,
+                    capture_output=True, text=True, timeout=30,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+            snapshots = list((data / "hook-snapshots").iterdir())
+            self.assertEqual(2, len(snapshots))
+            self.assertEqual(
+                {"first", "second"},
+                {(path / "revision.txt").read_text(encoding="utf-8") for path in snapshots},
+            )
+            shutil.rmtree(payload)
+            for command in commands:
+                recovered = subprocess.run(
+                    command, shell=True, cwd=ROOT, env=environment,
+                    capture_output=True, text=True, timeout=30,
+                )
+                self.assertEqual(recovered.returncode, 0, recovered.stderr)
 
 if __name__ == "__main__":
     unittest.main()
