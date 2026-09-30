@@ -16,8 +16,8 @@ This public name remains for existing callers. It resolves the durable owner, th
 1. A named ledger resolves its `Worktree`, branch, and PR. A named plan resolves every ledger whose `Plan:`
    header points to it; a named worktree resolves the ledger it owns.
 2. When exactly one owner exists, reconcile it against Git, GitHub, review state, and repository state. Restore
-   its exact open branch worktree, or create the next delivery worktree from current remote default after a
-   merged slice.
+   its exact open branch checkout, or start the next branch from the current remote default after a
+   merged slice. Select or reuse its checkout under `engineering:git-branching`.
 3. When several independent ledgers remain and no worktree was named, list their owners and next-action
    gists and obtain the missing choice. Do not guess. A legacy plan without a ledger gets the labelled
    reconstructed baseline defined by `engineering:plan-checkpoint`.
