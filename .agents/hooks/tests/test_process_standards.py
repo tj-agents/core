@@ -178,10 +178,10 @@ class ProcessStandardsTests(unittest.TestCase):
         body = authored_skill("techdebt").read_text(encoding="utf-8")
         flat = " ".join(body.split())
 
-        self.assertIn("Single-repo mode — isolate before reading a single `TECH_DEBT.md`", flat)
-        self.assertIn("*before* any survey or investigation", flat)
-        self.assertIn("Polyrepo-root mode — survey first, isolate second", flat)
-        self.assertIn("There is no repo to isolate into until one is chosen", flat)
+        self.assertIn("Single-repo mode:** survey the repository", flat)
+        self.assertIn("Select or reuse an available checkout under `engineering:git-branching`", flat)
+        self.assertIn("Polyrepo-root mode:** run Step 2's survey across every child repo", flat)
+        self.assertIn("Once the primary item is selected, its child repo owns this run", flat)
         self.assertIn("Pick the item(s) fast", flat)
         self.assertIn("do not read each entry in full", flat)
         self.assertIn("the bundling test below is applied after that pick", flat)
@@ -336,7 +336,7 @@ class ProcessStandardsTests(unittest.TestCase):
     def test_merge_requires_safe_cleanup_when_the_repository_helper_is_absent(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
         cleanup = body.split(
-            "### 5. Return to a clean base, and remove the merged worktree immediately",
+            "### 5. Return to a clean base and retire any isolated checkout",
             maxsplit=1,
         )[1].split("### 6. Follow the publish", maxsplit=1)[0]
         flat = " ".join(cleanup.split())
@@ -364,7 +364,7 @@ class ProcessStandardsTests(unittest.TestCase):
     def test_merge_retargets_the_host_before_active_worktree_removal(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
         cleanup = body.split(
-            "### 5. Return to a clean base, and remove the merged worktree immediately",
+            "### 5. Return to a clean base and retire any isolated checkout",
             maxsplit=1,
         )[1].split("### 6. Follow the publish", maxsplit=1)[0]
         flat = " ".join(cleanup.split())

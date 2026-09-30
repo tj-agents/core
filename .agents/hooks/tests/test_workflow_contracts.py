@@ -1735,6 +1735,34 @@ class RepositoryProviderTests(unittest.TestCase):
                 "contract-verification",
             )
 
+    def test_repository_provider_carries_the_review_through_transfer(self):
+        url = "https://github.com/example/runtime/pull/9"
+        text = self.ledger.read_text(encoding="utf-8").replace("`not opened`", f"`{url}`")
+        text = text.replace("Run the contract verification gate.",
+                            "Transfer: verified correction\nTransfer to: successor\n"
+                            "Resume stage: implementation\nResume when: successor reads the ledger")
+        self.ledger.write_text(text, encoding="utf-8")
+        state = self.provider.resolve("plans/runtime/RUNTIME_PROGRESS.md", "transfer", "implementation")
+        self.assertEqual(url, state["artifacts"]["pull_request"])
+        self.assertEqual("transfer", state["next_action"]["kind"])
+        self.assertIs(state, self.provider.validate_checkpoint(state))
+
+    def test_repository_provider_distinguishes_new_slice_from_missing_review_evidence(self):
+        path = "plans/runtime/RUNTIME_PROGRESS.md"
+        state = self.provider.resolve(path, "new-slice", "implementation")
+        self.assertIsNone(state["artifacts"]["pull_request"])
+        self.ledger.write_text(self.ledger.read_text(encoding="utf-8").replace(
+            "- PR: `not opened`\n", ""), encoding="utf-8")
+        state = self.provider.resolve(path, "legacy", "implementation")
+        self.assertNotIn("pull_request", state["artifacts"])
+
+    def test_repository_provider_rejects_ambiguous_review_evidence(self):
+        text = self.ledger.read_text(encoding="utf-8").replace(
+            "not opened", "https://github.com/example/runtime/pull/9 and https://github.com/example/runtime/pull/10")
+        self.ledger.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(ContractViolation, "one GitHub pull request"):
+            self.provider.resolve("plans/runtime/RUNTIME_PROGRESS.md", "ambiguous", "implementation")
+
     def test_repository_provider_rejects_a_missing_review_work_order(self):
         text = self.ledger.read_text(encoding="utf-8")
         self.ledger.write_text(

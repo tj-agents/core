@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import delivery_runtime
+import workflow_runtime
 
 
 SCHEMA_VERSION = 1
@@ -261,7 +262,16 @@ def compact_run(root, workflow_run_id, label, command, summary_lines, failure_it
 def inspect_repository(root, workflow_run_id):
     branch = git(root, "branch", "--show-current")
     head = git(root, "rev-parse", "HEAD")
-    status = git(root, "status", "--porcelain=v1")
+    status = run_process(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all", "-z"], root
+    ).stdout
+    dirty_paths = []
+    entries = iter(status.split("\0"))
+    for entry in entries:
+        if entry:
+            dirty_paths.append(entry[3:])
+            if "R" in entry[:2] or "C" in entry[:2]:
+                dirty_paths.append(next(entries))
     upstream = run_process(
         ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
         root,
@@ -284,7 +294,7 @@ def inspect_repository(root, workflow_run_id):
         "upstream": upstream or None,
         "ahead": ahead,
         "behind": behind,
-        "dirty_paths": [line[3:] for line in status.splitlines() if len(line) >= 4],
+        "dirty_paths": dirty_paths,
         "progress_ledgers": plans,
         "review_work_orders": reviews,
     }
@@ -987,7 +997,75 @@ def telemetry(root, workflow_run_id, transcript, host, offline_gap_seconds):
     return result
 
 
-def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref):
+def delivery_owner(root, workflow_run_id, ledger=None, pr_url=None):
+    repository = repository_slug(root)
+    branch = git(root, "branch", "--show-current")
+    references = {}
+    new_slice = False
+    if ledger:
+        provider = workflow_runtime.RepositoryStateProvider(root, workflow_runtime.WorkflowContract())
+        state = provider.resolve(ledger, workflow_run_id, "delivery-preflight")
+        artifacts = state["artifacts"]
+        new_slice = "pull_request" in artifacts and artifacts["pull_request"] is None
+        if artifacts.get("pull_request"):
+            references["ledger"] = artifacts["pull_request"]
+    if pr_url:
+        references["argument"] = pr_url
+    binding_path = root / delivery_runtime.BINDING_FILE
+    if binding_path.is_file():
+        binding = delivery_runtime.binding_from_artifact(json.loads(binding_path.read_text(encoding="utf-8")))
+        delivery_runtime.PersistentDeliveryRouter().validate_binding(binding)
+        if binding["repository"].casefold() != repository.casefold():
+            raise WorkflowOperationError("delivery binding belongs to another repository")
+        if Path(binding["worktree"]).resolve() != root.resolve():
+            raise WorkflowOperationError("delivery binding belongs to another worktree")
+        references["binding"] = binding["pr_url"]
+    numbers = set()
+    for reference in references.values():
+        match = re.fullmatch(r"https://github\.com/([^/\s]+/[^/\s]+)/pull/([1-9][0-9]*)", reference)
+        if not match or match[1].casefold() != repository.casefold():
+            raise WorkflowOperationError("owning PR must be a GitHub URL in this repository")
+        numbers.add(int(match[2]))
+    if len(numbers) > 1:
+        raise WorkflowOperationError("recorded delivery owners disagree; reconcile the ledger and binding")
+    fields = "number,url,headRefName,headRefOid,baseRefName,state,isCrossRepository"
+    if references:
+        number = next(iter(numbers))
+        value = json.loads(run_process(
+            ["gh", "pr", "view", str(number), "--repo", repository, "--json", fields], root
+        ).stdout)
+        source = next(iter(references))
+        if value.get("number") != number:
+            raise WorkflowOperationError("forge returned a different owning PR")
+    else:
+        matches = json.loads(run_process(
+            ["gh", "pr", "list", "--repo", repository, "--head", branch, "--state", "open",
+             "--limit", "2", "--json", fields], root
+        ).stdout)
+        if len(matches) > 1:
+            raise WorkflowOperationError("several open PRs use this branch; resolve the work's review")
+        if not matches:
+            return {"source": "ledger" if new_slice else "unresolved", "pr_url": None,
+                    "action": "create" if new_slice else "assess-scope"}
+        value = matches[0]
+        source = "branch"
+    if not all(value.get(key) for key in ("url", "headRefName", "headRefOid", "baseRefName", "state")):
+        raise WorkflowOperationError("forge returned incomplete owning PR state")
+    expected_url = f"https://github.com/{repository}/pull/{value.get('number')}"
+    if str(value["url"]).casefold() != expected_url.casefold():
+        raise WorkflowOperationError("forge returned a PR outside this repository")
+    if value["state"].upper() != "OPEN" or value.get("isCrossRepository"):
+        action = "reconcile-review"
+    else:
+        action = "update" if value["headRefName"] == branch else "integrate"
+    return {"source": source, "pr_url": value["url"], "branch": value["headRefName"],
+            "head": value["headRefOid"], "base": value["baseRefName"], "action": action}
+
+
+def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref, ledger=None, pr_url=None):
+    ownership = delivery_owner(root, workflow_run_id, ledger, pr_url)
+    owning_base = f"origin/{ownership['base']}" if ownership.get("base") else None
+    base_ref = base_ref or owning_base or "origin/main"
     inspection = inspect_repository(root, workflow_run_id)
     review = review_reconcile(root, workflow_run_id, descriptor_path, base_ref) if descriptor_path else None
     counts = git(root, "rev-list", "--left-right", "--count", f"{base_ref}...HEAD").split()
@@ -1001,6 +1079,10 @@ def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref):
         and not review["review_required"]
     )
     blockers = []
+    if ownership["action"] not in {"create", "update"}:
+        blockers.append("delivery-" + ownership["action"])
+    if owning_base and git(root, "rev-parse", base_ref) != git(root, "rev-parse", owning_base):
+        blockers.append("owning-review-base-mismatch")
     if not branch_valid:
         blockers.append("invalid-feature-branch")
     if inspection["behind"]:
@@ -1014,6 +1096,7 @@ def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref):
     result = {
         "schema_version": SCHEMA_VERSION,
         "operation": "delivery-preflight",
+        "ownership": ownership,
         "identity": {key: inspection[key] for key in ("repository", "root", "branch", "head", "upstream", "ahead", "behind")},
         "base_behind": base_behind,
         "branch_valid": branch_valid,
@@ -1375,7 +1458,9 @@ def parser():
 
     preflight = commands.add_parser("delivery-preflight")
     preflight.add_argument("--descriptor")
-    preflight.add_argument("--base", default="origin/main")
+    preflight.add_argument("--base")
+    preflight.add_argument("--ledger")
+    preflight.add_argument("--pr-url")
 
     commands.add_parser("goal-preflight")
 
@@ -1417,7 +1502,8 @@ def main(argv=None):
     elif arguments.operation == "telemetry":
         result = telemetry(root, arguments.workflow_run_id, arguments.transcript, arguments.host, arguments.offline_gap_seconds)
     elif arguments.operation == "delivery-preflight":
-        result = delivery_preflight(root, arguments.workflow_run_id, arguments.descriptor, arguments.base)
+        result = delivery_preflight(root, arguments.workflow_run_id, arguments.descriptor, arguments.base,
+                                    arguments.ledger, arguments.pr_url)
     elif arguments.operation == "goal-preflight":
         result = goal_preflight(root, arguments.workflow_run_id)
     elif arguments.operation == "delivery-bind":
@@ -1443,6 +1529,8 @@ def main(argv=None):
     else:
         result = cleanup(root, arguments.workflow_run_id, arguments.retention_days)
     emit(result)
+    if arguments.operation == "delivery-preflight" and not result["ready"]:
+        return 1
     return 0 if result.get("exit_state") != "failed" and result.get("budget", {}).get("allowed", True) else 1
 
 

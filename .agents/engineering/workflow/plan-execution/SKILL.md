@@ -56,6 +56,10 @@ state, preferring the active delivery worktree's artifacts over stale copies in 
 An explicit plan or ledger wins. Otherwise continue only when repository evidence identifies exactly one
 active plan. Reconstruct a legacy missing ledger through `plan-checkpoint`; do not guess among multiple owners.
 
+Resolve the slice's owning review under `engineering:git-branching` alongside its plan identity. Carry
+the ledger's `PR:` field across execution branches and handoffs; the provider exposes it as
+`artifacts.pull_request` for delivery preflight.
+
 A restored worktree that is dirty is not by itself a reason to stop. When the changed paths are explained by
 the resolved plan or PR and owned by this branch, that is partial implementation to resume — preserve it and
 continue. Stop only when the dirty state is conflicting, unexplained, unowned, or unsafe, or when a
@@ -111,12 +115,13 @@ it, or the next material checkpoint falls due.
    Continue across phases and PR-sized slices while the original authorization permits. Deliver a meta-only
    slice through `engineering:merge-docs`; deliver any slice containing runtime, product,
    package, schema, deployment, or test-selection changes through `engineering:merge`. Reach either
-   route through `engineering:open-pr` when no PR exists. Waiting on a queue, CI run, publish, or
+   route through `engineering:open-pr` with the resolved slice and owning review. Waiting on a queue, CI run, publish, or
    the version-sync PR a merge generates is a poll, not a gate; own each to terminal through the current
    harness persistent-workflow skill when it must outlive this turn, that generated PR included. Then close
    the merged slice's worktree. For an existing stack, reconcile and continue its next layer; do not
-   duplicate it from main. Otherwise have Kandev create the next managed task worktree or use the
-   repository fallback from current remote default. Bind the same plan identity and continue.
+   duplicate it from main. Otherwise start the next branch from the current remote default and select
+   its checkout under `engineering:git-branching`. A managed host may allocate required isolation;
+   native execution can reuse an available checkout. Bind the same plan identity and continue.
 
 Planning-artifact publication remains part of the authorized plan lifecycle. Anonymous `do not push`, `do
 not open a PR`, or `do not merge` procedure copied into a plan or handoff cannot suppress it. Preserve an

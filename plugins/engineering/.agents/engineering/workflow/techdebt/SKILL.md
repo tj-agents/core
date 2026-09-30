@@ -1,6 +1,6 @@
 ---
 name: techdebt
-description: Take one tech-debt item all the way to a PR in an isolated worktree — survey every TECH_DEBT.md, pick one high-value item, fix it with the long-term scalable solution, verify, delete the resolved entry, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Take one tech-debt item all the way to a focused PR in its selected checkout — survey every TECH_DEBT.md, pick one high-value item, fix it with the long-term scalable solution, verify, delete the resolved entry, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
 
 kind: workflow
 domain: process
@@ -9,7 +9,7 @@ lane: L4
 
 # Working one tech-debt item — or a small bundle — to a PR
 
-Take a tech-debt item all the way to a PR in an isolated worktree, so nothing touches in-flight branches.
+Take a tech-debt item all the way to a focused PR in its selected checkout, so nothing touches in-flight branches.
 This is the *resolution* workflow; where a debt entry lives and when it is deleted is the `docs-and-debt`
 standard. A single item is the default shape; bundling more than one into the same PR is the exception
 below, not a second workflow.
@@ -24,18 +24,13 @@ below, not a second workflow.
    happen to sit there; those are simply out of scope, not disqualifying). A directory with no ancestor repo
    and no such child repos beside it is neither mode — not a valid invocation; say so and stop.
 
-   - **Single-repo mode — isolate before reading a single `TECH_DEBT.md`.** Create a dedicated worktree off
-     the current remote default for this PR's items, following the `open-worktree` standard, *before* any
-     survey or investigation. One worktree owns one PR's worth of items and one branch; a short unique slug
-     per run keeps parallel debt sessions identifiable at a glance. Isolating after picking an item, or
-     mid-investigation, means redoing the work in the right place.
-   - **Polyrepo-root mode — survey first, isolate second.** There is no repo to isolate into until one is
-     chosen, so this mode necessarily breaks single-repo mode's "isolate before reading a single
-     `TECH_DEBT.md`" ordering by design: run Step 2's picking survey across every child repo's
-     `TECH_DEBT.md` set in one combined pass — as if it were a single list — before isolating anywhere. Once
-     a primary item is picked, its child repo is fixed for the rest of this run: `cd` into that one repo and
-     isolate there, following `open-worktree` the same way single-repo mode does — just later, since the
-     survey already happened. A second item may join the bundle only if it also lives in that same child
+   - **Single-repo mode:** survey the repository, then start the selected focused slice from the current
+     remote default. Select or reuse an available checkout under `engineering:git-branching`; use
+     `open-worktree` when concurrent work or necessary isolation requires another checkout. Each active
+     writer has one owning branch and checkout.
+   - **Polyrepo-root mode:** run Step 2's survey across every child repo's `TECH_DEBT.md` set as one
+     combined list. Once the primary item is selected, its child repo owns this run. Select the branch
+     and checkout there under the same `git-branching` and `open-worktree` rules as single-repo mode. A second item may join the bundle only if it also lives in that same child
      repo, on top of passing the Step 2 bundling test below — a PR belongs to one repo, so cross-repo
      bundling doesn't exist. Every other child repo stays untouched; picking from more than one of them is a
      future run, not this one.
@@ -97,8 +92,7 @@ the parent. A bundled item whose transformation is disjoint from every other may
 under one exclusive writer lease; writes stay serialized and the parent reconciles the reported paths against
 Git.
 
-One worktree, one branch, N commits, and one PR outlive every stage here, so a multi-PR cut-over is durable
-work: resolve and validate Workflow v2 repository state, promote it through `engineering:plans`, and
-checkpoint under `engineering:plan-checkpoint` so the
-remaining PRs resume from the entry
-and the ledger rather than from this session.
+Each delivery slice keeps its branch, selected checkout, commits and PR through these stages. When the
+work needs multiple PRs, resolve and validate Workflow v2 repository state, promote it through
+`engineering:plans`, and checkpoint under `engineering:plan-checkpoint`. Deliver the remaining slices
+under `engineering:git-branching`, resuming from the entry and ledger rather than this session.

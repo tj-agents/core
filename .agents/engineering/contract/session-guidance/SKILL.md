@@ -29,8 +29,10 @@ transitively. Use the host's native skill invocation when available or read its 
 ## Keep large changes reviewable
 
 Before implementing or expanding a large refactor or multi-concern change, apply
-`engineering:git-branching` to define and measure PR-sized delivery slices. Dependent slices default to
-stacked PRs; independent slices use separate branches. One goal may span many PRs. A phase label or
+`engineering:git-branching` to define and measure PR-sized delivery slices. Deliver one slice at a time
+by default: validate, review and merge when ready and authorized, then start the next from the updated
+base. When work must build on an unmerged PR, maintain a proper stack. Allocate worktrees for active
+execution needs independently of the number of branches. One goal may span many PRs. A phase label or
 an existing open PR never justifies accumulating the whole goal in one diff. Reassess an oversized
 candidate before adding more scope; preserve atomic behavior and security when choosing boundaries.
 

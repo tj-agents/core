@@ -1,6 +1,6 @@
 ---
 name: open-pr
-description: Open or update the pull request for the current branch with the forge's own CLI once a stable substantive candidate needs remote validation. Covers the read-only readiness gate, continuing actionable work after opening instead of stopping by default, drafting the title and body from committed history, keeping required attribution, why end-to-end labels belong to merge, and that marking a draft ready is not merge authorization. Use when the user says open a PR, raise a PR, create the PR, or PR this. Landing it is the merge procedure's job.
+description: Open or update the review that owns the resolved delivery slice, integrating corrections from other branches before publication. Use when opening a PR, publishing a correction, or showing the corrected review.
 
 kind: operation
 domain: process
@@ -9,7 +9,7 @@ lane: L4
 
 # Opening a pull request
 
-Open or update the PR for the current branch. **During implementation, open a draft PR at the first stable
+Resolve the work and its owning review under `engineering:git-branching`. **During implementation, open a draft PR at the first stable
 candidate that needs remote validation**; later stable candidates within that slice push to the same
 PR. A new substantive slice gets its own PR under `engineering:git-branching`, stacked when dependent.
 An existing draft is not permission to keep expanding its scope. This procedure does
@@ -49,22 +49,23 @@ Docs dirty → fine, they ride the next commit. Any completed **code** → run i
 `engineering:remote-validation`, then commit it per
 `engineering:committing`. A PR contains only committed work.
 
-### 3. Push the branch
+### 3. Publish to the owning review
 
-```bash
-git push -u origin HEAD
-```
+Follow preflight's ownership action. Integrate corrections into the owning review's branch when needed,
+then use `engineering:push` for the stable candidate. If the review already contains the correction,
+continue with its title and body. An assessed new slice publishes its selected branch.
 
-Only when there is no upstream, or the branch is ahead of its remote.
+Push only when the delivery branch has no upstream or has unpublished commits.
 
-### 4. Draft the title and body from the branch itself
+### 4. Draft the title and body from the delivery head
 
 - **Title**: concise, under about seventy characters, stating the change — not "fix bug" but the actual fix.
-- Read the branch to draft from, dropping merge commits:
+- Read the resolved review branch, using its current head as `<delivery-head>`. For a new slice use
+  the candidate head being published. Drop merge commits:
 
   ```bash
-  git log --oneline <actual-base>..HEAD
-  git diff --stat <actual-base>...HEAD
+  git log --oneline <actual-base>..<delivery-head>
+  git diff --stat <actual-base>...<delivery-head>
   ```
 
 - For a stack, use the immediate parent's branch as `<actual-base>` and `--base`; link the parent,
@@ -99,13 +100,13 @@ Only when there is no upstream, or the branch is ahead of its remote.
   with nothing to say. State what was verified and what was not; never claim an unobserved result. A visible
   UI change attaches screenshots per `engineering:pr-screenshots`. Keep the mandated attribution footer.
 
-### 5. Create the PR
+### 5. Update the owning PR or create the assessed slice's review
+
+For an existing review, use `gh pr edit <owning-url> --title <title> --body-file <body-file>` and
+preserve its resolved base. For a slice whose scope assessment established a new review:
 
 ```bash
-gh pr create --draft --title "<title>" --body "$(cat <<'EOF'
-<body>
-EOF
-)"
+gh pr create --draft --head <delivery-branch> --title "<title>" --body-file <body-file>
 ```
 
 Add `--base <branch>` only when targeting something other than the default. Omit `--draft` only when the work
@@ -113,13 +114,17 @@ is already complete, reviewed, and exact-head-CI-ready.
 
 ### 6. Bind the delivery owner
 
+For an existing review whose head is unchanged, retain its binding and continuation. A metadata update
+from a correction checkout returns that review's URL with its owner still active. When binding a new
+review or refreshing a pushed head, run from the review's delivery checkout with its explicit PR number.
+
 A PR with nothing owning its wait is what turns every later transition into a question for the user.
 For a stack child, record its parent dependency in the owning ledger. A binding may monitor its checks,
 but `engineering:merge` must verify that its base is eligible before acting. After a parent lands,
 reconcile the child and refresh this binding so the continuation does not rely on stale topology.
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind
+python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind --pr <n>
 ```
 
 It resolves the repository's recorded standing merge authorization against this head and writes the binding

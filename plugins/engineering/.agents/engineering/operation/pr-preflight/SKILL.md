@@ -1,6 +1,6 @@
 ---
 name: pr-preflight
-description: Read-only readiness gate answering whether the current branch is clear to open or enqueue a PR right now, run before you do. Checks it is a real capitalized Type/Name branch rather than the default one, that the local is not behind its own remote or tracking a deleted one, that it is current with base, that all code is committed while docs may ride uncommitted, whether a PR already exists, that no generated version-bump PR is explicitly red while healthy or pending automation remains out of scope, that no published-package cut-over is half-done, and that the targeted local checkpoint was run rather than a full solution build — then reports GREEN with the next command or every blocker with its exact fix. Changes no state beyond a fetch. Use when the user asks whether they can PR this, are clear to PR or merge, or wants a check before opening or landing one.
+description: Resolve the owning review and check publication readiness across the execution branch, actual base, upstream, committed code, review evidence and slice scope. Read-only apart from refreshing Git refs and runtime telemetry.
 
 kind: operation
 domain: process
@@ -15,9 +15,8 @@ reports a plain **GREEN (go)** or a list of blockers each with its exact fix.
 
 ## Read-only — this procedure never changes state
 
-Inspection commands only. It does **not** edit a ledger, commit, push, checkout, pull, rebase or merge. The one
-write it may perform is a `git fetch` to refresh remote-tracking refs; it never touches the working tree, the
-index, or any branch.
+Inspect repository and forge state without editing the working tree, index or branches. A fetch may
+refresh remote-tracking refs, and the runtime records its inspection telemetry in Git-private state.
 
 ## Why each check exists
 
@@ -41,13 +40,23 @@ index, or any branch.
 Run the deterministic local pass once:
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id <id> delivery-preflight --descriptor <review-descriptor> --base <actual-base>
+python .agents/workflows/workflow_ops.py --workflow-run-id <id> delivery-preflight --ledger <owning-progress-file> --descriptor <review-descriptor>
 ```
 
-It returns branch and exact-head identity, upstream and base currency, code versus documentation dirtiness,
-review reconciliation, and every local blocker. Do not reconstruct those fields with separate shell calls.
-Resolve `<actual-base>` from the intended PR target: the stack parent for a child, otherwise the trunk.
-The local runtime pass does not establish the delivery-slice assessment below; check that separately.
+Omit `--descriptor` before review. For work without a ledger, use `--pr-url <owning-review-url>` when
+known. The pass resolves the recorded review against GitHub before returning local readiness, using
+its base by default; `--base` supplies the intended base for a slice without a review. It checks the
+execution branch, upstream, base currency, dirtiness and review reconciliation in the same pass.
+
+The `ownership.action` routes the next step: `update` uses that review, `integrate` returns corrections
+to its branch, `create` continues an assessed slice recorded as `PR: not opened`, and `reconcile-review`
+resolves a closed or fork review before publication. `assess-scope` means no recorded owner or branch
+review was found: apply `engineering:git-branching` using the request, goal, handoff and history, then
+record the resolved review or separate slice. Standalone work can perform these checks inline and
+keep the assessment in its existing goal; a ledger is not required just to publish it.
+
+This supported preflight returns nonzero for a blocked route. It does not infer semantic scope from
+commit ancestry, nor intercept arbitrary forge commands. The slice assessment below remains required.
 
 1. **On a real feature branch.**
 
@@ -83,14 +92,10 @@ The local runtime pass does not establish the delivery-slice assessment below; c
    Any uncommitted **code** path → **blocker**: commit first, because review runs on committed history. Only
    markdown, plans or scratch docs dirty → fine; say "docs ride along" and move on without fuss.
 
-5. **Existing PR for this branch.**
-
-   ```bash
-   gh pr view --json number,state,url --jq '{number,state,url}'
-   ```
-
-   Already `OPEN` → do not open another; the next step is a push if ahead, then the merge procedure.
-   `MERGED`/`CLOSED` → report it; most likely return to a clean base and start fresh.
+5. **Owning review resolved.** Use the runtime's ownership result, or perform the same resolution inline
+   under `engineering:git-branching`. Confirm the recorded review's repository, state, head and base.
+   A correction branch's missing PR leaves that review unchanged. A closed review needs reconciliation
+   with the requested scope before a new slice is selected.
 
 6. **No explicitly red version-sync gate.**
 
@@ -119,8 +124,9 @@ The local runtime pass does not establish the delivery-slice assessment below; c
 
 ## Verdict
 
-- **GREEN — clear to PR.** State it plainly and give the next command: push if ahead, then
-  `engineering:open-pr` for a new PR, or `engineering:merge` if one is already open.
+- **GREEN — clear to publish the resolved slice.** Name the owning review or assessed new slice and its
+  next action. Push missing corrections to that review; use `engineering:open-pr` for publication and
+  `engineering:merge` when landing is authorized and next.
 - **Not clear.** One blocker per line, most-blocking first, each with the exact procedure that fixes it. Fix
   nothing here — report and stop.
 
