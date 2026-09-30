@@ -6,7 +6,8 @@ contract: `tier.json` beside flat `skills/<name>/SKILL.md` bodies whose front ma
 standards the gate cannot gate and conventions the review cannot find - silently. So each tier
 repository runs this check in its own CI against its generated `plugins/` output and fails loudly.
 
-Checks, per payload named in `.agents/plugins/payloads.json`:
+Checks, per payload named in `.agents/plugins/payloads.json` — or, for a repository authored directly
+as its payloads with no generator and no payloads.json, per directory found under `plugins/`:
 
 - the payload directory exists, and no undeclared directory sits in `plugins/` (stale generator
   output looks exactly like a real plugin to an installer);
