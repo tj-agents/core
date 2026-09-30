@@ -95,15 +95,33 @@ identity, effort, rule-independent objective, read-only tools, and no prior lens
 result against Workflow v2 before using it. Agent/role/model unavailability falls back to the parent over
 the same descriptor and bundle.
 
-## Stage 4 — load applicable repository rules
+## Stage 4 — load applicable rules
 
-Resolve rules mechanically from the frozen changed paths. Run the frozen tree's router with its working
-directory set to `<candidate-bundle>/tree`, decode `<candidate-bundle>/paths.nul`, and pass every decoded
-path as an exact literal argument:
+Two mechanical rule sources; neither depends on anything wired into the reviewed repository.
+
+**Tier conventions — every repository.** Resolve the installed `base` plugin's `stack-tiers` skill
+directory and run its gate in conventions mode against the reviewed repository root:
+
+```bash
+python <stack-tiers skill dir>/scripts/tier_gate.py --conventions --project <repository-root>
+```
+
+It lists, per tier that applies to this repository (multi-stack repositories list several), the
+conventions that tier's installed payload ships — its `kind: contract` skills — with their installed
+paths. Read every listed convention whose domain the frozen paths plainly touch, and check each changed
+file against the conventions of the tier(s) that own its language. Do not substitute the session's
+already-loaded skill list for this resolution; the gate reads the same installed declarations that
+gated the session.
+
+**Repository routes — repositories that carry them.** When the frozen tree ships
+`.agents/hooks/skill_router.py`, run it with its working directory set to `<candidate-bundle>/tree`,
+decode `<candidate-bundle>/paths.nul`, and pass every decoded path as an exact literal argument:
 
 ```bash
 python .agents/hooks/skill_router.py --skills-for "<exact-path-1>" "<exact-path-2>"
 ```
+
+A repository without a router owes only its tier conventions; that absence is normal, not a defect.
 
 Read every routed skill, the root and nearest changed-path `AGENTS.md` files, and the architecture premise
 from the exported frozen tree, never the live checkout. A `DENY PATTERN HIT` is evidence, not a hint.
