@@ -284,7 +284,7 @@
     "review"
   ],
   "host_only_terms": {
-    "claude": ["(?i)[`/]code-review(?=[`\\s.,;:)]|$)", "(?i)[`/]security-review(?=[`\\s.,;:)]|$)", "\\bSkill tool\\b", "(?i)\\bAskUserQuestion\\b", "(?i)\\bToolSearch\\b", "\\bCLAUDE_PLUGIN_ROOT\\b"],
+    "claude": ["(?i)[`/]code-review(?![-\\w/])", "(?i)[`/]security-review(?![-\\w/])", "\\b`?Skill`?\\s+[Tt]ool\\b", "(?i)\\bAskUserQuestion\\b", "(?i)\\bToolSearch\\b", "\\bCLAUDE_PLUGIN_ROOT\\b"],
     "codex": ["\\bcodex\\s+(?:review|exec)\\b", "\\bScheduled Task\\b"]
   },
   "workflow": {
