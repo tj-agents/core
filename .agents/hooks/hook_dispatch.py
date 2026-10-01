@@ -3,17 +3,20 @@
 Each argument is a script path, absolute or beside this one, optionally followed by
 ``@<tool matcher>``. The host's sibling-hook merge is reproduced here, so one event costs one
 interpreter launch instead of one per gate. Each gate still runs as its own ``__main__`` with its
-own stdin, stdout and stderr.
+own stdin, stdout and stderr. A leading ``--deadline <seconds>`` stays under the host timeout: a gate
+still running then is reported, and every finished gate's verdict is kept.
 """
 
 from __future__ import annotations
 
 import io
 import json
+import os
 from pathlib import Path
 import re
 import runpy
 import sys
+import threading
 import traceback
 
 
@@ -107,9 +110,12 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
             if isinstance(context, str) and context.strip():
                 contexts.append(context.strip())
             for key, value in output.items():
-                if key not in ("hookEventName", "permissionDecision", "permissionDecisionReason",
-                               "additionalContext"):
-                    specific.setdefault(key, value)
+                if key in ("hookEventName", "permissionDecision", "permissionDecisionReason",
+                           "additionalContext"):
+                    continue
+                if key in specific and specific[key] != value:
+                    diagnostics.append(f"{name}: conflicting {key} ignored; an earlier gate set it")
+                specific.setdefault(key, value)
 
         decision = data.get("decision")
         if event == "PreToolUse" and decision in LEGACY_DECISIONS:
@@ -167,17 +173,46 @@ def selected(spec: str, tool: str) -> str | None:
     if not separator or not name.endswith(".py"):
         return spec
     if not tool:
-        return name
+        return None
     try:
         return name if re.fullmatch(matcher, tool) else None
     except re.error:
         return name
 
 
+def overrun_notice(event: str, merged: dict, deadline: float, unfinished: list[str]) -> dict:
+    stalled, skipped = unfinished[0], unfinished[1:]
+    notice = (
+        f"hook-dispatch: {Path(stalled).name} did not finish within {deadline:g}s, so its verdict "
+        "is missing for this call"
+    )
+    if skipped:
+        notice += "; these gates did not run: " + ", ".join(Path(name).name for name in skipped)
+    notice += "."
+    merged = dict(merged)
+    message = merged.get("systemMessage")
+    merged["systemMessage"] = f"{message}\n{notice}" if message else notice
+    if event in ("PreToolUse", "PostToolUse", "PostToolUseFailure", "UserPromptSubmit"):
+        specific = dict(merged.get("hookSpecificOutput") or {"hookEventName": event})
+        context = specific.get("additionalContext")
+        specific["additionalContext"] = f"{context}\n\n{notice}" if context else notice
+        merged["hookSpecificOutput"] = specific
+    return merged
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) < 2:
+    arguments = argv[1:]
+    deadline = None
+    if len(arguments) >= 2 and arguments[0] == "--deadline":
+        try:
+            deadline = float(arguments[1])
+        except ValueError:
+            deadline = None
+        arguments = arguments[2:]
+    if not arguments:
         print("hook-dispatch: name the gate scripts to run.", file=sys.stderr)
         return 1
+    stdout, stderr = sys.stdout, sys.stderr
     raw = sys.stdin.buffer.read()
     try:
         data = json.loads(raw.decode("utf-8-sig")) if raw.strip() else {}
@@ -188,13 +223,32 @@ def main(argv: list[str]) -> int:
     event = data.get("hook_event_name") or data.get("hookEventName") or ""
     tool = data.get("tool_name") if isinstance(data.get("tool_name"), str) else ""
 
-    names = [name for name in (selected(spec, tool) for spec in argv[1:]) if name]
-    results = [(name, *run_gate(name, raw)) for name in names]
-    merged, diagnostics = merge(event, results)
+    names = [name for name in (selected(spec, tool) for spec in arguments) if name]
+    results: list[tuple[str, int, str, str]] = []
+    lock = threading.Lock()
+
+    def run_all() -> None:
+        for name in names:
+            result = (name, *run_gate(name, raw))
+            with lock:
+                results.append(result)
+
+    worker = threading.Thread(target=run_all, daemon=True)
+    worker.start()
+    worker.join(deadline)
+    with lock:
+        finished = list(results)
+    merged, diagnostics = merge(event, finished)
+    if worker.is_alive():
+        merged = overrun_notice(event, merged, deadline, names[len(finished):])
     if diagnostics:
-        sys.stderr.write(diagnostics + "\n")
+        stderr.write(diagnostics + "\n")
     if merged:
-        sys.stdout.write(json.dumps(merged, ensure_ascii=True) + "\n")
+        stdout.write(json.dumps(merged, ensure_ascii=True) + "\n")
+    if worker.is_alive():
+        stdout.flush()
+        stderr.flush()
+        os._exit(0)
     return 0
 
 

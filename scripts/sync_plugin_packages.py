@@ -93,6 +93,7 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                                     not isinstance(arguments, list)
                                     or not all(isinstance(argument, str) for argument in arguments)
                                     or any(character.isspace() for character in command)
+                                    or any(character.isspace() for argument in arguments for character in argument)
                                 ):
                                     raise ValueError(
                                         f"{hook_path}: {host} hooks must use exec form: an executable "

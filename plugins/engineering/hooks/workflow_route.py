@@ -155,25 +155,45 @@ def receipt_path(session: str) -> Path:
     return Path(tempfile.gettempdir()) / RECEIPTS / f"{digest}.json"
 
 
-def record_receipt(session: str) -> None:
+def record_receipt(session: str, prompt_id=None) -> None:
     path = receipt_path(session)
     now = time.time()
+    receipt = {"routed_at": now}
+    if isinstance(prompt_id, str) and prompt_id:
+        receipt["prompt_id"] = prompt_id
     try:
         path.parent.mkdir(exist_ok=True)
-        for stale in path.parent.glob("*.json"):
+        path.write_text(json.dumps(receipt), encoding="utf-8")
+        entries = list(path.parent.iterdir())
+    except OSError:
+        return
+    for stale in entries:
+        try:
             if stale != path and stale.stat().st_mtime < now - RECEIPT_RETENTION_SECONDS:
                 stale.unlink()
-        path.write_text(json.dumps({"routed_at": now}), encoding="utf-8")
-    except OSError:
-        pass
+        except OSError:
+            continue
 
 
-def receipt_time(session: str) -> float:
+def claim_recovery(session: str, submitted: float) -> bool:
+    receipt = receipt_path(session)
+    claim = receipt.parent / f"{receipt.stem}.{int(submitted * 1000)}.claim"
     try:
-        value = json.loads(receipt_path(session).read_text(encoding="utf-8")).get("routed_at")
-    except (OSError, ValueError, AttributeError):
-        return 0.0
-    return float(value) if isinstance(value, (int, float)) else 0.0
+        claim.parent.mkdir(exist_ok=True)
+        os.close(os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+    except FileExistsError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def read_receipt(session: str) -> dict:
+    try:
+        value = json.loads(receipt_path(session).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def prompt_text(content) -> str | None:
@@ -230,24 +250,33 @@ def last_prompt(transcript: Path) -> tuple[str, float] | None:
 
 
 def recover(data: dict) -> str | None:
-    if any(key in data for key in ("agent_id", "agentId", "turn_id", "turnId")):
+    if any(key in data for key in ("agent_id", "agentId", "agent_type", "turn_id", "turnId")):
         return None
     session = data.get("session_id")
     transcript = data.get("transcript_path")
     cwd = data.get("cwd")
     if not all(isinstance(value, str) and value for value in (session, transcript, cwd)):
         return None
+    prompt_id = data.get("prompt_id") if isinstance(data.get("prompt_id"), str) else None
+    receipt = read_receipt(session)
+    if prompt_id and receipt.get("prompt_id") == prompt_id:
+        return None
     found = last_prompt(Path(transcript))
     if found is None:
         return None
     prompt, submitted = found
-    if receipt_time(session) >= submitted:
+    routed_at = receipt.get("routed_at")
+    if isinstance(routed_at, (int, float)) and routed_at >= submitted:
+        if prompt_id:
+            record_receipt(session, prompt_id)
+        return None
+    if not claim_recovery(session, submitted):
         return None
     try:
         context = route(prompt, Path(cwd).resolve())
     except (OSError, RuntimeError, ValueError) as error:
         context = f"workflow-route: cannot recover this prompt's route: {error}"
-    record_receipt(session)
+    record_receipt(session, prompt_id)
     return RECOVERED + context if context else None
 
 
@@ -290,7 +319,7 @@ def main() -> int:
         emit("UserPromptSubmit", context)
     session = data.get("session_id")
     if isinstance(session, str) and session:
-        record_receipt(session)
+        record_receipt(session, data.get("prompt_id"))
     return 0
 
 

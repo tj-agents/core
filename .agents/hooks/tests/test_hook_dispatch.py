@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 import uuid
 
@@ -60,6 +61,10 @@ GATES = {
     """,
     "sibling.py": """
         VALUE = "sibling import resolved"
+    """,
+    "hang.py": """
+        import time
+        time.sleep(60)
     """,
 }
 
@@ -121,6 +126,17 @@ class HookDispatchTests(unittest.TestCase):
         self.assertEqual("keep working\n\ndeny reason", output["reason"])
         self.assertEqual("sibling import resolved", output["systemMessage"])
         self.assertNotIn("hookSpecificOutput", output)
+
+    def test_a_gate_past_the_deadline_keeps_finished_verdicts_and_reports_the_rest(self):
+        started = time.monotonic()
+        output, _ = self.dispatch(["--deadline", "2", "deny.py", "context.py", "hang.py", "ask.py"])
+        self.assertLess(time.monotonic() - started, 30)
+        specific = output["hookSpecificOutput"]
+        self.assertEqual("deny", specific["permissionDecision"])
+        self.assertEqual("deny reason", specific["permissionDecisionReason"])
+        self.assertIn("context from Bash", specific["additionalContext"])
+        self.assertIn("hang.py did not finish within 2s", specific["additionalContext"])
+        self.assertIn("these gates did not run: ask.py", output["systemMessage"])
 
     def test_silent_gates_produce_no_output(self):
         output, stderr = self.dispatch(["rebind.py"])

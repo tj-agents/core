@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -234,6 +235,33 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
         delivered = self.run_hook("UserPromptSubmit", prompt=self.PROMPT)
         self.assertIn("engineering:plan-execution automatically selected", delivered["additionalContext"])
         self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
+
+    def test_the_prompt_id_receipt_decides_delivery_before_timestamps(self):
+        self.write_transcript(self.PROMPT)
+        receipts = self.scratch / "agents-workflow-route"
+        receipts.mkdir()
+        digest = hashlib.sha256(self.session.encode("utf-8")).hexdigest()
+        (receipts / f"{digest}.json").write_text(
+            json.dumps({"routed_at": 0, "prompt_id": "prompt-1"}), encoding="utf-8"
+        )
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read", prompt_id="prompt-1"))
+        recovered = self.run_hook("PreToolUse", tool_name="Read", prompt_id="prompt-2")
+        self.assertIn("did not deliver this prompt's route", recovered["additionalContext"])
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read", prompt_id="prompt-2"))
+
+    def test_parallel_tool_calls_recover_the_route_only_once(self):
+        self.write_transcript(self.PROMPT)
+        data = json.dumps({"hook_event_name": "PreToolUse", "cwd": str(self.cwd),
+                           "session_id": self.session, "transcript_path": str(self.transcript),
+                           "tool_name": "Read"})
+        processes = [
+            subprocess.Popen([sys.executable, "-B", str(SCRIPT)], stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                             encoding="utf-8", env=self.environment)
+            for _ in range(4)
+        ]
+        outputs = [process.communicate(data, timeout=30)[0] for process in processes]
+        self.assertEqual(1, sum("did not deliver this prompt's route" in output for output in outputs))
 
     def test_an_unrouted_prompt_stays_silent_after_a_lost_hook(self):
         self.write_transcript("Fix the spelling mistake in README.md.")
