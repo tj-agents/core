@@ -10,4 +10,10 @@ model: gpt-6.1-sol
 # Canonical isolated code review
 
 Read and follow the [canonical shared definition](../../.agents/engineering/workflow/review/SKILL.md) in full.
-This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.
+This entry point adds only Codex's reviewers; the shared procedure is authored once under `.agents/`.
+
+## Codex reviewers
+
+- **Native layer (Stage 3):** `codex review --base <frozen-base>`, run from a checkout at the frozen head.
+  It cannot take a path scope, so the parent drops findings outside a bounded scope.
+- **Security layer (Stage 6):** Codex has no native security reviewer; use the `security` lens.
