@@ -221,6 +221,20 @@ class ReviewTests(RepositoryFixture):
         self.assertEqual(["feature"], [rule["name"] for rule in result["rules"]])
         self.assertEqual(".agents/skills/feature/SKILL.md", result["rules"][0]["path"])
 
+    def test_review_prepare_keeps_plugin_owned_routes_and_deny_hits(self):
+        (self.root / ".agents" / "skill-routes.json").write_text(json.dumps({"routes": [{
+            "path": "^src/", "skills": ["dotnet:persistence"],
+            "deny": [{"pattern": "candidate", "reason": "no candidate text"}],
+        }]}), encoding="utf-8")
+        self.git("add", ".agents/skill-routes.json")
+        self.git("commit", "-q", "-m", "add plugin routing")
+
+        result = ops.review_prepare(self.root, "plugin-routed", "origin/main", "HEAD", False)
+
+        self.assertEqual([], result["rules"])
+        self.assertEqual(["dotnet:persistence"], result["routed_skills"])
+        self.assertEqual([["src/mapping.txt", "no candidate text"]], result["route_violations"])
+
     def test_opted_in_review_fails_visibly_when_router_runtime_is_missing(self):
         (self.root / ".agents" / "skill-routes.json").write_text(
             json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),

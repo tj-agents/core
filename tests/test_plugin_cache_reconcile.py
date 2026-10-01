@@ -234,6 +234,35 @@ class PluginCacheReconcileTests(ReconcileHarness):
         self.assertEqual('', second.getvalue())
         self.assertTrue(stale.is_dir())
 
+    def test_a_superseded_session_is_stated_on_every_start(self):
+        loaded = self.version('market', 'machine', 'e0d17f00a3e4')
+        installed = self.version('market', 'machine', 'bcfa25a4f837')
+        self.registry(installed)
+        environ = dict(self.environ, CLAUDE_PLUGIN_ROOT=str(loaded))
+
+        outputs = []
+        for now in (1000.0, 1001.0):
+            stream = io.StringIO()
+            PRUNE.run_notice(self.config, 0, now, environ=environ, stream=stream)
+            outputs.append(stream.getvalue())
+
+        for output in outputs:
+            self.assertIn('loaded machine e0d17f00a3e4, but bcfa25a4f837 is installed', output)
+            self.assertIn('restart Claude Code', output)
+        self.assertTrue(loaded.is_dir())
+
+    def test_a_session_on_its_installed_root_hears_nothing_about_itself(self):
+        installed = self.version('market', 'machine', 'bcfa25a4f837')
+        self.registry(installed)
+        stream = io.StringIO()
+
+        PRUNE.run_notice(
+            self.config, 0, 1000.0,
+            environ=dict(self.environ, CLAUDE_PLUGIN_ROOT=str(installed)), stream=stream,
+        )
+
+        self.assertNotIn('plugin session', stream.getvalue())
+
     def test_the_notice_stays_silent_on_an_unusable_registry(self):
         self.version('gone', 'renamed', 'cccc')
         stream = io.StringIO()

@@ -1,6 +1,6 @@
 ---
 name: review
-description: Run the canonical isolated code-review workflow over one frozen branch, PR, commit-range, or path candidate with native/general review, relevant fresh read-only lenses, validated evidence, and parent-only deduplication, severity, judgment, and work-order writing. Use for a first full code review when asked to review a branch or PR; use incremental-review for later commits, big-review for a very large diff, docs-review for a meta-only diff, and address-review for existing findings.
+description: Run the canonical isolated code-review workflow over one frozen branch, PR, commit-range, or path candidate with the host's native reviewer, relevant fresh read-only lenses, validated evidence, and parent-only deduplication, severity, judgment, and work-order writing. Use for a first full code review when asked to review a branch or PR; use incremental-review for later commits, big-review for a very large diff, docs-review for a meta-only diff, and address-review for existing findings.
 
 kind: workflow
 domain: process
@@ -9,7 +9,7 @@ lane: L4
 
 # Canonical isolated code review
 
-Review one immutable candidate through a mandatory native/general layer and relevant repository-aware lenses.
+Review one immutable candidate through the host's mandatory native reviewer and relevant repository-aware lenses.
 Subordinate contexts return evidence only. The strong parent validates every result, verifies citations,
 deduplicates, assigns severity, makes the final judgment, and is the sole writer of the canonical work order
 defined by `review-lifecycle`.
@@ -31,6 +31,10 @@ defined by `review-lifecycle`.
   The same transition is authorized when this review is a stage of an implementation workflow whose original
   request already authorized fixing its candidate. Otherwise review is read-only and ends after judgment.
 
+`<engineering>` is the installed engineering plugin root: two directories above this skill's host entry
+point (`<engineering>/skills/review/` in Claude Code, `<engineering>/codex-skills/review/` in Codex). Every
+helper below runs from there against the reviewed repository, which needs no `.agents/` of its own.
+
 Use `incremental-review` when the canonical work order already has a completed watermark and HEAD moved.
 Use `big-review` when the frozen changed surface is too large for one pass, normally more than 300 files or
 several substantial components. Use `docs-review` for a documentation/meta-only diff.
@@ -42,7 +46,7 @@ remote base exactly once, immediately before this final review, while the worktr
 shared deterministic review preparation operation:
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id <id> review-prepare --base <actual-base> --head HEAD --synchronize
+python <engineering>/workflows/workflow_ops.py --root <repository-root> --workflow-run-id <id> review-prepare --base <actual-base> --head HEAD --synchronize
 ```
 
 Use the same resolved actual base for preparation, reconciliation and PR preflight. A stack child's
@@ -51,7 +55,8 @@ main directly into each child as a substitute for reconciling the stack from its
 
 A review-only request over an already immutable remote or commit candidate omits `--synchronize`. The helper
 returns one compact descriptor and Git-private bundle containing the binary patch and NUL path manifest. It
-also records the one synchronization, candidate identity, routed rule hashes, relevant lenses, and one wave.
+also records the one synchronization, candidate identity, routed rule hashes, relevant lenses, security-path
+classification, and one wave.
 Do not reconstruct those facts through separate shell calls.
 
 Freeze a candidate descriptor containing the full base SHA, full head SHA, target branch, scope as `all` or
@@ -83,29 +88,36 @@ No lens writes the artifact. Append a confirmed finding only after the parent va
 evidence. The parent may buffer independent lens results long enough to synthesize them together; recovery
 identity and confirmed findings must remain durable.
 
-## Stage 3 — native/general layer
+## Stage 3 — native layer
 
-Run the host's native general review first over the frozen descriptor, covering correctness, simplification,
-reuse, efficiency, and error handling. If the host exposes no callable native review, dispatch the existing
-`review-lens` capability with the bounded lens `native-general`. Do not invent or require a second
-repository agent definition.
+Run the host's own reviewer first, covering correctness, simplification, reuse, efficiency, and error
+handling. It is a tool call; reading the diff yourself is not this layer.
 
-The invocation receives the frozen base, head, path digest, exact scoped paths, materialized bundle path and
-identity, effort, rule-independent objective, read-only tools, and no prior lens conclusions. Validate the
-result against Workflow v2 before using it. Agent/role/model unavailability falls back to the parent over
-the same descriptor and bundle.
+- Claude Code: the built-in `code-review` skill, invoked through the Skill tool with
+  `<effort> <frozen-base>..<frozen-head>`, adding ` -- <scoped paths>` for a bounded scope. Never pass
+  `--comment` or `--fix`; this workflow owns both.
+- Codex: `codex review --base <frozen-base>`, run from a checkout at the frozen head.
+
+Both read the frozen commits from the local repository, so a synchronized merge that exists only locally is
+still the candidate. Keep only findings on lines changed inside the frozen range and scope. When the host
+reviewer is not callable in this session, dispatch the existing `review-lens` capability with the bounded
+lens `native-general` instead. Record in the work order which native layer ran. Do not invent or require a
+second repository agent definition.
+
+A `native-general` dispatch receives the frozen base, head, path digest, exact scoped paths, materialized
+bundle path and identity, effort, rule-independent objective, read-only tools, and no prior lens
+conclusions. Validate the result against Workflow v2 before using it. Agent/role/model unavailability falls
+back to the parent over the same descriptor and bundle.
 
 ## Stage 4 — load applicable rules
 
 Two mechanical rule sources; neither depends on anything wired into the reviewed repository.
 
-**Tier conventions — every repository.** Run the installed `base` plugin's tier gate in conventions
-mode against the reviewed repository root. Resolve the gate from the hook-provided plugin root when one
-is set, otherwise as the newest `<plugin cache>/<marketplace>/base/<version>/hooks/tier_gate.py` under
-`~/.claude/plugins/cache` or `~/.codex/plugins/cache`:
+**Tier conventions — every repository.** Run the tier gate shipped with this plugin in conventions mode
+against the reviewed repository root:
 
 ```bash
-python <installed base plugin>/hooks/tier_gate.py --conventions --project <repository-root>
+python <engineering>/hooks/tier_gate.py --conventions --project <repository-root>
 ```
 
 The base package's tiers README owns the output contract. Read every listed convention whose domain the
@@ -113,28 +125,23 @@ frozen paths plainly touch, and check each changed file against the conventions 
 its language. Do not substitute the session's already-loaded skill list for this resolution; the gate
 reads the same installed declarations that gated the session.
 
-**Repository routes — repositories that carry them.** When the frozen tree ships
-`.agents/hooks/skill_router.py`, run it with its working directory set to `<candidate-bundle>/tree`,
-decode `<candidate-bundle>/paths.nul`, and pass every decoded path as an exact literal argument:
-
-```bash
-python .agents/hooks/skill_router.py --skills-for "<exact-path-1>" "<exact-path-2>"
-```
-
-A repository without a router owes only its tier conventions; that absence is normal, not a defect.
+**Repository routes — repositories that carry them.** When the frozen tree ships `.agents/skill-routes.json`,
+`review-prepare` runs this plugin's router over it: the descriptor's `routed_skills` names every skill the
+frozen paths owe, plugin-owned ones included, and `route_violations` holds each deny-pattern hit. A
+repository without a route table owes only its tier conventions; that absence is normal, not a defect.
 
 Read every routed skill, the root and nearest changed-path `AGENTS.md` files, and the architecture premise
-from the exported frozen tree, never the live checkout. A `DENY PATTERN HIT` is evidence, not a hint.
+from the exported frozen tree, never the live checkout. A route violation is evidence, not a hint.
 Invoke additional standards only when the diff plainly touches their domain; a missing route is a
 route-table defect rather than a list to duplicate here. If the candidate contains plans or
 implementation-ready design references, load plans and apply its implementation-design review gate to
 those artifacts, including their implementation-path standards.
 
 Record the owning `review` lifecycle and the helper's routed technical rule identities with
-`workflow_ops.py skills`. Read only identities returned as `load`; an unchanged identity returned as
-`cached` is already available to this logical workflow and is not reread after compaction. The descriptor's
-hashes prove whether a cached body still matches the frozen candidate. Check every changed file against each
-routed rule; a changed or missing hash requires a new body read.
+`<engineering>/workflows/workflow_ops.py skills`. Read only identities returned as `load`; an unchanged
+identity returned as `cached` is already available to this logical workflow and is not reread after
+compaction. The descriptor's hashes prove whether a cached body still matches the frozen candidate. Check
+every changed file against each routed rule; a changed or missing hash requires a new body read.
 
 ## Stage 5 — choose and dispatch fresh lenses
 
@@ -163,10 +170,14 @@ dispatch ID contribute nothing.
 
 ## Stage 6 — conditional security layer
 
-Classify the frozen paths through the merge gate's own generic and repository `security_paths` inventory.
-When any path qualifies, run the host security review over the same descriptor. Security evidence joins
-parent synthesis, while the `Security-reviewed up to commit:` marker is written only when the whole pass
-completes. No qualifying path means no security marker.
+The descriptor's `security` field applies the merge gate's generic and repository `security_paths`
+inventory: `first_path` to the frozen paths, `trunk_first_path` to `<trunk_base>..<frozen-head>`, the range
+the gate classifies. Run the layer when `first_path` is set, or when `trunk_first_path` is set and the work
+order's `Security-reviewed up to commit:` marker is missing, unresolvable, or followed by a change to a
+security-sensitive path before the frozen head. It covers `<trunk_base>..<frozen-head>`, or `<frozen-base>..<frozen-head>` when
+`trunk_base` is null: Claude Code's built-in `security-review` skill, or in Codex a `review-lens` dispatch
+with the bounded lens `security` over that range. Security evidence joins parent synthesis, while the
+marker is written only when the whole pass completes. No qualifying path means no security marker.
 
 ## Stage 7 — parent synthesis and completion
 
