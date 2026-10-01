@@ -138,10 +138,8 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         self.assertEqual(["src/Authorization/Startup.cs"], descriptor["paths"])
         self.assertEqual([], descriptor["rules"])
         self.assertEqual([], descriptor["routed_skills"])
-        self.assertEqual(
-            {"first_path": "src/Authorization/Startup.cs", "trunk_first_path": "src/Authorization/Startup.cs"},
-            descriptor["security"],
-        )
+        self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["first_path"])
+        self.assertEqual("src/Authorization/Startup.cs", descriptor["security"]["trunk_first_path"])
         self.assertTrue(Path(descriptor["bundle"]["tree"]).is_dir())
 
     def test_stack_child_inherits_its_parent_layers_security_paths(self):
@@ -158,8 +156,10 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
         descriptor = json.loads(completed.stdout)
         self.assertNotIn("src/Authorization/Startup.cs", descriptor["paths"])
+        main = subprocess.run(["git", "rev-parse", "main"], cwd=self.repository, capture_output=True, text=True)
         self.assertEqual(
-            {"first_path": None, "trunk_first_path": "src/Authorization/Startup.cs"}, descriptor["security"]
+            {"first_path": None, "trunk_base": main.stdout.strip(), "trunk_first_path": "src/Authorization/Startup.cs"},
+            descriptor["security"],
         )
 
     def test_stage_four_lists_the_installed_tier_conventions_from_the_plugin(self):

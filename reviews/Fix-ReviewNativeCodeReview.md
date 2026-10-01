@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `in-progress`
-**Reviewed up to commit:** `49b980b`  `(2026-10-01)`
+**Reviewed up to commit:** `ca107f2`  `(2026-10-01)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-01 — full
@@ -123,8 +123,54 @@ synthesis over the same delta. No new path is security-sensitive.
 - [x] **NR16 — LOW — native** — `.agents/workflows/workflow_ops.py:379`
   The work-order slug was rebuilt from `git branch --show-current`, which is wrong on a detached HEAD.
   The docstring also narrated the design. Fix: both are removed along with NR11's exclusion.
-- [ ] **NR17 — LOW — native** — `.agents/engineering/workflow/review/SKILL.md:97`
+- [x] **NR17 — LOW — native** — `.agents/engineering/workflow/review/SKILL.md:97`
   ` -- <scoped paths>` is not a documented `code-review` target form. Fix: verify it on the next pass,
   and fall back to the range alone, with parent path filtering, if it is not honoured.
 
-  **Resolved** NR11–NR16 in the remediation commit after `1624018`.
+  **Resolved** NR11–NR16 in `ca107f2`. NR17 was verified in the next pass: given
+  `<range> -- <paths>`, `code-review` ran `git diff <range> -- <paths>` and every finding cited a scoped path.
+
+## Review pass — 2026-10-01 — incremental
+
+**Candidate base:** `162401871c1a4a6a1ee2a81bced9653dad1d3bf6`
+**Candidate head:** `ca107f25271175db546ac69d06f13fe3f3473357`
+**Candidate branch:** `Fix/ReviewNativeCodeReview`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:c5fd3e79db8e6f9c7dec52668920ee7e3b90ff7a89ea6f970fbb62eb11b55c1b` `(19 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-pr74-inc2\review\e667eff61e891991e131d0216a0cb318279bfa8d526a24b18d3cf33c5a4b000f`
+**Candidate bundle identity:** `sha256:493cc671d4c5e718d2ddd7c4d27444e7caaf2279e7aaa084afa83c88986899e9`
+**Work-order path:** `reviews/Fix-ReviewNativeCodeReview.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+**Lens coverage:** the native layer was Claude Code's built-in `code-review`, given the range plus
+` -- <authored paths>`. It returned 10 candidates. No security-sensitive path.
+
+### Findings
+
+- [x] **NR18 — MEDIUM — native** — `.agents/engineering/workflow/review/SKILL.md:176`
+  Stage 6's `<trunk-merge-base>` was never frozen. Fix: the descriptor's `security.trunk_base`
+  records it, and Stage 6 reviews `<trunk_base>..<frozen-head>`.
+- [x] **NR19 — MEDIUM — native** — `.agents/engineering/workflow/review/SKILL.md:175`
+  The trunk-range layer ran only for a `new` work order, so an appended pass on a branch with no
+  security marker skipped it and was then blocked at merge. Fix: run it whenever `trunk_first_path` is
+  set and the work order has no `Security-reviewed up to commit:` marker.
+- [x] **NR20 — LOW — native** — `.agents/hooks/tier_gate.py:178`
+  A matching project install with no `tier.json` discarded the user install, so the tier vanished.
+  The outer/inner project choice was also decided by mtime. Fix: rank each install by scope
+  specificity (user lowest) and let the best valid declaration win.
+- [x] **NR21 — LOW — native** — `.agents/hooks/tier_gate.py:162`
+  The cache key was unresolved for explicit `roots`. Fix: resolve the root once per cache.
+- [x] **NR22 — LOW — native** — `.agents/workflows/workflow_ops.py:626`
+  `load_descriptor` did not re-verify `routed_skills`/`route_violations`. Fix: compare them from one
+  `route_findings` call.
+- [x] **NR23 — LOW — native** — `.agents/hooks/tests/test_workflow_ops.py:236`
+  The deny-hit test asserted only truthiness. Fix: assert the exact `[path, reason]` evidence.
+  The security helper closure was also simplified.
+
+  **Resolved** NR18–NR23 in the remediation commit after `ca107f2`.
+
+Dismissed: paths with leading or trailing whitespace or embedded newlines lose exactness through the
+router's stdin contract. That is pathological in practice and predates this change, since the reconcile
+path uses the same contract. A legacy repo router returning the list form can't report deny hits; the
+packaged router always ships and returns the dict form.

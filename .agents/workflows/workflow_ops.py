@@ -361,14 +361,14 @@ def route_findings(root, paths):
     raise WorkflowOperationError("skill router returned an invalid JSON contract")
 
 
-def paths_against_trunk(root, head):
+def trunk_range(root, head):
     for trunk in ("origin/main", "main"):
         try:
             base = git(root, "merge-base", trunk, head)
         except WorkflowOperationError:
             continue
-        return git(root, "diff", "--name-only", f"{base}..{head}").splitlines()
-    return []
+        return base, git(root, "diff", "--name-only", f"{base}..{head}").splitlines()
+    return None, []
 
 
 def security_classification(root, tree_path, head, paths):
@@ -379,16 +379,15 @@ def security_classification(root, tree_path, head, paths):
 
     config = tree_path / merge_review_gate.CONFIG_FILE
     try:
-        patterns = merge_review_gate.security_patterns(config) if config.is_file() else None
+        patterns = merge_review_gate.security_patterns(config) if config.is_file() else merge_review_gate._SECURITY_PATTERNS
     except merge_review_gate.ConfigUnusable as error:
         raise WorkflowOperationError(str(error)) from error
-
-    def first(candidates):
-        if patterns is None:
-            return merge_review_gate.touches_security(candidates)
-        return merge_review_gate.touches_security(candidates, patterns)
-
-    return {"first_path": first(paths), "trunk_first_path": first(paths_against_trunk(root, head))}
+    trunk_base, trunk_paths = trunk_range(root, head)
+    return {
+        "first_path": merge_review_gate.touches_security(paths, patterns),
+        "trunk_base": trunk_base,
+        "trunk_first_path": merge_review_gate.touches_security(trunk_paths, patterns),
+    }
 
 
 def select_review_lenses(paths):
@@ -623,7 +622,10 @@ def load_descriptor(root, workflow_run_id, path):
     if tree_content_digest(required["tree"]) != value["tree_content_sha256"]:
         raise WorkflowOperationError("repository tree differs from the materialized review identity")
     expected_rules = []
-    for name in routed_skills(required["tree"], paths):
+    routed, violations = route_findings(required["tree"], paths)
+    if "routed_skills" in value and (value["routed_skills"], value.get("route_violations")) != (routed, violations):
+        raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
+    for name in routed:
         rule_path = required["tree"] / ".agents" / "skills" / name / "SKILL.md"
         if rule_path.is_file():
             expected_rules.append(

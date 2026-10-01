@@ -146,11 +146,11 @@ def _within(key, ancestor):
 
 
 def installed_declarations(root, project=None):
-    """`tier.json` of each version directory the registry beside this cache names, or None without one.
+    """Each installed `tier.json` the registry beside this cache names, with its scope rank, or None.
 
-    An install scoped to the assessed project replaces the user-scope install; one scoped to another
-    project does not count. Reading only installed paths keeps the per-call cost proportional to
-    installed plugins, not to the stale versions a cache accumulates.
+    A project-scoped install outranks the user-scope one, the most specific project first; one scoped
+    to another project does not count. Reading only installed paths keeps the per-call cost
+    proportional to installed plugins, not to the stale versions a cache accumulates.
     """
     registry = Path(root).parent / "installed_plugins.json"
     try:
@@ -159,24 +159,27 @@ def installed_declarations(root, project=None):
         return None
     if not isinstance(plugins, dict):
         return None
-    cache = _key(root)
+    cache = _resolved_key(root)
     here = _resolved_key(project) if project is not None else None
-    paths = []
+    ranked = {}
     for entries in plugins.values():
-        chosen = {}
         for entry in entries if isinstance(entries, list) else ():
             location = entry.get("installPath") if isinstance(entry, dict) else None
             if not _text(location):
                 continue
             scoped = _text(entry.get("projectPath"))
-            if scoped and (here is None or not _within(here, _resolved_key(scoped))):
-                continue
+            rank = -1
+            if scoped:
+                scope = _resolved_key(scoped)
+                if here is None or not _within(here, scope):
+                    continue
+                rank = len(scope)
             ancestor = Path(location).parent.parent.parent
             if _key(ancestor) != cache and _resolved_key(ancestor) != cache:
                 continue
-            chosen.setdefault(bool(scoped), []).append(Path(location) / DECLARATION_NAME)
-        paths.extend(chosen.get(True) or chosen.get(False) or [])
-    return sorted(set(paths))
+            path = Path(location) / DECLARATION_NAME
+            ranked[path] = max(rank, ranked.get(path, rank))
+    return ranked
 
 
 def declarations(roots=None, project=None):
@@ -187,14 +190,14 @@ def declarations(roots=None, project=None):
     """
     found = {}
     for root in cache_roots() if roots is None else roots:
-        paths = installed_declarations(root, project)
-        if paths is None:
+        ranked = installed_declarations(root, project)
+        if ranked is None:
             try:
-                paths = sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME))
+                ranked = dict.fromkeys(sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME)), -1)
             except OSError:
                 continue
         candidates = {}
-        for path in paths:
+        for path, rank in sorted(ranked.items()):
             version_directory = path.parent
             plugin = version_directory.parent.name
             marketplace = version_directory.parent.parent.name
@@ -208,23 +211,24 @@ def declarations(roots=None, project=None):
                 continue
             orphaned = (version_directory / ORPHAN_MARKER).exists()
             declaration = Declaration(plugin, marketplace, data, version_directory, orphaned)
+            preference = _preference(declaration, rank)
             current = candidates.get(declaration.id)
-            if current is None or _preference(declaration) > _preference(current):
-                candidates[declaration.id] = declaration
-        for identity, declaration in candidates.items():
+            if current is None or preference > current[0]:
+                candidates[declaration.id] = (preference, declaration)
+        for identity, (_, declaration) in candidates.items():
             current = found.get(identity)
             if current is None or (current.orphaned and not declaration.orphaned):
                 found[identity] = declaration
     return sorted(found.values(), key=lambda declaration: declaration.tier)
 
 
-def _preference(declaration):
-    """Live beats orphaned, then the newest directory."""
+def _preference(declaration, rank):
+    """The most specific install scope, then live over orphaned, then the newest directory."""
     try:
         modified = declaration.payload_dir.stat().st_mtime
     except OSError:
         modified = 0.0
-    return (not declaration.orphaned, modified)
+    return (rank, not declaration.orphaned, modified)
 
 
 def project_root(payload):

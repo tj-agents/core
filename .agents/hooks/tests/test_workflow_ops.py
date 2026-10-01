@@ -233,7 +233,7 @@ class ReviewTests(RepositoryFixture):
 
         self.assertEqual([], result["rules"])
         self.assertEqual(["dotnet:persistence"], result["routed_skills"])
-        self.assertTrue(result["route_violations"])
+        self.assertEqual([["src/mapping.txt", "no candidate text"]], result["route_violations"])
 
     def test_opted_in_review_fails_visibly_when_router_runtime_is_missing(self):
         (self.root / ".agents" / "skill-routes.json").write_text(
