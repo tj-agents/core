@@ -76,6 +76,27 @@ class HookContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "wrong plugin root"):
             self.validate(output)
 
+    def test_claude_shell_form_and_packed_arguments_are_rejected(self) -> None:
+        path = "plugins/engineering/hooks/claude.json"
+        packed = '-B "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"'
+        for hook in (
+            {"type": "command", "command": f"python {packed}"},
+            {"type": "command", "command": "python", "args": [packed]},
+        ):
+            with self.subTest(hook=hook):
+                output = copy.deepcopy(self.output)
+                payload = json.loads(output[path])
+                payload["hooks"]["UserPromptSubmit"][0]["hooks"][0] = hook
+                output[path] = json.dumps(payload).encode()
+                with self.assertRaisesRegex(ValueError, "exec form"):
+                    self.validate(output)
+
+    def test_missing_dispatched_gate_target_is_rejected(self) -> None:
+        output = copy.deepcopy(self.output)
+        del output["plugins/engineering/hooks/harness_grant.py"]
+        with self.assertRaisesRegex(ValueError, "script target is missing: hooks/harness_grant.py"):
+            self.validate(output)
+
     def test_codex_windows_command_is_required(self) -> None:
         output = copy.deepcopy(self.output)
         path = "plugins/base/hooks/codex.json"
