@@ -255,6 +255,17 @@ class SourceLayoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "thin canonical reference"):
             SYNC.build(self.root)
 
+    def test_a_host_only_term_in_a_shared_definition_fails_generation(self):
+        shared = self.root / ".agents/engineering/workflow/review/SKILL.md"
+        original = shared.read_text(encoding="utf-8")
+        for host, term in (("claude", "`code-review`"), ("codex", "codex review")):
+            with self.subTest(host=host):
+                shared.write_text(original + f"\nRun {term} here.\n", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, rf"{host}-only term .* belongs in \.{host}/skills/review"):
+                    SYNC.build(self.root)
+        shared.write_text(original, encoding="utf-8")
+        SYNC.build(self.root)
+
     def test_scope_metadata_and_public_names_are_enforced(self):
         kinded = self.root / ".agents/engineering/utility/recents/SKILL.md"
         kinded.write_text(
