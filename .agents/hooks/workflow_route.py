@@ -62,6 +62,9 @@ COMPLETE_STATUS = re.compile(
 RECEIPTS = "agents-workflow-route"
 RECEIPT_RETENTION_SECONDS = 7 * 24 * 60 * 60
 TRANSCRIPT_TAIL_BYTES = 1 << 20
+HOST_GENERATED_PROMPTS = (
+    "<command-name>", "<command-message>", "<local-command", "<task-notification>",
+)
 RECOVERED = (
     "workflow-route: the UserPromptSubmit hook did not deliver this prompt's route (it timed out "
     "or failed), so the route is delivered with this tool call instead.\n\n"
@@ -175,18 +178,23 @@ def receipt_time(session: str) -> float:
 
 def prompt_text(content) -> str | None:
     if isinstance(content, str):
-        return content
-    if not isinstance(content, list):
+        text = content
+    elif isinstance(content, list):
+        if any(isinstance(block, dict) and block.get("type") == "tool_result" for block in content):
+            return None
+        text = "\n".join(
+            block["text"] for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+        )
+    else:
         return None
-    texts = [
-        block["text"] for block in content
-        if isinstance(block, dict) and block.get("type") == "text"
-        and isinstance(block.get("text"), str)
-    ]
-    return "\n".join(texts) if texts else None
+    if not text.strip() or text.lstrip().startswith(HOST_GENERATED_PROMPTS):
+        return None
+    return text
 
 
-def last_human_prompt(transcript: Path) -> tuple[str, float] | None:
+def last_prompt(transcript: Path) -> tuple[str, float] | None:
     try:
         with transcript.open("rb") as handle:
             handle.seek(0, os.SEEK_END)
@@ -195,16 +203,18 @@ def last_human_prompt(transcript: Path) -> tuple[str, float] | None:
     except OSError:
         return None
     for line in reversed(tail.splitlines()):
-        if b'"human"' not in line:
+        if b'"user"' not in line:
             continue
         try:
             entry = json.loads(line)
         except ValueError:
             continue
-        if not isinstance(entry, dict) or entry.get("type") != "user" or entry.get("isMeta"):
+        if not isinstance(entry, dict) or entry.get("type") != "user":
+            continue
+        if entry.get("isMeta") or entry.get("isCompactSummary") or entry.get("isSidechain"):
             continue
         origin = entry.get("origin")
-        if not isinstance(origin, dict) or origin.get("kind") != "human":
+        if isinstance(origin, dict) and origin.get("kind") not in (None, "human"):
             continue
         message = entry.get("message")
         text = prompt_text(message.get("content")) if isinstance(message, dict) else None
@@ -227,7 +237,7 @@ def recover(data: dict) -> str | None:
     cwd = data.get("cwd")
     if not all(isinstance(value, str) and value for value in (session, transcript, cwd)):
         return None
-    found = last_human_prompt(Path(transcript))
+    found = last_prompt(Path(transcript))
     if found is None:
         return None
     prompt, submitted = found
