@@ -7,7 +7,7 @@
   "source_excludes": [
     ".agents/catalog/catalog.json"
   ],
-  "source_digest": "sha256:80dcda0eb0b5f4e3861408ddec37404e78e536304617983172bc6ac1792337c3",
+  "source_digest": "sha256:0f6fc3ff7060963cfa3971d8627c136a1f13437de379dfd6f0191249a06eff13",
   "requires": {
     "marketplaces": [
       {

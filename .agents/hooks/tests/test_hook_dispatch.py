@@ -1,0 +1,183 @@
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
+import unittest
+import uuid
+
+
+HOOKS = Path(__file__).resolve().parents[1]
+DISPATCH = HOOKS / "hook_dispatch.py"
+
+GATES = {
+    "deny.py": """
+        import sys
+        print("deny reason", file=sys.stderr)
+        sys.exit(2)
+    """,
+    "ask.py": """
+        import json, sys
+        json.load(sys.stdin)
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+            "permissionDecision": "ask", "permissionDecisionReason": "ask reason"}}))
+    """,
+    "allow.py": """
+        import json, sys
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+            "permissionDecision": "allow", "permissionDecisionReason": "allow reason"}}))
+    """,
+    "context.py": """
+        import json, sys
+        data = json.load(sys.stdin)
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": data["hook_event_name"],
+            "additionalContext": "context from " + data["tool_name"]}}))
+    """,
+    "echo.py": """
+        import json, sys
+        data = json.loads(sys.stdin.buffer.read())
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+            "additionalContext": "echo " + data["marker"]}}))
+    """,
+    "rebind.py": """
+        import io, sys
+        sys.stdin = io.TextIOWrapper(io.BytesIO(b"{}"), encoding="utf-8")
+    """,
+    "crash.py": """
+        raise RuntimeError("gate exploded")
+    """,
+    "block.py": """
+        import json
+        print(json.dumps({"decision": "block", "reason": "keep working"}))
+    """,
+    "imports.py": """
+        import json
+        from sibling import VALUE
+        print(json.dumps({"systemMessage": VALUE}))
+    """,
+    "sibling.py": """
+        VALUE = "sibling import resolved"
+    """,
+}
+
+
+class HookDispatchTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="hook dispatch ")
+        self.addCleanup(self.temp.cleanup)
+        self.hooks = Path(self.temp.name) / "hooks"
+        self.hooks.mkdir()
+        shutil.copy2(DISPATCH, self.hooks / DISPATCH.name)
+        for name, body in GATES.items():
+            (self.hooks / name).write_text(textwrap.dedent(body).lstrip(), encoding="utf-8")
+
+    def dispatch(self, gates, event="PreToolUse", tool="Bash", **extra):
+        payload = {"hook_event_name": event, "tool_name": tool, "marker": "m1", **extra}
+        result = subprocess.run(
+            [sys.executable, "-B", str(self.hooks / DISPATCH.name), *gates],
+            input=json.dumps(payload), capture_output=True, text=True, encoding="utf-8",
+            timeout=60,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        output = json.loads(result.stdout) if result.stdout.strip() else {}
+        return output, result.stderr
+
+    def test_most_restrictive_decision_wins_and_every_context_is_kept(self):
+        output, _ = self.dispatch(["allow.py", "ask.py", "context.py", "deny.py", "echo.py"])
+        specific = output["hookSpecificOutput"]
+        self.assertEqual("deny", specific["permissionDecision"])
+        self.assertEqual("deny reason", specific["permissionDecisionReason"])
+        self.assertEqual("context from Bash\n\necho m1", specific["additionalContext"])
+
+        output, _ = self.dispatch(["allow.py", "ask.py"])
+        self.assertEqual("ask", output["hookSpecificOutput"]["permissionDecision"])
+        self.assertEqual("ask reason", output["hookSpecificOutput"]["permissionDecisionReason"])
+
+    def test_tool_matcher_selects_gates_like_the_host(self):
+        output, _ = self.dispatch(["deny.py@Bash|PowerShell", "context.py"], tool="Read")
+        self.assertNotIn("permissionDecision", output["hookSpecificOutput"])
+        self.assertEqual("context from Read", output["hookSpecificOutput"]["additionalContext"])
+        output, _ = self.dispatch([str(self.hooks / "deny.py") + "@Bash|PowerShell"], tool="PowerShell")
+        self.assertEqual("deny", output["hookSpecificOutput"]["permissionDecision"])
+        output, _ = self.dispatch(["deny.py@Bash"], tool="BashOutput")
+        self.assertEqual({}, output)
+
+    def test_each_gate_reads_the_full_payload_even_after_a_sibling_rebinds_stdin(self):
+        output, _ = self.dispatch(["rebind.py", "echo.py", "crash.py", "echo.py"])
+        self.assertEqual("echo m1\n\necho m1", output["hookSpecificOutput"]["additionalContext"])
+
+    def test_a_crashing_gate_is_reported_and_its_siblings_still_run(self):
+        output, stderr = self.dispatch(["crash.py", "context.py"])
+        self.assertIn("crash.py", stderr)
+        self.assertIn("gate exploded", stderr)
+        self.assertEqual("context from Bash", output["hookSpecificOutput"]["additionalContext"])
+
+    def test_stop_blocks_combine_exit_code_and_json_reasons(self):
+        output, _ = self.dispatch(["block.py", "deny.py", "imports.py"], event="Stop", tool="")
+        self.assertEqual("block", output["decision"])
+        self.assertEqual("keep working\n\ndeny reason", output["reason"])
+        self.assertEqual("sibling import resolved", output["systemMessage"])
+        self.assertNotIn("hookSpecificOutput", output)
+
+    def test_silent_gates_produce_no_output(self):
+        output, stderr = self.dispatch(["rebind.py"])
+        self.assertEqual({}, output)
+        self.assertEqual("", stderr)
+
+
+class PackagedDispatchTests(unittest.TestCase):
+    ROOT = HOOKS.parents[1]
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="packaged dispatch ")
+        self.addCleanup(self.temp.cleanup)
+        self.cwd = Path(self.temp.name)
+        self.manifest = json.loads(
+            (self.ROOT / "plugins/engineering/hooks/claude.json").read_text(encoding="utf-8")
+        )
+        self.plugin = self.ROOT / "plugins/engineering"
+        self.environment = dict(
+            os.environ, CLAUDE_PLUGIN_ROOT=str(self.plugin), TEMP=self.temp.name,
+            TMP=self.temp.name, TMPDIR=self.temp.name,
+        )
+
+    def run_registration(self, event, payload):
+        hook = self.manifest["hooks"][event][0]["hooks"][0]
+        arguments = [
+            argument.replace("${CLAUDE_PLUGIN_ROOT}", str(self.plugin)) for argument in hook["args"]
+        ]
+        data = {"hook_event_name": event, "cwd": str(self.cwd),
+                "session_id": str(uuid.uuid4()), "tool_use_id": str(uuid.uuid4()), **payload}
+        return subprocess.run(
+            [hook["command"], *arguments], input=json.dumps(data), capture_output=True,
+            text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=60,
+        )
+
+    def test_credential_widening_is_denied_and_status_passes(self):
+        result = self.run_registration("PreToolUse", {
+            "tool_name": "Bash", "tool_input": {"command": "gh auth refresh -s admin:org"},
+        })
+        self.assertEqual(0, result.returncode, result.stderr)
+        specific = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("deny", specific["permissionDecision"])
+        self.assertIn("GIT-AUTH GATE", specific["permissionDecisionReason"])
+
+        result = self.run_registration("PreToolUse", {
+            "tool_name": "Bash", "tool_input": {"command": "gh auth status"},
+        })
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout + result.stderr)
+
+    def test_non_shell_tools_run_only_the_all_tool_gates(self):
+        result = self.run_registration("PreToolUse", {
+            "tool_name": "Read", "tool_input": {"file_path": str(self.cwd / "x")},
+        })
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout + result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -5,7 +5,7 @@
     ".agents/engineering"
   ],
   "source_excludes": [],
-  "source_digest": "sha256:368ee7e7dec594a44a890e263f932969b01e2c29defa209f6406fd5665e80801",
+  "source_digest": "sha256:6a3d9ae5b50abee1a54786f344e3077f73960eb6815ab4b16d31d36e97cee920",
   "requires": {
     "marketplaces": [
       {
@@ -60,6 +60,12 @@
       },
       {
         "path": "hooks/harness_grant.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/hook_dispatch.py",
         "hosts": [
           "claude"
         ]

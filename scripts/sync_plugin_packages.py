@@ -34,9 +34,10 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
             ),
         ),
         "claude": (
-            ("command", "${CLAUDE_PLUGIN_ROOT}", re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"']+)")),
+            ("command", "${CLAUDE_PLUGIN_ROOT}", re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"'@]+)")),
         ),
     }
+    exec_form_hosts = {"claude"}
     declarations = config.get("host_hook_sources", {})
     for plugin in plugins:
         declared = declarations.get(plugin, {})
@@ -85,10 +86,22 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                             command = hook.get(field)
                             if not isinstance(command, str) or not command:
                                 raise ValueError(f"{hook_path}: command hook is missing {field}")
-                            wrong_roots = [token for token in known_roots if token != root_token and token in command]
-                            if wrong_roots:
+                            parts = [command]
+                            if host in exec_form_hosts:
+                                arguments = hook.get("args")
+                                if (
+                                    not isinstance(arguments, list)
+                                    or not all(isinstance(argument, str) for argument in arguments)
+                                    or any(character.isspace() for character in command)
+                                ):
+                                    raise ValueError(
+                                        f"{hook_path}: {host} hooks must use exec form: an executable "
+                                        "command plus an args list, never a shell command line"
+                                    )
+                                parts.extend(arguments)
+                            if any(token != root_token and token in part for part in parts for token in known_roots):
                                 raise ValueError(f"{hook_path}: {field} uses the wrong plugin root")
-                            matches = list(script_pattern.finditer(command))
+                            matches = [match for part in parts for match in script_pattern.finditer(part)]
                             if not matches:
                                 raise ValueError(f"{hook_path}: {field} has no package-relative script")
                             for match in matches:

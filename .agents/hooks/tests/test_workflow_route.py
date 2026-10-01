@@ -1,4 +1,6 @@
+from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -155,6 +157,80 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertEqual("", result.stdout)
         self.assertIn("cannot read plan-execution contract", result.stderr)
+
+
+class WorkflowRouteRecoveryTests(unittest.TestCase):
+    PROMPT = "Continue and complete the active goal."
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="workflow route recovery ")
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
+        self.cwd = root / "repo"
+        self.cwd.mkdir()
+        (self.cwd / "GOAL.md").write_text("# Goal\n\nStatus: in progress\n", encoding="utf-8")
+        self.scratch = root / "temp"
+        self.scratch.mkdir()
+        self.transcript = root / "session.jsonl"
+        self.session = "session-1"
+        self.environment = dict(
+            os.environ, TEMP=str(self.scratch), TMP=str(self.scratch), TMPDIR=str(self.scratch)
+        )
+
+    def write_transcript(self, prompt, *, kind="human", filler=0):
+        stamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        entries = [
+            {"type": "user", "origin": {"kind": "human"}, "timestamp": "2026-01-01T00:00:00.000Z",
+             "message": {"role": "user", "content": "Fix the typo."}},
+            {"type": "user", "origin": {"kind": kind}, "timestamp": stamp,
+             "message": {"role": "user", "content": [{"type": "text", "text": prompt}]}},
+            *({"type": "assistant", "message": {"content": [{"type": "text", "text": "x" * 1000}]}}
+              for _ in range(filler)),
+            {"type": "user", "isMeta": True, "origin": {"kind": "human"}, "timestamp": stamp,
+             "message": {"role": "user", "content": "Continue and complete the active goal."}},
+        ]
+        self.transcript.write_text(
+            "".join(json.dumps(entry) + "\n" for entry in entries), encoding="utf-8"
+        )
+
+    def run_hook(self, event, **payload):
+        data = {"hook_event_name": event, "cwd": str(self.cwd), "session_id": self.session,
+                "transcript_path": str(self.transcript), **payload}
+        result = subprocess.run(
+            [sys.executable, "-B", str(SCRIPT)], input=json.dumps(data), capture_output=True,
+            text=True, encoding="utf-8", env=self.environment, timeout=20,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        return json.loads(result.stdout)["hookSpecificOutput"] if result.stdout.strip() else None
+
+    def test_a_lost_prompt_route_is_delivered_once_on_the_next_tool_call(self):
+        self.write_transcript(self.PROMPT)
+        recovered = self.run_hook("PreToolUse", tool_name="Read")
+        self.assertEqual("PreToolUse", recovered["hookEventName"])
+        context = recovered["additionalContext"]
+        self.assertTrue(context.startswith("workflow-route: the UserPromptSubmit hook did not deliver"))
+        self.assertIn("engineering:plan-execution automatically selected", context)
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Bash"))
+
+    def test_a_delivered_prompt_route_is_not_repeated(self):
+        self.write_transcript(self.PROMPT)
+        delivered = self.run_hook("UserPromptSubmit", prompt=self.PROMPT)
+        self.assertIn("engineering:plan-execution automatically selected", delivered["additionalContext"])
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
+
+    def test_an_unrouted_prompt_stays_silent_after_a_lost_hook(self):
+        self.write_transcript("Fix the spelling mistake in README.md.")
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
+
+    def test_subagents_and_non_human_turns_never_recover_the_parent_prompt(self):
+        self.write_transcript(self.PROMPT)
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read", agent_id="agent-1"))
+        self.write_transcript(self.PROMPT, kind="task-notification")
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
+
+    def test_recovery_reads_only_a_bounded_transcript_tail(self):
+        self.write_transcript(self.PROMPT, filler=2000)
+        self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
 
 
 if __name__ == "__main__":
