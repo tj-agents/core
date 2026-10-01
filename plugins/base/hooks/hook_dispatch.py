@@ -238,14 +238,15 @@ def main(argv: list[str]) -> int:
     worker.join(deadline)
     with lock:
         finished = list(results)
+        overrun = len(finished) < len(names)
     merged, diagnostics = merge(event, finished)
-    if worker.is_alive():
+    if overrun:
         merged = overrun_notice(event, merged, deadline, names[len(finished):])
     if diagnostics:
         stderr.write(diagnostics + "\n")
     if merged:
         stdout.write(json.dumps(merged, ensure_ascii=True) + "\n")
-    if worker.is_alive():
+    if overrun:
         stdout.flush()
         stderr.flush()
         os._exit(0)
