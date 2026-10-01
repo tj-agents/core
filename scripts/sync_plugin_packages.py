@@ -472,14 +472,22 @@ def expected_adapter_body(shared: dict, host: str) -> str:
 
 
 def validate_host_neutral(config: dict, skills: dict[str, dict]) -> None:
-    for host, terms in config.get("host_only_terms", {}).items():
-        for name, shared in skills.items():
-            for term in terms:
-                if term in shared["body"]:
-                    raise ValueError(
-                        f"{shared['relative']}: {host}-only term {term!r} belongs in "
-                        f".{host}/skills/{name}/SKILL.md, not the shared definition"
-                    )
+    patterns = {
+        host: [re.compile(term, re.IGNORECASE) for term in terms]
+        for host, terms in config.get("host_only_terms", {}).items()
+    }
+    for name, shared in skills.items():
+        for document in sorted(shared["path"].parent.rglob("*.md")):
+            text = document.read_text(encoding="utf-8")
+            for host, compiled in patterns.items():
+                for pattern in compiled:
+                    match = pattern.search(text)
+                    if match:
+                        raise ValueError(
+                            f"{document.as_posix()}: {host}-only term {match.group(0)!r} belongs in "
+                            f".{host}/skills/{name}/SKILL.md, registered in extended_host_adapters, "
+                            "not the shared definition"
+                        )
 
 
 def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict:
