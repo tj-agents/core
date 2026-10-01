@@ -4,7 +4,7 @@ description: Take one tech-debt item all the way to a focused PR in its selected
 
 kind: workflow
 domain: process
-model: gpt-6-sol
+model: gpt-6.1-sol
 ---
 
 # Working one tech-debt item — or a small bundle — to a PR

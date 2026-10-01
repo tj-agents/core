@@ -17,21 +17,21 @@
     },
     "L2": {
       "summary": "High-stakes judgement that is not design, where a wrong call is costly or hard to undo.",
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "xhigh",
       "context_ceiling": null,
       "why": "top general family at the setting above `high`. Judgement with a lot riding on it that designs nothing: a diagnosis of a production failure, a security or migration review. Delivering a change never selects it; merge, push and publish are governed by the delivery gates."
     },
     "L3": {
       "summary": "Open-ended judgement that is not design, where the answer is not yet known.",
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "high",
       "context_ceiling": null,
       "why": "top general family at its default setting. Open-ended judgement that designs nothing: a diagnosis with no known answer, an investigation, weighing evidence a test cannot settle."
     },
     "L4": {
       "summary": "Ordinary specified work that a compiler or a test suite will catch, delivery included.",
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "context_ceiling": null,
       "why": "the general family at reduced effort. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses, and the review, CI and merge that deliver them."
