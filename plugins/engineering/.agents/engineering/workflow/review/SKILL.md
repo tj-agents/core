@@ -126,17 +126,12 @@ its language. Do not substitute the session's already-loaded skill list for this
 reads the same installed declarations that gated the session.
 
 **Repository routes — repositories that carry them.** When the frozen tree ships `.agents/skill-routes.json`,
-run this plugin's router with its working directory set to `<candidate-bundle>/tree`, decode
-`<candidate-bundle>/paths.nul`, and pass every decoded path as an exact literal argument:
-
-```bash
-python <engineering>/hooks/skill_router.py --skills-for "<exact-path-1>" "<exact-path-2>"
-```
-
-A repository without a route table owes only its tier conventions; that absence is normal, not a defect.
+`review-prepare` runs this plugin's router over it: the descriptor's `routed_skills` names every skill the
+frozen paths owe, plugin-owned ones included, and `route_violations` holds each deny-pattern hit. A
+repository without a route table owes only its tier conventions; that absence is normal, not a defect.
 
 Read every routed skill, the root and nearest changed-path `AGENTS.md` files, and the architecture premise
-from the exported frozen tree, never the live checkout. A `DENY PATTERN HIT` is evidence, not a hint.
+from the exported frozen tree, never the live checkout. A route violation is evidence, not a hint.
 Invoke additional standards only when the diff plainly touches their domain; a missing route is a
 route-table defect rather than a list to duplicate here. If the candidate contains plans or
 implementation-ready design references, load plans and apply its implementation-design review gate to
@@ -175,11 +170,14 @@ dispatch ID contribute nothing.
 
 ## Stage 6 — conditional security layer
 
-The descriptor's `security` field classifies the frozen paths through the merge gate's generic and
-repository `security_paths` inventory. When it is required, run the host security review: Claude Code's
-built-in `security-review` skill, or in Codex a `review-lens` dispatch with the bounded lens `security`
-over the same descriptor. Security evidence joins parent synthesis, while the `Security-reviewed up to
-commit:` marker is written only when the whole pass completes. No qualifying path means no security marker.
+The descriptor's `security` field applies the merge gate's generic and repository `security_paths`
+inventory: `first_path` to the frozen paths, `trunk_first_path` to the head's whole range against the trunk,
+which is what the gate classifies. Run the layer when `first_path` is set, or in a `new` work order when
+`trunk_first_path` is set. It covers the head's range against the trunk: Claude Code's built-in
+`security-review` skill, or in Codex a `review-lens` dispatch with the bounded lens `security` over
+`<trunk-merge-base>..<frozen-head>`. Security evidence joins parent synthesis, while the
+`Security-reviewed up to commit:` marker is written only when the whole pass completes. No qualifying path
+means no security marker.
 
 ## Stage 7 — parent synthesis and completion
 
