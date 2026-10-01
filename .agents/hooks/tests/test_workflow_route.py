@@ -179,11 +179,14 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
 
     def write_transcript(self, prompt, *, kind="human", filler=0):
         stamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        latest = {"type": "user", "timestamp": stamp,
+                  "message": {"role": "user", "content": [{"type": "text", "text": prompt}]}}
+        if kind:
+            latest["origin"] = {"kind": kind}
         entries = [
             {"type": "user", "origin": {"kind": "human"}, "timestamp": "2026-01-01T00:00:00.000Z",
              "message": {"role": "user", "content": "Fix the typo."}},
-            {"type": "user", "origin": {"kind": kind}, "timestamp": stamp,
-             "message": {"role": "user", "content": [{"type": "text", "text": prompt}]}},
+            latest,
             *({"type": "assistant", "message": {"content": [{"type": "text", "text": "x" * 1000}]}}
               for _ in range(filler)),
             {"type": "user", "isMeta": True, "origin": {"kind": "human"}, "timestamp": stamp,
@@ -211,6 +214,20 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
         self.assertTrue(context.startswith("workflow-route: the UserPromptSubmit hook did not deliver"))
         self.assertIn("engineering:plan-execution automatically selected", context)
         self.assertIsNone(self.run_hook("PreToolUse", tool_name="Bash"))
+
+    def test_a_prompt_without_an_origin_marker_is_still_recovered(self):
+        self.write_transcript(self.PROMPT, kind=None)
+        recovered = self.run_hook("PreToolUse", tool_name="Read")
+        self.assertIn("engineering:plan-execution automatically selected", recovered["additionalContext"])
+
+    def test_host_generated_entries_are_not_treated_as_prompts(self):
+        for text in (
+            "<command-name>/continue</command-name>",
+            "<task-notification>complete</task-notification>",
+        ):
+            with self.subTest(text=text):
+                self.write_transcript(text, kind=None)
+                self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
 
     def test_a_delivered_prompt_route_is_not_repeated(self):
         self.write_transcript(self.PROMPT)
