@@ -322,9 +322,14 @@ def tree_content_digest(path):
 
 
 def routed_skills(root, paths):
+    return route_findings(root, paths)[0]
+
+
+def route_findings(root, paths):
+    """Every skill the route table owes for these paths, and its deny-pattern hits."""
     route_table = root / ".agents" / "skill-routes.json"
     if not route_table.is_file() or not paths:
-        return []
+        return [], []
     candidates = (
         Path(__file__).resolve().parents[1] / "hooks" / "skill_router.py",
         root / ".agents" / "hooks" / "skill_router.py",
@@ -349,9 +354,10 @@ def routed_skills(root, paths):
     except json.JSONDecodeError as error:
         raise WorkflowOperationError("skill router did not return its JSON contract") from error
     if isinstance(value, list):
-        return sorted({str(item) for item in value})
+        return sorted({str(item) for item in value}), []
     if isinstance(value, dict) and isinstance(value.get("skills"), dict):
-        return sorted(str(item) for item in value["skills"])
+        violations = [list(item) for item in value.get("violations") or [] if isinstance(item, (list, tuple))]
+        return sorted(str(item) for item in value["skills"]), violations
     raise WorkflowOperationError("skill router returned an invalid JSON contract")
 
 
@@ -365,28 +371,24 @@ def paths_against_trunk(root, head):
     return []
 
 
-def security_classification(root, tree_path, head, branch, paths):
-    """Whether the merge gate will demand a security marker for this head.
-
-    The gate classifies the head's whole range against main, so a stack child inherits its parent
-    layer's sensitive paths, and it never counts the branch's own work order.
-    """
+def security_classification(root, tree_path, head, paths):
     hooks = Path(__file__).resolve().parents[1] / "hooks"
     if str(hooks) not in sys.path:
         sys.path.insert(0, str(hooks))
     import merge_review_gate
 
-    work_order = f"reviews/{branch.replace('/', '-')}.md"
-    candidates = [path for path in dict.fromkeys([*paths, *paths_against_trunk(root, head)]) if path != work_order]
     config = tree_path / merge_review_gate.CONFIG_FILE
-    if config.is_file():
-        try:
-            first = merge_review_gate.touches_security(candidates, merge_review_gate.security_patterns(config))
-        except merge_review_gate.ConfigUnusable as error:
-            raise WorkflowOperationError(str(error)) from error
-    else:
-        first = merge_review_gate.touches_security(candidates)
-    return {"required": first is not None, "first_path": first}
+    try:
+        patterns = merge_review_gate.security_patterns(config) if config.is_file() else None
+    except merge_review_gate.ConfigUnusable as error:
+        raise WorkflowOperationError(str(error)) from error
+
+    def first(candidates):
+        if patterns is None:
+            return merge_review_gate.touches_security(candidates)
+        return merge_review_gate.touches_security(candidates, patterns)
+
+    return {"first_path": first(paths), "trunk_first_path": first(paths_against_trunk(root, head))}
 
 
 def select_review_lenses(paths):
@@ -462,7 +464,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
     paths_path.write_bytes(paths_bytes)
     tree_archive = materialize_tree(root, head, archive_path, tree_path)
     tree_sha256 = tree_content_digest(tree_path)
-    skills = routed_skills(tree_path, paths)
+    skills, route_violations = route_findings(tree_path, paths)
     rules = []
     for name in skills:
         path = tree_path / ".agents" / "skills" / name / "SKILL.md"
@@ -483,8 +485,10 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         "path_digest": path_digest,
         "patch_sha256": hashlib.sha256(patch).hexdigest(),
         "rules": rules,
+        "routed_skills": skills,
+        "route_violations": route_violations,
         "lenses": select_review_lenses(paths),
-        "security": security_classification(root, tree_path, head, git(root, "branch", "--show-current"), paths),
+        "security": security_classification(root, tree_path, head, paths),
         "waves": 1,
         "context": {
             "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],
