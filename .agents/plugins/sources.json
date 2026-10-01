@@ -284,8 +284,8 @@
     "review"
   ],
   "host_only_terms": {
-    "claude": ["Skill tool", "`code-review`", "`security-review`", "AskUserQuestion", "ToolSearch", "CLAUDE_PLUGIN_ROOT"],
-    "codex": ["codex review", "codex exec", "Scheduled Task"]
+    "claude": ["[`/]code-review\\b", "[`/]security-review\\b", "\\bAskUserQuestion\\b", "\\bToolSearch\\b", "\\bCLAUDE_PLUGIN_ROOT\\b"],
+    "codex": ["\\bcodex\\s+(?:review|exec)\\b", "\\bScheduled Task\\b"]
   },
   "workflow": {
     "source": ".agents/workflows",
