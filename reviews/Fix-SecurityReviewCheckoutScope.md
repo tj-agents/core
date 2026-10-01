@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `89741f1`  `(2026-10-01)`
+**Reviewed up to commit:** `c5eea99`  `(2026-10-01)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-01 — full
@@ -55,6 +55,26 @@ range plus ` -- <authored paths>`. No security-sensitive path, and no tier conve
 
 **Lens coverage:** the native layer was Claude Code's built-in `code-review` at `low`, run on the
 pattern-only delta. It found nothing.
+
+### Findings
+
+None.
+
+## Review pass — 2026-10-01 — incremental (base reconciliation)
+
+**Candidate base:** `89741f1`
+**Candidate head:** `c5eea99`
+**Candidate branch:** `Fix/SecurityReviewCheckoutScope`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Fix-SecurityReviewCheckoutScope.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+**Lens coverage:** a parent review of the merge of `origin/main` (#77, Codex lanes moved to 6.1). The only
+authored file both sides changed was `.codex/skills/review/SKILL.md`; it merged cleanly to the 6.1 model
+plus this branch's Codex reviewer lines. The conflicts were only digest and generated files, which were
+regenerated. The affected tests pass: review native layer, source layout, catalog, harness, workflow
+contracts, review workflows and lane tables.
 
 ### Findings
 
