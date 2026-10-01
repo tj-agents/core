@@ -11,4 +11,14 @@ effort: high
 # Canonical isolated code review
 
 Read and follow the [canonical shared definition](../../.agents/engineering/workflow/review/SKILL.md) in full.
-This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.
+This entry point adds only Claude Code's reviewers; the shared procedure is authored once under `.agents/`.
+
+## Claude Code reviewers
+
+- **Native layer (Stage 3):** the built-in `code-review` skill, invoked through the Skill tool with
+  `<effort> <frozen-base>..<frozen-head>`, adding ` -- <scoped paths>` for a bounded scope. Never pass
+  `--comment` or `--fix`; this workflow owns both.
+- **Security layer (Stage 6):** the built-in `security-review` skill. It takes no target and diffs the
+  working tree against `origin/HEAD`'s merge-base, so use it only when the checkout is clean at the frozen
+  head, scope is `all`, and `trunk_base` equals `git merge-base origin/HEAD <frozen-head>`. Otherwise use the
+  `security` lens.

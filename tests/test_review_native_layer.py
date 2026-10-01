@@ -29,19 +29,39 @@ def section(text, heading):
 
 
 class NativeLayerNamesTheHostReviewer(unittest.TestCase):
-    def test_stage_three_names_claude_code_review_and_codex_review(self):
-        stage = section(body("review"), "## Stage 3")
+    def host_entry(self, host, packaged=False):
+        if packaged:
+            tree = "skills" if host == "claude" else "codex-skills"
+            return " ".join((PACKAGE / tree / "review" / "SKILL.md").read_text(encoding="utf-8").split())
+        return " ".join((ROOT / f".{host}" / "skills" / "review" / "SKILL.md").read_text(encoding="utf-8").split())
 
-        self.assertIn("built-in `code-review` skill", stage)
-        self.assertIn("Skill tool", stage)
-        self.assertIn("`codex review --base <frozen-base>`", stage)
-        self.assertIn("reading the diff yourself is not this layer", stage)
-        self.assertIn("`native-general`", stage)
+    def test_the_shared_stages_name_no_host_and_defer_to_the_host_entry_point(self):
+        text = body("review")
+        for host_reviewer in ("`code-review`", "`security-review`", "codex review", "Skill tool"):
+            self.assertNotIn(host_reviewer, text)
+        native = section(text, "## Stage 3")
+        self.assertIn("`review`'s host entry point names that reviewer", native)
+        self.assertIn("reading the diff yourself is not this layer", native)
+        self.assertIn("`native-general`", native)
+        self.assertIn("host security reviewer that `review`'s host entry point names", section(text, "## Stage 6"))
 
-    def test_stage_six_names_claude_security_review(self):
-        stage = section(body("review"), "## Stage 6")
-        self.assertIn("built-in `security-review` skill", stage)
-        self.assertIn("the checkout is clean at the frozen head, scope is `all`, and `trunk_base` equals", stage)
+    def test_the_claude_entry_point_names_code_review_and_security_review(self):
+        for packaged in (False, True):
+            with self.subTest(packaged=packaged):
+                entry = self.host_entry("claude", packaged)
+                self.assertIn("built-in `code-review` skill, invoked through the Skill tool", entry)
+                self.assertIn("`<effort> <frozen-base>..<frozen-head>`", entry)
+                self.assertIn("built-in `security-review` skill", entry)
+                self.assertIn("the checkout is clean at the frozen head, scope is `all`", entry)
+                self.assertNotIn("codex review", entry)
+
+    def test_the_codex_entry_point_names_codex_review(self):
+        for packaged in (False, True):
+            with self.subTest(packaged=packaged):
+                entry = self.host_entry("codex", packaged)
+                self.assertIn("`codex review --base <frozen-base>`", entry)
+                self.assertIn("`security` lens", entry)
+                self.assertNotIn("`code-review`", entry)
 
     def test_every_mode_with_a_native_layer_delegates_to_stage_three(self):
         for skill in DELEGATES_NATIVE_LAYER:
