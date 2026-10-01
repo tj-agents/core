@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `in-progress`
-**Reviewed up to commit:** `ca107f2`  `(2026-10-01)`
+**Reviewed up to commit:** `1d8eff7`  `(2026-10-01)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-01 — full
@@ -174,3 +174,32 @@ Dismissed: paths with leading or trailing whitespace or embedded newlines lose e
 router's stdin contract. That is pathological in practice and predates this change, since the reconcile
 path uses the same contract. A legacy repo router returning the list form can't report deny hits; the
 packaged router always ships and returns the dict form.
+
+## Review pass — 2026-10-01 — incremental
+
+**Candidate base:** `ca107f25271175db546ac69d06f13fe3f3473357`
+**Candidate head:** `1d8eff77e5849aba12201975ffe4d58321b743ac`
+**Candidate branch:** `Fix/ReviewNativeCodeReview`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:c5fd3e79db8e6f9c7dec52668920ee7e3b90ff7a89ea6f970fbb62eb11b55c1b` `(19 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-pr74-inc3\review\2e197fde1736995bbd2c8862e935a932ee680c52a81436c89b3a3084813d54ae`
+**Candidate bundle identity:** `sha256:dd6b6b3f78fe1fcc30b018b97b9e13c159156480ddf8e12fd885d2c5ee435a42`
+**Work-order path:** `reviews/Fix-ReviewNativeCodeReview.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+**Lens coverage:** the native layer was Claude Code's built-in `code-review` at `medium`, given the range
+plus ` -- <authored paths>`. It returned 2 findings and confirmed the tier ranking, routing re-check and
+pattern fallback. No security-sensitive path.
+
+### Findings
+
+- [x] **NR24 — MEDIUM — native** — `.agents/engineering/workflow/review/SKILL.md:175`
+  The trunk-range layer skipped a branch whose security marker exists but is stale, and the gate blocks
+  on exactly that (`security_no_longer_covered`). Fix: run it when the marker is missing or a
+  security-sensitive path changed between it and the frozen head.
+- [x] **NR25 — LOW — native** — `.agents/engineering/workflow/review/SKILL.md:176`
+  With no resolvable trunk, `trunk_base` is null and the range is `None..<head>`. Fix: fall back to
+  `<frozen-base>..<frozen-head>`.
+
+  **Resolved** NR24–NR25 in the remediation commit after `1d8eff7`.
