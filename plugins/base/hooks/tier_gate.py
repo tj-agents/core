@@ -126,13 +126,51 @@ def cache_roots():
     return roots
 
 
+def _key(path):
+    return os.path.normcase(os.path.normpath(str(path)))
+
+
+def installed_declarations(root):
+    """`tier.json` of each version directory the registry beside this cache names, or None without one.
+
+    Reading only installed paths keeps the per-call cost proportional to installed plugins, not to the
+    stale versions a cache accumulates.
+    """
+    registry = Path(root).parent / "installed_plugins.json"
+    try:
+        plugins = json.loads(registry.read_text(encoding="utf-8-sig")).get("plugins")
+    except (OSError, UnicodeError, ValueError, AttributeError):
+        return None
+    if not isinstance(plugins, dict):
+        return None
+    cache = _key(root)
+    paths = []
+    for entries in plugins.values():
+        for entry in entries if isinstance(entries, list) else ():
+            location = entry.get("installPath") if isinstance(entry, dict) else None
+            if not _text(location):
+                continue
+            version_directory = Path(location)
+            if _key(version_directory.parent.parent.parent) == cache:
+                paths.append(version_directory / DECLARATION_NAME)
+    return sorted(set(paths))
+
+
 def declarations(roots=None):
+    """One declaration per plugin: the first cache root that has it, at its installed version.
+
+    Roots are in priority order, the running host's cache first. A cache with a host registry beside it
+    answers only for its installed versions; one without falls back to every cached version, newest first.
+    """
     found = {}
     for root in cache_roots() if roots is None else roots:
-        try:
-            paths = sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME))
-        except OSError:
-            continue
+        paths = installed_declarations(root)
+        if paths is None:
+            try:
+                paths = sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME))
+            except OSError:
+                continue
+        candidates = {}
         for path in paths:
             version_directory = path.parent
             plugin = version_directory.parent.name
@@ -147,11 +185,23 @@ def declarations(roots=None):
                 continue
             orphaned = (version_directory / ORPHAN_MARKER).exists()
             declaration = Declaration(plugin, marketplace, data, version_directory, orphaned)
-            current = found.get(declaration.id)
-            if current is not None and not current.orphaned and declaration.orphaned:
-                continue
-            found[declaration.id] = declaration
+            current = candidates.get(declaration.id)
+            if current is None or _preference(declaration) > _preference(current):
+                candidates[declaration.id] = declaration
+        for identity, declaration in candidates.items():
+            current = found.get(identity)
+            if current is None or (current.orphaned and not declaration.orphaned):
+                found[identity] = declaration
     return sorted(found.values(), key=lambda declaration: declaration.tier)
+
+
+def _preference(declaration):
+    """Live beats orphaned, then the newest directory."""
+    try:
+        modified = declaration.payload_dir.stat().st_mtime
+    except OSError:
+        modified = 0.0
+    return (not declaration.orphaned, modified)
 
 
 def project_root(payload):

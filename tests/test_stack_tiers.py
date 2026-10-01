@@ -107,6 +107,35 @@ class DeclarationDiscovery(unittest.TestCase):
 
         self.assertEqual([item.payload_dir for item in found], [live])
 
+    def test_the_registry_installed_version_beats_every_other_cached_version(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            installed = cache / "dotagents" / "dotnet" / "aaa-installed"
+            for name in ("aaa-installed", "zzz-stale"):
+                payload = cache / "dotagents" / "dotnet" / name
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            os.utime(installed, (1, 1))
+            registry = {"plugins": {"dotnet@dotagents": [{"installPath": str(installed)}]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.payload_dir for item in found], [installed])
+
+    def test_the_first_cache_root_answers_for_a_plugin_both_hosts_cache(self):
+        with tempfile.TemporaryDirectory() as claude, tempfile.TemporaryDirectory() as codex:
+            payloads = []
+            for cache, name in ((claude, "b693fe48ccd8"), (codex, "1.1.2")):
+                payload = Path(cache) / "dotagents" / "dotnet" / name
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+                payloads.append(payload)
+
+            found = gate.declarations([claude, codex])
+
+        self.assertEqual([item.payload_dir for item in found], [payloads[0]])
+
 
 class TemporaryProject(unittest.TestCase):
     def setUp(self):

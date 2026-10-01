@@ -18,9 +18,6 @@ a generated native-instruction fallback.
 Codex hook commands retain an integrity-checked copy of their trusted plugin package in `PLUGIN_DATA`.
 An active session can keep running its original hook scripts when a marketplace refresh removes the old
 cache directory. A changed hook definition still requires Codex trust review before it runs.
-Codex hook commands retain an integrity-checked copy of their trusted plugin package in `PLUGIN_DATA`.
-An active session can keep running its original hook scripts when a marketplace refresh removes the old
-cache directory. A changed hook definition still requires Codex trust review before it runs.
 
 The split packages form the **2.1.16** release candidate. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
