@@ -107,6 +107,112 @@ class DeclarationDiscovery(unittest.TestCase):
 
         self.assertEqual([item.payload_dir for item in found], [live])
 
+    def test_the_registry_installed_version_beats_every_other_cached_version(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            installed = cache / "dotagents" / "dotnet" / "aaa-installed"
+            for name in ("aaa-installed", "zzz-stale"):
+                payload = cache / "dotagents" / "dotnet" / name
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            os.utime(installed, (1, 1))
+            registry = {"plugins": {"dotnet@dotagents": [{"installPath": str(installed)}]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.payload_dir for item in found], [installed])
+
+    def test_a_project_scoped_install_answers_only_inside_its_project(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            user = cache / "dotagents" / "dotnet" / "user-version"
+            scoped = cache / "dotagents" / "dotnet" / "project-version"
+            for payload in (user, scoped):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            project = Path(config) / "project-x"
+            (project / "src").mkdir(parents=True)
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "user", "installPath": str(user)},
+                {"scope": "project", "projectPath": str(project), "installPath": str(scoped)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+            os.utime(scoped, (1, 1))
+
+            inside = gate.declarations([cache], project=project / "src")
+            elsewhere = gate.declarations([cache], project=Path(config) / "project-y")
+
+        self.assertEqual([item.payload_dir.name for item in inside], ["project-version"])
+        self.assertEqual([item.payload_dir.name for item in elsewhere], ["user-version"])
+
+    def test_a_project_install_without_a_declaration_leaves_the_user_install_answering(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            user = cache / "dotagents" / "dotnet" / "user-version"
+            user.mkdir(parents=True)
+            (user / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            legacy = cache / "dotagents" / "dotnet" / "pre-tier"
+            legacy.mkdir(parents=True)
+            project = Path(config) / "project"
+            project.mkdir()
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "user", "installPath": str(user)},
+                {"scope": "project", "projectPath": str(project), "installPath": str(legacy)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache], project=project)
+
+        self.assertEqual([item.payload_dir.name for item in found], ["user-version"])
+
+    def test_the_most_specific_project_install_wins(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            outer, inner = cache / "dotagents" / "dotnet" / "outer", cache / "dotagents" / "dotnet" / "inner"
+            for payload in (outer, inner):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            os.utime(inner, (1, 1))
+            repos = Path(config) / "repos"
+            (repos / "app" / "src").mkdir(parents=True)
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "project", "projectPath": str(repos), "installPath": str(outer)},
+                {"scope": "project", "projectPath": str(repos / "app"), "installPath": str(inner)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache], project=repos / "app" / "src")
+
+        self.assertEqual([item.payload_dir.name for item in found], ["inner"])
+
+    def test_the_gates_own_install_cache_precedes_the_home_caches(self):
+        with tempfile.TemporaryDirectory() as home:
+            own = Path(home) / ".codex" / "plugins" / "cache"
+            script = own / "base-agents" / "engineering" / "1.0.0" / "hooks" / "tier_gate.py"
+            script.parent.mkdir(parents=True)
+            (Path(home) / ".claude" / "plugins" / "cache").mkdir(parents=True)
+            cleared = {name: "" for name in (*gate.PLUGIN_ROOT_VARIABLES, "CLAUDE_CONFIG_DIR", "CODEX_HOME")}
+            with unittest.mock.patch.dict(os.environ, cleared), \
+                    unittest.mock.patch.object(gate, "__file__", str(script)), \
+                    unittest.mock.patch.object(gate.Path, "home", return_value=Path(home)):
+                roots = gate.cache_roots()
+
+        self.assertEqual(own.resolve(), roots[0])
+
+    def test_the_first_cache_root_answers_for_a_plugin_both_hosts_cache(self):
+        with tempfile.TemporaryDirectory() as claude, tempfile.TemporaryDirectory() as codex:
+            payloads = []
+            for cache, name in ((claude, "b693fe48ccd8"), (codex, "1.1.2")):
+                payload = Path(cache) / "dotagents" / "dotnet" / name
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+                payloads.append(payload)
+
+            found = gate.declarations([claude, codex])
+
+        self.assertEqual([item.payload_dir for item in found], [payloads[0]])
+
 
 class TemporaryProject(unittest.TestCase):
     def setUp(self):
