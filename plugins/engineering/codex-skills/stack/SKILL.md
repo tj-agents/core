@@ -4,7 +4,7 @@ description: Maintain a required stack when work must build on an unmerged PR. C
 
 kind: operation
 domain: process
-model: gpt-6-sol
+model: gpt-6.1-sol
 ---
 
 # Stacked pull requests

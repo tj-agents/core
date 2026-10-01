@@ -35,12 +35,12 @@
   ],
   "semantic_stages": {
     "strategic": {
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "high",
       "unavailable": "decision"
     },
     "implementation": {
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "unavailable": "typed-parent-fallback"
     },
@@ -53,13 +53,13 @@
       "model": "gpt-5.3-codex-spark",
       "specialist": "gpt-5.3-codex-spark",
       "fallback_models": [
-        "gpt-6-sol"
+        "gpt-6.1-sol"
       ],
       "reasoning_effort": "medium",
       "unavailable": "decision"
     },
     "critical": {
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "xhigh",
       "unavailable": "decision"
     }
@@ -113,7 +113,7 @@
         "implementation",
         "review"
       ],
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "sandbox_mode": "read-only",
       "kind": "review"
