@@ -40,3 +40,14 @@ two interpreters per gate. How Codex launches `commandWindows` is unmeasured.
 Resolve when Codex `PreToolUse` gates run through `hook_dispatch.py`, with the adapter's exit-code
 translation applied once to the merged result, and a timing probe of Codex's Windows hook launch
 path is recorded.
+
+## The prompt route fires on host-generated turns
+
+On 2026-10-01 the installed UserPromptSubmit `workflow_route.py` attached the full plan-execution
+contract (12 KB) to subagent hand-backs and task notifications. Claude delivers those as prompts, and
+their text often contains "complete" or "finish". Every background agent result therefore re-injects
+the route, whether or not the human authorized execution.
+
+Resolve when a live probe records the UserPromptSubmit payload for an agent hand-back and a task
+notification, and the route skips any prompt the payload or transcript marks as non-human, with a
+regression test for each.
