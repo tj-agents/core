@@ -1,9 +1,4 @@
-"""The review family names each host's real native reviewer and runs in a repository with no `.agents/`.
-
-A simulated `native-general` event passes whatever the procedure says, so it cannot catch a Stage 3 that
-names no reviewer. These checks read the shipped procedure itself and run its helpers from the packaged
-plugin against a consumer-shaped repository.
-"""
+"""The review family names each host's real native reviewer and runs in a repository with no `.agents/`."""
 
 import json
 import os
@@ -51,8 +46,11 @@ class NativeLayerNamesTheHostReviewer(unittest.TestCase):
             with self.subTest(skill=skill):
                 text = body(skill)
                 self.assertIn("`review` Stage 3 native layer", text)
-                self.assertNotIn("native/general layer over", text)
-                self.assertNotIn("native/general review receives", text)
+
+    def test_no_review_family_text_keeps_the_unnamed_native_general_layer(self):
+        for skill in ("review", *DELEGATES_NATIVE_LAYER):
+            with self.subTest(skill=skill):
+                self.assertNotIn("native/general", body(skill))
 
     def test_the_packaged_procedure_is_the_authored_one(self):
         for skill in ("review", *DELEGATES_NATIVE_LAYER):
@@ -106,9 +104,12 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         (source / "Startup.cs").write_text("class Startup {}\n", encoding="utf-8")
         self.git("add", ".")
         self.git("commit", "-q", "-m", "change")
-        self.environment = {key: value for key, value in os.environ.items()
-                            if key not in ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")}
-        self.environment["PYTHONIOENCODING"] = "utf-8"
+        home = self.root / "home"
+        home.mkdir()
+        self.environment = {key: value for key, value in os.environ.items() if key not in (
+            "CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT", "CODEX_HOME", "CLAUDE_CONFIG_DIR",
+        )}
+        self.environment.update(HOME=str(home), USERPROFILE=str(home), PYTHONIOENCODING="utf-8")
 
     def git(self, *arguments):
         subprocess.run(
@@ -141,13 +142,51 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         )
         self.assertTrue(Path(descriptor["bundle"]["tree"]).is_dir())
 
-    def test_stage_four_resolves_tier_conventions_from_the_plugin(self):
+    def test_stack_child_inherits_its_parent_layers_security_paths(self):
+        self.git("checkout", "-q", "-b", "Fix/AuthenticationRetry")
+        (self.repository / "reviews").mkdir()
+        (self.repository / "reviews" / "Fix-AuthenticationRetry.md").write_text("# review\n", encoding="utf-8")
+        (self.repository / "README.md").write_text("docs\n", encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "child")
+
+        completed = self.run_packaged(
+            "workflows/workflow_ops.py", "--root", str(self.repository),
+            "--workflow-run-id", "stack-child", "review-prepare", "--base", "fix-prod-boot", "--head", "HEAD",
+        )
+
+        self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
+        descriptor = json.loads(completed.stdout)
+        self.assertNotIn("src/Authorization/Startup.cs", descriptor["paths"])
+        self.assertEqual(
+            {"required": True, "first_path": "src/Authorization/Startup.cs"}, descriptor["security"]
+        )
+
+    def test_stage_four_lists_the_installed_tier_conventions_from_the_plugin(self):
+        config = self.root / "claude"
+        cache = config / "plugins" / "cache"
+        installed = cache / "dotagents" / "dotnet" / "installed"
+        stale = cache / "dotagents" / "dotnet" / "stale"
+        for payload in (installed, stale):
+            skill = payload / "skills" / "persistence"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\nname: persistence\nkind: contract\n---\n", encoding="utf-8")
+            (payload / "tier.json").write_text(json.dumps({
+                "schema_version": 1, "tier": "dotnet", "applies": "stack-present",
+                "detect": {"files": ["global.json"]},
+            }), encoding="utf-8")
+        registry = {"plugins": {"dotnet@dotagents": [{"scope": "user", "installPath": str(installed)}]}}
+        (config / "plugins" / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+        self.environment["CLAUDE_CONFIG_DIR"] = str(config)
+
         completed = self.run_packaged(
             "hooks/tier_gate.py", "--conventions", "--project", str(self.repository),
         )
 
         self.assertEqual(0, completed.returncode, completed.stderr)
-        self.assertTrue(completed.stdout.startswith("Tier gate - "), completed.stdout)
+        self.assertIn("dotnet (", completed.stdout)
+        self.assertIn(str(installed / "skills" / "persistence" / "SKILL.md"), completed.stdout)
+        self.assertNotIn(str(stale), completed.stdout)
 
 
 if __name__ == "__main__":
