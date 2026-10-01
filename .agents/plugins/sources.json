@@ -280,7 +280,8 @@
     ]
   },
   "extended_host_adapters": [
-    "persistent-workflow"
+    "persistent-workflow",
+    "review"
   ],
   "workflow": {
     "source": ".agents/workflows",
