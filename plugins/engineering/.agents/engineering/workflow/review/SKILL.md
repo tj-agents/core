@@ -171,13 +171,12 @@ dispatch ID contribute nothing.
 ## Stage 6 — conditional security layer
 
 The descriptor's `security` field applies the merge gate's generic and repository `security_paths`
-inventory: `first_path` to the frozen paths, `trunk_first_path` to the head's whole range against the trunk,
-which is what the gate classifies. Run the layer when `first_path` is set, or in a `new` work order when
-`trunk_first_path` is set. It covers the head's range against the trunk: Claude Code's built-in
-`security-review` skill, or in Codex a `review-lens` dispatch with the bounded lens `security` over
-`<trunk-merge-base>..<frozen-head>`. Security evidence joins parent synthesis, while the
-`Security-reviewed up to commit:` marker is written only when the whole pass completes. No qualifying path
-means no security marker.
+inventory: `first_path` to the frozen paths, `trunk_first_path` to `<trunk_base>..<frozen-head>`, the range
+the gate classifies. Run the layer when `first_path` is set, or when `trunk_first_path` is set and the work
+order has no `Security-reviewed up to commit:` marker yet. It covers `<trunk_base>..<frozen-head>`: Claude
+Code's built-in `security-review` skill, or in Codex a `review-lens` dispatch with the bounded lens
+`security` over that range. Security evidence joins parent synthesis, while the marker is written only
+when the whole pass completes. No qualifying path means no security marker.
 
 ## Stage 7 — parent synthesis and completion
 
