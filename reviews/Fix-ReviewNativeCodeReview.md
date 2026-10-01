@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `9363122`  `(2026-10-01)`
+**Reviewed up to commit:** `37b4c71`  `(2026-10-01)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-01 — full
@@ -243,6 +243,28 @@ plus ` -- .agents/engineering/workflow/review/SKILL.md`. It returned 1 finding. 
 
 **Lens coverage:** the native layer was Claude Code's built-in `code-review` at `low`, given the range
 plus ` -- .agents/engineering/workflow/review/SKILL.md`. It found nothing. No security-sensitive path.
+
+### Findings
+
+None.
+
+## Review pass — 2026-10-01 — incremental
+
+**Candidate base:** `93631227833d1fa8fecd85e9d401a2c5b509e513`
+**Candidate head:** `37b4c71ef35821a46774983e47e2bbe85b115e55`
+**Candidate branch:** `Fix/ReviewNativeCodeReview`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:e6f10243e1df011d6c4b52a035debb4509e4491eefb94c197e48a04e35e2f432` `(2 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-pr74-inc6\review\5b210feb915f2fe7e8ebc2b68b3aa275b7df0accffee1699097f82363ded5dc6`
+**Candidate bundle identity:** `sha256:f310bb6483a476da7d94de235e2e90dc046987ea1ef594b5bbecd0b68fc087ea`
+**Work-order path:** `reviews/Fix-ReviewNativeCodeReview.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+**Lens coverage:** the native layer was Claude Code's built-in `code-review` at `low`. It skips test files
+at that level and reviewed nothing. The parent reviewed the test-only delta: the Windows-only envelope
+tests now find `bin\bash.exe` under any ancestor of `git`, which resolves `Git\bin\bash.exe` from both
+`Git\cmd` and `mingw64\bin`. No security-sensitive path.
 
 ### Findings
 
