@@ -35,7 +35,7 @@ STAGE_LANES = {
 # frontier tier must outrank every rung.
 FAMILY_ORDER = {
     "claude": ("claude-fable-5", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"),
-    "codex": ("gpt-6-astra", "gpt-6-sol", "gpt-6-luna"),
+    "codex": ("gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"),
 }
 
 
