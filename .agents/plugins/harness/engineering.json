@@ -5,7 +5,7 @@
     ".agents/engineering"
   ],
   "source_excludes": [],
-  "source_digest": "sha256:569ec3d0c1cca19454c316ac7c152d966d36bb70b0c3bf64d5b727d59af2dc4d",
+  "source_digest": "sha256:7eeb23ee36ec1d6f56d2117c0768e679b90aaa4991a4099b69b4f4d1feb8ecbb",
   "requires": {
     "marketplaces": [
       {
