@@ -123,6 +123,43 @@ class DeclarationDiscovery(unittest.TestCase):
 
         self.assertEqual([item.payload_dir for item in found], [installed])
 
+    def test_a_project_scoped_install_answers_only_inside_its_project(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            user = cache / "dotagents" / "dotnet" / "user-version"
+            scoped = cache / "dotagents" / "dotnet" / "project-version"
+            for payload in (user, scoped):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            project = Path(config) / "project-x"
+            (project / "src").mkdir(parents=True)
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "user", "installPath": str(user)},
+                {"scope": "project", "projectPath": str(project), "installPath": str(scoped)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+            os.utime(user, (1, 1))
+
+            inside = gate.declarations([cache], project=project / "src")
+            elsewhere = gate.declarations([cache], project=Path(config) / "project-y")
+
+        self.assertEqual([item.payload_dir.name for item in inside], ["project-version"])
+        self.assertEqual([item.payload_dir.name for item in elsewhere], ["user-version"])
+
+    def test_the_gates_own_install_cache_precedes_the_home_caches(self):
+        with tempfile.TemporaryDirectory() as home:
+            own = Path(home) / ".codex" / "plugins" / "cache"
+            script = own / "base-agents" / "engineering" / "1.0.0" / "hooks" / "tier_gate.py"
+            script.parent.mkdir(parents=True)
+            (Path(home) / ".claude" / "plugins" / "cache").mkdir(parents=True)
+            cleared = {name: "" for name in (*gate.PLUGIN_ROOT_VARIABLES, "CLAUDE_CONFIG_DIR", "CODEX_HOME")}
+            with unittest.mock.patch.dict(os.environ, cleared), \
+                    unittest.mock.patch.object(gate, "__file__", str(script)), \
+                    unittest.mock.patch.object(gate.Path, "home", return_value=Path(home)):
+                roots = gate.cache_roots()
+
+        self.assertEqual(own.resolve(), roots[0])
+
     def test_the_first_cache_root_answers_for_a_plugin_both_hosts_cache(self):
         with tempfile.TemporaryDirectory() as claude, tempfile.TemporaryDirectory() as codex:
             payloads = []

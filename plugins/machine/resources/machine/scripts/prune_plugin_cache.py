@@ -483,8 +483,7 @@ def superseded_session(config_root, environ=None):
     """The installed replacement for the plugin root this session loaded, when the registry moved on.
 
     A process resolves its plugin roots once at startup and `/clear` keeps them, so an update made
-    since then reaches only new processes. Silent staleness is how a session runs a fixed procedure
-    in its old form.
+    since then reaches only new processes.
     """
     values = os.environ if environ is None else environ
     loaded = values.get("CLAUDE_PLUGIN_ROOT")
@@ -589,7 +588,8 @@ def build_parser():
     parser.add_argument(
         "--notice",
         action="store_true",
-        help="Throttled one-line session notice. Reports drift only; never removes.",
+        help="Throttled cache-drift line, plus an unthrottled line when this session runs a superseded "
+        "plugin root. Never removes.",
     )
     parser.add_argument(
         "--pin",

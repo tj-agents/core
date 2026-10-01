@@ -115,6 +115,10 @@ def cache_roots():
         if len(plugin_root.parents) >= 3:
             add(plugin_root.parents[2])
 
+    here = Path(__file__).resolve()
+    if len(here.parents) > 4 and here.parents[4].name == "cache":
+        add(here.parents[4])
+
     for variable in ("CLAUDE_CONFIG_DIR", "CODEX_HOME"):
         value = os.environ.get(variable)
         if value:
@@ -127,14 +131,23 @@ def cache_roots():
 
 
 def _key(path):
+    try:
+        path = Path(path).resolve()
+    except (OSError, ValueError):
+        pass
     return os.path.normcase(os.path.normpath(str(path)))
 
 
-def installed_declarations(root):
+def _within(path, ancestor):
+    path, ancestor = _key(path), _key(ancestor)
+    return path == ancestor or path.startswith(ancestor.rstrip("\\/") + os.sep)
+
+
+def installed_declarations(root, project=None):
     """`tier.json` of each version directory the registry beside this cache names, or None without one.
 
-    Reading only installed paths keeps the per-call cost proportional to installed plugins, not to the
-    stale versions a cache accumulates.
+    A project-scoped install counts only for its own project. Reading only installed paths keeps the
+    per-call cost proportional to installed plugins, not to the stale versions a cache accumulates.
     """
     registry = Path(root).parent / "installed_plugins.json"
     try:
@@ -150,13 +163,16 @@ def installed_declarations(root):
             location = entry.get("installPath") if isinstance(entry, dict) else None
             if not _text(location):
                 continue
+            scoped = _text(entry.get("projectPath"))
+            if scoped and (project is None or not _within(project, scoped)):
+                continue
             version_directory = Path(location)
             if _key(version_directory.parent.parent.parent) == cache:
                 paths.append(version_directory / DECLARATION_NAME)
     return sorted(set(paths))
 
 
-def declarations(roots=None):
+def declarations(roots=None, project=None):
     """One declaration per plugin: the first cache root that has it, at its installed version.
 
     Roots are in priority order, the running host's cache first. A cache with a host registry beside it
@@ -164,7 +180,7 @@ def declarations(roots=None):
     """
     found = {}
     for root in cache_roots() if roots is None else roots:
-        paths = installed_declarations(root)
+        paths = installed_declarations(root, project)
         if paths is None:
             try:
                 paths = sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME))
@@ -343,7 +359,7 @@ def overridden():
 
 
 def assess(root, found=None):
-    found = declarations() if found is None else found
+    found = declarations(project=root) if found is None else found
     if not found:
         return [], [], []
 
