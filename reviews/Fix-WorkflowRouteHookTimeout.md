@@ -5,9 +5,9 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `e868fc3ba938fa9dc35cd32d866e762aefe1fd8d`  `(2026-10-01)`
+**Reviewed up to commit:** `3c81e52`  `(2026-10-01)`
 **Security-reviewed up to commit:** `e868fc3ba938fa9dc35cd32d866e762aefe1fd8d`  `(2026-10-01)`
-**Judgment:** `changes-requested`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-01 — all
 
@@ -63,3 +63,12 @@ Dropped after validation. A subagent tool call receiving the parent's route was 
 2.1.282 probe, where subagent PreToolUse payloads carry `agent_id` and `agent_type`. Reusing the
 claim-pruning helper doesn't fit, because receipts are per session, not per invocation. Re-execution of
 sibling modules is inert, since no shipped module state crosses gates.
+
+## Review pass — 2026-10-01 — incremental `e868fc3..3c81e52`
+
+**Pass judgment:** `approved` after REV-009
+
+- [x] **REV-009 — MEDIUM — correctness** — `.agents/hooks/hook_dispatch.py:242`
+  The dispatcher read `worker.is_alive()` twice: once before merging and once before `os._exit`. If a
+  gate finished between the two reads, the output reported that gate as unfinished and left out its
+  verdict. Fix: decide whether the deadline was overrun once, from the locked results snapshot.

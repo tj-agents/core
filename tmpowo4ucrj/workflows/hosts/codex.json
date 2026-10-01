@@ -1,0 +1,150 @@
+{
+  "contract_version": "v2",
+  "host": "codex",
+  "status": "available-with-parent-fallback",
+  "model_override_agent_name": "default",
+  "delivery": {
+    "profile_environment": "CODEX_HOME",
+    "profile_default": "~/.codex",
+    "profile_directory": "agents",
+    "project_directory": ".codex/agents",
+    "plugin_directory": "codex-agents",
+    "extension": ".toml",
+    "plugin_installer": "scripts/install-codex-agents.ps1",
+    "plugin_loading": "unsupported-use-profile-installer",
+    "project_scope": "supported-for-project-owned-distinct-roles"
+  },
+  "probe": {
+    "command": "codex",
+    "version_arguments": [
+      "--version"
+    ]
+  },
+  "concurrency": {
+    "readers": "parallel",
+    "writers": "serialized",
+    "nested_dispatch": false
+  },
+  "fallback_reasons": [
+    "host-unavailable",
+    "role-unavailable",
+    "model-unavailable",
+    "unsupported-capability",
+    "invalid-result",
+    "cancelled"
+  ],
+  "semantic_stages": {
+    "strategic": {
+      "model": "gpt-6-sol",
+      "reasoning_effort": "high",
+      "unavailable": "decision"
+    },
+    "implementation": {
+      "model": "gpt-6-sol",
+      "reasoning_effort": "medium",
+      "unavailable": "typed-parent-fallback"
+    },
+    "mechanical": {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "unavailable": "typed-parent-fallback"
+    },
+    "review": {
+      "model": "gpt-5.3-codex-spark",
+      "specialist": "gpt-5.3-codex-spark",
+      "fallback_models": [
+        "gpt-6-sol"
+      ],
+      "reasoning_effort": "medium",
+      "unavailable": "decision"
+    },
+    "critical": {
+      "model": "gpt-6-sol",
+      "reasoning_effort": "xhigh",
+      "unavailable": "decision"
+    }
+  },
+  "continuation": {
+    "wake": "in-chat-scheduled-task",
+    "scope": "same-chat-local-project-worktree",
+    "unsupported_gate": "product-capability-unavailable"
+  },
+  "roles": {
+    "evidence-explorer": {
+      "agent_name": "evidence_explorer",
+      "filename": "evidence-explorer.toml",
+      "description": "Read-only repository evidence explorer for one bounded workflow question.",
+      "body": "../roles/evidence-explorer.md",
+      "default_stage": "mechanical",
+      "allowed_stages": [
+        "strategic",
+        "implementation",
+        "mechanical",
+        "critical"
+      ],
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "sandbox_mode": "read-only",
+      "kind": "review"
+    },
+    "log-analyst": {
+      "agent_name": "log_analyst",
+      "filename": "log-analyst.toml",
+      "description": "Read-only analyst for reducing supplied logs into evidence without diagnosing the fix.",
+      "body": "../roles/log-analyst.md",
+      "default_stage": "mechanical",
+      "allowed_stages": [
+        "implementation",
+        "mechanical",
+        "critical"
+      ],
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "sandbox_mode": "read-only",
+      "kind": "review"
+    },
+    "test-impact-analyst": {
+      "agent_name": "test_impact_analyst",
+      "filename": "test-impact-analyst.toml",
+      "description": "Read-only analyst for affected tests, gaps, and repository-supported validation commands.",
+      "body": "../roles/test-impact-analyst.md",
+      "default_stage": "implementation",
+      "allowed_stages": [
+        "implementation",
+        "review"
+      ],
+      "model": "gpt-6-sol",
+      "reasoning_effort": "medium",
+      "sandbox_mode": "read-only",
+      "kind": "review"
+    },
+    "review-lens": {
+      "agent_name": "review_lens",
+      "filename": "review-lens.toml",
+      "description": "Read-only independent review lens over one immutable diff and bounded concern.",
+      "body": "../roles/review-lens.md",
+      "model": "gpt-5.3-codex-spark",
+      "default_stage": "review",
+      "allowed_stages": [
+        "review"
+      ],
+      "reasoning_effort": "medium",
+      "sandbox_mode": "read-only",
+      "kind": "review"
+    },
+    "mechanical-worker": {
+      "agent_name": "mechanical_worker",
+      "filename": "mechanical-worker.toml",
+      "description": "Serialized mechanical writer restricted to one parent-approved writer lease.",
+      "body": "../roles/mechanical-worker.md",
+      "default_stage": "mechanical",
+      "allowed_stages": [
+        "mechanical"
+      ],
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "sandbox_mode": "workspace-write",
+      "kind": "worker"
+    }
+  }
+}

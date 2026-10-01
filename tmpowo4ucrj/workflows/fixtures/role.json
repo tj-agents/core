@@ -1,0 +1,19 @@
+{
+  "name": "workflow-contract-fixture",
+  "description": "Generator-only bounded read role fixture.",
+  "body": "role-body.md",
+  "codex": {
+    "model": "inherit",
+    "reasoning_effort": "medium",
+    "sandbox_mode": "read-only"
+  },
+  "claude": {
+    "model": "inherit",
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "kind": "review"
+}
