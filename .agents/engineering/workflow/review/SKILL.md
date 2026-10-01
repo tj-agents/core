@@ -176,9 +176,10 @@ the gate classifies. Run the layer when `first_path` is set, or when `trunk_firs
 order's `Security-reviewed up to commit:` marker is missing, unresolvable, or followed by a change to a
 security-sensitive path before the frozen head. It covers `<trunk_base>..<frozen-head>`, or
 `<frozen-base>..<frozen-head>` when `trunk_base` is null. Claude Code's built-in `security-review` skill
-takes no target and reviews the current branch's pending changes, so use it only when the checkout is at the
-frozen head; otherwise, and in Codex, dispatch `review-lens` with the bounded lens `security` over that
-range. Security evidence joins parent synthesis, while the marker is written only when the whole pass
+takes no target and diffs the working tree against `origin/HEAD`'s merge-base, so use it only when it
+reviews exactly that range: the checkout is clean at the frozen head, scope is `all`, and `trunk_base` equals
+`git merge-base origin/HEAD <frozen-head>`. Otherwise, and in Codex, dispatch `review-lens` with the bounded
+lens `security` over that range. Security evidence joins parent synthesis, while the marker is written only when the whole pass
 completes. No qualifying path means no security marker.
 
 ## Stage 7 — parent synthesis and completion

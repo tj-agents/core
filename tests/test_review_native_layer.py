@@ -41,7 +41,7 @@ class NativeLayerNamesTheHostReviewer(unittest.TestCase):
     def test_stage_six_names_claude_security_review(self):
         stage = section(body("review"), "## Stage 6")
         self.assertIn("built-in `security-review` skill", stage)
-        self.assertIn("only when the checkout is at the frozen head", stage)
+        self.assertIn("the checkout is clean at the frozen head, scope is `all`, and `trunk_base` equals", stage)
 
     def test_every_mode_with_a_native_layer_delegates_to_stage_three(self):
         for skill in DELEGATES_NATIVE_LAYER:
