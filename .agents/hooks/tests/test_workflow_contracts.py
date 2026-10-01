@@ -398,27 +398,29 @@ class WorkflowGenerationTests(unittest.TestCase):
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["persistent-workflow"], config["extended_host_adapters"])
-        canonical = authored_skill("persistent-workflow")
-        for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
-            source = ROOT / f".{host}" / "skills" / "persistent-workflow" / "SKILL.md"
-            authored = source.read_text(encoding="utf-8")
-            self.assertIn(
-                "](../../../.agents/engineering/workflow/persistent-workflow/SKILL.md)",
-                authored,
-            )
-            generated = (
-                ROOT / "plugins/engineering" / tree / "persistent-workflow" / "SKILL.md"
-            ).read_text(encoding="utf-8")
+        self.assertEqual(["persistent-workflow", "review"], config["extended_host_adapters"])
+        for skill in config["extended_host_adapters"]:
+            canonical = authored_skill(skill)
+            for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
+                with self.subTest(skill=skill, host=host):
+                    source = ROOT / f".{host}" / "skills" / skill / "SKILL.md"
+                    authored = source.read_text(encoding="utf-8")
+                    self.assertIn(
+                        f"](../../../{canonical.relative_to(ROOT).as_posix()})",
+                        authored,
+                    )
+                    generated = (
+                        ROOT / "plugins/engineering" / tree / skill / "SKILL.md"
+                    ).read_text(encoding="utf-8")
+                    self.assertEqual(
+                        authored.replace("../../../.agents/", "../../.agents/"),
+                        generated,
+                    )
+            packaged = ROOT / "plugins/engineering" / canonical.relative_to(ROOT)
             self.assertEqual(
-                authored.replace("../../../.agents/", "../../.agents/"),
-                generated,
+                canonical.read_text(encoding="utf-8"),
+                packaged.read_text(encoding="utf-8"),
             )
-        packaged = ROOT / "plugins/engineering" / canonical.relative_to(ROOT)
-        self.assertEqual(
-            canonical.read_text(encoding="utf-8"),
-            packaged.read_text(encoding="utf-8"),
-        )
 
     def test_each_verifier_executes_its_adjacent_bundle(self):
         scripts = (WORKFLOWS / "verify.py", PLUGIN_WORKFLOWS / "verify.py")

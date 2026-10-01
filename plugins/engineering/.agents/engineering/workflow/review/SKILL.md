@@ -90,16 +90,11 @@ identity and confirmed findings must remain durable.
 
 ## Stage 3 — native layer
 
-Run the host's own reviewer first, covering correctness, simplification, reuse, efficiency, and error
-handling. It is a tool call; reading the diff yourself is not this layer.
-
-- Claude Code: the built-in `code-review` skill, invoked through the Skill tool with
-  `<effort> <frozen-base>..<frozen-head>`, adding ` -- <scoped paths>` for a bounded scope. Never pass
-  `--comment` or `--fix`; this workflow owns both.
-- Codex: `codex review --base <frozen-base>`, run from a checkout at the frozen head.
-
-Both read the frozen commits from the local repository, so a synchronized merge that exists only locally is
-still the candidate. Keep only findings on lines changed inside the frozen range and scope. When the host
+Run the host's own native reviewer first, covering correctness, simplification, reuse, efficiency, and
+error handling, over the frozen range `<frozen-base>..<frozen-head>` and scope. `review`'s host entry point
+names that reviewer and its invocation (`<engineering>/skills/review/SKILL.md` in Claude Code,
+`<engineering>/codex-skills/review/SKILL.md` in Codex). It is a tool call; reading the diff yourself is not
+this layer. Keep only findings on lines changed inside the frozen range and scope. When the host
 reviewer is not callable in this session, dispatch the existing `review-lens` capability with the bounded
 lens `native-general` instead. Record in the work order which native layer ran. Do not invent or require a
 second repository agent definition.
@@ -174,10 +169,11 @@ The descriptor's `security` field applies the merge gate's generic and repositor
 inventory: `first_path` to the frozen paths, `trunk_first_path` to `<trunk_base>..<frozen-head>`, the range
 the gate classifies. Run the layer when `first_path` is set, or when `trunk_first_path` is set and the work
 order's `Security-reviewed up to commit:` marker is missing, unresolvable, or followed by a change to a
-security-sensitive path before the frozen head. It covers `<trunk_base>..<frozen-head>`, or `<frozen-base>..<frozen-head>` when
-`trunk_base` is null: Claude Code's built-in `security-review` skill, or in Codex a `review-lens` dispatch
-with the bounded lens `security` over that range. Security evidence joins parent synthesis, while the
-marker is written only when the whole pass completes. No qualifying path means no security marker.
+security-sensitive path before the frozen head. It covers `<trunk_base>..<frozen-head>`, or
+`<frozen-base>..<frozen-head>` when `trunk_base` is null, through the host security reviewer that `review`'s
+host entry point names. When the host has none that reviews exactly that range, dispatch `review-lens` with
+the bounded lens `security` over it. Security evidence joins parent synthesis, while the marker is written
+only when the whole pass completes. No qualifying path means no security marker.
 
 ## Stage 7 — parent synthesis and completion
 

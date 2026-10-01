@@ -38,8 +38,7 @@ Any surviving path makes this an ordinary docs review.
 
 Use the same `reviews/<branch-slug>.md` contract from `review-lifecycle`. The parent records status
 `in-progress` and the frozen candidate before review. Run the `review` Stage 3 native layer over that
-descriptor: Claude Code's built-in `code-review` skill or `codex review`, with the same `native-general`
-fallback.
+descriptor, with the same `native-general` fallback.
 
 ## Rules
 

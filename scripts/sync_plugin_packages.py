@@ -471,6 +471,25 @@ def expected_adapter_body(shared: dict, host: str) -> str:
     )
 
 
+def validate_host_neutral(config: dict, skills: dict[str, dict]) -> None:
+    patterns = {
+        host: [re.compile(term, re.MULTILINE) for term in terms]
+        for host, terms in config.get("host_only_terms", {}).items()
+    }
+    for name, shared in skills.items():
+        for document in sorted(shared["path"].parent.rglob("*.md")):
+            text = document.read_text(encoding="utf-8")
+            for host, compiled in patterns.items():
+                for pattern in compiled:
+                    match = pattern.search(text)
+                    if match:
+                        raise ValueError(
+                            f"{document.as_posix()}: {host}-only term {match.group(0)!r} belongs in "
+                            f".{host}/skills/{name}/SKILL.md, registered in extended_host_adapters, "
+                            "not the shared definition"
+                        )
+
+
 def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict:
     adapters: dict[str, dict[str, Path]] = {}
     extended = set(config.get("extended_host_adapters", []))
@@ -650,6 +669,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
         for path in (root / ".agents/plugins/harness").glob("*.json")
     }
     skills = discover(root, config)
+    validate_host_neutral(config, skills)
     adapters = validate_adapters(root, config, skills)
     plugins = validate_configuration(root, config)
     validate_default_selection(root, config, skills, compatibility)
