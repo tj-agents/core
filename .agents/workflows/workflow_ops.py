@@ -355,20 +355,37 @@ def routed_skills(root, paths):
     raise WorkflowOperationError("skill router returned an invalid JSON contract")
 
 
-def security_classification(tree_path, paths):
+def paths_against_trunk(root, head):
+    for trunk in ("origin/main", "main"):
+        try:
+            base = git(root, "merge-base", trunk, head)
+        except WorkflowOperationError:
+            continue
+        return git(root, "diff", "--name-only", f"{base}..{head}").splitlines()
+    return []
+
+
+def security_classification(root, tree_path, head, branch, paths):
+    """Whether the merge gate will demand a security marker for this head.
+
+    The gate classifies the head's whole range against main, so a stack child inherits its parent
+    layer's sensitive paths, and it never counts the branch's own work order.
+    """
     hooks = Path(__file__).resolve().parents[1] / "hooks"
     if str(hooks) not in sys.path:
         sys.path.insert(0, str(hooks))
     import merge_review_gate
 
+    work_order = f"reviews/{branch.replace('/', '-')}.md"
+    candidates = [path for path in dict.fromkeys([*paths, *paths_against_trunk(root, head)]) if path != work_order]
     config = tree_path / merge_review_gate.CONFIG_FILE
     if config.is_file():
         try:
-            first = merge_review_gate.touches_security(paths, merge_review_gate.security_patterns(config))
+            first = merge_review_gate.touches_security(candidates, merge_review_gate.security_patterns(config))
         except merge_review_gate.ConfigUnusable as error:
             raise WorkflowOperationError(str(error)) from error
     else:
-        first = merge_review_gate.touches_security(paths)
+        first = merge_review_gate.touches_security(candidates)
     return {"required": first is not None, "first_path": first}
 
 
@@ -467,7 +484,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         "patch_sha256": hashlib.sha256(patch).hexdigest(),
         "rules": rules,
         "lenses": select_review_lenses(paths),
-        "security": security_classification(tree_path, paths),
+        "security": security_classification(root, tree_path, head, git(root, "branch", "--show-current"), paths),
         "waves": 1,
         "context": {
             "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],

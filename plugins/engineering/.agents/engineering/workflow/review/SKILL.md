@@ -1,6 +1,6 @@
 ---
 name: review
-description: Run the canonical isolated code-review workflow over one frozen branch, PR, commit-range, or path candidate with native/general review, relevant fresh read-only lenses, validated evidence, and parent-only deduplication, severity, judgment, and work-order writing. Use for a first full code review when asked to review a branch or PR; use incremental-review for later commits, big-review for a very large diff, docs-review for a meta-only diff, and address-review for existing findings.
+description: Run the canonical isolated code-review workflow over one frozen branch, PR, commit-range, or path candidate with the host's native reviewer, relevant fresh read-only lenses, validated evidence, and parent-only deduplication, severity, judgment, and work-order writing. Use for a first full code review when asked to review a branch or PR; use incremental-review for later commits, big-review for a very large diff, docs-review for a meta-only diff, and address-review for existing findings.
 
 kind: workflow
 domain: process
@@ -93,16 +93,16 @@ identity and confirmed findings must remain durable.
 Run the host's own reviewer first, covering correctness, simplification, reuse, efficiency, and error
 handling. It is a tool call; reading the diff yourself is not this layer.
 
-- Claude Code: the built-in `code-review` skill, invoked through the Skill tool with `<effort> <target>`,
-  where the target is the PR number for a PR candidate and otherwise the branch. Never pass `--comment` or
-  `--fix`; this workflow owns both.
+- Claude Code: the built-in `code-review` skill, invoked through the Skill tool with
+  `<effort> <frozen-base>..<frozen-head>`, adding ` -- <scoped paths>` for a bounded scope. Never pass
+  `--comment` or `--fix`; this workflow owns both.
 - Codex: `codex review --base <frozen-base>`, run from a checkout at the frozen head.
 
-The native reviewer reads the live target, so first confirm the target's head equals the frozen head. Keep
-only its findings on lines changed inside the frozen range and scope. When the head moved or the reviewer
-is not callable in this session, dispatch the existing `review-lens` capability with the bounded lens
-`native-general` instead. Record in the work order which native layer ran. Do not invent or require a second
-repository agent definition.
+Both read the frozen commits from the local repository, so a synchronized merge that exists only locally is
+still the candidate. Keep only findings on lines changed inside the frozen range and scope. When the host
+reviewer is not callable in this session, dispatch the existing `review-lens` capability with the bounded
+lens `native-general` instead. Record in the work order which native layer ran. Do not invent or require a
+second repository agent definition.
 
 A `native-general` dispatch receives the frozen base, head, path digest, exact scoped paths, materialized
 bundle path and identity, effort, rule-independent objective, read-only tools, and no prior lens
@@ -125,10 +125,15 @@ frozen paths plainly touch, and check each changed file against the conventions 
 its language. Do not substitute the session's already-loaded skill list for this resolution; the gate
 reads the same installed declarations that gated the session.
 
-**Repository routes — repositories that carry them.** The descriptor's `rules` are the frozen tree's routed
-skills, resolved by `review-prepare` through this plugin's router whenever that tree ships
-`.agents/skill-routes.json`. A repository without a route table owes only its tier conventions; that
-absence is normal, not a defect.
+**Repository routes — repositories that carry them.** When the frozen tree ships `.agents/skill-routes.json`,
+run this plugin's router with its working directory set to `<candidate-bundle>/tree`, decode
+`<candidate-bundle>/paths.nul`, and pass every decoded path as an exact literal argument:
+
+```bash
+python <engineering>/hooks/skill_router.py --skills-for "<exact-path-1>" "<exact-path-2>"
+```
+
+A repository without a route table owes only its tier conventions; that absence is normal, not a defect.
 
 Read every routed skill, the root and nearest changed-path `AGENTS.md` files, and the architecture premise
 from the exported frozen tree, never the live checkout. A `DENY PATTERN HIT` is evidence, not a hint.

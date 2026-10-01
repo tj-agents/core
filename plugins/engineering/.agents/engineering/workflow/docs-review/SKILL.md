@@ -10,7 +10,7 @@ lane: L4
 # Documentation review mode
 
 This is the documentation mode of the canonical `review` pipeline. It uses the same frozen candidate,
-native/general layer, fresh read-only dispatches, result validation, parent synthesis, canonical work order,
+host native layer, fresh read-only dispatches, result validation, parent synthesis, canonical work order,
 status, watermark, and explicit review-and-fix authorization. Only the scope guard, loaded rules, and lenses
 differ.
 
