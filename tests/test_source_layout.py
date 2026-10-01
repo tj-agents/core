@@ -262,12 +262,20 @@ class SourceLayoutTests(unittest.TestCase):
             ("claude", "`code-review`"),
             ("claude", "`/code-review`"),
             ("claude", "askuserquestion"),
-            ("codex", "Codex  Review"),
+            ("claude", "the Skill tool"),
+            ("codex", "codex  review"),
         ):
             with self.subTest(host=host, term=term):
                 shared.write_text(original + f"\nRun {term} here.\n", encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, rf"{host}-only term .* belongs in \.{host}/skills/review"):
                     SYNC.build(self.root)
+        shared.write_text(
+            original + "\nThe `code-review-lens` path engineering/code-review/ runs in the Codex review lane"
+            " as a scheduled task through the host's skill tool.\n",
+            encoding="utf-8",
+        )
+        config = SYNC.load(self.root / ".agents/plugins/sources.json")
+        SYNC.validate_host_neutral(config, SYNC.discover(self.root, config))
         shared.write_text(original, encoding="utf-8")
 
         reference = shared.parent / "reference.md"
