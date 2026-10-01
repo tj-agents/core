@@ -173,8 +173,8 @@ dispatch ID contribute nothing.
 The descriptor's `security` field applies the merge gate's generic and repository `security_paths`
 inventory: `first_path` to the frozen paths, `trunk_first_path` to `<trunk_base>..<frozen-head>`, the range
 the gate classifies. Run the layer when `first_path` is set, or when `trunk_first_path` is set and the work
-order's `Security-reviewed up to commit:` marker is missing or a security-sensitive path changed between it
-and the frozen head. It covers `<trunk_base>..<frozen-head>`, or `<frozen-base>..<frozen-head>` when
+order's `Security-reviewed up to commit:` marker is missing, unresolvable, or followed by a change to a
+security-sensitive path before the frozen head. It covers `<trunk_base>..<frozen-head>`, or `<frozen-base>..<frozen-head>` when
 `trunk_base` is null: Claude Code's built-in `security-review` skill, or in Codex a `review-lens` dispatch
 with the bounded lens `security` over that range. Security evidence joins parent synthesis, while the
 marker is written only when the whole pass completes. No qualifying path means no security marker.

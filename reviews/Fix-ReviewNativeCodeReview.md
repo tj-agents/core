@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `in-progress`
-**Reviewed up to commit:** `1d8eff7`  `(2026-10-01)`
+**Reviewed up to commit:** `6d1ef40`  `(2026-10-01)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-01 — full
@@ -203,3 +203,27 @@ pattern fallback. No security-sensitive path.
   `<frozen-base>..<frozen-head>`.
 
   **Resolved** NR24–NR25 in the remediation commit after `1d8eff7`.
+
+## Review pass — 2026-10-01 — incremental
+
+**Candidate base:** `1d8eff77e5849aba12201975ffe4d58321b743ac`
+**Candidate head:** `6d1ef4081dd3be2ed7af13e3d77afff7fd68dbb2`
+**Candidate branch:** `Fix/ReviewNativeCodeReview`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:0c7a70aaf22bbdc30c3facc1a33b6e519b8836533721ae2235124b80814d84cf` `(8 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-pr74-inc4\review\2f72ef68089a1f595044999769eb61e8b5d4bc6d6656f263c5d7d090cf6e45d0`
+**Candidate bundle identity:** `sha256:e935814f198adc19b4ad1d2fac41d4eee2fdbe8ad7164a10d693b5890caaf83c`
+**Work-order path:** `reviews/Fix-ReviewNativeCodeReview.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+**Lens coverage:** the native layer was Claude Code's built-in `code-review` at `medium`, given the range
+plus ` -- .agents/engineering/workflow/review/SKILL.md`. It returned 1 finding. No security-sensitive path.
+
+### Findings
+
+- [x] **NR26 — LOW — native** — `.agents/engineering/workflow/review/SKILL.md:176`
+  An unresolvable marker (rebased away) is treated as stale by the gate, but the trigger did not cover
+  it. Fix: run the layer when the marker is missing, unresolvable, or followed by a sensitive change.
+
+  **Resolved** NR26 in the remediation commit after `6d1ef40`.
