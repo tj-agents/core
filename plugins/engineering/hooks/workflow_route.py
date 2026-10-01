@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sys
+import tempfile
+import time
 
 
 EXECUTION = re.compile(
@@ -54,6 +58,13 @@ DIRECT_HANDOFF = re.compile(
 )
 COMPLETE_STATUS = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?status\s*:?\s*(?:complete|completed|done|closed)\b"
+)
+RECEIPTS = "agents-workflow-route"
+RECEIPT_RETENTION_SECONDS = 7 * 24 * 60 * 60
+TRANSCRIPT_TAIL_BYTES = 1 << 20
+RECOVERED = (
+    "workflow-route: the UserPromptSubmit hook did not deliver this prompt's route (it timed out "
+    "or failed), so the route is delivered with this tool call instead.\n\n"
 )
 
 
@@ -126,40 +137,150 @@ def load_context(script: Path, relative_path: str, name: str) -> str:
     )
 
 
+def route(prompt: str, cwd: Path) -> str | None:
+    if selects_handoff(prompt, cwd):
+        return load_context(Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff")
+    if selects_plan_execution(prompt, cwd):
+        return load_context(
+            Path(__file__), "engineering/workflow/plan-execution/SKILL.md", "plan-execution"
+        )
+    return None
+
+
+def receipt_path(session: str) -> Path:
+    digest = hashlib.sha256(session.encode("utf-8")).hexdigest()
+    return Path(tempfile.gettempdir()) / RECEIPTS / f"{digest}.json"
+
+
+def record_receipt(session: str) -> None:
+    path = receipt_path(session)
+    now = time.time()
+    try:
+        path.parent.mkdir(exist_ok=True)
+        for stale in path.parent.glob("*.json"):
+            if stale != path and stale.stat().st_mtime < now - RECEIPT_RETENTION_SECONDS:
+                stale.unlink()
+        path.write_text(json.dumps({"routed_at": now}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def receipt_time(session: str) -> float:
+    try:
+        value = json.loads(receipt_path(session).read_text(encoding="utf-8")).get("routed_at")
+    except (OSError, ValueError, AttributeError):
+        return 0.0
+    return float(value) if isinstance(value, (int, float)) else 0.0
+
+
+def prompt_text(content) -> str | None:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return None
+    texts = [
+        block["text"] for block in content
+        if isinstance(block, dict) and block.get("type") == "text"
+        and isinstance(block.get("text"), str)
+    ]
+    return "\n".join(texts) if texts else None
+
+
+def last_human_prompt(transcript: Path) -> tuple[str, float] | None:
+    try:
+        with transcript.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, handle.tell() - TRANSCRIPT_TAIL_BYTES))
+            tail = handle.read()
+    except OSError:
+        return None
+    for line in reversed(tail.splitlines()):
+        if b'"human"' not in line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(entry, dict) or entry.get("type") != "user" or entry.get("isMeta"):
+            continue
+        origin = entry.get("origin")
+        if not isinstance(origin, dict) or origin.get("kind") != "human":
+            continue
+        message = entry.get("message")
+        text = prompt_text(message.get("content")) if isinstance(message, dict) else None
+        stamp = entry.get("timestamp")
+        if text is None or not isinstance(stamp, str):
+            continue
+        try:
+            submitted = datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        return text, submitted
+    return None
+
+
+def recover(data: dict) -> str | None:
+    if any(key in data for key in ("agent_id", "agentId", "turn_id", "turnId")):
+        return None
+    session = data.get("session_id")
+    transcript = data.get("transcript_path")
+    cwd = data.get("cwd")
+    if not all(isinstance(value, str) and value for value in (session, transcript, cwd)):
+        return None
+    found = last_human_prompt(Path(transcript))
+    if found is None:
+        return None
+    prompt, submitted = found
+    if receipt_time(session) >= submitted:
+        return None
+    try:
+        context = route(prompt, Path(cwd).resolve())
+    except (OSError, RuntimeError, ValueError) as error:
+        context = f"workflow-route: cannot recover this prompt's route: {error}"
+    record_receipt(session)
+    return RECOVERED + context if context else None
+
+
+def emit(event: str, context: str) -> None:
+    print(json.dumps({
+        "hookSpecificOutput": {"hookEventName": event, "additionalContext": context}
+    }, ensure_ascii=True))
+    sys.stdout.flush()
+
+
 def main() -> int:
     if sys.version_info < (3, 9):
         print("workflow-route: Python 3.9 or newer is required.", file=sys.stderr)
         return 1
     try:
         data = json.load(sys.stdin)
-        event = data.get("hook_event_name") or data.get("hookEventName")
-        if event != "UserPromptSubmit":
-            return 0
+    except (json.JSONDecodeError, OSError, UnicodeError) as error:
+        print(f"workflow-route: {error}", file=sys.stderr)
+        return 2
+    if not isinstance(data, dict):
+        return 0
+    event = data.get("hook_event_name") or data.get("hookEventName")
+    if event == "PreToolUse":
+        context = recover(data)
+        if context:
+            emit("PreToolUse", context)
+        return 0
+    if event != "UserPromptSubmit":
+        return 0
+    try:
         prompt = data.get("prompt")
         cwd_value = data.get("cwd")
         if not isinstance(prompt, str) or not isinstance(cwd_value, str):
             raise RuntimeError("UserPromptSubmit payload requires string prompt and cwd fields")
-        cwd = Path(cwd_value).resolve()
-        if selects_handoff(prompt, cwd):
-            context = load_context(
-                Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff"
-            )
-        elif selects_plan_execution(prompt, cwd):
-            context = load_context(
-                Path(__file__), "engineering/workflow/plan-execution/SKILL.md", "plan-execution"
-            )
-        else:
-            return 0
-    except (json.JSONDecodeError, OSError, RuntimeError, TypeError, ValueError) as error:
+        context = route(prompt, Path(cwd_value).resolve())
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
         print(f"workflow-route: {error}", file=sys.stderr)
         return 2
-
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "UserPromptSubmit",
-            "additionalContext": context,
-        }
-    }, ensure_ascii=True))
+    if context:
+        emit("UserPromptSubmit", context)
+    session = data.get("session_id")
+    if isinstance(session, str) and session:
+        record_receipt(session)
     return 0
 
 

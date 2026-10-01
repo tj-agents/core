@@ -28,3 +28,15 @@ Resolve when a trusted live Codex probe proves that a denied write delivers the 
 and the next invocation can verify that delivery from the session transcript or an equivalent host
 acknowledgment. Then add pinned-release install repair for genuinely absent skills and repeat the
 missing-marketplace write probe without a restart.
+
+## Codex hooks still launch one or two interpreters per gate
+
+Claude hooks use exec form and one dispatcher per plugin and event, because each Git Bash launch on
+Windows stalled 15 to 57 seconds under concurrent spawning while direct launches stayed under 10.
+Codex manifests are unchanged. Each Codex gate is its own hook, and on Windows
+`pre_tool_use_adapter.py` starts a second interpreter for every gate, so one shell call costs up to
+two interpreters per gate. How Codex launches `commandWindows` is unmeasured.
+
+Resolve when Codex `PreToolUse` gates run through `hook_dispatch.py`, with the adapter's exit-code
+translation applied once to the merged result, and a timing probe of Codex's Windows hook launch
+path is recorded.
