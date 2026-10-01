@@ -21,7 +21,7 @@ The review file is what `review` / `docs-review` write:
 
 Security layer: when the head being merged touches security-sensitive paths, the merge
 also requires a current `**Security-reviewed up to commit:** \`<sha>\`` marker —
-stamped by `review` Step 1d after it runs `/security-review`.
+stamped by `review` Stage 6 after its host security review.
 
 A repo opts in by carrying `.agents/merge-gate.json`; without one the review check exits 0
 and claims no jurisdiction. Codex is the exception at the target-proof boundary: its hook
