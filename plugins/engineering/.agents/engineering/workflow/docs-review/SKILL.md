@@ -10,7 +10,7 @@ lane: L4
 # Documentation review mode
 
 This is the documentation mode of the canonical `review` pipeline. It uses the same frozen candidate,
-native/general layer, fresh read-only dispatches, result validation, parent synthesis, canonical work order,
+host native layer, fresh read-only dispatches, result validation, parent synthesis, canonical work order,
 status, watermark, and explicit review-and-fix authorization. Only the scope guard, loaded rules, and lenses
 differ.
 
@@ -37,8 +37,9 @@ Any surviving path makes this an ordinary docs review.
 ## Work order and native layer
 
 Use the same `reviews/<branch-slug>.md` contract from `review-lifecycle`. The parent records status
-`in-progress` and the frozen candidate before review. Run the native/general layer over that descriptor,
-using the bounded `review-lens` fallback when the host has no callable native review.
+`in-progress` and the frozen candidate before review. Run the `review` Stage 3 native layer over that
+descriptor: Claude Code's built-in `code-review` skill or `codex review`, with the same `native-general`
+fallback.
 
 ## Rules
 
@@ -62,10 +63,9 @@ Dispatch only relevant fresh lenses, using the same immutable descriptor and con
   files; and
 - followability: each instruction has an unambiguous owner, action, and pass condition.
 
-When agent guidance changes, run
-`python <candidate-bundle>/tree/.agents/hooks/docs_reachability.py --root <candidate-bundle>/tree`.
-Execute the frozen exported tree's helper against that same tree, never against the live checkout, and
-treat each error as accuracy evidence.
+When agent guidance changes, run the frozen tree's own `.agents/hooks/docs_reachability.py` when it ships
+one, otherwise `<engineering>/hooks/docs_reachability.py` as defined by `review`, always with
+`--root <candidate-bundle>/tree` and never against the live checkout. Treat each error as accuracy evidence.
 
 Fresh lenses do not see sibling conclusions or write the artifact. The parent verifies repository evidence,
 deduplicates, assigns severity and stable IDs, and drops preference-only rewrites, unchanged pre-existing

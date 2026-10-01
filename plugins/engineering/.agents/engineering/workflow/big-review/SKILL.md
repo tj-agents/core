@@ -94,7 +94,8 @@ Set the selected coverage entry to `[~]` before dispatch. Read unresolved cross-
 Invoke the canonical `review` pipeline over the stage's exact frozen paths and
 `<merge-base>..<plan-anchor>`:
 
-- native/general review receives that same scoped descriptor;
+- the `review` Stage 3 native layer receives that same scoped descriptor, with the stage's paths as its
+  bounded scope;
 - only rules mapped to the stage are loaded;
 - relevant fresh `review-lens` contexts receive no sibling conclusions;
 - independent read-only lenses or disjoint subregions may overlap, while dependent stages stay serial;
