@@ -5,8 +5,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/contract/plan-artifacts/scripts/session-context.py\"",
-            "timeout": 10
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/contract/plan-artifacts/scripts/session-context.py"
+            ]
           }
         ]
       },
@@ -14,8 +18,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py\" --session-context",
-            "timeout": 10
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
+              "--session-context"
+            ]
           }
         ]
       },
@@ -23,8 +32,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/base/contract/agent-files/scripts/session-context.py\"",
-            "timeout": 10
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/contract/agent-files/scripts/session-context.py"
+            ]
           }
         ]
       }
@@ -34,21 +47,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py\"",
-            "timeout": 15
+            "timeout": 25,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py@Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py@Skill|Bash|PowerShell"
+            ]
           }
         ],
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py\"",
-            "timeout": 10
-          }
-        ],
-        "matcher": "Skill|Bash|PowerShell"
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|Skill"
       }
     ]
   }
