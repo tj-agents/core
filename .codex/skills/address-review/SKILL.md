@@ -4,7 +4,7 @@ description: Serially resolve open findings in the canonical review work order w
 
 kind: workflow
 domain: process
-model: gpt-6-sol
+model: gpt-6.1-sol
 ---
 
 # Address a review serially

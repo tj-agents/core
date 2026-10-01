@@ -21,3 +21,9 @@ engineering plugin root, so it runs in a repository with no `.agents/`. `plan-ex
 
 Resolve when each of those skills names `<engineering>/workflows/workflow_ops.py --root <repository-root>`
 and the `test_review_native_layer.py` repository-helper check covers them.
+
+## Workflow skill resolution still assumes the former flat layout
+
+The `skills` operation defaults lifecycle names to `.agents/skills/<name>/SKILL.md`. Core now owns `feature` under `.agents/engineering/workflow/feature/`, so recording the lifecycle by name fails before producing its identity record. This predates the Sol 6.1 update and is independent of lane resolution.
+
+Resolve when lifecycle discovery uses the canonical scope/kind layout and regression coverage proves `skills --lifecycle feature` records the shipped owner in both source and installed package layouts.
