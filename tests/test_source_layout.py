@@ -263,6 +263,8 @@ class SourceLayoutTests(unittest.TestCase):
             ("claude", "`/code-review`"),
             ("claude", "askuserquestion"),
             ("claude", "the Skill tool"),
+            ("claude", "the `Skill` tool"),
+            ("claude", "**/code-review**"),
             ("codex", "codex  review"),
         ):
             with self.subTest(host=host, term=term):
