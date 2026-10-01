@@ -4,7 +4,7 @@ description: Run the canonical isolated code-review workflow over one frozen bra
 
 kind: workflow
 domain: process
-model: gpt-6-sol
+model: gpt-6.1-sol
 ---
 
 # Canonical isolated code review
