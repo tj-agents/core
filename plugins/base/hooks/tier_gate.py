@@ -131,23 +131,26 @@ def cache_roots():
 
 
 def _key(path):
-    try:
-        path = Path(path).resolve()
-    except (OSError, ValueError):
-        pass
     return os.path.normcase(os.path.normpath(str(path)))
 
 
-def _within(path, ancestor):
-    path, ancestor = _key(path), _key(ancestor)
-    return path == ancestor or path.startswith(ancestor.rstrip("\\/") + os.sep)
+def _resolved_key(path):
+    try:
+        return _key(Path(path).resolve())
+    except (OSError, ValueError):
+        return _key(path)
+
+
+def _within(key, ancestor):
+    return key == ancestor or key.startswith(ancestor.rstrip("\\/") + os.sep)
 
 
 def installed_declarations(root, project=None):
     """`tier.json` of each version directory the registry beside this cache names, or None without one.
 
-    A project-scoped install counts only for its own project. Reading only installed paths keeps the
-    per-call cost proportional to installed plugins, not to the stale versions a cache accumulates.
+    An install scoped to the assessed project replaces the user-scope install; one scoped to another
+    project does not count. Reading only installed paths keeps the per-call cost proportional to
+    installed plugins, not to the stale versions a cache accumulates.
     """
     registry = Path(root).parent / "installed_plugins.json"
     try:
@@ -157,18 +160,22 @@ def installed_declarations(root, project=None):
     if not isinstance(plugins, dict):
         return None
     cache = _key(root)
+    here = _resolved_key(project) if project is not None else None
     paths = []
     for entries in plugins.values():
+        chosen = {}
         for entry in entries if isinstance(entries, list) else ():
             location = entry.get("installPath") if isinstance(entry, dict) else None
             if not _text(location):
                 continue
             scoped = _text(entry.get("projectPath"))
-            if scoped and (project is None or not _within(project, scoped)):
+            if scoped and (here is None or not _within(here, _resolved_key(scoped))):
                 continue
-            version_directory = Path(location)
-            if _key(version_directory.parent.parent.parent) == cache:
-                paths.append(version_directory / DECLARATION_NAME)
+            ancestor = Path(location).parent.parent.parent
+            if _key(ancestor) != cache and _resolved_key(ancestor) != cache:
+                continue
+            chosen.setdefault(bool(scoped), []).append(Path(location) / DECLARATION_NAME)
+        paths.extend(chosen.get(True) or chosen.get(False) or [])
     return sorted(set(paths))
 
 

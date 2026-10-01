@@ -25,7 +25,7 @@ def body(skill):
 def section(text, heading):
     start = text.index(heading)
     following = text.find("\n## ", start + len(heading))
-    return text[start:] if following == -1 else text[start:following]
+    return " ".join((text[start:] if following == -1 else text[start:following]).split())
 
 
 class NativeLayerNamesTheHostReviewer(unittest.TestCase):
@@ -137,15 +137,15 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         self.assertEqual("Infonetica/cris-authz", descriptor["repository"])
         self.assertEqual(["src/Authorization/Startup.cs"], descriptor["paths"])
         self.assertEqual([], descriptor["rules"])
+        self.assertEqual([], descriptor["routed_skills"])
         self.assertEqual(
-            {"required": True, "first_path": "src/Authorization/Startup.cs"}, descriptor["security"]
+            {"first_path": "src/Authorization/Startup.cs", "trunk_first_path": "src/Authorization/Startup.cs"},
+            descriptor["security"],
         )
         self.assertTrue(Path(descriptor["bundle"]["tree"]).is_dir())
 
     def test_stack_child_inherits_its_parent_layers_security_paths(self):
-        self.git("checkout", "-q", "-b", "Fix/AuthenticationRetry")
-        (self.repository / "reviews").mkdir()
-        (self.repository / "reviews" / "Fix-AuthenticationRetry.md").write_text("# review\n", encoding="utf-8")
+        self.git("checkout", "-q", "-b", "stack-child")
         (self.repository / "README.md").write_text("docs\n", encoding="utf-8")
         self.git("add", ".")
         self.git("commit", "-q", "-m", "child")
@@ -159,7 +159,7 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         descriptor = json.loads(completed.stdout)
         self.assertNotIn("src/Authorization/Startup.cs", descriptor["paths"])
         self.assertEqual(
-            {"required": True, "first_path": "src/Authorization/Startup.cs"}, descriptor["security"]
+            {"first_path": None, "trunk_first_path": "src/Authorization/Startup.cs"}, descriptor["security"]
         )
 
     def test_stage_four_lists_the_installed_tier_conventions_from_the_plugin(self):

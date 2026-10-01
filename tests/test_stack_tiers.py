@@ -138,7 +138,7 @@ class DeclarationDiscovery(unittest.TestCase):
                 {"scope": "project", "projectPath": str(project), "installPath": str(scoped)},
             ]}}
             (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
-            os.utime(user, (1, 1))
+            os.utime(scoped, (1, 1))
 
             inside = gate.declarations([cache], project=project / "src")
             elsewhere = gate.declarations([cache], project=Path(config) / "project-y")
