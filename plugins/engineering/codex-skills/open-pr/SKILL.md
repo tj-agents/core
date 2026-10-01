@@ -4,7 +4,7 @@ description: Open or update the review that owns the resolved delivery slice, in
 
 kind: operation
 domain: process
-model: gpt-6-sol
+model: gpt-6.1-sol
 ---
 
 # Opening a pull request
