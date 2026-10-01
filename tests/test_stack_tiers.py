@@ -146,6 +146,46 @@ class DeclarationDiscovery(unittest.TestCase):
         self.assertEqual([item.payload_dir.name for item in inside], ["project-version"])
         self.assertEqual([item.payload_dir.name for item in elsewhere], ["user-version"])
 
+    def test_a_project_install_without_a_declaration_leaves_the_user_install_answering(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            user = cache / "dotagents" / "dotnet" / "user-version"
+            user.mkdir(parents=True)
+            (user / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            legacy = cache / "dotagents" / "dotnet" / "pre-tier"
+            legacy.mkdir(parents=True)
+            project = Path(config) / "project"
+            project.mkdir()
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "user", "installPath": str(user)},
+                {"scope": "project", "projectPath": str(project), "installPath": str(legacy)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache], project=project)
+
+        self.assertEqual([item.payload_dir.name for item in found], ["user-version"])
+
+    def test_the_most_specific_project_install_wins(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            outer, inner = cache / "dotagents" / "dotnet" / "outer", cache / "dotagents" / "dotnet" / "inner"
+            for payload in (outer, inner):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            os.utime(inner, (1, 1))
+            repos = Path(config) / "repos"
+            (repos / "app" / "src").mkdir(parents=True)
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "project", "projectPath": str(repos), "installPath": str(outer)},
+                {"scope": "project", "projectPath": str(repos / "app"), "installPath": str(inner)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache], project=repos / "app" / "src")
+
+        self.assertEqual([item.payload_dir.name for item in found], ["inner"])
+
     def test_the_gates_own_install_cache_precedes_the_home_caches(self):
         with tempfile.TemporaryDirectory() as home:
             own = Path(home) / ".codex" / "plugins" / "cache"
