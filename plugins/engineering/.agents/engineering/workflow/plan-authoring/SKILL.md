@@ -34,7 +34,7 @@ can perform readiness. A bounded independent reader can check evidence without b
 middleman. Small and medium work normally continues in the same parent with bounded lane delegation.
 
 Before selecting a substantial-design transfer, maintain a compact `## Execution readiness` section
-in the canonical goal, referencing existing sections instead of copying them:
+in the canonical goal or its existing progress ledger, referencing existing sections instead of copying them:
 
 - intended outcome and observable acceptance criteria;
 - scope, exclusions and the source of implementation, publication and installation authority;

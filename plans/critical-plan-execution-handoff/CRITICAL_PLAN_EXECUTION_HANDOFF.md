@@ -56,16 +56,16 @@ Done when: the assessed correction is reviewed, validated and published as a dra
 
 ## Verification and acceptance
 
-- Transfer helper: 10 subprocess tests pass, including contention, competing claimants, early acknowledgement, stale goal/branch/head, interrupted launch, authority exclusions and equivalent Windows paths.
+- Transfer helper: 11 subprocess tests pass, including contention, competing claimants, early acknowledgement, stale goal/branch/head, interrupted launch, authority exclusions and equivalent Windows paths.
 - Existing plan suites: 96 pass; workflow routing: 14 pass; source layout: 17 pass. Both PowerShell packaging and launcher regression suites pass. Instruction-file pairing, tier payload and diff whitespace checks pass.
 - Harness manifest, catalog digest and generated distribution parity checks pass after final helper edits. The earlier parity failure was stale generated output and was repaired by generation.
-- Actual in-session Codex pickup: attempt `b15a162d-8174-4f2c-924b-9637d0c7707b`; one fresh L5 agent read the canonical fixture, acknowledged as `pickup-acceptance-agent`, produced RESULT.txt, and reached active. Parent status verified submission and progress digests. Result SHA-256: `531d7076f037c7e80dc91b1332defcfbd26f03fde62b8e9fe253f093f811001a`; generated helper SHA-256: `c4c1c5692507e7c2730f8096b6f3304eaae130f8b76bc57a419586abe1f8d434`.
+- Actual in-session Codex pickup: attempt `91309582-0e4c-4548-b5be-a43c300d0221`; one fresh L5 agent read the canonical fixture, acknowledged as `final-pickup-agent`, produced RESULT.txt, and reached active. Parent status verified submission and progress digests on the final helper. Both isolated fixtures were cleaned up after their agents returned. Result SHA-256: `531d7076f037c7e80dc91b1332defcfbd26f03fde62b8e9fe253f093f811001a`; generated helper SHA-256: `2f9785d3b5a27c5e130d413cc743ce919f59efe9f1a110b394deb49f105a2256`.
 - This demonstrates actual agent pickup using the generated helper, not independent Windows Terminal launch or installed hook adoption. Launcher regression tests use executable stubs; they are not authenticated-host evidence.
 - Automatic approval review rejected a proposed isolated native profile because it would copy local Codex authentication and configure unattended execution without explicit approval of those exact side effects. That command did not run. No credentials, profile or normal installation were changed. Complete draft/review work first, then request the specific remaining approval.
 
 ## Reviews
 
-Independent immutable review pending; owning artifact: reviews/Feature-CriticalPlanExecutionHandoff.md.
+Full immutable review completed at dded182; R1 ledger/checkpoint invocation and R2 harness declaration checks are repaired in this commit. Eleven focused tests and final generated-helper pickup pass. Fresh incremental review remains before draft publication. Owning artifact: reviews/Feature-CriticalPlanExecutionHandoff.md.
 
 ## Execution design
 

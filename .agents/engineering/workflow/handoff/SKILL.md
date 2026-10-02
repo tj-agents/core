@@ -59,7 +59,10 @@ serializes receipt changes; it does not evaluate design quality, grant authority
 schedule work or enforce a general writer lease. Hook/prompt delivery is guidance; only observed
 host execution establishes host acceptance.
 
-1. Complete the readiness assessment in the canonical goal. Add these four literal lines under
+1. Select the existing artifact that owns `## Next Steps` as `--goal`: the standalone goal, or the
+   progress ledger for a managed plan. Keep the design in its linked plan and reference it from the
+   readiness assessment. Finish all checkpoint edits and commits before preparing the receipt.
+   Add these four literal lines under
    `## Execution readiness`, alongside the assessment's evidence and section references:
 
    ```text
@@ -82,8 +85,8 @@ host execution establishes host acceptance.
    python -B <skill-directory>/scripts/transfer.py begin --receipt <absolute-receipt> --attempt <returned-attempt-id> --predecessor <same-session-identity>
    ```
 
-   Select `claude` when appropriate. Before `begin`, checkpoint every required edit and stop writing
-   owned paths. The helper binds the goal digest, checkout and available Git branch/head. Preparation
+   Select `claude` when appropriate. Stop writing owned paths before `begin`; the prepared checkpoint
+   stays unchanged. The helper binds the goal digest, checkout and available Git branch/head. Preparation
    fails when an attempt already exists. After `begin`, invoke exactly one supported machine launcher
    with the normal two-line pointer and selected execution lane. Keep the goal unchanged until pickup.
 3. Capture the actual launcher output in an evidence file and record successful submission:
@@ -96,7 +99,7 @@ host execution establishes host acceptance.
    the exact checkout:
 
    ```text
-   python -B <skill-directory>/scripts/transfer.py acknowledge --receipt <absolute-receipt> --attempt <attempt-id> --successor <distinct-session-identity>
+   python -B <skill-directory>/scripts/transfer.py acknowledge --receipt <absolute-receipt> --attempt <attempt-id> --successor <distinct-session-identity> --harness <selected-harness>
    ```
 
    One matching claimant succeeds. Acknowledgement may arrive before launcher output; a late submission
@@ -104,7 +107,7 @@ host execution establishes host acceptance.
    checkpoints its result or concrete gate in the goal, and records an actual nonempty evidence file:
 
    ```text
-   python -B <skill-directory>/scripts/transfer.py progress --receipt <absolute-receipt> --attempt <attempt-id> --successor <same-session-identity> --evidence-file <first-action-evidence>
+   python -B <skill-directory>/scripts/transfer.py progress --receipt <absolute-receipt> --attempt <attempt-id> --successor <same-session-identity> --harness <selected-harness> --evidence-file <first-action-evidence>
    ```
 
 4. The predecessor retains read-only pickup accountability. Use `status --receipt <absolute-receipt>`
