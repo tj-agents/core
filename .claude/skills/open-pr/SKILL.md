@@ -4,8 +4,6 @@ description: Open or update the review that owns the resolved delivery slice, in
 
 kind: operation
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Opening a pull request

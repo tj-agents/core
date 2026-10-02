@@ -4,7 +4,6 @@ description: Select and run the canonical isolated review workflow over only com
 
 kind: workflow
 domain: process
-model: gpt-6.1-sol
 ---
 
 # Incremental review selector

@@ -529,6 +529,10 @@ def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict
                 if table.get("skill_supports_effort") and effort_key in rung:
                     if values.get("effort") != rung[effort_key]:
                         raise ValueError(f"{path}: effort does not resolve canonical lane {lane}")
+            elif "model" in values or "effort" in values:
+                raise ValueError(
+                    f"{path}: model/effort without a canonical lane re-points the session"
+                )
             match = FRONTMATTER.match(body)
             if match is None:
                 raise ValueError(f"{path}: adapter has no body")
