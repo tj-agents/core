@@ -33,11 +33,15 @@ both harnesses, which is the whole point: one declaration, two resolutions.
 tables, and a rule stated in prose beside the data is a second copy waiting to disagree with it. Run
 `resolve.py --lanes` from whichever of the two locations above exists here for the current pairings.
 
-**Only a skill that IS the task may declare a lane.** A standard or supporting contract — anything loaded
-*during* other work to be consulted — must not, because its lane would re-point the model of whatever task
-loaded it: a migration would drop to the docs rung for having read the persistence standard. The generator
-refuses a lane on a routed standard for exactly this reason; for a self-contained process skill the test is
-whether an agent *runs* it or *reads* it. `commit` takes a lane; `committing` does not.
+**Only a leaf skill that IS one shape of work may declare a lane.** A standard or supporting contract —
+anything loaded *during* other work to be consulted — must not, because its lane would re-point the model
+of whatever task loaded it: a migration would drop to the docs rung for having read the persistence
+standard. A lifecycle or orchestrating skill that spans phases of varying shape (`feature`, `review`,
+`merge`) must not either: invoking one re-points the whole session, so it inherits the session's model and
+routes each bounded phase down the ladder instead. The generator refuses a lane on a routed standard for
+exactly this reason; the test for the rest is whether an agent *runs* one unvarying shape of work.
+`commit` takes a lane; `committing` and `feature` do not. `plan-authoring` keeps L1 because planning of
+any size is that one shape.
 
 **No declaration means inherit the session's model** — not a default rung. A lane is opt-in per skill, so
 adding one is a visible, reviewable decision and no skill silently changes model because a default moved.
@@ -90,10 +94,11 @@ not a lane change.
 ## Where a lane is applied
 
 - **A skill** declares `lane:` in front matter. The generator resolves it and stamps the harness's own
-  keys into each generated payload, re-pointing the running model for that skill and nothing else:
-  `model:` plus `effort:` for Claude, `model:` alone for Codex — **Codex has no per-skill effort key**, so
-  a Codex skill gets the rung's model at whatever effort the session is on. Where that half matters, use
-  a delegated lane agent, which is the only place Codex can carry `model_reasoning_effort`.
+  keys into each generated payload: `model:` plus `effort:` for Claude, `model:` alone for Codex —
+  **Codex has no per-skill effort key**, so a Codex skill gets the rung's model at whatever effort the
+  session is on. Where that half matters, use a delegated lane agent, which is the only place Codex can
+  carry `model_reasoning_effort`. Invoking the skill re-points the session and the switch outlives it,
+  which is why only a terminal leaf task declares one.
 - **A delegated lane agent** (`lane-l5`, `lane-l7`) is the alternative for cheap work that runs many
   turns. Prompt caches are model-scoped and a mid-conversation effort change invalidates the message
   cache, so re-pointing the main loop for a single clerical turn can cost more than it saves, while a

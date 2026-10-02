@@ -4,8 +4,6 @@ description: Implement an explicitly requested new or changed behavior from disc
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Deliver a feature

@@ -4,8 +4,6 @@ description: Automatically own authorized long-term or multi-phase work through 
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Execute a plan continuously

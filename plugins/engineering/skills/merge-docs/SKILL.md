@@ -4,8 +4,6 @@ description: Land a documentation or meta-only change as its own fast PR, bypass
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: medium
 ---
 
 # Landing a meta-only change

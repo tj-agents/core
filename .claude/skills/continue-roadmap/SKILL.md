@@ -4,8 +4,6 @@ description: Compatibility entry for asking what to plan next on an epic roadmap
 
 kind: workflow
 domain: process
-model: claude-opus-5-5
-effort: high
 ---
 
 # Select a roadmap item for plan authoring

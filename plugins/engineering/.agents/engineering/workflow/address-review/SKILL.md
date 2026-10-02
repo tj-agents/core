@@ -4,7 +4,6 @@ description: Serially resolve open findings in the canonical review work order w
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Address a review serially
