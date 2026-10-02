@@ -4,8 +4,6 @@ description: Select and run the canonical isolated review workflow over only com
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Incremental review selector

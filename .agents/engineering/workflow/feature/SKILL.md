@@ -4,7 +4,6 @@ description: Implement an explicitly requested new or changed behavior from disc
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Deliver a feature

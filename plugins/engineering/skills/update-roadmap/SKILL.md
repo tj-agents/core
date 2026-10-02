@@ -4,8 +4,6 @@ description: Reconcile a decision, requirement, dependency, package release, or 
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: medium
 ---
 
 # Reconciling a change across a roadmap and its live plans

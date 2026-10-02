@@ -4,7 +4,6 @@ description: Run the canonical isolated code-review workflow over one frozen bra
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Canonical isolated code review
