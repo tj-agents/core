@@ -4,7 +4,6 @@ description: Keep plan-managed work resumable with a compact current-state ledge
 
 kind: contract
 domain: process
-lane: L5
 ---
 
 # The plan-progress checkpoint

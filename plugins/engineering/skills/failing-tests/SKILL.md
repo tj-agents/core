@@ -4,8 +4,6 @@ description: What to do when a test run comes back red — enter the run/diagnos
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # A failing test is never just reported

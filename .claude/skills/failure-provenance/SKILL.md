@@ -4,8 +4,6 @@ description: Establish when a failing test last genuinely passed and what was di
 
 kind: contract
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Establishing what changed since it last passed
