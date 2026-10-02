@@ -243,6 +243,8 @@ def mutate(args):
             if state == "launching":
                 data["state"] = "submitted"
         elif args.command == "acknowledge":
+            if args.harness != data["harness"]:
+                raise ValueError("harness does not match receipt")
             successor = args.successor.strip()
             if not successor or successor == data["predecessor"]:
                 raise ValueError("successor must be nonempty and distinct from predecessor")
@@ -257,6 +259,8 @@ def mutate(args):
             else:
                 raise ValueError("acknowledge requires launching, submitted, or uncertain state")
         elif args.command == "progress":
+            if args.harness != data["harness"]:
+                raise ValueError("harness does not match receipt")
             successor = args.successor.strip()
             if state not in {"acknowledged", "active"} or successor != data.get("successor"):
                 raise ValueError("progress requires the acknowledged successor")
@@ -307,6 +311,7 @@ def parser():
             item.add_argument("--evidence-file", required=True)
         if name in {"acknowledge", "progress"}:
             item.add_argument("--successor", required=True)
+            item.add_argument("--harness", required=True, choices=("codex", "claude"))
         if name == "fail":
             item.add_argument("--reason", required=True)
             item.add_argument("--outcome", required=True, choices=("failed", "uncertain"))
