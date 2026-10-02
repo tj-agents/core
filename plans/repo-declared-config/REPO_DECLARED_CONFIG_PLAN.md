@@ -21,6 +21,9 @@ Everything that affects agent behaviour is committed in a repository. A machine 
 derived caches (downloaded plugins) and credentials. Cloning a repository on any machine gives
 identical behaviour.
 
+no parent-folder settings, so every new clone needs its own file. The Codex equivalent is not yet
+established.
+
 ## Design
 
 1. **Core owns the generic harness** for Claude and Codex: skill router, SessionStart check,
@@ -55,6 +58,10 @@ identical behaviour.
    - Per-repository local marketplace overrides.
    Core ships a read-only verifier that reports remaining machine-local behavioural state, so
    every machine can be checked the same way.
+5. **Conventions follow declarations.** `tier_gate.py` takes candidate tiers from every
+   `tier.json` in both hosts' plugin caches and ignores `enabledPlugins`, so a review loads the
+   standards of any cached stack the repository happens to contain. Take candidates only from
+   plugins enabled for the repository in the running host; stack detection still gates them.
 
 ## Marketplaces come only from tj-agents
 

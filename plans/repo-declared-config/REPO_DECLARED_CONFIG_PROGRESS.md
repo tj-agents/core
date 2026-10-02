@@ -33,6 +33,8 @@ Package generation and all 200 repository Python tests passed. The audit was com
 `982eeb3e8aeb9883ce5cad71f941154b575b610c`; synchronization with main produced reviewed head
 `93fd8054385e561b34a99f69b4db4d71d7247e1c`. Publication remains pending ownership reconciliation.
 
+tier gate's conventions ignore repository enablement.
+
 No normal machine configuration or consumer repository was changed. Migration and self-heal
 have not been implemented. The audit does not supply the separate plugin-write prevention guard.
 
