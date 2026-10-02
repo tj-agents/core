@@ -36,7 +36,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(65, len(skills))
+        self.assertEqual(66, len(skills))
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
         })
@@ -61,6 +61,7 @@ class SourceLayoutTests(unittest.TestCase):
             output,
         )
         self.assertIn("plugins/base/.agents/base/contract/agent-files/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/contract/goal-continuation/SKILL.md", output)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
