@@ -33,18 +33,60 @@ function Quote-Argument([string] $Value) {
     return '"' + ($Value -replace '(\\+)$', '$1$1') + '"'
 }
 function Read-Json([string] $Path) { return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json }
-function Get-OwnedTask($Receipt) {
+function Assert-ReceiptIdentity($Receipt) {
     if ($Receipt.owner_id -cne $owner.owner_id -or $Receipt.owner_path -cne $ownerFile -or
         $Receipt.task_name -cne $taskName -or $Receipt.task_path -cne '\') { throw 'Scheduler receipt does not match this exact continuation owner.' }
-    $tasks = @(Get-ScheduledTask -TaskName $Receipt.task_name -TaskPath $Receipt.task_path -ErrorAction SilentlyContinue)
-    if ($tasks.Count -eq 0) { return $null }
-    if ($tasks.Count -ne 1) { throw 'Scheduler returned an ambiguous task identity.' }
-    $task = $tasks[0]
-    $actions = @($task.Actions)
-    if ($task.Description -cne $Receipt.description -or $actions.Count -ne 1 -or
-        $actions[0].Execute -cne $Receipt.execute -or $actions[0].Arguments -cne $Receipt.arguments -or
-        $actions[0].WorkingDirectory -cne $Receipt.worktree) { throw 'Scheduled task differs from its exact ownership receipt; refusing to change it.' }
+}
+function Test-TaskReceipt($Task, $Receipt) {
+    $actions = @($Task.Actions)
+    return ($Task.Description -ceq $Receipt.description -and $actions.Count -eq 1 -and
+        $actions[0].Execute -ceq $Receipt.execute -and $actions[0].Arguments -ceq $Receipt.arguments -and
+        $actions[0].WorkingDirectory -ceq $Receipt.worktree)
+}
+function Get-ExactTask {
+    $tasks = @(Get-ScheduledTask -TaskName $taskName -TaskPath '\' -ErrorAction SilentlyContinue)
+    if ($tasks.Count -gt 1) { throw 'Scheduler returned an ambiguous task identity.' }
+    if ($tasks.Count) { return $tasks[0] }
+    return $null
+}
+function Get-OwnedTask($Receipt) {
+    Assert-ReceiptIdentity $Receipt
+    $task = Get-ExactTask
+    if ($task -and -not (Test-TaskReceipt $task $Receipt)) { throw 'Scheduled task differs from its exact ownership receipt; refusing to change it.' }
     return $task
+}
+function Write-AtomicJson([string] $Path, $Value) {
+    $temporary = "$Path.$([guid]::NewGuid().ToString('N')).tmp"
+    try {
+        $Value | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $temporary -Encoding utf8
+        Move-Item -LiteralPath $temporary -Destination $Path -Force
+    } finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary } }
+}
+function Resolve-PendingRegistration($CurrentReceipt) {
+    if (-not (Test-Path -LiteralPath $pendingPath -PathType Leaf)) { return $CurrentReceipt }
+    $pending = Read-Json $pendingPath
+    Assert-ReceiptIdentity $pending.proposed
+    if ($pending.previous) { Assert-ReceiptIdentity $pending.previous }
+    if ($CurrentReceipt) {
+        Assert-ReceiptIdentity $CurrentReceipt
+        $currentJson = $CurrentReceipt | ConvertTo-Json -Depth 10 -Compress
+        $previousJson = $pending.previous | ConvertTo-Json -Depth 10 -Compress
+        $proposedJson = $pending.proposed | ConvertTo-Json -Depth 10 -Compress
+        if ($currentJson -cne $previousJson -and $currentJson -cne $proposedJson) {
+            throw 'Scheduler receipt matches neither pending registration record; preserving transaction evidence.'
+        }
+    }
+    $task = Get-ExactTask
+    if ($task) {
+        if (Test-TaskReceipt $task $pending.proposed) { $resolved = $pending.proposed }
+        elseif ($pending.previous -and (Test-TaskReceipt $task $pending.previous)) { $resolved = $pending.previous }
+        else { throw 'Scheduled task matches neither pending registration identity; preserving task and transaction evidence.' }
+    } else { $resolved = if ($pending.previous) { $pending.previous } else { $pending.proposed } }
+    if ($PSCmdlet.ShouldProcess($taskName, 'Reconcile pending scheduler registration')) {
+        Write-AtomicJson $receiptPath $resolved
+        Remove-Item -LiteralPath $pendingPath
+    }
+    return $resolved
 }
 foreach ($name in @('Get-ScheduledTask', 'Register-ScheduledTask', 'Unregister-ScheduledTask', 'New-ScheduledTaskAction', 'New-ScheduledTaskTrigger', 'New-ScheduledTaskSettingsSet')) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw "Windows ScheduledTasks capability is unavailable: $name." }
@@ -76,7 +118,9 @@ try {
     catch [Threading.AbandonedMutexException] { $acquired = $true }
     if (-not $acquired) { throw 'Another scheduler lifecycle operation holds this owner; retry after it finishes.' }
 $receiptPath = Join-Path (Split-Path -Parent $ownerFile) 'scheduler.json'
+$pendingPath = Join-Path (Split-Path -Parent $ownerFile) 'scheduler.pending.json'
 $receipt = if (Test-Path -LiteralPath $receiptPath -PathType Leaf) { Read-Json $receiptPath } else { $null }
+$receipt = Resolve-PendingRegistration $receipt
 function Remove-OwnedTask {
     if (-not $receipt) { Write-Output "No scheduler receipt exists for owner $($owner.owner_id)."; return }
     $task = Get-OwnedTask $receipt
@@ -119,12 +163,9 @@ switch ($Command) {
             $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes($IntervalMinutes) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
             $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)
             $registration = [ordered]@{ owner_id = $owner.owner_id; owner_path = $ownerFile; task_name = $taskName; task_path = '\'; description = $description; execute = $pwsh; arguments = $arguments; worktree = $root; helper = $helper; python = $python; script = $PSCommandPath }
-            $temporary = "$receiptPath.$([guid]::NewGuid().ToString('N')).tmp"
-            try {
-                $registration | ConvertTo-Json | Set-Content -LiteralPath $temporary -Encoding utf8
-                Move-Item -LiteralPath $temporary -Destination $receiptPath -Force
+            Write-AtomicJson $pendingPath ([ordered]@{ previous = $receipt; proposed = $registration })
             Register-ScheduledTask -TaskName $taskName -TaskPath '\' -Action $action -Trigger $trigger -Settings $settings -Description $description -Force | Out-Null
-            } finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary } }
+            $receipt = Resolve-PendingRegistration $receipt
             Write-Output "Registered $taskName every $IntervalMinutes minutes. Package paths must remain available: $helper"
         }
     }

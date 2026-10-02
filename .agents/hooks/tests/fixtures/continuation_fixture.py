@@ -41,4 +41,8 @@ if mode == "repair":
     observation["headRefOid"] = binding["head"]
     observation["statusCheckRollup"] = [{"name": "CI", "status": "IN_PROGRESS"}]
     (root / "observation.json").write_text(json.dumps(observation))
+if scenario.get("release_binding"):
+    (root / ".agents/persistent-workflow-binding.json").unlink()
+    receipt["state"] = scenario["release_state"]
 Path(os.environ["CONTINUATION_RESULT_PATH"]).write_text(json.dumps(receipt))
+time.sleep(scenario.get("after_receipt_sleep", 0))
