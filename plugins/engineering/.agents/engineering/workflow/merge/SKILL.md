@@ -4,7 +4,6 @@ description: Land the current branch's PR through the merge queue and return to 
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Landing a PR through the merge queue

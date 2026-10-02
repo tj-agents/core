@@ -4,7 +4,6 @@ description: Reconcile a decision, requirement, dependency, package release, or 
 
 kind: workflow
 domain: process
-model: gpt-6-luna
 ---
 
 # Reconciling a change across a roadmap and its live plans

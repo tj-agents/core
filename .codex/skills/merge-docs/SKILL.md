@@ -4,7 +4,6 @@ description: Land a documentation or meta-only change as its own fast PR, bypass
 
 kind: workflow
 domain: process
-model: gpt-6-luna
 ---
 
 # Landing a meta-only change

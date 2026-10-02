@@ -4,7 +4,6 @@ description: Resolve the owning review and check publication readiness across th
 
 kind: operation
 domain: process
-model: gpt-6-luna
 ---
 
 # Is this branch clear to PR?
