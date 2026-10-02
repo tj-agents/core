@@ -4,7 +4,6 @@ description: Select and drive the canonical isolated review workflow for a very 
 
 kind: workflow
 domain: process
-lane: L3
 ---
 
 # Staged review selector

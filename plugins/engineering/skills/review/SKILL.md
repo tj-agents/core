@@ -4,8 +4,6 @@ description: Run the canonical isolated code-review workflow over one frozen bra
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Canonical isolated code review

@@ -4,8 +4,6 @@ description: Capturing and attaching real visual evidence to a PR that touches U
 
 kind: contract
 domain: process
-model: claude-sonnet-5
-effort: medium
 ---
 
 # Visual evidence for a PR

@@ -4,8 +4,6 @@ description: Resolve the owning review and check publication readiness across th
 
 kind: operation
 domain: process
-model: claude-sonnet-5
-effort: medium
 ---
 
 # Is this branch clear to PR?

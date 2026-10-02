@@ -4,8 +4,6 @@ description: Take one tech-debt item all the way to a focused PR in its selected
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Working one tech-debt item — or a small bundle — to a PR

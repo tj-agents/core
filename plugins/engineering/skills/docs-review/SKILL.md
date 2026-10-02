@@ -4,8 +4,6 @@ description: Apply the canonical isolated review workflow to a documentation or 
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Documentation review mode

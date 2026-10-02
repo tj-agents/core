@@ -164,6 +164,29 @@ class LaneDeclarationTests(unittest.TestCase):
                     self.assertIn(lane, rungs[host])
         self.assertGreater(declared, 0, "no skill declares a lane, so the ladder governs nothing")
 
+    def test_only_one_shape_leaf_tasks_declare_a_lane(self):
+        # A lane in skill front matter re-points the whole session when the skill is invoked, and the
+        # switch outlives the skill. A lifecycle or orchestrating skill spans phases of varying shape, so
+        # it must inherit the session's model and route each bounded phase down the ladder instead. Only
+        # a leaf task that is one unvarying shape may pin: the clerical operations, and plan-authoring,
+        # whose shape — planning of any size — is the L1 rung by definition. Adding a lane is a deliberate
+        # declaration that a skill is such a leaf; declare it here too.
+        expected = {
+            "plan-authoring": "L1",
+            "commit": "L7",
+            "commit-all": "L7",
+            "push": "L7",
+            "pull": "L7",
+            "sync-checkout": "L7",
+            "open-worktree": "L7",
+        }
+        declared = {}
+        for skill in self.skills():
+            lane = front_matter(skill).get("lane")
+            if lane:
+                declared[skill.parent.name] = lane
+        self.assertEqual(expected, declared)
+
     def test_no_routed_standard_declares_a_lane(self):
         # A routed standard is consulted DURING other work; a lane on one would re-point that task's
         # model. The generator refuses this too - asserted here so the rule survives a generator rewrite.

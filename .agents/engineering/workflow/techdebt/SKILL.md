@@ -4,7 +4,6 @@ description: Take one tech-debt item all the way to a focused PR in its selected
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Working one tech-debt item — or a small bundle — to a PR

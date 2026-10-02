@@ -4,7 +4,6 @@ description: Drive every remaining stage of one canonical staged big review to c
 
 kind: workflow
 domain: process
-lane: L3
 ---
 
 # Drive a staged review to completion
