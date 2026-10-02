@@ -133,7 +133,7 @@ def identity(root):
             "head": git(root, "rev-parse", "HEAD")}
 
 
-def check_identity(state):
+def check_identity(state, allow_terminal_release=False):
     root = Path(state["worktree"])
     current = identity(root)
     for key in ("repo", "worktree", "branch", "head"):
@@ -158,7 +158,7 @@ def check_identity(state):
         if state.get("pr") is not None and state["pr"] != binding["pr"]:
             raise Gate("binding-pr-changed")
         state["pr"] = binding["pr"]
-    elif state.get("pr") is not None:
+    elif state.get("pr") is not None and not allow_terminal_release:
         raise Gate("binding-removed")
     return binding
 
@@ -234,7 +234,7 @@ def apply_receipt(state, receipt):
             raise Gate("repair-binding-not-refreshed")
         state["head"] = current["head"]
         state["evidence"] = None
-    check_identity(state)
+    check_identity(state, allow_terminal_release=status in {"complete", "blocked"})
     transition(state, status, receipt["reason"], receipt.get("next_action", ""))
     state["failures"] = 0
 
@@ -255,11 +255,13 @@ def child(args):
     process = subprocess.Popen(payload["command"], cwd=state["worktree"], env=env,
                                creationflags=4 if job else 0,
                                preexec_fn=parent_death_signal if os.name == "posix" else None)
+    assigned = False
     try:
         if job:
             kernel, handle = job
             if not kernel.AssignProcessToJobObject(handle, int(process._handle)):
                 raise OSError("cannot assign supervised host to lifetime job")
+            assigned = True
         atomic_json(Path(payload["child_path"]), {"pid": process.pid,
                                                 "identity": process_identity(process.pid)})
         if job:
@@ -269,7 +271,7 @@ def child(args):
                 raise OSError("cannot resume supervised host")
         return process.wait()
     except BaseException:
-        if job:
+        if job and assigned:
             kernel.TerminateJobObject(handle, 1)
         elif process.poll() is None:
             process.kill()
@@ -401,14 +403,12 @@ def writer_records(state):
 def wake(path, state, args):
     if state["state"] in {"blocked", "complete"}:
         return
-    if time.time() >= state["deadline"] or state["launches"] >= state["max_launches"]:
-        transition(state, "blocked", "continuation-budget-exhausted", "Obtain renewed finite authority")
-        return
     if any(record and alive(record) for record in writer_records(state)):
         raise Gate("interrupted-writer-still-alive")
     if state.get("child"):
         if state.get("result_path") and Path(state["result_path"]).exists():
             apply_receipt(state, read(state["result_path"]))
+            state["last_result"] = state["result_path"]
             state["child"] = None
             if state["state"] in {"blocked", "complete"}:
                 return
@@ -416,6 +416,9 @@ def wake(path, state, args):
             state["child"] = None
             failure(state, "interrupted-writer-without-checkpoint")
             return
+    if time.time() >= state["deadline"]:
+        transition(state, "blocked", "continuation-budget-exhausted", "Obtain renewed finite authority")
+        return
     lease = state.get("foreground")
     if lease and alive(lease):
         if time.time() - lease["activity"] <= state["lease_seconds"]:
@@ -429,6 +432,9 @@ def wake(path, state, args):
     if evidence["kind"] == "pending" or (token == state.get("evidence") and not retry):
         transition(state, "waiting", "evidence-pending-or-unchanged", state["next_action"])
         state["evidence"] = token
+        return
+    if state["launches"] >= state["max_launches"]:
+        transition(state, "blocked", "continuation-budget-exhausted", "Obtain renewed finite authority")
         return
     state["evidence"] = token
     launch(path, state, binding, evidence, args.host_command)

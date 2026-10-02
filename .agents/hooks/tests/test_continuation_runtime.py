@@ -7,6 +7,8 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNTIME = ROOT / ".agents/workflows/continuation_runtime.py"
@@ -284,6 +286,92 @@ class ContinuationTests(unittest.TestCase):
                           "--authority", "test", "--harness", "codex", "--actions", "test", code=2)
         self.assertEqual(denied["reason"], "canonical-worktree-root-required")
         self.assertFalse((nested / ".agents/continuation/owner.json").exists())
+
+    def recover_completed_child(self, expired=False):
+        state = self.state()
+        state["max_launches"] = 1
+        runtime.atomic_json(self.owner, state)
+        self.fixture("complete", after_receipt_sleep=1)
+        supervisor = self.start(*self.wake_args())
+        self.wait_for(lambda: bool(self.state().get("result_path"))
+                      and Path(self.state()["result_path"]).exists())
+        supervisor.kill()
+        supervisor.wait()
+        recorded = self.state()
+        self.wait_for(lambda: not runtime.alive(recorded["child"]))
+        if expired:
+            recorded["deadline"] = time.time() - 1
+            runtime.atomic_json(self.owner, recorded)
+        complete = self.wake()
+        self.assertEqual(complete["state"], "complete")
+        self.assertEqual(complete["launches"], 1)
+        self.assertEqual(complete["last_result"], recorded["result_path"])
+        self.assertEqual(self.wake()["launches"], 1)
+
+    def test_recover_final_launch_receipt_before_budget_gate(self):
+        self.recover_completed_child()
+
+    def test_recover_completed_receipt_after_deadline(self):
+        self.recover_completed_child(expired=True)
+
+    @unittest.skipUnless(os.name == "nt", "Windows job assignment")
+    def test_unassigned_suspended_host_is_killed_and_waited(self):
+        state = self.state()
+        state["child"] = {"pid": os.getpid()}
+        runtime.atomic_json(self.owner, state)
+        payload = self.root / "assignment-payload.json"
+        payload.write_text(json.dumps({"command": ["fixture"], "environment": {},
+                                       "child_path": str(self.root / "host.json")}))
+        kernel = mock.Mock()
+        kernel.AssignProcessToJobObject.return_value = False
+        process = mock.Mock(pid=12345, _handle=123)
+        process.poll.return_value = None
+        args = SimpleNamespace(owner=str(self.owner), payload=str(payload))
+        with mock.patch.object(runtime, "windows_job", return_value=(kernel, 456)), \
+                mock.patch.object(runtime.subprocess, "Popen", return_value=process), \
+                mock.patch.object(runtime, "atomic_json") as write:
+            with self.assertRaisesRegex(OSError, "cannot assign"):
+                runtime.child(args)
+        process.kill.assert_called_once_with()
+        process.wait.assert_called_once_with(timeout=15)
+        kernel.TerminateJobObject.assert_not_called()
+        kernel.CloseHandle.assert_called_once_with(456)
+        write.assert_not_called()
+
+    def released_child(self, status):
+        self.binding("COMPLETED", "SUCCESS")
+        self.fixture("gate" if status == "blocked" else "complete",
+                     release_binding=True, release_state=status)
+        result = self.wake()
+        self.assertFalse((self.root / ".agents/persistent-workflow-binding.json").exists())
+        self.assertEqual(result["launches"], 1)
+        return result
+
+    def test_owned_binding_release_can_complete(self):
+        result = self.released_child("complete")
+        self.assertEqual(result["state"], "complete")
+        self.assertEqual(result["reason"], "fixture verified boundary")
+
+    def test_owned_binding_release_can_checkpoint_human_gate(self):
+        result = self.released_child("blocked")
+        self.assertEqual(result["state"], "blocked")
+        self.assertEqual(result["reason"], "human approval required")
+
+    def test_nonterminal_binding_release_gates(self):
+        result = self.released_child("waiting")
+        self.assertEqual(result["state"], "blocked")
+        self.assertEqual(result["reason"], "binding-removed")
+
+    def test_expired_owner_stops_even_when_evidence_pending(self):
+        self.binding()
+        state = self.state()
+        state["deadline"] = time.time() - 1
+        runtime.atomic_json(self.owner, state)
+        result = self.wake()
+        self.assertEqual(result["state"], "blocked")
+        self.assertEqual(result["reason"], "continuation-budget-exhausted")
+        self.assertEqual(result["launches"], 0)
+        self.assertFalse((self.root / "host-started").exists())
 
 
 if __name__ == "__main__":

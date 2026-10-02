@@ -55,6 +55,7 @@ try {
     if ($LASTEXITCODE) { throw 'Runtime init failed.' }
     $ownerPath = Join-Path $root '.agents/continuation/owner.json'
     $receiptPath = Join-Path $root '.agents/continuation/scheduler.json'
+    $pendingPath = Join-Path $root '.agents/continuation/scheduler.pending.json'
     $before = Get-Content -LiteralPath $ownerPath -Raw
     $legacy = [pscustomobject]@{ TaskName='AgentStandards-Delivery-legacy'; TaskPath='\'; Actions=@([pscustomobject]@{ WorkingDirectory=(Get-Content $ownerPath -Raw | ConvertFrom-Json).worktree }); Description='legacy'; State='Ready' }
     $global:ContinuationTasks[$legacy.TaskName] = $legacy
@@ -68,7 +69,7 @@ try {
     Assert ((Get-Content $ownerPath -Raw) -ceq $before) 'WhatIf changed runtime state.'
     $global:ContinuationFailRegistration = $true
     Expect-Failure { & $adapter register -OwnerPath $ownerPath } 'Injected scheduler registration failure'
-    Assert ((Test-Path $receiptPath) -and $global:ContinuationTasks.Count -eq 0) 'Failed registration orphaned a task or lost its recovery receipt.'
+    Assert ((Test-Path $pendingPath) -and -not (Test-Path $receiptPath) -and $global:ContinuationTasks.Count -eq 0) 'Failed registration orphaned a task or lost its recovery transaction.'
     & $adapter remove -OwnerPath $ownerPath
     $global:ContinuationFailRegistration = $false
     & $adapter register -OwnerPath $ownerPath
@@ -108,6 +109,43 @@ try {
     Copy-Item -LiteralPath $adapter -Destination $packageAdapter
     Copy-Item -LiteralPath $helper -Destination (Join-Path $package 'workflows/continuation_runtime.py')
     Copy-Item -LiteralPath (Join-Path $repository '.agents/lanes/codex.json') -Destination (Join-Path $package '.agents/lanes/codex.json')
+    & $adapter register -OwnerPath $ownerPath
+    $previousReceipt = Get-Content $receiptPath -Raw
+    $global:ContinuationFailRegistration = $true
+    Expect-Failure { & $packageAdapter register -OwnerPath $ownerPath } 'Injected scheduler registration failure'
+    Assert ((Get-Content $receiptPath -Raw) -ceq $previousReceipt) 'Failed package replacement destroyed the previous receipt.'
+    $knownReceipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
+    $unknownReceipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
+    $unknownReceipt.helper = 'unknown receipt evidence'
+    $unknownReceipt | ConvertTo-Json -Depth 10 | Set-Content $receiptPath -Encoding utf8
+    $unknownBefore = Get-Content $receiptPath -Raw
+    Expect-Failure { & $adapter remove -OwnerPath $ownerPath } 'receipt matches neither pending registration record'
+    Assert ((Get-Content $receiptPath -Raw) -ceq $unknownBefore -and (Test-Path $pendingPath)) 'Recovery overwrote unknown receipt evidence.'
+    $knownReceipt | ConvertTo-Json -Depth 10 | Set-Content $receiptPath -Encoding utf8
+    $transaction = Get-Content $pendingPath -Raw | ConvertFrom-Json
+    Assert ($transaction.previous.script -eq $adapter -and $transaction.proposed.script -eq $packageAdapter) 'Transaction did not retain both package identities.'
+    $pendingBefore = Get-Content $pendingPath -Raw
+    & $packageAdapter register -OwnerPath $ownerPath -WhatIf
+    Assert ((Get-Content $pendingPath -Raw) -ceq $pendingBefore -and (Get-Content $receiptPath -Raw) -ceq $previousReceipt) 'WhatIf reconciled or replaced pending registration files.'
+    & $adapter remove -OwnerPath $ownerPath
+    Assert (-not (Test-Path $receiptPath) -and -not (Test-Path $pendingPath)) 'Old live task recovery retained owned transaction files.'
+    $global:ContinuationFailRegistration = $false
+    & $adapter register -OwnerPath $ownerPath
+    $global:ContinuationFailRegistration = $true
+    Expect-Failure { & $packageAdapter register -OwnerPath $ownerPath } 'Injected scheduler registration failure'
+    $transaction = Get-Content $pendingPath -Raw | ConvertFrom-Json
+    $recoveryTask = $global:ContinuationTasks[$transaction.proposed.task_name]
+    $recoveryTask.Actions[0].Arguments = 'unknown replacement'
+    $pendingBefore = Get-Content $pendingPath -Raw
+    Expect-Failure { & $adapter remove -OwnerPath $ownerPath } 'matches neither pending registration identity'
+    Assert ((Get-Content $pendingPath -Raw) -ceq $pendingBefore -and $global:ContinuationTasks.ContainsKey($recoveryTask.TaskName)) 'Unknown task recovery changed the task or evidence.'
+    $recoveryTask.Actions[0] = [pscustomobject]@{ Execute=$transaction.proposed.execute; Arguments=$transaction.proposed.arguments; WorkingDirectory=$transaction.proposed.worktree }
+    $recoveryTask.Description = $transaction.proposed.description
+    & $packageAdapter remove -OwnerPath $ownerPath -WhatIf
+    Assert ((Get-Content $pendingPath -Raw) -ceq $pendingBefore -and $global:ContinuationTasks.ContainsKey($recoveryTask.TaskName)) 'New live task WhatIf recovery changed the task or evidence.'
+    & $packageAdapter remove -OwnerPath $ownerPath
+    Assert (-not (Test-Path $receiptPath) -and -not (Test-Path $pendingPath)) 'New live task recovery retained owned transaction files.'
+    $global:ContinuationFailRegistration = $false
     & $packageAdapter register -OwnerPath $ownerPath
     $packagedReceipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
     Assert ($packagedReceipt.helper -eq (Join-Path $package 'workflows/continuation_runtime.py')) 'Installed package runtime resolution failed.'
