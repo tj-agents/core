@@ -62,15 +62,15 @@ class HandoffTransferTests(unittest.TestCase):
         evidence.write_text(content, encoding="utf-8")
         return self.invoke("submitted", "--receipt", str(self.receipt), "--attempt", data["attempt"], "--evidence-file", str(evidence))
 
-    def acknowledge(self, data, successor="executor", cwd=None, ok=True):
+    def acknowledge(self, data, successor="executor", harness="codex", cwd=None, ok=True):
         return self.invoke("acknowledge", "--receipt", str(self.receipt), "--attempt", data["attempt"],
-                        "--successor", successor, cwd=cwd or self.root, ok=ok)
+                        "--successor", successor, "--harness", harness, cwd=cwd or self.root, ok=ok)
 
-    def progress(self, data, successor="executor", ok=True):
+    def progress(self, data, successor="executor", harness="codex", ok=True):
         evidence = self.root / "progress.txt"
         evidence.write_text("first action", encoding="utf-8")
         return self.invoke("progress", "--receipt", str(self.receipt), "--attempt", data["attempt"],
-                        "--successor", successor, "--evidence-file", str(evidence), cwd=self.root, ok=ok)
+                        "--successor", successor, "--harness", harness, "--evidence-file", str(evidence), cwd=self.root, ok=ok)
 
     def status(self):
         return self.invoke("status", "--receipt", str(self.receipt))
@@ -111,7 +111,7 @@ class HandoffTransferTests(unittest.TestCase):
         def claim(name):
             return subprocess.run(
                 [sys.executable, str(SCRIPT), "acknowledge", "--receipt", str(self.receipt), "--attempt", data["attempt"],
-                 "--successor", name], cwd=self.root, capture_output=True, text=True)
+                 "--successor", name, "--harness", "codex"], cwd=self.root, capture_output=True, text=True)
         with ThreadPoolExecutor(max_workers=2) as pool:
             claims = list(pool.map(claim, ("one", "two")))
         self.assertEqual(1, sum(item.returncode == 0 for item in claims))
@@ -137,7 +137,7 @@ class HandoffTransferTests(unittest.TestCase):
         self.goal.write_text(self.goal.read_text(encoding="utf-8") + "\nChanged.\n", encoding="utf-8")
         self.invoke("begin", "--receipt", str(self.receipt), "--attempt", data["attempt"], "--predecessor", "planner", cwd=self.root, ok=False)
         self.write_goal()
-        self.invoke("acknowledge", "--receipt", str(self.receipt), "--attempt", data["attempt"], "--successor", "executor", cwd=self.root, ok=False)
+        self.invoke("acknowledge", "--receipt", str(self.receipt), "--attempt", data["attempt"], "--successor", "executor", "--harness", "codex", cwd=self.root, ok=False)
         self.begin(data)
         self.acknowledge({"attempt": "wrong"}, ok=False)
         self.acknowledge(data, cwd=self.root.parent, ok=False)
@@ -189,6 +189,15 @@ class HandoffTransferTests(unittest.TestCase):
         prepared = self.prepare()
         self.invoke("fail", "--receipt", str(fresh), "--attempt", prepared["attempt"], "--reason", "no launch", "--outcome", "failed")
         self.invoke("begin", "--receipt", str(fresh), "--attempt", prepared["attempt"], "--predecessor", "planner", cwd=self.root, ok=False)
+
+    def test_harness_mismatch_preserves_pickup_state(self):
+        data = self.prepare()
+        self.begin(data)
+        self.acknowledge(data, harness="claude", ok=False)
+        self.assertEqual("launching", self.status()["state"])
+        self.acknowledge(data)
+        self.progress(data, harness="claude", ok=False)
+        self.assertEqual("acknowledged", self.status()["state"])
 
 
 if __name__ == "__main__":
