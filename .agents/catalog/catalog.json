@@ -25,6 +25,7 @@
           "skills": [
             "agent-files",
             "cd",
+            "goal-continuation",
             "plan-artifacts"
           ],
           "dependencies": {
@@ -37,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:508dd6b9ba06902c789cf262cd92e78a1bcf0d6d64f4b267b64a723cc324fcf0",
+          "digest": "sha256:1fa4034b9ba258f194c0633830d57bc4067c66ec0bbcee6ad0fb0221228ae266",
           "harness": {
             "marketplaces": [
               {
@@ -51,6 +52,13 @@
             "hooks": [
               {
                 "path": ".agents/base/contract/agent-files/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": ".agents/base/contract/goal-continuation/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -173,7 +181,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:7030dc9a1ac0b6c5b90283f372aa4de1ac7ffc3252436689f3da9fe360ec312d",
+          "digest": "sha256:f65a89a662df08c9fb63d46985b2a576595031343f6a812bbecc65a92ff27b98",
           "harness": {
             "marketplaces": [
               {

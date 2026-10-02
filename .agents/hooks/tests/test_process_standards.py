@@ -140,6 +140,7 @@ class ProcessStandardsTests(unittest.TestCase):
         shared = authored_skill("persistent-delivery").read_text(
             encoding="utf-8"
         )
+        workflow = authored_skill("persistent-workflow").read_text(encoding="utf-8")
         claude = (
             self.root / ".claude/skills/persistent-workflow/SKILL.md"
         ).read_text(encoding="utf-8")
@@ -150,19 +151,23 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("persistent-workflow skill", remote)
         self.assertIn("persistent-delivery", remote)
         self.assertIn("one persistent owner for a PR/head pair", shared)
-        self.assertIn("/goal", claude)
-        self.assertIn("Desktop scheduled tasks", claude)
-        self.assertIn("Dynamic Workflows", claude)
+        self.assertIn("init --root ROOT --goal GOALPATH", workflow)
+        self.assertIn("CONTINUATION_RESULT_PATH", workflow)
+        self.assertIn("900-second child timeout", workflow)
+        self.assertIn("Missing merge authorization gates merge only", shared)
+        self.assertIn("Claude `/goal`, `/loop`, monitors, channels", claude)
+        self.assertIn("fresh `claude -p` context", claude)
         self.assertIn(
-            "Scheduled Task attached to this owning Codex/ChatGPT Desktop conversation",
+            "Scheduled Task attached to the owning Codex conversation",
             codex,
         )
+        self.assertIn("fresh headless `codex exec` context", codex)
+        self.assertIn("delivery-continuation.ps1", codex)
         self.assertNotIn("Claude uses", remote)
         self.assertNotIn("Codex Desktop uses", remote)
         for skill in ("e2e-debug", "e2e-api-debug", "e2e-ui-debug", "integration-debug"):
             with self.subTest(skill=skill):
                 self.assertIn(skill, shared)
-        self.assertIn("clear context", shared)
         self.assertNotEqual(claude, codex)
 
         merge = authored_skill("merge").read_text(encoding="utf-8")

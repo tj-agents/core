@@ -9,7 +9,9 @@ domain: process
 
 These conventions apply when engineering is selected for the current scope. They do not grant
 implementation, publication or installation authority. Product profiles and compatibility policy remain
-with the project. The common maintained-plan contract is `base:plan-artifacts`.
+with the project. The common maintained-plan contract is `base:plan-artifacts`. The common
+continuation owner is `base:goal-continuation`; it selects `engineering:persistent-workflow` when
+an authorized task has a future decision that may outlive the current session.
 
 ## A task has an owning lifecycle — load it before the first edit
 
