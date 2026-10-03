@@ -11,6 +11,13 @@ import sys
 import tempfile
 
 
+CHILD_PROGRAM = (
+    "import subprocess,sys; "
+    "sys.exit(subprocess.call(sys.argv[1:], stdin=subprocess.DEVNULL, "
+    "creationflags=subprocess.CREATE_NO_WINDOW) if sys.stdin.buffer.read(1) == b'1' else 124)"
+)
+
+
 class WindowsJob:
     def __init__(self):
         self.api = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -60,7 +67,7 @@ def run(command: list[str], cwd: Path | None = None, timeout: float = 60,
         job = WindowsJob() if os.name == "nt" else None
         process = None
         try:
-            launched = [sys.executable, "-B", str(Path(__file__).resolve()), "--child", *command] if job else command
+            launched = [sys.executable, "-B", "-c", CHILD_PROGRAM, *command] if job else command
             process = subprocess.Popen(
                 launched, cwd=cwd, env=env, stdin=subprocess.PIPE if job else subprocess.DEVNULL,
                 stdout=output, stderr=error, **options,
@@ -96,15 +103,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("a command is required")
     environment = dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never")
     code, output, error = run(command, timeout=arguments.timeout, env=environment)
-    sys.stdout.write(output)
-    sys.stderr.write(error)
+    sys.stdout.buffer.write(output.encode("utf-8"))
+    sys.stderr.buffer.write(error.encode("utf-8"))
     return code if code is not None else 124
 
 
 if __name__ == "__main__":
-    if sys.argv[1:2] == ["--child"]:
-        if sys.stdin.buffer.read(1) != b"1":
-            sys.exit(124)
-        sys.exit(subprocess.call(sys.argv[2:], stdin=subprocess.DEVNULL,
-                                 creationflags=subprocess.CREATE_NO_WINDOW))
     sys.exit(main())

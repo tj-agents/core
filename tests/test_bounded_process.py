@@ -49,6 +49,17 @@ class BoundedProcessTests(unittest.TestCase):
             time.sleep(0.4)
             self.assertEqual(heartbeat.read_text(), previous, 'Grandchild survived timeout')
 
+    def test_cli_forwards_utf8_under_a_legacy_pipe_encoding(self):
+        environment = dict(os.environ, PYTHONIOENCODING='cp1252')
+        completed = subprocess.run([
+            sys.executable, '-B', str(SCRIPTS / 'bounded_process.py'), '--timeout', '5', '--',
+            sys.executable, '-c', 'import sys; sys.stdout.buffer.write(bytes.fromhex("e4bda0e5a5bd")); '
+            'sys.stderr.buffer.write(bytes.fromhex("e4bda0e5a5bd"))',
+        ], env=environment, capture_output=True, timeout=10)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout, bytes.fromhex('e4bda0e5a5bd'))
+        self.assertEqual(completed.stderr, bytes.fromhex('e4bda0e5a5bd'))
+
     def test_claude_respects_remaining_budget(self):
         token = SYNC.SYNC_DEADLINE.set(time.monotonic() - 1)
         try:
