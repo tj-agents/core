@@ -42,7 +42,14 @@ if mode == "repair":
     observation["statusCheckRollup"] = [{"name": "CI", "status": "IN_PROGRESS"}]
     (root / "observation.json").write_text(json.dumps(observation))
 if scenario.get("release_binding"):
-    (root / ".agents/persistent-workflow-binding.json").unlink()
+    binding_path = root / ".agents/persistent-workflow-binding.json"
+    receipt["released_binding"] = json.loads(binding_path.read_text())
+    if scenario.get("retain_stale_binding"):
+        binding = dict(receipt["released_binding"], head=receipt["rebind"]["old"]["head"])
+        binding_path.write_text(json.dumps(binding))
+    else:
+        binding_path.unlink()
     receipt["state"] = scenario["release_state"]
+receipt.update(scenario.get("receipt", {}))
 Path(os.environ["CONTINUATION_RESULT_PATH"]).write_text(json.dumps(receipt))
 time.sleep(scenario.get("after_receipt_sleep", 0))
