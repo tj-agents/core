@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -277,6 +278,22 @@ class StandardsSyncTests(StandardsSyncHarness):
         ages = [entry['lock_age'] for entry in self.invocations()]
         self.assertEqual(len(ages), 2)
         self.assertTrue(all(age < SYNC.STALE_LOCK_SECONDS for age in ages), ages)
+
+    def test_refresh_budget_reaches_parallel_remote_checks(self):
+        self.install()
+        def stalled_remote(market):
+            code, output, error = SYNC.run([sys.executable, '-c', 'import time; time.sleep(30)'])
+            return None, error
+        started = time.monotonic()
+        out = io.StringIO()
+        with patch.object(SYNC, 'remote_commit', stalled_remote):
+            code = SYNC.synchronize(self.config, self.plugins, self.project, self.state,
+                                    self.executable, out=out, timeout=0.3)
+        self.assertEqual(code, 1)
+        self.assertIn('timed out', out.getvalue())
+        self.assertIn('this session loads base', out.getvalue())
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual(self.invocations(), [])
 
     def test_command_line_runs_against_the_configured_profile(self):
         self.install()

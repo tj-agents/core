@@ -49,7 +49,10 @@ jobs:
 
       - name: Codex marketplace startup sync tests
         shell: pwsh
-        run: ./tests/codex-marketplace-sync.tests.ps1
+        run: |
+          ./tests/codex-marketplace-sync.tests.ps1
+          ./tests/codex-sync-timeout.tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/codex-sync-timeout.tests.ps1
       - name: Codex terminal profile tests
         shell: pwsh
         run: |

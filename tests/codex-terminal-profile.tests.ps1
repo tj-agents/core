@@ -8,6 +8,7 @@ $scripts = Join-Path $codexHome 'plugins/cache/base-agents/machine/9.9.9/resourc
 New-Item -ItemType Directory -Path $bin, $scripts -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex-profile.ps1') -Destination $scripts
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.ps1') -Destination $scripts
+Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/bounded_process.py') -Destination $scripts
 $fake = @'
 Add-Content -LiteralPath $env:CODEX_TEST_CALLS -Value ($args -join ' ')
 $global:LASTEXITCODE = 0
@@ -19,6 +20,7 @@ switch ($args -join ' ') {
     }
     'plugin list --available --json' { '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}' }
     'plugin add machine@base-agents --json' { '{"pluginId":"machine@base-agents"}' }
+    '--version' { 'FAKE VERSION' }
     'exec' { 'LAUNCHED exec' }
     default { throw "Unexpected Codex call: $($args -join ' ')" }
 }
@@ -52,6 +54,12 @@ try {
     $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS)
     if (($calls -join '|') -ne 'plugin marketplace upgrade --json|exec') {
         throw "Failed refresh made unexpected calls: $($calls -join '|')"
+    }
+    Clear-Content -LiteralPath $env:CODEX_TEST_CALLS
+    $result = codex --version
+    if ($result -ne 'FAKE VERSION') { throw 'Version command failed' }
+    if ((Get-Content -LiteralPath $env:CODEX_TEST_CALLS) -ne '--version') {
+        throw 'Version command triggered a refresh'
     }
     'Codex terminal profile tests passed.'
 }
