@@ -176,7 +176,12 @@ $arguments += "Read the file at $resolvedPromptPath and follow its instructions,
 $sync = Join-Path (Split-Path -Parent $agentCli) 'codex_marketplace_sync.ps1'
 if (-not (Test-Path -LiteralPath $sync -PathType Leaf)) { throw "Codex sync script missing: $sync" }
 . $sync
-Sync-CodexStandards -CodexExecutable $codex.Path -WorkingDirectory $resolvedWorkingDirectory | Out-Null
+try {
+    Sync-CodexStandards -CodexExecutable $codex.Path -WorkingDirectory $resolvedWorkingDirectory | Out-Null
+}
+catch {
+    Write-Warning "standards: Codex refresh failed; this session loads installed plugins: $($_.Exception.Message)"
+}
 
 # TERM is CLEARED, never forced - the opposite of handoff-claude, and not an oversight. Claude Code
 # exports TERM=xterm-256color; Codex is a Rust/crossterm binary, and on native Windows an unset TERM is

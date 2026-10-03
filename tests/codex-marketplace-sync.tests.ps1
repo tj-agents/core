@@ -5,25 +5,26 @@ $repository = Split-Path -Parent $PSScriptRoot
 $script:calls = [System.Collections.Generic.List[string]]::new()
 $script:failUpgrade = $false
 
-function Invoke-FakeCodex {
-    $commandLine = $args -join ' '
+function Invoke-CodexSyncCommand {
+    param($CodexExecutable, [string[]] $Arguments, [double] $TimeoutSeconds)
+    if ($TimeoutSeconds -le 0 -or $TimeoutSeconds -gt 60) { throw 'Invalid remaining refresh budget' }
+    $commandLine = $Arguments -join ' '
     $script:calls.Add($commandLine)
     $global:LASTEXITCODE = 0
     if ($commandLine -eq 'plugin marketplace upgrade --json') {
         if ($script:failUpgrade) {
-            $global:LASTEXITCODE = 1
-            'upgrade failed'
+            throw 'upgrade failed'
         } else {
-            '{"selectedMarketplaces":["base-agents"],"upgradedRoots":["cache"],"errors":[]}'
+        ('{"selectedMarketplaces":["base-agents"],"upgradedRoots":["cache"],"errors":[]}') | ConvertFrom-Json
         }
         return
     }
     if ($commandLine -eq 'plugin list --available --json') {
-        '{"installed":[{"pluginId":"base@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"local@local","enabled":true,"marketplaceSource":{"sourceType":"local"}}],"available":[{"pluginId":"engineering@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"unused@base-agents","enabled":false,"marketplaceSource":{"sourceType":"git"}}]}'
+        ('{"installed":[{"pluginId":"base@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"local@local","enabled":true,"marketplaceSource":{"sourceType":"local"}}],"available":[{"pluginId":"engineering@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"unused@base-agents","enabled":false,"marketplaceSource":{"sourceType":"git"}}]}') | ConvertFrom-Json
         return
     }
     if ($commandLine -match '^plugin add (.+) --json$') {
-        '{"pluginId":"' + $Matches[1] + '"}'
+        ('{"pluginId":"' + $Matches[1] + '"}') | ConvertFrom-Json
         return
     }
     throw "Unexpected fake Codex command: $commandLine"
