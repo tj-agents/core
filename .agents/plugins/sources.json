@@ -280,6 +280,7 @@
     ]
   },
   "extended_host_adapters": [
+    "create-credential",
     "persistent-workflow",
     "review"
   ],
