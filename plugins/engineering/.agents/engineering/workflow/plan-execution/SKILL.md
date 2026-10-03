@@ -19,6 +19,13 @@ would abandon authorized remaining work. Context transfer must use the available
 or launcher after checkpointing; a pointer alone does not transfer ownership unless prompt-only output
 was requested.
 
+When execution follows substantial critical-plan design, load `engineering:plan-authoring`'s execution
+readiness section before choosing inline execution or a fresh owner. A successor named by a transfer
+receipt follows `engineering:handoff`'s verified pickup procedure before deliverable writes. Read the
+canonical goal, validate the checkpoint and authority, acknowledge the exact attempt, then perform its
+next action immediately. Acknowledgement is not completion; keep the same goal through its remaining
+authorized slices and record the first action or genuine gate as progress evidence.
+
 ## Standalone or runtime-unavailable execution
 
 For standalone work or a project without the engineering runtime, apply
