@@ -121,6 +121,16 @@ the package wires the profiles; open a new terminal to use the wrapper. Set
 `BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. A project pinned to a release continues to
 use that release until its committed selection changes.
 
+Automatic refreshes announce their status and share a 60-second budget for network checks, lock waits
+and plugin updates. A timeout stops the command's child processes, reports the failed refresh and lets
+the session load installed plugins. Version and help commands bypass the refresh. The budget covers
+refresh work; stopping timed-out processes can take a few extra seconds.
+
+If GitHub requests hang on Windows with Git's Schannel TLS backend, compare a read-only request with
+`git -c http.sslBackend=openssl ls-remote <marketplace-url> HEAD`. If that succeeds, a GitHub-only
+workaround is `git config --global http.https://github.com/.sslBackend openssl`. This keeps certificate
+verification enabled. Core does not change that machine setting automatically.
+
 Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
 resolve and verify its complete dependency closure reproducibly.
 
