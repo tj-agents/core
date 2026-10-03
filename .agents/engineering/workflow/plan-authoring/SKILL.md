@@ -21,8 +21,38 @@ select this richer lifecycle or grant implementation or publication authority.
 Turn an explicitly requested planning outcome into one authoritative implementation design. A phased plan
 has a recovery ledger; a standing reference that owns no phases keeps its bare filename and needs no ledger.
 Both follow the `plans` skill's implementation-examples and standards contract. Planning-only authority ends
-with the planned artifacts; when the same request also authorizes implementation, enter
-`engineering:plan-execution` in the same parent after the plan identity is valid.
+with the planned artifacts; when the same request also authorizes implementation, apply the execution
+readiness decision below and enter `engineering:plan-execution` under the selected owner.
+
+## Execution readiness
+
+Planning includes responsibility for making the next owner able to act. For a large critical plan,
+evaluate whether substantial design, costly mistakes, independent delivery slices and the remaining
+execution context justify a distinct readiness responsibility and a fresh executor. Use judgment;
+plan length, a phase label or a model change alone does not select another agent. The current planner
+can perform readiness. A bounded independent reader can check evidence without becoming a permanent
+middleman. Small and medium work normally continues in the same parent with bounded lane delegation.
+
+Before selecting a substantial-design transfer, maintain a compact `## Execution readiness` section
+in the canonical goal or its existing progress ledger, referencing existing sections instead of copying them:
+
+- intended outcome and observable acceptance criteria;
+- scope, exclusions and the source of implementation, publication and installation authority;
+- actual checkout, branch, owning review, source evidence and applicable standards;
+- resolved mechanism decisions/examples, ordered reviewable slices and their dependencies;
+- verification gates, user budgets, stop/escalation rules and objective resume conditions;
+- exact next action, execution lane and reason for transferring;
+- ready verdict with evidence, or the specific unresolved decision and its resolver.
+
+Apply the `plans` implementation-design review gate. Ready means the selected executor can start the
+next authorized action without deciding unresolved architecture. A delivery hold can coexist with
+ready local implementation; an implementation blocker routes to its resolver while independent work
+continues. Planning-only work stops at its authorized planning outcome, however ready the design is.
+
+For ready, authorized work meeting `plans`' context-transfer criteria, enter `engineering:handoff`
+and perform its verified execution pickup procedure without a further go-ahead. Otherwise continue
+with `engineering:plan-execution` in this context. The canonical goal owns all execution requirements;
+the launcher prompt remains a pointer.
 
 ## Resolve ownership before writing
 
@@ -64,7 +94,7 @@ For a request to choose the next roadmap item, let the
    authorization: preserve an explicit current user limitation, repository authorization, security or
    validation hold, merge hold, or stop class as a typed delivery gate. With no live restriction, never report
    completion at a local commit, pushed branch, or open PR. Planning plus implementation transfers ownership
-   directly to `plan-execution` without a routine continuation prompt.
+   to the executor selected by the readiness decision without a routine continuation prompt.
 
 Use the Workflow v2 dispatch/result and provider/state envelopes in `.agents/workflows/contract/v2` when
 present, or the packaged `../../workflows/contract/v2` bundle. A subordinate may return evidence, never phase

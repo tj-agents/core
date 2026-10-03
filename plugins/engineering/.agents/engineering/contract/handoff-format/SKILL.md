@@ -13,6 +13,11 @@ a transfer: `engineering:plans` decides when one is needed, and `engineering:han
 transfer by invoking one launcher. The context-transfer criteria that decide whether an actionable non-terminal
 plan needs one are in `engineering:plans`.
 
+For an automatic transfer, this pointer identifies the input already sent to the successor; it is not
+a request for the user to paste it or tell the executor to continue. Readiness, receipt identity and
+pickup instructions live in the canonical goal under `engineering:handoff`'s verified pickup procedure.
+The Stop hook checks pointer formatting, not launch, acknowledgement or execution progress.
+
 **Hard final-response gate for a selected plan context transfer:** if the turn elects to move an owned or
 explicitly targeted actionable `_PROGRESS.md` ledger to another context, the response is incomplete until it
 ends with the pointer below. An actionable ledger by itself never selects a transfer. Merely naming a
