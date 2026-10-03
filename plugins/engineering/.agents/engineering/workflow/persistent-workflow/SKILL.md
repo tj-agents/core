@@ -39,7 +39,11 @@ preserves the goal, result and logs.
 
 The child process returns a receipt through the paths and identifiers in `CONTINUATION_RESULT_PATH`,
 `CONTINUATION_NONCE`, and `CONTINUATION_OWNER_ID`. It reports state, reason, next action, and an optional
-exact identity rebind. The supervisor owns checkpointing while it holds the writer lock; the child must
+exact identity rebind. After a repair, a terminal `complete` or `blocked` receipt that releases the
+delivery binding must include its refreshed full artifact snapshot as `released_binding`, captured before
+deletion, plus exact `rebind.old` and `rebind.new` identities. The snapshot must match the owner PR and
+current repository, worktree, branch and HEAD. It cannot override an existing binding or authorize a
+nonterminal release. The supervisor owns checkpointing while it holds the writer lock; the child must
 not call owner checkpoint itself. Continue to honor the canonical goal and authorization on every wake.
 The runtime lease coordinates its own writers; it does not gate arbitrary host writes or replace the
 harness's permission controls.

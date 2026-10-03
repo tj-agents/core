@@ -227,8 +227,21 @@ def apply_receipt(state, receipt):
         binding = read(binding_path) if binding_path.exists() else None
         old = {key: state[key] for key in ("repo", "worktree", "branch", "head")}
         if (rebind.get("old") != old or rebind.get("new") != current
-                or any(current[k] != state[k] for k in ("repo", "branch", "worktree"))
-                or (state.get("pr") and (binding is None or binding.get("pr") != state["pr"]))):
+                or any(current[k] != state[k] for k in ("repo", "branch", "worktree"))):
+            raise Gate("repair-rebind-invalid")
+        if binding is None and state.get("pr") is not None:
+            if status not in {"complete", "blocked"}:
+                raise Gate("binding-removed")
+            binding = receipt.get("released_binding")
+            if not isinstance(binding, dict):
+                raise Gate("released-binding-required")
+            try:
+                PersistentDeliveryRouter().validate_binding(binding_from_artifact(binding))
+            except (DeliveryContractViolation, KeyError, TypeError, AttributeError) as error:
+                raise Gate("released-binding-invalid") from error
+            if binding.get("pr") != state["pr"] or any(binding.get(key) != current[key] for key in current):
+                raise Gate("released-binding-invalid")
+        if binding is not None and state.get("pr") is not None and binding.get("pr") != state["pr"]:
             raise Gate("repair-rebind-invalid")
         if binding is not None and any(binding.get(key) != current[key] for key in current):
             raise Gate("repair-binding-not-refreshed")
@@ -346,7 +359,11 @@ def launch(path, state, binding, evidence, executable):
               f"Write a JSON checkpoint to {result} with nonce={nonce}, owner_id={state['owner_id']}, "
               "state waiting|complete|blocked, reason, next_action (required unless complete). "
               "If repairing HEAD, include rebind.old and rebind.new exact repo/worktree/branch/head "
-              "identities and refresh the delivery binding. Successful process exit is not completion. "
+              "identities and refresh the delivery binding. If releasing that binding at a complete or "
+              "blocked boundary after repair, include its refreshed full snapshot as released_binding "
+              "before deletion, with the same PR and current repo/worktree/branch/head. "
+              "A released snapshot cannot override an existing binding or authorize a waiting release. "
+              "Successful process exit is not completion. "
               "For a PR, load persistent-delivery and honor its review/evidence/authority decisions. "
               "The supervisor already owns the writer and scheduler; do not recursively initialize, "
               "claim, register or wake this owner. Preserve user host safeguards. "
