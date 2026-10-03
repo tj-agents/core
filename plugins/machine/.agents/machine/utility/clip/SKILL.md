@@ -65,9 +65,9 @@ Do not invent a wrapper script to dodge the problem — the clipboard already so
 throwaway script file is machinery he then has to clean up. Write a script only when the thing is
 genuinely worth keeping and re-running.
 
-A command that creates or moves a credential still goes to him to run, and pipes the value straight
-to its destination so it never reaches the transcript. Never echo the value, and never run such a
-command yourself — a half-finished attempt can leave a live credential stranded.
+Creating or delivering a credential is `create-credential`'s job end to end — route there instead of
+drafting the command. An ad-hoc credential command outside that skill still goes to him to run, pipes
+the value straight to its destination so it never reaches the transcript, and never echoes it.
 
 **Teams messages only, for the HTML flavour.** GitHub review comments (`draft-comment`,
 `respond-comments`) are previewed in the reply and posted from here, not pasted, so they never go on

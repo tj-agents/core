@@ -307,6 +307,7 @@
             "auto-memory",
             "bootstrap-capabilities",
             "clip",
+            "create-credential",
             "handoff-claude",
             "handoff-codex",
             "last-conversation",
@@ -328,10 +329,11 @@
               "exe:powershell",
               "exe:codex",
               "exe:claude",
+              "exe:gh",
               "windows-terminal"
             ]
           },
-          "digest": "sha256:20bab71f96a22313fa7dfdabb9e5c4e8a5fb92f74d6ab8a85085d6e89d9114c0",
+          "digest": "sha256:bbcd08d89a688bbb5033857ac3777fdcf6612465161b2db4ce854cf74514b799",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
