@@ -11,6 +11,11 @@ domain: process
 Use this contract only through the current harness's `persistent-workflow` skill. It defines the delivery
 owner; it does not create a watcher, scheduler, background process, or model turn.
 
+A continuation goal may exist before a PR or delivery binding. Keep its repository, worktree, canonical
+goal, completion condition and authorized actions in the existing goal record; add the exact PR/head/run
+binding when a remote delivery stage exists. Missing merge authorization gates merge only. It does not
+block authorized local work, exact-head repair, or review that can proceed before that gate.
+
 ## Bind one delivery owner
 
 Before creating or updating persistent work, capture one immutable delivery binding in the host task and in
