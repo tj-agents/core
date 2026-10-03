@@ -5,7 +5,7 @@
     ".agents/base"
   ],
   "source_excludes": [],
-  "source_digest": "sha256:7afa6f29ce28d5cced5698acbcdfcb51a64a1fa32372a6fc24b5eb7e9b478d72",
+  "source_digest": "sha256:76bdc7404be4eebe4399e8f0ec40ebabb25c9c7a307dadfbfabd7f2a41178b8c",
   "requires": {
     "marketplaces": [
       {
@@ -19,6 +19,13 @@
     "hooks": [
       {
         "path": ".agents/base/contract/agent-files/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": ".agents/base/contract/goal-continuation/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"

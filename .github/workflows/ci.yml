@@ -39,6 +39,10 @@ jobs:
         shell: pwsh
         run: ./tests/skill-packaging.tests.ps1
 
+      - name: continuation scheduler tests
+        shell: pwsh
+        run: ./tests/delivery-continuation.tests.ps1
+
       - name: handoff launcher tests
         shell: pwsh
         run: ./tests/handoff-launchers.tests.ps1
