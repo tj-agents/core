@@ -118,6 +118,11 @@ When a context transfer is genuinely selected, make the ledger safe to resume an
 pointer shape. An actionable checkpoint does not itself require a transfer. Blocked and paused plans report
 their owner, unblock action, and objective resume condition without replaying the blocked plan.
 
+For a critical execution transfer, retain the readiness verdict and references in the canonical goal,
+and the exact receipt pointer and current pickup gate in its existing progress owner. Follow
+`engineering:handoff` for receipt transitions. Submission, acknowledgement and first-action evidence
+are distinct facts; preserve the full authorized outcome, review identity and any continuation owner.
+
 ## The progress-ledger template
 
 ~~~markdown

@@ -42,6 +42,12 @@ The richer `plans`, `plan-authoring`, and `plan-checkpoint` engineering conventi
 project or user selects that lifecycle. They are not prerequisites for this common behavior. Preserve
 user plans when disabling or rolling back the plugin.
 
+An execution handoff keeps its outcome, acceptance criteria, authorized scope, source context, resolved
+decisions, dependencies, verification and exact next action in this same goal. Record its readiness
+evidence and pickup state with the goal; launcher submission alone is not acknowledgement. When the
+selected engineering workflow calls for critical-plan transfer, its `plan-authoring` and `handoff`
+skills own that assessment and verified pickup procedure.
+
 ## Default ownership of long-term work
 
 When a request authorizes a long-term or multi-phase goal, select the available `plan-execution`
