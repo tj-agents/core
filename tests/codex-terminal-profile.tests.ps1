@@ -10,6 +10,7 @@ Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex-pro
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.ps1') -Destination $scripts
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/bounded_process.py') -Destination $scripts
 $fake = @'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 Add-Content -LiteralPath $env:CODEX_TEST_CALLS -Value ($args -join ' ')
 $global:LASTEXITCODE = 0
 switch ($args -join ' ') {
@@ -18,8 +19,19 @@ switch ($args -join ' ') {
         if ($env:CODEX_TEST_FAIL_UPGRADE) { $global:LASTEXITCODE = 1; 'offline'; break }
         '{"selectedMarketplaces":["base-agents"],"upgradedRoots":[],"errors":[]}'
     }
-    'plugin list --available --json' { '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}' }
-    'plugin add machine@base-agents --json' { '{"pluginId":"machine@base-agents"}' }
+    'plugin list --available --json' {
+        if ($env:CODEX_TEST_REMOVE_RUNNER) {
+            '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"react@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}'
+        } else {
+            '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}'
+        }
+    }
+    'plugin add machine@base-agents --json' {
+        if ($env:CODEX_TEST_REMOVE_RUNNER) { Remove-Item -LiteralPath $env:CODEX_TEST_REMOVE_RUNNER -Force }
+        '{"pluginId":"machine@base-agents"}'
+    }
+    'plugin add react@base-agents --json' { '{"pluginId":"react@base-agents"}' }
+    'unicode' { @{ value = (([char]0x4f60),([char]0x597d) -join '') } | ConvertTo-Json -Compress }
     '--version' { 'FAKE VERSION' }
     'exec' { 'LAUNCHED exec' }
     default { throw "Unexpected Codex call: $($args -join ' ')" }
@@ -30,6 +42,7 @@ $oldPath = $env:PATH
 $oldHome = $env:CODEX_HOME
 $oldCalls = $env:CODEX_TEST_CALLS
 $oldFail = $env:CODEX_TEST_FAIL_UPGRADE
+$oldRemove = $env:CODEX_TEST_REMOVE_RUNNER
 try {
     $env:PATH = "$bin$([IO.Path]::PathSeparator)$oldPath"
     $env:CODEX_HOME = $codexHome
@@ -61,6 +74,19 @@ try {
     if ((Get-Content -LiteralPath $env:CODEX_TEST_CALLS) -ne '--version') {
         throw 'Version command triggered a refresh'
     }
+    . (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.ps1')
+    $encoding = [Console]::OutputEncoding
+    $unicode = Invoke-CodexSyncCommand -CodexExecutable (Join-Path $bin 'codex.ps1') -Arguments @('unicode')
+    if ($unicode.value -ne (([char]0x4f60),([char]0x597d) -join '')) { throw 'Unicode output was corrupted' }
+    if ([Console]::OutputEncoding.CodePage -ne $encoding.CodePage) { throw 'Caller encoding changed' }
+    Clear-Content -LiteralPath $env:CODEX_TEST_CALLS
+    $env:CODEX_TEST_FAIL_UPGRADE = $null
+    $env:CODEX_TEST_REMOVE_RUNNER = Join-Path $scripts 'bounded_process.py'
+    $result = codex exec
+    if ($result -ne 'LAUNCHED exec') { throw 'Machine upgrade prevented launch' }
+    $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS)
+    if ('plugin add react@base-agents --json' -notin $calls) { throw 'Runner removal prevented later plugin refresh' }
+    if (Test-Path -LiteralPath $env:CODEX_TEST_REMOVE_RUNNER) { throw 'Fixture did not remove the old runner' }
     'Codex terminal profile tests passed.'
 }
 finally {
@@ -68,6 +94,7 @@ finally {
     $env:CODEX_HOME = $oldHome
     $env:CODEX_TEST_CALLS = $oldCalls
     $env:CODEX_TEST_FAIL_UPGRADE = $oldFail
+    $env:CODEX_TEST_REMOVE_RUNNER = $oldRemove
     $root = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
     $target = [IO.Path]::GetFullPath($temp)
     if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'Test cleanup outside temp' }
