@@ -373,6 +373,55 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(result["launches"], 0)
         self.assertFalse((self.root / "host-started").exists())
 
+    def repaired_release(self, status, **extra):
+        self.binding("COMPLETED", "FAILURE")
+        self.fixture("repair", release_binding=True, release_state=status, **extra)
+        return self.wake()
+
+    def test_repaired_terminal_release_completes(self):
+        old_head = self.state()["head"]
+        result = self.repaired_release("complete")
+        self.assertEqual(result["state"], "complete")
+        self.assertNotEqual(result["head"], old_head)
+        self.assertEqual(result["head"], self.git("rev-parse", "HEAD"))
+        self.assertFalse((self.root / ".agents/persistent-workflow-binding.json").exists())
+
+    def test_repaired_terminal_release_preserves_human_gate(self):
+        result = self.repaired_release("blocked", receipt={"reason": "Approve repaired release",
+                                                          "next_action": "Obtain product approval"})
+        self.assertEqual(result["state"], "blocked")
+        self.assertEqual(result["reason"], "Approve repaired release")
+        self.assertEqual(result["next_action"], "Obtain product approval")
+        self.assertEqual(result["head"], self.git("rev-parse", "HEAD"))
+
+    def test_repaired_release_rejects_missing_or_mismatched_snapshot(self):
+        self.binding()
+        state = self.state()
+        runtime.check_identity(state)
+        state["launch_nonce"] = "fixture-receipt"
+        old = {key: state[key] for key in ("repo", "worktree", "branch", "head")}
+        self.git("commit", "--allow-empty", "-m", "Repaired head")
+        new = dict(old, head=self.git("rev-parse", "HEAD"))
+        binding_path = self.root / ".agents/persistent-workflow-binding.json"
+        snapshot = dict(json.loads(binding_path.read_text()), head=new["head"])
+        binding_path.unlink()
+        receipt = {"nonce": state["launch_nonce"], "owner_id": state["owner_id"], "state": "complete",
+                   "reason": "Repaired boundary", "rebind": {"old": old, "new": new}}
+        invalid = [None, dict(snapshot, pr=None), dict(snapshot, pr=99), dict(snapshot, head=old["head"])]
+        for candidate in invalid:
+            with self.subTest(snapshot=candidate):
+                current_receipt = dict(receipt, released_binding=candidate)
+                with self.assertRaisesRegex(runtime.Gate, "released-binding-(required|invalid)"):
+                    runtime.apply_receipt(dict(state), current_receipt)
+        waiting = dict(receipt, state="waiting", next_action="resume", released_binding=snapshot)
+        with self.assertRaisesRegex(runtime.Gate, "binding-removed"):
+            runtime.apply_receipt(dict(state), waiting)
+
+    def test_repaired_release_cannot_override_existing_stale_binding(self):
+        result = self.repaired_release("complete", retain_stale_binding=True)
+        self.assertEqual(result["state"], "blocked")
+        self.assertEqual(result["reason"], "repair-binding-not-refreshed")
+
 
 if __name__ == "__main__":
     unittest.main()
