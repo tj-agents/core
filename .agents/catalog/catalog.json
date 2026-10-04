@@ -127,6 +127,7 @@
             "feature",
             "git-auth",
             "git-branching",
+            "guide",
             "handoff",
             "handoff-format",
             "incremental-review",
@@ -181,7 +182,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:a35a9eb6e440decefb9d32f13c9ec03fe73e16cce8a9a9198925632acc7d7449",
+          "digest": "sha256:adf1513a2c81ffb8ed26861d837c673e761b032bffa902eaec1c09e38076d746",
           "harness": {
             "marketplaces": [
               {
