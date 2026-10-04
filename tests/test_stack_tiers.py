@@ -340,6 +340,15 @@ class SessionStatement(TemporaryProject):
         self.assertIn("Does not apply here: `react:*`", text)
         self.assertNotIn("Does not apply here: `dotnet", text)
 
+    def test_an_audit_can_inspect_source_without_adopting_inapplicable_rules(self):
+        found = [declaration("dotnet", "dotagents", DOTNET)]
+        text = gate.statement(self.project, found)
+        self.assertIn("standards-source audit", text)
+        self.assertIn("canonical source files", text)
+        self.assertIn("does not load them as governing instructions", text)
+        self.assertNotIn("do not read, invoke or cite", text)
+        self.assertIn("no stack tier applies", gate.conventions(self.project, found))
+
 
 class Conventions(TemporaryProject):
     def installed(self, skills):
@@ -356,21 +365,28 @@ class Conventions(TemporaryProject):
         (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
         return gate.declarations([cache.name])
 
-    def test_an_applicable_tier_lists_only_its_contract_skills(self):
-        found = self.installed([("persistence", "contract"), ("e2e-debug", "operation")])
+    def test_legacy_new_and_mixed_payloads_discover_the_same_conventions(self):
         (self.project / "Api.csproj").write_text("", encoding="utf-8")
-
-        text = gate.conventions(self.project, found)
-
-        self.assertIn("dotnet (.NET detected (Api.csproj)): 1 convention(s)", text)
-        self.assertIn("persistence", text)
-        self.assertNotIn("e2e-debug", text)
+        excluded = [(kind, kind) for kind in ("operation", "policy", "utility", "workflow", "knowledge", "custom")]
+        for kinds in (("contract", "contract"), ("convention", "convention"), ("contract", "convention")):
+            with self.subTest(kinds=kinds):
+                found = self.installed(list(zip(("persistence", "style"), kinds)) + excluded)
+                payload = found[0].payload_dir
+                self.assertEqual([name for name, _ in gate.contract_skills(payload)], ["persistence", "style"])
+                text = gate.conventions(self.project, found)
+                self.assertIn("dotnet (.NET detected (Api.csproj)): 2 convention(s)", text)
+                self.assertIn("persistence", text)
+                self.assertIn("style", text)
+                for name, _ in excluded:
+                    self.assertNotIn("  " + name + " -", text)
 
     def test_no_applicable_tier_is_said_explicitly(self):
-        found = self.installed([("persistence", "contract")])
-        text = gate.conventions(self.project, found)
-        self.assertIn("no stack tier applies", text)
-        self.assertNotIn("persistence", text)
+        for kind in ("contract", "convention"):
+            with self.subTest(kind=kind):
+                found = self.installed([("persistence", kind)])
+                text = gate.conventions(self.project, found)
+                self.assertIn("no stack tier applies", text)
+                self.assertNotIn("persistence", text)
 
 
 class Gate(TemporaryProject):
@@ -405,6 +421,14 @@ class Gate(TemporaryProject):
     def test_naming_the_plugin_without_reading_a_standard_is_not_a_block(self):
         payload = {"tool_name": "Bash", "tool_input": {"command": "git log dotagents/dotnet"}}
         self.assertEqual(self.call(payload), 0)
+
+    def test_source_inspection_does_not_enable_skill_invocation(self):
+        command = 'cat ../standards/.agents/dotnet/contract/style/SKILL.md'
+        self.assertEqual(self.call({"tool_name": "shell", "tool_input": {"command": command}}), 0)
+        self.assertEqual(self.call({"tool_name": "Skill", "tool_input": {"skill": "dotnet:style"}}), 2)
+        _, applicable, blocked = gate.assess(self.project, self.found)
+        self.assertEqual(applicable, [])
+        self.assertEqual([item.tier for item in blocked], ["dotnet"])
 
     def test_an_unrecognized_payload_allows(self):
         self.assertEqual(self.call({"tool_name": "Read", "tool_input": {"file_path": "x"}}), 0)

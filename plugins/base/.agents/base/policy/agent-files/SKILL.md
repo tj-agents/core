@@ -1,7 +1,7 @@
 ---
 name: agent-files
 description: Keep AGENTS.md and CLAUDE.md paired in every repository, with one shared instruction source.
-kind: contract
+kind: policy
 domain: behavior
 ---
 
