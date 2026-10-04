@@ -14,7 +14,8 @@ tool-policy decisions and report an authentic external gate with its concrete ac
 ## Ownership and current delivery
 
 - Side checkout: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ExternalGoalContinuation`.
-- Side branch: `Fix/ExternalGoalContinuation`; base `743c34a43bc538d9a58bac92b7dc65fef4024b8a`.
+- Runtime delivery: `Fix/ExternalGoalContinuation`, PR #92 merged at `0a528a457d4131bfca7710a97af1a8a9d1859097`.
+- Current guidance delivery: `Docs/ExternalGoalContinuation`, base `9f4884ee9f4b2793101e11f94c058a3331a2914c`; no PR yet.
 - This file is the side repair's single goal. Start at L4 after loading `engineering:lanes` and `bugfix`.
   The defect, intended boundary and verification below are specified. Re-route other stages as needed.
 - Original rename goal: `C:/Users/TommySeery/.claude/plans/tj-agents-core/SKILL_KIND_RENAME.md`.
@@ -134,21 +135,17 @@ handoff is a separate capability and must not be claimed by this change.
 
 - Runtime and binder repair implemented in four authored files (about 250 changed lines). Binding 29/29 and router 28/28 tests pass; continuation full run reached 29 tests with one 30-second subprocess transport timeout, whose isolated rerun passed (5.577s); the new external-goal transition test also passed alone (20.529s). Scheduler, goal-contract, paired agent files, generation -Check and harness checks pass.
 - Native probe: `C:/Users/TommySeery/AppData/Local/Temp/external-goal-native-zsk72daq`. Real scheduler registration, live-foreground no-launch, yield, native L4 wake, valid complete nonce/owner receipt, exact external goal in child prompt and scheduler removal observed. Outer adapter output wrapper timed out; terminal artifacts independently verified. No normal-profile installation or hook activation claimed.
+- Native review and workflow lens completed clean at runtime head `59798a01225ea36c813544c1b37ebd79aec868d5`; native reviewer ran all 58 binding/continuation tests green. Exact-head CI run `37229819002` passed before merge.
 - Known flat lifecycle skill resolver defect is already owned by `docs/workflows/TECH_DEBT.md`; use loaded canonical skill files for this run.
 
 ## Next Steps
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: freeze, independently review and deliver runtime/binder repair.
-Remaining scope: separately deliver durable usage guidance, follow post-merge generation, report original-owner adoption boundary.
+Current slice: usage guidance on `Docs/ExternalGoalContinuation`, base `9f4884ee9f4b2793101e11f94c058a3331a2914c`.
+Remaining scope: review, CI, guidance merge, generated-package confirmation and original-owner adoption result.
 Done when: both repair slices are reviewed and merged with generation green and concrete adoption instructions recorded.
 
-1. Verify the exact checkout/branch and record the pickup marker, actual session identity and selected L4
-   lane here before source edits. This is a bounded side handoff; no critical-plan receipt exists.
-2. Load the lane and bugfix lifecycle, implement the bounded runtime/guidance correction, and execute the
-   regression and runtime acceptance described above. Do not recursively hand off this specified repair.
-3. Carry review, CI and authorized merge to completion, with one real continuation if a result will outlive
-   the turn. Use this in-worktree goal to own the repair while testing an external fixture.
-4. Leave a concrete result here for the original owner: revision, verification, supported initialization
-   command with its external plan and canonical owner path, and any real activation gate. The original
-   owner alone adopts it and claims its foreground lease. Preserve its active work and authority.
+1. Finish the bounded guidance correction in persistent-workflow and persistent-delivery; validate goal-contract, documentation reachability, paired instructions, generation and unchanged harness requirements. L4 remains selected for correctness of process commands and scope.
+2. Commit the guidance with this material checkpoint, run native docs review plus independent accuracy/contradiction lens, publish the focused PR and bind only that PR's recorded authority. Wait through exact-head CI and authorized ordinary merge.
+3. Follow the guidance merge's own generation run to terminal success. Runtime PR #92 merged at `0a528a457d4131bfca7710a97af1a8a9d1859097`; its run `37230284587` is owned by monitor tool session `66879`. It must also finish green. Runtime owner receipts are preserved in primary `.git/agent-workflow/runs/external-goal-continuation/pr92-owner/`. Its scheduler and binding were removed before initializing this slice.
+4. Record usable revision, verification, supported init with the original external plan, and actual adoption boundary here. Only the original owner adopts and claims its lease; do not change its active scheduler or checkout. Current native session PID remains `27616`, and the foreground token is read from this checkout's canonical runtime state.
