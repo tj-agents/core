@@ -29,6 +29,10 @@ class NormalizeUrlTests(unittest.TestCase):
             SYNC.normalize_url('https://git.example.com/Org/repoa.git'),
         )
 
+    def test_folds_scp_style_ssh_remotes_to_the_same_form_as_https(self):
+        self.assertEqual(SYNC.normalize_url('git@github.com:tj-agents/cpp.git'), SYNC.normalize_url('https://github.com/tj-agents/cpp.git'))
+        self.assertEqual(SYNC.normalize_url('ssh://git@github.com/tj-agents/cpp.git'), SYNC.normalize_url('https://github.com/tj-agents/cpp.git'))
+
 
 def git(cwd, *arguments):
     return subprocess.run(
