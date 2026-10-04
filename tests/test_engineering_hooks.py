@@ -94,6 +94,26 @@ class PackagedEngineeringHooks(unittest.TestCase):
                     self.package / ".agents/engineering/workflow/plan-execution/SKILL.md"
                 ), context)
 
+    def test_planning_then_approval_selects_the_corresponding_packaged_workflow(self):
+        (self.cwd / "GOAL.md").write_text(
+            "# Goal\n\nStatus: awaiting approval\n\nFinish the taxonomy proposal.\n", encoding="utf-8"
+        )
+        for prompt, name in (
+            ("Planning only: finish the taxonomy proposal, but do not implement it.", "plan-authoring"),
+            ("I approve the plan. Implement it through completion.", "plan-execution"),
+        ):
+            with self.subTest(workflow=name):
+                result = self.run_hook("hooks/workflow_route.py", {
+                    "hook_event_name": "UserPromptSubmit", "prompt": prompt,
+                })
+                self.assertEqual(0, result.returncode, result.stderr)
+                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                canonical = (
+                    self.package / f".agents/engineering/workflow/{name}/SKILL.md"
+                ).read_text(encoding="utf-8").strip()
+                self.assertIn(f"engineering:{name} automatically selected", context)
+                self.assertEqual(canonical, context.split("\n\n", 1)[1])
+
     def test_host_manifests_register_supported_router_and_red_run_events(self):
         codex = json.loads((self.package / "hooks/codex.json").read_text(encoding="utf-8"))
         claude = json.loads((self.package / "hooks/claude.json").read_text(encoding="utf-8"))

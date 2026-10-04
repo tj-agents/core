@@ -21,6 +21,10 @@ PLANNING_ONLY = re.compile(
     r"\b(?:continue|resume)\s+planning\b",
     re.IGNORECASE,
 )
+PLANNING_REQUEST = re.compile(
+    r"\b(?:only\s+plan|plan(?:ning)?\s+only|(?:continue|resume)\s+planning|plan-authoring)\b",
+    re.IGNORECASE,
+)
 OWNER_REFERENCE = re.compile(r"\b(?:goal|plan|roadmap)\b", re.IGNORECASE)
 LONG_RUNNING = re.compile(
     r"\b(?:all\s+(?:remaining\s+)?phases|end[- ]to[- ]end|entire\s+(?:migration|project)|"
@@ -140,7 +144,11 @@ def main() -> int:
         if not isinstance(prompt, str) or not isinstance(cwd_value, str):
             raise RuntimeError("UserPromptSubmit payload requires string prompt and cwd fields")
         cwd = Path(cwd_value).resolve()
-        if selects_handoff(prompt, cwd):
+        if PLANNING_REQUEST.search(prompt):
+            context = load_context(
+                Path(__file__), "engineering/workflow/plan-authoring/SKILL.md", "plan-authoring"
+            )
+        elif selects_handoff(prompt, cwd):
             context = load_context(
                 Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff"
             )
