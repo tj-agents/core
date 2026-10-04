@@ -64,7 +64,9 @@ function Sync-CodexStandards {
                 throw "Codex installed $($installed.pluginId) while refreshing $identity"
             }
         }
-        Invoke-CodexHookTrust -CodexExecutable $CodexExecutable -WorkingDirectory $resolved -HelperScript $trustSnapshot
+        if (@($selected).Count -gt 0 -or @($inventory.installed | Where-Object { $_.enabled }).Count -gt 0) {
+            Invoke-CodexHookTrust -CodexExecutable $CodexExecutable -WorkingDirectory $resolved -HelperScript $trustSnapshot
+        }
         return @($selected)
     }
     finally {

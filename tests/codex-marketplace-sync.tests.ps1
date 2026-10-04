@@ -4,6 +4,7 @@ $repository = Split-Path -Parent $PSScriptRoot
 
 $script:calls = [System.Collections.Generic.List[string]]::new()
 $script:failUpgrade = $false
+$script:emptyInventory = $false
 
 function Invoke-CodexHookTrust {
     param([string] $CodexExecutable, [string] $WorkingDirectory, [string] $HelperScript)
@@ -28,6 +29,10 @@ function Invoke-FakeCodex {
         return
     }
     if ($commandLine -eq 'plugin list --available --json') {
+        if ($script:emptyInventory) {
+            '{"installed":[],"available":[]}'
+            return
+        }
         '{"installed":[{"pluginId":"base@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"local@local","enabled":true,"marketplaceSource":{"sourceType":"local"}}],"available":[{"pluginId":"engineering@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"unused@base-agents","enabled":false,"marketplaceSource":{"sourceType":"git"}}]}'
         return
     }
@@ -55,6 +60,13 @@ if (($script:calls -join '|') -ne ($expected -join '|')) {
 }
 if ((Get-Location).Path -ne $before) { throw 'Startup sync changed the caller directory' }
 
+$script:calls.Clear()
+$script:emptyInventory = $true
+$selected = @(Sync-CodexStandards -CodexExecutable 'Invoke-FakeCodex' -WorkingDirectory $repository)
+if ($selected.Count -ne 0 -or ($script:calls -join '|') -ne 'plugin marketplace upgrade --json|plugin list --available --json') {
+    throw 'An empty plugin inventory invoked hook trust'
+}
+$script:emptyInventory = $false
 $script:calls.Clear()
 $script:failUpgrade = $true
 $blocked = $false
