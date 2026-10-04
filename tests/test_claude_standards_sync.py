@@ -20,6 +20,16 @@ SPEC.loader.exec_module(SYNC)
 FAKE_CLAUDE = ROOT / 'tests/fixtures/fake_claude.py'
 
 
+class NormalizeUrlTests(unittest.TestCase):
+    def test_folds_scheme_host_case_and_git_suffix_but_not_path_case(self):
+        self.assertEqual(SYNC.normalize_url('HTTPS://GitHub.com/tj-agents/Cpp.git'), 'github.com/tj-agents/Cpp')
+        self.assertEqual(SYNC.normalize_url('https://github.com/tj-agents/cpp.git/'), SYNC.normalize_url('https://github.com/tj-agents/cpp'))
+        self.assertNotEqual(
+            SYNC.normalize_url('https://git.example.com/Org/RepoA.git'),
+            SYNC.normalize_url('https://git.example.com/Org/repoa.git'),
+        )
+
+
 def git(cwd, *arguments):
     return subprocess.run(
         ['git', '-c', 'user.name=test', '-c', 'user.email=test@example.invalid', *arguments],

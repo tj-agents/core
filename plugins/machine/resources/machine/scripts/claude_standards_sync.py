@@ -171,7 +171,8 @@ def normalize_url(url: str) -> str:
     stripped = re.sub(r"^[a-z][a-z0-9+.-]*://", "", url.strip(), flags=re.IGNORECASE).rstrip("/")
     if stripped.lower().endswith(".git"):
         stripped = stripped[:-4]
-    return stripped.lower()
+    host, separator, rest = stripped.partition("/")
+    return host.lower() + separator + rest
 
 
 def external_groups(markets: list[Marketplace]) -> list[Marketplace]:
