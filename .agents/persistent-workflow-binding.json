@@ -1,0 +1,36 @@
+{
+  "authorization_resolution": {
+    "standing": "absent",
+    "stopped_by": {
+      "class": "no-recorded-authorization"
+    }
+  },
+  "bound_at": "2026-10-04T01:42:44.920652+00:00",
+  "branch": "Fix/ExternalPluginSourceSync",
+  "changed_path_count": 9,
+  "completion_condition": "the bound PR reaches MERGED, or a recorded terminal ends this delivery",
+  "head": "2738dfeab86a8f825912d886204826bafc7c756a",
+  "merge_authorization": {
+    "instruction": null,
+    "mode": "absent"
+  },
+  "pending_evidence": [
+    {
+      "check_id": "111337413533",
+      "head_sha": "2738dfeab86a8f825912d886204826bafc7c756a",
+      "run_id": "37168836060"
+    }
+  ],
+  "pr": 83,
+  "pr_url": "https://github.com/tj-agents/core/pull/83",
+  "repo": "tj-agents/core",
+  "review": {
+    "reviewed_sha": null,
+    "work_order": "reviews/Fix-ExternalPluginSourceSync.md",
+    "work_order_order": [
+      "full"
+    ]
+  },
+  "schema_version": 1,
+  "worktree": "C:\\Users\\TommySeery\\source\\repos\\tj-agents\\core\\.worktrees\\Fix-ExternalPluginSourceSync"
+}
