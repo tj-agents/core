@@ -38,6 +38,13 @@ steps. A request to plan, correct a plan, or resume planning does not authorize 
 request to implement remains valid within its scope. Neither a ready plan nor this contract authorizes
 publication, installation, or other actions outside that request or another standing authorization.
 
+Finish planning with a clear transition in both the plan and the response. Present the concrete proposal
+and the decision still required from the user, then state the first execution action that follows that
+decision. Ask for approval only when the proposal is ready and approval is actually missing. If execution
+is already authorized, enter its owning workflow and continue without a routine continuation question.
+An incomplete investigation is still planning work: continue every authorized part and handle any genuine
+blocker under `base:goal-continuation` before returning a partial result.
+
 The richer `plans`, `plan-authoring`, and `plan-checkpoint` engineering conventions apply only when the
 project or user selects that lifecycle. They are not prerequisites for this common behavior. Preserve
 user plans when disabling or rolling back the plugin.
