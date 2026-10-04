@@ -16,6 +16,22 @@ SYNC = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SYNC)
 
 
+class KindMetadataTests(unittest.TestCase):
+    def body(self, kind):
+        return f"---\nname: custom-skill\ndescription: fixture\nkind: {kind}\ndomain: process\n---\n"
+
+    def test_kind_accepts_open_lowercase_words(self):
+        for kind in ("contract", "convention", "policy", "utility", "workflow", "knowledge", "custom"):
+            with self.subTest(kind=kind):
+                self.assertEqual(SYNC.metadata(self.body(kind), Path("fixture/SKILL.md"))["kind"], kind)
+
+    def test_kind_rejects_nonword_syntax(self):
+        for kind in ("convention2", "con-vention", "Convention", "", "two words", "café"):
+            with self.subTest(kind=kind):
+                with self.assertRaises(ValueError):
+                    SYNC.metadata(self.body(kind), Path("fixture/SKILL.md"))
+
+
 class SourceLayoutTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="agent source layout ")
