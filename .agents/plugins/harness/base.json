@@ -4,8 +4,6 @@
   "source_roots": [
     ".agents/base"
   ],
-  "source_excludes": [],
-  "source_digest": "sha256:cd4bc8ae259922aa7a6da8769267821bdaff2814e35d1ae764943fa1545bc97a",
   "requires": {
     "marketplaces": [
       {
