@@ -13,8 +13,9 @@ For Claude select `machine:handoff-claude`. The machine plugin and that launcher
 and CLI prerequisites must be available. Resolve the skill using native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
 
-When an active task surfaces a distinct, independently actionable, separately authorized side workstream,
-select this workflow in **bounded side-workstream** mode immediately. Give the side workstream one isolated
+When an active task surfaces a distinct, independently actionable side workstream whose authorization is
+separate — granted by the user, or standing like `engineering:session-guidance`'s standards-defect
+default — select this workflow in **bounded side-workstream** mode immediately. Give the side workstream one isolated
 checkout and one successor; the originating session retains its active goal and remains its only writer.
 This is not a full-goal transfer. Do not offload a step that is inseparable from the original task's next
 action, create duplicate writers, or hand off work that overlaps the original checkout's owned paths.
