@@ -87,6 +87,13 @@ continues in the same checkout and may give a bounded implementation or review t
 Give that agent explicit path and responsibility ownership, avoid overlapping writers, and reconcile its
 result in the parent. A small follow-up can stay with the parent. If delegation is unavailable, use the
 current owner's supported fallback; do not open an independent session solely to change model or cost.
+Direct execution and parent fallback use the selected phase lane. A tiny inline follow-up may remain
+with the parent, but that allowance does not cover an implementation phase or a complete implementation
+goal on L1. If a worker is unavailable, use a supported in-session model/effort control or another
+available bounded worker that honors the selected lane. If neither is available and the current owner
+cannot execute at that lane, report the unavailable control and the blocked phase in the existing goal;
+continue independent authorized preparation and resume implementation when a suitable control or worker
+is available. Never claim a model switch happened merely because a lane was recorded.
 For a massive plan whose design is a substantial phase, `engineering:plans` normally transfers execution
 to a fresh harness after a durable phased checkpoint. That decision is about the work and its context,
 not a lane change.
