@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `e58a505a5339f35fb49f73de25fe807b7dcdc9ef`  `(2026-10-04)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `ac6ae88221ba87bfd23676b1490be5a046251575`  `(2026-10-04)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-04 — docs
 
@@ -149,3 +149,28 @@ semantics — the fronted adverbial keeps the current-goal exclusion. Validation
 `sync-generated.ps1 -Check` green after regeneration; `tests/test_goal_continuation.py` (4) and
 `test_process_standards.py` (19) OK; no test pins the changed sentences. A final incremental pass
 over the fixing commit follows.
+
+## Review pass — 2026-10-04 — incremental (2)
+
+**Candidate base:** `e58a505a5339f35fb49f73de25fe807b7dcdc9ef`
+**Candidate head:** `ac6ae88221ba87bfd23676b1490be5a046251575`
+**Candidate branch:** `Fix/DefectHandoffDefault`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:a0acff6dd52bb04895c0da3e5bc9bf7ef8bd95760d3144e59ae010e5368281ee` `(13 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\docs-review-defect-handoff-default\review\10f318266ebed5d35764238ee62a1ac91ca03676c5940d016b77c7ffadf08493`
+**Candidate bundle identity:** `sha256:5d53f4fb824db083c82de9decf28ac6e45b3377c244e6c106f8d171cd7e41bc9`
+**Work-order path:** `reviews/Fix-DefectHandoffDefault.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Claude Code built-in `code-review` skill over the delta. Lens: contradiction.
+Security layer not required (`first_path` and `trunk_first_path` both null).
+
+### Findings (incremental 2)
+
+No findings. The native layer verified the rewritten sentences keep their antecedents and the
+generated copies byte-match the authored sources; the contradiction lens checked every reworded
+element against session-guidance's own body, handoff's bounded side-workstream section,
+plan-artifacts, the rest of goal-continuation, and docs-and-debt, and found the
+goal-continuation/session-guidance merge juxtaposition compatible (continuation preserves the
+standing grant; it does not manufacture authority).
