@@ -19,13 +19,16 @@ def git(*args: str) -> str:
     return result.stdout.strip()
 
 
-def generated_roots() -> list[str]:
-    config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
+def generated_roots(merge_base: str) -> list[str]:
+    # Read from the merge base, not the PR's tree: a PR editing sources.json
+    # must not be able to exempt its own paths from this guard.
+    config = json.loads(git("show", f"{merge_base}:.agents/plugins/sources.json"))
     return list(config["generated_roots"])
 
 
-def offending_paths(base: str, roots: list[str]) -> list[str]:
+def offending_paths(base: str) -> list[str]:
     merge_base = git("merge-base", base, "HEAD")
+    roots = generated_roots(merge_base)
     changed = git("diff", "--name-only", f"{merge_base}..HEAD").splitlines()
     return sorted(
         path
@@ -39,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base", required=True, help="base ref the pull request targets")
     args = parser.parse_args(argv)
     try:
-        offending = offending_paths(args.base, generated_roots())
+        offending = offending_paths(args.base)
     except (OSError, ValueError, KeyError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
         print(f"Generated-path guard failed to run: {error}", file=sys.stderr)
         return 1
