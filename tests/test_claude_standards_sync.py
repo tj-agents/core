@@ -96,8 +96,9 @@ class StandardsSyncHarness(unittest.TestCase):
     def enable(self, values, path=None):
         self.write(path or self.config / 'settings.json', {'enabledPlugins': values})
 
-    def install(self, identity='base@core', scope='user', project=None):
-        version = git(self.checkout, 'rev-parse', 'HEAD')[:12]
+    def install(self, identity='base@core', scope='user', project=None, version=None):
+        if version is None:
+            version = git(self.checkout, 'rev-parse', 'HEAD')[:12]
         name, marketplace = identity.split('@')
         path = self.plugins / 'cache' / marketplace / name / version
         path.mkdir(parents=True, exist_ok=True)
@@ -289,6 +290,95 @@ class StandardsSyncTests(StandardsSyncHarness):
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertEqual(self.records()[0]['version'], pushed[:12])
 
+
+class ExternalPluginSourceTests(StandardsSyncHarness):
+    """The marketplace's git-subdir plugins can source a different repository than the marketplace
+    itself; the sync must track that source, not the marketplace's own remote."""
+
+    def setUp(self):
+        super().setUp()
+        base = Path(self.temp.name)
+        self.plugin_remote = base / 'plugin-source.git'
+        self.plugin_author = base / 'plugin author'
+        git(base, 'init', '--quiet', '--bare', '--initial-branch=main', str(self.plugin_remote))
+        git(base, 'clone', '--quiet', str(self.plugin_remote), str(self.plugin_author))
+        self.plugin_head = self.publish_plugin('first')
+        self.declare_sources({'ext': str(self.plugin_remote)})
+        self.enable({'ext@core': True})
+
+    def declare_sources(self, plugins):
+        self.write(self.checkout / '.claude-plugin' / 'marketplace.json', {
+            'name': 'core',
+            'plugins': [
+                {'name': name, 'source': {'source': 'git-subdir', 'url': url, 'path': f'./plugins/{name}', 'ref': 'main'}}
+                for name, url in plugins.items()
+            ],
+        })
+
+    def publish_plugin(self, content, author=None):
+        author = author or self.plugin_author
+        payload = author / 'payload.txt'
+        payload.write_text(content, encoding='utf-8')
+        git(author, 'add', '-A')
+        git(author, 'commit', '--quiet', '-m', content)
+        git(author, 'push', '--quiet', 'origin', 'HEAD:main')
+        return git(author, 'rev-parse', 'HEAD')
+
+    def test_plugin_source_outside_the_marketplace_repository_is_tracked_independently(self):
+        self.install('ext@core', version=self.plugin_head[:12])
+        pushed = self.publish_plugin('second')
+        code, output = self.sync()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(
+            [entry['argv'] for entry in self.invocations()],
+            [['plugin', 'update', 'ext@core', '--scope', 'user', '--json']],
+        )
+        self.assertEqual(self.records('ext@core')[0]['version'], pushed[:12])
+        self.assertIn(f'at {pushed[:12]}: ext {pushed[:12]}', output)
+
+    def test_unchanged_plugin_source_outside_the_marketplace_is_silent(self):
+        self.install('ext@core', version=self.plugin_head[:12])
+        code, output = self.sync()
+        self.assertEqual((code, output), (0, ''))
+        self.assertEqual(self.invocations(), [])
+
+    def test_unreachable_plugin_source_warns_and_continues(self):
+        self.install('ext@core', version=self.plugin_head[:12])
+        self.declare_sources({'ext': str(Path(self.temp.name) / 'missing-plugin.git')})
+        code, output = self.sync()
+        self.assertEqual(code, 1)
+        self.assertIn('could not check', output)
+        self.assertIn('this session loads ext', output)
+        self.assertEqual(self.invocations(), [])
+
+    def test_shared_external_source_is_probed_once_for_all_its_plugins(self):
+        self.declare_sources({'ext': str(self.plugin_remote), 'ext2': str(self.plugin_remote)})
+        self.enable({'ext@core': True, 'ext2@core': True})
+        self.install('ext@core', version=self.plugin_head[:12])
+        self.install('ext2@core', version=self.plugin_head[:12])
+        pushed = self.publish_plugin('second')
+        probes = []
+        original = SYNC.run
+        def counting(command, cwd=None, timeout=SYNC.REMOTE_TIMEOUT_SECONDS):
+            if len(command) > 1 and command[1] == 'ls-remote' and str(self.plugin_remote) in command:
+                probes.append(command)
+            return original(command, cwd=cwd, timeout=timeout)
+        SYNC.run = counting
+        try:
+            code, output = self.sync()
+        finally:
+            SYNC.run = original
+        self.assertEqual(code, 0, output)
+        self.assertEqual(len(probes), 1, probes)
+        self.assertEqual(
+            sorted(entry['argv'] for entry in self.invocations()),
+            [
+                ['plugin', 'update', 'ext2@core', '--scope', 'user', '--json'],
+                ['plugin', 'update', 'ext@core', '--scope', 'user', '--json'],
+            ],
+        )
+        self.assertEqual(self.records('ext@core')[0]['version'], pushed[:12])
+        self.assertEqual(self.records('ext2@core')[0]['version'], pushed[:12])
 
 if __name__ == '__main__':
     unittest.main()
