@@ -216,6 +216,7 @@ class ContinuationTests(unittest.TestCase):
         args = runtime.lane_command(state, "test", ["fixture"])
         lane = json.loads((ROOT / ".agents/lanes/codex.json").read_text())["lanes"]["L4"]
         self.assertIn(lane["model"], args)
+        self.assertIn(f'model_reasoning_effort="{lane["reasoning_effort"]}"', args)
         self.assertFalse(any("bypass" in arg for arg in args))
 
     def test_timeout_kills_writer_before_next_wake(self):
@@ -272,13 +273,63 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(self.wake()["reason"], "continuation-budget-exhausted")
         result = self.cli("init", "--root", str(self.root), "--goal", "missing.md", "--completion", "done",
                           "--authority", "test", "--harness", "codex", "--actions", "test", code=2)
-        self.assertEqual(result["reason"], "goal-must-exist-inside-worktree")
+        self.assertTrue(result["reason"].startswith("canonical-goal-file-required:"))
+
+    def test_absolute_external_goal_survives_claim_yield_repair_and_wake(self):
+        with tempfile.TemporaryDirectory() as external:
+            goal = Path(external).resolve() / "canonical goal.md"
+            goal.write_text("Merge the approved PR after exact-head review and checks")
+            self.owner.unlink()
+            initialized = self.init("--goal", str(goal))
+            self.assertEqual(initialized["goal"], str(goal))
+            self.binding()
+            binding_path = self.root / ".agents/persistent-workflow-binding.json"
+            binding = json.loads(binding_path.read_text())
+            binding["merge_authorization"] = {"mode": "merge", "instruction": "Merge this PR when reviewed and green"}
+            binding_path.write_text(json.dumps(binding))
+            claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+            self.assertEqual(self.wake()["launches"], 0)
+            self.cli("yield", "--owner", str(self.owner), "--token", claimed["foreground"]["token"])
+            self.assertEqual(self.wake()["launches"], 0)
+            self.fixture("repair")
+            self.observation("COMPLETED", "FAILURE")
+            repaired = self.wake()
+            self.assertEqual(repaired["state"], "waiting")
+            self.assertEqual(repaired["goal"], str(goal))
+            self.assertEqual(json.loads(binding_path.read_text())["merge_authorization"], binding["merge_authorization"])
+            self.assertEqual(self.wake()["launches"], 1)
+            self.fixture("complete")
+            self.observation("COMPLETED", "SUCCESS")
+            final = self.wake()
+            self.assertEqual(final["state"], "complete")
+            self.assertEqual(final["goal"], str(goal))
+            for payload_path in self.owner.parent.glob("launch-*.json"):
+                prompt = json.loads(payload_path.read_text())["command"][-1]
+                self.assertIn(f"Read {goal}.", prompt)
+                self.assertIn(binding["merge_authorization"]["instruction"], prompt)
+            goal.unlink()
+            with self.assertRaisesRegex(runtime.Gate, "canonical-goal-unavailable"):
+                runtime.check_identity(final)
+
+    def test_relative_escape_and_directory_goal_are_rejected(self):
+        with tempfile.TemporaryDirectory() as external:
+            goal = Path(external).resolve() / "goal.md"
+            goal.write_text("External goal")
+            escaped = os.path.relpath(goal, self.root)
+            result = self.cli(
+                "init", "--root", str(self.root), "--goal", escaped, "--completion", "done",
+                "--authority", "test", "--harness", "codex", "--actions", "test", code=2)
+            self.assertTrue(result["reason"].startswith("relative-goal-escape:"))
+            result = self.cli("init", "--root", str(self.root), "--goal", external, "--completion", "done",
+                              "--authority", "test", "--harness", "codex", "--actions", "test", code=2)
+            self.assertTrue(result["reason"].startswith("canonical-goal-file-required:"))
 
     def test_alias_owner_and_nested_root_are_rejected(self):
         alias = self.root / "alternate-owner.json"
         alias.write_text(self.owner.read_text())
         denied = self.cli("wake", "--owner", str(alias), code=2)
-        self.assertEqual(denied["reason"], "canonical-owner-path-required")
+        self.assertTrue(denied["reason"].startswith("canonical-owner-path-required:"))
+        self.assertIn("omit --owner", denied["reason"])
         nested = self.root / "nested"
         nested.mkdir()
         (nested / "goal.md").write_text("same checkout")
