@@ -36,7 +36,7 @@ enough next-step context for another session to continue; do not claim unobserve
 Planning alone grants no implementation authority. Record the authorized scope separately from proposed
 steps. A request to plan, correct a plan, or resume planning does not authorize executing it; an existing
 request to implement remains valid within its scope. Neither a ready plan nor this contract authorizes
-publication, installation, or other actions outside that request.
+publication, installation, or other actions outside that request or another standing authorization.
 
 The richer `plans`, `plan-authoring`, and `plan-checkpoint` engineering conventions apply only when the
 project or user selects that lifecycle. They are not prerequisites for this common behavior. Preserve

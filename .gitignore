@@ -5,3 +5,4 @@ deployment-backups/
 *.jsonl
 *.tmp
 .agents/continuation/
+.agents/persistent-workflow-binding.json
