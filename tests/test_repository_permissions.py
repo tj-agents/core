@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BLOCK_START = re.compile(r"run:\s*[|>][-+]?\d*")
+BLOCK_START = re.compile(r"run:\s*[|>](?:[-+]?\d?|\d[-+])\s*(?:#.*)?")
 POWERSHELL_CONTROL = re.compile(r"(\$|if\s*\()")
 
 
@@ -20,6 +20,8 @@ def verify_job_commands():
     block_indent = None
     for line in lines[start:end]:
         stripped = line.strip()
+        if stripped.startswith("- run:"):
+            stripped = stripped.removeprefix("- ")
         indent = len(line) - len(line.lstrip())
         if block_indent is not None and stripped and indent < block_indent:
             block_indent = None
@@ -64,7 +66,7 @@ class RepositoryPermissionTests(unittest.TestCase):
                 self.assertTrue(self.auto_approved("PowerShell", command))
                 self.assertTrue(self.auto_approved("Bash", bash_form(command)))
 
-    def test_destructive_delivery_forms_are_never_auto_approved(self):
+    def test_project_settings_never_auto_approve_destructive_delivery(self):
         for tool in ("Bash", "PowerShell"):
             for command in (
                 "git push --force origin Fix/Example",
