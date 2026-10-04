@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Validate package harness declarations and refresh their authored-source digests."""
+"""Validate package harness declarations against authored sources and hook wiring."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -28,78 +27,6 @@ def inside(root: Path, relative: str) -> Path:
     if not path.is_relative_to(root.resolve()):
         raise ValueError(f"Path escapes repository: {relative}")
     return path
-
-
-def add_path(root: Path, relative: str, members: dict[str, bytes], excludes: set[str]) -> None:
-    root = root.resolve()
-    source = inside(root, relative)
-    if not source.exists():
-        raise ValueError(f"Missing harness source: {relative}")
-    paths = sorted(source.rglob("*")) if source.is_dir() else [source]
-    for path in paths:
-        if not path.is_file() or path.suffix == ".pyc" or "__pycache__" in path.parts:
-            continue
-        if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
-            raise ValueError(f"Harness source escapes repository: {path}")
-        name = path.relative_to(root).as_posix()
-        if name not in excludes:
-            data = path.read_bytes()
-            # Git may check out text as CRLF or LF. Bind the declaration to the same
-            # authored content on both hosts without rewriting opaque binary assets.
-            members[name] = data.replace(b"\r\n", b"\n") if b"\0" not in data else data
-
-
-def source_projection(config: dict, plugin: str) -> dict:
-    projection = {
-        "scopes": [item for item in config["scopes"] if item["plugin"] == plugin],
-        "host_adapter_roots": config["host_adapter_roots"],
-        "host_manifest_roots": config["host_manifest_roots"],
-        "host_hook_sources": config.get("host_hook_sources", {}).get(plugin, {}),
-        "resources": [item for item in config.get("resources", []) if item["plugin"] == plugin],
-        "prerequisites": config["prerequisites"][plugin],
-    }
-    workflow = config.get("workflow")
-    if workflow and workflow.get("plugin") == plugin:
-        projection["workflow"] = workflow
-    return projection
-
-
-def source_digest(root: Path, manifest: dict, config: dict, plugin: str) -> str:
-    excludes = set(manifest["source_excludes"])
-    allowed = {".agents/catalog/catalog.json"} if plugin == "machine" else set()
-    if excludes - allowed:
-        raise ValueError(f"{plugin}: unsupported source exclusions: {sorted(excludes - allowed)}")
-    members: dict[str, bytes] = {}
-    for relative in manifest["source_roots"]:
-        add_path(root, relative, members, excludes)
-    projection = source_projection(config, plugin)
-    members[".agents/plugins/sources.json#" + plugin] = (
-        json.dumps(projection, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    )
-    for resource in projection["resources"]:
-        add_path(root, resource["source"], members, excludes)
-    for relative in projection["host_hook_sources"].values():
-        add_path(root, relative, members, excludes)
-    for host, relative in config["host_manifest_roots"].items():
-        add_path(root, f"{relative}/{plugin}.json", members, excludes)
-    skill_names = {
-        path.parent.name
-        for relative in manifest["source_roots"]
-        for path in inside(root, relative).rglob("SKILL.md")
-    }
-    for relative in config["host_adapter_roots"].values():
-        for name in skill_names:
-            add_path(root, f"{relative}/{name}", members, excludes)
-    if "workflow" in projection:
-        add_path(root, projection["workflow"]["source"], members, excludes)
-    digest = hashlib.sha256()
-    for relative, data in sorted(members.items()):
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(str(len(data)).encode("ascii"))
-        digest.update(b"\0")
-        digest.update(data)
-    return "sha256:" + digest.hexdigest()
 
 
 def expected_hooks(root: Path, config: dict, plugin: str) -> list[dict]:
@@ -176,7 +103,7 @@ def synchronize(root: Path, check: bool) -> dict[str, dict]:
     for plugin in sorted(expected):
         path = directory / f"{plugin}.json"
         manifest = load(path)
-        required = {"schema_version", "plugin", "source_roots", "source_excludes", "source_digest", "requires"}
+        required = {"schema_version", "plugin", "source_roots", "requires"}
         if set(manifest) != required or manifest.get("schema_version") != 1:
             raise ValueError(f"{path}: invalid manifest shape or schema version")
         if manifest["plugin"] != f"base-agents/{plugin}":
@@ -185,12 +112,6 @@ def synchronize(root: Path, check: bool) -> dict[str, dict]:
         if manifest["source_roots"] != expected_roots:
             raise ValueError(f"{path}: source roots must be {expected_roots}")
         validate_requires(root, config, catalog, plugin, manifest["requires"])
-        digest = source_digest(root, manifest, config, plugin)
-        if manifest["source_digest"] != digest:
-            if check:
-                raise ValueError(f"{path}: stale source digest")
-            manifest["source_digest"] = digest
-            path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         result[plugin] = manifest
     return result
 
