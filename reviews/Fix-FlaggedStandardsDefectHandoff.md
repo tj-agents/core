@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `88e492efa9f2f701bb426562ba19032d949a0d4c`  `(2026-10-04)`
+**Reviewed up to commit:** `e10d0ed5ccb2d82d9d5294b7bf0a7e37e269e4e6`  `(2026-10-04)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-04 — full
@@ -329,3 +329,29 @@ test-parser fix and a pure rewrap.
 No findings. The native layer ran the parser against the real `ci.yml` (exactly the 16 verify commands),
 confirmed `run: |#c` is rejected while `run: |` and `run: |- # note` are accepted and a sibling key now
 closes a `- run: |` block, and verified the session-guidance change is a word-for-word rewrap.
+
+## Review pass — 2026-10-04 — incremental (6, base integration)
+
+**Candidate base:** `88e492efa9f2f701bb426562ba19032d949a0d4c`
+**Candidate head:** `e10d0ed5ccb2d82d9d5294b7bf0a7e37e269e4e6`
+**Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
+**Candidate scope:** `.agents/engineering/contract/session-guidance/SKILL.md`, `.agents/hooks/tests/test_process_standards.py`, `.claude/**`, `tests/test_repository_permissions.py`
+**Candidate path-set:** `sha256:cd5744cbac526d2c112afd6541509f5adc4a7099bbf3f260b839e4b3f428152d` `(86 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-flagged-standards-defect-handoff-inc6\review\a1d67393c6faaaf81c1378ebe43cf5241c917dbc1f101d61f8fdbeae56e76167`
+**Candidate bundle identity:** `sha256:c5f86e798f4afcb4affbfe7d039fc7c8fa46709bc031d9e5eb4dc386f4e0c8a3`
+**Work-order path:** `reviews/Fix-FlaggedStandardsDefectHandoff.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Claude Code built-in `code-review` skill (medium) over the delta, scoped to the paths where
+main's merged changes meet this candidate. `review-reconcile` reported relevant base movement
+(`base-changed-relevant-evidence`). Security layer not required (`first_path` and `trunk_first_path` both
+null).
+
+### Findings (incremental 6)
+
+No findings. The four `.claude/skills` base adapters main moved to `kind: policy` resolve to existing
+`.agents/base/policy/*` targets inside `Edit(/.claude/skills/**)`, and main's lanes paragraph in
+session-guidance sits in a separate section without contradicting the standards-defect rule. Post-merge
+validation: `test_repository_permissions.py` (3), `test_process_standards.py` (20) OK;
+`sync-generated.ps1 -Check`, `sync_harness_manifests.py --check` and the tier payload check green.
