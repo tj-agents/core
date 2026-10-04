@@ -22,7 +22,7 @@ PLANNING_ONLY = re.compile(
     re.IGNORECASE,
 )
 PLANNING_REQUEST = re.compile(
-    r"\b(?:only\s+plan|plan(?:ning)?\s+only|(?:continue|resume)\s+planning|plan-authoring)\b",
+    r"\b(?:only\s+plan|plan(?:ning)?\s+only|(?:continue|resume)\s+planning)\b",
     re.IGNORECASE,
 )
 OWNER_REFERENCE = re.compile(r"\b(?:goal|plan|roadmap)\b", re.IGNORECASE)
