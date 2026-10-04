@@ -130,6 +130,12 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
 
+    def test_implementing_a_plan_authoring_fix_still_selects_execution(self):
+        result = self.run_hook("Implement the plan-authoring fix across all phases.")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:plan-execution automatically selected", result.stdout)
+        self.assertNotIn("engineering:plan-authoring automatically selected", result.stdout)
+
     def test_quick_task_without_a_goal_stays_silent(self):
         result = self.run_hook("Fix the spelling mistake in README.md.")
         self.assertEqual(0, result.returncode, result.stderr)
