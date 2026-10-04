@@ -22,6 +22,7 @@ switch ($args -join ' ') {
     'plugin list --json' { '{"installed":[{"pluginId":"machine@base-agents","version":"9.9.9","enabled":true}],"available":[]}' }
     'plugin marketplace upgrade --json' {
         if ($env:CODEX_TEST_FAIL_UPGRADE) { $global:LASTEXITCODE = 1; 'offline'; break }
+        if ($env:CODEX_TEST_TRUST_SOURCE) { Remove-Item -LiteralPath $env:CODEX_TEST_TRUST_SOURCE -Force }
         '{"selectedMarketplaces":["base-agents"],"upgradedRoots":[],"errors":[]}'
     }
     'plugin list --available --json' { '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}' }
@@ -35,10 +36,12 @@ $oldPath = $env:PATH
 $oldHome = $env:CODEX_HOME
 $oldCalls = $env:CODEX_TEST_CALLS
 $oldFail = $env:CODEX_TEST_FAIL_UPGRADE
+$oldTrustSource = $env:CODEX_TEST_TRUST_SOURCE
 try {
     $env:PATH = "$bin$([IO.Path]::PathSeparator)$oldPath"
     $env:CODEX_HOME = $codexHome
     $env:CODEX_TEST_CALLS = Join-Path $temp 'calls.txt'
+    $env:CODEX_TEST_TRUST_SOURCE = Join-Path $scripts 'codex_hook_trust.py'
     & python -B (Join-Path $repository '.agents/machine/scripts/codex_terminal_profile.py') --documents $documents | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Profile installer failed' }
     $profile = Join-Path $documents 'PowerShell/Microsoft.PowerShell_profile.ps1'
@@ -51,6 +54,7 @@ try {
         'plugin list --available --json', 'plugin add machine@base-agents --json', 'trust tj-agents hooks', 'exec')
     if (($calls -join '|') -ne ($expected -join '|')) { throw "Wrong call order: $($calls -join '|')" }
     Clear-Content -LiteralPath $env:CODEX_TEST_CALLS
+    Set-Content -LiteralPath $env:CODEX_TEST_TRUST_SOURCE -Value $trustStub
     $env:CODEX_TEST_FAIL_UPGRADE = '1'
     $result = codex exec 3>&1 | Out-String
     if ($result -notmatch 'refresh failed' -or $result -notmatch 'LAUNCHED exec') {
@@ -67,6 +71,7 @@ finally {
     $env:CODEX_HOME = $oldHome
     $env:CODEX_TEST_CALLS = $oldCalls
     $env:CODEX_TEST_FAIL_UPGRADE = $oldFail
+    $env:CODEX_TEST_TRUST_SOURCE = $oldTrustSource
     $root = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
     $target = [IO.Path]::GetFullPath($temp)
     if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'Test cleanup outside temp' }
