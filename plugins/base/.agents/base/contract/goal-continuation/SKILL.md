@@ -25,6 +25,15 @@ limitation and continue independent authorized work in the current session.
 Continuation preserves the existing goal and authority. It adds no authority for installation,
 publication, merging, broader scope, or a new external action. Stop at the applicable existing gate;
 keep authorized preparation and repair moving when they do not depend on that gate.
+
+Before ending at a blocker, establish what action is blocked and whether diagnosis, repair or an owned
+handoff can resolve it within the existing authorization. Perform that work when available. A gate on
+one action does not end ownership of the remaining goal. When an external decision is still required,
+record and report the blocked action, its resolver, the concrete unblock action and the observable resume
+condition, followed by the next action toward the original outcome. A partial result or saved plan alone
+is not that transition. Preserve higher-priority restrictions; a source change does not update instructions
+already loaded in an active session.
+
 Before a supported wake, checkpoint the next action and release the foreground lease. A later process
 claims the same owner before acting; it is a fresh context unless the host confirms it resumed the
 original session. Keep one active writer per owner so a scheduled wake cannot race foreground work.
