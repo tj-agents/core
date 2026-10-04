@@ -6,10 +6,11 @@ $script:calls = [System.Collections.Generic.List[string]]::new()
 $script:failUpgrade = $false
 
 function Invoke-CodexHookTrust {
-    param([string] $CodexExecutable, [string] $WorkingDirectory)
+    param([string] $CodexExecutable, [string] $WorkingDirectory, [string] $HelperScript)
     if ($CodexExecutable -ne 'Invoke-FakeCodex' -or $WorkingDirectory -ne $repository) {
         throw 'Hook trust received the wrong executable or project'
     }
+    if (-not (Test-Path -LiteralPath $HelperScript)) { throw 'Hook trust was not preserved before refresh' }
     $script:calls.Add('trust tj-agents hooks')
 }
 
