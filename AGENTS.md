@@ -12,9 +12,10 @@ contains Claude-only equivalents. Authored host manifests and hook wiring live u
 point references its canonical definition in `.agents/` and adds only genuine host differences; never
 copy a shared instruction body into either host tree as another authored source.
 
-`plugins/*` is generated distribution output, never an authored source tree. Run
-`pwsh .agents/sync-generated.ps1` after authored changes and require
-`pwsh .agents/sync-generated.ps1 -Check` before delivery. See [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md).
+`plugins/*` is generated distribution output, never an authored source tree, and never part of a PR:
+CI's guard rejects generated paths and the post-merge job regenerates and commits them on main. Run
+`pwsh .agents/sync-generated.ps1` locally only to refresh the tree for tests, and leave its output
+uncommitted. See [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md).
 
 A utility skill must not depend on a manually assembled, machine-local file the plugin does not ship.
 See [`PACKAGING.md`](PACKAGING.md).
