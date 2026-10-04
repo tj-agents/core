@@ -29,6 +29,12 @@ stable owner before any PR binding exists. Existing delivery identity and exact-
 `persistent-delivery`; add or refresh that binding when the task reaches a PR. A continuation goal may
 therefore own local work and later remote repair/review without pretending a PR already exists.
 
+`GOALPATH` may name an existing worktree-relative file or an explicitly supplied absolute path to an
+existing external canonical goal. The runtime normalizes and retains that identity; relative escapes,
+missing files and directories are rejected. Keep the goal in place. The owner remains at the canonical
+per-worktree path above. On `canonical-owner-path-required`, retry `init --root ROOT` with `--owner`
+omitted. This recoverable invocation error does not establish that the runtime is unavailable.
+
 The runtime supports `status --owner OWNER` and `wake --owner OWNER`. After initialization, the current
 foreground session claims the owner with `claim --owner OWNER --pid PID`; PID must identify that
 long-lived session, not a short-lived tool shell. The returned `foreground.token` is required by
@@ -57,6 +63,14 @@ existing owner or claim unattended progress before the host and scheduler report
 must use an implemented runtime adapter; if none is available, state the limitation and continue
 independent authorized work in the current session.
 
+Establish durable continuation through successful initialization, foreground claim, scheduler registration
+and an observed wake. Child execution resolves L4 model and effort from the packaged canonical lane table.
+The runtime owner remains bound to one worktree and branch; its receipt permits a head rebind within that
+identity. To move a longer goal to the next slice, follow the foreground owner transition in
+`persistent-delivery`, preserve the old receipts and maintain one active writer. Completing this runtime
+owner's slice does not mark the full goal complete. Automatic supervisor transfer across worktrees is
+outside this runtime.
+
 Runtime budgets default to six child launches, three consecutive transport failures, a 24-hour deadline,
 and a 900-second child timeout. Tighter limits already recorded by the user take precedence. Do not
 increase them silently or add bypass-permission flags.
@@ -66,6 +80,9 @@ remote decision through `persistent-delivery`; reject observations from another 
 failure receives one appropriate repair context, a green head receives independent current-head review,
 and merge remains behind its existing authorization gate. Missing merge authorization blocks merge only;
 it does not stop authorized local work, failure repair, or review that can proceed before that gate.
+Preserve an observed approval for this PR through the delivery binder's `--approval-record` input.
+A wake or supported same-PR repair does not require another approval merely because the repository has
+no standing table; the binder reevaluates fresh stop paths and hold labels before authorizing the new head.
 
 An unsupported host or unavailable runtime must expose the concrete missing capability and leave a
 recoverable checkpoint. Installation of this package adds context and tools only: it does not create or
