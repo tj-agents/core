@@ -45,16 +45,6 @@
       "Bash(python -B -m unittest discover -s .agents/hooks/tests *)",
       "Bash(python .agents/workflows/workflow_ops.py *)",
       "Bash(python -B .agents/workflows/workflow_ops.py *)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push)",
-      "Bash(git push -u origin HEAD)",
-      "Bash(gh pr create *)",
-      "Bash(gh pr view *)",
-      "Bash(gh pr checks *)",
-      "Bash(gh pr merge *)",
-      "Bash(gh run view *)",
-      "Bash(gh run watch *)",
       "PowerShell(./.agents/sync-generated.ps1)",
       "PowerShell(./.agents/sync-generated.ps1 -Check)",
       "PowerShell(./tests/codex-marketplace-sync.tests.ps1)",
@@ -87,22 +77,10 @@
       "PowerShell(python -B -m unittest discover -s .agents/hooks/tests)",
       "PowerShell(python -B -m unittest discover -s .agents/hooks/tests *)",
       "PowerShell(python .agents/workflows/workflow_ops.py *)",
-      "PowerShell(python -B .agents/workflows/workflow_ops.py *)",
-      "PowerShell(git add *)",
-      "PowerShell(git commit *)",
-      "PowerShell(git push)",
-      "PowerShell(git push -u origin HEAD)",
-      "PowerShell(gh pr create *)",
-      "PowerShell(gh pr view *)",
-      "PowerShell(gh pr checks *)",
-      "PowerShell(gh pr merge *)",
-      "PowerShell(gh run view *)",
-      "PowerShell(gh run watch *)"
+      "PowerShell(python -B .agents/workflows/workflow_ops.py *)"
     ],
     "deny": [
-      "Edit(/.agents/plugins/marketplace.json)",
-      "Bash(gh pr merge*--admin*)",
-      "PowerShell(gh pr merge*--admin*)"
+      "Edit(/.agents/plugins/marketplace.json)"
     ]
   }
 }

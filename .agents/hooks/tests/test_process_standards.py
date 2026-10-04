@@ -114,8 +114,8 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(instructions.split())
 
         for phrase in (
-            "A defect in a consumed standards package or its source repository is the exception "
-            "unless the current goal already fixes it in that repository",
+            "A defect in a consumed standards package or its source repository is the exception: "
+            "a stale or broken standard",
             "and so is a standard that caused or failed to prevent a mistake",
             "in the same turn, before the current task resumes, without asking",
             "announcing a later or separate fix instead of launching is a violation",

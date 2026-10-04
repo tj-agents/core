@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `94e4b3f0dac50ecc4c0d1446605663b99c2e9394`  `(2026-10-04)`
+**Reviewed up to commit:** `b24180ad50a66317ab9d27f498f126262c4bf580`  `(2026-10-04)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-04 — full
@@ -207,3 +207,61 @@ pins the 16 verify commands and checks Bash as well as PowerShell. F22/F23: carv
 current goal already fixes it in that repository", paragraph rewrapped. Validation:
 `test_repository_permissions.py` (3), `test_process_standards.py` (20) OK; `sync-generated.ps1 -Check`
 and `sync_harness_manifests.py --check` green after local regeneration (output left uncommitted).
+
+## Review pass — 2026-10-04 — incremental (3)
+
+**Candidate base:** `94e4b3f0dac50ecc4c0d1446605663b99c2e9394`
+**Candidate head:** `b24180ad50a66317ab9d27f498f126262c4bf580`
+**Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:a8934002fe71441b09e26341daa8f01f7e672b750905d92be5b80cfcbbaa9600` `(5 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-flagged-standards-defect-handoff-inc3\review\4ee59cae9c6b32ea6afdbd8fc74fafaf9dd0846148b175795ab9ab9d2afdc7c5`
+**Candidate bundle identity:** `sha256:1bb996d730291e836f60cbfa60619634b35279373a5ef62b0cffcb7a6b22be70`
+**Work-order path:** `reviews/Fix-FlaggedStandardsDefectHandoff.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill (high) over the delta. Lens: api-contract.
+Security layer not required (`first_path` and `trunk_first_path` both null).
+
+Evidence gathered at synthesis: Tommy's user scope already allows `git commit:*`, `git push:*`,
+`gh pr create:*` and `gh pr merge:*` (narrow rules that survive auto mode), while its `python:*` and
+`pwsh:*` are interpreter wildcards auto mode drops and it has no `Edit` rule — exactly the calls the
+classifier blocked in core.
+
+Dropped at synthesis: destructive pushes are auto-approved through the user scope's `git push:*` and the
+test reads only the project file (native) — that is the user's own pre-existing policy in every
+repository, unchanged by this candidate, and core's project file must not override it (superseded by F24);
+`POWERSHELL_CONTROL` skipping `$…` lines and counting `}`/`exit` lines (native) — the exact 16-command pin
+fails on any reshaping, which is the tripwire; the Bash form running the CLI-session test under `pwsh`
+rather than CI's Windows PowerShell (native) — it matches how an agent runs it from Bash; the work-order
+header showing `changes-requested` with every finding ticked (native) — the designed state between
+remediation and its incremental pass, which this pass resolves.
+
+### Findings (incremental 3)
+
+- [x] **F24 — MEDIUM — native, api-contract** — `.claude/settings.json:47`
+  The project delivery rules duplicate user-scope rules that already allow delivery, the exact
+  `git push -u origin HEAD` misses `engineering:push`'s prescribed `git push -u origin <current-branch>`,
+  and a project deny would override the user's own scope. Fix: remove every git and gh delivery rule,
+  allow and deny, keeping only the edits and repository commands the classifier blocked.
+- [x] **F25 — LOW — native** — `.agents/engineering/contract/session-guidance/SKILL.md:60`
+  "unless the current goal already fixes it in that repository" excludes nothing: a defect the goal already
+  fixes is not an out-of-scope defect, so the exception never covered it. Fix: drop the clause.
+- [x] **F26 — LOW — native** — `tests/test_repository_permissions.py:11`
+  `BLOCK_START` rejects `- run: |`, trailing comments and indentation-then-chomping indicators. Fix: accept
+  them.
+- [x] **F27 — LOW — native** — `tests/test_repository_permissions.py:67`
+  "never auto-approved" overclaims: the test reads only the project file. Fix: name it for the project
+  settings it checks.
+
+### Disposition — 2026-10-04 (incremental 3)
+
+All four fixed in one remediation commit. F24: core's project file now holds only `Edit` rules for the
+authored roots, the generated-marketplace `Edit` deny, and the repository's generation, validation and
+test commands; delivery permissions stay with the user scope. F25: the redundant carve-out is gone and
+the test pins the exception's subject. F26/F27: the CI parser accepts `- run:` steps, trailing comments
+and indentation-then-chomping indicators; the destructive-delivery test is named for the project settings
+it checks. Validation: `test_repository_permissions.py` (3), `test_process_standards.py` (20) OK;
+`sync-generated.ps1 -Check` and `sync_harness_manifests.py --check` green after local regeneration
+(output left uncommitted).
