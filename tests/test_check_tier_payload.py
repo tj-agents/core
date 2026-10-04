@@ -112,6 +112,21 @@ class PayloadTree(unittest.TestCase):
         problems = checker.check(self.root)
         self.assertTrue(any("kind" in problem for problem in problems), problems)
 
+    def test_kind_accepts_open_lowercase_words(self):
+        self.declare(["dotnet"])
+        for kind in ("contract", "convention", "policy", "utility", "workflow", "knowledge", "custom"):
+            with self.subTest(kind=kind):
+                self.payload("dotnet", skills=(("persistence", kind),))
+                self.assertEqual(checker.check(self.root), [])
+
+    def test_kind_rejects_nonword_syntax(self):
+        self.declare(["dotnet"])
+        for kind in ("convention2", "con-vention", "Convention", "", "two words", "café"):
+            with self.subTest(kind=kind):
+                self.payload("dotnet", skills=(("persistence", kind),))
+                problems = checker.check(self.root)
+                self.assertTrue(any("kind" in problem for problem in problems), problems)
+
     def test_the_index_must_match_the_shipped_skills_exactly(self):
         self.declare(["dotnet"])
         payload = self.payload("dotnet")

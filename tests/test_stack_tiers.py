@@ -365,21 +365,28 @@ class Conventions(TemporaryProject):
         (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
         return gate.declarations([cache.name])
 
-    def test_an_applicable_tier_lists_only_its_contract_skills(self):
-        found = self.installed([("persistence", "contract"), ("e2e-debug", "operation")])
+    def test_legacy_new_and_mixed_payloads_discover_the_same_conventions(self):
         (self.project / "Api.csproj").write_text("", encoding="utf-8")
-
-        text = gate.conventions(self.project, found)
-
-        self.assertIn("dotnet (.NET detected (Api.csproj)): 1 convention(s)", text)
-        self.assertIn("persistence", text)
-        self.assertNotIn("e2e-debug", text)
+        excluded = [(kind, kind) for kind in ("operation", "policy", "utility", "workflow", "knowledge", "custom")]
+        for kinds in (("contract", "contract"), ("convention", "convention"), ("contract", "convention")):
+            with self.subTest(kinds=kinds):
+                found = self.installed(list(zip(("persistence", "style"), kinds)) + excluded)
+                payload = found[0].payload_dir
+                self.assertEqual([name for name, _ in gate.contract_skills(payload)], ["persistence", "style"])
+                text = gate.conventions(self.project, found)
+                self.assertIn("dotnet (.NET detected (Api.csproj)): 2 convention(s)", text)
+                self.assertIn("persistence", text)
+                self.assertIn("style", text)
+                for name, _ in excluded:
+                    self.assertNotIn("  " + name + " -", text)
 
     def test_no_applicable_tier_is_said_explicitly(self):
-        found = self.installed([("persistence", "contract")])
-        text = gate.conventions(self.project, found)
-        self.assertIn("no stack tier applies", text)
-        self.assertNotIn("persistence", text)
+        for kind in ("contract", "convention"):
+            with self.subTest(kind=kind):
+                found = self.installed([("persistence", kind)])
+                text = gate.conventions(self.project, found)
+                self.assertIn("no stack tier applies", text)
+                self.assertNotIn("persistence", text)
 
 
 class Gate(TemporaryProject):

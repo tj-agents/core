@@ -20,7 +20,7 @@ Three modes, one detection:
 - `--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
   all when no stack tier is installed, because a statement about an empty set is pure noise.
 - `--conventions` lists, for every tier that applies here, the conventions its installed payload
-  ships - the skills whose front matter declares `kind: contract`. This is what a review loads: the
+  ships - the skills whose front matter declares `kind: convention` or legacy `kind: contract`. This is what a review loads: the
   applicable tiers' rules, resolved from the same installed declarations the gate reads, with nothing
   wired into the reviewed repository.
 - No argument (PreToolUse) blocks invoking a skill that belongs to a tier whose stack is absent.
@@ -51,8 +51,8 @@ import sys
 SCHEMA_VERSIONS = (1, 2)
 DECLARATION_NAME = "tier.json"
 ORPHAN_MARKER = ".orphaned_at"
-FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z0-9-]+)[ \t]*$", re.MULTILINE)
-CONVENTION_KIND = "contract"
+FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
+CONVENTION_KINDS = frozenset({"contract", "convention"})
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 SHELL_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "exec", "local_shell"})
@@ -434,11 +434,6 @@ def front_matter(text):
 
 
 def contract_skills(payload_dir):
-    """Every convention the installed payload ships: (name, SKILL.md path), sorted by name.
-
-    A convention is a skill whose front matter declares `kind: contract` - the marker every tier
-    repository already uses. Front matter is the source of truth; INDEX.md is only a human index.
-    """
     if payload_dir is None:
         return []
     try:
@@ -453,7 +448,7 @@ def contract_skills(payload_dir):
         except OSError:
             continue
         match = FRONT_MATTER_KIND.search(front_matter(text))
-        if match and match.group(1) == CONVENTION_KIND:
+        if match and match.group(1) in CONVENTION_KINDS:
             skills.append((entry.name, skill))
     return skills
 
