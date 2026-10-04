@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `ce82032084b320f0101e12db3ca050a6c88801b0`  `(2026-10-04)`
+**Reviewed up to commit:** `e58a505a5339f35fb49f73de25fe807b7dcdc9ef`  `(2026-10-04)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-04 — docs
@@ -92,3 +92,60 @@ Validation: `sync-generated.ps1 -Check` green after regeneration; `test_process_
 `test_plan_workflows.py` (19), `test_workflow_contracts.py` (62), `tests/test_plan_artifacts.py` (4)
 all OK; no test pins the amended preamble or plan-artifacts sentences. Incremental review of the
 remediation delta follows in the next pass.
+
+## Review pass — 2026-10-04 — incremental
+
+**Candidate base:** `ce82032084b320f0101e12db3ca050a6c88801b0`
+**Candidate head:** `e58a505a5339f35fb49f73de25fe807b7dcdc9ef`
+**Candidate branch:** `Fix/DefectHandoffDefault`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:b8995f44aca4f34cccbfa3870b3cd253ab64bf7c1a37cac40407ecab3a531c08` `(17 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\docs-review-defect-handoff-default\review\db2579ac7b4f8fbb0724078cee341d6f82d6cd7178a6405bf765dd7abcb3103c`
+**Candidate bundle identity:** `sha256:74192a5498f8453f890ee8a3f797183ff553d8be2e249cbcfcfbc8f675ee01d5`
+**Work-order path:** `reviews/Fix-DefectHandoffDefault.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill over the delta. Lenses: contradiction,
+concision. Security layer not required (`first_path` and `trunk_first_path` both null).
+
+Dropped at synthesis: removing "below" from the preamble (navigational, earns its place); reverting
+"as with" to "like" in handoff (re-litigates the prior pass's accepted CONC1); "another" → "a" in
+plan-artifacts (low-confidence preference); the preamble-overclaim reading (the lens itself resolved
+it as non-contradictory).
+
+### Findings (incremental)
+
+- [x] **INC1 — MEDIUM — contradiction** — `.agents/base/contract/goal-continuation/SKILL.md:26`
+  The delta gave plan-artifacts a standing-authorization carve-out but left goal-continuation — the
+  continuation owner session-guidance names for exactly this outlive-the-session fix work — flatly
+  stating continuation "does not authorize … merging", reading as a revocation of the standing merge
+  grant. Fix: "It adds no authority for installation, publication, merging, broader scope, or a new
+  external action" — continuation adds nothing; standing grants survive.
+- [x] **INC2 — MEDIUM — accuracy/native** — `.agents/engineering/contract/session-guidance/SKILL.md:64`
+  "the originating repository's" can be read as the standards repo (where the fix originates),
+  inverting which install the gate covers. Fix: "(the consuming repository included)", pairing with
+  "consumed standards package".
+- [x] **INC3 — MEDIUM — concision** — `.agents/engineering/contract/session-guidance/SKILL.md:58`
+  "…or its source repository, outside the current goal, is the exception" attaches the qualifier to
+  the repository instead of the defect (native layer found the same). Fix: front the adverbial —
+  "Outside the current goal, a defect in …".
+- [x] **INC4 — MEDIUM — concision** — `.agents/engineering/contract/session-guidance/SKILL.md:60`
+  "bounded side-workstream mode, whose goal records the defect" attaches "whose" to "mode". Fix:
+  "(the side workstream's goal records the defect)".
+- [x] **INC5 — LOW — concision** — `.agents/engineering/contract/session-guidance/SKILL.md:64`
+  Double-"and" list boundary ("…stay gated, and explicit user limits still hold") reads as a fourth
+  list item. Fix: parenthesize the scope clause and split with a semicolon. Folded editorial tightening
+  from the same lens: "regardless of the current task's own authority", drop "own" from "repository's
+  own gates".
+- [x] **INC6 — LOW — native** — `.agents/engineering/contract/session-guidance/SKILL.md:11`
+  Preamble line exceeded the file's ~100-column wrap. Fix: rewrapped.
+
+### Disposition — 2026-10-04 (incremental)
+
+All six fixed in one coupled wording round before the remediation commit; concision's proposed INC3
+wording ("even when it falls outside the current goal") was rejected as inverting the qualifier's
+semantics — the fronted adverbial keeps the current-goal exclusion. Validation:
+`sync-generated.ps1 -Check` green after regeneration; `tests/test_goal_continuation.py` (4) and
+`test_process_standards.py` (19) OK; no test pins the changed sentences. A final incremental pass
+over the fixing commit follows.
