@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 
@@ -132,7 +134,7 @@ def source_package(plugin, cwd, published=None):
     if root not in published:
         head = run(["git", "-C", str(root), "rev-parse", "HEAD"], cwd)
         remote = run([
-            "git", "ls-remote", f"https://github.com/{repository[0]}/{repository[1]}.git",
+            "git", "-C", str(root), "ls-remote", f"https://github.com/{repository[0]}/{repository[1]}.git",
             "HEAD", "refs/heads/*", "refs/tags/*",
         ], cwd)
         if head not in {line.split()[0] for line in remote.splitlines() if line.split()}:
@@ -144,15 +146,31 @@ def source_package(plugin, cwd, published=None):
     ], cwd)
     if changes:
         raise RuntimeError(f"Plugin source has local changes: {plugin['pluginId']}")
-    return path
+    return committed_files(root, published[root], relative, cwd)
 
 
-def normalized_bytes(path):
-    content = path.read_bytes()
+def normalized_bytes(content):
     try:
         return content.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
     except UnicodeDecodeError:
         return content
+
+
+def committed_files(root, revision, relative, cwd):
+    tree = revision if relative == "." else f"{revision}:{relative}"
+    archive = subprocess.run(
+        ["git", "-C", str(root), "archive", "--format=tar", tree],
+        cwd=cwd, check=True, capture_output=True, timeout=TIMEOUT,
+    ).stdout
+    result = {}
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tree:
+        for entry in tree:
+            if entry.isdir():
+                continue
+            if not entry.isfile() or Path(entry.name).is_absolute() or ".." in Path(entry.name).parts:
+                raise RuntimeError("Published plugin package contains an unsupported entry")
+            result[entry.name] = normalized_bytes(tree.extractfile(entry).read())
+    return result
 
 
 def package_files(root):
@@ -161,7 +179,7 @@ def package_files(root):
         if path.is_symlink():
             raise RuntimeError(f"Plugin package contains a symbolic link: {path}")
         if path.is_file():
-            result[path.relative_to(root).as_posix()] = normalized_bytes(path)
+            result[path.relative_to(root).as_posix()] = normalized_bytes(path.read_bytes())
     return result
 
 
@@ -202,7 +220,7 @@ def trust_updates(inventory, entries, cwd):
                 source = source_package(candidates[identity], cwd, published)
                 if source is None:
                     continue
-                if package_files(package) != package_files(source):
+                if package_files(package) != source:
                     raise RuntimeError(f"Installed plugin differs from its Git source: {identity}")
                 verified.add((identity, package))
             key, current_hash = hook["key"], hook["currentHash"]
@@ -245,7 +263,7 @@ def main(argv=None):
             action = "Would trust" if arguments.preview else "Trusted"
             print(f"standards: {action} {len(updates)} tj-agents hook definitions")
         return 0
-    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+    except (OSError, ValueError, RuntimeError, tarfile.TarError, subprocess.SubprocessError) as error:
         print(f"standards: tj-agents hook trust failed: {error}", file=sys.stderr)
         return 1
 

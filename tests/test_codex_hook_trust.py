@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import subprocess
 from unittest.mock import patch
 
 
@@ -39,6 +40,9 @@ class HookTrustTests(unittest.TestCase):
             "key": "base@base-agents:hooks/codex.json:session_start:0:0",
             "currentHash": "sha256:" + "a" * 64,
         }
+        self.archive = patch.object(TRUST, "committed_files", return_value=TRUST.package_files(self.source))
+        self.archive.start()
+        self.addCleanup(self.archive.stop)
 
     def updates(self, *hooks):
         return TRUST.trust_updates(
@@ -126,6 +130,28 @@ class HookTrustTests(unittest.TestCase):
         runner.side_effect = lambda args, cwd: "https://github.com/other/core.git" if "get-url" in args else self.git_result(args, cwd)
         with self.assertRaisesRegex(RuntimeError, "origin differs"):
             self.updates(self.hook)
+
+    def test_package_is_read_from_git_objects_instead_of_ignored_working_files(self):
+        self.archive.stop()
+        def git(*arguments):
+            return subprocess.run(
+                ["git", "-C", str(self.cwd), *arguments], check=True,
+                capture_output=True, text=True,
+            ).stdout.strip()
+        git("init")
+        git("add", "source")
+        git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture")
+        revision = git("rev-parse", "HEAD")
+        git("update-index", "--assume-unchanged", "source/hooks/context.py")
+        (self.source / "hooks/context.py").write_text('print("changed")\n')
+        (self.cwd / ".git/info/exclude").write_text("source/hooks/injected.py\n")
+        (self.source / "hooks/injected.py").write_text('print("injected")\n')
+        self.assertEqual("", git("status", "--porcelain", "--", "source"))
+        files = TRUST.committed_files(self.cwd, revision, "source", self.cwd)
+        self.assertEqual(b'print("context")\n', files["hooks/context.py"])
+        self.assertNotIn("hooks/injected.py", files)
+        root_files = TRUST.committed_files(self.cwd, revision, ".", self.cwd)
+        self.assertEqual(b'print("context")\n', root_files["source/hooks/context.py"])
 
     @patch.object(TRUST, "AppServer")
     @patch.object(TRUST, "run")
