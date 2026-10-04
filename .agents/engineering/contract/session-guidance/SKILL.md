@@ -55,6 +55,14 @@ diagnose, repair and focused verification loop. Do not weaken a check merely to 
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
 out-of-scope defects with an objective resolution condition in the existing project's debt or plan owner.
-Before committing or returning a terminal result, reconcile every problem encountered: it is fixed or
-already has the owning debt entry. `engineering:docs-and-debt` defines the selected repository convention.
-Do not create a second ledger for a standalone goal just to satisfy a repository-oriented procedure.
+A defect in a consumed standards package or its source repository is the exception: a stale or broken
+standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
+to the user. Diagnose it, record it, and immediately launch `engineering:handoff` in bounded
+side-workstream mode — without asking, whatever authority the current task carries — while that task
+continues. This standing authorization covers implementing, testing, opening the PR and merging through
+the standards repository's gates; installing into another scope, publishing outside that repository, and
+destructive operations stay gated.
+Before committing or returning a terminal result, reconcile every problem encountered: it is fixed,
+handed off, or already has the owning debt entry. `engineering:docs-and-debt` defines the selected
+repository convention. Do not create a second ledger for a standalone goal just to satisfy a
+repository-oriented procedure.
