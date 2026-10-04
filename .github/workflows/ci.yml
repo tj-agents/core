@@ -15,7 +15,9 @@ jobs:
           fetch-depth: 0
 
       - name: generated output stays out of pull requests
-        run: python3 -B scripts/check_generated_paths.py --base "origin/${{ github.base_ref }}"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: python3 -B scripts/check_generated_paths.py --base "origin/${BASE_REF}"
 
   verify:
     runs-on: windows-latest
@@ -25,8 +27,11 @@ jobs:
       - name: regenerate the workspace from authored sources
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: generated files are current
         shell: pwsh
@@ -94,13 +99,19 @@ jobs:
       - name: regenerate committed packages from authored sources
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           python -B scripts/update_catalog_digests.py
           ./.agents/sync-generated.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: verify the regenerated tree
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           ./.agents/sync-generated.ps1 -Check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -B .agents/hooks/check_tier_payload.py --root .
           python -B scripts/update_catalog_digests.py --check
           python -B scripts/sync_harness_manifests.py --check
@@ -108,14 +119,16 @@ jobs:
       - name: commit and push the regeneration
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .agents/catalog/catalog.json plugins .agents/plugins/marketplace.json .claude-plugin/marketplace.json CAPABILITIES.md
-          git diff --cached --quiet
-          if ($LASTEXITCODE -ne 0) {
+          $staged = git diff --cached --name-only
+          if ($staged) {
             git commit -m "Regenerate packages for $env:GITHUB_SHA"
-            git push origin HEAD:main
             python -B scripts/update_catalog_digests.py --check --source base-agents=. --source-revision base-agents=HEAD
+            git push origin HEAD:main
           } else {
             "Generated output already current."
           }
