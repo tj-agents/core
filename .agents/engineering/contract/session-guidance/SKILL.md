@@ -56,10 +56,9 @@ diagnose, repair and focused verification loop. Do not weaken a check merely to 
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
 out-of-scope defects with an objective resolution condition in the existing project's debt or plan owner.
-A defect in a consumed standards package or its source repository is the exception unless the current
-goal already fixes it in that repository: a stale or broken standard, including the automation that
-missed it, is a defect to diagnose, never a manual step to hand to the user, and so is a standard that
-caused or failed to prevent a mistake. Diagnose it and launch `engineering:handoff` in bounded
+A defect in a consumed standards package or its source repository is the exception: a stale or broken
+standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
+to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and launch `engineering:handoff` in bounded
 side-workstream mode (the side workstream's goal records the defect) in the same turn, before the
 current task resumes, without asking, regardless of that task's own authority; announcing a later or
 separate fix instead of launching is a violation. This rule is the standing authorization: it covers
