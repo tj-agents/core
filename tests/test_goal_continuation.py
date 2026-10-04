@@ -32,7 +32,7 @@ class GoalContinuationTests(unittest.TestCase):
         return json.loads(manifest_path.read_text(encoding="utf-8"))
 
     def invoke(self, extra=()):
-        script = self.plugin / ".agents/base/contract/goal-continuation/scripts/session-context.py"
+        script = self.plugin / ".agents/base/policy/goal-continuation/scripts/session-context.py"
         return subprocess.run([sys.executable, "-B", str(script), *extra], input="{}", text=True,
                               encoding="utf-8", capture_output=True, cwd=self.cwd)
 
@@ -40,7 +40,7 @@ class GoalContinuationTests(unittest.TestCase):
         for host, variable in (("codex", "PLUGIN_ROOT"), ("claude", "CLAUDE_PLUGIN_ROOT")):
             hooks = json.loads((self.plugin / self.manifest(host)["hooks"]).read_text(encoding="utf-8"))
             startup = hooks["hooks"]["SessionStart"]
-            helper = ".agents/base/contract/goal-continuation/scripts/session-context.py"
+            helper = ".agents/base/policy/goal-continuation/scripts/session-context.py"
             self.assertEqual(len(startup), 4)
             handler = startup[3]["hooks"][0]
             if host == "claude":
@@ -52,7 +52,7 @@ class GoalContinuationTests(unittest.TestCase):
 
     def test_context_has_its_own_identity_and_is_read_only_in_an_installed_path(self):
         before = snapshot(self.root)
-        source = (self.plugin / ".agents/base/contract/goal-continuation/SKILL.md").read_text(encoding="utf-8")
+        source = (self.plugin / ".agents/base/policy/goal-continuation/SKILL.md").read_text(encoding="utf-8")
         result = self.invoke()
         self.assertEqual(result.returncode, 0, result.stderr)
         output = json.loads(result.stdout)["hookSpecificOutput"]
@@ -63,7 +63,7 @@ class GoalContinuationTests(unittest.TestCase):
         self.assertEqual(before, snapshot(self.root))
 
     def test_instruction_fallback_tracks_the_packaged_contract_digest(self):
-        contract = self.plugin / ".agents/base/contract/goal-continuation/SKILL.md"
+        contract = self.plugin / ".agents/base/policy/goal-continuation/SKILL.md"
         digest = hashlib.sha256(contract.read_text(encoding="utf-8-sig").encode("utf-8")).hexdigest()
         result = self.invoke(("--instruction-fragment",))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -71,7 +71,7 @@ class GoalContinuationTests(unittest.TestCase):
         self.assertIn(contract.read_text(encoding="utf-8-sig").split("\n---\n", 1)[1].strip(), result.stdout)
 
     def test_missing_or_malformed_contract_fails_without_changing_the_package(self):
-        contract = self.plugin / ".agents/base/contract/goal-continuation/SKILL.md"
+        contract = self.plugin / ".agents/base/policy/goal-continuation/SKILL.md"
         original = contract.read_bytes()
         for content in (b"invalid contract", b"\xff"):
             contract.write_bytes(content)
