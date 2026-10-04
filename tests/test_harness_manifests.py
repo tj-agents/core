@@ -1,4 +1,4 @@
-"""Package harness declarations stay bound to their authored source and hook wiring."""
+"""Package harness declarations stay consistent with the catalog and hook wiring."""
 
 import importlib.util
 import json
@@ -23,62 +23,13 @@ class HarnessManifestTests(unittest.TestCase):
             for plugin in release["plugins"]:
                 self.assertEqual(manifests[plugin["name"]]["requires"], plugin["harness"])
 
-    def test_source_digest_changes_when_owned_source_changes(self):
-        with tempfile.TemporaryDirectory() as raw:
-            root = Path(raw)
-            source = root / ".agents/base/example.txt"
-            source.parent.mkdir(parents=True)
-            source.write_text("first", encoding="utf-8")
-            config = {
-                "scopes": [{"plugin": "base", "root": ".agents/base"}],
-                "host_adapter_roots": {},
-                "host_manifest_roots": {},
-                "host_hook_sources": {},
-                "resources": [],
-                "prerequisites": {"base": []},
-            }
-            manifest = {"source_roots": [".agents/base"], "source_excludes": []}
-            first = HARNESS.source_digest(root, manifest, config, "base")
-            source.write_text("second", encoding="utf-8")
-            self.assertNotEqual(first, HARNESS.source_digest(root, manifest, config, "base"))
-
-    def test_source_digest_ignores_checkout_line_endings(self):
-        with tempfile.TemporaryDirectory() as raw:
-            root = Path(raw)
-            source = root / ".agents/base/example.txt"
-            source.parent.mkdir(parents=True)
-            config = {
-                "scopes": [{"plugin": "base", "root": ".agents/base"}],
-                "host_adapter_roots": {},
-                "host_manifest_roots": {},
-                "host_hook_sources": {},
-                "resources": [],
-                "prerequisites": {"base": []},
-            }
-            manifest = {"source_roots": [".agents/base"], "source_excludes": []}
-            source.write_bytes(b"first\nsecond\n")
-            lf = HARNESS.source_digest(root, manifest, config, "base")
-            source.write_bytes(b"first\r\nsecond\r\n")
-            self.assertEqual(lf, HARNESS.source_digest(root, manifest, config, "base"))
-
-    def test_source_digest_resolves_root_alias_before_relative_paths(self):
-        with tempfile.TemporaryDirectory() as raw:
-            root = Path(raw)
-            (root / "alias").mkdir()
-            source = root / ".agents/base/example.txt"
-            source.parent.mkdir(parents=True)
-            source.write_text("stable", encoding="utf-8")
-            config = {
-                "scopes": [{"plugin": "base", "root": ".agents/base"}],
-                "host_adapter_roots": {},
-                "host_manifest_roots": {},
-                "host_hook_sources": {},
-                "resources": [],
-                "prerequisites": {"base": []},
-            }
-            manifest = {"source_roots": [".agents/base"], "source_excludes": []}
-            expected = HARNESS.source_digest(root, manifest, config, "base")
-            self.assertEqual(expected, HARNESS.source_digest(root / "alias" / "..", manifest, config, "base"))
+    def test_manifest_shape_carries_no_digest_fields(self):
+        manifest = json.loads(
+            (ROOT / ".agents/plugins/harness/base.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            {"schema_version", "plugin", "source_roots", "requires"}, set(manifest)
+        )
 
     def test_declared_hook_hosts_must_match_host_wiring(self):
         with tempfile.TemporaryDirectory() as raw:
