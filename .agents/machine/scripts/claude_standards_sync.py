@@ -168,11 +168,18 @@ def repo_label(url: str) -> str:
 
 
 def normalize_url(url: str) -> str:
-    stripped = re.sub(r"^[a-z][a-z0-9+.-]*://", "", url.strip(), flags=re.IGNORECASE).rstrip("/")
+    stripped = url.strip()
+    if "://" in stripped:
+        stripped = re.sub(r"^[a-z][a-z0-9+.-]*://", "", stripped, flags=re.IGNORECASE)
+    else:
+        scp = re.match(r"^[^/@]+@([^:/]+):(.+)$", stripped)
+        if scp:
+            stripped = f"{scp.group(1)}/{scp.group(2)}"
+    stripped = stripped.rstrip("/")
     if stripped.lower().endswith(".git"):
         stripped = stripped[:-4]
     host, separator, rest = stripped.partition("/")
-    return host.lower() + separator + rest
+    return host.rsplit("@", 1)[-1].lower() + separator + rest
 
 
 def external_groups(markets: list[Marketplace]) -> list[Marketplace]:
