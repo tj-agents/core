@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `07333b763732c6034903ab9128b2831137a3902d`  `(2026-10-04)`
+**Reviewed up to commit:** `94e4b3f0dac50ecc4c0d1446605663b99c2e9394`  `(2026-10-04)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-04 — full
@@ -148,3 +148,62 @@ generated root is editable. F15: the subject and carve-out are pinned. Validatio
 `test_repository_permissions.py` (3), `test_process_standards.py` (20), `test_source_layout.py` (17) OK;
 `sync-generated.ps1 -Check` and `sync_harness_manifests.py --check` green after local regeneration
 (output left uncommitted). A final incremental pass over the fixing commit follows.
+
+## Review pass — 2026-10-04 — incremental (2)
+
+**Candidate base:** `07333b763732c6034903ab9128b2831137a3902d`
+**Candidate head:** `94e4b3f0dac50ecc4c0d1446605663b99c2e9394`
+**Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:a8934002fe71441b09e26341daa8f01f7e672b750905d92be5b80cfcbbaa9600` `(5 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-flagged-standards-defect-handoff-inc2\review\c5d6280f4cff3aab8bcbfdfb46a6cb703762de95374c43e00fb06dee11700cf6`
+**Candidate bundle identity:** `sha256:976d736d22ae77c8897fbcc89588f2553547e3c535ccada6fe07b4070d4bc784`
+**Work-order path:** `reviews/Fix-FlaggedStandardsDefectHandoff.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill (high) over the delta. Lens: api-contract.
+Security layer not required (`first_path` and `trunk_first_path` both null).
+
+Dropped at synthesis: the api-contract lens's proposed `git push* :*` deny — its trailing `:*` is the
+legacy prefix wildcard, so it would deny every push (superseded by F16); `fnmatchcase` treating `?`/`[`
+as glob syntax (api-contract) — latent, no rule or CI command contains them.
+
+### Findings (incremental 2)
+
+- [x] **F16 — MEDIUM — native, api-contract** — `.claude/settings.json:103`
+  A glob deny list cannot complete `git push *`: colon-refspec deletion (`origin :branch`), `--prune` and
+  combined short flags (`-uf`, `-ud`) still run unprompted. Fix: replace `git push *` with the two exact
+  delivery forms (`git push`, `git push -u origin HEAD`) and drop the push deny rules; any other push
+  falls back to the normal permission flow.
+- [x] **F17 — LOW — native, api-contract** — `.claude/settings.json:112`
+  `git commit*--no-verify*` matches commit-message text, denying legitimate commits, and core has no git
+  hooks for the flag to skip. Fix: drop the commit deny rule.
+- [x] **F18 — LOW — native** — `tests/test_repository_permissions.py:59`
+  The destructive-forms test lists only spellings the deny rules already catch. Fix: assert no destructive
+  form is auto-approved, covering colon-refspec deletion, `--prune`, combined short flags and admin merge.
+- [x] **F19 — LOW — native, api-contract** — `tests/test_repository_permissions.py:26`
+  Only `run: |` opens a block, and the `> 10` floor still passes when both multi-line steps are dropped.
+  Fix: accept every block-scalar indicator and pin the exact parsed command count.
+- [x] **F20 — LOW — native** — `tests/test_repository_permissions.py:11`
+  The prefix filter silently skips any command not starting with python/pwsh/powershell.exe/`./`. Fix:
+  skip only PowerShell control lines (`$…`, `if …`) so every other command must match.
+- [x] **F21 — LOW — native** — `tests/test_repository_permissions.py:48`
+  Only PowerShell rules are checked. Fix: check Bash too, running direct `.ps1` invocations through `pwsh`.
+- [x] **F22 — MEDIUM — native** — `.agents/engineering/contract/session-guidance/SKILL.md:60`
+  "unless the current goal already works in that repository" exempts unrelated work in the standards
+  repository. Fix: "unless the current goal already fixes it in that repository".
+- [x] **F23 — LOW — native** — `.agents/engineering/contract/session-guidance/SKILL.md:62`
+  Uneven wrap after the reflow. Fix: rewrap the paragraph.
+
+### Disposition — 2026-10-04 (incremental 2)
+
+All eight fixed in one remediation commit. F16/F17: pushes are allowed only as `git push` and
+`git push -u origin HEAD`; the push and commit deny rules are gone (core has no git hooks for
+`--no-verify` to skip); `gh pr merge --admin` stays denied. F18–F21: the permission test now asserts no
+destructive form (including colon-refspec deletion, `--prune`, `-uf`/`-ud`, admin merge) is
+auto-approved on either shell, parses every block-scalar `run:` form, skips only PowerShell control lines,
+pins the 16 verify commands and checks Bash as well as PowerShell. F22/F23: carve-out is now "unless the
+current goal already fixes it in that repository", paragraph rewrapped. Validation:
+`test_repository_permissions.py` (3), `test_process_standards.py` (20) OK; `sync-generated.ps1 -Check`
+and `sync_harness_manifests.py --check` green after local regeneration (output left uncommitted).
