@@ -102,7 +102,7 @@ class ProcessStandardsTests(unittest.TestCase):
 
         self.assertIn(
             "Before committing or returning a terminal result, reconcile every problem "
-            "encountered: it is fixed or already has the owning debt entry",
+            "encountered: it is fixed, handed off, or already has the owning debt entry",
             flat,
         )
 
