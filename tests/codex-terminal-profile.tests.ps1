@@ -8,6 +8,13 @@ $scripts = Join-Path $codexHome 'plugins/cache/base-agents/machine/9.9.9/resourc
 New-Item -ItemType Directory -Path $bin, $scripts -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex-profile.ps1') -Destination $scripts
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.ps1') -Destination $scripts
+$trustStub = @'
+import os
+from pathlib import Path
+with Path(os.environ["CODEX_TEST_CALLS"]).open("a", encoding="utf-8") as calls:
+    calls.write("trust tj-agents hooks\n")
+'@
+Set-Content -LiteralPath (Join-Path $scripts 'codex_hook_trust.py') -Value $trustStub
 $fake = @'
 Add-Content -LiteralPath $env:CODEX_TEST_CALLS -Value ($args -join ' ')
 $global:LASTEXITCODE = 0
@@ -41,7 +48,7 @@ try {
     if ($result -ne 'LAUNCHED exec') { throw "Wrong Codex launch: $result" }
     $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS)
     $expected = @('plugin list --json', 'plugin marketplace upgrade --json',
-        'plugin list --available --json', 'plugin add machine@base-agents --json', 'exec')
+        'plugin list --available --json', 'plugin add machine@base-agents --json', 'trust tj-agents hooks', 'exec')
     if (($calls -join '|') -ne ($expected -join '|')) { throw "Wrong call order: $($calls -join '|')" }
     Clear-Content -LiteralPath $env:CODEX_TEST_CALLS
     $env:CODEX_TEST_FAIL_UPGRADE = '1'

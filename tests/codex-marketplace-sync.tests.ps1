@@ -5,6 +5,14 @@ $repository = Split-Path -Parent $PSScriptRoot
 $script:calls = [System.Collections.Generic.List[string]]::new()
 $script:failUpgrade = $false
 
+function Invoke-CodexHookTrust {
+    param([string] $CodexExecutable, [string] $WorkingDirectory)
+    if ($CodexExecutable -ne 'Invoke-FakeCodex' -or $WorkingDirectory -ne $repository) {
+        throw 'Hook trust received the wrong executable or project'
+    }
+    $script:calls.Add('trust tj-agents hooks')
+}
+
 function Invoke-FakeCodex {
     $commandLine = $args -join ' '
     $script:calls.Add($commandLine)
@@ -38,7 +46,8 @@ $expected = @(
     'plugin marketplace upgrade --json',
     'plugin list --available --json',
     'plugin add base@base-agents --json',
-    'plugin add engineering@base-agents --json'
+    'plugin add engineering@base-agents --json',
+    'trust tj-agents hooks'
 )
 if (($script:calls -join '|') -ne ($expected -join '|')) {
     throw "Wrong refresh sequence: $($script:calls -join '|')"

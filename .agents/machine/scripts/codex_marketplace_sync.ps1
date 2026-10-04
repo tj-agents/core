@@ -16,6 +16,18 @@ function Invoke-CodexSyncCommand {
     }
 }
 
+function Invoke-CodexHookTrust {
+    param(
+        [Parameter(Mandatory)][string] $CodexExecutable,
+        [Parameter(Mandatory)][string] $WorkingDirectory
+    )
+
+    $helper = Join-Path $PSScriptRoot 'codex_hook_trust.py'
+    if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw "Codex hook trust helper missing: $helper" }
+    & python -B $helper --codex $CodexExecutable --project $WorkingDirectory | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw 'Codex could not trust tj-agents hooks' }
+}
+
 function Sync-CodexStandards {
     [CmdletBinding()]
     param(
@@ -48,6 +60,7 @@ function Sync-CodexStandards {
                 throw "Codex installed $($installed.pluginId) while refreshing $identity"
             }
         }
+        Invoke-CodexHookTrust -CodexExecutable $CodexExecutable -WorkingDirectory $resolved
         return @($selected)
     }
     finally {
