@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `57e000e3033f910dedc910367be2eeffb71381dd`  `(2026-10-04)`
+**Reviewed up to commit:** `1faacb1f39b3e9be5fb4a2a5f7d54bcc225e2fc5`  `(2026-10-04)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-04 — full
@@ -39,7 +39,7 @@ security path was classified (`first_path`/`trunk_first_path` null).
 ## Review pass — 2026-10-04 — incremental
 
 **Candidate base:** `42d0a11f346778365c44b9275375191fb16825cc`
-**Candidate head:** `57e000e3033f910dedc910367be2eeffb71381dd`
+**Candidate head:** `1faacb1f39b3e9be5fb4a2a5f7d54bcc225e2fc5`
 **Candidate branch:** `Feature/PostMergeGeneration`
 **Candidate scope:** `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 **Work-order path:** `reviews/Feature-PostMergeGeneration.md`
