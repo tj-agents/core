@@ -101,8 +101,9 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(instructions.split())
 
         self.assertIn(
-            "Before committing or returning a terminal result, reconcile every problem "
-            "encountered: it is fixed, handed off, or already has the owning debt entry",
+            "Before committing or returning a terminal result, check the work against the "
+            "standards that governed it and reconcile every problem encountered: it is fixed, "
+            "handed off, or already has the owning debt entry",
             flat,
         )
 
