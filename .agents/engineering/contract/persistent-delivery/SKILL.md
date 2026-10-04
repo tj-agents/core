@@ -128,8 +128,10 @@ head may enter `merge`, and only under the recorded authorization.
 The runtime owner is bound to one worktree and branch, and permits head repair within that identity.
 It cannot rebind itself to a successor PR or another checkout. When a slice PR merges, complete its
 recorded delivery condition, release its binding, checkpoint its runtime owner and remove its scheduled
-task. Preserve that owner's receipts and results. Completing the slice owner does not complete the
-broader canonical goal.
+task. Preserve that owner's receipts and results. Before reusing the same checkout, archive its terminal
+`.agents/continuation/` directory, including `owner.json`, receipts and results, outside the tracked tree;
+the next initialization needs the canonical owner path available. Remove the old scheduler before
+archiving its receipt. Completing the slice owner does not complete the broader canonical goal.
 
 With a workflow handoff, the foreground parent resumes the recorded stage through `plan-execution` and
 reconciles the next slice's existing branch, worktree and PR, including its actual base and head. Create
