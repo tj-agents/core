@@ -99,19 +99,42 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual("", result.stdout)
 
-    def test_planning_only_prompt_stays_silent_even_with_an_active_goal(self):
+    def test_planning_only_prompt_loads_authoring_even_with_an_active_goal(self):
         self.write_goal()
         result = self.run_hook("Planning only: revise the plan, but do not implement it.")
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("", result.stdout)
+        context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+        canonical = (ROOT / ".agents/engineering/workflow/plan-authoring/SKILL.md").read_text(
+            encoding="utf-8"
+        ).strip()
+        self.assertIn("engineering:plan-authoring automatically selected", context)
+        self.assertEqual(canonical, context.split("\n\n", 1)[1])
 
-    def test_planning_only_side_workstream_prompt_stays_silent(self):
+    def test_planning_only_side_workstream_does_not_select_a_launcher(self):
         self.write_goal()
         result = self.run_hook(
             "Planning only: hand off this side task, but do not implement it."
         )
         self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:plan-authoring automatically selected", result.stdout)
+        self.assertNotIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_resuming_planning_without_a_goal_loads_authoring(self):
+        result = self.run_hook("Resume planning the taxonomy; implementation waits for approval.")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:plan-authoring automatically selected", result.stdout)
+
+    def test_a_prohibition_alone_does_not_authorize_planning_or_execution(self):
+        self.write_goal()
+        result = self.run_hook("Do not implement the plan.")
+        self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
+
+    def test_implementing_a_plan_authoring_fix_still_selects_execution(self):
+        result = self.run_hook("Implement the plan-authoring fix across all phases.")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:plan-execution automatically selected", result.stdout)
+        self.assertNotIn("engineering:plan-authoring automatically selected", result.stdout)
 
     def test_quick_task_without_a_goal_stays_silent(self):
         result = self.run_hook("Fix the spelling mistake in README.md.")

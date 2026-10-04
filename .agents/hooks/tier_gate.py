@@ -417,7 +417,11 @@ def statement(root, found=None):
         )
         lines.append(
             "Does not apply here: " + names + ". Those standards describe code this project does "
-            "not contain - do not read, invoke or cite them here. A PreToolUse gate blocks them."
+            "not contain; do not invoke them or apply their rules to this project's code. "
+            "For an explicitly requested standards-source audit, read canonical source files as "
+            "the subject of the investigation and cite them as evidence. That inspection does not "
+            "load them as governing instructions or make their tier applicable. Installed skill "
+            "invocations and cached skill loads remain gated."
         )
     return "\n".join(lines)
 
