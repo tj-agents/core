@@ -34,7 +34,7 @@ import sys
 PAYLOADS_FILE = Path(".agents") / "plugins" / "payloads.json"
 PLUGINS_DIR = "plugins"
 TIER_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-KIND_PATTERN = re.compile(r"^[a-z][a-z0-9-]*$")
+KIND_PATTERN = re.compile(r"[a-z]+")
 OWNER_PATTERN = re.compile(r"^[^/ ]+/[^/ ]+$")
 FRONT_FIELD = r"^{0}:[ \t]*(\S[^\r\n]*?)[ \t]*$"
 INDEX_ENTRY = re.compile(r"^- `([^`]+)`", re.MULTILINE)
@@ -146,7 +146,7 @@ def check_skills(payload, problems):
                 f"{payload.name}: skills/{entry.name}/SKILL.md front-matter name is {name!r}, not its directory"
             )
         kind = front_field(block, "kind")
-        if not kind or not KIND_PATTERN.match(kind):
+        if not kind or not KIND_PATTERN.fullmatch(kind):
             problems.append(
                 f"{payload.name}: skills/{entry.name}/SKILL.md kind {kind!r} is not one lowercase word"
             )

@@ -115,7 +115,10 @@ codex plugin add machine@base-agents
 ```
 
 Typing `codex` in PowerShell and using `handoff-codex` refresh configured Git marketplaces and
-enabled plugins before Codex loads them. The machine plugin's SessionStart hook adds a marked block
+enabled plugins before Codex loads them. The launcher then records native Codex hook trust only for
+enabled plugins sourced from GitHub's `tj-agents` organisation, after checking the installed package
+against its unchanged Git source. Other publishers and user/project hooks retain normal trust review.
+Set `BASE_AGENTS_CODEX_HOOK_TRUST=off` to keep manual review for all hooks. The machine plugin's SessionStart hook adds a marked block
 to both PowerShell profiles. That block resolves the active installed machine package, so later
 terminals load its `codex` wrapper without pulling this checkout. The first session after installing
 the package wires the profiles; open a new terminal to use the wrapper. Set

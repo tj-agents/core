@@ -1,7 +1,7 @@
 ---
 name: cd
 description: Keep the active agent session attached to the exact repository or worktree that now owns the task. Use whenever work moves to a different directory, including after creating, cloning, moving, renaming, locating, or selecting a repository or worktree.
-kind: contract
+kind: policy
 domain: behavior
 ---
 
