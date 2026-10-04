@@ -18,6 +18,7 @@ Generated from canonical `.agents/` definitions.
 - `feature` — workflow — `.agents/engineering/workflow/feature/SKILL.md`
 - `git-auth` — contract — `.agents/engineering/contract/git-auth/SKILL.md`
 - `git-branching` — contract — `.agents/engineering/contract/git-branching/SKILL.md`
+- `guide` — contract — `.agents/engineering/contract/guide/SKILL.md`
 - `handoff` — workflow — `.agents/engineering/workflow/handoff/SKILL.md`
 - `handoff-format` — contract — `.agents/engineering/contract/handoff-format/SKILL.md`
 - `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`
