@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `b24180ad50a66317ab9d27f498f126262c4bf580`  `(2026-10-04)`
+**Reviewed up to commit:** `508c8d4594cbba1d676fa1b933e9fa56d0b55185`  `(2026-10-04)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-04 — full
@@ -265,3 +265,45 @@ and indentation-then-chomping indicators; the destructive-delivery test is named
 it checks. Validation: `test_repository_permissions.py` (3), `test_process_standards.py` (20) OK;
 `sync-generated.ps1 -Check` and `sync_harness_manifests.py --check` green after local regeneration
 (output left uncommitted).
+
+## Review pass — 2026-10-04 — incremental (4)
+
+**Candidate base:** `b24180ad50a66317ab9d27f498f126262c4bf580`
+**Candidate head:** `508c8d4594cbba1d676fa1b933e9fa56d0b55185`
+**Candidate branch:** `Fix/FlaggedStandardsDefectHandoff`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:a8934002fe71441b09e26341daa8f01f7e672b750905d92be5b80cfcbbaa9600` `(5 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\review-flagged-standards-defect-handoff-inc4\review\59696af83a76bd830d74218dd918b6a87954772c257d964de2789f25002dbfdc`
+**Candidate bundle identity:** `sha256:c52b59f6d80bb08055770d9735fc0ee0d430675579ca49cd5a5bf3f13e4a7406`
+**Work-order path:** `reviews/Fix-FlaggedStandardsDefectHandoff.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill (high) over the delta. No specialist lens: the
+delta removes delivery rules and a clause and adjusts a test parser, which the native layer covers.
+
+Dropped at synthesis: PowerShell `git add` and `gh pr merge --admin` reach the user scope's rules or
+lack of them (native) — user-scope policy that applies identically in every repository; core's project
+file deliberately owns no delivery policy (F24); the destructive-delivery test is vacuous (native) — it
+fails if broad delivery rules are reintroduced into the project file, which is its job; removing the
+carve-out makes the handoff fire on a defect the current task already fixes (native) — "the exception"
+scopes the rule to the preceding out-of-scope defects, every explicit carve-out tried here reopened a
+loophole (F3, F8, F22), and `engineering:handoff` already forbids duplicate writers on the same work;
+explicit `|4` indentation indicators (native) — the exact 16-command pin fails on any such reshaping.
+
+### Findings (incremental 4)
+
+- [x] **F28 — LOW — native** — `tests/test_repository_permissions.py:29`
+  For `- run: |`, `block_indent` came from the dash column, so a sibling key such as `shell: pwsh` was
+  captured as a command. Fix: measure from the `run` key.
+- [x] **F29 — LOW — native** — `.agents/engineering/contract/session-guidance/SKILL.md:61`
+  One line ran ~140 columns after the rewrap. Fix: rewrap the paragraph.
+- [x] **F30 — LOW — native** — `tests/test_repository_permissions.py:11`
+  `run: |#c` was accepted as a block start although YAML needs whitespace before a comment. Fix: require
+  it.
+
+### Disposition — 2026-10-04 (incremental 4)
+
+All three fixed in one remediation commit; a synthetic workflow with `- run: |`, a sibling `shell:` key
+and `run: |-  # note` parses to exactly its two commands. Validation: `test_repository_permissions.py`
+(3), `test_process_standards.py` (20) OK.

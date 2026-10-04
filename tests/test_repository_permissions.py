@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BLOCK_START = re.compile(r"run:\s*[|>](?:[-+]?\d?|\d[-+])\s*(?:#.*)?")
+BLOCK_START = re.compile(r"run:\s*[|>](?:[-+]?\d?|\d[-+])\s*(?:\s#.*)?")
 POWERSHELL_CONTROL = re.compile(r"(\$|if\s*\()")
 
 
@@ -20,9 +20,10 @@ def verify_job_commands():
     block_indent = None
     for line in lines[start:end]:
         stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
         if stripped.startswith("- run:"):
             stripped = stripped.removeprefix("- ")
-        indent = len(line) - len(line.lstrip())
+            indent += 2
         if block_indent is not None and stripped and indent < block_indent:
             block_indent = None
         if BLOCK_START.fullmatch(stripped):
