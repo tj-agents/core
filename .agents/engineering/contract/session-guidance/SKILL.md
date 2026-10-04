@@ -23,6 +23,12 @@ Planning-only work selects `engineering:plan-authoring` and does not authorize i
 A question or review request alone grants no implementation authority. A status question during already
 authorized execution should be answered before that execution continues.
 
+Before implementation, load `engineering:lanes`, select the next phase's lane, and apply it through the
+current host's supported controls or a bounded lane worker. Select again as the phase changes or a
+dispatch falls back. Design approval does not select an implementation lane. The canonical lane contract
+owns direct execution, tiny inline follow-ups, capability limits, and when substantial design needs a
+fresh execution owner; apply it even when the engineering runtime is unavailable.
+
 ## A link to another skill is a stage pointer, not a read
 
 Load a referenced skill when its stage is actually entered, never because a document you are reading names
