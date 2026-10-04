@@ -57,15 +57,15 @@ diagnose, repair and focused verification loop. Do not weaken a check merely to 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
 out-of-scope defects with an objective resolution condition in the existing project's debt or plan owner.
 A defect in a consumed standards package or its source repository is the exception unless the current
-goal already works in that repository: a stale or broken standard, including the automation that missed
-it, is a defect to diagnose, never a manual step to hand to the user, and so is a standard that caused or
-failed to prevent a mistake. Diagnose it and launch `engineering:handoff` in bounded side-workstream mode (the
-side workstream's goal records the defect) in the same turn, before the current task resumes, without
-asking, regardless of that task's own authority; announcing a later or separate fix instead of launching
-is a violation. This rule is the standing authorization: it covers implementing, testing, opening the
-PR and merging once that repository's gates pass. Installing into any other scope (the consuming
-repository included), publishing outside that repository, and destructive operations stay gated;
-explicit user limits still hold.
+goal already fixes it in that repository: a stale or broken standard, including the automation that
+missed it, is a defect to diagnose, never a manual step to hand to the user, and so is a standard that
+caused or failed to prevent a mistake. Diagnose it and launch `engineering:handoff` in bounded
+side-workstream mode (the side workstream's goal records the defect) in the same turn, before the
+current task resumes, without asking, regardless of that task's own authority; announcing a later or
+separate fix instead of launching is a violation. This rule is the standing authorization: it covers
+implementing, testing, opening the PR and merging once that repository's gates pass. Installing into
+any other scope (the consuming repository included), publishing outside that repository, and
+destructive operations stay gated; explicit user limits still hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
 entry. `engineering:docs-and-debt` defines the selected repository convention. Do not create a second

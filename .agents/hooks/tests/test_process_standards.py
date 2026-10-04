@@ -115,7 +115,7 @@ class ProcessStandardsTests(unittest.TestCase):
 
         for phrase in (
             "A defect in a consumed standards package or its source repository is the exception "
-            "unless the current goal already works in that repository",
+            "unless the current goal already fixes it in that repository",
             "and so is a standard that caused or failed to prevent a mistake",
             "in the same turn, before the current task resumes, without asking",
             "announcing a later or separate fix instead of launching is a violation",

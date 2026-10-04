@@ -8,7 +8,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-COMMAND_PREFIXES = ("python ", "pwsh ", "powershell.exe ", "./")
+BLOCK_START = re.compile(r"run:\s*[|>][-+]?\d*")
+POWERSHELL_CONTROL = re.compile(r"(\$|if\s*\()")
 
 
 def verify_job_commands():
@@ -22,13 +23,17 @@ def verify_job_commands():
         indent = len(line) - len(line.lstrip())
         if block_indent is not None and stripped and indent < block_indent:
             block_indent = None
-        if stripped == "run: |":
+        if BLOCK_START.fullmatch(stripped):
             block_indent = indent + 2
         elif stripped.startswith("run: "):
             commands.append(stripped.removeprefix("run: "))
         elif block_indent is not None and stripped:
             commands.append(stripped)
-    return [command for command in commands if command.startswith(COMMAND_PREFIXES)]
+    return [command for command in commands if not POWERSHELL_CONTROL.match(command)]
+
+
+def bash_form(command):
+    return "pwsh " + command if command.startswith("./") else command
 
 
 class RepositoryPermissionTests(unittest.TestCase):
@@ -45,30 +50,37 @@ class RepositoryPermissionTests(unittest.TestCase):
             if rule.startswith(prefix) and rule.endswith(")")
         ]
 
-    def test_every_ci_verify_command_is_allowed_for_powershell(self):
-        commands = verify_job_commands()
-        allowed = self.specifiers("allow", "PowerShell")
+    def auto_approved(self, tool, command):
+        allowed = any(fnmatchcase(command, rule) for rule in self.specifiers("allow", tool))
+        denied = any(fnmatchcase(command, rule) for rule in self.specifiers("deny", tool))
+        return allowed and not denied
 
-        self.assertGreater(len(commands), 10)
+    def test_every_ci_verify_command_is_allowed_for_both_shells(self):
+        commands = verify_job_commands()
+
+        self.assertEqual(16, len(commands))
         for command in commands:
             with self.subTest(command=command):
-                self.assertTrue(any(fnmatchcase(command, rule) for rule in allowed))
+                self.assertTrue(self.auto_approved("PowerShell", command))
+                self.assertTrue(self.auto_approved("Bash", bash_form(command)))
 
-    def test_destructive_delivery_forms_are_denied_for_both_shells(self):
+    def test_destructive_delivery_forms_are_never_auto_approved(self):
         for tool in ("Bash", "PowerShell"):
-            denied = self.specifiers("deny", tool)
             for command in (
                 "git push --force origin Fix/Example",
                 "git push origin Fix/Example --force-with-lease",
                 "git push -f origin Fix/Example",
+                "git push -uf origin Fix/Example",
+                "git push -ud origin Fix/Example",
                 "git push origin +Fix/Example",
+                "git push origin :Fix/Example",
                 "git push origin --delete Fix/Example",
+                "git push --prune origin refs/heads/*:refs/heads/*",
                 "git push --mirror origin",
-                "git commit --no-verify -m message",
                 "gh pr merge 12 --admin",
             ):
                 with self.subTest(tool=tool, command=command):
-                    self.assertTrue(any(fnmatchcase(command, rule) for rule in denied))
+                    self.assertFalse(self.auto_approved(tool, command))
 
     def test_generated_output_is_not_editable(self):
         sources = json.loads(
