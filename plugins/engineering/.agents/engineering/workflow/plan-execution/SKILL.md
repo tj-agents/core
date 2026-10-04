@@ -97,8 +97,8 @@ it, or the next material checkpoint falls due.
    PR's measured size against its recorded delivery slice. Split large dependent work into a stack,
    carrying the same goal and owner; record any atomic exception before growing the candidate. An open
    PR or phase is not a container for all remaining work. Route a distinct, independently actionable
-   side workstream with its own user-granted or standing authorization through `engineering:handoff`
-   in bounded side-workstream mode; retain this session's active goal instead of transferring it.
+   side workstream with its own authorization through `engineering:handoff` in bounded side-workstream
+   mode; retain this session's active goal instead of transferring it.
    Execute directly or dispatch only bounded independent work through semantic capabilities. Independent
    readers may overlap; a `mechanical-worker` receives only a disjoint transformation under one exact
    serialized writer lease. The parent retains architecture, phase, scope, diagnosis, security, migration,
