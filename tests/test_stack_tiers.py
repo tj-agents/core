@@ -340,6 +340,15 @@ class SessionStatement(TemporaryProject):
         self.assertIn("Does not apply here: `react:*`", text)
         self.assertNotIn("Does not apply here: `dotnet", text)
 
+    def test_an_audit_can_inspect_source_without_adopting_inapplicable_rules(self):
+        found = [declaration("dotnet", "dotagents", DOTNET)]
+        text = gate.statement(self.project, found)
+        self.assertIn("standards-source audit", text)
+        self.assertIn("canonical source files", text)
+        self.assertIn("does not load them as governing instructions", text)
+        self.assertNotIn("do not read, invoke or cite", text)
+        self.assertIn("no stack tier applies", gate.conventions(self.project, found))
+
 
 class Conventions(TemporaryProject):
     def installed(self, skills):
@@ -405,6 +414,14 @@ class Gate(TemporaryProject):
     def test_naming_the_plugin_without_reading_a_standard_is_not_a_block(self):
         payload = {"tool_name": "Bash", "tool_input": {"command": "git log dotagents/dotnet"}}
         self.assertEqual(self.call(payload), 0)
+
+    def test_source_inspection_does_not_enable_skill_invocation(self):
+        command = 'cat ../standards/.agents/dotnet/contract/style/SKILL.md'
+        self.assertEqual(self.call({"tool_name": "shell", "tool_input": {"command": command}}), 0)
+        self.assertEqual(self.call({"tool_name": "Skill", "tool_input": {"skill": "dotnet:style"}}), 2)
+        _, applicable, blocked = gate.assess(self.project, self.found)
+        self.assertEqual(applicable, [])
+        self.assertEqual([item.tier for item in blocked], ["dotnet"])
 
     def test_an_unrecognized_payload_allows(self):
         self.assertEqual(self.call({"tool_name": "Read", "tool_input": {"file_path": "x"}}), 0)
