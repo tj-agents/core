@@ -31,23 +31,55 @@ the current durable handoff or plan state when one exists:
 
 When the current PR is one stage of a longer plan-managed delivery, also bind one workflow handoff:
 workflow ID, repository-relative plan or ledger state artifact, and the exact next stage to resume after this
-PR merges. The workflow handoff owns the single continuation across successive PR bindings; it never weakens
-the exact PR/head/run identity active at any moment.
+PR merges. The workflow handoff preserves the broader goal across successive delivery owners; it never
+weakens the exact PR/head/run identity active at any moment.
 
 There is exactly one persistent owner for a PR/head pair. Reuse and update that owner when the binding is the
 same. A new head created by this owner replaces its binding. A head changed by somebody else, a changed PR,
 or a different worktree ends ownership and surfaces a human decision; never silently follow it.
 
-**Resolve the authorization from the repository's recorded standing instruction; never ask for it once per
-PR.** `python .agents/workflows/workflow_ops.py --workflow-run-id <id> delivery-bind [--pr <n>]` is the
-single writer of the binding artifact. It reads authoritative forge state once and resolves
-`.agents/delivery-authorization.json` — the standing mode, its exact recorded wording, and the repository's
-own always-stop paths — against this head's changed path set and labels. Six stop classes hold everywhere
-(the table itself, CI workflow, migration, auth, money, published contract); a repository adds its own.
-Editing the table always stops, because a diff that changes who may merge unattended must not merge
-unattended. A repository carrying
-no such table resolves `absent`, which is the ordinary stop-and-ask. **Re-run it on every rebind:** a repair
-push can add a stop-class path, so the authorization belongs to the head, not the PR. End it with
+Resolve authority from the repository's recorded standing instruction or an observed user approval for
+this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
+the binding artifact:
+
+```text
+python -B .agents/workflows/workflow_ops.py --root ROOT --workflow-run-id ID delivery-bind --pr NUMBER [--approval-record PATH]
+```
+
+The optional approval record has exactly these fields. Replace the illustrative values with the actual
+owning checkout identity, permitted merge mode, user's wording and observed message provenance:
+
+```json
+{
+  "repository": "example/test",
+  "pr_number": 42,
+  "worktree": "C:\\source\\test",
+  "branch": "feature",
+  "mode": "merge",
+  "instruction": "Merge PR 42 when checks and review pass",
+  "source": "User message in SESSION at TIMESTAMP"
+}
+```
+
+`worktree` must match the binder's normalized absolute checkout root, and `branch` must match both the
+checkout and remote PR. `mode` is `merge` or `auto`, according to the actual approval. A goal's existence
+or implementation approval never invents merge authority. Invalid explicit input fails before any
+standing-authority fallback. Without a standing instruction or matching scoped approval, authority remains
+`absent` and merge requires a user decision.
+
+The binder reads authoritative forge state and resolves `.agents/delivery-authorization.json`, when
+present, against the current changed paths and labels. Six stop classes hold everywhere: the authorization
+table itself, CI workflow, migration, auth, money and published contract. Repository stop paths and its
+hold label also apply; without a table, `human-gate` is the hold label. A scoped approval cannot bypass
+these stops. **Re-run the binder on every rebind:** a repaired head may add a stop path or hold.
+
+The artifact retains matching approval wording and provenance as `scoped_approval` across wakes and
+supported repairs to the same PR, worktree and branch. Each rebind refreshes the remote head, checks and
+review evidence and reevaluates the stops. A stopped head retains the approval record but resolves
+`absent`; it does not authorize unattended merge. A wake or same-PR repair never requires another approval
+solely because the repository lacks a standing table. The record cannot carry into another repository,
+PR, worktree or branch. If ordinary merge is approved and GitHub auto-merge is unavailable, wait for
+terminal checks and current-head review, then perform the authorized ordinary merge. End the binding with
 `delivery-release --reason <terminal>`.
 
 That command writes the binding to `.agents/persistent-workflow-binding.json` at the owning worktree root — repo
@@ -93,16 +125,23 @@ head may enter `merge`, and only under the recorded authorization.
 
 ## Transfer an intermediate merge
 
-When a bound PR merges with no workflow handoff, remove the continuation normally. When it merges with a
-workflow handoff, close the completed PR binding without removing the continuation, checkpoint the merge,
-and enter the recorded next stage through `plan-execution`. The parent resolves the plan's next owned work
-and reconciles its existing recorded branch, worktree and PR, including the actual base and current head.
-Create those only when the successor does not yet exist. Refresh its exact delivery binding and rebind
-the same continuation to it. Only the parent may perform this transfer, and the repository, workflow ID,
-and state artifact must remain identical.
+The runtime owner is bound to one worktree and branch, and permits head repair within that identity.
+It cannot rebind itself to a successor PR or another checkout. When a slice PR merges, complete its
+recorded delivery condition, release its binding, checkpoint its runtime owner and remove its scheduled
+task. Preserve that owner's receipts and results. Before reusing the same checkout, archive its terminal
+`.agents/continuation/` directory, including `owner.json`, receipts and results, outside the tracked tree;
+the next initialization needs the canonical owner path available. Remove the old scheduler before
+archiving its receipt. Completing the slice owner does not complete the broader canonical goal.
+
+With a workflow handoff, the foreground parent resumes the recorded stage through `plan-execution` and
+reconciles the next slice's existing branch, worktree and PR, including its actual base and head. Create
+those only when absent. After retiring the old owner, initialize and claim the next worktree's canonical
+owner against the same goal, then register its continuation when needed. Keep one active writer. The
+repository, workflow ID and state artifact remain identical; automatic supervisor transfer across
+worktrees is outside the runtime's supported transition.
 
 The successor is a new delivery binding with its own checks, review watermark, and merge authorization.
-Authorization for the completed PR never silently authorizes the successor. The continuation may implement,
+Authorization for the completed PR never silently authorizes the successor. The workflow owner may implement,
 validate, push, open, and review that successor without intervention when those actions are already in scope,
 but it stops at its merge gate unless the recorded instruction explicitly covers that exact successor or
 bounded delivery chain.
@@ -123,7 +162,7 @@ also enforces the single-monitor / one-read-per-wake rule from this contract. La
 wakes the owner only for a material transition or terminal result. A repeated model-turn status read of
 unchanged state is blocked.
 
-Stop and remove the host task when the bound PR merges without a workflow handoff, closes, is superseded, or reaches a genuine human,
+Stop and remove the slice's host task when the bound PR merges, closes, is superseded, or reaches a genuine human,
 authorization, external-head, model-availability, or product-capability decision. A closed continuation is
 never replaced merely to report why it stopped. Record the final PR/head/result and next decision in the
 normal handoff or plan artifact when one owns the work. The host task prompt itself carries the full binding
