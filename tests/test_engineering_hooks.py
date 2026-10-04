@@ -35,8 +35,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
 
     def test_each_host_context_uses_its_packaged_contract_without_mutating_the_caller(self):
-        script = ".agents/engineering/contract/session-guidance/scripts/session-context.py"
-        contract = self.package / ".agents/engineering/contract/session-guidance/SKILL.md"
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
         bodies = []
         for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
             with self.subTest(host=host):
@@ -58,10 +58,10 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertEqual([], list(self.cwd.iterdir()))
 
     def test_missing_context_contract_is_an_actionable_error(self):
-        contract = self.package / ".agents/engineering/contract/session-guidance/SKILL.md"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
         contract.unlink()
         result = self.run_hook(
-            ".agents/engineering/contract/session-guidance/scripts/session-context.py"
+            ".agents/engineering/policy/session-guidance/scripts/session-context.py"
         )
         self.assertNotEqual(0, result.returncode)
         self.assertIn("cannot read contract", result.stderr)
