@@ -336,6 +336,20 @@ class ExternalPluginSourceTests(StandardsSyncHarness):
         self.assertEqual(self.records('ext@core')[0]['version'], pushed[:12])
         self.assertIn(f'at {pushed[:12]}: ext {pushed[:12]}', output)
 
+    def test_plugin_source_shaped_differently_but_same_repository_is_tracked_as_native(self):
+        differently_shaped = str(self.remote)[:-4] + '/'
+        self.declare_sources({'base': differently_shaped, 'ext': str(self.plugin_remote)})
+        self.enable({'base@core': True, 'ext@core': True})
+        self.install('base@core')
+        pushed = self.publish('second')
+        code, output = self.sync()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(
+            [entry['argv'] for entry in self.invocations()],
+            [['plugin', 'marketplace', 'update', 'core'], ['plugin', 'update', 'base@core', '--scope', 'user', '--json']],
+        )
+        self.assertEqual(self.records('base@core')[0]['version'], pushed[:12])
+
     def test_unchanged_plugin_source_outside_the_marketplace_is_silent(self):
         self.install('ext@core', version=self.plugin_head[:12])
         code, output = self.sync()
