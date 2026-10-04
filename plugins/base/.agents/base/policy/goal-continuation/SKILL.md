@@ -1,7 +1,7 @@
 ---
 name: goal-continuation
 description: Sustain ownership of substantive authorized work through its stated completion, selecting a supported persistent capability when future decisions outlive the current session.
-kind: contract
+kind: policy
 domain: behavior
 ---
 

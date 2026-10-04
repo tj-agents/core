@@ -1,7 +1,7 @@
 ---
 name: plan-artifacts
 description: Maintain one Markdown plan for a long-term goal or substantive planning request, automatically route authorized execution to its available workflow, and keep corrections and resumable progress in the same artifact.
-kind: contract
+kind: policy
 domain: behavior
 ---
 
