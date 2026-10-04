@@ -25,6 +25,128 @@ def load_gate():
 
 
 gate = load_gate()
+sys.path.insert(0, str(HOOK.parents[1] / "workflows"))
+import workflow_ops
+from delivery_runtime import PersistentDeliveryRouter, binding_from_artifact
+
+
+class ScopedApprovalTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        (self.root / ".agents").mkdir()
+        self.record = {"repository": "example/test", "pr_number": 42,
+                       "worktree": str(self.root), "branch": "feature", "mode": "merge",
+                       "instruction": "Merge PR 42 when checks and review pass",
+                       "source": "user message in session fixture at 2026-10-04T18:00:00Z"}
+        self.record_path = self.root / "approval.json"
+        self.value = {"number": 42, "url": "https://github.com/example/test/pull/42",
+                      "headRefOid": HEAD, "headRefName": "feature", "state": "OPEN",
+                      "files": [{"path": "README.md"}], "labels": [], "statusCheckRollup": []}
+        for name, kwargs in (
+                ("repository_slug", {"return_value": "example/test"}),
+                ("pull_request_state", {"side_effect": lambda *args: self.value}),
+                ("changed_paths", {"side_effect": lambda *args: [item["path"] for item in self.value["files"]]}),
+                ("git", {"return_value": "feature"}),
+                ("review_binding", {"side_effect": lambda root, branch, head: {
+                    "work_order": "reviews/feature.md", "work_order_order": ["full"], "reviewed_sha": head}}),
+                ("append_event", {"return_value": None})):
+            started = patch.object(workflow_ops, name, **kwargs)
+            started.start()
+            self.addCleanup(started.stop)
+
+    def bind(self, explicit=False):
+        if explicit:
+            self.record_path.write_text(json.dumps(self.record), encoding="utf-8")
+        return workflow_ops.delivery_bind(self.root, "fixture", self.value["number"], "PR merged", None,
+                                          self.record_path if explicit else None)["binding"]
+
+    def test_no_table_approved_current_head_routes_merge(self):
+        bound = self.bind(explicit=True)
+        self.assertEqual("merge", bound["merge_authorization"]["mode"])
+        self.assertEqual(self.record, bound["scoped_approval"])
+        decision = PersistentDeliveryRouter().decide(binding_from_artifact(bound), {
+            "pr_number": 42, "remote_head_sha": HEAD, "state": "open", "state_token": "ready",
+            "checks_conclusion": "success", "review_judgment": "clean", "reviewed_sha": HEAD})
+        self.assertEqual("merge", decision["skill"])
+
+    def test_same_pr_rebind_preserves_wording_source_and_mode_on_new_head(self):
+        self.bind(explicit=True)
+        self.value["headRefOid"] = "b" * 40
+        bound = self.bind()
+        self.assertEqual("b" * 40, bound["head"])
+        self.assertEqual(self.record, bound["scoped_approval"])
+        self.assertEqual({"mode": "merge", "instruction": self.record["instruction"]}, bound["merge_authorization"])
+
+    def test_no_record_keeps_missing_authority(self):
+        bound = self.bind()
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertNotIn("scoped_approval", bound)
+
+    def test_explicit_mismatch_or_invalid_record_never_falls_back_to_standing(self):
+        policy = {"standing_authorization": "auto", "instruction": "Merge green reviewed PRs"}
+        (self.root / ".agents/delivery-authorization.json").write_text(json.dumps(policy))
+        original = dict(self.record)
+        for field, wrong in (("repository", "other/repo"), ("pr_number", 43),
+                             ("worktree", str(self.root / "other")), ("branch", "other"),
+                             ("mode", "absent"), ("instruction", ""), ("source", "")):
+            with self.subTest(field=field):
+                self.record = dict(original, **{field: wrong})
+                with self.assertRaises(workflow_ops.WorkflowOperationError):
+                    self.bind(explicit=True)
+                self.assertFalse((self.root / workflow_ops.delivery_runtime.BINDING_FILE).exists())
+        self.record_path.write_text("{")
+        with self.assertRaisesRegex(workflow_ops.WorkflowOperationError, "could not be read"):
+            workflow_ops.delivery_bind(self.root, "fixture", 42, "PR merged", None, self.record_path)
+
+    def test_new_stop_class_on_repair_revokes_delivery_and_keeps_provenance(self):
+        self.bind(explicit=True)
+        self.value["headRefOid"] = "b" * 40
+        self.value["files"] = [{"path": ".github/workflows/verify.yml"}]
+        bound = self.bind()
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertEqual("ci-workflow", bound["authorization_resolution"]["stopped_by"]["class"])
+        self.assertEqual(self.record, bound["scoped_approval"])
+
+    def test_hold_label_blocks_approval_without_table(self):
+        self.value["labels"] = [{"name": "human-gate"}]
+        bound = self.bind(explicit=True)
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertEqual("hold-label", bound["authorization_resolution"]["stopped_by"]["class"])
+
+    def test_repository_stop_path_and_hold_label_block_scoped_approval(self):
+        policy = {"standing_authorization": "absent", "instruction": None,
+                  "always_stop_paths": [r"^special/"], "hold_label": "delivery-hold"}
+        (self.root / ".agents/delivery-authorization.json").write_text(json.dumps(policy))
+        self.value["files"] = [{"path": "special/handler.py"}]
+        self.assertEqual("absent", self.bind(explicit=True)["merge_authorization"]["mode"])
+        self.value["files"] = [{"path": "README.md"}]
+        self.value["labels"] = [{"name": "delivery-hold"}]
+        self.assertEqual("absent", self.bind()["merge_authorization"]["mode"])
+
+    def test_successor_pr_branch_checkout_or_repository_does_not_inherit(self):
+        for change in ("pr", "branch", "checkout", "repository"):
+            with self.subTest(change=change):
+                self.value.update(number=42, url="https://github.com/example/test/pull/42", headRefName="feature")
+                self.bind(explicit=True)
+                if change == "pr":
+                    self.value.update(number=43, url="https://github.com/example/test/pull/43")
+                elif change == "branch":
+                    self.value["headRefName"] = "successor"
+                elif change == "checkout":
+                    bound_path = self.root / workflow_ops.delivery_runtime.BINDING_FILE
+                    artifact = json.loads(bound_path.read_text())
+                    artifact["scoped_approval"]["worktree"] = str(self.root / "other")
+                    bound_path.write_text(json.dumps(artifact))
+                else:
+                    bound_path = self.root / workflow_ops.delivery_runtime.BINDING_FILE
+                    artifact = json.loads(bound_path.read_text())
+                    artifact["scoped_approval"]["repository"] = "other/repo"
+                    bound_path.write_text(json.dumps(artifact))
+                bound = self.bind()
+                self.assertEqual("absent", bound["merge_authorization"]["mode"])
+                self.assertNotIn("scoped_approval", bound)
 
 
 class CreatedPullRequestTests(unittest.TestCase):

@@ -1337,11 +1337,13 @@ def review_binding(root, branch, head):
 def standing_authorization(root, changed_paths, labels):
     path = root / delivery_runtime.STANDING_AUTHORIZATION_FILE
     if not path.is_file():
-        return {
-            "merge_authorization": {"mode": "absent", "instruction": None},
-            "standing": "absent",
-            "stopped_by": {"class": "no-recorded-authorization"},
-        }
+        resolution = delivery_runtime.StandingMergeAuthorization().resolve(
+            {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
+            changed_paths, labels,
+        )
+        if resolution["stopped_by"] is None:
+            resolution["stopped_by"] = {"class": "no-recorded-authorization"}
+        return resolution
     try:
         policy = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -1354,13 +1356,38 @@ def standing_authorization(root, changed_paths, labels):
         raise WorkflowOperationError(str(error)) from error
 
 
-def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff):
-    """Resolve one delivery owner from authoritative forge state and write its binding artifact.
+def scoped_approval(root, repository, number, branch, supplied):
+    expected = {"repository": repository, "pr_number": number, "worktree": str(root), "branch": branch}
+    explicit = supplied is not None
+    if explicit:
+        try:
+            record = json.loads(Path(supplied).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise WorkflowOperationError(f"approval record could not be read: {error}") from error
+    else:
+        path = root / delivery_runtime.BINDING_FILE
+        record = json.loads(path.read_text(encoding="utf-8")).get("scoped_approval") if path.is_file() else None
+    if record is None and not explicit:
+        return None
+    fields = set(expected) | {"mode", "instruction", "source"}
+    if (not isinstance(record, dict) or set(record) != fields
+            or type(record.get("pr_number")) is not int
+            or not isinstance(record.get("mode"), str)
+            or record.get("mode") not in {"auto", "merge"}
+            or any(not isinstance(record.get(key), str) or not record[key].strip()
+                   for key in ("worktree", "instruction", "source"))
+            or not Path(record["worktree"]).is_absolute()):
+        raise WorkflowOperationError("approval record requires exact identity, merge mode, user instruction and source")
+    matches = all(record[key] == value for key, value in expected.items())
+    matches = matches and git(root, "branch", "--show-current") == branch
+    if not matches:
+        if explicit:
+            raise WorkflowOperationError("approval record does not match this repository/PR/worktree/branch")
+        return None
+    return record
 
-    This is the single writer of `.agents/persistent-workflow-binding.json`. It re-resolves the
-    standing authorization against the head being bound on every call, so a repair push that adds a
-    stop-class path cannot ride an authorization computed for an earlier head.
-    """
+
+def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None):
     value = pull_request_state(root, pr)
     head = str(value.get("headRefOid") or "")
     branch = str(value.get("headRefName") or "")
@@ -1373,9 +1400,15 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff):
     reported = [str(item.get("path")) for item in value.get("files") or [] if item.get("path")]
     changed = changed_paths(root, number, reported, value.get("changedFiles"))
     labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
+    repository = repository_slug(root)
+    approval = scoped_approval(root, repository, number, branch, approval_record)
     resolution = standing_authorization(root, changed, labels)
+    if approval is not None and (resolution["stopped_by"] is None
+                                 or resolution["stopped_by"]["class"] == "no-recorded-authorization"):
+        resolution["merge_authorization"] = {"mode": approval["mode"], "instruction": approval["instruction"]}
+        resolution["stopped_by"] = None
     binding = {
-        "repository": repository_slug(root),
+        "repository": repository,
         "pr_url": str(value.get("url") or ""),
         "pr_number": number,
         "worktree": str(root),
@@ -1402,6 +1435,8 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff):
         },
         changed_path_count=len(changed),
     )
+    if approval is not None:
+        artifact["scoped_approval"] = approval
     atomic_json(root / delivery_runtime.BINDING_FILE, artifact)
     append_event(
         root,
@@ -1507,6 +1542,7 @@ def parser():
 
     bind = commands.add_parser("delivery-bind")
     bind.add_argument("--pr", type=int)
+    bind.add_argument("--approval-record")
     bind.add_argument(
         "--completion-condition",
         default="the bound PR reaches MERGED, or a recorded terminal ends this delivery",
@@ -1563,7 +1599,8 @@ def main(argv=None):
             else None
         )
         result = delivery_bind(
-            root, arguments.workflow_run_id, arguments.pr, arguments.completion_condition, handoff
+            root, arguments.workflow_run_id, arguments.pr, arguments.completion_condition, handoff,
+            arguments.approval_record,
         )
     elif arguments.operation == "delivery-release":
         result = delivery_release(root, arguments.workflow_run_id, arguments.reason)
