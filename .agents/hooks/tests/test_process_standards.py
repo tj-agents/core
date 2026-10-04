@@ -426,7 +426,7 @@ class ProcessStandardsTests(unittest.TestCase):
             cd,
         )
         self.assertIn(
-            "the original stops repository-scoped work and releases its host session", cd
+            "the original stops repository-scoped work; it cannot end its own host session", cd
         )
         self.assertIn(
             "put that exact operation and its final filesystem verification in the "
