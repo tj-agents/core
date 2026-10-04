@@ -167,25 +167,33 @@ def repo_label(url: str) -> str:
     return "/".join(segments[-2:]) if len(segments) >= 2 else (segments[-1] if segments else stripped)
 
 
+def normalize_url(url: str) -> str:
+    stripped = re.sub(r"^[a-z][a-z0-9+.-]*://", "", url.strip(), flags=re.IGNORECASE).rstrip("/")
+    if stripped.lower().endswith(".git"):
+        stripped = stripped[:-4]
+    return stripped.lower()
+
+
 def external_groups(markets: list[Marketplace]) -> list[Marketplace]:
-    """Split out installs whose own marketplace entry sources a different repository than their
-    marketplace's own checkout, grouped and deduplicated by that source's (url, ref)."""
-    grouped: dict[tuple[str, str | None], list[Install]] = {}
+    grouped: dict[tuple[str, str | None], tuple[str, list[Install]]] = {}
     for market in markets:
         sources = plugin_entry_sources(market.checkout)
+        own = normalize_url(market.url) if market.url else None
         native = []
         for install in market.installs:
             override = sources.get(install.name)
             resolved = source_url(override) if isinstance(override, dict) else None
-            if resolved and resolved != market.url:
+            if resolved and normalize_url(resolved) != own:
                 ref = override.get("ref")
-                key = (resolved, ref if isinstance(ref, str) and ref else None)
-                grouped.setdefault(key, []).append(install)
+                key = (normalize_url(resolved), ref if isinstance(ref, str) and ref else None)
+                raw_url, members = grouped.get(key, (resolved, []))
+                members.append(install)
+                grouped[key] = (raw_url, members)
             else:
                 native.append(install)
         market.installs = native
     ordered = sorted(grouped.items(), key=lambda item: (item[0][0], item[0][1] or ""))
-    return [Marketplace(repo_label(url), None, url, ref, members, owned=False) for (url, ref), members in ordered]
+    return [Marketplace(repo_label(raw_url), None, raw_url, ref, members, owned=False) for (_, ref), (raw_url, members) in ordered]
 
 
 def run(command: list[str], cwd: Path | None = None, timeout: float = REMOTE_TIMEOUT_SECONDS) -> tuple[int | None, str, str]:
