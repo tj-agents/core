@@ -32,8 +32,8 @@ shared prose returns to `.agents/`.
 
 `plugins/*` contains generated installable payloads. The build assembles canonical `.agents/` definitions,
 the selected `.codex/` or `.claude/` adapter and all declared resources into a self-contained plugin.
-Generated output is validated and may be committed for marketplace distribution, but it is never edited as
-source.
+Generated output is validated and committed to main by CI's post-merge regeneration job for marketplace
+distribution; it never changes in a pull request and is never edited as source.
 
 Two host-native marketplace files are generated bridges: `.agents/plugins/marketplace.json` comes from
 `.agents/plugins/manifests/codex/marketplace.json`, and `.claude-plugin/marketplace.json` comes from
