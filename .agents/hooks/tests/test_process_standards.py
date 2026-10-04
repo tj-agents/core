@@ -107,6 +107,21 @@ class ProcessStandardsTests(unittest.TestCase):
             flat,
         )
 
+    def test_a_standards_defect_hands_off_in_the_same_turn(self):
+        instructions = authored_skill("session-guidance").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(instructions.split())
+
+        for phrase in (
+            "is the exception unless the current goal is repairing that package",
+            "and so is a standard that caused or failed to prevent a mistake",
+            "in the same turn, before the current task resumes, without asking",
+            "announcing a later or separate fix instead of launching is a violation",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, flat)
+
     def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
         body = authored_skill("plan-execution").read_text(
             encoding="utf-8"
