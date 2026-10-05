@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import uuid
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,8 +24,11 @@ class PackagedEngineeringHooks(unittest.TestCase):
         shutil.copytree(ROOT / 'plugins/engineering', self.package)
         self.cwd = self.root / 'unrelated caller'
         self.cwd.mkdir()
+        review_cache = self.root / 'review cache'
+        review_cache.mkdir()
         self.environment = dict(os.environ, PLUGIN_ROOT=str(self.package),
-                                CLAUDE_PLUGIN_ROOT=str(self.package), PYTHONIOENCODING='utf-8')
+                                CLAUDE_PLUGIN_ROOT=str(self.package), PYTHONIOENCODING='utf-8',
+                                TMP=str(review_cache), TEMP=str(review_cache))
 
     def run_hook(self, path, data=None):
         payload = dict(cwd=str(self.cwd), session_id=str(uuid.uuid4()),
@@ -190,7 +194,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("packaged_workflow_ops", runtime)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        result = module.review_prepare(consumer, "packaged-route", "origin/main", "HEAD", False)
+        with mock.patch.object(module.tempfile, "gettempdir", return_value=str(self.root / "review cache")):
+            result = module.review_prepare(consumer, "packaged-route", "origin/main", "HEAD", False)
 
         self.assertEqual(["feature"], [rule["name"] for rule in result["rules"]])
         self.assertEqual(".agents/skills/feature/SKILL.md", result["rules"][0]["path"])
