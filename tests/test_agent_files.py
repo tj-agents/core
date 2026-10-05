@@ -18,7 +18,10 @@ class AgentFileTests(unittest.TestCase):
         for host in ("claude", "codex"):
             manifest = json.loads((PLUGIN / f".{host}-plugin/plugin.json").read_text(encoding="utf-8"))
             hooks = json.loads((PLUGIN / manifest["hooks"]).read_text(encoding="utf-8"))
-            commands = [item["hooks"][0]["command"] for item in hooks["hooks"]["SessionStart"]]
+            commands = [
+                " ".join([item["hooks"][0]["command"], *item["hooks"][0].get("args", [])])
+                for item in hooks["hooks"]["SessionStart"]
+            ]
             self.assertEqual(1, sum("agent-files/scripts/session-context.py" in command for command in commands))
         result = subprocess.run(
             [sys.executable, "-B", str(SCRIPT)],
