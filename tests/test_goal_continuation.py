@@ -41,8 +41,9 @@ class GoalContinuationTests(unittest.TestCase):
             hooks = json.loads((self.plugin / self.manifest(host)["hooks"]).read_text(encoding="utf-8"))
             startup = hooks["hooks"]["SessionStart"]
             helper = ".agents/base/policy/goal-continuation/scripts/session-context.py"
-            self.assertEqual(len(startup), 4)
-            handler = startup[3]["hooks"][0]
+            matches = [item["hooks"][0] for item in startup if helper in item["hooks"][0]["command"]]
+            self.assertEqual(1, len(matches))
+            handler = matches[0]
             if host == "claude":
                 self.assertEqual(handler["command"], f'python -B "${{{variable}}}/{helper}"')
             else:

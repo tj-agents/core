@@ -40,6 +40,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/base/policy/harness/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/base/policy/harness/scripts/session-context.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PreToolUse": [
