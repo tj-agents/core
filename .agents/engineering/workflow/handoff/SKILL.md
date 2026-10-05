@@ -150,10 +150,12 @@ distinct transfer, reconcile the completed attempt and its current owner before 
 
 For a transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted,
 put that exact operation and its final filesystem verification in the successor's `## Next Steps`. The
-predecessor must not perform the operation after launch: it ends repository-scoped activity and releases the
-host session. The successor waits until that host attachment is gone, then performs the operation from the
-target checkout and treats a command error or residual path as incomplete rather than accepting partial Git
-cleanup.
+predecessor must not perform the operation after launch: it ends repository-scoped activity. No tool lets it
+end its own host process or close its own window, so releasing the host session is a human action; the
+successor's `## Next Steps` must name that release as a gate (who closes or redirects the predecessor's
+window) before the operation. The successor waits until that gate clears, then performs the operation from
+the target checkout and treats a command error or residual path as incomplete rather than accepting partial
+Git cleanup.
 
 If discovery cannot resolve the launcher, report the missing capability and required selection. Continue
 independent authorized work where possible. Never claim transfer occurred or silently substitute a
