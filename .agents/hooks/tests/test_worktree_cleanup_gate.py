@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,34 @@ class WorktreeCleanupGateTests(unittest.TestCase):
         response = json.loads(result.stdout)
         self.assertEqual("block", response["decision"])
         self.assertIn("cannot run the configured audit", response["reason"])
+
+    def test_slow_audit_does_not_block_the_session(self):
+        audit = self.repo / "audit.py"
+        audit.write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+        (self.repo / ".agents" / "worktree-cleanup-gate.json").write_text(
+            json.dumps({"audit_command": [sys.executable, str(audit)]}), encoding="utf-8"
+        )
+
+        result = subprocess.run(
+            [sys.executable, str(HOOK)],
+            input=json.dumps(
+                {
+                    "hook_event_name": "Stop",
+                    "session_id": f"worktree-cleanup-{uuid.uuid4().hex}",
+                    "turn_id": "turn-1",
+                    "cwd": str(self.repo),
+                }
+            ),
+            capture_output=True,
+            text=True,
+            cwd=self.repo,
+            check=False,
+            env={**os.environ, "WORKTREE_CLEANUP_GATE_TIMEOUT_SECONDS": "1"},
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+        self.assertIn("did not finish within 1s", result.stderr)
 
     def test_no_config_is_not_this_gates_business(self):
         result = self.invoke()
