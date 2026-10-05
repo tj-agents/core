@@ -19,6 +19,9 @@ ToolSearch call: `tabs_context_mcp`, `tabs_create_mcp`, `navigate`, `computer`, 
 `form_input` for fields the URL cannot set. Open the pre-filled URL in a new tab and verify the
 page's actual selections with `read_page` before and after filling.
 
+If `claude-in-chrome` is unavailable, follow the canonical procedure's step 3 fallback: open the
+pre-filled URL with the default browser and deliver with the canonical script's `-Prompt` mode.
+
 ## Recorded quirks (2026-10-03)
 
 - An automated click on the provider's copy button does not reach the OS clipboard, and a script

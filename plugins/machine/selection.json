@@ -10,7 +10,6 @@
     "auto-memory",
     "bootstrap-capabilities",
     "clip",
-    "create-credential",
     "handoff-claude",
     "handoff-codex",
     "last-conversation",

@@ -107,7 +107,7 @@ user-scope installs. Concretely:
 Core owns the schema at `.agents/plugins/harness.schema.json`. Each standards repository owns one
 manifest per published plugin at `.agents/plugins/harness/<plugin>.json`; core starts with
 `base.json`, `engineering.json`, and `machine.json`. `scripts/sync_harness_manifests.py` validates
-and refreshes the manifests, and `scripts/update_catalog_digests.py` copies the validated `requires`
+the manifests, and `scripts/update_catalog_digests.py` copies the validated `requires`
 object into the matching plugin entry in `.agents/catalog/catalog.json`. The generated package also
 ships the manifest as `plugins/<plugin>/harness.json`, so its package digest covers the declaration.
 The catalog schema makes `harness` required for every current plugin release.
@@ -119,8 +119,6 @@ The manifest shape is fixed:
   "schema_version": 1,
   "plugin": "base-agents/machine",
   "source_roots": [".agents/machine"],
-  "source_excludes": [".agents/catalog/catalog.json"],
-  "source_digest": "sha256:<digest of sorted authored source paths, lengths, and bytes>",
   "requires": {
     "marketplaces": [{"id": "base-agents", "repository": "tj-agents/core"}],
     "plugins": ["base-agents/base", "base-agents/machine"],
@@ -148,13 +146,10 @@ The manifest shape is fixed:
 `hooks[].path` is the package-relative generated destination and `hosts` is a non-empty subset of
 `claude` and `codex`. Each Codex rule is an allow decision; the generator supplies
 `decision = "allow"` and requires non-empty pattern, justification, match and not-match arrays.
-`source_digest` covers every file below `source_roots`, a canonical record of that plugin's
-entries in `.agents/plugins/sources.json`, and every authored resource source those entries name.
-`source_excludes` is normally empty; only `base-agents/machine` may exclude
-`.agents/catalog/catalog.json`, which avoids the existing catalog/package digest self-reference.
-Adding or changing a skill, workflow, hook, host
-adapter, or package resource therefore makes `sync_harness_manifests.py --check` fail until the
-same change refreshes the declaration. The validator also proves every declared hook is wired by
+The validator recomputes the expected hooks, plugins and marketplaces from the authored sources on
+every run, so a wiring change makes `sync_harness_manifests.py --check` fail until the declaration
+is updated; the earlier blanket `source_digest`/`source_excludes` tripwire was dropped as
+consumerless. The validator also proves every declared hook is wired by
 both host manifests where its `hosts` list requires that, every required plugin exists in the
 catalog, and every marketplace repository matches its own release owner and GitHub source.
 Core's authored catalog contains only core releases; each other standards repository maintains

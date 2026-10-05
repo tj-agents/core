@@ -13,8 +13,9 @@ For Claude select `machine:handoff-claude`. The machine plugin and that launcher
 and CLI prerequisites must be available. Resolve the skill using native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
 
-When an active task surfaces a distinct, independently actionable, separately authorized side workstream,
-select this workflow in **bounded side-workstream** mode immediately. Give the side workstream one isolated
+When an active task surfaces a distinct, independently actionable side workstream whose authorization is
+separate — granted by the user, or standing, as with `engineering:session-guidance`'s standards-defect
+default — select this workflow in **bounded side-workstream** mode immediately. Give the side workstream one isolated
 checkout and one successor; the originating session retains its active goal and remains its only writer.
 This is not a full-goal transfer. Do not offload a step that is inseparable from the original task's next
 action, create duplicate writers, or hand off work that overlaps the original checkout's owned paths.
@@ -149,10 +150,12 @@ distinct transfer, reconcile the completed attempt and its current owner before 
 
 For a transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted,
 put that exact operation and its final filesystem verification in the successor's `## Next Steps`. The
-predecessor must not perform the operation after launch: it ends repository-scoped activity and releases the
-host session. The successor waits until that host attachment is gone, then performs the operation from the
-target checkout and treats a command error or residual path as incomplete rather than accepting partial Git
-cleanup.
+predecessor must not perform the operation after launch: it ends repository-scoped activity. No tool lets it
+end its own host process or close its own window, so releasing the host session is a human action; the
+successor's `## Next Steps` must name that release as a gate (who closes or redirects the predecessor's
+window) before the operation. The successor waits until that gate clears, then performs the operation from
+the target checkout and treats a command error or residual path as incomplete rather than accepting partial
+Git cleanup.
 
 If discovery cannot resolve the launcher, report the missing capability and required selection. Continue
 independent authorized work where possible. Never claim transfer occurred or silently substitute a

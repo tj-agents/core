@@ -7,7 +7,7 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py\""
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\""
           }
         ]
       }
