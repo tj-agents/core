@@ -113,7 +113,7 @@ try {
     $env:AGENT_STATE_DIRECTORY = Split-Path -Parent $stateDirectory
     $fakeClaude = Join-Path $scratch 'claude.exe'
     Copy-Item -LiteralPath $env:ComSpec -Destination $fakeClaude
-    $fakeProcess = Start-Process -FilePath $fakeClaude -ArgumentList '/c', 'timeout /t 30 /nobreak' -PassThru -WindowStyle Hidden
+    $fakeProcess = Start-Process -FilePath $fakeClaude -ArgumentList '/c', 'ping -n 31 127.0.0.1 > nul' -PassThru -WindowStyle Hidden
     try {
         $unrecordedUnderOutput = Invoke-PeerCliList -WorkingDirectory $repositoryRoot -IncludeUnrecorded -Under $outsideDirectory
         Assert-Contains -Actual $unrecordedUnderOutput -Expected ([string]$fakeProcess.Id) -Message 'Unrecorded sessions were hidden by the explicit scope filter.'
@@ -122,6 +122,8 @@ try {
     }
     finally {
         if (-not $fakeProcess.HasExited) { Stop-Process -Id $fakeProcess.Id -Force }
+        $fakeProcess.WaitForExit()
+        $fakeProcess.Dispose()
     }
 }
 finally {
