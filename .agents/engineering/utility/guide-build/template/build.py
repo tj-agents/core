@@ -3,6 +3,7 @@ import html
 import json
 import re
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 GUIDE = Path(__file__).resolve().parent
@@ -118,7 +119,12 @@ def segment(lines, parts, where):
                 return first, last
         raise SystemExit(f"{where}: unbalanced block at {anchor!r}")
     if mode.startswith("+"):
-        return first, first + int(mode[1:]) - 1
+        count = int(mode[1:])
+        if count < 1:
+            raise SystemExit(f"{where}: {anchor!r} {mode}: count must be at least +1")
+        if first + count > len(lines):
+            raise SystemExit(f"{where}: {anchor!r} {mode}: runs past end of file")
+        return first, first + count - 1
     return first, find(lines, end_text, first + 1, where)
 
 
@@ -179,7 +185,12 @@ def render_code(match, chapter, annotations_data, seen, revision, focus_rows, co
         for mark in entry["marks"]:
             marker_id = f"{excerpt}-{mark['id']}"
             notes.append(f'<li id="{marker_id}-note" class="trace-note"><span class="trace-kind">{mark["letter"]} · {KINDS[mark["kind"]]}</span> <span><strong>{html.escape(mark["label"])}</strong> — {html.escape(mark["text"])}</span></li>')
-        source_links = " ".join(f'<a href="{config_data["repository"]}/blob/{revision}/{rel}#L{a + 1}">lines {a + 1}–{b + 1}</a>' for a, b in ranges)
+        def source_link(a, b):
+            if b > a:
+                return f'<a href="{config_data["repository"]}/blob/{revision}/{rel}#L{a + 1}-L{b + 1}">lines {a + 1}–{b + 1}</a>'
+            return f'<a href="{config_data["repository"]}/blob/{revision}/{rel}#L{a + 1}">lines {a + 1}</a>'
+
+        source_links = " ".join(source_link(a, b) for a, b in ranges)
         return (f'<figure class="code annotated-code" id="{excerpt}" data-lang="{language}"><figcaption><span class="path">{html.escape(rel)}</span><span class="lines">{source_links}</span></figcaption>'
                 f'<div class="annotation-grid"><div class="code-viewport"><pre><code>{chr(10).join(rows)}</code></pre></div><aside class="annotation-notes" aria-label="{html.escape(entry["owner"], quote=True)} annotations"><span class="annotation-owner">{html.escape(entry["owner"])}</span><ul>{"".join(notes)}</ul></aside></div></figure>')
     return (
@@ -190,7 +201,7 @@ def render_code(match, chapter, annotations_data, seen, revision, focus_rows, co
     )
 
 
-CHAPTER_REF = re.compile(r"\b([Cc]hapters?) (\d+)((?:,? and \d+)*)")
+CHAPTER_REF = re.compile(r"\b([Cc]hapters?) (\d+)((?:(?:,? and|,) \d+)*)")
 UNLINKED = re.compile(r"(<svg\b.*?</svg>|<pre\b.*?</pre>|<a\b.*?</a>|<!--.*?-->|<[^>]+>)", re.S)
 
 
@@ -213,8 +224,12 @@ def link_chapters(text, ids, where):
 
 
 def git(*args):
-    return subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True,
-                          check=True).stdout.strip()
+    try:
+        return subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True,
+                              check=True).stdout.strip()
+    except subprocess.CalledProcessError as error:
+        stderr = (error.stderr or "").strip() or str(error)
+        raise SystemExit(f"git {' '.join(args)}: {stderr}")
 
 
 def resolve_focus_links(page, annotations_data, focus_rows):
@@ -242,7 +257,8 @@ def resolve_focus_links(page, annotations_data, focus_rows):
 
 def validate_page_links(page):
     ids = re.findall(r'\bid="([^"]+)"', page)
-    duplicates = sorted({value for value in ids if ids.count(value) > 1})
+    counts = Counter(ids)
+    duplicates = sorted(value for value, count in counts.items() if count > 1)
     if duplicates:
         raise SystemExit(f"duplicate page IDs: {duplicates}")
     targets = re.findall(r'href="#([^"]+)"', page)
@@ -288,6 +304,9 @@ def main():
         chapters.append(text)
         toc.append(f'<li><a href="#{chapter_id}"><span class="n">{number}</span>{title}</a></li>')
 
+    if seen != set(annotations_data):
+        raise SystemExit(f"unused annotations: {sorted(set(annotations_data) - seen)}")
+
     page = (GUIDE / "page.html").read_text(encoding="utf-8")
     page = page.replace("@@TITLE@@", config_data["title"]).replace("@@EYEBROW@@", config_data["eyebrow"])
     page = page.replace("@@REPO_NAME@@", config_data["repository"].rsplit("/", 1)[-1])
@@ -299,8 +318,6 @@ def main():
     page = page.replace("@@TOC@@", "\n".join(toc)).replace("@@CHAPTERS@@", "\n".join(chapters))
     page = resolve_focus_links(page, annotations_data, focus_rows)
     page = page.replace("@@REPO_SHA@@", git("rev-parse", "--short", "HEAD"))
-    if seen != set(annotations_data):
-        raise SystemExit(f"unused annotations: {sorted(set(annotations_data) - seen)}")
     validate_page_links(page)
     leftover = re.findall(r"@@[A-Z_]+[^@]*@@", page)
     if leftover:

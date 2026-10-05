@@ -1,6 +1,7 @@
 """Exercise the vendored guide builder template and its scaffold script."""
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -137,10 +138,33 @@ class ScaffoldTests(unittest.TestCase):
         scaffold_repo(self.repo)
         self.assertNotIn(b"\r", (self.repo / "guide" / "open.sh").read_bytes())
 
+    def test_crlf_checkout_of_vendored_file_is_not_drift(self):
+        scaffold_repo(self.repo)
+        page = self.repo / "guide" / "page.html"
+        page.write_bytes(page.read_bytes().replace(b"\n", b"\r\n"))
+
+        clean = scaffold_repo(self.repo, extra=("--check",))
+        self.assertEqual(0, clean.returncode, clean.stderr)
+
+        result = scaffold_repo(self.repo)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("replaced guide/page.html", result.stdout)
+
     def test_repo_must_be_existing_directory(self):
         missing = self.repo / "does-not-exist"
         result = run([str(SCAFFOLD), "--repo", str(missing)], cwd=self.repo)
         self.assertNotEqual(0, result.returncode)
+
+    @unittest.skipUnless(os.name == "posix", "exec bit only applies on POSIX")
+    def test_lost_exec_bit_on_up_to_date_open_sh_is_restored(self):
+        scaffold_repo(self.repo)
+        open_sh = self.repo / "guide" / "open.sh"
+        open_sh.chmod(0o644)
+
+        result = scaffold_repo(self.repo)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(0o755, open_sh.stat().st_mode & 0o777)
 
 
 class GuideFixture:
@@ -261,16 +285,18 @@ class BuildTests(unittest.TestCase):
         self.assertTrue(output_path.exists())
         page = output_path.read_text(encoding="utf-8")
 
+        self.assertTrue(page.startswith("<!doctype html>"))
+        self.assertIn('<html lang="en">', page)
         self.assertIn("<title>Demo Guide</title>", page)
         self.assertIn("<h1>Demo Guide</h1>", page)
         self.assertIn('<span class="eyebrow">Demo</span>', page)
         self.assertIn("<code>demo</code>", page)
         self.assertIn(short_revision, page)
         self.assertIn(
-            f'<a href="https://example.com/demo/blob/{revision}/src/main.rs#L1">', page
+            f'<a href="https://example.com/demo/blob/{revision}/src/main.rs#L1-L2">', page
         )
         self.assertIn(
-            f'<a href="https://example.com/demo/blob/{revision}/Cargo.toml#L1">', page
+            f'<a href="https://example.com/demo/blob/{revision}/Cargo.toml#L1-L3">', page
         )
         self.assertIn("fn main()", page)
         self.assertIn("println!", page)
@@ -406,6 +432,154 @@ class BuildTests(unittest.TestCase):
         result = self.fixture.build()
         self.assertNotEqual(0, result.returncode)
         self.assertIn("missing <!-- chapter: id | title -->", result.stderr)
+
+    def test_segment_plus_zero_fails(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            '@@CODE src/main.rs "fn helper()" +0@@\n'
+            "</article>\n",
+        )
+        self.fixture.write_annotations({})
+
+        result = self.fixture.build()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("count must be at least +1", result.stderr)
+
+    def test_segment_plus_n_past_end_of_file_fails(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            '@@CODE src/main.rs "fn helper()" +50@@\n'
+            "</article>\n",
+        )
+        self.fixture.write_annotations({})
+
+        result = self.fixture.build()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("runs past end of file", result.stderr)
+
+    def test_unused_annotation_entry_with_marks_fails(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            '<p>No excerpts here.</p>\n'
+            "</article>\n",
+        )
+        self.fixture.write_annotations(
+            {
+                "orphan": {
+                    "owner": "Nobody",
+                    "marks": [
+                        {
+                            "id": "stray",
+                            "match": "anything",
+                            "kind": "data",
+                            "target": "intro",
+                            "label": "Stray mark",
+                            "text": "Never rendered.",
+                        }
+                    ],
+                }
+            }
+        )
+
+        result = self.fixture.build()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("unused annotations", result.stderr)
+
+    def test_comma_separated_chapter_list_links_every_number(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            "<p>See chapters 1, 2 and 3 for details.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_chapter(
+            "02-setup.html",
+            "<!-- chapter: setup | Configuration -->\n"
+            '<article class="chapter" id="setup">\n'
+            "<p>Setup chapter.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_chapter(
+            "03-wrap-up.html",
+            "<!-- chapter: wrap-up | Wrap Up -->\n"
+            '<article class="chapter" id="wrap-up">\n'
+            "<p>Wrap-up chapter.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_annotations({})
+
+        result = self.fixture.build()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        page = (self.repo / "target" / "guide" / "demo-guide.html").read_text(encoding="utf-8")
+        self.assertIn('<a href="#setup">2</a>', page)
+        self.assertIn('<a href="#wrap-up">3</a>', page)
+
+    def test_comma_separated_chapter_list_with_missing_chapter_fails(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            "<p>See chapters 1, 2 and 9 for details.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_chapter(
+            "02-setup.html",
+            "<!-- chapter: setup | Configuration -->\n"
+            '<article class="chapter" id="setup">\n'
+            "<p>Setup chapter.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_annotations({})
+
+        result = self.fixture.build()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("reference to missing chapter", result.stderr)
+
+    def test_annotated_single_line_excerpt_renders_singular_label_and_anchor(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            '<div id="target-anchor">Target</div>\n'
+            '@@CODE Cargo.toml id=single "[package]" +1@@\n'
+            "</article>\n",
+        )
+        self.fixture.write_annotations(
+            {
+                "single": {
+                    "owner": "Core Team",
+                    "marks": [
+                        {
+                            "id": "only-mark",
+                            "match": "[package]",
+                            "kind": "data",
+                            "target": "target-anchor",
+                            "label": "Package name",
+                            "text": "Declares the package.",
+                        }
+                    ],
+                }
+            }
+        )
+
+        result = self.fixture.build()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=self.repo, capture_output=True, text=True, check=True
+        ).stdout.strip()
+        page = (self.repo / "target" / "guide" / "demo-guide.html").read_text(encoding="utf-8")
+        self.assertIn(
+            f'<a href="https://example.com/demo/blob/{revision}/Cargo.toml#L1">lines 1</a>', page
+        )
 
 
 if __name__ == "__main__":
