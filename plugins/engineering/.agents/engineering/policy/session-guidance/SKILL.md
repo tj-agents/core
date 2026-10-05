@@ -1,7 +1,7 @@
 ---
 name: session-guidance
 description: Session guidance for an explicitly selected engineering lifecycle, including workflow ownership, staged skill loading, repair responsibility and authorized delivery continuity.
-kind: contract
+kind: policy
 domain: process
 ---
 
