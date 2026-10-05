@@ -10,7 +10,7 @@ from hook_runtime import claim_invocation
 CONFIG_FILE = ".agents/worktree-cleanup-gate.json"
 HOOK_NAME = "worktree-cleanup-gate"
 VIOLATION_STATES = ("MERGED_NOT_IN_MAIN", "ORPHAN_FOLDER")
-AUDIT_TIMEOUT_SECONDS = int(os.environ.get("WORKTREE_CLEANUP_GATE_TIMEOUT_SECONDS", "25"))
+AUDIT_TIMEOUT_SECONDS = int(os.environ.get("WORKTREE_CLEANUP_GATE_TIMEOUT_SECONDS", "10"))
 
 
 def find_config(cwd):
