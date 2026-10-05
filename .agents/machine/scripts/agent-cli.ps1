@@ -56,7 +56,7 @@ function Sync-ClaudeStandards {
     try {
         $registry = Get-Content -LiteralPath (Join-Path $plugins 'installed_plugins.json') -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
         $candidates += @($registry.plugins.'machine@base-agents' | Where-Object { $_.scope -eq 'user' -and $_.installPath } |
-            ForEach-Object { Join-Path $_.installPath 'resources\machine\scripts\claude_standards_sync.py' })
+            ForEach-Object { Join-Path $_.installPath 'resources/machine/scripts/claude_standards_sync.py' })
     }
     catch { }
     $candidates += Join-Path $PSScriptRoot 'claude_standards_sync.py'
@@ -215,7 +215,7 @@ function Resolve-AgentLaneModel {
     if (-not $Lane -and -not $Frontier) { throw 'Resolve-AgentLaneModel needs a -Lane or -Frontier.' }
     if ($Lane -and $Frontier) { throw 'A lane and the frontier tier are mutually exclusive.' }
 
-    $tablePath = Join-Path $PSScriptRoot "..\..\lanes\$Harness.json"
+    $tablePath = Join-Path $PSScriptRoot "../../lanes/$Harness.json"
     if (-not (Test-Path -LiteralPath $tablePath -PathType Leaf)) {
         throw "The $Harness lane table was not found at $tablePath."
     }
