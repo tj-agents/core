@@ -61,17 +61,16 @@ def _is_script(path):
 # The native executable, never the npm shim: a shim launches the TUI through an extra node process and
 # degrades it to monochrome and non-interactive, the failure handoff-codex first recorded. On Windows
 # `claude` on PATH resolves to that shim (claude.ps1/claude.cmd), so PATH is consulted only for a real
-# claude.exe; on POSIX the shim is a `#!` script, so a PATH hit that is one is refused.
+# claude.exe; on POSIX the shim is a `#!` script, and npm with its prefix at ~/.local puts one at the native
+# install's own path, so any candidate that is one is refused.
 def resolve_claude_executable(home=None, which=shutil.which):
     home = Path(home) if home else Path.home()
     name = 'claude.exe' if IS_WINDOWS else 'claude'
     local = home / '.local' / 'bin' / name
-    if local.is_file():
-        return str(local)
-
     found = which(name)
-    if found and os.path.isfile(found) and (IS_WINDOWS or not _is_script(os.path.realpath(found))):
-        return found
+    for candidate in (str(local), found):
+        if candidate and os.path.isfile(candidate) and (IS_WINDOWS or not _is_script(os.path.realpath(candidate))):
+            return candidate
 
     raise LaunchError(f'The native Claude Code executable was not found. Looked for {local} and a native {name} on PATH.')
 
@@ -263,6 +262,11 @@ def terminal_argument(value):
         raise LaunchError(
             f'Windows Terminal cannot carry a line break or tab in an argument containing no space, and would drop it: {value}'
         )
+
+    # An empty value has no space to be quoted for, so Windows Terminal drops it and every later argument
+    # shifts into its place.
+    if not value:
+        raise LaunchError('Windows Terminal cannot carry an empty argument, and would shift the next one into its place.')
 
     quoted = ' ' in value
     parts = []

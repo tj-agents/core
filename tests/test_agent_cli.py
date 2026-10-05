@@ -124,6 +124,10 @@ class TerminalArgumentTests(unittest.TestCase):
             with self.assertRaises(CLI.LaunchError):
                 CLI.terminal_argument(value)
 
+    def test_an_empty_value_is_refused_rather_than_dropped(self):
+        with self.assertRaises(CLI.LaunchError):
+            CLI.terminal_argument('')
+
     def test_a_line_break_or_tab_beside_a_space_is_carried(self):
         self.assert_delivered('a b\nc', 'tab\there too')
 
@@ -165,6 +169,17 @@ class ClaudeExecutableTests(unittest.TestCase):
         shim = executable(self.base / 'npm' / 'claude', '#!/usr/bin/env node\n')
         with self.assertRaises(CLI.LaunchError):
             CLI.resolve_claude_executable(home=self.base / 'empty', which=lambda _: str(shim))
+
+    @unittest.skipIf(CLI.IS_WINDOWS, 'the #! shim check is POSIX-only')
+    def test_an_npm_shim_at_the_native_install_path_is_refused(self):
+        executable(self.base / 'npm' / 'cli.js', '#!/usr/bin/env node\n')
+        local = self.base / 'home' / '.local' / 'bin' / 'claude'
+        local.parent.mkdir(parents=True)
+        local.symlink_to(self.base / 'npm' / 'cli.js')
+        native = executable(self.base / 'path' / 'claude', '\x7fELF')
+        self.assertEqual(CLI.resolve_claude_executable(home=self.base / 'home', which=lambda _: str(native)), str(native))
+        with self.assertRaises(CLI.LaunchError):
+            CLI.resolve_claude_executable(home=self.base / 'home', which=lambda _: None)
 
     def test_a_native_binary_on_path_is_accepted(self):
         native = executable(self.base / 'path' / self.name, '\x7fELF')
