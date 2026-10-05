@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    'codex_followup', ROOT / '.agents/machine/followup-codex/scripts/codex_followup.py'
+    'codex_followup', ROOT / '.agents/machine/utility/followup-codex/scripts/codex_followup.py'
 )
 FOLLOWUP = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FOLLOWUP)

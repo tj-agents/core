@@ -7,5 +7,5 @@ domain: machine
 
 # Verified Codex follow-up
 
-Read and follow the [canonical shared definition](../../../.agents/machine/followup-codex/SKILL.md) in full.
+Read and follow the [canonical shared definition](../../../.agents/machine/utility/followup-codex/SKILL.md) in full.
 This entry point supplies only Claude discovery metadata; the shared procedure is authored once under `.agents/`.
