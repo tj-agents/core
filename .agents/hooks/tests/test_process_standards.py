@@ -101,10 +101,27 @@ class ProcessStandardsTests(unittest.TestCase):
         flat = " ".join(instructions.split())
 
         self.assertIn(
-            "Before committing or returning a terminal result, reconcile every problem "
-            "encountered: it is fixed or already has the owning debt entry",
+            "Before committing or returning a terminal result, check the work against the "
+            "standards that governed it and reconcile every problem encountered: it is fixed, "
+            "handed off, or already has the owning debt entry",
             flat,
         )
+
+    def test_a_standards_defect_hands_off_in_the_same_turn(self):
+        instructions = authored_skill("session-guidance").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(instructions.split())
+
+        for phrase in (
+            "A defect in a consumed standards package or its source repository is the exception: "
+            "a stale or broken standard",
+            "and so is a standard that caused or failed to prevent a mistake",
+            "in the same turn, before the current task resumes, without asking",
+            "announcing a later or separate fix instead of launching is a violation",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, flat)
 
     def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
         body = authored_skill("plan-execution").read_text(
@@ -409,7 +426,7 @@ class ProcessStandardsTests(unittest.TestCase):
             cd,
         )
         self.assertIn(
-            "the original stops repository-scoped work and releases its host session", cd
+            "the original stops repository-scoped work; it cannot end its own host session", cd
         )
         self.assertIn(
             "put that exact operation and its final filesystem verification in the "
