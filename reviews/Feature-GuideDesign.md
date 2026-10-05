@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `b5015684b690bb8affe83f88f3d4f5e26bcd87ae`  `(2026-10-05)`
+**Reviewed up to commit:** `d9afa4c0593d71b2f030e82a907b8449b1b537ae`  `(2026-10-05)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-05 — full
@@ -173,4 +173,27 @@ the head; `workflow` lens over the materialized bundle — zero findings (author
 catalog change, work-order edits append/status-only, test placement verified). The one noted non-finding
 ("chapter 1 and 2 other repos" consuming ` and 2`) is the construct's intended meaning, predates this
 branch, and is unchanged by it.
+
+## Review pass — 2026-10-05 — incremental
+
+**Candidate base:** `b5015684b690bb8affe83f88f3d4f5e26bcd87ae`
+**Candidate head:** `d9afa4c0593d71b2f030e82a907b8449b1b537ae`
+**Candidate branch:** `Feature/GuideDesign`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:833f95c99232a9756c3b34d0c2a69f4a650e0fa495679a1a32af7b2cf1e20694` `(3 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\guide-design-review-5\review\b9372a8bd1df27e1cb44378ac0ed07f24e55827bb676c435c11715c90eaff26e`
+**Candidate bundle identity:** `sha256:6e901f39ea23cb6b3b758752b4e3f6746d85a1883b9d4e01657a3ecdf2cfaa09`
+**Work-order path:** `reviews/Feature-GuideDesign.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No findings. Layer: native Claude Code `code-review` (medium) over `b501568..d9afa4c` (the helper selected
+no other lens for this delta). The delta fixes the PR-CI failure: CI's Windows checkout materialized the
+template files as CRLF while the scaffold writes LF-normalized bytes, so two raw-byte test assertions
+failed remotely and passed locally. The tests now compare against LF-normalized template bytes — verified
+as the exact contract `write_builder_owned` guarantees — and `.gitattributes` pins the template directory
+to LF (index and worktree confirmed `i/lf w/lf` for all four files; the generated `plugins/` copies are
+distribution output outside the attribute's concern). The work-order bookkeeping commit is append-only.
 
