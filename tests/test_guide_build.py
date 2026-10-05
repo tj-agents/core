@@ -15,6 +15,10 @@ TEMPLATE = GUIDE_BUILD / "template"
 BUILDER_OWNED = ("build.py", "page.html", "open.sh", "README.md")
 
 
+def template_bytes(name):
+    return (TEMPLATE / name).read_bytes().replace(b"\r\n", b"\n")
+
+
 def run(args, cwd):
     return subprocess.run(
         [sys.executable, *args], cwd=str(cwd), capture_output=True, text=True
@@ -97,7 +101,7 @@ class ScaffoldTests(unittest.TestCase):
         guide = self.repo / "guide"
         for name in BUILDER_OWNED:
             self.assertTrue((guide / name).exists(), name)
-            self.assertEqual((guide / name).read_bytes(), (TEMPLATE / name).read_bytes())
+            self.assertEqual((guide / name).read_bytes(), template_bytes(name))
         self.assertEqual(
             json.loads((guide / "guide.json").read_text(encoding="utf-8")),
             {"title": "", "eyebrow": "", "repository": "", "output": ""},
@@ -117,7 +121,7 @@ class ScaffoldTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("build.py", result.stdout)
-        self.assertEqual((guide / "build.py").read_bytes(), (TEMPLATE / "build.py").read_bytes())
+        self.assertEqual((guide / "build.py").read_bytes(), template_bytes("build.py"))
         self.assertEqual(
             json.loads((guide / "guide.json").read_text(encoding="utf-8"))["title"],
             "Kept Title",
