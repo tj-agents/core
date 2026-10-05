@@ -12,6 +12,11 @@ peer the way the user sees it rather than by a branch-derived internal name.
 A session is recorded at SessionStart by register_session.py. A session started before that hook existed,
 or outside the launcher, has no entry; `list -IncludeUnrecorded` also reports live claude.exe processes
 with no entry so nothing is invisible.
+
+`list` scopes to what the caller plausibly cares about: sessions under the current repository and under
+its parent folder (the sibling repos beside it - an "org" of related checkouts). Pass `-Under` for an
+explicit scope instead, or `-All` to see every recorded session on the machine unfiltered. A caller not
+inside a git repository gets `-All` behavior automatically, since there is no repo root to scope to.
 #>
 [CmdletBinding(DefaultParameterSetName = 'List')]
 param(
@@ -24,6 +29,12 @@ param(
     [string] $Session,
 
     [switch] $IncludeUnrecorded,
+
+    # list only: show every recorded session, ignoring the repo/org scope.
+    [switch] $All,
+
+    # list only: scope to sessions whose directory is under this path instead of the auto-detected scope.
+    [string] $Under,
 
     # close only: end the process without the confirmation prompt.
     [switch] $Force
@@ -48,7 +59,10 @@ function Get-RecordedSessions {
 
         $process = try { Get-Process -Id $entry.pid -ErrorAction Stop } catch { $null }
         # A pid is reused once its owner exits, so age-match before believing a live process is this one.
-        $alive = $null -ne $process -and $process.StartTime.ToUniversalTime() -le
+        # StartTime is null, not an exception, for a process this account cannot query (e.g. a reused pid
+        # now owned by another user's or a protected process) - that is not provably our session either.
+        $startTime = if ($process) { try { $process.StartTime } catch { $null } } else { $null }
+        $alive = $null -ne $startTime -and $startTime.ToUniversalTime() -le
             [DateTimeOffset]::FromUnixTimeSeconds([long]$entry.started_at).UtcDateTime.AddMinutes(1)
 
         [pscustomobject]@{
@@ -80,6 +94,27 @@ function Get-UnrecordedSessions {
         }
 }
 
+function Get-RepoRoot {
+    param([string] $From = (Get-Location).Path)
+
+    $current = Get-Item -LiteralPath $From
+    while ($current) {
+        if (Test-Path -LiteralPath (Join-Path $current.FullName '.git')) { return $current.FullName }
+        $current = $current.Parent
+    }
+    return $null
+}
+
+function Test-UnderPath {
+    param([string] $Path, [string] $Root)
+
+    if (-not $Path -or -not $Root) { return $false }
+    $normalizedPath = $Path.TrimEnd('\', '/')
+    $normalizedRoot = $Root.TrimEnd('\', '/')
+    if ($normalizedPath.Equals($normalizedRoot, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    return $normalizedPath.StartsWith($normalizedRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Find-Session {
     param([object[]] $Sessions, [string] $Needle)
 
@@ -106,7 +141,35 @@ if ($IncludeUnrecorded) { $sessions += @(Get-UnrecordedSessions -Known $sessions
 switch ($Action) {
     'list' {
         if ($sessions.Count -eq 0) { Write-Output 'No CLI sessions recorded.'; break }
-        $sessions |
+
+        $scoped = $sessions
+        $scopeNote = $null
+        if (-not $All) {
+            if ($Under) {
+                $scoped = @($sessions | Where-Object { Test-UnderPath -Path $_.Cwd -Root $Under })
+                $scopeNote = "scoped to '$Under'"
+            }
+            else {
+                $repoRoot = Get-RepoRoot
+                if ($repoRoot) {
+                    $orgRoot = (Get-Item -LiteralPath $repoRoot).Parent.FullName
+                    $scoped = @($sessions | Where-Object {
+                        (Test-UnderPath -Path $_.Cwd -Root $repoRoot) -or (Test-UnderPath -Path $_.Cwd -Root $orgRoot)
+                    })
+                    $scopeNote = "scoped to '$orgRoot' (pass -All for every machine session, -Under <path> for a different scope)"
+                }
+                else {
+                    $scopeNote = 'not in a git repository; showing every recorded session (pass -Under <path> to scope)'
+                }
+            }
+        }
+
+        if ($scopeNote) { Write-Output $scopeNote }
+        if ($scoped.Count -eq 0) {
+            Write-Output 'No CLI sessions in scope.'
+            break
+        }
+        $scoped |
             Sort-Object -Property @{ Expression = 'Alive'; Descending = $true }, 'Title' |
             Format-Table -AutoSize Title, SessionId, Alive, Pid, Cwd
     }
