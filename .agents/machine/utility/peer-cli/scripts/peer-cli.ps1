@@ -186,7 +186,11 @@ switch ($Action) {
             $answer = Read-Host "Close '$($target.Title ?? $target.SessionId)' (pid $($target.Pid))? [y/N]"
             if ($answer -notmatch '^(y|yes)$') { Write-Output 'Left running.'; break }
         }
-        Stop-Process -Id $target.Pid -ErrorAction Stop
+        # Stop-Process only kills the named pid, not its children. Each Bash-tool call spawns its own
+        # bash.exe/sh.exe tree, and an orphaned child left running after the parent dies can still hold
+        # a real directory lock on whatever it was cd'd into - taskkill /T kills the whole tree.
+        & taskkill.exe /PID $target.Pid /T /F | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "taskkill exited $LASTEXITCODE closing pid $($target.Pid)" }
         Write-Output "Closed '$($target.Title ?? $target.SessionId)' (pid $($target.Pid))."
     }
 }
