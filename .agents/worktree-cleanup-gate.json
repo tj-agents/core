@@ -1,0 +1,3 @@
+{
+  "audit_command": ["pwsh", "-NoProfile", "-File", "scripts/worktrees.ps1", "audit"]
+}

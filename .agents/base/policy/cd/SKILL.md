@@ -28,11 +28,21 @@ checkout. That workflow checkpoints the current owner, selects the supported Cod
 starts exactly one successor, verifies launcher submission, and releases the original writer.
 
 When the transfer exists to release the current directory for removal, the handoff must make the successor
-the sole owner of the removal and final filesystem verification. After verified launcher submission the
-original stops repository-scoped work; it cannot end its own host session, so releasing it is a human action
-the successor's `## Next Steps` names as a gate, and the original must not attempt the removal itself.
-The successor continues from the target checkout only after the predecessor no longer holds the old path,
-and treats any removal error or residual path as incomplete cleanup.
+the sole owner of the removal and final filesystem verification. A process still holding the old path as its
+cwd blocks that removal no matter which directory a later command targets — a live original is incomplete
+cleanup even after it has reported done. After verified launcher submission the original reports its last
+status, then ends its own host session immediately: self-close through `machine:peer-cli`'s `close` command
+against its own recorded session id, with `-Force` (a confirmation prompt would block forever with no one to
+answer it).
+
+```powershell
+& '<peer-cli-skill-directory>/scripts/peer-cli.ps1' close '<own-session-id>' -Force
+```
+
+Where the repository's terminal profile has run `configure-terminal-tab-close.ps1` (peer-cli's one-time
+`closeOnExit: always` setup), this also takes the original's terminal tab with it. The original must not
+attempt the removal itself. The successor continues from the target checkout only after the predecessor's
+session is confirmed closed, and treats any removal error or residual path as incomplete cleanup.
 
 Only after the automatic `handoff` capability is genuinely unavailable, or its launcher fails after
 diagnosis, give the user the exact `/cd <absolute-path>` command and pause repository-scoped work until the
