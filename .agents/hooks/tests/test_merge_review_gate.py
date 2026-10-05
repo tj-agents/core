@@ -351,11 +351,15 @@ class CanonicalEnvelopeShellTests(unittest.TestCase):
         git = shutil.which("git")
         if git is None:
             return None
-        for ancestor in Path(git).resolve().parents[:3]:
-            candidate = ancestor / "bin" / "bash.exe"
-            if candidate.is_file():
-                return str(candidate)
-        return None
+        candidate = next(
+            (
+                root / "bin" / "bash.exe"
+                for root in Path(git).resolve().parents
+                if (root / "bin" / "bash.exe").is_file()
+            ),
+            None,
+        )
+        return str(candidate) if candidate else None
 
     def test_command_position_variants_execute_pushd_under_native_bash(self):
         bash = self.bash()
@@ -407,7 +411,6 @@ class CanonicalEnvelopeShellTests(unittest.TestCase):
         )
         bash = self.bash()
         self.assertIsNotNone(bash)
-        bash = Path(bash)
         self.assert_target(
             subprocess.run([str(bash), "-c", command], capture_output=True, text=True)
         )

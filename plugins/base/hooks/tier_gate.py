@@ -20,7 +20,7 @@ Three modes, one detection:
 - `--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
   all when no stack tier is installed, because a statement about an empty set is pure noise.
 - `--conventions` lists, for every tier that applies here, the conventions its installed payload
-  ships - the skills whose front matter declares `kind: contract`. This is what a review loads: the
+  ships - the skills whose front matter declares `kind: convention` or legacy `kind: contract`. This is what a review loads: the
   applicable tiers' rules, resolved from the same installed declarations the gate reads, with nothing
   wired into the reviewed repository.
 - No argument (PreToolUse) blocks invoking a skill that belongs to a tier whose stack is absent.
@@ -51,8 +51,8 @@ import sys
 SCHEMA_VERSIONS = (1, 2)
 DECLARATION_NAME = "tier.json"
 ORPHAN_MARKER = ".orphaned_at"
-FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z0-9-]+)[ \t]*$", re.MULTILINE)
-CONVENTION_KIND = "contract"
+FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
+CONVENTION_KINDS = frozenset({"contract", "convention"})
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 SHELL_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "exec", "local_shell"})
@@ -115,6 +115,10 @@ def cache_roots():
         if len(plugin_root.parents) >= 3:
             add(plugin_root.parents[2])
 
+    here = Path(__file__).resolve()
+    if len(here.parents) > 4 and here.parents[4].name == "cache":
+        add(here.parents[4])
+
     for variable in ("CLAUDE_CONFIG_DIR", "CODEX_HOME"):
         value = os.environ.get(variable)
         if value:
@@ -126,14 +130,74 @@ def cache_roots():
     return roots
 
 
-def declarations(roots=None):
+def _key(path):
+    return os.path.normcase(os.path.normpath(str(path)))
+
+
+def _resolved_key(path):
+    try:
+        return _key(Path(path).resolve())
+    except (OSError, ValueError):
+        return _key(path)
+
+
+def _within(key, ancestor):
+    return key == ancestor or key.startswith(ancestor.rstrip("\\/") + os.sep)
+
+
+def installed_declarations(root, project=None):
+    """Each installed `tier.json` the registry beside this cache names, with its scope rank, or None.
+
+    A project-scoped install outranks the user-scope one, the most specific project first; one scoped
+    to another project does not count. Reading only installed paths keeps the per-call cost
+    proportional to installed plugins, not to the stale versions a cache accumulates.
+    """
+    registry = Path(root).parent / "installed_plugins.json"
+    try:
+        plugins = json.loads(registry.read_text(encoding="utf-8-sig")).get("plugins")
+    except (OSError, UnicodeError, ValueError, AttributeError):
+        return None
+    if not isinstance(plugins, dict):
+        return None
+    cache = _resolved_key(root)
+    here = _resolved_key(project) if project is not None else None
+    ranked = {}
+    for entries in plugins.values():
+        for entry in entries if isinstance(entries, list) else ():
+            location = entry.get("installPath") if isinstance(entry, dict) else None
+            if not _text(location):
+                continue
+            scoped = _text(entry.get("projectPath"))
+            rank = -1
+            if scoped:
+                scope = _resolved_key(scoped)
+                if here is None or not _within(here, scope):
+                    continue
+                rank = len(scope)
+            ancestor = Path(location).parent.parent.parent
+            if _key(ancestor) != cache and _resolved_key(ancestor) != cache:
+                continue
+            path = Path(location) / DECLARATION_NAME
+            ranked[path] = max(rank, ranked.get(path, rank))
+    return ranked
+
+
+def declarations(roots=None, project=None):
+    """One declaration per plugin: the first cache root that has it, at its installed version.
+
+    Roots are in priority order, the running host's cache first. A cache with a host registry beside it
+    answers only for its installed versions; one without falls back to every cached version, newest first.
+    """
     found = {}
     for root in cache_roots() if roots is None else roots:
-        try:
-            paths = sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME))
-        except OSError:
-            continue
-        for path in paths:
+        ranked = installed_declarations(root, project)
+        if ranked is None:
+            try:
+                ranked = dict.fromkeys(sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME)), -1)
+            except OSError:
+                continue
+        candidates = {}
+        for path, rank in sorted(ranked.items()):
             version_directory = path.parent
             plugin = version_directory.parent.name
             marketplace = version_directory.parent.parent.name
@@ -147,11 +211,24 @@ def declarations(roots=None):
                 continue
             orphaned = (version_directory / ORPHAN_MARKER).exists()
             declaration = Declaration(plugin, marketplace, data, version_directory, orphaned)
-            current = found.get(declaration.id)
-            if current is not None and not current.orphaned and declaration.orphaned:
-                continue
-            found[declaration.id] = declaration
+            preference = _preference(declaration, rank)
+            current = candidates.get(declaration.id)
+            if current is None or preference > current[0]:
+                candidates[declaration.id] = (preference, declaration)
+        for identity, (_, declaration) in candidates.items():
+            current = found.get(identity)
+            if current is None or (current.orphaned and not declaration.orphaned):
+                found[identity] = declaration
     return sorted(found.values(), key=lambda declaration: declaration.tier)
+
+
+def _preference(declaration, rank):
+    """The most specific install scope, then live over orphaned, then the newest directory."""
+    try:
+        modified = declaration.payload_dir.stat().st_mtime
+    except OSError:
+        modified = 0.0
+    return (rank, not declaration.orphaned, modified)
 
 
 def project_root(payload):
@@ -293,7 +370,7 @@ def overridden():
 
 
 def assess(root, found=None):
-    found = declarations() if found is None else found
+    found = declarations(project=root) if found is None else found
     if not found:
         return [], [], []
 
@@ -340,7 +417,11 @@ def statement(root, found=None):
         )
         lines.append(
             "Does not apply here: " + names + ". Those standards describe code this project does "
-            "not contain - do not read, invoke or cite them here. A PreToolUse gate blocks them."
+            "not contain; do not invoke them or apply their rules to this project's code. "
+            "For an explicitly requested standards-source audit, read canonical source files as "
+            "the subject of the investigation and cite them as evidence. That inspection does not "
+            "load them as governing instructions or make their tier applicable. Installed skill "
+            "invocations and cached skill loads remain gated."
         )
     return "\n".join(lines)
 
@@ -353,11 +434,6 @@ def front_matter(text):
 
 
 def contract_skills(payload_dir):
-    """Every convention the installed payload ships: (name, SKILL.md path), sorted by name.
-
-    A convention is a skill whose front matter declares `kind: contract` - the marker every tier
-    repository already uses. Front matter is the source of truth; INDEX.md is only a human index.
-    """
     if payload_dir is None:
         return []
     try:
@@ -372,7 +448,7 @@ def contract_skills(payload_dir):
         except OSError:
             continue
         match = FRONT_MATTER_KIND.search(front_matter(text))
-        if match and match.group(1) == CONVENTION_KIND:
+        if match and match.group(1) in CONVENTION_KINDS:
             skills.append((entry.name, skill))
     return skills
 

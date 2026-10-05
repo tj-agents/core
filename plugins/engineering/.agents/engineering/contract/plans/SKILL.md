@@ -370,6 +370,10 @@ resumes that plan as its owner. Judge plans between these cases by the size and 
 execution, how much planning context is useful, and whether a fresh owner can act from the checkpoint.
 Record the reason when choosing the less usual path; plan length alone is not a mechanical threshold.
 
+`engineering:plan-authoring` owns the critical-plan readiness decision and compact execution goalpost.
+Apply it before a substantial-design transfer. `engineering:handoff` owns the matching acknowledgement
+and first-action evidence; launcher submission alone does not establish an accountable executor.
+
 Transfer to a fresh context only when at least one of these conditions is true:
 
 - the user explicitly asks to clear, restart, or hand the work to another context;

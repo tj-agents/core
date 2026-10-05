@@ -10,7 +10,7 @@
             "command": "python",
             "args": [
               "-B",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py"
             ]
           }
         ]

@@ -4,7 +4,6 @@ description: Drive every remaining stage of one canonical staged big review to c
 
 kind: workflow
 domain: process
-model: gpt-6-sol
 ---
 
 # Drive a staged review to completion

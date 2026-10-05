@@ -4,9 +4,6 @@ description: Maintain a required stack when work must build on an unmerged PR. C
 
 kind: operation
 domain: process
-model: claude-sonnet-5
-effort: high
-effort: high
 ---
 
 # Stacked pull requests

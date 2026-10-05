@@ -16,6 +16,22 @@ SYNC = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SYNC)
 
 
+class KindMetadataTests(unittest.TestCase):
+    def body(self, kind):
+        return f"---\nname: custom-skill\ndescription: fixture\nkind: {kind}\ndomain: process\n---\n"
+
+    def test_kind_accepts_open_lowercase_words(self):
+        for kind in ("contract", "convention", "policy", "utility", "workflow", "knowledge", "custom"):
+            with self.subTest(kind=kind):
+                self.assertEqual(SYNC.metadata(self.body(kind), Path("fixture/SKILL.md"))["kind"], kind)
+
+    def test_kind_rejects_nonword_syntax(self):
+        for kind in ("convention2", "con-vention", "Convention", "", "two words", "café"):
+            with self.subTest(kind=kind):
+                with self.assertRaises(ValueError):
+                    SYNC.metadata(self.body(kind), Path("fixture/SKILL.md"))
+
+
 class SourceLayoutTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="agent source layout ")
@@ -36,7 +52,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(65, len(skills))
+        self.assertEqual(67, len(skills))
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
         })
@@ -57,10 +73,11 @@ class SourceLayoutTests(unittest.TestCase):
         self.assertFalse((self.root / "engineering").exists())
         self.assertFalse((self.root / "machine").exists())
         self.assertIn(
-            "plugins/base/.agents/base/contract/plan-artifacts/SKILL.md",
+            "plugins/base/.agents/base/policy/plan-artifacts/SKILL.md",
             output,
         )
-        self.assertIn("plugins/base/.agents/base/contract/agent-files/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/goal-continuation/SKILL.md", output)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
@@ -93,13 +110,13 @@ class SourceLayoutTests(unittest.TestCase):
         )
 
     def test_generated_text_bytes_are_stable_across_checkout_line_endings(self):
-        source = self.root / ".agents/base/contract/plan-artifacts/templates/PLAN.md"
+        source = self.root / ".agents/base/policy/plan-artifacts/templates/PLAN.md"
         lf = source.read_bytes().replace(b"\r\n", b"\n")
         source.write_bytes(lf.replace(b"\n", b"\r\n"))
 
         _, output, _, _ = SYNC.build(self.root)
 
-        generated = output["plugins/base/.agents/base/contract/plan-artifacts/templates/PLAN.md"]
+        generated = output["plugins/base/.agents/base/policy/plan-artifacts/templates/PLAN.md"]
         self.assertEqual(lf, generated)
         self.assertNotIn(b"\r\n", generated)
 
@@ -159,8 +176,8 @@ class SourceLayoutTests(unittest.TestCase):
     def test_cd_routes_to_automatic_handoff_before_manual_fallback(self):
         _, output, _, _ = SYNC.build(self.root)
         bodies = [
-            (self.root / ".agents/base/contract/cd/SKILL.md").read_text(encoding="utf-8"),
-            output["plugins/base/.agents/base/contract/cd/SKILL.md"].decode("utf-8"),
+            (self.root / ".agents/base/policy/cd/SKILL.md").read_text(encoding="utf-8"),
+            output["plugins/base/.agents/base/policy/cd/SKILL.md"].decode("utf-8"),
         ]
         for body in bodies:
             normalized = body.replace("\r\n", "\n")
@@ -254,6 +271,38 @@ class SourceLayoutTests(unittest.TestCase):
         path.write_text(path.read_text(encoding="utf-8") + "\nDuplicated rule.\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "thin canonical reference"):
             SYNC.build(self.root)
+
+    def test_a_host_only_term_in_a_shared_definition_fails_generation(self):
+        shared = self.root / ".agents/engineering/workflow/review/SKILL.md"
+        original = shared.read_text(encoding="utf-8")
+        for host, term in (
+            ("claude", "`code-review`"),
+            ("claude", "`/code-review`"),
+            ("claude", "askuserquestion"),
+            ("claude", "the Skill tool"),
+            ("claude", "the `Skill` tool"),
+            ("claude", "**/code-review**"),
+            ("codex", "codex  review"),
+        ):
+            with self.subTest(host=host, term=term):
+                shared.write_text(original + f"\nRun {term} here.\n", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, rf"{host}-only term .* belongs in \.{host}/skills/review"):
+                    SYNC.build(self.root)
+        shared.write_text(
+            original + "\nThe `code-review-lens` path engineering/code-review/ runs in the Codex review lane"
+            " as a scheduled task through the host's skill tool.\n",
+            encoding="utf-8",
+        )
+        config = SYNC.load(self.root / ".agents/plugins/sources.json")
+        SYNC.validate_host_neutral(config, SYNC.discover(self.root, config))
+        shared.write_text(original, encoding="utf-8")
+
+        reference = shared.parent / "reference.md"
+        reference.write_text("Invoke `/security-review` next.\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, r"reference\.md: claude-only term"):
+            SYNC.build(self.root)
+        reference.unlink()
+        SYNC.build(self.root)
 
     def test_scope_metadata_and_public_names_are_enforced(self):
         kinded = self.root / ".agents/engineering/utility/recents/SKILL.md"

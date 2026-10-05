@@ -9,7 +9,7 @@
             "command": "python",
             "args": [
               "-B",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/contract/plan-artifacts/scripts/session-context.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/plan-artifacts/scripts/session-context.py"
             ]
           }
         ]
@@ -36,7 +36,20 @@
             "command": "python",
             "args": [
               "-B",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/base/contract/agent-files/scripts/session-context.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/agent-files/scripts/session-context.py"
+            ]
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/goal-continuation/scripts/session-context.py"
             ]
           }
         ]

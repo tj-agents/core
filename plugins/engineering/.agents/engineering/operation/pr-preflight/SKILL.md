@@ -4,7 +4,6 @@ description: Resolve the owning review and check publication readiness across th
 
 kind: operation
 domain: process
-lane: L5
 ---
 
 # Is this branch clear to PR?

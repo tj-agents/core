@@ -92,11 +92,11 @@ class WorkflowContractTests(unittest.TestCase):
         claude = json.loads((WORKFLOWS / "hosts" / "claude.json").read_text(encoding="utf-8"))
         self.assertEqual(
             {
-                "strategic": "gpt-6-sol",
-                "implementation": "gpt-6-sol",
+                "strategic": "gpt-6.1-sol",
+                "implementation": "gpt-6.1-sol",
                 "mechanical": "gpt-6-luna",
                 "review": "gpt-5.3-codex-spark",
-                "critical": "gpt-6-sol",
+                "critical": "gpt-6.1-sol",
             },
             {stage: value["model"] for stage, value in codex["semantic_stages"].items()},
         )
@@ -115,7 +115,7 @@ class WorkflowContractTests(unittest.TestCase):
                 "strategic": [],
                 "implementation": [],
                 "mechanical": [],
-                "review": ["gpt-6-sol"],
+                "review": ["gpt-6.1-sol"],
                 "critical": [],
             },
             {
@@ -146,7 +146,7 @@ class WorkflowContractTests(unittest.TestCase):
                 (self.contract_root / "gates.md").read_text(encoding="utf-8"),
             ]
         ).lower()
-        for model in ("gpt-6-sol", "gpt-6-luna", "codex-spark", "opus", "sonnet"):
+        for model in ("gpt-6.1-sol", "gpt-6-luna", "codex-spark", "opus", "sonnet"):
             self.assertNotIn(model, shared_policy)
 
     def test_every_compatibility_entry_and_replacement_is_an_installed_skill(self):
@@ -398,27 +398,29 @@ class WorkflowGenerationTests(unittest.TestCase):
 
     def test_extended_host_adapter_preserves_one_public_identity(self):
         config = json.loads((ROOT / ".agents/plugins/sources.json").read_text(encoding="utf-8"))
-        self.assertEqual(["persistent-workflow"], config["extended_host_adapters"])
-        canonical = authored_skill("persistent-workflow")
-        for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
-            source = ROOT / f".{host}" / "skills" / "persistent-workflow" / "SKILL.md"
-            authored = source.read_text(encoding="utf-8")
-            self.assertIn(
-                "](../../../.agents/engineering/workflow/persistent-workflow/SKILL.md)",
-                authored,
-            )
-            generated = (
-                ROOT / "plugins/engineering" / tree / "persistent-workflow" / "SKILL.md"
-            ).read_text(encoding="utf-8")
+        self.assertEqual(["persistent-workflow", "review"], config["extended_host_adapters"])
+        for skill in config["extended_host_adapters"]:
+            canonical = authored_skill(skill)
+            for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
+                with self.subTest(skill=skill, host=host):
+                    source = ROOT / f".{host}" / "skills" / skill / "SKILL.md"
+                    authored = source.read_text(encoding="utf-8")
+                    self.assertIn(
+                        f"](../../../{canonical.relative_to(ROOT).as_posix()})",
+                        authored,
+                    )
+                    generated = (
+                        ROOT / "plugins/engineering" / tree / skill / "SKILL.md"
+                    ).read_text(encoding="utf-8")
+                    self.assertEqual(
+                        authored.replace("../../../.agents/", "../../.agents/"),
+                        generated,
+                    )
+            packaged = ROOT / "plugins/engineering" / canonical.relative_to(ROOT)
             self.assertEqual(
-                authored.replace("../../../.agents/", "../../.agents/"),
-                generated,
+                canonical.read_text(encoding="utf-8"),
+                packaged.read_text(encoding="utf-8"),
             )
-        packaged = ROOT / "plugins/engineering" / canonical.relative_to(ROOT)
-        self.assertEqual(
-            canonical.read_text(encoding="utf-8"),
-            packaged.read_text(encoding="utf-8"),
-        )
 
     def test_each_verifier_executes_its_adjacent_bundle(self):
         scripts = (WORKFLOWS / "verify.py", PLUGIN_WORKFLOWS / "verify.py")
@@ -571,7 +573,7 @@ class WorkflowGenerationTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractViolation, "oneOf branches"):
             contract.validate("host", fallback)
         fallback.pop("failed_model")
-        fallback["next_model"] = "gpt-6-sol"
+        fallback["next_model"] = "gpt-6.1-sol"
         with self.assertRaisesRegex(ContractViolation, "oneOf branches"):
             contract.validate("host", fallback)
         reconciliation = json.loads(
@@ -1279,12 +1281,12 @@ class HostAdapterTests(unittest.TestCase):
             "codex",
             dispatch,
             probe=probe,
-            available_models={"gpt-6-sol"},
+            available_models={"gpt-6.1-sol"},
         )
 
         self.assertEqual("review", invocation["semantic_stage"])
         self.assertEqual("gpt-5.3-codex-spark", invocation["primary_model"])
-        self.assertEqual("gpt-6-sol", invocation["model"])
+        self.assertEqual("gpt-6.1-sol", invocation["model"])
         self.assertEqual("fallback", invocation["model_selection"])
         self.assertEqual("default", invocation["agent_name"])
         self.assertEqual("review_lens", invocation["role_agent_name"])
@@ -1315,11 +1317,11 @@ class HostAdapterTests(unittest.TestCase):
         self.assertEqual("model-unavailable", fallback["reason_code"])
         self.assertEqual("fallback", fallback["parent_transition"])
         self.assertEqual("gpt-5.3-codex-spark", fallback["failed_model"])
-        self.assertEqual("gpt-6-sol", fallback["next_model"])
+        self.assertEqual("gpt-6.1-sol", fallback["next_model"])
 
         retry_dispatch = self.dispatch("review-lens", "dispatch-002")
         retry = registry.prepare("codex", retry_dispatch, probe=probe)
-        self.assertEqual("gpt-6-sol", retry["model"])
+        self.assertEqual("gpt-6.1-sol", retry["model"])
         self.assertEqual("fallback", retry["model_selection"])
         self.assertEqual("default", retry["agent_name"])
 
@@ -1330,7 +1332,7 @@ class HostAdapterTests(unittest.TestCase):
             "Sol is unavailable.",
         )
         self.assertEqual("pause", exhausted["parent_transition"])
-        self.assertEqual("gpt-6-sol", exhausted["failed_model"])
+        self.assertEqual("gpt-6.1-sol", exhausted["failed_model"])
         self.assertIsNone(exhausted["next_model"])
 
     def test_claude_nondefault_stage_uses_general_purpose_without_a_fallback(self):

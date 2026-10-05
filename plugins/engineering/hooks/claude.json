@@ -7,11 +7,7 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py"
-            ]
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\""
           }
         ]
       }
@@ -22,11 +18,7 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py"
-            ]
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py\""
           }
         ]
       }
@@ -36,24 +28,70 @@
         "hooks": [
           {
             "type": "command",
-            "timeout": 30,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-              "--deadline",
-              "25",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py@Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py@Bash|PowerShell"
-            ]
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
       }
     ],
     "PostToolUse": [
@@ -61,16 +99,18 @@
         "hooks": [
           {
             "type": "command",
-            "timeout": 30,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-              "--deadline",
-              "25",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py"
-            ]
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ],
+        "matcher": "Bash|PowerShell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py\""
           }
         ],
         "matcher": "Bash|PowerShell"
@@ -81,17 +121,26 @@
         "hooks": [
           {
             "type": "command",
-            "timeout": 30,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
-              "--deadline",
-              "25",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py"
-            ]
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\""
           }
         ]
       }
@@ -102,11 +151,7 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"
-            ]
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py\""
           }
         ]
       }
@@ -117,11 +162,7 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py"
-            ]
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py\""
           }
         ],
         "matcher": "Bash|PowerShell"
