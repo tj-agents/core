@@ -55,7 +55,7 @@ def run_gate(name: str, raw: bytes) -> tuple[int, str, str]:
         runpy.run_path(str(script), run_name="__main__")
     except SystemExit as exit:
         code, message = exit_status(exit.code)
-    except Exception:
+    except BaseException:
         traceback.print_exc(file=stderr)
         code = 1
     finally:

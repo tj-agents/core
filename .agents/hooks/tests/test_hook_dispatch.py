@@ -50,6 +50,9 @@ GATES = {
     "crash.py": """
         raise RuntimeError("gate exploded")
     """,
+    "interrupt.py": """
+        raise KeyboardInterrupt("gate interrupted")
+    """,
     "block.py": """
         import json
         print(json.dumps({"decision": "block", "reason": "keep working"}))
@@ -119,6 +122,13 @@ class HookDispatchTests(unittest.TestCase):
         self.assertIn("crash.py", stderr)
         self.assertIn("gate exploded", stderr)
         self.assertEqual("context from Bash", output["hookSpecificOutput"]["additionalContext"])
+
+    def test_a_gate_raising_a_base_exception_is_a_crash_not_an_overrun(self):
+        for deadline in ([], ["--deadline", "20"]):
+            output, stderr = self.dispatch([*deadline, "interrupt.py", "context.py"])
+            self.assertIn("gate interrupted", stderr)
+            self.assertEqual("context from Bash", output["hookSpecificOutput"]["additionalContext"])
+            self.assertNotIn("systemMessage", output)
 
     def test_stop_blocks_combine_exit_code_and_json_reasons(self):
         output, _ = self.dispatch(["block.py", "deny.py", "imports.py"], event="Stop", tool="")
