@@ -39,7 +39,8 @@ closure.
   commit a composed catalog of owner-published release records beside their capability lock.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
-- `shell/` owns the PowerShell profile, one concern per file.
+- `shell/` owns the PowerShell profile, one concern per file. The `f` and `cr` commands live in
+  [tj-agents/cli](https://github.com/tj-agents/cli), which installs them for PowerShell and POSIX shells.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
 - install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
 
