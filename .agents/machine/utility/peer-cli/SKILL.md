@@ -19,10 +19,17 @@ the two things they do not do: resolving the title the user sees, and ending a s
 
 ```powershell
 & '<skill-directory>\scripts\peer-cli.ps1' list
+& '<skill-directory>\scripts\peer-cli.ps1' list -All
+& '<skill-directory>\scripts\peer-cli.ps1' list -Under 'C:\Users\name\source\repos\some-org'
 & '<skill-directory>\scripts\peer-cli.ps1' list -IncludeUnrecorded
 & '<skill-directory>\scripts\peer-cli.ps1' resolve 'Postgres sweep: Search'
 & '<skill-directory>\scripts\peer-cli.ps1' close 'Postgres sweep: Search'
 ```
+
+`list` defaults to what the caller plausibly cares about: sessions under the current repository and under
+its parent folder (sibling checkouts in the same org). `-Under <path>` scopes explicitly instead; `-All`
+drops scoping and shows every recorded session on the machine. Outside a git repository, `list` cannot
+auto-scope and behaves like `-All`.
 
 `close` prompts unless `-Force`. A session records itself at SessionStart, so one started before that hook
 existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe` processes that own no entry, so
