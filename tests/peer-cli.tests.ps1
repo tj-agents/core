@@ -121,7 +121,7 @@ try {
         Assert-Contains -Actual $unrecordedDefaultOutput -Expected ([string]$fakeProcess.Id) -Message 'Unrecorded sessions were hidden by the default scope filter.'
     }
     finally {
-        if (-not $fakeProcess.HasExited) { Stop-Process -Id $fakeProcess.Id -Force }
+        if (-not $fakeProcess.HasExited) { & taskkill.exe /PID $fakeProcess.Id /T /F | Out-Null }
         $fakeProcess.WaitForExit()
         $fakeProcess.Dispose()
     }
