@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:c2c0932f8442c5b8740c3d5886a6e05193d903ccf065139bd6e57baa62a08f81",
+          "digest": "sha256:d7b2755988f6aa2f39240739d3bdfdf41c21a29fc163f7b3788c0de311f4eadd",
           "harness": {
             "marketplaces": [
               {
@@ -69,6 +69,12 @@
                 "hosts": [
                   "claude",
                   "codex"
+                ]
+              },
+              {
+                "path": "hooks/hook_dispatch.py",
+                "hosts": [
+                  "claude"
                 ]
               },
               {
@@ -182,7 +188,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:a0a8cb3d7279e60209f548c7a132495bdfffc32463bb13907b0f8596e7b74859",
+          "digest": "sha256:4a8760226906673c19108cfbb8bdcfb117c08f09763dfefd2b11b3b4f96a782c",
           "harness": {
             "marketplaces": [
               {
@@ -237,6 +243,12 @@
               },
               {
                 "path": "hooks/harness_grant.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/hook_dispatch.py",
                 "hosts": [
                   "claude"
                 ]
@@ -332,7 +344,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:33f77a4df3f80bc996f865ef2774bfbeeb7aad53cc7072a47f66203dd0b27733",
+          "digest": "sha256:56a5274257ae326267b7376e502011ef26fd5003875787bd4459e9c5e03615ba",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
