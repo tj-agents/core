@@ -232,11 +232,10 @@ and is not evidence that the old directory can be deleted.
 - If that interface is unavailable, invoke the unqualified `handoff` workflow once with the primary
   checkout. Checkpoint the exact repository, merged PR, branch, remote head, target worktree, primary
   checkout, and remote default. Put the remaining Step 5 cleanup and final inventory in the successor's
-  `## Next Steps`. After verified launcher submission the predecessor stops repository-scoped work; it
-  cannot end its own host session, so releasing it is a human action the successor's `## Next Steps` names
-  as a gate, and it does not run either cleanup path. The successor is the sole cleanup owner:
-  after the predecessor no longer holds the target, it selects the helper or native-Git path below, requires
-  the physical target path to be absent, and then continues this delivery.
+  `## Next Steps`. After verified launcher submission the predecessor ends its own host session per
+  `base:cd` instead of waiting for a human to close it; it does not run either cleanup path. The successor
+  is the sole cleanup owner: after the predecessor's session is confirmed closed, it selects the helper or
+  native-Git path below, requires the physical target path to be absent, and then continues this delivery.
 
 Do not make the user choose between these paths or teach them this lifecycle detail. Only the final manual
 `/cd` pause already defined by `base:cd` applies when the automatic handoff capability is genuinely
