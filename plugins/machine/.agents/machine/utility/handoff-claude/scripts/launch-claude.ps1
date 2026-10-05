@@ -22,9 +22,9 @@ $ErrorActionPreference = 'Stop'
 
 # The shared launch primitives, from the authored source layout or the installed package layout.
 $agentCli = @(
-    (Join-Path $PSScriptRoot '..\..\..\scripts\agent-cli.ps1'),
-    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1'),
-    (Join-Path $PSScriptRoot '..\..\..\..\..\resources\machine\scripts\agent-cli.ps1')
+    (Join-Path $PSScriptRoot '../../../scripts/agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '../../../resources/machine/scripts/agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '../../../../../resources/machine/scripts/agent-cli.ps1')
 ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if (-not $agentCli) { throw "The shared agent-cli.ps1 library was not found relative to $PSScriptRoot." }
 . $agentCli
