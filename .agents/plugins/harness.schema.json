@@ -8,8 +8,6 @@
     "schema_version",
     "plugin",
     "source_roots",
-    "source_excludes",
-    "source_digest",
     "requires"
   ],
   "properties": {
@@ -20,15 +18,6 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/repositoryPath" },
       "uniqueItems": true
-    },
-    "source_excludes": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/repositoryPath" },
-      "uniqueItems": true
-    },
-    "source_digest": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "requires": { "$ref": "#/$defs/requires" }
   },
