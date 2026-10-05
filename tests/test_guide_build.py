@@ -543,6 +543,22 @@ class BuildTests(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("reference to missing chapter", result.stderr)
 
+    def test_prose_comma_number_after_chapter_reference_is_not_a_list(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            "<p>In chapter 1, 12 tests cover this.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_annotations({})
+
+        result = self.fixture.build()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        page = (self.repo / "target" / "guide" / "demo-guide.html").read_text(encoding="utf-8")
+        self.assertIn('<a href="#intro">chapter 1</a>, 12 tests', page)
+
     def test_annotated_single_line_excerpt_renders_singular_label_and_anchor(self):
         self.fixture.write_chapter(
             "01-intro.html",
