@@ -849,7 +849,8 @@ def build(root: Path, validate_catalog_digests: bool = True):
             if entry["digest"] != actual_digest:
                 raise ValueError(
                     f"Catalog digest drift for {plugin_id}: expected {entry['digest']}, actual {actual_digest}. "
-                    "Run python -B scripts/update_catalog_digests.py"
+                    "Run python -B scripts/update_catalog_digests.py and leave the result uncommitted: "
+                    "main's post-merge regenerate job commits catalog digests"
                 )
 
     return config, output, skills, compatibility
