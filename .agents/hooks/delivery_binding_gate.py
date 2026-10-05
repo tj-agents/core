@@ -34,11 +34,16 @@ Contract: exit 0 = say nothing; exit 2 = stderr is fed back to the agent.
 
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
-from hook_runtime import claim_invocation, own_payload_root
+from hook_runtime import (
+    CommandTimeout,
+    NETWORK_COMMAND_TIMEOUT_SECONDS,
+    claim_invocation,
+    own_payload_root,
+    run_command,
+)
 
 # The message is what the agent acts on, and Windows defaults these streams to cp1252.
 for _stream in (sys.stdout, sys.stderr):
@@ -135,23 +140,27 @@ def workflow_ops(root):
 
 
 def bind(root, pr):
-    completed = subprocess.run(
-        [
-            sys.executable,
-            "-B",
-            str(workflow_ops(root)),
-            "--root",
-            str(root),
-            "--workflow-run-id",
-            f"delivery-bind-pr-{pr}",
-            "delivery-bind",
-            "--pr",
-            str(pr),
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(root),
-    )
+    try:
+        completed = run_command(
+            [
+                sys.executable,
+                "-B",
+                str(workflow_ops(root)),
+                "--root",
+                str(root),
+                "--workflow-run-id",
+                f"delivery-bind-pr-{pr}",
+                "delivery-bind",
+                "--pr",
+                str(pr),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(root),
+            timeout=NETWORK_COMMAND_TIMEOUT_SECONDS,
+        )
+    except CommandTimeout as error:
+        return None, str(error)
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "").strip()[:800]
         return None, detail or f"delivery-bind exited {completed.returncode}"

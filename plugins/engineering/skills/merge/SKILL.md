@@ -4,8 +4,6 @@ description: Land the current branch's PR through the merge queue and return to 
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Landing a PR through the merge queue

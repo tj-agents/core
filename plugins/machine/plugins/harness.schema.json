@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tj-agents/core/plugins/harness.schema.json",
+  "title": "Standards package harness declaration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plugin",
+    "source_roots",
+    "requires"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plugin": { "$ref": "#/$defs/pluginId" },
+    "source_roots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/repositoryPath" },
+      "uniqueItems": true
+    },
+    "requires": { "$ref": "#/$defs/requires" }
+  },
+  "$defs": {
+    "pluginId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$"
+    },
+    "repositoryPath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "marketplace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "repository"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        }
+      }
+    },
+    "hook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "hosts"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "hosts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["claude", "codex"] },
+          "uniqueItems": true
+        }
+      }
+    },
+    "codexPrefixRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "justification", "match", "not_match"],
+      "properties": {
+        "pattern": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "justification": { "type": "string", "minLength": 1 },
+        "match": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "not_match": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claude_allow", "codex_prefix_rules"],
+      "properties": {
+        "claude_allow": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "codex_prefix_rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/codexPrefixRule" }
+        }
+      }
+    },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["marketplaces", "plugins", "hooks", "permissions"],
+      "properties": {
+        "marketplaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/marketplace" }
+        },
+        "plugins": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/pluginId" },
+          "uniqueItems": true
+        },
+        "hooks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/hook" }
+        },
+        "permissions": { "$ref": "#/$defs/permissions" }
+      }
+    }
+  }
+}

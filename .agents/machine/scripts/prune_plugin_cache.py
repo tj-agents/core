@@ -31,9 +31,12 @@ PIN_DIRECTORY = "plugin-pins"
 # A pin younger than this is honoured whatever its pid says. The hook's parent may be a shell that has
 # already exited, which would otherwise read as a dead session the moment it was recorded.
 PIN_GRACE_SECONDS = 12 * 60 * 60
+HOST_ORPHAN_MARKER = ".orphaned_at"
+HOST_ORPHAN_GRACE_SECONDS = 14 * 24 * 60 * 60
 
 LIVE = "live"
 PINNED = "pinned"
+GRACE = "grace"
 RETAINED = "retained"
 STALE = "stale"
 ORPHAN = "orphan"
@@ -153,15 +156,29 @@ def modified_at(path):
         return 0.0
 
 
-def classify(versions, live, pinned=(), keep_previous=0):
+def in_host_grace(path, now):
+    marker = path / HOST_ORPHAN_MARKER
+    try:
+        orphaned_at = int(marker.read_text(encoding="utf-8").strip()) / 1000
+    except (OSError, ValueError):
+        try:
+            orphaned_at = marker.stat().st_mtime
+        except OSError:
+            return False
+    return 0 <= now - orphaned_at < HOST_ORPHAN_GRACE_SECONDS
+
+
+def classify(versions, live, pinned=(), keep_previous=0, now=None):
     """Label every cached version directory. Returns [(path, state)] in scan order.
 
     A plugin with no live version is orphaned outright - the rename case, where nothing is coming
     back. Retention applies only to plugins that are still installed.
 
     A pin outranks every dead state and is not counted against retention: it is not a version being
-    kept back, it is a directory a running session is using.
+    kept back, it is a directory a running session is using. The host's own orphan window is treated
+    the same way.
     """
+    moment = time.time() if now is None else now
     by_plugin = {}
     for version in versions:
         by_plugin.setdefault(version.parent, []).append(version)
@@ -175,6 +192,8 @@ def classify(versions, live, pinned=(), keep_previous=0):
         for entry in entries:
             if entry not in states and normalize(entry) in held:
                 states[entry] = PINNED
+            elif entry not in states and in_host_grace(entry, moment):
+                states[entry] = GRACE
         dead = [entry for entry in entries if entry not in states]
         if not alive:
             states.update((entry, ORPHAN) for entry in dead)
@@ -381,7 +400,7 @@ def reconcile(config_root, keep_previous=0, environ=None, home=None, now=None):
         "live": live,
         "pinned": held - live,
         "expired_pins": expired,
-        "entries": classify(versions, live, held, keep_previous),
+        "entries": classify(versions, live, held, keep_previous, now),
         "missing": missing_install_paths(live, versions),
     }
 
@@ -403,12 +422,17 @@ def render_report(result, apply_mode, removed, failures, stream):
         f"{len(entries)} cached version directories",
         file=stream,
     )
-    for state in (LIVE, PINNED, RETAINED, STALE, ORPHAN):
+    for state in (LIVE, PINNED, GRACE, RETAINED, STALE, ORPHAN):
         if counts.get(state):
             print(f"  {state:<9} {counts[state]}", file=stream)
     if counts.get(PINNED):
         print(
             f"  {counts[PINNED]} directory(s) held by a running session and not removed",
+            file=stream,
+        )
+    if counts.get(GRACE):
+        print(
+            f"  {counts[GRACE]} directory(s) inside Claude's 14-day orphan window and not removed",
             file=stream,
         )
 
@@ -455,8 +479,41 @@ def run_pin(config_root, now, environ=None, home=None):
     return EXIT_OK
 
 
+def superseded_session(config_root, environ=None):
+    """The installed replacement for the plugin root this session loaded, when the registry moved on.
+
+    A process resolves its plugin roots once at startup and `/clear` keeps them, so an update made
+    since then reaches only new processes.
+    """
+    values = os.environ if environ is None else environ
+    loaded = values.get("CLAUDE_PLUGIN_ROOT")
+    if not loaded:
+        return None
+    try:
+        live = live_install_paths(config_root)
+    except RegistryUnusable:
+        return None
+    if normalize(loaded) in live:
+        return None
+    plugin = normalize(Path(loaded).parent)
+    replacements = sorted(path for path in live if normalize(Path(path).parent) == plugin)
+    return Path(replacements[0]) if replacements else None
+
+
 def run_notice(config_root, keep_previous, now, environ=None, home=None, stream=sys.stdout):
-    """One line when the cache has drifted, silence otherwise. Never removes anything."""
+    """One line when the cache has drifted, silence otherwise. Never removes anything.
+
+    A superseded session is stated every time, unthrottled: it is a fact about this session.
+    """
+    replacement = superseded_session(config_root, environ)
+    if replacement is not None:
+        loaded = Path((os.environ if environ is None else environ)["CLAUDE_PLUGIN_ROOT"])
+        print(
+            f"plugin session: this Claude process loaded {loaded.parent.name} {loaded.name}, but "
+            f"{replacement.name} is installed. /clear does not reload plugins; tell the user to "
+            "restart Claude Code before relying on this plugin's skills or hooks.",
+            file=stream,
+        )
     marker = state_directory(environ, home) / "plugin-cache-notice.json"
     if not notice_is_due(marker, now):
         return EXIT_OK
@@ -531,7 +588,8 @@ def build_parser():
     parser.add_argument(
         "--notice",
         action="store_true",
-        help="Throttled one-line session notice. Reports drift only; never removes.",
+        help="Throttled cache-drift line, plus an unthrottled line when this session runs a superseded "
+        "plugin root. Never removes.",
     )
     parser.add_argument(
         "--pin",

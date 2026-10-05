@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "plugin": "base-agents/engineering",
+  "source_roots": [
+    ".agents/engineering"
+  ],
+  "requires": {
+    "marketplaces": [
+      {
+        "id": "base-agents",
+        "repository": "tj-agents/core"
+      }
+    ],
+    "plugins": [
+      "base-agents/base",
+      "base-agents/engineering"
+    ],
+    "hooks": [
+      {
+        "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/compact_output_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/delivery_binding_gate.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/denial_prompt.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/forge_poll_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/git_auth_scope_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/harness_grant.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/merge_review_gate.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/persistent_workflow_merge_gate.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/plan_handoff_stop_launcher.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/pre_tool_use_adapter.py",
+        "hosts": [
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/red_run_gate.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
+        "path": "hooks/workflow_route.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/worktree_cleanup_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      }
+    ],
+    "permissions": {
+      "claude_allow": [],
+      "codex_prefix_rules": []
+    }
+  }
+}

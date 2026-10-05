@@ -21,6 +21,10 @@ PLANNING_ONLY = re.compile(
     r"\b(?:continue|resume)\s+planning\b",
     re.IGNORECASE,
 )
+PLANNING_REQUEST = re.compile(
+    r"\b(?:only\s+plan|plan(?:ning)?\s+only|(?:continue|resume)\s+planning)\b",
+    re.IGNORECASE,
+)
 OWNER_REFERENCE = re.compile(r"\b(?:goal|plan|roadmap)\b", re.IGNORECASE)
 LONG_RUNNING = re.compile(
     r"\b(?:all\s+(?:remaining\s+)?phases|end[- ]to[- ]end|entire\s+(?:migration|project)|"
@@ -44,6 +48,12 @@ HANDOFF_ACTION = re.compile(
     r"\b(?:side\s+(?:task|thing|work(?:stream)?)|separate\s+(?:task|workstream)|"
     r"distinct(?:ly)?\s+(?:actionable\s+)?(?:task|workstream))\b[^.!?\n]{0,80}"
     r"\b(?:hand\s*off|delegate|dispatch|launch|invoke|do\s+(?:a\s+)?handoff)\b",
+    re.IGNORECASE,
+)
+DIRECT_HANDOFF = re.compile(
+    r"(?:^|[.!?;\n]\s*)(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|"
+    r"go\s+ahead\s+and\s+)?(?:hand\s+(?:off\b|(?:this|it|that)\s+off\b)|"
+    r"do\s+(?:a\s+)?handoff\b|handoff\b)",
     re.IGNORECASE,
 )
 COMPLETE_STATUS = re.compile(
@@ -78,9 +88,11 @@ def selects_plan_execution(prompt: str, cwd: Path) -> bool:
     )
 
 
-def selects_side_workstream_handoff(prompt: str, cwd: Path) -> bool:
+def selects_handoff(prompt: str, cwd: Path) -> bool:
     if not prompt.strip() or PLANNING_ONLY.search(prompt):
         return False
+    if DIRECT_HANDOFF.search(prompt):
+        return True
     return (
         SIDE_WORKSTREAM.search(prompt) is not None
         and HANDOFF_ACTION.search(prompt) is not None
@@ -132,7 +144,11 @@ def main() -> int:
         if not isinstance(prompt, str) or not isinstance(cwd_value, str):
             raise RuntimeError("UserPromptSubmit payload requires string prompt and cwd fields")
         cwd = Path(cwd_value).resolve()
-        if selects_side_workstream_handoff(prompt, cwd):
+        if PLANNING_REQUEST.search(prompt):
+            context = load_context(
+                Path(__file__), "engineering/workflow/plan-authoring/SKILL.md", "plan-authoring"
+            )
+        elif selects_handoff(prompt, cwd):
             context = load_context(
                 Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff"
             )
