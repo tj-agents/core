@@ -4,8 +4,6 @@ description: Serially resolve open findings in the canonical review work order w
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Address a review serially

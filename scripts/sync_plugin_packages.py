@@ -205,6 +205,33 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
     return "sha256:" + digest.hexdigest()
 
 
+def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
+    loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
+    if "'" in loader:
+        raise ValueError("Codex hook snapshot loader must use only double-quoted strings")
+    expression = "exec(" + repr(loader).replace('"', r'\x22') + ")"
+    for plugin in sorted(plugins):
+        hook_path = f"plugins/{plugin}/hooks/codex.json"
+        excluded = ["hooks/codex.json"]
+        if plugin == "machine":
+            excluded.append("catalog/catalog.json")
+        expected = output_tree_digest(output, f"plugins/{plugin}", excluded)
+        payload = json.loads(output[hook_path])
+        for groups in payload["hooks"].values():
+            for group in groups:
+                for hook in group["hooks"]:
+                    for field in ("command", "commandWindows"):
+                        command = hook[field]
+                        prefix = "python3 -B " if field == "command" else "python -B "
+                        if not command.startswith(prefix + '"${PLUGIN_ROOT}/'):
+                            raise ValueError(f"Unsupported Codex {field} for {plugin}: {command}")
+                        hook[field] = (
+                            prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
+                            f'"{plugin}" ' + command[len(prefix):]
+                        )
+        output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
+
+
 def inside(root: Path, relative: str | PurePosixPath) -> Path:
     candidate = (root / Path(*PurePosixPath(relative).parts)).resolve()
     if not candidate.is_relative_to(root.resolve()):
@@ -444,6 +471,25 @@ def expected_adapter_body(shared: dict, host: str) -> str:
     )
 
 
+def validate_host_neutral(config: dict, skills: dict[str, dict]) -> None:
+    patterns = {
+        host: [re.compile(term, re.MULTILINE) for term in terms]
+        for host, terms in config.get("host_only_terms", {}).items()
+    }
+    for name, shared in skills.items():
+        for document in sorted(shared["path"].parent.rglob("*.md")):
+            text = document.read_text(encoding="utf-8")
+            for host, compiled in patterns.items():
+                for pattern in compiled:
+                    match = pattern.search(text)
+                    if match:
+                        raise ValueError(
+                            f"{document.as_posix()}: {host}-only term {match.group(0)!r} belongs in "
+                            f".{host}/skills/{name}/SKILL.md, registered in extended_host_adapters, "
+                            "not the shared definition"
+                        )
+
+
 def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict:
     adapters: dict[str, dict[str, Path]] = {}
     extended = set(config.get("extended_host_adapters", []))
@@ -483,6 +529,10 @@ def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict
                 if table.get("skill_supports_effort") and effort_key in rung:
                     if values.get("effort") != rung[effort_key]:
                         raise ValueError(f"{path}: effort does not resolve canonical lane {lane}")
+            elif "model" in values or "effort" in values:
+                raise ValueError(
+                    f"{path}: model/effort without a canonical lane re-points the session"
+                )
             match = FRONTMATTER.match(body)
             if match is None:
                 raise ValueError(f"{path}: adapter has no body")
@@ -521,8 +571,10 @@ def agent_payload(role: dict, body: str, host: str) -> str:
     values = {
         "name": role["agent_name"],
         "description": role["description"],
-        "model": role["model"],
     }
+    if role.get("kind"):
+        values["kind"] = role["kind"]
+    values["model"] = role["model"]
     if role.get("effort"):
         values["effort"] = role["effort"]
     values.update(
@@ -570,7 +622,8 @@ def emit_workflow_agents(root: Path, config: dict, emit):
         for lane, rung in table["lanes"].items():
             role = {
                 "agent_name": f"lane-{lane.lower()}" if host == "claude" else f"lane_{lane.lower()}",
-                "description": f"Bounded delegated work at {lane}.",
+                "description": f"Runs one delegated task at lane {lane}. {rung['summary']}",
+                "kind": "lane",
                 "tools": ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
                 "sandbox_mode": "workspace-write",
                 **rung,
@@ -612,8 +665,15 @@ def build(root: Path, validate_catalog_digests: bool = True):
     payloads = load(root / ".agents/plugins/payloads.json")["payloads"]
     compatibility = load(root / ".agents/plugins/compatibility.json")
     catalog = load(root / ".agents/catalog/catalog.json")
+    if any(release["owner_repository"] != "tj-agents/core" for release in catalog["releases"]):
+        raise ValueError("Core's authored catalog may contain only core releases")
     _, catalog_plugins = catalog_index(catalog)
+    harnesses = {
+        path.stem: load(path)
+        for path in (root / ".agents/plugins/harness").glob("*.json")
+    }
     skills = discover(root, config)
+    validate_host_neutral(config, skills)
     adapters = validate_adapters(root, config, skills)
     plugins = validate_configuration(root, config)
     validate_default_selection(root, config, skills, compatibility)
@@ -680,6 +740,10 @@ def build(root: Path, validate_catalog_digests: bool = True):
 
     manifests: dict[str, dict[str, dict]] = {plugin: {} for plugin in plugins}
     for plugin in sorted(plugins):
+        harness = harnesses.get(plugin)
+        if harness is None or harness.get("plugin") != f"base-agents/{plugin}":
+            raise ValueError(f"Missing or mismatched harness manifest: {plugin}")
+        emit(f"plugins/{plugin}/harness.json", json.dumps(harness, indent=2) + "\n")
         for host, tree in (("codex", "codex-skills"), ("claude", "skills")):
             manifest_path = inside(root, f"{config['host_manifest_roots'][host]}/{plugin}.json")
             manifest = load(manifest_path)
@@ -750,6 +814,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
         if resolved not in output:
             raise ValueError(f"{path}: missing packaged canonical definition {resolved}")
 
+    bind_codex_hook_snapshots(root, output, plugins)
     validate_hook_outputs(output, config, plugins)
 
     for plugin in sorted(plugins):
@@ -764,6 +829,8 @@ def build(root: Path, validate_catalog_digests: bool = True):
             raise ValueError(f"Catalog skill roster drift: {plugin_id}")
         if entry["package_path"] != f"plugins/{plugin}":
             raise ValueError(f"Catalog package path drift: {plugin_id}")
+        if entry.get("harness") != harnesses[plugin]["requires"]:
+            raise ValueError(f"Catalog harness drift: {plugin_id}")
         allowed_excludes = ["catalog/catalog.json"] if plugin_id == "base-agents/machine" else []
         if entry.get("digest_excludes", []) != allowed_excludes:
             raise ValueError(f"Catalog digest exclusion drift: {plugin_id}")

@@ -39,10 +39,11 @@ Derive every diff, native review, security review, routed rule set, guidance rea
 marker from the descriptor and materialized bundle. Do not substitute a later live `HEAD` or working-tree
 file. If the branch moves, finish or cancel the frozen pass and review the later delta incrementally.
 
-Movement of the remote base alone does not invalidate this source review. Run `workflow_ops.py
-review-reconcile` against the stored descriptor. A changed candidate head requires incremental review; a
-base-only change requires another source review only when it touches a candidate path or a routed rule body.
-Merge-group validation remains the authoritative combined-tree check against the current base.
+Movement of the remote base alone does not invalidate this source review. Run
+`<engineering>/workflows/workflow_ops.py review-reconcile`, with `<engineering>` as `review` defines it,
+against the stored descriptor. A changed candidate head requires incremental review; a base-only change
+requires another source review only when it touches a candidate path or a routed rule body. Merge-group
+validation remains the authoritative combined-tree check against the current base.
 
 Record the descriptor in the pass section:
 

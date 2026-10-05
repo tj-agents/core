@@ -7,8 +7,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/engineering/contract/session-guidance/scripts/session-context.py\""
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\""
           }
         ]
       },

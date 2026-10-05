@@ -15,8 +15,11 @@ available as `python` on PATH. Codex skips new or changed plugin hooks until the
 in `/hooks`; a fresh missing-marketplace write probe is required before claiming enforcement. The host
 coverage limit is tracked in `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents
 a generated native-instruction fallback.
+Codex hook commands retain an integrity-checked copy of their trusted plugin package in `PLUGIN_DATA`.
+An active session can keep running its original hook scripts when a marketplace refresh removes the old
+cache directory. A changed hook definition still requires Codex trust review before it runs.
 
-The split packages form the **2.1.15** release. Existing 1.x consumers and fresh installations select all
+The split packages form the **2.1.16** release candidate. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
@@ -31,19 +34,19 @@ closure.
 - [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md) defines this source/adapter/distribution boundary.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared open taxonomy used by every agent marketplace repo.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
-- `.agents/catalog/catalog.json` records immutable cross-repository releases and package digests. The generated
-  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index; project selections live in one
-  `.agents/capabilities.lock.json` governed by the shipped lock schema.
+- `.agents/catalog/catalog.json` records this repository's immutable releases and package digests. The generated
+  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers selecting other standards
+  commit a composed catalog of owner-published release records beside their capability lock.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
 - install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
 
-Run `pwsh .agents/sync-generated.ps1` after changing a skill and
-`pwsh .agents/sync-generated.ps1 -Check` before delivery.
-
-When package bytes change, refresh the local catalog digests before generation:
+A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
+workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
+catalog digests, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,
+run the same two commands and leave their output uncommitted:
 
 ```powershell
 python -B scripts/update_catalog_digests.py
@@ -73,8 +76,9 @@ data, transcripts, credentials, and identifiers remain outside the repository.
 ## Install / update the default plugins
 
 GitHub is authoritative; a machine's installed copies of `base@base-agents`,
-`engineering@base-agents`, and `machine@base-agents` are expected to be exactly what
-the latest commit on `main` generated into `plugins/<package>/`. Every skill's own scripts and resources travel
+`engineering@base-agents`, and `machine@base-agents` are expected to be exactly what the post-merge
+`regenerate` job last committed into `plugins/<package>/` on `main` (briefly the previous, still
+self-consistent generation while that job runs). Every skill's own scripts and resources travel
 inside that generated package (see `PACKAGING.md`), so registering the marketplace and installing/updating
 the plugins is the entire supported procedure — never hand-place a script or resolver on a machine to make
 a skill work.
@@ -88,10 +92,16 @@ Claude Code:
 /plugin install machine@base-agents
 ```
 
-After a new commit lands on `main`, pick it up with:
+Claude loads installed plugins at session start and `/plugin marketplace update` refreshes only the
+catalog. Typing `claude` in PowerShell, `open-claude`, `handoff-claude` and session recovery run
+`.agents/machine/scripts/claude_standards_sync.py` first, so a session started through them loads the
+latest registered commit of every plugin the directory enables. The machine plugin's SessionStart hook
+adds one marked block to both PowerShell profiles that loads its own `claude` wrapper, so the wrapper
+updates with the plugin and no checkout is pulled; set `BASE_AGENTS_CLAUDE_PROFILE=off` to opt out.
+From a core checkout, run it directly:
 
-```
-/plugin marketplace update base-agents
+```powershell
+python -B .agents/machine/scripts/claude_standards_sync.py --project <directory>
 ```
 
 Codex treats `INSTALLED_BY_DEFAULT` as marketplace policy, not a CLI dependency resolver. Register the
@@ -103,6 +113,17 @@ codex plugin add base@base-agents
 codex plugin add engineering@base-agents
 codex plugin add machine@base-agents
 ```
+
+Typing `codex` in PowerShell and using `handoff-codex` refresh configured Git marketplaces and
+enabled plugins before Codex loads them. The launcher then records native Codex hook trust only for
+enabled plugins sourced from GitHub's `tj-agents` organisation, after checking the installed package
+against its unchanged Git source. Other publishers and user/project hooks retain normal trust review.
+Set `BASE_AGENTS_CODEX_HOOK_TRUST=off` to keep manual review for all hooks. The machine plugin's SessionStart hook adds a marked block
+to both PowerShell profiles. That block resolves the active installed machine package, so later
+terminals load its `codex` wrapper without pulling this checkout. The first session after installing
+the package wires the profiles; open a new terminal to use the wrapper. Set
+`BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. A project pinned to a release continues to
+use that release until its committed selection changes.
 
 Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
 resolve and verify its complete dependency closure reproducibly.
