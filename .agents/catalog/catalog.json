@@ -128,6 +128,7 @@
             "git-auth",
             "git-branching",
             "guide",
+            "guide-build",
             "handoff",
             "handoff-format",
             "incremental-review",
@@ -178,11 +179,12 @@
               "python>=3.9"
             ],
             "optional": [
+              "exe:bash",
               "exe:gh",
               "exe:powershell"
             ]
           },
-          "digest": "sha256:e33bdecb8d5de81471e43c37d24ba71fbd2c37dd08829e1e27c0eb4f03978ff7",
+          "digest": "sha256:0062f51e33478337124fc49f168e29bf882af0a301020902613751cab31aae38",
           "harness": {
             "marketplaces": [
               {
