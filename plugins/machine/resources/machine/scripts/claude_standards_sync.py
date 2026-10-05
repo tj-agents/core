@@ -6,27 +6,19 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from contextvars import ContextVar, copy_context
 from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import sys
 import time
-
-try:
-    from . import bounded_process
-except ImportError:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import bounded_process
 
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
 STATE_FILE = "claude-standards-sync.json"
 LOCK_FILE = "claude-standards-sync.lock"
-SYNC_TIMEOUT_SECONDS = 60
-SYNC_DEADLINE = ContextVar("sync_deadline", default=None)
 REMOTE_TIMEOUT_SECONDS = 20
 MARKETPLACE_TIMEOUT_SECONDS = 180
 PLUGIN_TIMEOUT_SECONDS = 120
@@ -63,6 +55,7 @@ class Marketplace:
     url: str | None
     ref: str | None
     installs: list[Install] = field(default_factory=list)
+    owned: bool = True
 
 
 def read_json(path: Path) -> dict:
@@ -156,12 +149,82 @@ def marketplaces(plugins: Path, found: list[Install]) -> list[Marketplace]:
     return selected
 
 
+def plugin_entry_sources(checkout: Path | None) -> dict[str, dict]:
+    if checkout is None:
+        return {}
+    entries = read_json(checkout / ".claude-plugin" / "marketplace.json").get("plugins")
+    found = {}
+    if isinstance(entries, list):
+        for entry in entries:
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                found[entry["name"]] = entry.get("source")
+    return found
+
+
+def repo_label(url: str) -> str:
+    stripped = url[:-4] if url.endswith(".git") else url
+    segments = [segment for segment in re.split(r"[\\/]+", stripped) if segment]
+    return "/".join(segments[-2:]) if len(segments) >= 2 else (segments[-1] if segments else stripped)
+
+
+def normalize_url(url: str) -> str:
+    stripped = url.strip()
+    if "://" in stripped:
+        stripped = re.sub(r"^[a-z][a-z0-9+.-]*://", "", stripped, flags=re.IGNORECASE)
+    else:
+        scp = re.match(r"^[^/@]+@([^:/]+):(.+)$", stripped)
+        if scp:
+            stripped = f"{scp.group(1)}/{scp.group(2)}"
+    stripped = stripped.rstrip("/")
+    if stripped.lower().endswith(".git"):
+        stripped = stripped[:-4]
+    host, separator, rest = stripped.partition("/")
+    return host.rsplit("@", 1)[-1].lower() + separator + rest
+
+
+def external_groups(markets: list[Marketplace]) -> list[Marketplace]:
+    grouped: dict[tuple[str, str | None], tuple[str, list[Install]]] = {}
+    for market in markets:
+        sources = plugin_entry_sources(market.checkout)
+        own = normalize_url(market.url) if market.url else None
+        native = []
+        for install in market.installs:
+            override = sources.get(install.name)
+            resolved = source_url(override) if isinstance(override, dict) else None
+            if resolved and normalize_url(resolved) != own:
+                ref = override.get("ref")
+                key = (normalize_url(resolved), ref if isinstance(ref, str) and ref else None)
+                raw_url, members = grouped.get(key, (resolved, []))
+                members.append(install)
+                grouped[key] = (raw_url, members)
+            else:
+                native.append(install)
+        market.installs = native
+    ordered = sorted(grouped.items(), key=lambda item: (item[0][0], item[0][1] or ""))
+    return [Marketplace(repo_label(raw_url), None, raw_url, ref, members, owned=False) for (_, ref), (raw_url, members) in ordered]
+
+
 def run(command: list[str], cwd: Path | None = None, timeout: float = REMOTE_TIMEOUT_SECONDS) -> tuple[int | None, str, str]:
-    deadline = SYNC_DEADLINE.get()
-    if deadline is not None:
-        timeout = min(timeout, deadline - time.monotonic())
     environment = dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never")
-    return bounded_process.run(command, cwd=cwd, timeout=timeout, env=environment)
+    options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            **options,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "", f"timed out after {timeout:g}s"
+    except OSError as error:
+        return None, "", str(error)
+    return completed.returncode, completed.stdout, completed.stderr
 
 
 def last_line(*texts: str) -> str:
@@ -297,7 +360,7 @@ def update(market: Marketplace, remote: str, executable: str, project: Path, plu
     pending = [install for install in market.installs if not current(install, remote, state)]
     before = checkout_head(market)
     print(f"standards: updating {market.name} to {short(remote)} (installed: {describe(pending or market.installs)})", file=out, flush=True)
-    if before != remote:
+    if market.owned and before != remote:
         renew()
         ok, detail = claude(executable, ["plugin", "marketplace", "update", market.name], project, MARKETPLACE_TIMEOUT_SECONDS)
         if not ok:
@@ -323,15 +386,15 @@ def update(market: Marketplace, remote: str, executable: str, project: Path, plu
     return len(failed)
 
 
-def _synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, executable: str | None,
+def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, executable: str | None,
                 check: bool = False, out=sys.stdout, lock_wait: float = LOCK_WAIT_SECONDS) -> int:
-    markets = marketplaces(plugins, installs(plugins, project, enabled_plugins(config, project)))
+    owned = marketplaces(plugins, installs(plugins, project, enabled_plugins(config, project)))
+    groups = external_groups(owned)
+    markets = [market for market in owned if market.installs] + groups
     if not markets:
         return 0
     with ThreadPoolExecutor(max_workers=min(8, len(markets))) as pool:
-        contexts = [copy_context() for _ in markets]
-        futures = [pool.submit(context.run, probe, market) for context, market in zip(contexts, markets)]
-        probes = [future.result() for future in futures]
+        probes = list(pool.map(probe, markets))
     state = load_state(state_dir)
     problems = 0
     stale = []
@@ -339,7 +402,7 @@ def _synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, ex
         if remote is None:
             print(f"standards: could not check {market.name} ({error}); this session loads {describe(market.installs)}", file=out)
             problems += 1
-        elif head != remote or not all(current(install, remote, state) for install in market.installs):
+        elif (market.owned and head != remote) or not all(current(install, remote, state) for install in market.installs):
             stale.append((market, remote))
     if check:
         for market, remote in stale:
@@ -351,9 +414,6 @@ def _synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, ex
         print("standards: the claude executable was not found; this session loads the installed plugins", file=out)
         return 1
     try:
-        deadline = SYNC_DEADLINE.get()
-        if deadline is not None:
-            lock_wait = min(lock_wait, max(0, deadline - time.monotonic()))
         with exclusive(state_dir, lock_wait) as renew:
             state = load_state(state_dir)
             for market, remote in stale:
@@ -363,16 +423,6 @@ def _synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, ex
         print(f"standards: {error}; this session loads the installed plugins", file=out)
         return 1
     return int(bool(problems))
-
-
-def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, executable: str | None,
-                check: bool = False, out=sys.stdout, lock_wait: float = LOCK_WAIT_SECONDS,
-                timeout: float = SYNC_TIMEOUT_SECONDS) -> int:
-    token = SYNC_DEADLINE.set(time.monotonic() + timeout)
-    try:
-        return _synchronize(config, plugins, project, state_dir, executable, check, out, lock_wait)
-    finally:
-        SYNC_DEADLINE.reset(token)
 
 
 def main(argv: list[str] | None = None) -> int:

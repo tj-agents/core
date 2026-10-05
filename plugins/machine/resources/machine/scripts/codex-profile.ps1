@@ -2,7 +2,7 @@ function codex {
     $exe = @(Get-Command codex -CommandType Application, ExternalScript -ErrorAction SilentlyContinue)[0]
     if (-not $exe) { throw 'codex executable not found on PATH' }
     $target = $exe.Source
-    if ($args.Count -eq 0 -or @('plugin', '--version', '-V', '--help', '-h') -notcontains [string]$args[0]) {
+    if ($args.Count -eq 0 -or $args[0] -ne 'plugin') {
         $sync = Join-Path $PSScriptRoot 'codex_marketplace_sync.ps1'
         try {
             if (-not (Test-Path -LiteralPath $sync -PathType Leaf)) { throw "Codex sync script missing: $sync" }

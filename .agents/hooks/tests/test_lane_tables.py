@@ -306,7 +306,7 @@ class PluginDeliveryTests(unittest.TestCase):
         self.assertFalse((ROOT / ".claude" / "agents").exists())
 
     def test_the_shipped_skill_names_locations_that_exist_in_each_layout(self):
-        canonical = self.PLUGIN / ".agents/engineering/contract/lanes/SKILL.md"
+        canonical = self.PLUGIN / ".agents/engineering/policy/lanes/SKILL.md"
         body = canonical.read_text(encoding="utf-8-sig")
         self.assertIn(".agents/lanes/", body)
         self.assertIn("../../.agents/lanes/", body)

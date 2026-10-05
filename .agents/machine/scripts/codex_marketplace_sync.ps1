@@ -35,6 +35,17 @@ function Invoke-CodexSyncCommand {
     }
 }
 
+function Invoke-CodexHookTrust {
+    param(
+        [Parameter(Mandatory)][string] $CodexExecutable,
+        [Parameter(Mandatory)][string] $WorkingDirectory,
+        [Parameter(Mandatory)][string] $HelperScript
+    )
+
+    & python -B $HelperScript --codex $CodexExecutable --project $WorkingDirectory | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw 'Codex could not trust tj-agents hooks' }
+}
+
 function Sync-CodexStandards {
     [CmdletBinding()]
     param(
@@ -47,9 +58,14 @@ function Sync-CodexStandards {
     $clock = [Diagnostics.Stopwatch]::StartNew()
     $resolved = (Resolve-Path -LiteralPath $WorkingDirectory -ErrorAction Stop).Path
     $runnerSnapshot = Join-Path ([IO.Path]::GetTempPath()) ('core-plugin-sync-' + [guid]::NewGuid().ToString('N') + '.py')
+    $trustSnapshot = $null
     Push-Location -LiteralPath $resolved
     try {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bounded_process.py') -Destination $runnerSnapshot -ErrorAction Stop
+        $helper = Join-Path $PSScriptRoot 'codex_hook_trust.py'
+        if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw "Codex hook trust helper missing: $helper" }
+        $trustSnapshot = [IO.Path]::GetTempFileName()
+        Copy-Item -LiteralPath $helper -Destination $trustSnapshot -Force
         $upgrade = Invoke-CodexSyncCommand -CodexExecutable $CodexExecutable -RunnerPath $runnerSnapshot -TimeoutSeconds ($TimeoutSeconds - $clock.Elapsed.TotalSeconds) -Arguments @(
             'plugin', 'marketplace', 'upgrade', '--json'
         )
@@ -72,10 +88,14 @@ function Sync-CodexStandards {
                 throw "Codex installed $($installed.pluginId) while refreshing $identity"
             }
         }
+        if (@($selected).Count -gt 0 -or @($inventory.installed | Where-Object { $_.enabled }).Count -gt 0) {
+            Invoke-CodexHookTrust -CodexExecutable $CodexExecutable -WorkingDirectory $resolved -HelperScript $trustSnapshot
+        }
         return @($selected)
     }
     finally {
         Pop-Location
         Remove-Item -LiteralPath $runnerSnapshot -Force -ErrorAction SilentlyContinue
+        if ($trustSnapshot) { Remove-Item -LiteralPath $trustSnapshot -Force }
     }
 }

@@ -140,7 +140,7 @@ def check_identity(state, allow_terminal_release=False):
         if current[key] != state[key]:
             raise Gate(f"owner-{key}-changed")
     goal = Path(state["goal"])
-    if not goal.is_file() or not goal.resolve().is_relative_to(root):
+    if not goal.is_absolute() or not goal.is_file() or goal.resolve() != goal:
         raise Gate("canonical-goal-unavailable")
     binding_path = root / BINDING_FILE
     binding = read(binding_path) if binding_path.exists() else None
@@ -464,9 +464,12 @@ def initialize(path, args):
     if Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
         raise Gate("canonical-worktree-root-required")
     goal = Path(args.goal)
+    relative = not goal.is_absolute()
     goal = (root / goal).resolve() if not goal.is_absolute() else goal.resolve()
-    if not goal.is_file() or not goal.is_relative_to(root):
-        raise Gate("goal-must-exist-inside-worktree")
+    if relative and not goal.is_relative_to(root):
+        raise Gate("relative-goal-escape: supply an explicit absolute canonical goal path")
+    if not goal.is_file():
+        raise Gate(f"canonical-goal-file-required: {goal}")
     if not args.authority.strip() or not args.completion.strip() or not all(a.strip() for a in args.actions):
         raise Gate("explicit-authority-completion-actions-required")
     bound = identity(root)
@@ -592,7 +595,7 @@ def main(argv=None):
     root = Path(args.root).resolve() if args.root else Path(read(path)["worktree"]).resolve()
     expected = root / ".agents/continuation/owner.json"
     if path != expected or path.parent.resolve() != expected.parent:
-        raise Gate("canonical-owner-path-required")
+        raise Gate("canonical-owner-path-required: omit --owner and use --root to select .agents/continuation/owner.json")
     if Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
         raise Gate("canonical-worktree-root-required")
     if args.operation == "status":

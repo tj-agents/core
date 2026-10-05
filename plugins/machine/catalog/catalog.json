@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:153c3af4082ad44bf9afb94afde8a04dc691e555f8f5fc2ef5cb51c91c624842",
+          "digest": "sha256:c2c0932f8442c5b8740c3d5886a6e05193d903ccf065139bd6e57baa62a08f81",
           "harness": {
             "marketplaces": [
               {
@@ -51,21 +51,21 @@
             ],
             "hooks": [
               {
-                "path": ".agents/base/contract/agent-files/scripts/session-context.py",
+                "path": ".agents/base/policy/agent-files/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
                 ]
               },
               {
-                "path": ".agents/base/contract/goal-continuation/scripts/session-context.py",
+                "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
                 ]
               },
               {
-                "path": ".agents/base/contract/plan-artifacts/scripts/session-context.py",
+                "path": ".agents/base/policy/plan-artifacts/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -127,6 +127,7 @@
             "feature",
             "git-auth",
             "git-branching",
+            "guide",
             "handoff",
             "handoff-format",
             "incremental-review",
@@ -181,7 +182,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:a35a9eb6e440decefb9d32f13c9ec03fe73e16cce8a9a9198925632acc7d7449",
+          "digest": "sha256:a0a8cb3d7279e60209f548c7a132495bdfffc32463bb13907b0f8596e7b74859",
           "harness": {
             "marketplaces": [
               {
@@ -195,7 +196,7 @@
             ],
             "hooks": [
               {
-                "path": ".agents/engineering/contract/session-guidance/scripts/session-context.py",
+                "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -331,7 +332,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:87468e00f08d3a5e1a27be317d27fff356c79d47c07943755cd31d05b33e7ae3",
+          "digest": "sha256:33f77a4df3f80bc996f865ef2774bfbeeb7aad53cc7072a47f66203dd0b27733",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
