@@ -28,3 +28,12 @@ Resolve when a trusted live Codex probe proves that a denied write delivers the 
 and the next invocation can verify that delivery from the session transcript or an equivalent host
 acknowledgment. Then add pinned-release install repair for genuinely absent skills and repeat the
 missing-marketplace write probe without a restart.
+
+## Catalog digest guard keys entries by package id alone
+
+`scripts/check_generated_paths.py` compares catalog digests between the merge base and the PR by
+package id. If one id appeared in two releases, only the last release's digest would be compared, so a
+committed digest change in an earlier release would pass. The catalog currently holds one release.
+
+Resolve when the guard keys each digest by release id and package id, with a test covering two releases
+that share a package id.
