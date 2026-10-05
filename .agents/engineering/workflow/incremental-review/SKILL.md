@@ -4,7 +4,6 @@ description: Select and run the canonical isolated review workflow over only com
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Incremental review selector
@@ -40,7 +39,8 @@ as `review` Stage 1 requires. Record branch, exact scope, canonical work-order p
 - Non-empty valid delta: set the work-order status to `in-progress`, append one immutable pass descriptor,
   and invoke `review` Stages 3-7 over that descriptor.
 
-Native/general review and every selected fresh lens consume `<watermark>..<frozen-head>`; IDs continue
+The `review` Stage 3 native layer and every selected fresh lens consume `<watermark>..<frozen-head>`, the
+native reviewer with the watermark as its frozen base; IDs continue
 without renumbering, prior findings and dispositions stay unchanged, and the parent appends only new
 deduplicated findings. A later live `HEAD` never widens this pass.
 

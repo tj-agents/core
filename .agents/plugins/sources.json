@@ -260,6 +260,11 @@
       "destination": "hooks/docs_reachability.py"
     },
     {
+      "plugin": "engineering",
+      "source": ".agents/hooks/tier_gate.py",
+      "destination": "hooks/tier_gate.py"
+    },
+    {
       "plugin": "base",
       "source": ".agents/tiers/base.json",
       "destination": "tier.json"
@@ -285,8 +290,13 @@
     ]
   },
   "extended_host_adapters": [
-    "persistent-workflow"
+    "persistent-workflow",
+    "review"
   ],
+  "host_only_terms": {
+    "claude": ["(?i)[`/]code-review(?![-\\w/])", "(?i)[`/]security-review(?![-\\w/])", "\\b`?Skill`?\\s+[Tt]ool\\b", "(?i)\\bAskUserQuestion\\b", "(?i)\\bToolSearch\\b", "\\bCLAUDE_PLUGIN_ROOT\\b"],
+    "codex": ["\\bcodex\\s+(?:review|exec)\\b", "\\bScheduled Task\\b"]
+  },
   "workflow": {
     "source": ".agents/workflows",
     "plugin": "engineering"

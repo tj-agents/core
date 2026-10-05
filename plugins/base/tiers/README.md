@@ -13,7 +13,9 @@ repositories. Any match makes the stack present. Use a
 marker intrinsic to the stack, such as a project file. `owner_repository` allows a standards
 authoring repository to use its own skills without ordinary project markers.
 
-The gate gets plugin and marketplace identity from the installed path. It exposes
+The gate gets plugin and marketplace identity from the installed path. Each plugin answers from the
+first cache that has it, the running host's first, and from the version that cache's
+`installed_plugins.json` names; a cache with no registry falls back to its newest version. It exposes
 `AGENTS_TIER_OVERRIDE=<tier>[,<tier>]` for a single session when detection is wrong. Correct a
 bad declaration in its owning stack repository. Host skill listings can still show blocked
 skills; the PreToolUse gate prevents their application.

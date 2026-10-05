@@ -4,7 +4,6 @@ description: Land a documentation or meta-only change as its own fast PR, bypass
 
 kind: workflow
 domain: process
-lane: L5
 ---
 
 # Landing a meta-only change

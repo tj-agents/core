@@ -4,8 +4,6 @@ description: Drive every remaining stage of one canonical staged big review to c
 
 kind: workflow
 domain: process
-model: claude-opus-5-5
-effort: high
 ---
 
 # Drive a staged review to completion
