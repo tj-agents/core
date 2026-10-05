@@ -96,6 +96,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/hooks/hook_dispatch.py",
+      "destination": "hooks/hook_dispatch.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/plugins/compatibility.json",
       "destination": "hooks/compatibility.json"
     },
@@ -173,6 +178,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/hook_runtime.py",
       "destination": "hooks/hook_runtime.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/hook_dispatch.py",
+      "destination": "hooks/hook_dispatch.py"
     },
     {
       "plugin": "engineering",

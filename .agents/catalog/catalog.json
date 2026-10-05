@@ -72,6 +72,12 @@
                 ]
               },
               {
+                "path": "hooks/hook_dispatch.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
                 "path": "hooks/pre_tool_use_adapter.py",
                 "hosts": [
                   "codex"
@@ -239,6 +245,12 @@
               },
               {
                 "path": "hooks/harness_grant.py",
+                "hosts": [
+                  "claude"
+                ]
+              },
+              {
+                "path": "hooks/hook_dispatch.py",
                 "hosts": [
                   "claude"
                 ]
