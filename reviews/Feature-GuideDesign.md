@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `55709c246a95c096b49ae95710cdce504fad5395`  `(2026-10-05)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `b5015684b690bb8affe83f88f3d4f5e26bcd87ae`  `(2026-10-05)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-05 — full
 
@@ -150,4 +150,27 @@ residual of the same class:
 Fixed on this branch: the Oxford comma is now permitted only after at least one comma element
 (verified empirically against all seven reference phrasings), with prose and Oxford-list tests added
 (26 tests OK, 1 POSIX skip). Incremental pass below.
+
+## Review pass — 2026-10-05 — incremental
+
+**Candidate base:** `55709c246a95c096b49ae95710cdce504fad5395`
+**Candidate head:** `b5015684b690bb8affe83f88f3d4f5e26bcd87ae`
+**Candidate branch:** `Feature/GuideDesign`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:ece889ba7fea8c1632ee315d4e3c0385eb7bd9869d364efda90bec603d760984` `(4 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\guide-design-review-4\review\5dc4f50e914c917ae70a6d6aa85a396a53999a2188060a5797fbdf75a9dbfcda`
+**Candidate bundle identity:** `sha256:57b8bf05d1419e97d2c8b7ecd775d533e85e7bffd147c0d76d75161235869eae`
+**Work-order path:** `reviews/Feature-GuideDesign.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No findings. Layers: native Claude Code `code-review` (medium) over `55709c2..b501568` — zero findings,
+with the F13 regex empirically exercised against nine phrasings, the now-optional capture group verified
+against `link_chapters`' falsy check, digests confirmed current, and the 26-test suite re-run green at
+the head; `workflow` lens over the materialized bundle — zero findings (authored-only paths, digest-only
+catalog change, work-order edits append/status-only, test placement verified). The one noted non-finding
+("chapter 1 and 2 other repos" consuming ` and 2`) is the construct's intended meaning, predates this
+branch, and is unchanged by it.
 
