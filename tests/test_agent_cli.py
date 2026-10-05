@@ -1,9 +1,12 @@
 """agent_cli.py: synthetic homes, PATHs and plugin registries only; the real profile is never read."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -310,6 +313,217 @@ class LaneModelTests(unittest.TestCase):
     def test_an_unknown_lane_is_an_error_not_a_fallback(self):
         with self.assertRaisesRegex(CLI.LaunchError, 'unknown lane'):
             CLI.resolve_lane_model('codex', lane='L9')
+
+
+def fake_run(results=()):
+    """A `run` stand-in returning each (stdout, stderr, returncode) in turn and recording every call."""
+    queue = list(results)
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        stdout, stderr, returncode = queue.pop(0) if queue else ('', '', 0)
+        return subprocess.CompletedProcess(cmd, returncode, stdout=stdout, stderr=stderr)
+
+    run.calls = calls
+    return run
+
+
+class LaunchTabTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='agent cli tab ')
+        self.addCleanup(temp.cleanup)
+        self.directory = temp.name
+
+    def test_a_missing_working_directory_is_rejected_before_any_handler_runs(self):
+        with self.assertRaisesRegex(CLI.LaunchError, 'not a directory'):
+            CLI.launch_tab(os.path.join(self.directory, 'missing'), '/bin/exe', 'Tab',
+                            environ={'TMUX': 'x'}, run=fake_run(), popen=mock.Mock())
+
+    def test_detection_order_tmux_wins_over_kitty_window_id(self):
+        run = fake_run([('', '', 0)])
+        CLI.launch_tab(self.directory, '/bin/exe', 'Tab',
+                        environ={'TMUX': 'session', 'KITTY_WINDOW_ID': '5', 'KITTY_LISTEN_ON': 'unix:/x'},
+                        run=run, popen=mock.Mock())
+        self.assertEqual(run.calls[0][0][0], 'tmux')
+
+    def test_detection_order_kitty_wins_over_konsole(self):
+        run = fake_run([('', '', 0)])
+        CLI.launch_tab(self.directory, '/bin/exe', 'Tab',
+                        environ={'KITTY_WINDOW_ID': '5', 'KITTY_LISTEN_ON': 'unix:/x',
+                                 'KONSOLE_DBUS_WINDOW': '/Windows/1'},
+                        run=run, popen=mock.Mock())
+        self.assertEqual(run.calls[0][0][0], 'kitty')
+
+    def test_tmux_handler_exact_argv(self):
+        run = fake_run([('', '', 0)])
+        CLI.launch_tab(self.directory, '/bin/exe', 'My Title', arguments=['--flag', 'v'],
+                        environ={'TMUX': 'session'}, run=run, popen=mock.Mock())
+        cmd, kwargs = run.calls[0]
+        self.assertEqual(cmd[:6], ['tmux', 'new-window', '-d', '-n', 'My Title', '--'])
+        inner = cmd[6:]
+        self.assertEqual(inner[:5], ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', self.directory])
+        self.assertEqual(inner[5], 'env')
+        self.assertIn('AGENT_CLI_TAB_TITLE=My Title', inner)
+        self.assertEqual(inner[-3:], ['/bin/exe', '--flag', 'v'])
+        self.assertEqual(kwargs, {'stdin': subprocess.DEVNULL, 'capture_output': True, 'text': True, 'timeout': 30})
+
+    def test_kitty_handler_exact_argv(self):
+        run = fake_run([('', '', 0)])
+        CLI.launch_tab(self.directory, '/bin/exe', 'A Tab',
+                        environ={'KITTY_WINDOW_ID': '42', 'KITTY_LISTEN_ON': 'unix:/tmp/kitty-99'},
+                        run=run, popen=mock.Mock())
+        cmd, kwargs = run.calls[0]
+        self.assertEqual(cmd[:4], ['kitty', '@', '--to', 'unix:/tmp/kitty-99'])
+        self.assertEqual(cmd[4:8], ['launch', '--type=tab', '--match', 'id:42'])
+        self.assertEqual(cmd[8:10], ['--tab-title', 'A Tab'])
+        self.assertEqual(cmd[10], 'sh')
+        self.assertEqual(kwargs, {'stdin': subprocess.DEVNULL, 'capture_output': True, 'text': True, 'timeout': 30})
+
+    def test_kitty_without_listen_on_raises_and_opens_nothing(self):
+        run = fake_run()
+        popen = mock.Mock()
+        with self.assertRaisesRegex(CLI.LaunchError, 'allow_remote_control socket-only'):
+            CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'KITTY_WINDOW_ID': '42'}, run=run, popen=popen)
+        self.assertEqual(run.calls, [])
+        popen.assert_not_called()
+
+    def test_konsole_handler_exact_dbus_calls_and_script_invocation(self):
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0)])
+        with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus6' if name == 'qdbus6' else None):
+            CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
+        self.assertEqual(run.calls[0][0], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Windows/1', 'newSession'])
+        self.assertEqual(run.calls[1][0],
+                          ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7', 'setTitle', '1', 'A Tab'])
+        run_command = run.calls[2][0]
+        self.assertEqual(run_command[:4], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7', 'runCommand'])
+        self.assertTrue(run_command[4].startswith('exec sh '))
+
+    def test_konsole_falls_back_to_qdbus_when_qdbus6_is_absent(self):
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0)])
+        with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus' if name == 'qdbus' else None):
+            CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
+        self.assertEqual(run.calls[0][0][0], '/usr/bin/qdbus')
+
+    def test_konsole_without_qdbus_on_path_raises(self):
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        with mock.patch.object(CLI.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(CLI.LaunchError, 'qdbus'):
+                CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ=environ, run=fake_run(), popen=mock.Mock())
+
+    def test_a_failing_handler_raises_and_never_opens_a_window(self):
+        run = fake_run([('', 'tmux: no server running', 1)])
+        popen = mock.Mock()
+        with self.assertRaisesRegex(CLI.LaunchError, 'no server running'):
+            CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'TMUX': 'x'}, run=run, popen=popen)
+        popen.assert_not_called()
+
+    @unittest.skipIf(CLI.IS_WINDOWS, 'TERM is only special-cased on POSIX')
+    def test_term_is_never_forced_or_cleared_on_posix(self):
+        run = fake_run([('', '', 0)])
+        CLI.launch_tab(self.directory, '/bin/exe', 'Tab', clear=['TERM'],
+                        force={'TERM': 'xterm-256color', 'FORCE_COLOR': '1'},
+                        environ={'TMUX': 'x'}, run=run, popen=mock.Mock())
+        inner = run.calls[0][0]
+        self.assertNotIn('TERM', ' '.join(inner))
+        self.assertIn('FORCE_COLOR=1', inner)
+
+    def test_windows_terminal_handler_argv_escaped_and_env_passed_via_kwarg(self):
+        run = fake_run([('', '', 0)])
+        environ = {'WT_SESSION': 'abc', 'SOME_OTHER': 'x', 'CLAUDECODE': '1'}
+        with mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
+            CLI.launch_tab(self.directory, 'C:\\exe with space\\claude.exe', 'A Title',
+                            arguments=['--resume', 'id; two'], force={'FORCE_COLOR': '1'},
+                            environ=environ, run=run, popen=mock.Mock())
+        cmd, kwargs = run.calls[0]
+        self.assertEqual(cmd[0], '/mnt/c/wt.exe')
+        self.assertEqual(cmd[1:7], ['--window', '0', 'new-tab', '--startingDirectory', self.directory, '--title'])
+        self.assertIn('--suppressApplicationTitle', cmd)
+        self.assertIn(CLI.terminal_argument('id; two'), cmd)
+        env = kwargs['env']
+        self.assertEqual(env.get('FORCE_COLOR'), '1')
+        self.assertNotIn('CLAUDECODE', env)
+        # The caller's own environ is read, never mutated: the changes travel only in this call's env=.
+        self.assertEqual(environ, {'WT_SESSION': 'abc', 'SOME_OTHER': 'x', 'CLAUDECODE': '1'})
+        self.assertEqual(kwargs.get('stdin'), subprocess.DEVNULL)
+
+    def test_windows_terminal_handler_failure_raises(self):
+        run = fake_run([('', 'wt.exe: boom', 1)])
+        with mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
+            with self.assertRaisesRegex(CLI.LaunchError, 'boom'):
+                CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'WT_SESSION': 'abc'}, run=run, popen=mock.Mock())
+
+    @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX no-terminal fallback is exercised here')
+    def test_no_terminal_detected_posix_fallback_uses_popen_with_detached_stdio_and_warns(self):
+        popen = mock.Mock()
+        with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/xterm' if name == 'xterm' else None):
+            with contextlib.redirect_stderr(io.StringIO()) as captured:
+                CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={}, run=fake_run(), popen=popen)
+        self.assertIn('no terminal', captured.getvalue())
+        popen.assert_called_once()
+        args, kwargs = popen.call_args
+        self.assertEqual(args[0][0], 'xterm')
+        self.assertTrue(kwargs.get('start_new_session'))
+        self.assertEqual(kwargs.get('stdin'), subprocess.DEVNULL)
+        self.assertEqual(kwargs.get('stdout'), subprocess.DEVNULL)
+        self.assertEqual(kwargs.get('stderr'), subprocess.DEVNULL)
+
+    @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX no-terminal fallback is exercised here')
+    def test_no_terminal_detected_posix_with_nothing_available_raises(self):
+        with mock.patch.object(CLI.shutil, 'which', return_value=None):
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaisesRegex(CLI.LaunchError, 'No terminal'):
+                    CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={}, run=fake_run(), popen=mock.Mock())
+
+
+class PosixInnerCommandExecutionTests(unittest.TestCase):
+    """Actually runs the POSIX inner command (and the Konsole script that wraps it) through `sh`."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='agent cli exec ')
+        self.addCleanup(temp.cleanup)
+        self.base = Path(temp.name)
+        self.directory = self.base / 'work dir with spaces'
+        self.directory.mkdir()
+        self.recorder = executable(self.base / 'record.py', '#!/usr/bin/env python3\n'
+            'import json, os, sys\n'
+            'with open(sys.argv[1], "w") as f:\n'
+            '    json.dump({"cwd": os.getcwd(), "argv": sys.argv[2:],\n'
+            '               "env": {k: os.environ.get(k) for k in ("CLAUDECODE", "NO_COLOR",'
+            ' "AGENT_CLI_TAB_TITLE", "FORCE_COLOR")}}, f)\n')
+        self.output = self.base / 'result.json'
+        self.prompt = 'Phase one: migrate "Auth"; then $Search.\nPhase two: a\\\\b\\;c; done.'
+        self.cleared = ['CLAUDECODE', 'NO_COLOR']
+        self.forced = {'AGENT_CLI_TAB_TITLE': 'A Title', 'FORCE_COLOR': '1'}
+        self.env = dict(os.environ)
+        self.env['CLAUDECODE'] = '1'
+        self.env['NO_COLOR'] = '1'
+
+    def run_and_check(self, argv):
+        result = subprocess.run(argv, env=self.env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(self.output.read_text())
+        self.assertEqual(data['cwd'], str(self.directory))
+        self.assertEqual(data['argv'], ['--resume', self.prompt])
+        self.assertIsNone(data['env']['CLAUDECODE'])
+        self.assertIsNone(data['env']['NO_COLOR'])
+        self.assertEqual(data['env']['AGENT_CLI_TAB_TITLE'], 'A Title')
+        self.assertEqual(data['env']['FORCE_COLOR'], '1')
+
+    def test_the_inner_command_runs_in_the_directory_with_the_scrubbed_environment_and_whole_argv(self):
+        inner = CLI.posix_inner_command(self.directory, self.cleared, self.forced, str(self.recorder),
+                                         [str(self.output), '--resume', self.prompt])
+        self.run_and_check(inner)
+
+    def test_the_konsole_script_runs_identically_and_deletes_itself(self):
+        inner = CLI.posix_inner_command(self.directory, self.cleared, self.forced, str(self.recorder),
+                                         [str(self.output), '--resume', self.prompt])
+        script_path = CLI._write_posix_script(inner)
+        self.assertTrue(script_path.is_file())
+        self.run_and_check(['sh', str(script_path)])
+        self.assertFalse(script_path.exists(), 'the Konsole script did not delete itself')
 
 
 if __name__ == '__main__':
