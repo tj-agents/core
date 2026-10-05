@@ -83,7 +83,7 @@ class NativeLayerNamesTheHostReviewer(unittest.TestCase):
 
 class ReviewRunsWithoutRepositoryHelpers(unittest.TestCase):
     def test_no_review_family_step_runs_a_helper_from_the_reviewed_repository(self):
-        lifecycle = ROOT / ".agents" / "engineering" / "contract" / "review-lifecycle" / "SKILL.md"
+        lifecycle = ROOT / ".agents" / "engineering" / "convention" / "review-lifecycle" / "SKILL.md"
         texts = {skill: body(skill) for skill in REVIEW_FAMILY}
         texts["review-lifecycle"] = lifecycle.read_text(encoding="utf-8")
         for skill, text in texts.items():
