@@ -128,6 +128,7 @@
             "git-auth",
             "git-branching",
             "guide",
+            "guide-build",
             "handoff",
             "handoff-format",
             "incremental-review",
@@ -178,11 +179,12 @@
               "python>=3.9"
             ],
             "optional": [
+              "exe:bash",
               "exe:gh",
               "exe:powershell"
             ]
           },
-          "digest": "sha256:a0a8cb3d7279e60209f548c7a132495bdfffc32463bb13907b0f8596e7b74859",
+          "digest": "sha256:3ea24cd3a11c13d5801931572a93c813dfd0c03b3f507fe9e7870c96f3a248be",
           "harness": {
             "marketplaces": [
               {
@@ -332,7 +334,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:15c44c7928a325129c68678d7b2c737b79f1d56dc3825cc942d4f55503908d09",
+          "digest": "sha256:bc55d28f6521a127a93e8b04e98eb2ab03b2c55167f5cca98a677e0468942206",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
