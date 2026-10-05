@@ -18,6 +18,5 @@ Use the installed `browser@openai-bundled` plugin's `control-in-app-browser` ski
 Chrome; it owns setup, tab binding and interaction. Do not substitute Computer Use or standalone
 Playwright while that plugin is available.
 
-If no browser backend connects, fall back without weakening the delivery: open the pre-filled URL
-in the default browser with `Start-Process '<url>'`, let Tommy work the form, and deliver with the
-canonical script's `-Prompt` mode so the value still never appears in chat or a command line.
+If no browser backend connects, follow the canonical procedure's step 3 fallback: open the
+pre-filled URL with `Start-Process '<url>'` and deliver with the canonical script's `-Prompt` mode.

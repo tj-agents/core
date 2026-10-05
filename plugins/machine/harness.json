@@ -4,10 +4,6 @@
   "source_roots": [
     ".agents/machine"
   ],
-  "source_excludes": [
-    ".agents/catalog/catalog.json"
-  ],
-  "source_digest": "sha256:be32cb2a8f5f0f42839cc25f61489c77158e37ac422b7d90ed54771d8435aa6d",
   "requires": {
     "marketplaces": [
       {

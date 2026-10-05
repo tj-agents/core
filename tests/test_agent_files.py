@@ -9,8 +9,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/base"
-SCRIPT = PLUGIN / ".agents/base/contract/agent-files/scripts/session-context.py"
-CONTRACT = PLUGIN / ".agents/base/contract/agent-files/SKILL.md"
+SCRIPT = PLUGIN / ".agents/base/policy/agent-files/scripts/session-context.py"
+CONTRACT = PLUGIN / ".agents/base/policy/agent-files/SKILL.md"
 
 
 class AgentFileTests(unittest.TestCase):

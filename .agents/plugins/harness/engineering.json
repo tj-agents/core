@@ -4,8 +4,6 @@
   "source_roots": [
     ".agents/engineering"
   ],
-  "source_excludes": [],
-  "source_digest": "sha256:9fb856997c5546e03347a5b0c29e5c07e553b26cd2429696ca0ba75afa4cf428",
   "requires": {
     "marketplaces": [
       {
@@ -19,7 +17,7 @@
     ],
     "hooks": [
       {
-        "path": ".agents/engineering/contract/session-guidance/scripts/session-context.py",
+        "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"

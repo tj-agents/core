@@ -24,8 +24,11 @@ step below.
    in one question, not a drip.
 2. **Build the pre-filled URL** from the provider's recipe under `providers/` beside this file.
    Every field the URL can carry is in the URL.
-3. **Open and verify.** Use the host entry's browser mechanics. Check what the page actually
-   selected — radios and pre-selections are verified, not assumed — and fill what the URL could not.
+3. **Open and verify.** With browser automation available, drive the page through the host entry's
+   mechanics: check what it actually selected — radios and pre-selections are verified, not assumed —
+   and fill what the URL could not. Without browser automation, open the pre-filled URL in the
+   default browser and say so explicitly, then let Tommy drive the page himself. Either way, never
+   type a password, 2FA code, sudo code or credential value into the page.
 4. **Stop for Tommy's steps.** A password, 2FA or sudo prompt is his: name that one step, wait,
    continue. Never type a password, a code or a credential value into any page.
 5. **Generate.** The value shows once.
@@ -73,5 +76,6 @@ exposed path to avoid the prompt.
   say exactly what would be exposed, proceed only on Tommy's explicit acceptance, and offer
   immediate rotation afterwards.
 - Real credentials beyond what the task needs: ask first. Revoke test credentials afterwards.
-- `gh` and the host's browser automation are prerequisites; a missing one fails the step loudly
-  rather than degrading into manual instructions.
+- `gh` is a prerequisite; a missing `gh` fails the step loudly rather than degrading into manual
+  instructions. Browser automation is preferred, not required — its absence falls back to step 3's
+  default-browser path, never to a blank form or a manual checklist.
