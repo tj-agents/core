@@ -18,7 +18,7 @@ with the executable bit (`git add --chmod=+x guide/open.sh`) and keep it LF (`*.
 
 - `page.html`: the page shell, with its styles, chapter navigation and scripts.
 - `chapters/NN-name.html`: one fragment per chapter, in reading order. Each starts with
-  `<!-- chapter: id | Title -->`.
+  `<!-- chapter: id | Title -->`, and `@@N@@` anywhere in it becomes the chapter's reading-order number.
 - `build.py`: assembles the page and copies code into it from the repository.
 - `annotations.json`: optional lettered notes on source lines of an excerpt.
 - `guide.json`: the build configuration. Four keys, all required: `title` and `eyebrow` for the page
@@ -40,9 +40,10 @@ first later line containing the end text. Join segments with `&` to show an elis
 fails if an anchor no longer exists.
 
 To annotate an excerpt, add an ID after its path (`@@CODE src/main.rs id=entry "fn main()" block@@`) and
-the same ID in `annotations.json` with an `owner` and `marks`. Each mark names a unique substring of one
-included line, a `call`, `callback`, `data` or `return` kind, a page `target` ID, a `label` and a `text`.
-An optional `focus` names the destination line inside an annotated target.
+the same ID in `annotations.json` with an `owner` and `marks`. Each mark has a unique slug `id` (it forms
+the marker and footnote anchors), a `match` naming a unique substring of one included line, a `call`,
+`callback`, `data` or `return` kind, a page `target` ID, a `label` and a `text`. An optional `focus`
+names the destination line inside an annotated target.
 
 ## Updating
 

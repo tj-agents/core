@@ -8,10 +8,11 @@ BUILDER_OWNED = ("build.py", "page.html", "open.sh", "README.md")
 
 
 def template_bytes_for(name):
-    data = (TEMPLATE / name).read_bytes()
-    if name == "open.sh":
-        data = data.replace(b"\r\n", b"\n")
-    return data
+    return (TEMPLATE / name).read_bytes().replace(b"\r\n", b"\n")
+
+
+def target_bytes_for(target):
+    return target.read_bytes().replace(b"\r\n", b"\n")
 
 
 def check(guide):
@@ -19,7 +20,7 @@ def check(guide):
     for name in BUILDER_OWNED:
         target = guide / name
         template_bytes = template_bytes_for(name)
-        if not target.exists() or target.read_bytes() != template_bytes:
+        if not target.exists() or target_bytes_for(target) != template_bytes:
             drift.append(name)
     if drift:
         for name in drift:
@@ -32,15 +33,13 @@ def write_builder_owned(guide):
         target = guide / name
         template_bytes = template_bytes_for(name)
         existed = target.exists()
-        if existed and target.read_bytes() == template_bytes:
-            continue
-        target.write_bytes(template_bytes)
-        if name == "open.sh":
-            if os.name == "posix":
-                target.chmod(0o755)
-            else:
+        if not existed or target_bytes_for(target) != template_bytes:
+            target.write_bytes(template_bytes)
+            if name == "open.sh" and os.name != "posix":
                 print("scaffold: on Windows, mark it executable with: git add --chmod=+x guide/open.sh")
-        print(f"{'replaced' if existed else 'created'} guide/{name}")
+            print(f"{'replaced' if existed else 'created'} guide/{name}")
+        if name == "open.sh" and os.name == "posix" and target.exists():
+            target.chmod(0o755)
 
 
 def write_repo_owned(guide):
