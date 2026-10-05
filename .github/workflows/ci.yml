@@ -57,13 +57,23 @@ jobs:
         shell: pwsh
         run: ./tests/skill-packaging.tests.ps1
 
+      - name: PowerShell host compatibility tests
+        shell: pwsh
+        run: |
+          ./tests/powershell-host-compat.tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell-host-compat.tests.ps1
+
       - name: continuation scheduler tests
         shell: pwsh
-        run: ./tests/delivery-continuation.tests.ps1
+        run: |
+          ./tests/delivery-continuation.tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/delivery-continuation.tests.ps1
 
       - name: handoff launcher tests
         shell: pwsh
-        run: ./tests/handoff-launchers.tests.ps1
+        run: |
+          ./tests/handoff-launchers.tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/handoff-launchers.tests.ps1
 
       - name: Codex marketplace startup sync tests
         shell: pwsh
