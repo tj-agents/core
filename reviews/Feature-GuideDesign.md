@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `d8cfd0810665bf3649e03ae652eec25af2ad7b9e`  `(2026-10-05)`
+**Reviewed up to commit:** `e7210633575881c282bcbaefbd05d1e6563c2700`  `(2026-10-05)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-05 — full
@@ -86,4 +86,36 @@ all builder-owned files, exec bit re-asserted on POSIX every run); F2 in `templa
 `<html lang="en">`); F4/F11 in `template/README.md` (mark `id` documented, `@@N@@` documented).
 Validation: guide-build suite 23 tests OK (1 POSIX skip on Windows), source-layout suite OK, packaging
 suite PASS, generation and digests clean. Incremental pass over the remediation delta follows below.
+
+## Review pass — 2026-10-05 — incremental
+
+**Candidate base:** `d8cfd0810665bf3649e03ae652eec25af2ad7b9e`
+**Candidate head:** `e7210633575881c282bcbaefbd05d1e6563c2700`
+**Candidate branch:** `Feature/GuideDesign`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:5b95b8ec0be52517a583ef5db584864b2b831d5cf73ab858de604d564dcc5481` `(7 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\guide-design-review-2\review\f80d99380ba0f6c3a9937503c79b361b15223b3de560e0c4d5aa5c1630689e62`
+**Candidate bundle identity:** `sha256:17828794539dcb35d5584d8fc9186cf0c00562b091192756323e8c83484cd94d`
+**Work-order path:** `reviews/Feature-GuideDesign.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+Layers: native Claude Code `code-review` (medium) over `d8cfd08..e721063`; `workflow` lens over the
+materialized bundle (no findings: authored-only paths, work-order integrity, catalog digest-only change,
+no machine-local paths, README claims match build.py). Native layer verified all eleven F1-F11 fixes
+correct and found one regression introduced by the F8 fix:
+
+- [x] **F12 — MEDIUM — native/correctness** — `.agents/engineering/utility/guide-build/template/build.py:204`
+  The widened `CHAPTER_REF` tail `(?:(?:,? and|,) \d+)*` consumes bare `, N` in ordinary prose, so
+  "in chapter 3, 12 tests cover this" fails the build with `reference to missing chapter 12` (or
+  mislinks when that chapter exists). Fix: consume a comma run only when it terminates in an `and N`
+  element — tail `((?:(?:, \d+)*,? and \d+)?)` — and add a prose-safety test.
+
+### Remediation — 2026-10-05 (F12)
+
+Fixed on this branch: the chapter-list tail now consumes a comma run only when it ends in an `and N`
+element, so "chapters 1, 2 and 3" still links every number while prose like "in chapter 1, 12 tests"
+builds untouched (new prose-safety test; 24 tests OK, 1 POSIX skip). Incremental pass below.
 

@@ -201,7 +201,7 @@ def render_code(match, chapter, annotations_data, seen, revision, focus_rows, co
     )
 
 
-CHAPTER_REF = re.compile(r"\b([Cc]hapters?) (\d+)((?:(?:,? and|,) \d+)*)")
+CHAPTER_REF = re.compile(r"\b([Cc]hapters?) (\d+)((?:(?:, \d+)*,? and \d+)?)")
 UNLINKED = re.compile(r"(<svg\b.*?</svg>|<pre\b.*?</pre>|<a\b.*?</a>|<!--.*?-->|<[^>]+>)", re.S)
 
 
