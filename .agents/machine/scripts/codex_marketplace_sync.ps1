@@ -16,6 +16,17 @@ function Invoke-CodexSyncCommand {
     }
 }
 
+function Invoke-CodexHookTrust {
+    param(
+        [Parameter(Mandatory)][string] $CodexExecutable,
+        [Parameter(Mandatory)][string] $WorkingDirectory,
+        [Parameter(Mandatory)][string] $HelperScript
+    )
+
+    & python -B $HelperScript --codex $CodexExecutable --project $WorkingDirectory | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw 'Codex could not trust tj-agents hooks' }
+}
+
 function Sync-CodexStandards {
     [CmdletBinding()]
     param(
@@ -24,8 +35,13 @@ function Sync-CodexStandards {
     )
 
     $resolved = (Resolve-Path -LiteralPath $WorkingDirectory -ErrorAction Stop).Path
+    $trustSnapshot = $null
     Push-Location -LiteralPath $resolved
     try {
+        $helper = Join-Path $PSScriptRoot 'codex_hook_trust.py'
+        if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw "Codex hook trust helper missing: $helper" }
+        $trustSnapshot = [IO.Path]::GetTempFileName()
+        Copy-Item -LiteralPath $helper -Destination $trustSnapshot -Force
         $upgrade = Invoke-CodexSyncCommand -CodexExecutable $CodexExecutable -Arguments @(
             'plugin', 'marketplace', 'upgrade', '--json'
         )
@@ -48,9 +64,13 @@ function Sync-CodexStandards {
                 throw "Codex installed $($installed.pluginId) while refreshing $identity"
             }
         }
+        if (@($selected).Count -gt 0 -or @($inventory.installed | Where-Object { $_.enabled }).Count -gt 0) {
+            Invoke-CodexHookTrust -CodexExecutable $CodexExecutable -WorkingDirectory $resolved -HelperScript $trustSnapshot
+        }
         return @($selected)
     }
     finally {
         Pop-Location
+        if ($trustSnapshot) { Remove-Item -LiteralPath $trustSnapshot -Force }
     }
 }

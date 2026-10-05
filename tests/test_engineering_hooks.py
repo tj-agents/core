@@ -39,8 +39,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
 
     def test_each_host_context_uses_its_packaged_contract_without_mutating_the_caller(self):
-        script = ".agents/engineering/contract/session-guidance/scripts/session-context.py"
-        contract = self.package / ".agents/engineering/contract/session-guidance/SKILL.md"
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
         bodies = []
         for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
             with self.subTest(host=host):
@@ -54,6 +54,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
                 self.assertIn("engineering:plan-execution", context)
+                self.assertRegex(context, r"load `engineering:lanes`.*?select the next phase")
                 self.assertIn(str(contract), context)
                 self.assertIn("source SHA-256", context)
                 bodies.append(context)
@@ -61,10 +62,10 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertEqual([], list(self.cwd.iterdir()))
 
     def test_missing_context_contract_is_an_actionable_error(self):
-        contract = self.package / ".agents/engineering/contract/session-guidance/SKILL.md"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
         contract.unlink()
         result = self.run_hook(
-            ".agents/engineering/contract/session-guidance/scripts/session-context.py"
+            ".agents/engineering/policy/session-guidance/scripts/session-context.py"
         )
         self.assertNotEqual(0, result.returncode)
         self.assertIn("cannot read contract", result.stderr)
@@ -94,9 +95,39 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
                 self.assertEqual(canonical, context.split("\n\n", 1)[1])
+                entry, standalone = context.split("## Standalone or runtime-unavailable execution", 1)
+                standalone, repository = standalone.split("## Repository runtime execution", 1)
+                self.assertRegex(entry, r"load `engineering:lanes`")
+                self.assertRegex(entry, r"(?s)Repeat selection.*?phase changes.*?design approval.*?fallback")
+                self.assertRegex(entry, r"(?s)Apply the selected lane.*?before implementing")
+                self.assertNotRegex(entry.split("---", 2)[1], r"(?m)^lane:")
+                self.assertIn("The rest of this document does not apply in this mode", standalone)
+                fallback = repository.split("## Dispatch and fallback", 1)[1].split("## Transfer", 1)[0]
+                self.assertRegex(fallback, r"(?s)reselect the phase lane.*?`engineering:lanes`")
+                self.assertRegex(fallback, r"(?s)Parent fallback must.*?same lane and capability-limit rules")
                 self.assertIn(str(
                     self.package / ".agents/engineering/workflow/plan-execution/SKILL.md"
                 ), context)
+
+    def test_planning_then_approval_selects_the_corresponding_packaged_workflow(self):
+        (self.cwd / "GOAL.md").write_text(
+            "# Goal\n\nStatus: awaiting approval\n\nFinish the taxonomy proposal.\n", encoding="utf-8"
+        )
+        for prompt, name in (
+            ("Planning only: finish the taxonomy proposal, but do not implement it.", "plan-authoring"),
+            ("I approve the plan. Implement it through completion.", "plan-execution"),
+        ):
+            with self.subTest(workflow=name):
+                result = self.run_hook("hooks/workflow_route.py", {
+                    "hook_event_name": "UserPromptSubmit", "prompt": prompt,
+                })
+                self.assertEqual(0, result.returncode, result.stderr)
+                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                canonical = (
+                    self.package / f".agents/engineering/workflow/{name}/SKILL.md"
+                ).read_text(encoding="utf-8").strip()
+                self.assertIn(f"engineering:{name} automatically selected", context)
+                self.assertEqual(canonical, context.split("\n\n", 1)[1])
 
     def test_host_manifests_register_supported_router_and_red_run_events(self):
         codex = json.loads((self.package / "hooks/codex.json").read_text(encoding="utf-8"))

@@ -18,9 +18,6 @@ a generated native-instruction fallback.
 Codex hook commands retain an integrity-checked copy of their trusted plugin package in `PLUGIN_DATA`.
 An active session can keep running its original hook scripts when a marketplace refresh removes the old
 cache directory. A changed hook definition still requires Codex trust review before it runs.
-Codex hook commands retain an integrity-checked copy of their trusted plugin package in `PLUGIN_DATA`.
-An active session can keep running its original hook scripts when a marketplace refresh removes the old
-cache directory. A changed hook definition still requires Codex trust review before it runs.
 
 The split packages form the **2.1.16** release candidate. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
@@ -46,10 +43,10 @@ closure.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
 - install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
 
-Run `pwsh .agents/sync-generated.ps1` after changing a skill and
-`pwsh .agents/sync-generated.ps1 -Check` before delivery.
-
-When package bytes change, refresh the local catalog digests before generation:
+A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
+workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
+catalog digests, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,
+run the same two commands and leave their output uncommitted:
 
 ```powershell
 python -B scripts/update_catalog_digests.py
@@ -79,8 +76,9 @@ data, transcripts, credentials, and identifiers remain outside the repository.
 ## Install / update the default plugins
 
 GitHub is authoritative; a machine's installed copies of `base@base-agents`,
-`engineering@base-agents`, and `machine@base-agents` are expected to be exactly what
-the latest commit on `main` generated into `plugins/<package>/`. Every skill's own scripts and resources travel
+`engineering@base-agents`, and `machine@base-agents` are expected to be exactly what the post-merge
+`regenerate` job last committed into `plugins/<package>/` on `main` (briefly the previous, still
+self-consistent generation while that job runs). Every skill's own scripts and resources travel
 inside that generated package (see `PACKAGING.md`), so registering the marketplace and installing/updating
 the plugins is the entire supported procedure — never hand-place a script or resolver on a machine to make
 a skill work.
@@ -117,7 +115,10 @@ codex plugin add machine@base-agents
 ```
 
 Typing `codex` in PowerShell and using `handoff-codex` refresh configured Git marketplaces and
-enabled plugins before Codex loads them. The machine plugin's SessionStart hook adds a marked block
+enabled plugins before Codex loads them. The launcher then records native Codex hook trust only for
+enabled plugins sourced from GitHub's `tj-agents` organisation, after checking the installed package
+against its unchanged Git source. Other publishers and user/project hooks retain normal trust review.
+Set `BASE_AGENTS_CODEX_HOOK_TRUST=off` to keep manual review for all hooks. The machine plugin's SessionStart hook adds a marked block
 to both PowerShell profiles. That block resolves the active installed machine package, so later
 terminals load its `codex` wrapper without pulling this checkout. The first session after installing
 the package wires the profiles; open a new terminal to use the wrapper. Set

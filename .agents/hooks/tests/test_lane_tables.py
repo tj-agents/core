@@ -35,7 +35,7 @@ STAGE_LANES = {
 # frontier tier must outrank every rung.
 FAMILY_ORDER = {
     "claude": ("claude-fable-5", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"),
-    "codex": ("gpt-6-astra", "gpt-6-sol", "gpt-6-luna"),
+    "codex": ("gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"),
 }
 
 
@@ -164,6 +164,29 @@ class LaneDeclarationTests(unittest.TestCase):
                     self.assertIn(lane, rungs[host])
         self.assertGreater(declared, 0, "no skill declares a lane, so the ladder governs nothing")
 
+    def test_only_one_shape_leaf_tasks_declare_a_lane(self):
+        # A lane in skill front matter re-points the whole session when the skill is invoked, and the
+        # switch outlives the skill. A lifecycle or orchestrating skill spans phases of varying shape, so
+        # it must inherit the session's model and route each bounded phase down the ladder instead. Only
+        # a leaf task that is one unvarying shape may pin: the clerical operations, and plan-authoring,
+        # whose shape — planning of any size — is the L1 rung by definition. Adding a lane is a deliberate
+        # declaration that a skill is such a leaf; declare it here too.
+        expected = {
+            "plan-authoring": "L1",
+            "commit": "L7",
+            "commit-all": "L7",
+            "push": "L7",
+            "pull": "L7",
+            "sync-checkout": "L7",
+            "open-worktree": "L7",
+        }
+        declared = {}
+        for skill in self.skills():
+            lane = front_matter(skill).get("lane")
+            if lane:
+                declared[skill.parent.name] = lane
+        self.assertEqual(expected, declared)
+
     def test_no_routed_standard_declares_a_lane(self):
         # A routed standard is consulted DURING other work; a lane on one would re-point that task's
         # model. The generator refuses this too - asserted here so the rule survives a generator rewrite.
@@ -283,7 +306,7 @@ class PluginDeliveryTests(unittest.TestCase):
         self.assertFalse((ROOT / ".claude" / "agents").exists())
 
     def test_the_shipped_skill_names_locations_that_exist_in_each_layout(self):
-        canonical = self.PLUGIN / ".agents/engineering/contract/lanes/SKILL.md"
+        canonical = self.PLUGIN / ".agents/engineering/policy/lanes/SKILL.md"
         body = canonical.read_text(encoding="utf-8-sig")
         self.assertIn(".agents/lanes/", body)
         self.assertIn("../../.agents/lanes/", body)

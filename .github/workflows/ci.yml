@@ -6,10 +6,32 @@ on:
   pull_request:
 
 jobs:
+  guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: generated output stays out of pull requests
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: python3 -B scripts/check_generated_paths.py --base "origin/${BASE_REF}"
+
   verify:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: regenerate the workspace from authored sources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -B scripts/update_catalog_digests.py
+          ./.agents/sync-generated.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: generated files are current
         shell: pwsh
@@ -27,10 +49,6 @@ jobs:
         shell: pwsh
         run: python -B scripts/sync_harness_manifests.py --check
 
-      - name: committed release package digests are current
-        shell: pwsh
-        run: python -B scripts/update_catalog_digests.py --check --source base-agents=. --source-revision base-agents=HEAD
-
       - name: CLI session recovery tests
         shell: powershell
         run: ./cli-session-recovery/tests/cli-session-vault.tests.ps1
@@ -38,6 +56,10 @@ jobs:
       - name: skill packaging tests
         shell: pwsh
         run: ./tests/skill-packaging.tests.ps1
+
+      - name: continuation scheduler tests
+        shell: pwsh
+        run: ./tests/delivery-continuation.tests.ps1
 
       - name: handoff launcher tests
         shell: pwsh
@@ -60,3 +82,53 @@ jobs:
       - name: shared runtime tests
         shell: pwsh
         run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v
+
+  regenerate:
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: regenerate-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: regenerate committed packages from authored sources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -B scripts/update_catalog_digests.py
+          ./.agents/sync-generated.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: verify the regenerated tree
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          ./.agents/sync-generated.ps1 -Check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B .agents/hooks/check_tier_payload.py --root .
+          python -B scripts/update_catalog_digests.py --check
+          python -B scripts/sync_harness_manifests.py --check
+
+      - name: commit and push the regeneration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .agents/catalog/catalog.json plugins .agents/plugins/marketplace.json .claude-plugin/marketplace.json CAPABILITIES.md
+          $staged = git diff --cached --name-only
+          if ($staged) {
+            git commit -m "Regenerate packages for $env:GITHUB_SHA"
+            python -B scripts/update_catalog_digests.py --check --source base-agents=. --source-revision base-agents=HEAD
+            git push origin HEAD:main
+          } else {
+            "Generated output already current."
+          }

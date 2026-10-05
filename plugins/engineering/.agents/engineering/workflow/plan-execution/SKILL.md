@@ -4,7 +4,6 @@ description: Automatically own authorized long-term or multi-phase work through 
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Execute a plan continuously
@@ -19,6 +18,28 @@ request. Preserve explicit user limits and genuine gates, but repair agent-autho
 would abandon authorized remaining work. Context transfer must use the available automated continuation
 or launcher after checkpointing; a pointer alone does not transfer ownership unless prompt-only output
 was requested.
+
+When execution follows substantial critical-plan design, load `engineering:plan-authoring`'s execution
+readiness section before choosing inline execution or a fresh owner. A successor named by a transfer
+receipt follows `engineering:handoff`'s verified pickup procedure before deliverable writes. Read the
+canonical goal, validate the checkpoint and authority, acknowledge the exact attempt, then perform its
+next action immediately. Acknowledgement is not completion; keep the same goal through its remaining
+authorized slices and record the first action or genuine gate as progress evidence.
+
+## Select the execution lane
+
+Before choosing either execution mode below or making a deliverable edit, load `engineering:lanes`
+through the host's skill invocation or read its advertised SKILL.md in full. Select and record the lane
+for the next bounded phase using that contract and resolve it from the current host's canonical table.
+Repeat selection when the phase changes, including after design approval, review entry, or fallback.
+Approval supplies execution authority; it does not carry the design lane into implementation.
+
+Apply the selected lane through a supported host control or a bounded lane worker before implementing.
+Direct execution is appropriate when the current owner already runs at the selected lane. Preserve the
+canonical contract's tiny inline follow-up allowance and its distinction between in-session workers and
+a fresh execution owner after substantial critical-plan design. If the host cannot apply the lane,
+follow that contract's capability-limit procedure; do not treat inherited session settings as selection.
+This step applies to standalone work and runtime-unavailable work as well as repository execution.
 
 ## Standalone or runtime-unavailable execution
 
@@ -90,11 +111,12 @@ it, or the next material checkpoint falls due.
 2. Apply `engineering:git-branching` before implementation and at each scope expansion. Check the current
    PR's measured size against its recorded delivery slice. Split large dependent work into a stack,
    carrying the same goal and owner; record any atomic exception before growing the candidate. An open
-   PR or phase is not a container for all remaining work. Route a distinct, independently actionable,
-   separately authorized side workstream through `engineering:handoff` in bounded side-workstream mode;
-   retain this session's active goal instead of transferring it.
-   Execute directly or dispatch only bounded independent work through semantic capabilities. Independent
-   readers may overlap; a `mechanical-worker` receives only a disjoint transformation under one exact
+   PR or phase is not a container for all remaining work. Route a distinct, independently actionable
+   side workstream with its own authorization through `engineering:handoff` in bounded side-workstream
+   mode; retain this session's active goal instead of transferring it.
+   Execute directly at the selected phase lane or dispatch only bounded independent work through semantic
+   capabilities that honor that lane. Independent readers may overlap; a `mechanical-worker` receives
+   only a disjoint transformation under one exact
    serialized writer lease. The parent retains architecture, phase, scope, diagnosis, security, migration,
    acceptance, review synthesis, and transition decisions and reconciles every writer result against Git.
 3. Implement the selected slice and run focused checks through the shared `run` operation so detailed output
@@ -138,9 +160,12 @@ updates the owning dependency ledger with the return condition before stopping.
 
 Use Workflow v2 semantic capabilities rather than agent or model names. Validate every result and give one
 focused follow-up to a correctable incomplete result. On another invalid result, timeout, unavailable
-role/model, unsupported host capability, or cancellation, close the dispatch and perform the same bounded
-objective in the parent. Reconcile a failed or cancelled writer's observed paths against Git before reusing
-its lease; never overlap writers or let a subordinate choose a phase, fix, severity, or terminal transition.
+role/model, unsupported host capability, or cancellation, close the dispatch and reselect the phase lane
+under `engineering:lanes` before performing the same bounded objective in the parent. Parent fallback must
+satisfy the same lane and capability-limit rules as direct execution; a missing worker does not promote
+implementation to the design lane. Reconcile a failed or cancelled writer's observed paths against Git
+before reusing its lease; never overlap writers or let a subordinate choose a phase, fix, severity, or
+terminal transition.
 
 ## Transfer and restart
 

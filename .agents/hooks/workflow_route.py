@@ -25,6 +25,10 @@ PLANNING_ONLY = re.compile(
     r"\b(?:continue|resume)\s+planning\b",
     re.IGNORECASE,
 )
+PLANNING_REQUEST = re.compile(
+    r"\b(?:only\s+plan|plan(?:ning)?\s+only|(?:continue|resume)\s+planning)\b",
+    re.IGNORECASE,
+)
 OWNER_REFERENCE = re.compile(r"\b(?:goal|plan|roadmap)\b", re.IGNORECASE)
 LONG_RUNNING = re.compile(
     r"\b(?:all\s+(?:remaining\s+)?phases|end[- ]to[- ]end|entire\s+(?:migration|project)|"
@@ -141,6 +145,10 @@ def load_context(script: Path, relative_path: str, name: str) -> str:
 
 
 def route(prompt: str, cwd: Path) -> str | None:
+    if PLANNING_REQUEST.search(prompt):
+        return load_context(
+            Path(__file__), "engineering/workflow/plan-authoring/SKILL.md", "plan-authoring"
+        )
     if selects_handoff(prompt, cwd):
         return load_context(Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff")
     if selects_plan_execution(prompt, cwd):
