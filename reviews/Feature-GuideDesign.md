@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `e7210633575881c282bcbaefbd05d1e6563c2700`  `(2026-10-05)`
+**Reviewed up to commit:** `55709c246a95c096b49ae95710cdce504fad5395`  `(2026-10-05)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-05 — full
@@ -118,4 +118,36 @@ correct and found one regression introduced by the F8 fix:
 Fixed on this branch: the chapter-list tail now consumes a comma run only when it ends in an `and N`
 element, so "chapters 1, 2 and 3" still links every number while prose like "in chapter 1, 12 tests"
 builds untouched (new prose-safety test; 24 tests OK, 1 POSIX skip). Incremental pass below.
+
+## Review pass — 2026-10-05 — incremental
+
+**Candidate base:** `e7210633575881c282bcbaefbd05d1e6563c2700`
+**Candidate head:** `55709c246a95c096b49ae95710cdce504fad5395`
+**Candidate branch:** `Feature/GuideDesign`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:ece889ba7fea8c1632ee315d4e3c0385eb7bd9869d364efda90bec603d760984` `(4 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\guide-design-review-3\review\3abbad0cb437cfc3297d18492e0edb7b7379ad633dbd7c04669d173d690ae31b`
+**Candidate bundle identity:** `sha256:dc75a3d1c4d66aa6e44e31fccaf618a4d53486cf5e7e1a155f417ddf8c90a252`
+**Work-order path:** `reviews/Feature-GuideDesign.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+Layers: native Claude Code `code-review` (medium) over `e721063..55709c2`; `workflow` lens over the
+materialized bundle (no findings; its one noted evidence gap — F12's text across status flips — is
+parent-resolved: those edits were status-only). Native layer confirmed the F12 fix and its test, with one
+residual of the same class:
+
+- [x] **F13 — LOW — native/correctness** — `.agents/engineering/utility/guide-build/template/build.py:204`
+  The tail permits the optional Oxford comma with zero preceding `, N` elements, so prose like
+  "chapter 1, and 2 others" consumes `, and 2` and fails or mislinks. Fix: require at least one comma
+  element before the optional Oxford comma — tail `((?:(?:, \d+)+,?)? and \d+)?` — keeping
+  "chapters 1 and 2", "chapters 1, 2 and 3" and "chapters 1, 2, and 3" linked; add prose and Oxford tests.
+
+### Remediation — 2026-10-05 (F13)
+
+Fixed on this branch: the Oxford comma is now permitted only after at least one comma element
+(verified empirically against all seven reference phrasings), with prose and Oxford-list tests added
+(26 tests OK, 1 POSIX skip). Incremental pass below.
 

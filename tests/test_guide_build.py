@@ -559,6 +559,53 @@ class BuildTests(unittest.TestCase):
         page = (self.repo / "target" / "guide" / "demo-guide.html").read_text(encoding="utf-8")
         self.assertIn('<a href="#intro">chapter 1</a>, 12 tests', page)
 
+    def test_prose_oxford_comma_without_list_is_not_a_list(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            "<p>In chapter 1, and 2 other places, this appears.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_annotations({})
+
+        result = self.fixture.build()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        page = (self.repo / "target" / "guide" / "demo-guide.html").read_text(encoding="utf-8")
+        self.assertIn('<a href="#intro">chapter 1</a>, and 2 other places', page)
+
+    def test_oxford_comma_chapter_list_links_every_number(self):
+        self.fixture.write_chapter(
+            "01-intro.html",
+            "<!-- chapter: intro | Introduction -->\n"
+            '<article class="chapter" id="intro">\n'
+            "<p>See chapters 1, 2, and 3 for details.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_chapter(
+            "02-setup.html",
+            "<!-- chapter: setup | Configuration -->\n"
+            '<article class="chapter" id="setup">\n'
+            "<p>Setup chapter.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_chapter(
+            "03-wrap-up.html",
+            "<!-- chapter: wrap-up | Wrap Up -->\n"
+            '<article class="chapter" id="wrap-up">\n'
+            "<p>Wrap-up chapter.</p>\n"
+            "</article>\n",
+        )
+        self.fixture.write_annotations({})
+
+        result = self.fixture.build()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        page = (self.repo / "target" / "guide" / "demo-guide.html").read_text(encoding="utf-8")
+        self.assertIn('<a href="#setup">2</a>', page)
+        self.assertIn('<a href="#wrap-up">3</a>', page)
+
     def test_annotated_single_line_excerpt_renders_singular_label_and_anchor(self):
         self.fixture.write_chapter(
             "01-intro.html",
