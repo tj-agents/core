@@ -368,7 +368,7 @@ class Stub {
     $prompt = "Phase one: migrate Auth; then Search.`nPhase two: verify `"end to end`"; report back."
     & $openLauncher -WorkingDirectory $workDir -Title 'test open' -Prompt $prompt
     if (-not (Test-Path -LiteralPath $deliveredLog)) { throw 'The stubbed terminal recorded no delivered command line.' }
-    $delivered = [System.IO.File]::ReadAllText($deliveredLog) -split "`u{001f}"
+    $delivered = [System.IO.File]::ReadAllText($deliveredLog) -split [char]0x1f
     if ($delivered[0] -ne '1') {
         throw "The prompt's semicolons split the terminal command line into $($delivered[0]) subcommands; the tab would have run only the first."
     }

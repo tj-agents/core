@@ -11,6 +11,7 @@ $global:ContinuationRegistrations = 0
 $global:ContinuationRemovals = 0
 $global:ContinuationFailRegistration = $false
 function Assert([bool] $Condition, [string] $Message) { if (-not $Condition) { throw $Message } }
+function Write-Json([string] $Path, $Value, [int] $Depth) { [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth $Depth), [Text.UTF8Encoding]::new($false)) }
 function Expect-Failure([scriptblock] $Action, [string] $Pattern) {
     $failure = $null
     try { & $Action } catch { $failure = $_ }
@@ -43,7 +44,7 @@ try {
     $root = Join-Path $scratch 'owner checkout'
     $bin = Join-Path $scratch 'bin'
     New-Item -ItemType Directory -Path $root, $bin | Out-Null
-    Copy-Item -LiteralPath (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source -Destination (Join-Path $bin 'codex.exe')
+    New-Item -ItemType File -Path (Join-Path $bin 'codex.exe') | Out-Null
     $env:PATH = $bin + [IO.Path]::PathSeparator + $originalPath
     & git init --quiet $root
     & git -C $root remote add origin https://github.com/example/isolated-test.git
@@ -75,7 +76,7 @@ try {
     & $adapter register -OwnerPath $ownerPath
     $receipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
     Assert ($receipt.helper -eq $helper) 'Authored runtime path resolution failed.'
-    Assert ($receipt.execute -match 'pwsh' -and $receipt.arguments -match ' wake -OwnerPath ') 'Scheduled task does not run deterministic wake.'
+    Assert ($receipt.execute -ieq (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -and $receipt.arguments -match ' wake -OwnerPath ') 'Scheduled task does not run deterministic wake under the inbox Windows PowerShell.'
     Assert ($receipt.arguments -notmatch 'cmd.exe| exec | -p ') 'Scheduled action launches a model directly.'
     & $adapter register -OwnerPath $ownerPath -IntervalMinutes 10
     Assert ($global:ContinuationTasks.Count -eq 1 -and $global:ContinuationRegistrations -eq 2) 'Registration did not retain one stable task.'
@@ -117,11 +118,11 @@ try {
     $knownReceipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
     $unknownReceipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
     $unknownReceipt.helper = 'unknown receipt evidence'
-    $unknownReceipt | ConvertTo-Json -Depth 10 | Set-Content $receiptPath -Encoding utf8
+    Write-Json $receiptPath $unknownReceipt 10
     $unknownBefore = Get-Content $receiptPath -Raw
     Expect-Failure { & $adapter remove -OwnerPath $ownerPath } 'receipt matches neither pending registration record'
     Assert ((Get-Content $receiptPath -Raw) -ceq $unknownBefore -and (Test-Path $pendingPath)) 'Recovery overwrote unknown receipt evidence.'
-    $knownReceipt | ConvertTo-Json -Depth 10 | Set-Content $receiptPath -Encoding utf8
+    Write-Json $receiptPath $knownReceipt 10
     $transaction = Get-Content $pendingPath -Raw | ConvertFrom-Json
     Assert ($transaction.previous.script -eq $adapter -and $transaction.proposed.script -eq $packageAdapter) 'Transaction did not retain both package identities.'
     $pendingBefore = Get-Content $pendingPath -Raw
@@ -155,7 +156,7 @@ try {
     & $adapter register -OwnerPath $ownerPath
     $terminalOwner = Get-Content $ownerPath -Raw | ConvertFrom-Json
     $terminalOwner.state = 'blocked'
-    $terminalOwner | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $ownerPath -Encoding utf8
+    Write-Json $ownerPath $terminalOwner 30
     & $adapter wake -OwnerPath $ownerPath
     Assert (-not (Test-Path $receiptPath)) 'Terminal runtime wake retained its scheduler receipt.'
     Assert ($global:ContinuationTasks.Count -eq 1 -and $global:ContinuationTasks.ContainsKey($foreign.TaskName)) 'Terminal wake removed unrelated tasks or retained its task.'
