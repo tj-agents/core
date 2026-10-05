@@ -4,8 +4,6 @@ description: Keep plan-managed work resumable with a compact current-state ledge
 
 kind: contract
 domain: process
-model: claude-sonnet-5
-effort: medium
 ---
 
 # The plan-progress checkpoint

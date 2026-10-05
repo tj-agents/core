@@ -1,21 +1,24 @@
 ---
 name: open-worktree
-description: Create, inspect, or close one isolated git worktree so every in-flight delivery branch gets its own checkout and carries its plan and ledger. Covers the planning-only no-worktree exception, the worktree identity gate, starting at fetched origin/main, branch casing, flat folders, safe audit/close/retire, and stale guidance links. Use when the user wants a worktree created, a branch or PR isolated, worktrees listed, or one closed or retired.
+description: Select, create, inspect or close a checkout for active work. Reuse available checkouts for sequential delivery; create isolation for concurrent execution or an explicit request. Covers ownership, fresh bases, branch casing, space before restoring dependencies and safe closure. Use when selecting or managing a worktree.
 
 kind: operation
 domain: process
 lane: L7
 ---
 
-# One checkout per in-flight branch
+# Checkout isolation for active work
 
-Give every in-flight branch its own working tree, so two branches cannot corrupt each other through a single
-shared checkout. The failure this prevents is concrete: an unrelated guidance edit bleeding into a refactor's
-PR, or a build running against a tree half-switched to another branch.
+`engineering:git-branching` owns sequential delivery, required stack relationships and checkout allocation.
+Reuse an available checkout for sequential work after preserving its previous work and verifying that no
+writer, build, monitor or active session still owns it. Create a separate worktree when concurrent execution,
+necessary isolation or an explicit request requires one. A branch or open PR can exist without its own
+permanent checkout; a stack alone does not require one worktree per layer.
 
-**Planning-only authoring is the exception.** It needs no isolated worktree. Once implementation starts, the
-delivery branch's worktree owns the plan and ledger for that slice, and material updates ride its substantive
-commits. Never maintain a competing normal-checkout copy while that worktree is active.
+Planning-only authoring needs no isolated worktree. The active delivery checkout owns the plan and ledger
+for its slice, and material updates ride its substantive commits. Before creating another checkout or
+restoring its dependencies, inspect available space and existing generated outputs. Preserve unfinished
+work and required evidence, and close completed worktrees promptly through the lifecycle below.
 
 Creation is *setup*, never the deliverable. **When the invocation also carries a task, continue that task in
 the new checkout in the same session**, addressing it by absolute path — nothing requires a fresh session, and
@@ -26,7 +29,8 @@ stopping after the checkout exists is the failure this sentence prevents.
 | Intent | Procedure |
 |---|---|
 | Planning-only authoring with no delivery branch | Use the normal checkout; **do not create a worktree** |
-| Create or restore one branch checkout | **Create**, below |
+| Continue sequential work in an available checkout | Verify ownership, clean/preserved status and task binding; switch branches under `engineering:git-branching` |
+| Create or restore an actively needed isolated checkout | **Create**, below |
 | Resume plan-managed work | The repository's plan floor — its ledger owns the branch, PR and worktree identity |
 | Read-only inventory | `./scripts/worktrees.ps1 audit` when the repository ships it; otherwise `git worktree list --porcelain` and each entry's `git -C "<worktree>" status --porcelain` |
 | Close a merged PR's worktree | `engineering:merge` Step 5's cleanup, which uses the helper when present and native Git otherwise |
@@ -42,8 +46,8 @@ absent, use the fallbacks above. **Never substitute a manual deletion for `retir
 1. **Apply the repository's worktree identity gate first.** Read its guidance and state whether the task
    matches the current branch directly, or is branch-local work because it changes code not yet on the default
    branch. Verify against the dirty paths and the other registered worktrees rather than matching on a shared
-   refactor name. An explicitly planned dependent stack slice also matches: record its parent and branch
-   from that parent's tip under `engineering:git-branching`. Do not treat all unmerged feature code as
+   refactor name. A necessary dependent slice also matches: record why it must precede the parent's
+   merge, then branch from that parent's tip under `engineering:git-branching`. Do not treat all unmerged feature code as
    one mandatory PR. **If none of these bases holds, stop and resolve ownership.** A planning-only task
    never reaches this creation procedure; active delivery continues in the ledger's recorded slice.
 2. **Confirm no open red generated-sync PR before starting new work** — `engineering:merging` owns

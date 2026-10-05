@@ -49,8 +49,8 @@ Naming or opening a plan, ledger, or roadmap obliges **reading its active owner'
 acting**. The copy in another checkout may be stale, and remembered state is not current state.
 
 After a delivery PR merges, the default branch inherits its planning state. Reconcile and continue an
-already-recorded successor stack layer. Only when no successor exists does remaining work start a fresh
-worktree from the current remote default. An in-flight sibling reads the owning branch or PR when it
+already-recorded successor stack layer. When no successor exists, start the next branch from the current
+remote default and select an available checkout under `engineering:git-branching`. An in-flight sibling reads the owning branch or PR when it
 needs newer evidence; it does not create a competing ledger copy.
 
 **A plan must not cite its roadmap — but an agent working the plan may read it.** The document dependency
@@ -104,8 +104,11 @@ gap resurfaces downstream as naming churn over a thing whose job was never fixed
 A phase can require several PRs. Apply `engineering:git-branching` before implementing or expanding a
 large change; its split assessment and atomicity exceptions govern the delivery map. Record each PR
 slice's purpose, included code/tests, base or parent, dependency, size estimate and validation gate.
-Dependent slices default to a stack; independent slices start from the remote default. Keep a single
-goal and one current ledger, with branch/PR links and exact base/head SHAs as the stack materializes.
+Deliver slices sequentially by default, landing the current ready and authorized PR before starting the
+next from the updated remote default. If dependent work must proceed before its parent lands, record
+why and maintain the required stack under `engineering:git-branching`. Keep a single goal and one current
+ledger, with branch/PR links and exact base/head SHAs for the active slices. Checkout allocation follows
+active execution needs, separately from planned PR boundaries.
 
 Review a child against its actual parent while validating the cumulative tree. Reconcile descendants
 after parent changes. After a lower PR lands, continue from the reconciled next layer rather than
@@ -305,15 +308,15 @@ alone does not require that transfer; the context-transfer decision is owned by
    creating them, check plans, branches, worktrees, and PRs for the same work, then assign each logical
    workstream exactly one ledger.
 2. **Branch, then work a delivery slice** from the current remote default or the recorded stack parent's
-   tip. That branch and worktree own the plan's current state for one PR-sized slice.
+   tip. That branch and its selected checkout own the plan's current state for one PR-sized slice.
 3. **At a material milestone, update the plan and compact ledger before the substantive commit.** Check off
    or strike shipped phases, retain only current recovery state, and stage those edits with the work.
 4. **Keep both artifacts after the last local phase while delivery is live.** Make the ledger's exact next
    action the gate that now owns progress — **review comes first: never write a merge as the next step until
    a review is recorded** (a `## Reviews` entry or a review watermark); then PR, merge, publication,
-   dependency, or platform sync. `plan_graph.py` enforces this. Once the PR merges, close its worktree; if
-   work remains, reconcile and continue its existing successor layer, or create a fresh worktree from
-   the current remote default when no successor exists. Resume the same ledger.
+   dependency, or platform sync. `plan_graph.py` enforces this. Once the PR merges, complete the checkout
+   cleanup under `engineering:merge`; if work remains, reconcile and continue its existing successor layer, or start the next branch from
+   the current remote default in a checkout selected under `engineering:git-branching`. Resume the same ledger.
 5. **Close out only after the entire lifecycle is terminal.** Planning-only work is terminal only when its
    reviewed artifacts are merged to the default branch through `merge-docs`; planning artifacts updated with
    implementation are terminal only when that delivery PR merges. A local commit, pushed branch, or open PR
@@ -321,11 +324,13 @@ alone does not require that transfer; the context-transfer decision is owned by
    plan and ledger in the next substantive commit or one final docs-only closeout. Never push a commit whose
    only purpose is to record a remote observation.
 
-### Plans outlive PR worktrees
+### Plans outlive delivery branches
 
-A worktree owns one PR-sized delivery slice, while the plan survives through the commits merged to the
-default branch. Once the PR merges, remove its worktree and continue the reconciled successor layer.
-Create a fresh worktree from the current remote default only when remaining work has no existing slice.
+A branch owns one PR-sized delivery slice, while the plan survives through the commits merged to the
+default branch. After merge, retire the completed branch and any isolated checkout through
+`engineering:merge`, then continue the reconciled successor layer.
+When remaining work has no existing slice, start its branch from the current remote default and select
+its checkout under `engineering:git-branching`; create isolation only when active execution needs it.
 Never reopen a merged branch to append observations; the forge owns remote evidence until a
 later substantive commit or final closeout needs it.
 
@@ -364,6 +369,10 @@ and normally hand execution to one fresh harness, even when the checkout stays t
 resumes that plan as its owner. Judge plans between these cases by the size and complexity of the remaining
 execution, how much planning context is useful, and whether a fresh owner can act from the checkpoint.
 Record the reason when choosing the less usual path; plan length alone is not a mechanical threshold.
+
+`engineering:plan-authoring` owns the critical-plan readiness decision and compact execution goalpost.
+Apply it before a substantial-design transfer. `engineering:handoff` owns the matching acknowledgement
+and first-action evidence; launcher submission alone does not establish an accountable executor.
 
 Transfer to a fresh context only when at least one of these conditions is true:
 

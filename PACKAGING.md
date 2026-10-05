@@ -3,6 +3,13 @@
 A repository-owned runtime dependency must work when its owning plugin is installed on a supported machine.
 Installation is the delivery mechanism; no manually assembled machine-local file may be required.
 
+Every published standards package owns a committed harness manifest listing the plugins,
+marketplaces, hook entry points, and host permissions its skills and workflows require. Adding
+or changing any of those requirements updates that package's manifest in the same change.
+The package owner checks its manifest against authored sources and shipped hook wiring; consumers
+check generated project settings against the selected packages' declarations. Core does not
+maintain another package owner's release records or harness manifest.
+
 ## Ownership
 
 A skill-local helper, template, or policy file lives beside its canonical `SKILL.md` under `.agents/`.
@@ -41,3 +48,4 @@ shared helper, such as the history reader, to ship once through an explicit mapp
 - Shared resources remain inside their owning plugin.
 - External prerequisites are explicit and fail with a useful message.
 - `pwsh .agents/sync-generated.ps1 -Check` passes.
+- `python -B scripts/sync_harness_manifests.py --check` passes for this repository's packages.

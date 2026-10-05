@@ -4,7 +4,6 @@ description: Establish when a failing test last genuinely passed and what was di
 
 kind: contract
 domain: process
-model: gpt-6-sol
 ---
 
 # Establishing what changed since it last passed

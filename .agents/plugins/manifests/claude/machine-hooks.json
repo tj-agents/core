@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/machine/peer-cli/scripts/register_session.py\"",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py\"",
             "timeout": 10
           },
           {
@@ -16,6 +16,11 @@
           {
             "type": "command",
             "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py\" --notice",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python -B \"${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/claude_terminal_profile.py\"",
             "timeout": 10
           }
         ]

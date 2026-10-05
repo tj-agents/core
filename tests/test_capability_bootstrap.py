@@ -14,7 +14,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ".agents/machine/bootstrap-capabilities/scripts/bootstrap_capabilities.py"
+SCRIPT = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts/bootstrap_capabilities.py"
 SPEC = importlib.util.spec_from_file_location("bootstrap_capabilities", SCRIPT)
 BOOT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BOOT)
@@ -26,14 +26,13 @@ class CatalogTests(unittest.TestCase):
 
     def test_catalog_has_unique_closed_acyclic_plugins(self):
         releases, plugins = BOOT.catalog_index(self.catalog())
-        self.assertEqual(4, len(releases))
-        self.assertEqual(14, len(plugins))
+        self.assertEqual(1, len(releases))
+        self.assertEqual(3, len(plugins))
         self.assertEqual(
             ["base-agents/base"],
             plugins["base-agents/engineering"]["dependencies"]["required"],
         )
-        self.assertEqual("deprecated", plugins["cpp-agents/windows"]["status"])
-        self.assertEqual("2027-03-31", plugins["cpp-agents/windows"]["remove_after"])
+        self.assertEqual({"base-agents/base", "base-agents/engineering", "base-agents/machine"}, set(plugins))
 
     def test_lock_requires_dependency_closure_and_known_skills(self):
         catalog = self.catalog()

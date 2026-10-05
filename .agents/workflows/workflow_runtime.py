@@ -750,6 +750,18 @@ class RepositoryStateProvider:
         }
         if owner:
             state["next_action"]["owner"] = owner
+        if "PR" in headers:
+            recorded_pr = headers["PR"]
+            urls = re.findall(
+                r"https://github\.com/[^/\s]+/[^/\s]+/pull/[1-9][0-9]*(?=$|[\s`)\]>.,])",
+                recorded_pr,
+            )
+            if len(urls) == 1:
+                state["artifacts"]["pull_request"] = urls[0]
+            elif recorded_pr.casefold() == "not opened":
+                state["artifacts"]["pull_request"] = None
+            else:
+                raise ContractViolation("ledger PR must name one GitHub pull request URL or 'not opened'")
         if resume_condition:
             state["next_action"]["resume_condition"] = resume_condition
         if blocker:

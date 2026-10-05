@@ -8,6 +8,22 @@ domain: process
 
 # Docs and tech debt
 
+## Describe the intended behavior
+
+Start a standard with the responsibility it assigns, the evidence used to select it, and the normal
+lifecycle. Explain how an agent chooses the next action and where exceptions belong. A reader should
+be able to carry out the work from that model, including a case the author has not seen before.
+
+When a failure exposes an unclear boundary, repair that boundary in its existing owner and consolidate
+overlapping instructions. Incident details belong in tests, a commit message or the owning debt record.
+A hard prohibition is appropriate for a material invariant: state the invariant and the reason in its
+owning contract. Repeated mistakes alone do not establish one. Use examples to clarify decisions;
+negative wording remains useful where it makes a real constraint precise.
+
+Enforcement should exercise that same decision through a supported entry point. Describe what inputs
+it verifies, the action it controls and the paths outside its coverage. A procedure or optional helper
+provides guidance on its own path; host-wide enforcement requires observed host interception.
+
 ## One rule, one home
 
 **Exactly one file owns a rule.** Everywhere else links to it and never restates it. **A second copy is a bug,
@@ -79,8 +95,8 @@ never let it evaporate.
   something that actually loads it. A doc reachable from nothing is loaded nowhere, which is how a convention
   goes unread until a shipped feature violates it. Check it with a hook, and fail a guidance doc that links a
   file which does not exist.
-- Keep a rule's statement short: statement, anti-pattern, one example. Headings that are imperative rule
-  statements ("Repositories inherit the module base") beat topic labels ("Repositories").
+- Keep each statement short, with selection criteria and an example where they clarify the decision.
+  Headings that name the responsibility ("Repositories inherit the module base") help readers act.
 
 ## Sort a rule by the cost of missing it, not by topic
 

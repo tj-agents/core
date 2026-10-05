@@ -189,6 +189,28 @@ class PluginCacheReconcileTests(ReconcileHarness):
         self.assertEqual(PRUNE.RETAINED, states[stale])
         self.assertEqual(PRUNE.ORPHAN, states[orphan])
 
+    def test_apply_keeps_what_claude_orphaned_inside_its_window(self):
+        import time
+
+        live = self.version('market', 'kept', 'aaaa')
+        recent = self.version('market', 'kept', 'bbbb')
+        expired = self.version('market', 'kept', 'cccc')
+        uninstalled = self.version('gone', 'renamed', 'dddd')
+        now_ms = int(time.time() * 1000)
+        (recent / PRUNE.HOST_ORPHAN_MARKER).write_text(str(now_ms), encoding='utf-8')
+        (uninstalled / PRUNE.HOST_ORPHAN_MARKER).write_text(str(now_ms), encoding='utf-8')
+        expired_ms = now_ms - (PRUNE.HOST_ORPHAN_GRACE_SECONDS + 60) * 1000
+        (expired / PRUNE.HOST_ORPHAN_MARKER).write_text(str(expired_ms), encoding='utf-8')
+        self.registry(live)
+
+        code, output = self.run_cli('--apply')
+
+        self.assertEqual(PRUNE.EXIT_OK, code)
+        self.assertTrue(recent.is_dir())
+        self.assertTrue(uninstalled.is_dir())
+        self.assertFalse(expired.exists())
+        self.assertIn("2 directory(s) inside Claude's 14-day orphan window", output)
+
     def test_a_removal_target_must_be_a_cached_version_directory(self):
         PRUNE.assert_within(self.cache, self.cache / 'market' / 'plugin' / 'version')
         with self.assertRaises(ValueError):
@@ -211,6 +233,35 @@ class PluginCacheReconcileTests(ReconcileHarness):
         self.assertIn('1 version directories', first.getvalue())
         self.assertEqual('', second.getvalue())
         self.assertTrue(stale.is_dir())
+
+    def test_a_superseded_session_is_stated_on_every_start(self):
+        loaded = self.version('market', 'machine', 'e0d17f00a3e4')
+        installed = self.version('market', 'machine', 'bcfa25a4f837')
+        self.registry(installed)
+        environ = dict(self.environ, CLAUDE_PLUGIN_ROOT=str(loaded))
+
+        outputs = []
+        for now in (1000.0, 1001.0):
+            stream = io.StringIO()
+            PRUNE.run_notice(self.config, 0, now, environ=environ, stream=stream)
+            outputs.append(stream.getvalue())
+
+        for output in outputs:
+            self.assertIn('loaded machine e0d17f00a3e4, but bcfa25a4f837 is installed', output)
+            self.assertIn('restart Claude Code', output)
+        self.assertTrue(loaded.is_dir())
+
+    def test_a_session_on_its_installed_root_hears_nothing_about_itself(self):
+        installed = self.version('market', 'machine', 'bcfa25a4f837')
+        self.registry(installed)
+        stream = io.StringIO()
+
+        PRUNE.run_notice(
+            self.config, 0, 1000.0,
+            environ=dict(self.environ, CLAUDE_PLUGIN_ROOT=str(installed)), stream=stream,
+        )
+
+        self.assertNotIn('plugin session', stream.getvalue())
 
     def test_the_notice_stays_silent_on_an_unusable_registry(self):
         self.version('gone', 'renamed', 'cccc')

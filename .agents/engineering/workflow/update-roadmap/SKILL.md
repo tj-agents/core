@@ -4,7 +4,6 @@ description: Reconcile a decision, requirement, dependency, package release, or 
 
 kind: workflow
 domain: process
-lane: L5
 ---
 
 # Reconciling a change across a roadmap and its live plans
