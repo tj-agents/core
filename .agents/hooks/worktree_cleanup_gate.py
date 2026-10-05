@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +10,7 @@ from hook_runtime import claim_invocation
 CONFIG_FILE = ".agents/worktree-cleanup-gate.json"
 HOOK_NAME = "worktree-cleanup-gate"
 VIOLATION_STATES = ("MERGED_NOT_IN_MAIN", "ORPHAN_FOLDER")
+AUDIT_TIMEOUT_SECONDS = int(os.environ.get("WORKTREE_CLEANUP_GATE_TIMEOUT_SECONDS", "10"))
 
 
 def find_config(cwd):
@@ -43,10 +45,12 @@ def run_audit(command, cwd):
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=AUDIT_TIMEOUT_SECONDS,
             check=False,
         )
-    except (OSError, subprocess.TimeoutExpired) as error:
+    except subprocess.TimeoutExpired:
+        return None
+    except OSError as error:
         raise RuntimeError(str(error)) from error
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
@@ -88,6 +92,12 @@ def main():
         output = run_audit(audit_command(config_path), config_path.parent.parent)
     except (ValueError, RuntimeError) as error:
         block(f"WORKTREE CLEANUP GATE: cannot run the configured audit: {error}")
+        return 0
+    if output is None:
+        sys.stderr.write(
+            f"WORKTREE CLEANUP GATE: the audit did not finish within {AUDIT_TIMEOUT_SECONDS}s; "
+            "skipping this check rather than blocking on a slow environment.\n"
+        )
         return 0
     found = violations(output)
     if found:

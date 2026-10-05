@@ -68,6 +68,10 @@ jobs:
       - name: Codex marketplace startup sync tests
         shell: pwsh
         run: ./tests/codex-marketplace-sync.tests.ps1
+
+      - name: worktree audit tests
+        shell: pwsh
+        run: ./tests/worktrees-audit.tests.ps1
       - name: Codex terminal profile tests
         shell: pwsh
         run: |
