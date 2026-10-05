@@ -182,7 +182,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:27ecb00215417ff0b15766168f2f23544cd05fb0f1c1f393770210f5e7918950",
+          "digest": "sha256:a0a8cb3d7279e60209f548c7a132495bdfffc32463bb13907b0f8596e7b74859",
           "harness": {
             "marketplaces": [
               {
@@ -196,7 +196,7 @@
             ],
             "hooks": [
               {
-                "path": ".agents/engineering/contract/session-guidance/scripts/session-context.py",
+                "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"

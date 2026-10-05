@@ -17,7 +17,7 @@
     ],
     "hooks": [
       {
-        "path": ".agents/engineering/contract/session-guidance/scripts/session-context.py",
+        "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"
