@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hook_runtime import COMMAND_TIMEOUT_SECONDS, grant, is_trusted_checkout
+from hook_runtime import grant, is_trusted_checkout
 
 SHELL_TOOLS = {"bash", "powershell"}
 
@@ -45,15 +45,14 @@ def is_codex_invocation(data):
 
 def git(checkout, *args):
     return subprocess.run(
-        ["git", "-C", str(checkout), *args], capture_output=True, text=True, check=True,
-        timeout=COMMAND_TIMEOUT_SECONDS,
+        ["git", "-C", str(checkout), *args], capture_output=True, text=True, check=True
     ).stdout.strip()
 
 
 def git_succeeds(checkout, *args):
     try:
         git(checkout, *args)
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.CalledProcessError):
         return False
     return True
 
@@ -73,7 +72,7 @@ def absolute_dir(raw):
 def default_branch(checkout):
     try:
         ref = git(checkout, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.CalledProcessError):
         return None
     return ref[len("origin/"):] if ref.startswith("origin/") else None
 
@@ -86,7 +85,7 @@ def linked_worktrees(checkout):
     """``{resolved path: head}`` for every linked worktree, excluding the main one."""
     try:
         porcelain = git(checkout, "worktree", "list", "--porcelain")
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.CalledProcessError):
         return {}
     entries = [block for block in porcelain.split("\n\n") if block.strip()]
     linked = {}
@@ -106,7 +105,7 @@ def sync_is_safe(checkout, ref, default):
         return False
     try:
         current = git(checkout, "symbolic-ref", "--short", "HEAD")
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.CalledProcessError):
         return False
     return current != default
 
