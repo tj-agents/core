@@ -1,15 +1,18 @@
 import argparse
+import base64
 import hashlib
 import io
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -25,6 +28,7 @@ DEFAULT_SUMMARY_BYTES = 4096
 DEFAULT_POLL_SECONDS = 60
 DEFAULT_MONITOR_SECONDS = 21600
 DEFAULT_OFFLINE_GAP_SECONDS = 300
+REVIEW_BUNDLE_RETENTION_SECONDS = 7 * 24 * 60 * 60
 FAILURE_PATTERN = re.compile(
     r"(?:\bfailed\b|\bfailure\b|\berror\b|\bfatal\b|\bexception\b|\bpanic\b|\btimeout\b)",
     re.IGNORECASE,
@@ -125,11 +129,26 @@ def repository_slug(root):
     return f"{match.group(1)}/{match.group(2)}"
 
 
-def state_root(root):
+def common_git_directory(root):
     common = Path(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir"))
     if not common.is_absolute():
         common = root / common
-    target = common.resolve() / "agent-workflow"
+    return common.resolve()
+
+
+def worktree_roots(root):
+    listing = run_process(
+        ["git", "worktree", "list", "--porcelain", "-z"], root, text=False
+    ).stdout
+    roots = []
+    for record in listing.split(b"\0"):
+        if record.startswith(b"worktree "):
+            roots.append(Path(record[9:].decode("utf-8", errors="surrogateescape")).resolve())
+    return roots
+
+
+def state_root(root):
+    target = common_git_directory(root) / "agent-workflow"
     target.mkdir(parents=True, exist_ok=True)
     return target
 
@@ -145,6 +164,11 @@ def run_root(root, workflow_run_id):
         raise WorkflowOperationError("workflow run id escapes the workflow state root") from error
     if candidate == runs:
         raise WorkflowOperationError("workflow run id must identify a run below the workflow state root")
+    current = runs
+    for part in candidate.relative_to(runs).parts:
+        current = current / part
+        if current.exists() and is_redirect(current):
+            raise WorkflowOperationError("workflow run id contains a redirected owned directory")
     return candidate
 
 
@@ -438,12 +462,270 @@ def materialize_tree(root, head, archive_path, tree_path):
     return archive
 
 
+def is_redirect(path):
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    return path.is_symlink() or stat.S_ISLNK(metadata.st_mode) or bool(
+        attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    )
+
+
+def review_candidate_key(value):
+    return digest(
+        {
+            "base": value.get("base"),
+            "head": value.get("head"),
+            "path_digest": value.get("path_digest"),
+            "patch_sha256": value.get("patch_sha256"),
+        }
+    )
+
+
+def review_bundle_locations(root, workflow_run_id, candidate_key):
+    root = repository_root(root)
+    common = common_git_directory(root)
+    temporary = Path(tempfile.gettempdir()).resolve()
+    for protected in (*worktree_roots(root), common):
+        try:
+            temporary.relative_to(protected)
+        except ValueError:
+            continue
+        raise WorkflowOperationError("review bundle cache cannot be inside the checkout or common Git directory")
+    run = run_root(root, workflow_run_id).resolve()
+    cache = temporary / "review"
+    repository_cache = cache / compact_cache_key(os.path.normcase(str(common)))
+    run_cache = repository_cache / compact_cache_key(os.path.normcase(str(run)))
+    directory = run_cache / compact_candidate_key(candidate_key)
+    for candidate in (cache, repository_cache, run_cache, directory):
+        if candidate.exists() and (is_redirect(candidate) or not candidate.is_dir()):
+            raise WorkflowOperationError("review bundle cache contains a redirected or invalid owned directory")
+    private = run / "review" / candidate_key
+    for candidate in (run, run / "review", private):
+        if candidate.exists() and (is_redirect(candidate) or not candidate.is_dir()):
+            raise WorkflowOperationError("review descriptor namespace contains a redirected or invalid owned directory")
+    return {
+        "private": private,
+        "descriptor": private / "descriptor.json",
+        "directory": directory,
+        "patch": directory / "candidate.patch",
+        "paths": directory / "paths.nul",
+        "tree": directory / "tree",
+        "tree_archive": directory / "tree.tar",
+        "identity": directory / "identity.json",
+    }
+
+
+def compact_cache_key(value):
+    return base64.urlsafe_b64encode(hashlib.sha256(value.encode("utf-8")).digest()).decode("ascii").rstrip("=")[:22]
+
+
+def compact_candidate_key(value):
+    return base64.urlsafe_b64encode(bytes.fromhex(value)).decode("ascii").rstrip("=")[:22]
+
+
+def legacy_review_bundle_locations(locations):
+    directory = locations["private"]
+    return {
+        "directory": directory,
+        "patch": directory / "candidate.patch",
+        "paths": directory / "paths.nul",
+        "tree": directory / "tree",
+        "tree_archive": directory / "tree.tar",
+        "identity": directory / "identity.json",
+    }
+
+
+def bundle_matches_locations(bundle, locations):
+    return all(bundle.get(name) == str(locations[name]) for name in (
+        "directory", "patch", "paths", "tree", "tree_archive", "identity"
+    ))
+
+
+def remove_legacy_review_payload(locations):
+    legacy = legacy_review_bundle_locations(locations)
+    for name in ("patch", "paths", "tree", "tree_archive", "identity"):
+        path = legacy[name]
+        if not path.exists() and not is_redirect(path):
+            continue
+        if is_redirect(path):
+            raise WorkflowOperationError("legacy review bundle contains a redirected artifact path")
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+
+def validate_legacy_review_bundle(root, value, locations):
+    artifacts = [locations[name] for name in ("patch", "paths", "tree", "tree_archive", "identity")]
+    present = [path.exists() or is_redirect(path) for path in artifacts]
+    if not any(present):
+        return
+    if not all(present):
+        raise WorkflowOperationError("legacy review bundle is incomplete")
+    if any(is_redirect(path) for path in artifacts):
+        raise WorkflowOperationError("legacy review bundle contains a redirected artifact path")
+    if sha256_file(locations["patch"]) != value["patch_sha256"]:
+        raise WorkflowOperationError("legacy review patch hash differs from its descriptor")
+    path_bytes = locations["paths"].read_bytes()
+    if hashlib.sha256(path_bytes).hexdigest() != value["path_digest"]:
+        raise WorkflowOperationError("legacy review path manifest differs from its descriptor")
+    if sha256_file(locations["tree_archive"]) != value["tree_archive_sha256"]:
+        raise WorkflowOperationError("legacy review tree archive hash differs from its descriptor")
+    if sha256_file(locations["identity"]) != value["bundle"]["identity_sha256"]:
+        raise WorkflowOperationError("legacy review identity manifest hash differs from its descriptor")
+    if json.loads(locations["identity"].read_text(encoding="utf-8")) != expected_identity(value, path_bytes):
+        raise WorkflowOperationError("legacy review identity manifest differs from the frozen candidate")
+    if tree_content_digest(locations["tree"]) != value["tree_content_sha256"]:
+        raise WorkflowOperationError("legacy materialized review tree differs from its descriptor")
+    if git(root, "rev-parse", f"{value['head']}^{{tree}}") != value["head_tree"]:
+        raise WorkflowOperationError("review head tree differs from the repository object")
+    patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
+    if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
+        raise WorkflowOperationError("review patch differs from the repository objects")
+
+
+def create_review_bundle_directory(locations):
+    directory = locations["directory"]
+    if directory.exists() or is_redirect(directory):
+        raise WorkflowOperationError("review bundle already exists without its authoritative descriptor")
+    directory.mkdir(parents=True, exist_ok=False, mode=0o700)
+    if is_redirect(directory) or not directory.is_dir():
+        raise WorkflowOperationError("review bundle cache contains a redirected owned directory")
+
+
+def expected_identity(value, path_bytes):
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "descriptor_id": value["descriptor_id"],
+        "repository": value["repository"],
+        "base": value["base"],
+        "head": value["head"],
+        "head_tree": value["head_tree"],
+        "patch_sha256": value["patch_sha256"],
+        "paths_sha256": hashlib.sha256(path_bytes).hexdigest(),
+        "path_digest": value["path_digest"],
+        "tree_archive_sha256": value["tree_archive_sha256"],
+        "tree_content_sha256": value["tree_content_sha256"],
+        "rules": value["rules"],
+    }
+
+
+def restore_review_bundle(root, value, locations):
+    create_review_bundle_directory(locations)
+    paths_bytes = b"\0".join(item.encode("utf-8", errors="surrogateescape") for item in value["paths"])
+    patch = run_process(
+        ["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False
+    ).stdout
+    if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
+        raise WorkflowOperationError("review patch differs from the repository objects")
+    if hashlib.sha256(paths_bytes).hexdigest() != value["path_digest"]:
+        raise WorkflowOperationError("review path manifest differs from its descriptor")
+    locations["patch"].write_bytes(patch)
+    locations["paths"].write_bytes(paths_bytes)
+    archive = materialize_tree(root, value["head"], locations["tree_archive"], locations["tree"])
+    if hashlib.sha256(archive).hexdigest() != value["tree_archive_sha256"]:
+        raise WorkflowOperationError("review tree archive differs from the repository object")
+    if tree_content_digest(locations["tree"]) != value["tree_content_sha256"]:
+        raise WorkflowOperationError("repository tree differs from the materialized review identity")
+    atomic_json(locations["identity"], expected_identity(value, paths_bytes))
+    if sha256_file(locations["identity"]) != value["bundle"]["identity_sha256"]:
+        raise WorkflowOperationError("review identity manifest differs from its descriptor")
+
+
+def validate_review_bundle(root, value, locations):
+    directory = locations["directory"]
+    required = {name: locations[name] for name in ("patch", "paths", "tree", "tree_archive", "identity")}
+    if is_redirect(directory) or any(is_redirect(path) for path in required.values()):
+        raise WorkflowOperationError("review bundle contains a redirected artifact path")
+    if not all(path.exists() for path in required.values()):
+        raise WorkflowOperationError("review bundle is incomplete")
+    if sha256_file(required["patch"]) != value["patch_sha256"]:
+        raise WorkflowOperationError("review patch hash differs from its descriptor")
+    path_bytes = required["paths"].read_bytes()
+    paths = [item.decode("utf-8", errors="surrogateescape") for item in path_bytes.split(b"\0") if item]
+    if paths != value["paths"] or hashlib.sha256(path_bytes).hexdigest() != value["path_digest"]:
+        raise WorkflowOperationError("review path manifest differs from its descriptor")
+    current_paths_bytes = run_process(
+        ["git", "diff", "--name-only", "-z", value["base"], value["head"]], root, text=False
+    ).stdout
+    if [item.decode("utf-8", errors="surrogateescape") for item in current_paths_bytes.split(b"\0") if item] != paths:
+        raise WorkflowOperationError("review path manifest differs from the repository objects")
+    if sha256_file(required["identity"]) != value["bundle"]["identity_sha256"]:
+        raise WorkflowOperationError("review identity manifest hash differs from its descriptor")
+    if sha256_file(required["tree_archive"]) != value["tree_archive_sha256"]:
+        raise WorkflowOperationError("review tree archive hash differs from its descriptor")
+    if json.loads(required["identity"].read_text(encoding="utf-8")) != expected_identity(value, path_bytes):
+        raise WorkflowOperationError("review identity manifest differs from the frozen candidate")
+    if git(root, "rev-parse", f"{value['head']}^{{tree}}") != value["head_tree"]:
+        raise WorkflowOperationError("review head tree differs from the repository object")
+    if tree_content_digest(required["tree"]) != value["tree_content_sha256"]:
+        raise WorkflowOperationError("materialized review tree differs from its descriptor")
+    patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
+    if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
+        raise WorkflowOperationError("review patch differs from the repository objects")
+    routed, violations = route_findings(required["tree"], paths)
+    if (value.get("routed_skills"), value.get("route_violations")) != (routed, violations):
+        raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
+    rules = []
+    for name in routed:
+        rule_path = required["tree"] / ".agents" / "skills" / name / "SKILL.md"
+        if rule_path.is_file():
+            rules.append({
+                "name": name,
+                "path": str(rule_path.relative_to(required["tree"])).replace("\\", "/"),
+                "sha256": sha256_file(rule_path),
+            })
+    if rules != value["rules"]:
+        raise WorkflowOperationError("review rules differ from the frozen tree routing evidence")
+
+
+def cleanup_review_bundles(root, now=None):
+    root = repository_root(root)
+    runs = state_root(root) / "runs"
+    if not runs.is_dir():
+        return
+    current = now or datetime.now(timezone.utc)
+    for descriptor_path in runs.rglob("descriptor.json"):
+        if descriptor_path.parent.parent.name != "review":
+            continue
+        try:
+            run_id = descriptor_path.parent.parent.parent.relative_to(runs).as_posix()
+            value = json.loads(descriptor_path.read_text(encoding="utf-8"))
+            candidate_key = review_candidate_key(value)
+            locations = review_bundle_locations(root, run_id, candidate_key)
+            bundle = value["bundle"]
+            expected = ("directory", "patch", "paths", "tree", "tree_archive", "identity")
+            validated_at = bundle.get("last_validated_at", value["created_at"])
+            timestamp = datetime.fromisoformat(validated_at)
+            if timestamp.tzinfo is None:
+                continue
+            owned = (
+                value.get("repository") == repository_slug(root)
+                and value.get("descriptor_id") == descriptor_identity(value)
+                and descriptor_path.resolve() == locations["descriptor"].resolve()
+                and not is_redirect(descriptor_path)
+                and all(bundle.get(name) == str(locations[name]) for name in expected)
+            )
+            if not owned or current - timestamp.astimezone(timezone.utc) < timedelta(seconds=REVIEW_BUNDLE_RETENTION_SECONDS):
+                continue
+            directory = locations["directory"]
+            artifacts = [locations[name] for name in expected if name != "directory"]
+            if directory.exists() and not is_redirect(directory) and not any(is_redirect(path) for path in artifacts):
+                shutil.rmtree(directory)
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError, WorkflowOperationError):
+            continue
+
+
 def descriptor_identity(value):
     excluded = {"artifact", "bundle", "descriptor_id"}
     return digest({key: item for key, item in value.items() if key not in excluded})
 
 
 def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
+    cleanup_review_bundles(root)
     sync = synchronize_for_review(root, base_ref) if synchronize else None
     base = git(root, "merge-base", base_ref, head_ref)
     head = git(root, "rev-parse", head_ref)
@@ -453,22 +735,25 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
     path_digest = hashlib.sha256(paths_bytes).hexdigest()
     patch = run_process(["git", "diff", "--binary", "--full-index", base, head], root, text=False).stdout
     candidate_key = digest({"base": base, "head": head, "path_digest": path_digest, "patch_sha256": hashlib.sha256(patch).hexdigest()})
-    bundle = run_root(root, workflow_run_id) / "review" / candidate_key
-    bundle.mkdir(parents=True, exist_ok=True)
-    patch_path = bundle / "candidate.patch"
-    paths_path = bundle / "paths.nul"
-    archive_path = bundle / "tree.tar"
-    tree_path = bundle / "tree"
-    patch_path.write_bytes(patch)
-    paths_path.write_bytes(paths_bytes)
-    tree_archive = materialize_tree(root, head, archive_path, tree_path)
-    tree_sha256 = tree_content_digest(tree_path)
-    skills, route_violations = route_findings(tree_path, paths)
+    locations = review_bundle_locations(root, workflow_run_id, candidate_key)
+    if locations["descriptor"].exists():
+        stored = json.loads(locations["descriptor"].read_text(encoding="utf-8"))
+        if stored.get("branch") != git(root, "branch", "--show-current"):
+            raise WorkflowOperationError("review run belongs to another branch; use a distinct workflow run id")
+        descriptor = load_descriptor(root, workflow_run_id, locations["descriptor"])
+        descriptor["artifact"] = str(locations["descriptor"])
+        return descriptor
+    create_review_bundle_directory(locations)
+    locations["patch"].write_bytes(patch)
+    locations["paths"].write_bytes(paths_bytes)
+    tree_archive = materialize_tree(root, head, locations["tree_archive"], locations["tree"])
+    tree_sha256 = tree_content_digest(locations["tree"])
+    skills, route_violations = route_findings(locations["tree"], paths)
     rules = []
     for name in skills:
-        path = tree_path / ".agents" / "skills" / name / "SKILL.md"
+        path = locations["tree"] / ".agents" / "skills" / name / "SKILL.md"
         if path.is_file():
-            rules.append({"name": name, "path": str(path.relative_to(tree_path)).replace("\\", "/"), "sha256": sha256_file(path)})
+            rules.append({"name": name, "path": str(path.relative_to(locations["tree"])).replace("\\", "/"), "sha256": sha256_file(path)})
     descriptor = {
         "schema_version": SCHEMA_VERSION,
         "operation": "review-prepare",
@@ -487,7 +772,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         "routed_skills": skills,
         "route_violations": route_violations,
         "lenses": select_review_lenses(paths),
-        "security": security_classification(root, tree_path, head, paths),
+        "security": security_classification(root, locations["tree"], head, paths),
         "waves": 1,
         "context": {
             "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],
@@ -515,32 +800,25 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         "tree_content_sha256": tree_sha256,
         "rules": rules,
     }
-    identity_path = bundle / "identity.json"
-    atomic_json(identity_path, identity)
     descriptor["bundle"] = {
-        "directory": str(bundle),
-        "patch": str(patch_path),
-        "paths": str(paths_path),
-        "tree": str(tree_path),
-        "tree_archive": str(archive_path),
-        "identity": str(identity_path),
-        "identity_sha256": sha256_file(identity_path),
+        "directory": str(locations["directory"]),
+        "patch": str(locations["patch"]),
+        "paths": str(locations["paths"]),
+        "tree": str(locations["tree"]),
+        "tree_archive": str(locations["tree_archive"]),
+        "identity": str(locations["identity"]),
     }
-    target = bundle / "descriptor.json"
-    atomic_json(target, descriptor)
-    load_descriptor(root, workflow_run_id, target)
-    descriptor["artifact"] = str(target)
+    atomic_json(locations["identity"], identity)
+    descriptor["bundle"]["identity_sha256"] = sha256_file(locations["identity"])
+    atomic_json(locations["descriptor"], descriptor)
+    load_descriptor(root, workflow_run_id, locations["descriptor"])
+    descriptor["artifact"] = str(locations["descriptor"])
     append_event(root, workflow_run_id, {"kind": "review", "operation": "prepare", "waves": 1, "descriptor_id": descriptor["descriptor_id"]})
     return descriptor
 
 
 def load_descriptor(root, workflow_run_id, path):
-    descriptor_path = Path(path).resolve()
-    review_root = (run_root(root, workflow_run_id) / "review").resolve()
-    try:
-        descriptor_path.relative_to(review_root)
-    except ValueError as error:
-        raise WorkflowOperationError("review descriptor is outside the current workflow run") from error
+    descriptor_path = Path(path).absolute()
     value = json.loads(descriptor_path.read_text(encoding="utf-8"))
     required_fields = ("operation", "repository", "base", "head", "head_tree", "tree_archive_sha256", "tree_content_sha256", "paths", "path_digest", "patch_sha256", "rules", "descriptor_id", "bundle")
     if not isinstance(value, dict) or any(field not in value for field in required_fields):
@@ -557,25 +835,38 @@ def load_descriptor(root, workflow_run_id, path):
     bundle_fields = ("directory", "patch", "paths", "tree", "tree_archive", "identity", "identity_sha256")
     if not isinstance(bundle, dict) or any(not isinstance(bundle.get(field), str) or not bundle[field] for field in bundle_fields):
         raise WorkflowOperationError("review bundle identity is incomplete")
-    directory = Path(bundle.get("directory", "")).resolve()
-    if directory != descriptor_path.parent or directory.parent != review_root:
-        raise WorkflowOperationError("review descriptor is not bound to its declared bundle")
-    candidate_key = digest(
-        {
-            "base": value.get("base"),
-            "head": value.get("head"),
-            "path_digest": value.get("path_digest"),
-            "patch_sha256": value.get("patch_sha256"),
-        }
-    )
-    if directory.name != candidate_key:
-        raise WorkflowOperationError("review bundle directory differs from its candidate identity")
-    required = {name: Path(bundle.get(name, "")) for name in ("patch", "paths", "tree", "tree_archive", "identity")}
-    if any(path.resolve().parent != directory for name, path in required.items() if name != "tree") or required["tree"].resolve().parent != directory:
-        raise WorkflowOperationError("review bundle contains an external artifact path")
+    candidate_key = review_candidate_key(value)
+    locations = review_bundle_locations(root, workflow_run_id, candidate_key)
+    if os.path.normcase(str(descriptor_path)) != os.path.normcase(str(locations["descriptor"])):
+        raise WorkflowOperationError("review descriptor is outside the current workflow run")
+    if is_redirect(descriptor_path):
+        raise WorkflowOperationError("review descriptor is redirected")
+    legacy = legacy_review_bundle_locations(locations)
+    external_bundle = bundle_matches_locations(bundle, locations)
+    legacy_bundle = bundle_matches_locations(bundle, legacy)
+    if not external_bundle and not legacy_bundle:
+        raise WorkflowOperationError("review descriptor is not bound to its expected external bundle")
+    if legacy_bundle:
+        validate_legacy_review_bundle(root, value, legacy)
+        if locations["directory"].exists():
+            validate_review_bundle(root, value, locations)
+        else:
+            restore_review_bundle(root, value, locations)
+            validate_review_bundle(root, value, locations)
+        value["bundle"].update({name: str(locations[name]) for name in (
+            "directory", "patch", "paths", "tree", "tree_archive", "identity"
+        )})
+        atomic_json(descriptor_path, value)
+        remove_legacy_review_payload(locations)
+    directory = locations["directory"]
+    required = {name: locations[name] for name in ("patch", "paths", "tree", "tree_archive", "identity")}
     expected_names = {"patch": "candidate.patch", "paths": "paths.nul", "tree": "tree", "tree_archive": "tree.tar", "identity": "identity.json"}
     if any(required[name].name != expected for name, expected in expected_names.items()):
         raise WorkflowOperationError("review bundle artifact names differ from the contract")
+    if not directory.exists():
+        restore_review_bundle(root, value, locations)
+    if is_redirect(directory) or any(is_redirect(path) for path in required.values()):
+        raise WorkflowOperationError("review bundle contains a redirected artifact path")
     if not all(path.exists() for path in required.values()):
         raise WorkflowOperationError("review bundle is incomplete")
     if sha256_file(required["patch"]) != value.get("patch_sha256"):
@@ -595,21 +886,8 @@ def load_descriptor(root, workflow_run_id, path):
     if sha256_file(required["tree_archive"]) != value["tree_archive_sha256"]:
         raise WorkflowOperationError("review tree archive hash differs from its descriptor")
     identity = json.loads(required["identity"].read_text(encoding="utf-8"))
-    expected_identity = {
-        "schema_version": SCHEMA_VERSION,
-        "descriptor_id": value["descriptor_id"],
-        "repository": value["repository"],
-        "base": value["base"],
-        "head": value["head"],
-        "head_tree": value["head_tree"],
-        "patch_sha256": value["patch_sha256"],
-        "paths_sha256": hashlib.sha256(path_bytes).hexdigest(),
-        "path_digest": value["path_digest"],
-        "tree_archive_sha256": value["tree_archive_sha256"],
-        "tree_content_sha256": value["tree_content_sha256"],
-        "rules": value["rules"],
-    }
-    if identity != expected_identity:
+    frozen_identity = expected_identity(value, path_bytes)
+    if identity != frozen_identity:
         raise WorkflowOperationError("review identity manifest differs from the frozen candidate")
     if git(root, "rev-parse", f"{value['head']}^{{tree}}") != value["head_tree"]:
         raise WorkflowOperationError("review head tree differs from the repository object")
@@ -618,9 +896,6 @@ def load_descriptor(root, workflow_run_id, path):
     current_patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
     if hashlib.sha256(current_patch).hexdigest() != value["patch_sha256"]:
         raise WorkflowOperationError("review patch differs from the repository objects")
-    materialize_tree(root, value["head"], required["tree_archive"], required["tree"])
-    if tree_content_digest(required["tree"]) != value["tree_content_sha256"]:
-        raise WorkflowOperationError("repository tree differs from the materialized review identity")
     expected_rules = []
     routed, violations = route_findings(required["tree"], paths)
     if "routed_skills" in value and (value["routed_skills"], value.get("route_violations")) != (routed, violations):
@@ -637,6 +912,9 @@ def load_descriptor(root, workflow_run_id, path):
             )
     if expected_rules != value.get("rules"):
         raise WorkflowOperationError("review rules differ from the frozen tree routing evidence")
+    value["bundle"]["last_validated_at"] = utc_now()
+    atomic_json(descriptor_path, value)
+    remove_legacy_review_payload(locations)
     return value
 
 
