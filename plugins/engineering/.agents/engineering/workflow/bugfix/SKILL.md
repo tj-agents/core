@@ -4,7 +4,6 @@ description: Diagnose and fix a defect, regression, crash, or incorrect existing
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Diagnose and repair a bug

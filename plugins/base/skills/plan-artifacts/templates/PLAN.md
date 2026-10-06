@@ -20,6 +20,12 @@ Record decisions, useful source evidence, and unresolved questions.
 
 Record completed work and actual verification, including limitations.
 
-## Next steps
+## Execution readiness (when transferring execution)
+
+Reference the outcome, acceptance criteria, authority, source context, decisions, dependencies and
+verification above. Record unresolved decisions, execution lane, transfer reason, pickup evidence,
+budgets and concrete stop/resume conditions. Omit this section for ordinary inline work.
+
+## Next Steps
 
 Record the next action and remaining work needed to resume.

@@ -1,21 +1,23 @@
 ---
 name: stack
-description: Create and maintain a dependent stack of focused GitHub pull requests. Use when a change needs stacked PRs, a child PR must target its parent branch, a parent changes after a child opens, or a stack must be landed from the bottom up.
+description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow git-branching.
 kind: operation
 domain: process
-lane: L4
 ---
 
 # Stacked pull requests
 
-Use `engineering:git-branching` for slice boundaries, parent and head identities, sizing,
-validation, and reconciliation after a parent changes. Keep the full goal and stack map in its
-existing plan or ledger.
+`engineering:git-branching` owns the decision to overlap dependent work. Sequential delivery is the
+default; use this procedure whenever a PR must build on an unmerged parent. Record the concrete reason
+the child must proceed before the parent lands in the existing plan or ledger. Preserve the full goal,
+parent/head identities, slice sizes and validation gates there.
 
-Use `engineering:open-worktree` to create each dependent branch from its recorded parent's
-current tip and keep each branch in its own checkout. Use `engineering:open-pr` to open each
-child PR with its immediate parent branch as the base. Review and validate each layer against
-that parent and its cumulative tree.
+Create each dependent branch from its recorded parent's verified current tip. Use
+`engineering:open-worktree` only when active execution needs another checkout; inactive layers can remain
+Git branches. Use `engineering:open-pr` to open every child against its immediate parent branch. Review
+the child-only delta and validate its cumulative tree. Every unmerged PR dependency uses this relationship.
+
+Keep the stack limited to necessary active work and land each ready, authorized parent promptly.
 
 Land from the bottom up through the repository's selected merge workflow. After a parent lands,
 verify the child's new base and diff. If the forge does not retarget it correctly, replay only

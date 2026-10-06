@@ -4,7 +4,6 @@ description: Select and drive the canonical isolated review workflow for a very 
 
 kind: workflow
 domain: process
-model: gpt-6-sol
 ---
 
 # Staged review selector
