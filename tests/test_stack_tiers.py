@@ -71,7 +71,7 @@ class DeclarationDiscovery(unittest.TestCase):
         self.assertEqual(found[0].plugin, "dotnet")
         self.assertEqual(found[0].marketplace, "dotagents")
 
-    def test_an_unreadable_or_unversioned_declaration_is_ignored(self):
+    def test_an_invalid_declaration_retains_its_installed_identity(self):
         with tempfile.TemporaryDirectory() as cache:
             for name, body in (
                 ("broken", "{not json"),
@@ -82,7 +82,9 @@ class DeclarationDiscovery(unittest.TestCase):
                 payload.mkdir(parents=True)
                 (payload / "tier.json").write_text(body, encoding="utf-8")
 
-            self.assertEqual(gate.declarations([cache]), [])
+            found = gate.declarations([cache])
+            self.assertEqual([item.plugin for item in found], ["broken", "nameless", "future"])
+            self.assertTrue(all(item.diagnostics for item in found))
 
     def test_schema_version_two_is_accepted(self):
         with tempfile.TemporaryDirectory() as cache:
