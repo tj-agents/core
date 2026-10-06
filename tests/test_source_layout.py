@@ -96,6 +96,8 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
             "plugins/machine/codex-skills/handoff-claude/scripts/launch-claude.ps1",
             "plugins/machine/resources/machine/scripts/history.py",
+            "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
+            "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/skills/bootstrap-capabilities/scripts/bootstrap_capabilities.py",
             "plugins/machine/catalog/catalog.json",
             "plugins/machine/catalog/capabilities.lock.schema.json",
