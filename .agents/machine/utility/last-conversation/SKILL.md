@@ -19,8 +19,14 @@ python -B "<skill-directory>/../../resources/machine/scripts/history.py" recent 
 ```
 
 Use `--host claude` for Claude. Respect the requested harness; otherwise use the current host. Options
-are `--count N`, `--cwd <directory>`, `--project <substring>`, `--all-projects`, and an explicit transcript
-`--history-root <directory>` for a non-default data store. Quote paths and arguments for the calling shell.
+are `--count N`, `--cwd <directory>`, `--project <substring>`, `--all-projects`, `--worktree <directory>`,
+and an explicit transcript `--history-root <directory>` for a non-default data store. Quote paths and
+arguments for the calling shell.
+
+`--worktree <directory>` finds the conversations that worked in a checkout even when they started
+elsewhere (a `git -C`/tool call naming it from the main checkout or another directory), searching all
+projects; prefer it when asked which conversation owns a worktree. Results add `matched_by` (`cwd` or
+`tool`) and sort by `last_activity`, newest first.
 
 Report the relevant session and its returned `resume` command. The newest session may be the current
 one; distinguish it using the preview. Never guess an ID or use Claude's resume syntax for Codex.
