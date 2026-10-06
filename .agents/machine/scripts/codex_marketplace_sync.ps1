@@ -16,22 +16,31 @@ function Invoke-CodexSyncCommand {
     }
     $duration = $TimeoutSeconds.ToString('R', [Globalization.CultureInfo]::InvariantCulture)
     $previousEncoding = [Console]::OutputEncoding
+    $previousErrorAction = $ErrorActionPreference
+    $stdout = [Collections.Generic.List[string]]::new()
+    $stderr = [Collections.Generic.List[string]]::new()
     try {
         [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-        $output = @(& $python.Source -B $RunnerPath --timeout $duration -- @command 2>&1)
+        $ErrorActionPreference = 'Continue'
+        foreach ($item in @(& $python.Source -B $RunnerPath --timeout $duration -- @command 2>&1)) {
+            if ($item -is [System.Management.Automation.ErrorRecord]) { $stderr.Add($item.Exception.Message) }
+            else { $stdout.Add([string] $item) }
+        }
         $exitCode = $LASTEXITCODE
     }
     finally {
         [Console]::OutputEncoding = $previousEncoding
+        $ErrorActionPreference = $previousErrorAction
     }
+    $combined = @($stdout) + @($stderr)
     if ($exitCode -ne 0) {
-        throw "Codex plugin sync failed: $($Arguments -join ' '): $($output -join ' ')"
+        throw "Codex plugin sync failed: $($Arguments -join ' '): $($combined -join ' ')"
     }
     try {
-        return ($output -join "`n" | ConvertFrom-Json -ErrorAction Stop)
+        return ($stdout -join "`n" | ConvertFrom-Json -ErrorAction Stop)
     }
     catch {
-        throw "Codex plugin sync returned invalid JSON: $($Arguments -join ' ')"
+        throw "Codex plugin sync returned invalid JSON: $($Arguments -join ' '): $($combined -join ' ')"
     }
 }
 
@@ -47,13 +56,18 @@ function Invoke-CodexHookTrust {
     $python = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1
     $duration = $TimeoutSeconds.ToString('R', [Globalization.CultureInfo]::InvariantCulture)
     $previousEncoding = [Console]::OutputEncoding
+    $previousErrorAction = $ErrorActionPreference
     try {
         [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-        $output = @(& $python.Source -B $RunnerPath --timeout $duration -- $python.Source -B $HelperScript --codex $CodexExecutable --project $WorkingDirectory 2>&1)
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $python.Source -B $RunnerPath --timeout $duration -- $python.Source -B $HelperScript --codex $CodexExecutable --project $WorkingDirectory 2>&1) | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { $_ }
+        }
         $exitCode = $LASTEXITCODE
     }
     finally {
         [Console]::OutputEncoding = $previousEncoding
+        $ErrorActionPreference = $previousErrorAction
     }
     $output | ForEach-Object { Write-Host $_ }
     if ($exitCode -ne 0) { throw "Codex could not trust tj-agents hooks: $($output -join ' ')" }
