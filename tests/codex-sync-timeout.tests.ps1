@@ -90,6 +90,7 @@ time.sleep(70)
             [switch] $Recurse
         )
         $script:cleanupCalls++
+        if ($LiteralPath) { Microsoft.PowerShell.Management\Remove-Item -LiteralPath $LiteralPath -Force -ErrorAction SilentlyContinue }
         if ($script:cleanupCalls -eq 2) {
             $exception = [IO.IOException]::new('The process cannot access the file because it is being used by another process.')
             $record = [Management.Automation.ErrorRecord]::new($exception, 'FileLocked', [Management.Automation.ErrorCategory]::WriteError, $LiteralPath)
