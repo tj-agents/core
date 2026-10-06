@@ -111,6 +111,11 @@
     },
     {
       "plugin": "machine",
+      "source": ".agents/hooks/hook_dispatch.py",
+      "destination": "hooks/hook_dispatch.py"
+    },
+    {
+      "plugin": "machine",
       "source": ".agents/machine/scripts",
       "destination": "resources/machine/scripts"
     },

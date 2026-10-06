@@ -66,7 +66,8 @@
       {
         "path": "hooks/hook_dispatch.py",
         "hosts": [
-          "claude"
+          "claude",
+          "codex"
         ]
       },
       {
