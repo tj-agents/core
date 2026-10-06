@@ -160,5 +160,22 @@ class OpenClaudeTests(unittest.TestCase):
         self.assertNotIn('Launched', out)
 
 
+class InstalledLayoutTests(unittest.TestCase):
+    """Every layout the package ships open_claude.py in must find the shared agent_cli.py beside it."""
+
+    LAYOUTS = ('.agents/machine/utility', 'codex-skills', 'skills')
+
+    def test_the_authored_and_every_packaged_copy_loads_agent_cli(self):
+        copies = [SCRIPT] + [ROOT / 'plugins/machine' / layout / 'open-claude/scripts/open_claude.py'
+                             for layout in self.LAYOUTS]
+        for copy in copies:
+            with self.subTest(copy=str(copy.relative_to(ROOT))):
+                self.assertTrue(copy.is_file(), f'{copy} is missing; run pwsh .agents/sync-generated.ps1 first')
+                spec = importlib.util.spec_from_file_location(f'open_claude_{abs(hash(copy))}', copy)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.assertTrue(callable(module._load_agent_cli().launch_tab))
+
+
 if __name__ == '__main__':
     unittest.main()
