@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import delivery_runtime
 import workflow_runtime
+from pr_body import validate_pr_body
 
 
 SCHEMA_VERSION = 1
@@ -1513,13 +1514,31 @@ def goal_preflight(root, workflow_run_id):
     return result
 
 
-def pull_request_state(root, pr):
-    fields = "number,url,headRefOid,headRefName,state,isDraft,labels,files,changedFiles,statusCheckRollup"
+def pull_request_state(root, pr, repo=None):
+    fields = "number,url,body,headRefOid,headRefName,state,isDraft,labels,files,changedFiles,statusCheckRollup"
     arguments = ["gh", "pr", "view"]
     if pr is not None:
         arguments.append(str(pr))
     arguments += ["--json", fields]
+    if repo is not None:
+        arguments += ["--repo", repo]
     return json.loads(run_process(arguments, root).stdout)
+
+
+def pr_body_check(root, pr, repo=None):
+    value = pull_request_state(root, pr, repo)
+    validation = validate_pr_body(value.get("body"))
+    if not isinstance(value.get("number"), int) or not value.get("url") or not value.get("headRefOid"):
+        raise WorkflowOperationError("gh pr view returned no usable PR identity")
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "operation": "pr-body-check",
+        "pr": value["number"],
+        "url": value["url"],
+        "head": value["headRefOid"],
+        "validation": validation,
+        "exit_state": "passed" if validation["valid"] else "failed",
+    }
 
 
 def changed_paths(root, pr, reported, expected_count=None):
@@ -1685,6 +1704,9 @@ def scoped_approval(root, repository, number, branch, supplied):
 
 def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None):
     value = pull_request_state(root, pr)
+    validation = validate_pr_body(value.get("body"))
+    if not validation["valid"]:
+        raise WorkflowOperationError("; ".join(validation["errors"]))
     head = str(value.get("headRefOid") or "")
     branch = str(value.get("headRefName") or "")
     number = value.get("number")
@@ -1836,6 +1858,10 @@ def parser():
 
     commands.add_parser("goal-preflight")
 
+    body_check = commands.add_parser("pr-body-check")
+    body_check.add_argument("--pr", required=True)
+    body_check.add_argument("--repo")
+
     bind = commands.add_parser("delivery-bind")
     bind.add_argument("--pr", type=int)
     bind.add_argument("--approval-record")
@@ -1858,7 +1884,8 @@ def parser():
 def main(argv=None):
     arguments = parser().parse_args(argv)
     root = repository_root(Path(arguments.root).resolve())
-    run_root(root, arguments.workflow_run_id)
+    if arguments.operation != "pr-body-check":
+        run_root(root, arguments.workflow_run_id)
     if arguments.operation == "run":
         command = arguments.command[1:] if arguments.command[:1] == ["--"] else arguments.command
         result = compact_run(root, arguments.workflow_run_id, arguments.label, command, arguments.summary_lines, arguments.failure_items, arguments.summary_bytes)
@@ -1879,6 +1906,8 @@ def main(argv=None):
                                     arguments.ledger, arguments.pr_url)
     elif arguments.operation == "goal-preflight":
         result = goal_preflight(root, arguments.workflow_run_id)
+    elif arguments.operation == "pr-body-check":
+        result = pr_body_check(root, arguments.pr, arguments.repo)
     elif arguments.operation == "delivery-bind":
         declared = (arguments.workflow_id, arguments.state_artifact, arguments.next_stage)
         if any(declared) and not all(declared):

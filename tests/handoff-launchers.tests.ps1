@@ -157,6 +157,20 @@ class Stub {
         if (-not (Test-Path -LiteralPath $wtLog)) {
             throw "The generated launcher did not reach the stub terminal: $launcher"
         }
+        $delivered = @([System.IO.File]::ReadAllText($wtLog) -split [char]0x1f)
+        $titleIndex = [array]::IndexOf($delivered, '--title')
+        $suppressionIndex = [array]::IndexOf($delivered, '--suppressApplicationTitle')
+        $expectedExecutable = if ((Split-Path -Leaf $launcher) -eq 'launch-codex.ps1') {
+            Join-Path $codexBin 'codex.exe'
+        } else {
+            Join-Path $claudeBin 'claude.exe'
+        }
+        if ($titleIndex -lt 0 -or $delivered[$titleIndex + 1] -cne 'layout test') {
+            throw "The generated launcher did not retain the caller's title: $launcher"
+        }
+        if ($suppressionIndex -ne ($titleIndex + 2) -or $delivered[$suppressionIndex + 1] -cne $expectedExecutable) {
+            throw "The generated launcher did not suppress application titles before the executable: $launcher"
+        }
     }
 
     # --- the shared escaping survives a quote, a semicolon and a trailing backslash before a space ---
