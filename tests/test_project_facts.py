@@ -187,6 +187,104 @@ class ProjectFacts(unittest.TestCase):
         self.assertFalse(gate.evaluate_project(self.graph(), 'A.csproj', first.detect, definitions,
                                               facts={'second.fact': gate.PredicateResult('Other.csproj', True)}).matched)
 
+    def test_choose_otherwise_dependencies_and_edges_remain_unknown(self):
+        self.write('B.csproj', '<Project><ItemGroup><PackageReference Include="Example"/></ItemGroup></Project>')
+        self.write('A.csproj', '<Project><Choose><When Condition="true"><ItemGroup/></When><Otherwise><ItemGroup><PackageReference Include="Example"/><ProjectReference Include="B.csproj"/></ItemGroup></Otherwise></Choose></Project>')
+        graph = self.graph()
+        for node in (self.dependency('nuget', 'Example'),
+                     {'project_dependency': {'transitive': True, 'where': self.dependency('nuget', 'Example')}}):
+            result = gate.evaluate_project(graph, 'A.csproj', node)
+            self.assertFalse(result.matched)
+            self.assertTrue(result.diagnostics)
+
+    def test_project_reference_removals_respect_order_and_uncertainty(self):
+        self.write('B.csproj', '<Project><ItemGroup><PackageReference Include="Example"/></ItemGroup></Project>')
+        include = '<ProjectReference Include="B.csproj"/>'
+        node = {'project_dependency': {'transitive': True, 'where': self.dependency('nuget', 'Example')}}
+        for items, matched, diagnostic in (
+            (include + '<ProjectReference Remove="./B.csproj"/>', False, False),
+            ('<ProjectReference Remove="B.csproj"/>' + include, True, False),
+            (include + '<ProjectReference Remove="B.csproj"/>' + include, True, False),
+            (include + '<ProjectReference Remove="B.csproj" Condition="$(RemoveIt)"/>', False, True),
+            (include + '<ProjectReference Remove="*.csproj"/>', False, True),
+            ('<ProjectReference Remove="$(References)"/>', False, True),
+        ):
+            with self.subTest(items=items):
+                self.write('A.csproj', '<Project><ItemGroup>' + items + '</ItemGroup></Project>')
+                result = gate.evaluate_project(self.graph(), 'A.csproj', node)
+                self.assertEqual(result.matched, matched)
+                self.assertEqual(bool(result.diagnostics), diagnostic)
+
+    def test_literal_exclusions_and_unresolved_exclusions_apply_to_items(self):
+        self.write('Used.csproj', '<Project><ItemGroup><PackageReference Include="Used"/></ItemGroup></Project>')
+        self.write('Excluded.csproj', '<Project><ItemGroup><PackageReference Include="Excluded"/></ItemGroup></Project>')
+        self.write('A.csproj', '<Project><ItemGroup><PackageReference Include="Used;Excluded" Exclude="excluded"/><ProjectReference Include="Used.csproj;Excluded.csproj" Exclude="./Excluded.csproj"/></ItemGroup></Project>')
+        graph = self.graph()
+        for identity, expected in (('Used', True), ('Excluded', False)):
+            for node in (self.dependency('nuget', identity),
+                         {'project_dependency': {'transitive': True, 'where': self.dependency('nuget', identity)}}):
+                result = gate.evaluate_project(graph, 'A.csproj', node)
+                self.assertEqual(result.matched, expected)
+                self.assertFalse(result.diagnostics)
+        for exclude in ('U*', '$(Excluded)', '@(Excluded)', '%(Identity)'):
+            with self.subTest(exclude=exclude):
+                self.write('A.csproj', '<Project><ItemGroup><PackageReference Include="Used" Exclude="' + exclude + '"/><ProjectReference Include="Used.csproj" Exclude="' + exclude + '"/></ItemGroup></Project>')
+                graph = self.graph()
+                for node in (self.dependency('nuget', 'Used'), self.dependency('nuget', 'Absent'),
+                             {'project_dependency': {'transitive': True, 'where': self.dependency('nuget', 'Used')}}):
+                    result = gate.evaluate_project(graph, 'A.csproj', node)
+                    self.assertFalse(result.matched)
+                    self.assertTrue(result.diagnostics)
+
+    def test_optional_npm_dependencies_supply_facts_and_explicit_local_edges(self):
+        self.write('package.json', {'workspaces': ['packages/*']})
+        self.write('packages/b/package.json', {'name': 'b', 'version': '1.0.0', 'dependencies': {'react': '18'}})
+        node = {'project_dependency': {'transitive': True, 'where': self.dependency('npm', 'react')}}
+        for version in ('workspace:*', '1.0.0', 'file:../b', 'link:../b'):
+            with self.subTest(version=version):
+                self.write('packages/a/package.json', {'name': 'a', 'optionalDependencies': {'b': version, 'axios': '1'}})
+                graph = self.graph()
+                self.assertTrue(gate.evaluate_project(graph, 'packages/a/package.json', self.dependency('npm', 'axios')).matched)
+                self.assertTrue(gate.evaluate_project(graph, 'packages/a/package.json', self.dependency('npm', 'b')).matched)
+                self.assertTrue(gate.evaluate_project(graph, 'packages/a/package.json', node).matched)
+        self.write('packages/a/package.json', {'name': 'a', 'optionalDependencies': {'b': '^1.0.0'}})
+        result = gate.evaluate_project(self.graph(), 'packages/a/package.json', node)
+        self.assertFalse(result.matched)
+        self.assertTrue(result.diagnostics)
+        self.write('packages/a/package.json', {'dependencies': {'axios': '1'}, 'optionalDependencies': []})
+        result = gate.evaluate_project(self.graph(), 'packages/a/package.json', self.dependency('npm', 'axios'))
+        self.assertFalse(result.matched)
+        self.assertTrue(result.diagnostics)
+
+    def test_optional_dependency_replaces_same_name_dependency_local_edge(self):
+        self.write('app/package.json', {'dependencies': {'shared': 'file:../old'},
+                                        'optionalDependencies': {'shared': 'file:../new'}})
+        self.write('old/package.json', {'name': 'shared', 'dependencies': {'old-only': '1'}})
+        self.write('new/package.json', {'name': 'shared', 'dependencies': {'new-only': '1'}})
+        graph = self.graph()
+        self.assertTrue(gate.evaluate_project(graph, 'app/package.json', self.dependency('npm', 'shared')).matched)
+        for identity, expected in (('old-only', False), ('new-only', True)):
+            result = gate.evaluate_project(graph, 'app/package.json',
+                                           {'project_dependency': {'transitive': True, 'where': self.dependency('npm', identity)}})
+            self.assertEqual(result.matched, expected)
+            self.assertFalse(result.diagnostics)
+        self.assertEqual(graph.reachable('app/package.json', False)[0],
+                         [('new/package.json', ('app/package.json -> new/package.json',))])
+
+    def test_implicit_build_imports_make_reference_presence_and_absence_unknown(self):
+        self.write('B.csproj', '<Project><ItemGroup><PackageReference Include="Example"/></ItemGroup></Project>')
+        node = {'project_dependency': {'transitive': True, 'where': self.dependency('nuget', 'Example')}}
+        for name in ('Directory.Build.props', 'Directory.Build.targets'):
+            imported = self.write('app/' + name, '<Project/>')
+            for include in ('', '<ItemGroup><ProjectReference Include="../B.csproj"/></ItemGroup>'):
+                with self.subTest(name=name, include=include):
+                    self.write('app/A.csproj', '<Project>' + include + '</Project>')
+                    result = gate.evaluate_project(self.graph(), 'app/A.csproj', node)
+                    self.assertFalse(result.matched)
+                    self.assertEqual({item['path'] for item in result.diagnostics}, {'app/' + name})
+                    self.assertEqual({item['code'] for item in result.diagnostics}, {'unknown-project-reference'})
+            imported.unlink()
+
     def test_new_primitives_require_project_identity_and_validate_shape(self):
         dependency = self.dependency('nuget', 'Example')
         self.assertEqual(gate.evaluate_predicate(self.root, dependency).diagnostics[0]['code'], 'project-scope-required')

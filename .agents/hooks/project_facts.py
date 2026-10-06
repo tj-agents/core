@@ -83,30 +83,58 @@ class ProjectGraph:
         for sdk in (tree.get('Sdk') or '').split(';'):
             if sdk:
                 project.dependency('sdk', None if '$(' in sdk else sdk.split('/')[0], project.id, '$(' in sdk)
+        def unresolved(value):
+            return any(token in value for token in ('*', '?', '$(', '@(', '%('))
+        def target_identity(value):
+            if unresolved(value):
+                return None
+            try:
+                return repository_path(self.repository, value, manifest.parent).relative_to(self.repository).as_posix()
+            except ValueError:
+                return None
         def visit(element, conditional=False):
-            conditional = conditional or bool(element.get('Condition'))
             tag = element.tag.rsplit('}', 1)[-1]
-            if tag in ('PackageReference', 'FrameworkReference', 'Sdk'):
+            conditional = conditional or bool(element.get('Condition')) or tag in ('Choose', 'When', 'Otherwise')
+            if tag in ('PackageReference', 'FrameworkReference', 'Sdk', 'ProjectReference'):
+                reference = tag == 'ProjectReference'
+                kind = {'PackageReference': 'nuget', 'FrameworkReference': 'framework', 'Sdk': 'sdk'}.get(tag)
+                def key(value):
+                    return target_identity(value) if reference else value.lower() if kind == 'nuget' else value
+                def unknown(value=None):
+                    if reference:
+                        project.references.append({'target': key(value) if value else None, 'path': project.id, 'unknown': True})
+                    else:
+                        project.dependency(kind, value, project.id, True)
+                for removed in (element.get('Remove') or '').split(';'):
+                    removed = removed.strip()
+                    if not removed:
+                        continue
+                    if conditional or unresolved(removed) or (reference and key(removed) is None):
+                        unknown(None if unresolved(removed) else removed)
+                    elif reference:
+                        project.references[:] = [edge for edge in project.references if edge['target'] != key(removed)]
+                    else:
+                        project.dependencies[:] = [item for item in project.dependencies
+                                                   if item['kind'] != kind or key(item['id']) != key(removed)]
+                exclusions = [value.strip() for value in (element.get('Exclude') or '').split(';') if value.strip()]
+                uncertain_exclusion = any(unresolved(value) or (reference and key(value) is None) for value in exclusions)
+                excluded = {key(value) for value in exclusions if not unresolved(value)}
                 identity = element.get('Include') or element.get('Name')
-                kind = {'PackageReference': 'nuget', 'FrameworkReference': 'framework', 'Sdk': 'sdk'}[tag]
-                if identity:
-                    for item in identity.split(';'):
-                        unresolved = conditional or '$(' in item or '@(' in item or '*' in item
-                        project.dependency(kind, None if unresolved and ('$' in item or '@' in item or '*' in item) else item,
-                                           project.id, unresolved)
-                elif element.get('Remove'):
-                    for removed in element.get('Remove').split(';'):
-                        unresolved = any(token in removed for token in ('*', '$(', '@('))
-                        project.dependency(kind, None if unresolved else removed, project.id, True)
-            elif tag == 'ProjectReference' and element.get('Include'):
-                for include in element.get('Include').split(';'):
-                    try:
-                        target = repository_path(self.repository, include, manifest.parent)
-                        target_id = target.relative_to(self.repository).as_posix()
-                    except ValueError:
-                        target_id = None
-                    project.references.append({'target': target_id, 'path': project.id,
-                                               'unknown': conditional or '$(' in include or '@(' in include or '*' in include or target_id is None})
+                for item in (identity or '').split(';'):
+                    item = item.strip()
+                    if not item:
+                        continue
+                    if not unresolved(item) and key(item) in excluded:
+                        continue
+                    uncertain = conditional or unresolved(item) or uncertain_exclusion
+                    if reference:
+                        target = key(item)
+                        project.references.append({'target': target, 'path': project.id,
+                                                   'unknown': uncertain or target is None})
+                    else:
+                        project.dependency(kind, None if unresolved(item) else item, project.id, uncertain)
+                    if uncertain_exclusion:
+                        unknown()
             elif tag == 'Import':
                 evidence = project.id
                 try:
@@ -125,7 +153,9 @@ class ProjectGraph:
             while directory.is_relative_to(self.repository):
                 candidate = directory / name
                 if candidate.is_file():
-                    project.unknown.append({'kind': None, 'id': None, 'path': candidate.relative_to(self.repository).as_posix()})
+                    evidence = candidate.relative_to(self.repository).as_posix()
+                    project.unknown.append({'kind': None, 'id': None, 'path': evidence})
+                    project.references.append({'target': None, 'path': evidence, 'unknown': True})
                     break
                 if directory == self.repository:
                     break
@@ -144,10 +174,14 @@ class ProjectGraph:
             if not isinstance(workspaces, list) or any(not isinstance(item, str) for item in workspaces):
                 raise ValueError('Workspace patterns must be strings')
             project.workspace_patterns = workspaces
-            for field in ('dependencies', 'devDependencies', 'peerDependencies'):
+            dependency_fields = {}
+            for field in ('dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'):
                 dependencies = data.get(field, {})
                 if not isinstance(dependencies, dict):
                     raise ValueError(field + ' must be an object')
+                dependency_fields[field] = dependencies
+            dependency_fields['dependencies'] = dict(dependency_fields['dependencies'], **dependency_fields.pop('optionalDependencies'))
+            for dependencies in dependency_fields.values():
                 for identity, version in dependencies.items():
                     project.dependency('npm', identity, project.id, not isinstance(version, str) or not version)
                     if isinstance(version, str) and version.startswith(('file:', 'link:')):
