@@ -41,7 +41,7 @@ The verifier is read-only and requires Python 3.11 or newer for TOML inspection.
 `--repository` for each project being migrated; it checks project Codex agents and local
 marketplace sources in Codex and Claude settings. GitHub marketplace declarations are allowed.
 It reports user-scope plugin selections, marketplaces, hooks, notifications, instruction files,
-and loose agents or skills. Codex's recorded hook trust hashes and built-in marketplaces are
+agent settings, and loose agents or skills. Codex's recorded hook trust hashes and built-in marketplaces are
 runtime state and are not reported. Use `--json` for stable finding codes, paths, settings, and
 clean or drift status. Exit status 1 means findings or an inspection failure remain. Output
 never includes configuration values.

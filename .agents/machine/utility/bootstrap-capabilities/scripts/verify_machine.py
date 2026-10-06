@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import stat
@@ -35,10 +36,10 @@ def _finding(code: str, path: Path, setting: str) -> dict[str, str]:
 
 def _linked(path: Path) -> bool:
     try:
-        details = path.stat(follow_symlinks=False)
+        details = os.lstat(path)
     except (OSError, ValueError):
-        return path.is_symlink()
-    return path.is_symlink() or bool(
+        return os.path.islink(path)
+    return stat.S_ISLNK(details.st_mode) or bool(
         getattr(details, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
     )
 
@@ -84,9 +85,16 @@ def _scan_settings(data: dict, path: Path, findings: list[dict[str, str]], scope
         findings.append(_finding(f"{scope}_behavior", path, prefix + setting))
 
 
-def _scan_codex(path: Path, findings: list[dict[str, str]], scope: str):
-    if tomllib is None:
+def _toml_unavailable(path: Path, findings: list[dict[str, str]]) -> bool:
+    if tomllib is not None:
+        return False
+    if path.exists() or path.is_symlink():
         findings.append(_finding("python_3_11_required", path, "toml"))
+    return True
+
+
+def _scan_codex(path: Path, findings: list[dict[str, str]], scope: str):
+    if _toml_unavailable(path, findings):
         return
     data = _read(path, "toml", findings)
     if data is None:
@@ -143,8 +151,7 @@ def _local_source(value) -> bool:
 
 
 def _scan_repository_codex(path: Path, findings: list[dict[str, str]]):
-    if tomllib is None:
-        findings.append(_finding("python_3_11_required", path, "toml"))
+    if _toml_unavailable(path, findings):
         return
     data = _read(path, "toml", findings)
     if data is None:
