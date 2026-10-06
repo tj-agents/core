@@ -74,7 +74,8 @@ def build_arguments(args, agent_cli):
         arguments += ['--model', args.model]
 
     if args.prompt_path:
-        arguments.append(agent_cli.prompt_file_argument(args.prompt_path))
+        sentence, _ = agent_cli.prompt_file_argument(args.prompt_path)
+        arguments.append(sentence)
     elif args.prompt:
         arguments.append(args.prompt)
 
@@ -86,19 +87,20 @@ def main(argv=None):
     agent_cli.make_stdio_encoding_lossy()
     try:
         args = parse_args(argv, agent_cli)
+
+        # Validated first, before any prompt handling: whichever is wrong, the directory is the one thing
+        # every other step here depends on, and its error should never be shadowed by a later check that
+        # only looked irrelevant.
+        working_directory = agent_cli.resolve_tab_directory(args.working_directory)
+
         arguments = build_arguments(args, agent_cli)
 
-        working_directory = agent_cli.open_claude_tab(args.working_directory, args.title, arguments)
+        agent_cli.open_claude_tab(working_directory, args.title, arguments)
 
         print(f"Launched claude tab '{args.title}' in {working_directory}")
         return 0
-    except agent_cli.LaunchTimeout as exc:
-        print(str(exc), file=sys.stderr)
-        print('The tab may already have opened; check the terminal before launching another.', file=sys.stderr)
-        return 3
     except agent_cli.LaunchError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        return agent_cli.report_launch_failure(exc)
 
 
 if __name__ == '__main__':
