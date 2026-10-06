@@ -4,7 +4,7 @@
 > findings directly and report what changed. Tick each `[x]` as you land it. Pause only for a genuinely
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
-**Review status:** `complete`
+**Review status:** `in-progress`
 **Reviewed up to commit:** `7da0ed7827705dee3873bc44046130e4a1ab97e2`  `(2026-10-06)`
 **Judgment:** `changes-requested`
 
@@ -72,3 +72,36 @@ directive replaced with "no delivery standard adds a per-PR approval requirement
 GW5: binder points at the owning goal record. GW6: plan clause reconciled to the new rule. GW7: paragraph
 rewrapped. GW8: pointers folded into the sentences they qualify. Validation: test_process_standards
 21/21, test_goal_continuation + test_plan_artifacts 8/8.
+
+## Review pass — 2026-10-06 — incremental
+
+**Candidate base:** `7da0ed7827705dee3873bc44046130e4a1ab97e2`
+**Candidate head:** `a1dba1b2fda68ac8c745c59c1636c7195dfdc6e5`
+**Candidate branch:** `Fix/GoalWideMergeApproval`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:09906b4f1b7803b8787a8c457c8fc24cc2144b5540ae0d4f625b08fbb2f91539` `(8 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\goal-wide-merge-approval-review-inc\review\3d2177e7ff3c97470b6a9265c9bea00ca7eba5830caf379b0baca31e2f8cd821`
+**Candidate bundle identity:** `sha256:1d20d9e5ae6360460591422ed02069e543451a74468d312a982280962a03d672`
+**Work-order path:** `reviews/Fix-GoalWideMergeApproval.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: built-in `code-review` skill (high) over the delta. Parent applied the docs lenses
+directly (small mechanical delta); `docs_reachability.py` on the delta bundle tree — 0 errors.
+
+### Findings
+
+- [x] **GW9 — MEDIUM — followability** — `.agents/engineering/policy/persistent-delivery/SKILL.md:66`
+  The GW1 `auto` default was scoped to goal authorizations only, leaving an exact-PR approval naming no
+  mode with the original guess; and the `mode` field spec three lines up still read "according to the
+  actual approval" against it. Fix: the default moved into the field spec and applies to any
+  authorization naming no mode.
+- [x] **GW10 — LOW — concision** — `plans/external-goal-continuation/EXTERNAL_GOAL_CONTINUATION.md:82`
+  The GW6 edit left an orphan fragment line; rewrapped.
+- [x] **GW11 — LOW — concision** — `.agents/engineering/policy/persistent-delivery/SKILL.md:70`
+  The GW1 clause broke the paragraph wrap (117-char line); fixed by the GW9 rewording.
+- [x] **GW12 — LOW — simplification** — `.agents/hooks/tests/test_process_standards.py:217`
+  persistent-delivery was read and flattened twice; the mode-default assertion moved into the referrer
+  loop as a second persistent-delivery pair, sharing the loop's normalization. This also makes the GW2
+  disposition sentence above ("pins each pointer sentence and the mode default" in the loop) accurate,
+  closing the native layer's work-order-accuracy finding.

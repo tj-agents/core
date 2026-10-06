@@ -63,11 +63,11 @@ owning checkout identity, permitted merge mode, user's wording and observed mess
 ```
 
 `worktree` must match the binder's normalized absolute checkout root, and `branch` must match both the
-checkout and remote PR. `mode` is `merge` or `auto`, according to the actual approval. A goal file's bare
+checkout and remote PR. `mode` is `merge` or `auto`, according to the actual approval; an authorization
+naming no mode records `auto`, because unattended completion is what it requests. A goal file's bare
 existence never invents merge authority; the user's recorded authorization of the goal does, for the
 goal's own PRs (`engineering:merging`) — write it as this record, with its wording and provenance, for
-each PR the goal creates, recording `auto` when the authorization names no mode: unattended completion
-is what a goal authorization requests. Invalid explicit input fails before any standing-authority fallback. Without a
+each PR the goal creates. Invalid explicit input fails before any standing-authority fallback. Without a
 standing instruction, goal authorization, or matching scoped approval, authority remains `absent` and
 merge requires a user decision.
 

@@ -214,17 +214,14 @@ class ProcessStandardsTests(unittest.TestCase):
             1, corpus.count("Merge authorization is scoped to the goal, not the PR")
         )
 
-        shared = " ".join(
-            authored_skill("persistent-delivery").read_text(encoding="utf-8").split()
-        )
-        self.assertIn(
-            "recording `auto` when the authorization names no mode", shared
-        )
-
         for referrer, pointer in (
             (
                 "persistent-delivery",
                 "the owning goal record (`engineering:merging` owns that goal-wide scope)",
+            ),
+            (
+                "persistent-delivery",
+                "an authorization naming no mode records `auto`",
             ),
             (
                 "merge",
