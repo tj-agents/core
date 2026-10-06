@@ -179,6 +179,19 @@ class HistoryTests(unittest.TestCase):
             result = HISTORY.query(self.root / 'claude', 'claude', worktree=worktree)
         self.assertEqual([item['session'] for item in result], ['mapped'])
 
+    def test_worktree_given_spelling_collapses_parent_segments(self):
+        worktree = self.root / 'mapped' / 'Feature-Up'
+        start = self.root / 'mapped' / 'sub'
+        start.mkdir(parents=True)
+        self.write('claude/project/up.jsonl', [
+            dict(type='user', sessionId='up', cwd=str(worktree), timestamp='2026-01-09T00:00:00Z',
+                 message={'content': 'one level up'})])
+        self.addCleanup(os.chdir, Path.cwd())
+        os.chdir(start)
+        with mock.patch.object(HISTORY.Path, 'resolve', return_value=Path('//server/share/elsewhere')):
+            result = HISTORY.query(self.root / 'claude', 'claude', worktree=Path('..') / 'Feature-Up')
+        self.assertEqual([item['session'] for item in result], ['up'])
+
     def test_worktree_matches_git_bash_drive_spelling_on_windows(self):
         if os.name != 'nt':
             self.skipTest('MSYS path folding only applies on Windows')
