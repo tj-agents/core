@@ -197,6 +197,7 @@ class MergeCleanupGateTests(unittest.TestCase):
             "git status", "git -C \"" + str(worktree) + "\" fetch", "git worktree list",
             "gh pr view 3", "gh run list", "python cleanup_proof.py --worktree x",
             "pwsh close-tab.ps1 -List",
+            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\plugins\\peer-cli\\scripts\\finish.ps1",
         ):
             with self.subTest(command=command):
                 result = self.run_hook(self.payload(command, session="s1", cwd=str(worktree)))
@@ -358,6 +359,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(head, obligation["head"])
         self.assertIn(f"--head {head}", denied.stderr)
         self.assertNotIn("<head>", denied.stderr)
+        self.assertIn("finish.ps1", denied.stderr)
 
         self.run_hook(self.payload(merge_command, codex=False, session="claude-session"))
         claude_path, _ = self.sole_obligation() if len(self.obligation_files()) == 1 else (None, None)
