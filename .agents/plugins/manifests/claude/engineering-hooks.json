@@ -48,27 +48,13 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py@Bash|PowerShell",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py@Bash|PowerShell"
             ]
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 60,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py",
-              "--validate-body"
-            ]
-          }
-        ],
-        "matcher": "Bash|PowerShell"
       }
     ],
     "PostToolUse": [

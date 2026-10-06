@@ -48,12 +48,14 @@ class BodyTests(unittest.TestCase):
 
 
 class HookTests(unittest.TestCase):
-    def run_gate(self, command, *, codex=False, pre=True, cwd=None):
+    def run_gate(self, command, *, codex=False, pre=True, cwd=None, workdir=None):
         payload = {"tool_name": "exec_command" if codex else "PowerShell",
                    "tool_input": {"cmd" if codex else "command": command},
                    "cwd": cwd or ".", "tool_response": "https://github.com/example/test/pull/42"}
         if codex:
             payload["turn_id"] = "fixture"
+        if workdir is not None:
+            payload["tool_input"]["workdir"] = workdir
         with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
              patch.object(sys, "argv", ["gate", "--validate-body"] if pre else ["gate"]), \
              patch.object(sys, "stderr", io.StringIO()):
@@ -125,6 +127,81 @@ class HookTests(unittest.TestCase):
             self.assertEqual("https://github.com/example/test/pull/42", check.call_args.args[1])
             check.side_effect = ValueError("Missing Why section")
             self.assertEqual(2, self.run_gate(f"gh pr create -b '{BODY}'", pre=False))
+
+    def test_attached_short_body_flags_are_checked_before_and_after_edits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "valid.md").write_text(BODY, encoding="utf-8")
+            (root / "invalid.md").write_text("empty", encoding="utf-8")
+            for codex in (False, True):
+                for flag in ("-bempty", "-Finvalid.md"):
+                    for operation in ("create", "edit 42"):
+                        self.assertEqual(2, self.run_gate(f"gh pr {operation} {flag}",
+                                                        cwd=directory, codex=codex))
+                    with patch.object(gate, "authoritative_body", side_effect=ValueError("Missing Why section")) as check:
+                        self.assertEqual(2, self.run_gate(f"gh pr edit 42 {flag}",
+                                                        cwd=directory, codex=codex, pre=False))
+                        check.assert_called_once_with(root.resolve(), "42", None)
+                for flag in (f"-b'{BODY}'", "-Fvalid.md"):
+                    self.assertEqual(0, self.run_gate(f"gh pr edit 42 {flag}", cwd=directory, codex=codex))
+
+    def test_merge_flags_use_merge_option_semantics(self):
+        for flags in ("-m", "-r", "-s", "-a", "-m -a", "-r -d", "-t 'subject' -b 'commit body'",
+                      "-A author@example.com --match-head-commit abc123"):
+            with self.subTest(flags=flags), patch.object(gate, "authoritative_body") as check:
+                self.assertEqual(0, self.run_gate(f"gh pr merge {flags} 42"))
+                self.assertEqual("42", check.call_args.args[1])
+                check.side_effect = ValueError("Missing Why section")
+                self.assertEqual(2, self.run_gate(f"gh pr merge 42 {flags}"))
+        with tempfile.TemporaryDirectory() as directory:
+            for flags in ("-m", "-r", "-s -d"):
+                with patch.object(gate, "authoritative_body") as check:
+                    command = f'pushd "{directory}" && gh pr merge 42 {flags}'
+                    self.assertEqual(0, self.run_gate(command, codex=True))
+                    check.assert_called_once_with(Path(directory).resolve(), "42", None)
+
+    def test_windows_executable_spellings_are_gated(self):
+        for executable in ("gh.exe", "GH", "GH.EXE", "Gh.Exe"):
+            for codex in (False, True):
+                for operation in ("create", "edit 42"):
+                    self.assertEqual(2, self.run_gate(f"{executable} pr {operation} -bempty", codex=codex))
+                self.assertEqual(2, self.run_gate(f"{executable} pr create --body 'unterminated", codex=codex))
+                self.assertEqual(0, self.run_gate(f"echo '{executable} pr create -bempty'", codex=codex))
+                self.assertEqual(0, self.run_gate(f"{executable} pr create --help", codex=codex))
+            with patch.object(gate, "authoritative_body") as check:
+                self.assertEqual(0, self.run_gate(f"{executable} pr merge 42 -m"))
+                check.assert_called_once()
+                check.reset_mock()
+                self.assertEqual(2, self.run_gate(f"{executable} pr merge 42 -m", codex=True))
+                check.assert_not_called()
+            with tempfile.TemporaryDirectory() as directory, patch.object(gate, "authoritative_body") as check:
+                checkout = Path(directory) / "GH.EXE pr merge -m folder"
+                checkout.mkdir()
+                command = f'pushd "{checkout}" && {executable} pr merge 42 --squash --auto'
+                self.assertEqual(0, self.run_gate(command, codex=True))
+                check.assert_called_once_with(checkout.resolve(), "42", None)
+                self.assertEqual(2, self.run_gate(command + " && echo done", codex=True))
+            with patch.object(gate, "authoritative_body", side_effect=ValueError("Empty Why section")) as check:
+                self.assertEqual(2, self.run_gate(f"{executable} pr edit 42 -bempty", pre=False))
+                check.assert_called_once()
+
+    def test_body_files_use_invocation_workdir_before_session_cwd(self):
+        with tempfile.TemporaryDirectory() as directory:
+            session = Path(directory) / "session"
+            invocation = Path(directory) / "invocation"
+            session.mkdir()
+            invocation.mkdir()
+            for codex in (False, True):
+                for session_body, invocation_body, expected in ((BODY, "empty", 2), ("empty", BODY, 0)):
+                    (session / "body.md").write_text(session_body, encoding="utf-8")
+                    (invocation / "body.md").write_text(invocation_body, encoding="utf-8")
+                    for operation in ("create", "edit 42"):
+                        self.assertEqual(expected, self.run_gate(f"gh pr {operation} -Fbody.md", codex=codex,
+                                                                cwd=str(session), workdir=str(invocation)))
+                with patch.object(gate, "authoritative_body") as check:
+                    self.assertEqual(0, self.run_gate("gh pr edit 42 -Fbody.md", pre=False,
+                                                    cwd=str(session), workdir=str(invocation), codex=codex))
+                    check.assert_called_once_with(invocation.resolve(), "42", None)
 
 
 class OperationTests(unittest.TestCase):
