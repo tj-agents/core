@@ -302,15 +302,33 @@ def posix_inner_command(directory, cleared, forced, executable, arguments):
     return ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', str(directory), 'env', *env_args, executable, *arguments]
 
 
+def _client(run, command, what, **kwargs):
+    """Run a terminal's own control command; every way it can fail is a LaunchError naming `what`."""
+    try:
+        result = run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30, **kwargs)
+    except subprocess.TimeoutExpired:
+        raise LaunchError(f'{what} did not answer within 30 seconds.') from None
+    except OSError as exc:
+        raise LaunchError(f'{what} could not be run: {exc}') from None
+    if result.returncode != 0:
+        raise LaunchError(f'{what} failed (exit {result.returncode}): {(result.stderr or result.stdout).strip()}')
+    return result.stdout.strip()
+
+
+def _environment_for(environ, cleared, forced):
+    env = dict(environ)
+    for name in cleared:
+        env.pop(name, None)
+    env.update(forced)
+    return env
+
+
 def _launch_tmux(directory, executable, title, arguments, cleared, forced, environ, run, popen):
     inner = posix_inner_command(directory, cleared, forced, executable, arguments)
     # Passing several argv elements after `--` is what makes tmux 3.0+ exec them directly without an
     # intermediate shell; a single joined string would be re-split by tmux's own command parser. No `-d`:
     # the new window comes to the front, as a new tab does in every other terminal.
-    result = run(['tmux', 'new-window', '-n', title, '--', *inner],
-                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
-    if result.returncode != 0:
-        raise LaunchError(f'tmux new-window failed: {(result.stderr or result.stdout).strip()}')
+    _client(run, ['tmux', 'new-window', '-n', title, '--', *inner], 'tmux new-window')
 
 
 def _launch_kitty(directory, executable, title, arguments, cleared, forced, environ, run, popen):
@@ -325,11 +343,8 @@ def _launch_kitty(directory, executable, title, arguments, cleared, forced, envi
     inner = posix_inner_command(directory, cleared, forced, executable, arguments)
     # For `launch`, --match selects a tab, and `id:` is a tab id; `window_id:` selects the tab holding the
     # caller's own window. The two id counters are independent, so `id:` lands in the wrong place.
-    command = ['kitty', '@', '--to', listen_on, 'launch', '--type=tab', '--match', f'window_id:{window_id}',
-               '--tab-title', title, *inner]
-    result = run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
-    if result.returncode != 0:
-        raise LaunchError(f'kitty @ launch failed: {(result.stderr or result.stdout).strip()}')
+    _client(run, ['kitty', '@', '--to', listen_on, 'launch', '--type=tab', '--match', f'window_id:{window_id}',
+                  '--tab-title', title, *inner], 'kitty @ launch')
 
 
 def _konsole_qdbus():
@@ -344,28 +359,38 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
     window = environ.get('KONSOLE_DBUS_WINDOW')
     if not service or not window:
         raise LaunchError('KONSOLE_DBUS_SERVICE or KONSOLE_DBUS_WINDOW is not set.')
+    # The title becomes Konsole's tab-title format, where `%` sequences expand to the directory, program
+    # and so on, with no escape for a literal `%`. The visible title must equal AGENT_CLI_TAB_TITLE, which
+    # peer-cli resolves sessions by, so a `%` is refused rather than shown differently.
+    if '%' in title:
+        raise LaunchError(f'Konsole would expand the % in the tab title {title!r}; choose a title without %.')
 
     def call(*args):
-        result = run([qdbus, *args], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            raise LaunchError(f'{qdbus} {" ".join(args)} failed: {(result.stderr or result.stdout).strip()}')
-        return result.stdout.strip()
+        return _client(run, [qdbus, service, *args], f'{qdbus} {args[-1] if len(args) < 3 else args[1]}')
 
-    session = call(service, window, 'newSession')
-    # setTitle alone is replaced by the tab-title format as soon as the foreground process changes, so the
-    # format itself is set for both the local (0) and remote (1) contexts.
-    for context in ('0', '1'):
-        call(service, f'/Sessions/{session}', 'setTabTitleFormat', context, title)
-
-    # runCommand TYPES this text into the user's own interactive shell, which may not be sh (it may be
-    # fish), so the inner command never travels as that text: it is written to a private sh script whose
-    # first line deletes it and its directory, and the only thing typed is `exec sh '<path>'`.
-    inner = posix_inner_command(directory, cleared, forced, executable, arguments)
-    script_path = _write_posix_script(inner)
+    session = call(window, 'newSession')
+    session_path = f'/Sessions/{session}'
+    script_path = None
     try:
-        call(service, f'/Sessions/{session}', 'runCommand', f'exec sh {shlex.quote(str(script_path))}')
-    except LaunchError:
-        shutil.rmtree(script_path.parent, ignore_errors=True)
+        # setTitle alone is replaced by the tab-title format as soon as the foreground process changes, so
+        # the format itself is set for both the local (0) and remote (1) contexts.
+        for context in ('0', '1'):
+            call(session_path, 'setTabTitleFormat', context, title)
+
+        # runCommand TYPES this text into the user's own interactive shell, which may not be sh (it may be
+        # fish), so the inner command never travels as that text: it is written to a private sh script whose
+        # first line deletes it and its directory, and the only thing typed is `exec sh '<path>'`.
+        script_path = _write_posix_script(posix_inner_command(directory, cleared, forced, executable, arguments))
+        call(session_path, 'runCommand', f'exec sh {shlex.quote(str(script_path))}')
+    except BaseException:
+        if script_path is not None:
+            shutil.rmtree(script_path.parent, ignore_errors=True)
+        # Konsole exposes no D-Bus call to close a session; ending its shell closes the tab this created.
+        try:
+            run([qdbus, service, session_path, 'sendText', 'exit\n'],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
         raise
 
 
@@ -393,50 +418,41 @@ def _launch_windows_terminal(directory, executable, title, arguments, cleared, f
     # The tab process inherits the environment of this wt.exe invocation, so the changes travel through
     # its own `env=` rather than by mutating this process's environment, which would leak them back into
     # the calling session.
-    env = dict(environ)
-    for name in cleared:
-        env.pop(name, None)
-    env.update(forced)
-
-    result = run([terminal, *escaped], env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
-    if result.returncode != 0:
-        raise LaunchError(f'Windows Terminal exited with code {result.returncode}: {(result.stderr or result.stdout).strip()}')
+    _client(run, [terminal, *escaped], 'Windows Terminal', env=_environment_for(environ, cleared, forced))
 
 
 # Checked in this order because it is the order a launcher process could be nested in another: tmux
 # inside kitty inside Konsole inside Windows Terminal sees TMUX first, so the innermost multiplexer the
 # caller is actually attached to wins over an outer terminal emulator it happens to also be running in.
+# Each handler runs only on the platform it can start a tab from: WT_SESSION also reaches WSL through
+# WSLENV, and TMUX reaches Windows Python started from an MSYS or Cygwin tmux pane, and neither terminal
+# can start the other platform's executable.
 _TAB_HANDLERS = (
-    ('TMUX', _launch_tmux),
-    ('KITTY_WINDOW_ID', _launch_kitty),
-    ('KONSOLE_DBUS_WINDOW', _launch_konsole),
-    ('WT_SESSION', _launch_windows_terminal),
+    ('TMUX', 'posix', _launch_tmux),
+    ('KITTY_WINDOW_ID', 'posix', _launch_kitty),
+    ('KONSOLE_DBUS_WINDOW', 'posix', _launch_konsole),
+    ('WT_SESSION', 'windows', _launch_windows_terminal),
 )
 
 
 def _launch_new_window(directory, executable, title, arguments, cleared, forced, environ, run, popen):
     if IS_WINDOWS:
-        wt = shutil.which('wt.exe')
-        if wt:
+        if shutil.which('wt.exe'):
             # Still a tab: --window 0 opens it in the Windows Terminal window used most recently.
             return _launch_windows_terminal(directory, executable, title, arguments, cleared, forced, environ, run, popen)
-    elif not (environ.get('DISPLAY') or environ.get('WAYLAND_DISPLAY')):
-        # Without a display a terminal emulator starts and exits at once, which would read as a launch.
-        raise LaunchError('No terminal was detected and there is no graphical display to open a new window on.')
-
-    print('warning: no terminal was detected; opening a new window instead of a tab', file=sys.stderr)
-
-    if IS_WINDOWS:
-
-        env = dict(environ)
-        for name in cleared:
-            env.pop(name, None)
-        env.update(forced)
+        print('warning: no terminal was detected; opening a new window instead of a tab', file=sys.stderr)
         try:
-            popen([executable, *arguments], cwd=str(directory), env=env, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            popen([executable, *arguments], cwd=str(directory), env=_environment_for(environ, cleared, forced),
+                  creationflags=subprocess.CREATE_NEW_CONSOLE)
         except OSError as exc:
             raise LaunchError(f'Could not open a new console window: {exc}') from exc
         return
+
+    # Without a display an X11 or Wayland terminal emulator starts and exits at once, which would read as
+    # a launch. macOS sessions set neither variable and need no such check.
+    if sys.platform != 'darwin' and not (environ.get('DISPLAY') or environ.get('WAYLAND_DISPLAY')):
+        raise LaunchError('No terminal was detected and there is no graphical display to open a new window on.')
+    print('warning: no terminal was detected; opening a new window instead of a tab', file=sys.stderr)
 
     inner = posix_inner_command(directory, cleared, forced, executable, arguments)
     candidates = []
@@ -469,8 +485,10 @@ def launch_tab(working_directory, executable, title, arguments=(), clear=(), for
     caller relies on. A detected handler that fails raises rather than falling back to a window: a silent
     new window is a worse surprise than a loud failure.
     """
-    # Resolved here, because a relative path would be re-resolved against the terminal's own cwd in the tab.
-    directory = Path(working_directory).resolve()
+    # Made absolute here, because a relative path would be re-resolved against the terminal's own cwd in the
+    # tab. Not resolve(): on Windows that rewrites a mapped or subst drive to its target, and Claude Code
+    # keys a session's history by the directory string it was started in.
+    directory = Path(os.path.abspath(working_directory))
     if not directory.is_dir():
         raise LaunchError(f'Working directory is not a directory: {working_directory}')
 
@@ -489,11 +507,9 @@ def launch_tab(working_directory, executable, title, arguments=(), clear=(), for
     forced['AGENT_CLI_TAB_TITLE'] = title
     arguments = list(arguments)
 
-    for name, handler in _TAB_HANDLERS:
-        # WT_SESSION also reaches WSL through WSLENV, but wt.exe cannot start a Linux path in a tab.
-        if handler is _launch_windows_terminal and not IS_WINDOWS:
-            continue
-        if environ.get(name):
+    platform = 'windows' if IS_WINDOWS else 'posix'
+    for name, handler_platform, handler in _TAB_HANDLERS:
+        if handler_platform == platform and environ.get(name):
             return handler(directory, executable, title, arguments, cleared, forced, environ, run, popen)
 
     return _launch_new_window(directory, executable, title, arguments, cleared, forced, environ, run, popen)

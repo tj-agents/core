@@ -443,6 +443,42 @@ class LaunchTabTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, script.parent, True)
         self.assertTrue(script.is_file())
 
+    def test_a_timed_out_terminal_command_is_a_launch_error(self):
+        def run(cmd, **kwargs):
+            raise subprocess.TimeoutExpired(cmd, 30)
+        with self.assertRaisesRegex(CLI.LaunchError, 'did not answer within 30 seconds'):
+            CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'TMUX': 'x'}, run=run, popen=mock.Mock())
+
+    def test_a_missing_terminal_command_is_a_launch_error(self):
+        def run(cmd, **kwargs):
+            raise FileNotFoundError(cmd[0])
+        with self.assertRaisesRegex(CLI.LaunchError, 'could not be run'):
+            CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'TMUX': 'x'}, run=run, popen=mock.Mock())
+
+    def test_a_symlinked_working_directory_is_kept_as_given(self):
+        link = Path(self.directory).parent / (Path(self.directory).name + ' link')
+        link.symlink_to(self.directory)
+        self.addCleanup(link.unlink)
+        run = fake_run([('', '', 0)])
+        CLI.launch_tab(str(link), '/bin/exe', 'Tab', environ={'TMUX': 'x'}, run=run, popen=mock.Mock())
+        self.assertIn(str(link), run.calls[0][0])
+
+    def test_a_konsole_title_with_a_percent_sign_is_refused_before_any_tab_opens(self):
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        run = fake_run()
+        with mock.patch.object(CLI.shutil, 'which', return_value='/usr/bin/qdbus6'):
+            with self.assertRaisesRegex(CLI.LaunchError, 'expand the %'):
+                CLI.launch_tab(self.directory, '/bin/exe', 'Fix 100%d', environ=environ, run=run, popen=mock.Mock())
+        self.assertEqual(run.calls, [])
+
+    @unittest.skipIf(CLI.IS_WINDOWS, 'checks POSIX handlers are skipped when pretending to be Windows')
+    def test_posix_terminal_variables_are_ignored_on_windows(self):
+        run = fake_run([('', '', 0)])
+        with mock.patch.object(CLI, 'IS_WINDOWS', True), mock.patch.object(CLI.shutil, 'which', return_value='C:/wt.exe'):
+            CLI.launch_tab(self.directory, 'C:/claude.exe', 'Tab', environ={'TMUX': 'x', 'WT_SESSION': 'abc'},
+                           run=run, popen=mock.Mock())
+        self.assertEqual(run.calls[0][0][0], 'C:/wt.exe')
+
     def test_a_failed_konsole_run_command_removes_its_script(self):
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
         run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0), ('', 'no such session', 1)])
@@ -453,6 +489,8 @@ class LaunchTabTests(unittest.TestCase):
                 with self.assertRaisesRegex(CLI.LaunchError, 'no such session'):
                     CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
         self.assertFalse(created[0].parent.exists())
+        # The empty tab it created is closed by ending its shell.
+        self.assertEqual(run.calls[-1][0], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7', 'sendText', 'exit\n'])
 
     def test_konsole_falls_back_to_qdbus_when_qdbus6_is_absent(self):
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
