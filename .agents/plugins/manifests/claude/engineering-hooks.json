@@ -12,6 +12,15 @@
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py"
             ]
+          },
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
+            ]
           }
         ]
       }
@@ -111,15 +120,6 @@
             "args": [
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"
-            ]
-          },
-          {
-            "type": "command",
-            "timeout": 15,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
             ]
           }
         ]
