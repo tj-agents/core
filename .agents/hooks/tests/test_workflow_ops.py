@@ -147,6 +147,34 @@ class CompactRunTests(RepositoryFixture):
         with self.assertRaisesRegex(ops.WorkflowOperationError, "escapes"):
             ops.inspect_repository(self.root, "../outside")
 
+    def test_run_id_rejects_an_alias_to_another_run_inside_the_state_root(self):
+        runs = ops.state_root(self.root) / "runs"
+        target = runs / "target"
+        target.mkdir(parents=True)
+        alias = runs / "alias"
+        if sys.platform == "win32":
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(alias), str(target)],
+                capture_output=True, check=True,
+            )
+            self.addCleanup(alias.rmdir)
+        else:
+            alias.symlink_to(target, target_is_directory=True)
+            self.addCleanup(alias.unlink)
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "redirected"):
+            ops.run_root(self.root, "alias/nested")
+
+    def test_run_id_rejects_a_redirected_workflow_state_root(self):
+        state = ops.state_root(self.root)
+        original_redirect = ops.is_redirect
+        with mock.patch.object(
+            ops, "is_redirect",
+            side_effect=lambda path: Path(path) == state or original_redirect(path),
+        ):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "redirected"):
+                ops.run_root(self.root, "run-1")
+
 
 class InspectionAndSkillTests(RepositoryFixture):
     def test_inspection_consolidates_repository_identity(self):
@@ -192,6 +220,71 @@ class ReviewTests(RepositoryFixture):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.head = self.commit("src/mapping.txt", "candidate\n", "candidate")
+
+    def test_failed_initial_routing_removes_the_unpublished_bundle_and_allows_retry(self):
+        with mock.patch.object(ops, "route_findings", side_effect=OSError("routing failed")):
+            with self.assertRaisesRegex(OSError, "routing failed"):
+                ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        result = ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
+
+    def test_failed_descriptor_publication_removes_the_unpublished_bundle_and_allows_retry(self):
+        original_atomic_json = ops.atomic_json
+
+        def fail_publication(path, value):
+            if Path(path).name == "descriptor.json":
+                raise OSError("publication failed")
+            original_atomic_json(path, value)
+
+        with mock.patch.object(ops, "atomic_json", side_effect=fail_publication):
+            with self.assertRaisesRegex(OSError, "publication failed"):
+                ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        result = ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
+
+    def test_rejected_preexisting_unpublished_bundle_is_preserved(self):
+        result = ops.review_prepare(self.root, "existing", "origin/main", "HEAD", False)
+        Path(result["artifact"]).unlink()
+        directory = Path(result["bundle"]["directory"])
+        original_patch = Path(result["bundle"]["patch"]).read_bytes()
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "already exists"):
+            ops.review_prepare(self.root, "existing", "origin/main", "HEAD", False)
+
+        self.assertTrue(directory.is_dir())
+        self.assertEqual(original_patch, Path(result["bundle"]["patch"]).read_bytes())
+
+    def test_cleanup_locked_expired_bundle_does_not_block_unrelated_preparation(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+        original_rmtree = ops.shutil.rmtree
+
+        def remove_unlocked(path, *args, **kwargs):
+            if Path(path) == Path(expired["bundle"]["directory"]):
+                raise PermissionError("bundle locked")
+            return original_rmtree(path, *args, **kwargs)
+
+        with mock.patch.object(ops.shutil, "rmtree", side_effect=remove_unlocked):
+            result = ops.review_prepare(self.root, "unrelated", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
+        self.assertTrue(Path(expired["bundle"]["directory"]).is_dir())
+
+    def test_cleanup_malformed_descriptor_does_not_block_unrelated_preparation(self):
+        for name, value in (("list", []), ("bundle-list", {"bundle": []})):
+            path = ops.run_root(self.root, name) / "review" / "candidate" / "descriptor.json"
+            ops.atomic_json(path, value)
+
+        result = ops.review_prepare(self.root, "unrelated", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
 
     def test_small_candidate_gets_one_minimal_isolated_wave(self):
         result = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)

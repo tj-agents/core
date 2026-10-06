@@ -156,19 +156,27 @@ def state_root(root):
 def run_root(root, workflow_run_id):
     if not isinstance(workflow_run_id, str) or not workflow_run_id.strip():
         raise WorkflowOperationError("workflow run id is required")
-    runs = (state_root(root) / "runs").resolve()
-    candidate = (runs / workflow_run_id).resolve()
+    runs = state_root(root) / "runs"
+    candidate = runs / workflow_run_id
+    try:
+        parts = candidate.relative_to(runs).parts
+    except ValueError as error:
+        raise WorkflowOperationError("workflow run id escapes the workflow state root") from error
+    current = runs
+    if is_redirect(runs.parent) or is_redirect(current):
+        raise WorkflowOperationError("workflow run id contains a redirected owned directory")
+    for part in parts:
+        current = current / part
+        if is_redirect(current):
+            raise WorkflowOperationError("workflow run id contains a redirected owned directory")
+    runs = runs.resolve()
+    candidate = candidate.resolve()
     try:
         candidate.relative_to(runs)
     except ValueError as error:
         raise WorkflowOperationError("workflow run id escapes the workflow state root") from error
     if candidate == runs:
         raise WorkflowOperationError("workflow run id must identify a run below the workflow state root")
-    current = runs
-    for part in candidate.relative_to(runs).parts:
-        current = current / part
-        if current.exists() and is_redirect(current):
-            raise WorkflowOperationError("workflow run id contains a redirected owned directory")
     return candidate
 
 
@@ -694,6 +702,8 @@ def cleanup_review_bundles(root, now=None):
         try:
             run_id = descriptor_path.parent.parent.parent.relative_to(runs).as_posix()
             value = json.loads(descriptor_path.read_text(encoding="utf-8"))
+            if not isinstance(value, dict) or not isinstance(value.get("bundle"), dict):
+                continue
             candidate_key = review_candidate_key(value)
             locations = review_bundle_locations(root, run_id, candidate_key)
             bundle = value["bundle"]
@@ -715,7 +725,7 @@ def cleanup_review_bundles(root, now=None):
             artifacts = [locations[name] for name in expected if name != "directory"]
             if directory.exists() and not is_redirect(directory) and not any(is_redirect(path) for path in artifacts):
                 shutil.rmtree(directory)
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError, WorkflowOperationError):
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError, WorkflowOperationError):
             continue
 
 
@@ -744,73 +754,81 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         descriptor["artifact"] = str(locations["descriptor"])
         return descriptor
     create_review_bundle_directory(locations)
-    locations["patch"].write_bytes(patch)
-    locations["paths"].write_bytes(paths_bytes)
-    tree_archive = materialize_tree(root, head, locations["tree_archive"], locations["tree"])
-    tree_sha256 = tree_content_digest(locations["tree"])
-    skills, route_violations = route_findings(locations["tree"], paths)
-    rules = []
-    for name in skills:
-        path = locations["tree"] / ".agents" / "skills" / name / "SKILL.md"
-        if path.is_file():
-            rules.append({"name": name, "path": str(path.relative_to(locations["tree"])).replace("\\", "/"), "sha256": sha256_file(path)})
-    descriptor = {
-        "schema_version": SCHEMA_VERSION,
-        "operation": "review-prepare",
-        "repository": repository_slug(root),
-        "branch": git(root, "branch", "--show-current"),
-        "base_ref": base_ref,
-        "base": base,
-        "head": head,
-        "head_tree": git(root, "rev-parse", f"{head}^{{tree}}"),
-        "tree_archive_sha256": hashlib.sha256(tree_archive).hexdigest(),
-        "tree_content_sha256": tree_sha256,
-        "paths": paths,
-        "path_digest": path_digest,
-        "patch_sha256": hashlib.sha256(patch).hexdigest(),
-        "rules": rules,
-        "routed_skills": skills,
-        "route_violations": route_violations,
-        "lenses": select_review_lenses(paths),
-        "security": security_classification(root, locations["tree"], head, paths),
-        "waves": 1,
-        "context": {
-            "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],
-            "repository_paths": paths,
-            "rule_identities": rules,
-        },
-        "synchronization": sync,
-        "created_at": utc_now(),
-    }
-    descriptor["context"]["immutable_artifacts"].extend(
-        [f"sha256:{descriptor['patch_sha256']}", f"path-digest:{descriptor['path_digest']}"]
-    )
-    descriptor["descriptor_id"] = descriptor_identity(descriptor)
-    identity = {
-        "schema_version": SCHEMA_VERSION,
-        "descriptor_id": descriptor["descriptor_id"],
-        "repository": descriptor["repository"],
-        "base": base,
-        "head": head,
-        "head_tree": descriptor["head_tree"],
-        "patch_sha256": descriptor["patch_sha256"],
-        "paths_sha256": hashlib.sha256(paths_bytes).hexdigest(),
-        "path_digest": descriptor["path_digest"],
-        "tree_archive_sha256": descriptor["tree_archive_sha256"],
-        "tree_content_sha256": tree_sha256,
-        "rules": rules,
-    }
-    descriptor["bundle"] = {
-        "directory": str(locations["directory"]),
-        "patch": str(locations["patch"]),
-        "paths": str(locations["paths"]),
-        "tree": str(locations["tree"]),
-        "tree_archive": str(locations["tree_archive"]),
-        "identity": str(locations["identity"]),
-    }
-    atomic_json(locations["identity"], identity)
-    descriptor["bundle"]["identity_sha256"] = sha256_file(locations["identity"])
-    atomic_json(locations["descriptor"], descriptor)
+    try:
+        locations["patch"].write_bytes(patch)
+        locations["paths"].write_bytes(paths_bytes)
+        tree_archive = materialize_tree(root, head, locations["tree_archive"], locations["tree"])
+        tree_sha256 = tree_content_digest(locations["tree"])
+        skills, route_violations = route_findings(locations["tree"], paths)
+        rules = []
+        for name in skills:
+            path = locations["tree"] / ".agents" / "skills" / name / "SKILL.md"
+            if path.is_file():
+                rules.append({"name": name, "path": str(path.relative_to(locations["tree"])).replace("\\", "/"), "sha256": sha256_file(path)})
+        descriptor = {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "review-prepare",
+            "repository": repository_slug(root),
+            "branch": git(root, "branch", "--show-current"),
+            "base_ref": base_ref,
+            "base": base,
+            "head": head,
+            "head_tree": git(root, "rev-parse", f"{head}^{{tree}}"),
+            "tree_archive_sha256": hashlib.sha256(tree_archive).hexdigest(),
+            "tree_content_sha256": tree_sha256,
+            "paths": paths,
+            "path_digest": path_digest,
+            "patch_sha256": hashlib.sha256(patch).hexdigest(),
+            "rules": rules,
+            "routed_skills": skills,
+            "route_violations": route_violations,
+            "lenses": select_review_lenses(paths),
+            "security": security_classification(root, locations["tree"], head, paths),
+            "waves": 1,
+            "context": {
+                "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],
+                "repository_paths": paths,
+                "rule_identities": rules,
+            },
+            "synchronization": sync,
+            "created_at": utc_now(),
+        }
+        descriptor["context"]["immutable_artifacts"].extend(
+            [f"sha256:{descriptor['patch_sha256']}", f"path-digest:{descriptor['path_digest']}"]
+        )
+        descriptor["descriptor_id"] = descriptor_identity(descriptor)
+        identity = {
+            "schema_version": SCHEMA_VERSION,
+            "descriptor_id": descriptor["descriptor_id"],
+            "repository": descriptor["repository"],
+            "base": base,
+            "head": head,
+            "head_tree": descriptor["head_tree"],
+            "patch_sha256": descriptor["patch_sha256"],
+            "paths_sha256": hashlib.sha256(paths_bytes).hexdigest(),
+            "path_digest": descriptor["path_digest"],
+            "tree_archive_sha256": descriptor["tree_archive_sha256"],
+            "tree_content_sha256": tree_sha256,
+            "rules": rules,
+        }
+        descriptor["bundle"] = {
+            "directory": str(locations["directory"]),
+            "patch": str(locations["patch"]),
+            "paths": str(locations["paths"]),
+            "tree": str(locations["tree"]),
+            "tree_archive": str(locations["tree_archive"]),
+            "identity": str(locations["identity"]),
+        }
+        atomic_json(locations["identity"], identity)
+        descriptor["bundle"]["identity_sha256"] = sha256_file(locations["identity"])
+        atomic_json(locations["descriptor"], descriptor)
+    except Exception:
+        if not locations["descriptor"].exists() and not is_redirect(locations["directory"]):
+            try:
+                shutil.rmtree(locations["directory"])
+            except OSError:
+                pass
+        raise
     load_descriptor(root, workflow_run_id, locations["descriptor"])
     descriptor["artifact"] = str(locations["descriptor"])
     append_event(root, workflow_run_id, {"kind": "review", "operation": "prepare", "waves": 1, "descriptor_id": descriptor["descriptor_id"]})
