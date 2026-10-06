@@ -13,8 +13,6 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-_EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
-
 
 def _load_agent_cli():
     # The shared launch primitives, from the authored source layout or either installed package layout.
@@ -39,7 +37,6 @@ def parse_args(argv, agent_cli):
     parser.add_argument('--prompt-path', required=True)
     parser.add_argument('--title', default='Claude handoff')
     parser.add_argument('--model')
-    parser.add_argument('--effort', choices=_EFFORTS)
     parser.add_argument('--lane', choices=('L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'))
     parser.add_argument('--frontier', action='store_true')
     parser.add_argument('--dangerously-skip-permissions', action='store_true')
@@ -60,24 +57,24 @@ def parse_args(argv, agent_cli):
 def resolve_model(args, agent_cli):
     """(model, effort, tier text for the success message) per this launcher's selection precedence.
 
-    An explicit --model wins, a --lane resolves through the shipped lane table, and neither leaves
-    claude on its own configured default, same as an interactively launched session. The lane is never
-    guessed here: a transport that inferred one from the prompt would quietly decide the cost of every
-    handoff. A lane's effort travels with its model, but only when the lane actually resolved the model:
-    an explicit --model beating the lane means no lane effort applies either. An explicit --effort wins
-    over a lane's effort either way, mirroring how launch-codex.ps1's -ReasoningEffort beats the lane.
+    An explicit --model wins and carries no effort of its own -- there is no --effort flag here, so an
+    effort can only ever be the one the resolved lane or frontier entry prices for its own model, never a
+    caller's guess paired with a model it was never priced for. A --lane or --frontier that actually
+    resolves the model also supplies whatever effort the table prices for it, or none, same as that rung
+    would get interactively; an explicit --model beating the lane means no lane effort applies either. The
+    lane is never guessed here: a transport that inferred one from the prompt would quietly decide the
+    cost of every handoff.
     """
     model = args.model
-    lane_effort = None
+    effort = None
     tier = ''
     if args.frontier:
-        model, lane_effort = agent_cli.resolve_lane_model('claude', frontier=True)
+        model, effort = agent_cli.resolve_lane_model('claude', frontier=True)
         tier = 'frontier -> '
     elif not model and args.lane:
-        model, lane_effort = agent_cli.resolve_lane_model('claude', lane=args.lane)
+        model, effort = agent_cli.resolve_lane_model('claude', lane=args.lane)
         tier = f'lane {args.lane} -> '
 
-    effort = args.effort if args.effort is not None else lane_effort
     return model, effort, tier
 
 
@@ -100,25 +97,24 @@ def main(argv=None):
     try:
         args = parse_args(argv, agent_cli)
 
-        prompt_sentence = agent_cli.prompt_file_argument(args.prompt_path)
-        prompt_path = Path(args.prompt_path).resolve()
+        # Validated first, before any prompt or lane handling: whichever is wrong, the directory is the
+        # one thing every other step here depends on, and its error should never be shadowed by a later
+        # check that only looked irrelevant.
+        working_directory = agent_cli.resolve_tab_directory(args.working_directory)
+
+        prompt_sentence, prompt_path = agent_cli.prompt_file_argument(args.prompt_path)
         model, effort, tier = resolve_model(args, agent_cli)
         arguments = build_arguments(args, model, effort, prompt_sentence)
 
-        working_directory = agent_cli.open_claude_tab(args.working_directory, args.title, arguments)
+        agent_cli.open_claude_tab(working_directory, args.title, arguments)
 
         selection = f'{tier}{model}' if model else 'the CLI default model'
         if effort:
             selection += f' at {effort}'
         print(f"Launched claude handoff tab '{args.title}' in {working_directory} on {selection} with prompt {prompt_path}")
         return 0
-    except agent_cli.LaunchTimeout as exc:
-        print(str(exc), file=sys.stderr)
-        print('The tab may already have opened; check the terminal before launching another.', file=sys.stderr)
-        return 3
     except agent_cli.LaunchError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        return agent_cli.report_launch_failure(exc)
 
 
 if __name__ == '__main__':
