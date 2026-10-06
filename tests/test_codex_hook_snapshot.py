@@ -7,7 +7,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -19,6 +21,48 @@ SPEC.loader.exec_module(SNAPSHOT)
 
 
 class CodexHookSnapshotTests(unittest.TestCase):
+    def test_concurrent_delayed_reads_keep_digest_order_and_reject_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, content in [('a.txt', b'first\r\n'), ('b.bin', b'\xff\r\n'),
+                                  ('c.txt', b'last\r')]:
+                (root / name).write_bytes(content)
+            expected = SNAPSHOT.digest_tree(root, 'base')
+            read_bytes = Path.read_bytes
+            started = threading.Barrier(3)
+            last_finished = threading.Event()
+            lock = threading.Lock()
+            completions = []
+            active = peak = 0
+
+            def delayed_read(path):
+                nonlocal active, peak
+                with lock:
+                    active += 1
+                    peak = max(peak, active)
+                try:
+                    started.wait(timeout=10)
+                    content = read_bytes(path)
+                    if path.name != 'c.txt' and not last_finished.wait(timeout=10):
+                        raise TimeoutError('Concurrent final read did not complete')
+                    with lock:
+                        completions.append(path.name)
+                    if path.name == 'c.txt':
+                        last_finished.set()
+                    return content
+                finally:
+                    with lock:
+                        active -= 1
+
+            with patch.object(Path, 'read_bytes', delayed_read):
+                self.assertEqual(expected, SNAPSHOT.digest_tree(root, 'base'))
+                self.assertEqual(3, peak)
+                self.assertEqual('c.txt', completions[0])
+                (root / 'b.bin').write_bytes(b'tampered')
+                with self.assertRaises(SystemExit) as raised:
+                    SNAPSHOT.verified(root, expected, 'base')
+                self.assertEqual(2, raised.exception.code)
+
     def test_nested_text_binary_and_exclusions_keep_known_integrity_digests(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

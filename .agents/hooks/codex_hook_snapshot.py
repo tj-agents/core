@@ -1,4 +1,5 @@
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import runpy
@@ -31,22 +32,24 @@ def digest_tree(root, plugin):
                     files.append((relative, entry.path))
                 else:
                     fail("Codex hook package contains an unsupported entry")
+    files = [(relative, Path(path)) for relative, path in sorted(files) if relative not in excluded]
     digest = hashlib.sha256()
-    for relative, path in sorted(files):
-        if relative in excluded:
-            continue
-        content = Path(path).read_bytes()
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            pass
-        else:
-            content = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(str(len(content)).encode("ascii"))
-        digest.update(b"\0")
-        digest.update(content)
+    if files:
+        with ThreadPoolExecutor(max_workers=min(16, len(files))) as reader:
+            for start in range(0, len(files), 16):
+                batch = files[start:start + 16]
+                for (relative, _), content in zip(batch, reader.map(Path.read_bytes, [path for _, path in batch])):
+                    try:
+                        text = content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        pass
+                    else:
+                        content = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+                    digest.update(relative.encode("utf-8"))
+                    digest.update(b"\0")
+                    digest.update(str(len(content)).encode("ascii"))
+                    digest.update(b"\0")
+                    digest.update(content)
     return "sha256:" + digest.hexdigest()
 
 
