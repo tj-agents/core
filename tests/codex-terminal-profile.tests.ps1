@@ -8,6 +8,7 @@ $scripts = Join-Path $codexHome 'plugins/cache/base-agents/machine/9.9.9/resourc
 New-Item -ItemType Directory -Path $bin, $scripts -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex-profile.ps1') -Destination $scripts
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.ps1') -Destination $scripts
+Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/bounded_process.py') -Destination $scripts
 $trustStub = @'
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ with Path(os.environ["CODEX_TEST_CALLS"]).open("a", encoding="utf-8") as calls:
 '@
 Set-Content -LiteralPath (Join-Path $scripts 'codex_hook_trust.py') -Value $trustStub
 $fake = @'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 Add-Content -LiteralPath $env:CODEX_TEST_CALLS -Value ($args -join ' ')
 $global:LASTEXITCODE = 0
 switch ($args -join ' ') {
@@ -25,8 +27,20 @@ switch ($args -join ' ') {
         if ($env:CODEX_TEST_TRUST_SOURCE) { Remove-Item -LiteralPath $env:CODEX_TEST_TRUST_SOURCE -Force }
         '{"selectedMarketplaces":["base-agents"],"upgradedRoots":[],"errors":[]}'
     }
-    'plugin list --available --json' { '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}' }
-    'plugin add machine@base-agents --json' { '{"pluginId":"machine@base-agents"}' }
+    'plugin list --available --json' {
+        if ($env:CODEX_TEST_REMOVE_RUNNER) {
+            '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}},{"pluginId":"react@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}'
+        } else {
+            '{"installed":[{"pluginId":"machine@base-agents","enabled":true,"marketplaceSource":{"sourceType":"git"}}],"available":[]}'
+        }
+    }
+    'plugin add machine@base-agents --json' {
+        if ($env:CODEX_TEST_REMOVE_RUNNER) { Remove-Item -LiteralPath $env:CODEX_TEST_REMOVE_RUNNER -Force }
+        '{"pluginId":"machine@base-agents"}'
+    }
+    'plugin add react@base-agents --json' { '{"pluginId":"react@base-agents"}' }
+    'unicode' { @{ value = (([char]0x4f60),([char]0x597d) -join '') } | ConvertTo-Json -Compress }
+    '--version' { 'FAKE VERSION' }
     'exec' { 'LAUNCHED exec' }
     default { throw "Unexpected Codex call: $($args -join ' ')" }
 }
@@ -36,6 +50,7 @@ $oldPath = $env:PATH
 $oldHome = $env:CODEX_HOME
 $oldCalls = $env:CODEX_TEST_CALLS
 $oldFail = $env:CODEX_TEST_FAIL_UPGRADE
+$oldRemove = $env:CODEX_TEST_REMOVE_RUNNER
 $oldTrustSource = $env:CODEX_TEST_TRUST_SOURCE
 try {
     $env:PATH = "$bin$([IO.Path]::PathSeparator)$oldPath"
@@ -64,6 +79,25 @@ try {
     if (($calls -join '|') -ne 'plugin marketplace upgrade --json|exec') {
         throw "Failed refresh made unexpected calls: $($calls -join '|')"
     }
+    Clear-Content -LiteralPath $env:CODEX_TEST_CALLS
+    $result = codex --version
+    if ($result -ne 'FAKE VERSION') { throw 'Version command failed' }
+    if ((Get-Content -LiteralPath $env:CODEX_TEST_CALLS) -ne '--version') {
+        throw 'Version command triggered a refresh'
+    }
+    . (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.ps1')
+    $encoding = [Console]::OutputEncoding
+    $unicode = Invoke-CodexSyncCommand -CodexExecutable (Join-Path $bin 'codex.ps1') -Arguments @('unicode')
+    if ($unicode.value -ne (([char]0x4f60),([char]0x597d) -join '')) { throw 'Unicode output was corrupted' }
+    if ([Console]::OutputEncoding.CodePage -ne $encoding.CodePage) { throw 'Caller encoding changed' }
+    Clear-Content -LiteralPath $env:CODEX_TEST_CALLS
+    $env:CODEX_TEST_FAIL_UPGRADE = $null
+    $env:CODEX_TEST_REMOVE_RUNNER = Join-Path $scripts 'bounded_process.py'
+    $result = codex exec
+    if ($result -ne 'LAUNCHED exec') { throw 'Machine upgrade prevented launch' }
+    $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS)
+    if ('plugin add react@base-agents --json' -notin $calls) { throw 'Runner removal prevented later plugin refresh' }
+    if (Test-Path -LiteralPath $env:CODEX_TEST_REMOVE_RUNNER) { throw 'Fixture did not remove the old runner' }
     'Codex terminal profile tests passed.'
 }
 finally {
@@ -71,6 +105,7 @@ finally {
     $env:CODEX_HOME = $oldHome
     $env:CODEX_TEST_CALLS = $oldCalls
     $env:CODEX_TEST_FAIL_UPGRADE = $oldFail
+    $env:CODEX_TEST_REMOVE_RUNNER = $oldRemove
     $env:CODEX_TEST_TRUST_SOURCE = $oldTrustSource
     $root = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
     $target = [IO.Path]::GetFullPath($temp)
