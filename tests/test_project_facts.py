@@ -285,6 +285,58 @@ class ProjectFacts(unittest.TestCase):
                     self.assertEqual({item['code'] for item in result.diagnostics}, {'unknown-project-reference'})
             imported.unlink()
 
+    def test_unresolved_external_exclusions_preserve_unknown_reference_evidence(self):
+        for include, exclude in (('../External.csproj', '../Other.csproj'),
+                                 ('C:/External.csproj', 'C:/Other.csproj')):
+            with self.subTest(include=include):
+                self.write('A.csproj', '<Project><ItemGroup><ProjectReference Include="' + include + '" Exclude="' + exclude + '"/></ItemGroup></Project>')
+                graph = self.graph()
+                result = gate.evaluate_project(graph, 'A.csproj',
+                                               {'project_dependency': {'transitive': True, 'where': self.dependency('nuget', 'Example')}})
+                self.assertFalse(result.matched)
+                self.assertTrue(graph.projects['A.csproj'].references)
+                self.assertEqual({item['code'] for item in result.diagnostics}, {'unknown-project-reference'})
+
+    def test_target_operations_remain_runtime_uncertain(self):
+        self.write('B.csproj', '<Project><ItemGroup><PackageReference Include="Example"/></ItemGroup></Project>')
+        for operation in ('Include', 'Remove'):
+            with self.subTest(operation=operation):
+                baseline = '<ItemGroup><PackageReference Include="Example"/><ProjectReference Include="B.csproj"/></ItemGroup>' if operation == 'Remove' else ''
+                target = '<Target Name="Deferred"><ItemGroup><PackageReference ' + operation + '="Example"/><ProjectReference ' + operation + '="B.csproj"/></ItemGroup></Target>'
+                self.write('A.csproj', '<Project>' + baseline + target + '</Project>')
+                graph = self.graph()
+                for node in (self.dependency('nuget', 'Example'),
+                             {'project_dependency': {'transitive': True, 'where': self.dependency('nuget', 'Example')}}):
+                    result = gate.evaluate_project(graph, 'A.csproj', node)
+                    self.assertFalse(result.matched)
+                    self.assertTrue(result.diagnostics)
+                if operation == 'Remove':
+                    self.assertEqual(graph.projects['A.csproj'].dependencies[0]['id'], 'Example')
+                    self.assertFalse(graph.projects['A.csproj'].references[0]['unknown'])
+                    self.assertEqual(graph.projects['A.csproj'].references[0]['target'], 'B.csproj')
+
+    def test_framework_item_exclusion_and_removal_ignore_case_without_changing_predicates(self):
+        for items in ('<FrameworkReference Include="Microsoft.AspNetCore.App" Exclude="microsoft.aspnetcore.app"/>',
+                      '<FrameworkReference Include="Microsoft.AspNetCore.App"/><FrameworkReference Remove="microsoft.aspnetcore.app"/>'):
+            with self.subTest(items=items):
+                self.write('A.csproj', '<Project><ItemGroup>' + items + '</ItemGroup></Project>')
+                result = gate.evaluate_project(self.graph(), 'A.csproj', self.dependency('framework', 'Microsoft.AspNetCore.App'))
+                self.assertFalse(result.matched)
+                self.assertFalse(result.diagnostics)
+        self.write('A.csproj', '<Project><ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App"/></ItemGroup></Project>')
+        graph = self.graph()
+        self.assertTrue(gate.evaluate_project(graph, 'A.csproj', self.dependency('framework', 'Microsoft.AspNetCore.App')).matched)
+        self.assertFalse(gate.evaluate_project(graph, 'A.csproj', self.dependency('framework', 'microsoft.aspnetcore.app')).matched)
+
+    def test_uncertain_framework_removals_shadow_case_equivalent_known_items(self):
+        for removal in ('<ItemGroup Condition="$(RemoveIt)"><FrameworkReference Remove="microsoft.aspnetcore.app"/></ItemGroup>',
+                        '<Target Name="Deferred"><ItemGroup><FrameworkReference Remove="microsoft.aspnetcore.app"/></ItemGroup></Target>'):
+            with self.subTest(removal=removal):
+                self.write('A.csproj', '<Project><ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App"/></ItemGroup>' + removal + '</Project>')
+                result = gate.evaluate_project(self.graph(), 'A.csproj', self.dependency('framework', 'Microsoft.AspNetCore.App'))
+                self.assertFalse(result.matched)
+                self.assertEqual({item['code'] for item in result.diagnostics}, {'unknown-dependency'})
+
     def test_new_primitives_require_project_identity_and_validate_shape(self):
         dependency = self.dependency('nuget', 'Example')
         self.assertEqual(gate.evaluate_predicate(self.root, dependency).diagnostics[0]['code'], 'project-scope-required')
