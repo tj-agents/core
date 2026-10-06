@@ -95,8 +95,9 @@ Push only when the delivery branch has no upstream or has unpublished commits.
   - <a non-default end-to-end tier and why; a version-sync consequence if publishable source changed>
   ```
 
-  A small change collapses to two paragraphs, `**What:**` then `**Why:**`, with no headings. Drop a section
-  with nothing to say. State what was verified and what was not; never claim an unobserved result. A visible
+  Every body requires nonempty What and Why sections. A small change collapses to two paragraphs,
+  `**What:** <change>` then `**Why:** <reason>`, with no headings. Drop optional sections with nothing
+  to say. State what was verified and what was not; never claim an unobserved result. A visible
   UI change attaches screenshots per `engineering:pr-screenshots`. Keep the mandated attribution footer.
 
 ### 5. Update the owning PR or create the assessed slice's review
@@ -111,7 +112,18 @@ gh pr create --draft --head <delivery-branch> --title "<title>" --body-file <bod
 Add `--base <branch>` only when targeting something other than the default. Omit `--draft` only when the work
 is already complete, reviewed, and exact-head-CI-ready.
 
-### 6. Bind the delivery owner
+### 6. Check the published body and bind the delivery owner
+
+After every create or body edit, fetch and validate the authoritative body before binding or reporting,
+including when the head and existing binding are unchanged:
+
+```bash
+python <workflow-ops> --root <delivery-checkout> --workflow-run-id pr-body-<n> pr-body-check --pr <owning-url>
+```
+
+`<workflow-ops>` is `.agents/workflows/workflow_ops.py` in a source checkout or `workflows/workflow_ops.py`
+under the installed engineering package. Use `--repo <owner/repo>` when naming a PR number in another
+repository. If validation fails, repair the body, preserve its attribution and repeat the check.
 
 For an existing review whose head is unchanged, retain its binding and continuation. A metadata update
 from a correction checkout returns that review's URL with its owner still active. When binding a new

@@ -54,6 +54,21 @@
             ]
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 60,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py",
+              "--validate-body"
+            ]
+          }
+        ],
+        "matcher": "Bash|PowerShell"
       }
     ],
     "PostToolUse": [
