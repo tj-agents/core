@@ -78,8 +78,9 @@ Tommy again. Repair both mechanisms before claiming this outcome.
 6. Add one explicit optional approval-record input to the existing delivery binder. Its structured record
    carries repository, PR number, exact worktree/branch, permitted merge mode, the actual user's wording
    and the source of that authorization. The agent may supply this only from an observed user instruction;
-   a goal file's existence or implementation approval never invents merge authority. Keep one binder as
-   the writer of the delivery binding; do not hand-edit an existing binding to override its result.
+   a goal file's bare existence never invents merge authority (the user's recorded goal authorization
+   does, per `engineering:merging`). Keep one binder as the writer of the delivery binding; do not
+   hand-edit an existing binding to override its result.
 7. Match the recorded approval to the same PR/worktree/branch, then bind the current exact remote head and
    re-evaluate all existing stop-class paths and hold labels. A scoped approval can resolve absence of a
    repository-wide table; it cannot bypass a stop class or hold. Preserve the approval wording/provenance

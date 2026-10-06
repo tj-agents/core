@@ -31,6 +31,12 @@
         ]
       },
       {
+        "path": "hooks/hook_dispatch.py",
+        "hosts": [
+          "codex"
+        ]
+      },
+      {
         "path": "resources/machine/scripts/claude_terminal_profile.py",
         "hosts": [
           "claude"
