@@ -403,6 +403,7 @@ class WorkflowGenerationTests(unittest.TestCase):
         )
         for skill in config["extended_host_adapters"]:
             canonical = authored_skill(skill)
+            package = canonical.relative_to(ROOT / ".agents").parts[0]
             for host, tree in (("claude", "skills"), ("codex", "codex-skills")):
                 with self.subTest(skill=skill, host=host):
                     source = ROOT / f".{host}" / "skills" / skill / "SKILL.md"
@@ -412,13 +413,13 @@ class WorkflowGenerationTests(unittest.TestCase):
                         authored,
                     )
                     generated = (
-                        ROOT / "plugins/engineering" / tree / skill / "SKILL.md"
+                        ROOT / "plugins" / package / tree / skill / "SKILL.md"
                     ).read_text(encoding="utf-8")
                     self.assertEqual(
                         authored.replace("../../../.agents/", "../../.agents/"),
                         generated,
                     )
-            packaged = ROOT / "plugins/engineering" / canonical.relative_to(ROOT)
+            packaged = ROOT / "plugins" / package / canonical.relative_to(ROOT)
             self.assertEqual(
                 canonical.read_text(encoding="utf-8"),
                 packaged.read_text(encoding="utf-8"),
