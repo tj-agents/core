@@ -42,6 +42,7 @@ class ScopedApprovalTests(unittest.TestCase):
                        "source": "user message in session fixture at 2026-10-04T18:00:00Z"}
         self.record_path = self.root / "approval.json"
         self.value = {"number": 42, "url": "https://github.com/example/test/pull/42",
+                      "body": "## What\nChange\n## Why\nReason",
                       "headRefOid": HEAD, "headRefName": "feature", "state": "OPEN",
                       "files": [{"path": "README.md"}], "labels": [], "statusCheckRollup": []}
         for name, kwargs in (
@@ -268,6 +269,7 @@ class GateSubprocessTests(unittest.TestCase):
             json.dumps(
                 {
                     "number": 42,
+                    "body": "## What\nChange\n## Why\nReason",
                     "url": "https://github.com/Concertable/agents/pull/42",
                     "headRefOid": HEAD,
                     "headRefName": "Feature/Thing",

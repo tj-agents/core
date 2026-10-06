@@ -203,7 +203,6 @@ class PackagedEngineeringHooks(unittest.TestCase):
         commands = {'forge_poll_gate': 'gh pr checks 42',
                     'compact_output_gate': 'python -m unittest',
                     'persistent_workflow_merge_gate': 'gh pr merge 42 --auto',
-                    'delivery_binding_gate': 'gh pr create --title Example',
                     'worktree_cleanup_gate': ''}
         for name, command in commands.items():
             with self.subTest(name=name):
@@ -213,6 +212,20 @@ class PackagedEngineeringHooks(unittest.TestCase):
                     hook_event_name='SessionStart' if name == 'worktree_cleanup_gate' else 'PreToolUse'))
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual('', result.stdout + result.stderr)
+
+    def test_both_hosts_register_body_validation_before_shell_writes(self):
+        for host in ('claude', 'codex'):
+            data = json.loads((self.package / f'hooks/{host}.json').read_text(encoding='utf-8'))
+            commands = [command_line(hook) for group in data['hooks']['PreToolUse']
+                        for hook in group['hooks']]
+            body = [command for command in commands if 'delivery_binding_gate.py' in command]
+            self.assertEqual(1, len(body))
+            self.assertIn('--validate-body', body[0])
+            if host == 'codex':
+                windows = [hook['commandWindows'] for group in data['hooks']['PreToolUse']
+                           for hook in group['hooks'] if 'delivery_binding_gate.py' in hook['command']]
+                self.assertIn('pre_tool_use_adapter.py', windows[0])
+                self.assertIn('--validate-body', windows[0])
 
     def test_credential_guard_blocks_widening_but_allows_read_only_status(self):
         for tool, field in (('Bash', 'command'), ('exec_command', 'cmd')):
