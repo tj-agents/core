@@ -1,0 +1,245 @@
+"""Converge every installed base-agents package's declared harness permissions on this machine."""
+
+import importlib.util
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py"
+sys.path.insert(0, str(SCRIPT.parent))
+SPEC = importlib.util.spec_from_file_location("harness_permissions_sync", SCRIPT)
+SYNC = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SYNC)
+import harness_permissions
+
+
+SAMPLE_RULE = {
+    "pattern": [["python", "python3", "py"], "-B", "${PLUGIN_ROOT}/sample/finish.py"],
+    "justification": "test rule",
+    "match": [["python", "-B", "${PLUGIN_ROOT}/sample/finish.py"]],
+    "not_match": [["python", "${PLUGIN_ROOT}/sample/finish.py"]],
+}
+
+
+def write_harness(root, name, claude_allow, codex_rules=None):
+    root.mkdir(parents=True, exist_ok=True)
+    harness = {
+        "schema_version": 1,
+        "plugin": f"base-agents/{name}",
+        "source_roots": [],
+        "requires": {
+            "marketplaces": [],
+            "plugins": [],
+            "hooks": [],
+            "permissions": {"claude_allow": claude_allow, "codex_prefix_rules": codex_rules or []},
+        },
+    }
+    (root / "harness.json").write_text(json.dumps(harness), encoding="utf-8")
+
+
+def install_claude_plugin(claude_config, name, version, claude_allow, codex_rules=None, scope="user", project_path=None):
+    root = claude_config / "plugins" / "cache" / "base-agents" / name / version
+    write_harness(root, name, claude_allow, codex_rules)
+    installed_path = claude_config / "plugins" / "installed_plugins.json"
+    installed_path.parent.mkdir(parents=True, exist_ok=True)
+    data = json.loads(installed_path.read_text(encoding="utf-8")) if installed_path.is_file() else {"version": 2, "plugins": {}}
+    identity = f"{name}@base-agents"
+    entry = {"scope": scope, "installPath": str(root), "version": version}
+    if project_path is not None:
+        entry["projectPath"] = str(project_path)
+    data["plugins"].setdefault(identity, []).append(entry)
+    installed_path.write_text(json.dumps(data), encoding="utf-8")
+    return root
+
+
+def clear_claude_plugin(claude_config, name):
+    installed_path = claude_config / "plugins" / "installed_plugins.json"
+    data = json.loads(installed_path.read_text(encoding="utf-8"))
+    data["plugins"][f"{name}@base-agents"] = []
+    installed_path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def install_codex_plugin(codex_home, name, version, claude_allow=None, codex_rules=None):
+    root = codex_home / "plugins" / "cache" / "base-agents" / name / version
+    write_harness(root, name, claude_allow or [], codex_rules)
+    return root
+
+
+class HarnessPermissionsSyncTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.claude_config = self.root / "claude"
+        self.codex_home = self.root / "codex"
+        self.state = self.root / "state"
+        self.environ = {
+            "CLAUDE_CONFIG_DIR": str(self.claude_config),
+            "CODEX_HOME": str(self.codex_home),
+            "AGENT_STATE_DIRECTORY": str(self.state),
+        }
+
+    def settings_path(self):
+        return self.claude_config / "settings.json"
+
+    def rules_path(self):
+        return self.codex_home / "rules" / "base-agents.rules"
+
+    def write_settings(self, content):
+        self.settings_path().parent.mkdir(parents=True, exist_ok=True)
+        self.settings_path().write_text(json.dumps(content), encoding="utf-8")
+
+    def test_user_entries_survive(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        self.write_settings({"permissions": {"allow": ["Bash(user-thing)"]}})
+
+        drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertEqual([], warnings)
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertIn("Bash(user-thing)", allow)
+        self.assertIn(str(self.settings_path()), drifted)
+
+    def test_stale_owned_entries_are_removed(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        SYNC.synchronize(self.environ, "apply")
+        before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertTrue(any("v1" in entry for entry in before))
+
+        clear_claude_plugin(self.claude_config, "engineering")
+        SYNC.synchronize(self.environ, "apply")
+
+        after = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertEqual([], after)
+
+    def test_a_version_path_change_rerenders(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        SYNC.synchronize(self.environ, "apply")
+
+        clear_claude_plugin(self.claude_config, "engineering")
+        install_claude_plugin(self.claude_config, "engineering", "v2", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        SYNC.synchronize(self.environ, "apply")
+
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertFalse(any("v1" in entry for entry in allow))
+        self.assertTrue(any("v2" in entry for entry in allow))
+
+    def test_idempotent_second_apply_is_byte_identical(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_codex_plugin(self.codex_home, "machine", "2.0.0", codex_rules=[SAMPLE_RULE])
+
+        SYNC.synchronize(self.environ, "apply")
+        settings_first = self.settings_path().read_bytes()
+        rules_first = self.rules_path().read_bytes()
+
+        drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertEqual([], warnings)
+        self.assertEqual(settings_first, self.settings_path().read_bytes())
+        self.assertEqual(rules_first, self.rules_path().read_bytes())
+
+    def test_settings_with_foreign_formatting_are_untouched_when_allow_already_matches(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        SYNC.synchronize(self.environ, "apply")
+        data = json.loads(self.settings_path().read_text(encoding="utf-8"))
+        data["theme"] = "dark"
+        foreign = json.dumps(data, indent=4).replace("\n", "\r\n") + "\r\n"
+        self.settings_path().write_bytes(foreign.encode("utf-8"))
+
+        drifted, _ = SYNC.synchronize(self.environ, "apply")
+
+        self.assertEqual([], [path for path in drifted if path.endswith("settings.json")])
+        self.assertEqual(foreign.encode("utf-8"), self.settings_path().read_bytes())
+
+    def test_malformed_settings_warn_and_do_not_write(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        self.settings_path().parent.mkdir(parents=True, exist_ok=True)
+        self.settings_path().write_text("{not json", encoding="utf-8")
+
+        drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertNotIn(str(self.settings_path()), drifted)
+        self.assertTrue(any("cannot parse settings" in warning for warning in warnings))
+        self.assertEqual("{not json", self.settings_path().read_text(encoding="utf-8"))
+
+    def test_check_exit_codes(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+
+        drifted, warnings = SYNC.synchronize(self.environ, "check")
+        self.assertTrue(drifted)
+        self.assertEqual([], warnings)
+
+        SYNC.synchronize(self.environ, "apply")
+        drifted, warnings = SYNC.synchronize(self.environ, "check")
+        self.assertEqual([], drifted)
+
+    def test_opt_out_disables_both_modes(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        self.environ["BASE_AGENTS_HARNESS_PERMISSIONS"] = "off"
+
+        drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertEqual([], drifted)
+        self.assertEqual([], warnings)
+        self.assertFalse(self.settings_path().is_file())
+
+    def test_both_separator_spellings_are_rendered(self):
+        root = install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        SYNC.synchronize(self.environ, "apply")
+
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        forward, backslash = harness_permissions.path_spellings(root)
+        self.assertIn(f"Bash(python -B {forward}/cleanup_proof.py)", allow)
+        self.assertIn(f"Bash(python -B {backslash}\\cleanup_proof.py)", allow)
+
+    def test_multiple_scopes_all_survive(self):
+        install_claude_plugin(self.claude_config, "engineering", "user-root", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"], scope="user")
+        install_claude_plugin(
+            self.claude_config, "engineering", "local-root", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"],
+            scope="local", project_path=self.root / "some-project",
+        )
+
+        SYNC.synchronize(self.environ, "apply")
+
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertTrue(any("user-root" in entry for entry in allow))
+        self.assertTrue(any("local-root" in entry for entry in allow))
+
+    def test_print_mode_resolves_an_exact_invocation(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+
+        lines, warnings = SYNC.print_invocations(self.environ, "cleanup_proof.py")
+
+        self.assertEqual([], warnings)
+        self.assertEqual(1, len(lines))
+        self.assertIn("cleanup_proof.py", lines[0])
+        self.assertNotIn("${PLUGIN_ROOT}", lines[0])
+
+    def test_codex_rules_file_loads_under_execpolicy_when_available(self):
+        codex = shutil.which("codex")
+        if not codex:
+            self.skipTest("codex CLI not on PATH")
+        root = install_codex_plugin(self.codex_home, "engineering", "2.1.16", codex_rules=[SAMPLE_RULE])
+
+        SYNC.synchronize(self.environ, "apply")
+
+        rules_path = self.rules_path()
+        self.assertTrue(rules_path.is_file())
+        _, backslash = harness_permissions.path_spellings(root)
+        result = subprocess.run(
+            [codex, "execpolicy", "check", "--rules", str(rules_path), "--resolve-host-executables",
+             "--", "python", "-B", f"{backslash}\\sample\\finish.py"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn('"decision":"allow"', result.stdout.replace(" ", ""))
+
+
+if __name__ == "__main__":
+    unittest.main()
