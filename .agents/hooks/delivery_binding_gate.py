@@ -90,15 +90,18 @@ def command_options(tokens, operation):
         value, raw = tokens[index]
         if any(char in raw for char in ";&|<>") and not raw.startswith(("'", '"')):
             raise ValueError("ambiguous command composition")
-        key, equal, _ = value.partition("=")
-        attached = not equal and len(key) > 2 and key[:2] in value_flags
+        attached = len(value) > 2 and value[:2] in value_flags
         if attached:
-            key = key[:2]
+            key, equal = value[:2], False
+        else:
+            key, equal, _ = value.partition("=")
         if key in value_flags:
-            if equal:
-                argument = raw.split("=", 1)[1]
-            elif attached:
+            if attached:
                 argument = raw[2:]
+                if argument.startswith("="):
+                    argument = argument[1:]
+            elif equal:
+                argument = raw.split("=", 1)[1]
             else:
                 index += 1
                 if index >= len(tokens):

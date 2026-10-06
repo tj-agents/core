@@ -43,6 +43,7 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "25",
+              "--deny-on-timeout",
               "${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
