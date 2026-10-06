@@ -31,6 +31,10 @@ class GeneratedPathGuardTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.repo = Path(temp.name)
         git(self.repo, 'init', '--quiet', '--initial-branch=main')
+        # A commit may start git's automatic gc or maintenance in the background, which then writes into
+        # .git while the temporary directory is being removed.
+        git(self.repo, 'config', 'gc.auto', '0')
+        git(self.repo, 'config', 'maintenance.auto', 'false')
         self.write('.agents/plugins/sources.json', {'generated_roots': ['plugins']})
         self.write(GUARD.CATALOG, catalog('sha256:old'))
         self.write('plugins/pkg/file.txt', 'generated')

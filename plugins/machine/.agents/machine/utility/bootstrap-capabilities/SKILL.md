@@ -34,12 +34,17 @@ After each repository has adopted its generated project settings, audit the mach
 old user-profile behavior:
 
 ```powershell
-python -B '<skill-directory>\scripts\verify_machine.py' --home C:\Users\name
+python -B '<skill-directory>\scripts\verify_machine.py' --home C:\Users\name --repository C:\path\to\project
 ```
 
-The verifier is read-only. It reports user-scope plugin selections, marketplaces, hooks,
-notification commands, and loose agents or skills. Codex's recorded hook trust hashes and host
-preferences are runtime state and are not reported. Exit status 1 means findings remain.
+The verifier is read-only and requires Python 3.11 or newer for TOML inspection. Repeat
+`--repository` for each project being migrated; it checks project Codex agents and local
+marketplace sources in Codex and Claude settings. GitHub marketplace declarations are allowed.
+It reports user-scope plugin selections, marketplaces, hooks, notifications, instruction files,
+agent settings, and loose agents or skills. Codex's recorded hook trust hashes and built-in marketplaces are
+runtime state and are not reported. Use `--json` for stable finding codes, paths, settings, and
+clean or drift status. Exit status 1 means findings or an inspection failure remain. Output
+never includes configuration values.
 
 Use the packaged Python entry point. The lock and composed catalog are project-owned; core's
 bundled catalog covers only core packages. `--profile` is the actual Codex or Claude configuration
