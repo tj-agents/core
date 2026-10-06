@@ -27,8 +27,12 @@ Konsole).
 ## One tab, and never a second
 
 The launcher **exits non-zero** on failure and prints `Launched claude handoff tab '<title>' …` on success.
-Those are the only two outcomes. `standards:` lines before them report the pre-launch plugin refresh,
-which never blocks the launch.
+`standards:` lines before them report the pre-launch plugin refresh, which never blocks the launch.
+
+Exit code **3 is distinct from every other failure**: it means the terminal control command timed out
+after the tab may already have opened, not that the launch definitely failed. Check the terminal for the
+tab before doing anything else; never relaunch automatically on exit 3. Any other non-zero exit means the
+launch did not happen.
 
 **Never verify a launch by listing processes, and never re-run the launcher because one looked absent.**
 A tab takes seconds to appear and a process listing is trivially misread — an unsorted `Select-Object
@@ -37,7 +41,8 @@ repository, which is worse than no handoff at all: they collide on the same file
 the other.
 
 If the launcher printed its confirmation, the handoff happened. Report it and stop. If it exited
-non-zero, say so; do not retry blind.
+non-zero, say so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a
+second tab for the same handoff.
 
 ## Model selection
 
@@ -75,6 +80,13 @@ explicitly asked for that tier or its model by name.** No lane resolves to the t
 family an effort step below, and frontier spend is the user's provenance to grant, never a reward for a
 hard-looking task — and it rejects `--lane` or `--model` beside it.
 
+A lane's effort travels with its resolved model (`--lane L4`, for example, resolves both a model and an
+effort from the table) and reaches `claude --effort <level>`, except when an explicit `--model` beat the
+lane — then no lane effort applies either, matching the model it would have paired with. An explicit
+`--effort '<low|medium|high|xhigh|max>'` always wins over a lane's own effort, the same way `-ReasoningEffort`
+beats a lane in `handoff-codex`. Some rungs (Claude's `L7`) price no effort at all, and the launcher passes
+none rather than inventing one.
+
 A calling skill or workflow that ships its own resolved selection may still pass `--model` directly;
 that wins over `--lane`. What is no longer acceptable is inventing a model id at the call site.
 
@@ -84,11 +96,13 @@ Launch with `scripts/launch_claude.py`, beside this file:
 python3 '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
 ```
 
-On Windows, use `python` instead of `python3` if `python3` is not on PATH.
+Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
-Add `--lane '<L1..L7>'` (or `--frontier`) to have the launcher resolve the model, or `--model '<model-id>'`
-for one the user named. Omitting all three lets the CLI fall back to its own configured default —
-the same behavior an interactively launched session gets.
+Add `--lane '<L1..L7>'` (or `--frontier`) to have the launcher resolve the model and, where the table
+prices one, its effort, or `--model '<model-id>'` and `--effort '<level>'` for values the user named.
+Omitting them all lets the CLI fall back to its own configured default — the same behavior an
+interactively launched session gets.
 
 Add `--dangerously-skip-permissions` **only when the user asks for it in that request**. It disables every
 permission prompt in the new window, so it is never a default and never inferred from the repository

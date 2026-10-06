@@ -26,7 +26,8 @@ Resolve the exact directory the request concerns and do not substitute another c
 python3 '<skill-directory>/scripts/open_claude.py' --working-directory '<absolute-path>' --title '<short-title>'
 ```
 
-On Windows, use `python` instead of `python3` if `python3` is not on PATH.
+Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 - `--resume '<session-id>'` reopens a specific past session; `--continue` reopens the most recent one for
   that directory. A session resumes only from the directory it was started in, so pass the session's own
@@ -42,9 +43,13 @@ one tab per request, and report the directory and any session id afterwards.
 
 ## One tab, and never a second
 
-The launcher **exits non-zero** on failure and prints `Launched claude tab '<title>' …` on success. Those
-are the only two outcomes. `standards:` lines before them report the pre-launch plugin refresh, which
-never blocks the launch.
+The launcher **exits non-zero** on failure and prints `Launched claude tab '<title>' …` on success.
+`standards:` lines before them report the pre-launch plugin refresh, which never blocks the launch.
+
+Exit code **3 is distinct from every other failure**: it means the terminal control command timed out
+after the tab may already have opened, not that the launch definitely failed. Check the terminal for the
+tab before doing anything else; never relaunch automatically on exit 3. Any other non-zero exit means the
+launch did not happen.
 
 **Never verify a launch by listing processes, and never re-run the launcher because one looked absent.**
 A tab takes seconds to appear and a process listing is trivially misread — an unsorted `Select-Object
@@ -53,4 +58,5 @@ repository, which is worse than no handoff at all: they collide on the same file
 the other.
 
 If the launcher printed its confirmation, the handoff happened. Report it and stop. If it exited
-non-zero, say so; do not retry blind.
+non-zero, say so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a
+second tab for the same request.
