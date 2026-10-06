@@ -196,6 +196,81 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("exact run head", merging)
         self.assertIn("bound PR source head", merging)
 
+    def test_merge_authorization_is_goal_scoped_with_one_owner(self):
+        merging = authored_skill("merging").read_text(encoding="utf-8")
+        flat_merging = " ".join(merging.split())
+        corpus = " ".join(self.corpus().split())
+
+        self.assertIn("## What authorizes a merge", merging)
+        self.assertIn("Merge authorization is scoped to the goal, not the PR", flat_merging)
+        self.assertIn(
+            "merge authorization for every PR that goal itself creates", flat_merging
+        )
+        self.assertIn("no per-PR re-approval", flat_merging)
+        self.assertIn(
+            "no delivery standard adds a per-PR approval requirement", flat_merging
+        )
+        self.assertEqual(
+            1, corpus.count("Merge authorization is scoped to the goal, not the PR")
+        )
+
+        bodies = {
+            name: " ".join(authored_skill(name).read_text(encoding="utf-8").split())
+            for name in (
+                "persistent-delivery",
+                "merge",
+                "plan-execution",
+                "plans",
+                "feature",
+                "bugfix",
+            )
+        }
+        self.assertIn(
+            "an authorization naming no mode records `auto`",
+            bodies["persistent-delivery"],
+        )
+        for referrer, pointer in (
+            (
+                "persistent-delivery",
+                "the owning goal record (`engineering:merging` owns that goal-wide scope)",
+            ),
+            (
+                "merge",
+                "re-resolves merge authorization from the goal's recorded "
+                "authorization (`engineering:merging`)",
+            ),
+            (
+                "plan-execution",
+                "default-branch state (`engineering:merging` owns the goal-wide "
+                "merge-authorization scope)",
+            ),
+            (
+                "plans",
+                "default-branch state (`engineering:merging` owns the goal-wide "
+                "merge-authorization scope)",
+            ),
+            (
+                "feature",
+                "covers delivery (`engineering:merging` owns that goal-wide scope)",
+            ),
+            (
+                "bugfix",
+                "covers delivery (`engineering:merging` owns that goal-wide scope)",
+            ),
+        ):
+            with self.subTest(referrer=referrer):
+                self.assertIn(pointer, bodies[referrer])
+
+        for per_pr_reading in (
+            "implementation approval never invents merge authority",
+            "reaches merge only under explicit authorization",
+            "never silently authorizes the successor",
+            "merge authorization into the successor",
+            "adds no authority for installation, publication, merging",
+        ):
+            with self.subTest(per_pr_reading=per_pr_reading):
+                self.assertNotIn(per_pr_reading, corpus)
+
     def test_techdebt_uses_mode_specific_isolation_and_picks_fast(self):
         body = authored_skill("techdebt").read_text(encoding="utf-8")
         flat = " ".join(body.split())
