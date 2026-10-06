@@ -52,6 +52,22 @@ def resolve(host, lane):
     return out
 
 
+def frontier(host):
+    """The tier above the ladder. No lane resolves to it; only an explicit user request selects it."""
+    if host not in HOSTS:
+        raise SystemExit(f"lanes: unknown host {host!r}; known hosts are {', '.join(HOSTS)}")
+    data = table(host)
+    tier = data.get("frontier") or {}
+    if not tier.get("model"):
+        raise SystemExit(f"lanes: the {host} table prices no frontier tier")
+    effort_key = data.get("effort_key", "effort")
+    out = {"host": host, "model": tier["model"]}
+    if effort_key in tier:
+        out["effort"] = tier[effort_key]
+        out["effort_key"] = effort_key
+    return out
+
+
 def ladder():
     return {host: {lane: rung for lane, rung in table(host)["lanes"].items()} for host in HOSTS}
 
