@@ -323,6 +323,7 @@
             "bootstrap-capabilities",
             "clip",
             "create-credential",
+            "followup-codex",
             "handoff-claude",
             "handoff-codex",
             "last-conversation",
@@ -348,7 +349,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:562fb43087fa4bbd0299b30a4988356f661c96c74997ceb1f598f8b4f783fd6e",
+          "digest": "sha256:c4d6e7a757d7320f37b340fea1ff668001841c4b4949036e02ef53f50b85db44",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
