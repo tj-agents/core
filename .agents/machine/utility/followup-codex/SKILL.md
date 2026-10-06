@@ -51,9 +51,11 @@ Report the returned status accurately:
   actual recipient response supports it.
 - `accepted` or `unverified` (exit 2): delivery remains unproven. Report that plainly and retain the
   receipt. A missing queue entry, successful CLI exit, or timeout is not delivery evidence.
-- `unavailable` or `rejected` (exit 2): report the reason. If no send was attempted, immediately give the
-  authorized message as plain prose for the user to paste; do not claim it was sent or ask another
-  permission question. If submission might have occurred, disclose that before any manual retry.
+- `unavailable` or `rejected` (exit 2): report the reason. If no receipt exists yet for this message,
+  immediately give the authorized message as plain prose for the user to paste; do not claim it was sent
+  or ask another permission question. If a receipt already exists for a different message or target, or
+  `status` found no valid receipt to check, do not paste blindly — disclose that a prior or different send
+  may exist and get a fresh receipt path, or check the target session directly, before resending anything.
 
 Do not substitute `codex queue` success for verified delivery. A queue entry can persist without the
 recipient consuming it, particularly for an embedded session without a shared server. An older queued
