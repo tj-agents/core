@@ -9,9 +9,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $taskPrefix = 'AgentStandards-Continuation-'
-if ($PSVersionTable.PSVersion.Major -lt 7 -or -not $IsWindows) {
-    throw 'Continuation scheduling requires Windows and PowerShell 7. No scheduler adapter is provided for this platform.'
+if ($env:OS -ne 'Windows_NT') {
+    throw 'Continuation scheduling requires Windows. No scheduler adapter is provided for this platform.'
 }
+function Test-FullyQualifiedPath([string] $Path) { return $Path -match '^(?:[A-Za-z]:[\\/]|[\\/]{2})' }
 function Find-Executable([string] $Name) {
     $found = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $found) { throw "Required executable '$Name' is missing from PATH." }
@@ -32,7 +33,7 @@ function Quote-Argument([string] $Value) {
     if ($Value.Contains('"') -or $Value.Contains("`r") -or $Value.Contains("`n")) { throw 'Scheduled paths must not contain quotes or newlines.' }
     return '"' + ($Value -replace '(\\+)$', '$1$1') + '"'
 }
-function Read-Json([string] $Path) { return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json }
+function Read-Json([string] $Path) { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json }
 function Assert-ReceiptIdentity($Receipt) {
     if ($Receipt.owner_id -cne $owner.owner_id -or $Receipt.owner_path -cne $ownerFile -or
         $Receipt.task_name -cne $taskName -or $Receipt.task_path -cne '\') { throw 'Scheduler receipt does not match this exact continuation owner.' }
@@ -58,7 +59,7 @@ function Get-OwnedTask($Receipt) {
 function Write-AtomicJson([string] $Path, $Value) {
     $temporary = "$Path.$([guid]::NewGuid().ToString('N')).tmp"
     try {
-        $Value | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $temporary -Encoding utf8
+        [IO.File]::WriteAllText($temporary, ($Value | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
         Move-Item -LiteralPath $temporary -Destination $Path -Force
     } finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary } }
 }
@@ -105,11 +106,13 @@ else {
 }
 if (-not (Test-Path -LiteralPath $ownerFile -PathType Leaf)) { throw "Continuation owner is missing: $ownerFile. Initialize it with continuation_runtime.py init first." }
 $owner = Read-Json $ownerFile
-if (-not $owner.owner_id -or $owner.harness -notin @('codex', 'claude') -or -not [IO.Path]::IsPathFullyQualified($owner.worktree)) { throw 'Invalid continuation runtime owner.' }
+if (-not $owner.owner_id -or $owner.harness -notin @('codex', 'claude') -or -not (Test-FullyQualifiedPath $owner.worktree)) { throw 'Invalid continuation runtime owner.' }
 $root = [IO.Path]::GetFullPath($owner.worktree)
 if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw "Owner worktree is unavailable: $root." }
 if ($Worktree -and [IO.Path]::GetFullPath($Worktree) -ine $root) { throw 'Worktree does not match the runtime owner.' }
-$hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($owner.owner_id))).ToLowerInvariant()
+$sha256 = [Security.Cryptography.SHA256]::Create()
+try { $hash = -join ($sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($owner.owner_id)) | ForEach-Object { $_.ToString('x2') }) }
+finally { $sha256.Dispose() }
 $taskName = $taskPrefix + $hash
 $mutex = [Threading.Mutex]::new($false, ('Global\' + $taskName))
 $acquired = $false
@@ -142,9 +145,10 @@ switch ($Command) {
         }
         if ($owner.state -in @('blocked', 'complete')) { throw 'A terminal owner cannot be scheduled; reconcile its runtime state first.' }
         $python = Find-Executable 'python'
-        $pwsh = Find-Executable 'pwsh'
+        $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        if (-not (Test-Path -LiteralPath $windowsPowerShell -PathType Leaf)) { throw "Windows PowerShell is missing: $windowsPowerShell." }
         if ($owner.PSObject.Properties['host_executable'] -and $owner.host_executable) {
-            if (-not [IO.Path]::IsPathFullyQualified($owner.host_executable) -or -not (Test-Path -LiteralPath $owner.host_executable -PathType Leaf) -or [IO.Path]::GetExtension($owner.host_executable) -ine '.exe') {
+            if (-not (Test-FullyQualifiedPath $owner.host_executable) -or -not (Test-Path -LiteralPath $owner.host_executable -PathType Leaf) -or [IO.Path]::GetExtension($owner.host_executable) -ine '.exe') {
                 throw 'The pinned host executable must be an existing absolute native .exe path.'
             }
         } else { $null = Find-Executable $owner.harness }
@@ -153,16 +157,16 @@ switch ($Command) {
         $packageRoot = Split-Path -Parent (Split-Path -Parent $helper)
         $lanes = @((Join-Path $packageRoot "lanes/$($owner.harness).json"), (Join-Path $packageRoot ".agents/lanes/$($owner.harness).json"))
         if (-not ($lanes | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })) { throw 'The package is missing the selected host lane resource.' }
-        $arguments = '-NoProfile -NonInteractive -File {0} wake -OwnerPath {1}' -f (Quote-Argument $PSCommandPath), (Quote-Argument $ownerFile)
+        $arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0} wake -OwnerPath {1}' -f (Quote-Argument $PSCommandPath), (Quote-Argument $ownerFile)
         $description = "Continuation owner $($owner.owner_id)"
         $existing = @(Get-ScheduledTask -TaskName $taskName -TaskPath '\' -ErrorAction SilentlyContinue)
         if ($receipt) { $null = Get-OwnedTask $receipt }
         elseif ($existing.Count) { throw 'An existing task has no matching receipt; refusing to overwrite it.' }
         if ($PSCmdlet.ShouldProcess($taskName, 'Register deterministic continuation wake')) {
-            $action = New-ScheduledTaskAction -Execute $pwsh -Argument $arguments -WorkingDirectory $root
+            $action = New-ScheduledTaskAction -Execute $windowsPowerShell -Argument $arguments -WorkingDirectory $root
             $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes($IntervalMinutes) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
             $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)
-            $registration = [ordered]@{ owner_id = $owner.owner_id; owner_path = $ownerFile; task_name = $taskName; task_path = '\'; description = $description; execute = $pwsh; arguments = $arguments; worktree = $root; helper = $helper; python = $python; script = $PSCommandPath }
+            $registration = [ordered]@{ owner_id = $owner.owner_id; owner_path = $ownerFile; task_name = $taskName; task_path = '\'; description = $description; execute = $windowsPowerShell; arguments = $arguments; worktree = $root; helper = $helper; python = $python; script = $PSCommandPath }
             Write-AtomicJson $pendingPath ([ordered]@{ previous = $receipt; proposed = $registration })
             Register-ScheduledTask -TaskName $taskName -TaskPath '\' -Action $action -Trigger $trigger -Settings $settings -Description $description -Force | Out-Null
             $receipt = Resolve-PendingRegistration $receipt

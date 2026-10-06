@@ -190,7 +190,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:93d398dd7605342ca2b354d80b9d854bcc12cbd8ffd58fb65415f373f3d0c015",
+          "digest": "sha256:2818084005646ced9ebcaa23c5236a7d81dfa87095cf550ade1653f66e0672cb",
           "harness": {
             "marketplaces": [
               {
@@ -349,7 +349,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:c4d6e7a757d7320f37b340fea1ff668001841c4b4949036e02ef53f50b85db44",
+          "digest": "sha256:cc6a5c4f504064d7d4ae967baaa244fc7806ff64f656056c9da9b26802edfb2d",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
