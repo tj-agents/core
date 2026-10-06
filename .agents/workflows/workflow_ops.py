@@ -691,15 +691,26 @@ def validate_review_bundle(root, value, locations):
         raise WorkflowOperationError("review rules differ from the frozen tree routing evidence")
 
 
+def review_descriptor_paths(runs):
+    if is_redirect(runs.parent) or is_redirect(runs) or not runs.is_dir():
+        return
+    for current_path, directory_names, file_names in os.walk(runs, topdown=True, followlinks=False):
+        current = Path(current_path)
+        legacy_candidate = current.parent.name == "review" and re.fullmatch(r"[0-9a-f]{64}", current.name)
+        directory_names[:] = [
+            name for name in directory_names
+            if not is_redirect(current / name) and not (legacy_candidate and name == "tree")
+        ]
+        descriptor = current / "descriptor.json"
+        if current.parent.name == "review" and "descriptor.json" in file_names and not is_redirect(descriptor):
+            yield descriptor
+
+
 def cleanup_review_bundles(root, now=None):
     root = repository_root(root)
     runs = state_root(root) / "runs"
-    if not runs.is_dir():
-        return
     current = now or datetime.now(timezone.utc)
-    for descriptor_path in runs.rglob("descriptor.json"):
-        if descriptor_path.parent.parent.name != "review":
-            continue
+    for descriptor_path in review_descriptor_paths(runs):
         try:
             run_id = descriptor_path.parent.parent.parent.relative_to(runs).as_posix()
             value = json.loads(descriptor_path.read_text(encoding="utf-8"))

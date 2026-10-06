@@ -352,6 +352,72 @@ class ReviewTests(RepositoryFixture):
         locations.assert_not_called()
         self.assertTrue(Path(recent["bundle"]["directory"]).is_dir())
 
+    def test_cleanup_never_scans_legacy_payload_trees(self):
+        payloads = []
+        for name, with_descriptor in (("stored", True), ("unpublished", False)):
+            candidate = ops.run_root(self.root, name) / "review" / ("a" * 64)
+            payload = candidate / "tree"
+            payload.mkdir(parents=True)
+            payloads.append(payload)
+            if with_descriptor:
+                ops.atomic_json(candidate / "descriptor.json", {"bundle": {}})
+        original_scandir = ops.os.scandir
+
+        def scan_namespace(path):
+            self.assertNotIn(Path(path), payloads)
+            return original_scandir(path)
+
+        with mock.patch.object(ops.os, "scandir", side_effect=scan_namespace), mock.patch.object(
+            getattr(Path, "_globber", ops.os), "scandir", side_effect=scan_namespace
+        ):
+            ops.cleanup_review_bundles(self.root)
+
+    def test_descriptor_scan_preserves_nested_review_and_candidate_named_runs(self):
+        runs = ops.state_root(self.root) / "runs"
+        paths = []
+        for run_id in ("nested/run", "review/" + "b" * 64 + "/nested", "namespace/tree/run"):
+            descriptor = ops.run_root(self.root, run_id) / "review" / ("c" * 64) / "descriptor.json"
+            ops.atomic_json(descriptor, {"bundle": {}})
+            paths.append(descriptor)
+
+        self.assertCountEqual(paths, ops.review_descriptor_paths(runs))
+
+    def test_descriptor_scan_does_not_traverse_directory_junctions(self):
+        runs = ops.state_root(self.root) / "runs"
+        runs.mkdir(parents=True)
+        target = Path(self.temp.name) / "foreign-run"
+        descriptor = target / "review" / ("d" * 64) / "descriptor.json"
+        ops.atomic_json(descriptor, {"bundle": {}})
+        alias = runs / "alias"
+        if sys.platform == "win32":
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(alias), str(target)],
+                capture_output=True, check=True,
+            )
+            self.addCleanup(alias.rmdir)
+        else:
+            alias.symlink_to(target, target_is_directory=True)
+            self.addCleanup(alias.unlink)
+        original_scandir = ops.os.scandir
+
+        def scan_namespace(path):
+            self.assertNotEqual(alias, Path(path))
+            return original_scandir(path)
+
+        with mock.patch.object(ops.os, "scandir", side_effect=scan_namespace):
+            self.assertEqual([], list(ops.review_descriptor_paths(runs)))
+
+    def test_descriptor_scan_rejects_redirected_roots_and_descriptors(self):
+        runs = ops.state_root(self.root) / "runs"
+        descriptor = ops.run_root(self.root, "stored") / "review" / ("e" * 64) / "descriptor.json"
+        ops.atomic_json(descriptor, {"bundle": {}})
+        original_redirect = ops.is_redirect
+        for redirected in (runs.parent, runs, descriptor):
+            with self.subTest(redirected=redirected), mock.patch.object(
+                ops, "is_redirect", side_effect=lambda path: Path(path) == redirected or original_redirect(path)
+            ):
+                self.assertEqual([], list(ops.review_descriptor_paths(runs)))
+
     def test_cleanup_removes_only_expired_repository_owned_bundles(self):
         expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
         recent = ops.review_prepare(self.root, "recent", "origin/main", "HEAD", False)
