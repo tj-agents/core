@@ -59,7 +59,8 @@ Promotion changes persistence, not the requested outcome.
 7. Checkpoint only material recovery state and commit any remaining coherent change. Re-resolve the next safe,
    reversible action after every implementation, review, validation, checkpoint, and commit; continue while
    authorized work remains.
-8. When the original authorization covers delivery, enter `engineering:merge`, reaching it through
+8. When the original authorization covers delivery (`engineering:merging` owns that goal-wide scope),
+   enter `engineering:merge`, reaching it through
    `engineering:open-pr` when no PR exists. Waiting on a queue, CI run, publish, or the version-sync
    PR a merge generates is a poll, not a gate; own each to terminal, that generated PR included.
 

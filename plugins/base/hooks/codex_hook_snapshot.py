@@ -1,4 +1,5 @@
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import runpy
@@ -16,29 +17,39 @@ def digest_tree(root, plugin):
     excluded = {"hooks/codex.json"}
     if plugin == "machine":
         excluded.add("catalog/catalog.json")
+    files = []
+    directories = [(root, "")]
+    while directories:
+        directory, prefix = directories.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                relative = prefix + entry.name
+                if entry.is_symlink():
+                    fail("Codex hook package contains a symbolic link")
+                if entry.is_dir(follow_symlinks=False):
+                    directories.append((entry.path, relative + "/"))
+                elif entry.is_file(follow_symlinks=False):
+                    files.append((relative, entry.path))
+                else:
+                    fail("Codex hook package contains an unsupported entry")
+    files = [(relative, Path(path)) for relative, path in sorted(files) if relative not in excluded]
     digest = hashlib.sha256()
-    for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
-        if path.is_symlink():
-            fail("Codex hook package contains a symbolic link")
-        if path.is_dir():
-            continue
-        if not path.is_file():
-            fail("Codex hook package contains an unsupported entry")
-        relative = path.relative_to(root).as_posix()
-        if relative in excluded:
-            continue
-        content = path.read_bytes()
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            pass
-        else:
-            content = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(str(len(content)).encode("ascii"))
-        digest.update(b"\0")
-        digest.update(content)
+    if files:
+        with ThreadPoolExecutor(max_workers=min(16, len(files))) as reader:
+            for start in range(0, len(files), 16):
+                batch = files[start:start + 16]
+                for (relative, _), content in zip(batch, reader.map(Path.read_bytes, [path for _, path in batch])):
+                    try:
+                        text = content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        pass
+                    else:
+                        content = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+                    digest.update(relative.encode("utf-8"))
+                    digest.update(b"\0")
+                    digest.update(str(len(content)).encode("ascii"))
+                    digest.update(b"\0")
+                    digest.update(content)
     return "sha256:" + digest.hexdigest()
 
 
