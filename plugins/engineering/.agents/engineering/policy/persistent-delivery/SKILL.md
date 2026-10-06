@@ -38,8 +38,9 @@ There is exactly one persistent owner for a PR/head pair. Reuse and update that 
 same. A new head created by this owner replaces its binding. A head changed by somebody else, a changed PR,
 or a different worktree ends ownership and surfaces a human decision; never silently follow it.
 
-Resolve authority from the repository's recorded standing instruction or an observed user approval for
-this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
+Resolve authority from the repository's recorded standing instruction, the user authorization kept in
+the owning goal record (`engineering:merging` owns that goal-wide scope), or an observed user approval
+for this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
 the binding artifact:
 
 ```text
@@ -62,10 +63,13 @@ owning checkout identity, permitted merge mode, user's wording and observed mess
 ```
 
 `worktree` must match the binder's normalized absolute checkout root, and `branch` must match both the
-checkout and remote PR. `mode` is `merge` or `auto`, according to the actual approval. A goal's existence
-or implementation approval never invents merge authority. Invalid explicit input fails before any
-standing-authority fallback. Without a standing instruction or matching scoped approval, authority remains
-`absent` and merge requires a user decision.
+checkout and remote PR. `mode` is `merge` or `auto`, according to the actual approval; an authorization
+naming no mode records `auto`, because unattended completion is what it requests. A goal file's bare
+existence never invents merge authority; the user's recorded authorization of the goal does, for the
+goal's own PRs (`engineering:merging`) — write it as this record, with its wording and provenance, for
+each PR the goal creates. Invalid explicit input fails before any standing-authority fallback. Without a
+standing instruction, goal authorization, or matching scoped approval, authority remains `absent` and
+merge requires a user decision.
 
 The binder reads authoritative forge state and resolves `.agents/delivery-authorization.json`, when
 present, against the current changed paths and labels. Six stop classes hold everywhere: the authorization
@@ -141,10 +145,11 @@ repository, workflow ID and state artifact remain identical; automatic superviso
 worktrees is outside the runtime's supported transition.
 
 The successor is a new delivery binding with its own checks, review watermark, and merge authorization.
-Authorization for the completed PR never silently authorizes the successor. The workflow owner may implement,
-validate, push, open, and review that successor without intervention when those actions are already in scope,
-but it stops at its merge gate unless the recorded instruction explicitly covers that exact successor or
-bounded delivery chain.
+A completed PR's binding never carries over; the successor re-resolves authority from the same recorded
+sources, and the goal's authorization covers each PR the goal itself creates (`engineering:merging`). The
+workflow owner may implement, validate, push, open, and review that successor without intervention when
+those actions are already in scope, and stops at its merge gate only when no recorded goal, standing, or
+scoped authority covers it.
 
 An unchanged authoritative state produces no report, mutation, replacement continuation, or model-driven
 work. Host mechanics decide how a later transition wakes the owner; shared policy never claims that a shell
