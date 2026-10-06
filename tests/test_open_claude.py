@@ -79,6 +79,16 @@ class OpenClaudeTests(unittest.TestCase):
         self.assertIn('not a directory', err.getvalue())
         self.stub.launch_tab.assert_not_called()
 
+    def test_a_symlinked_working_directory_reaches_the_tab_as_given(self):
+        link = Path(self.directory).parent / (Path(self.directory).name + ' link')
+        link.symlink_to(self.directory)
+        self.addCleanup(link.unlink)
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = OPEN_CLAUDE.main(['--working-directory', str(link)])
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertEqual(self.stub.launch_tab.call_args.args[0], link)
+
     # --- argument assembly ---
 
     def test_resume_reaches_launch_tab_as_resume_flag_and_id(self):

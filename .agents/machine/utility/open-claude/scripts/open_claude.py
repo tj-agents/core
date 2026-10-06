@@ -6,6 +6,7 @@ Run as `python3 open_claude.py ...` (or `python` on Windows); the shebang and ex
 
 import argparse
 import importlib.util
+import os
 from pathlib import Path
 import sys
 
@@ -87,7 +88,9 @@ def main(argv=None):
     try:
         args = parse_args(argv, agent_cli)
 
-        working_directory = Path(args.working_directory).resolve()
+        # Absolute but not resolved: Claude Code keys a session's history by the directory string it started
+        # in, so a symlinked checkout or a Windows mapped or subst drive must reach the tab as given.
+        working_directory = Path(os.path.abspath(args.working_directory))
         if not working_directory.is_dir():
             raise agent_cli.LaunchError(f'Working directory is not a directory: {working_directory}')
 

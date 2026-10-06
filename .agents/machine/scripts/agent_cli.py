@@ -41,6 +41,10 @@ class LaunchError(Exception):
     """A launch precondition failed; the message is the whole report."""
 
 
+class LaunchTimeout(LaunchError):
+    """A terminal control command did not answer in time, so whether it took effect is unknown."""
+
+
 def launch_environment(clear=(), force=None):
     """The environment changes a launched CLI needs: names to remove and values to set.
 
@@ -307,7 +311,7 @@ def _client(run, command, what, **kwargs):
     try:
         result = run(command, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30, **kwargs)
     except subprocess.TimeoutExpired:
-        raise LaunchError(f'{what} did not answer within 30 seconds.') from None
+        raise LaunchTimeout(f'{what} did not answer within 30 seconds; it may still have taken effect.') from None
     except OSError as exc:
         raise LaunchError(f'{what} could not be run: {exc}') from None
     if result.returncode != 0:
@@ -382,6 +386,10 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
         # first line deletes it and its directory, and the only thing typed is `exec sh '<path>'`.
         script_path = _write_posix_script(posix_inner_command(directory, cleared, forced, executable, arguments))
         call(session_path, 'runCommand', f'exec sh {shlex.quote(str(script_path))}')
+    except LaunchTimeout:
+        # The command may already have been typed and be running; removing its script or typing `exit`
+        # into the session now would break a launch that is actually under way.
+        raise
     except BaseException:
         if script_path is not None:
             shutil.rmtree(script_path.parent, ignore_errors=True)

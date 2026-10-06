@@ -479,6 +479,26 @@ class LaunchTabTests(unittest.TestCase):
                            run=run, popen=mock.Mock())
         self.assertEqual(run.calls[0][0][0], 'C:/wt.exe')
 
+    def test_a_timed_out_konsole_run_command_leaves_a_possibly_running_launch_alone(self):
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        results = iter([('7', '', 0), ('', '', 0), ('', '', 0)])
+        calls = []
+
+        def run(cmd, **kwargs):
+            calls.append(cmd)
+            if cmd[3] == 'runCommand':
+                raise subprocess.TimeoutExpired(cmd, 30)
+            stdout, stderr, code = next(results)
+            return subprocess.CompletedProcess(cmd, code, stdout=stdout, stderr=stderr)
+
+        with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus6' if name == 'qdbus6' else None):
+            with self.assertRaises(CLI.LaunchTimeout):
+                CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
+        script = Path(shlex.split(calls[-1][4])[2])
+        self.addCleanup(shutil.rmtree, script.parent, True)
+        self.assertTrue(script.is_file(), 'a launch that may be running lost its script')
+        self.assertNotIn('sendText', [cmd[3] for cmd in calls])
+
     def test_a_failed_konsole_run_command_removes_its_script(self):
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
         run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0), ('', 'no such session', 1)])
