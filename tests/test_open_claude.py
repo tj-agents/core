@@ -1,4 +1,6 @@
-"""open_claude.py: option validation and argument assembly, with open_claude_tab stubbed."""
+"""open_claude.py: option validation and argument assembly, with resolve_claude_executable/
+sync_claude_standards/launch_tab stubbed but everything else (the directory check, the prompt file check
+and open_claude_tab's own orchestration) left real."""
 import contextlib
 import importlib.util
 import io
@@ -7,64 +9,21 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import types
 import unittest
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / '.agents/machine/utility/open-claude/scripts/open_claude.py'
-AGENT_CLI = ROOT / '.agents/machine/scripts/agent_cli.py'
+
+_TESTS_DIR = Path(__file__).resolve().parent
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
+import launcher_test_support  # noqa: E402  (after the sys.path fix-up above)
+
 SPEC = importlib.util.spec_from_file_location('open_claude', SCRIPT)
 OPEN_CLAUDE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = OPEN_CLAUDE
 SPEC.loader.exec_module(OPEN_CLAUDE)
-
-
-class StubLaunchError(Exception):
-    pass
-
-
-class StubLaunchTimeout(StubLaunchError):
-    pass
-
-
-def _stub_prompt_file_argument(path):
-    """Mirrors agent_cli.prompt_file_argument closely enough to drive main()'s wiring under test, without
-    the stub ever touching the real module."""
-    resolved = Path(path).resolve()
-    if not resolved.is_file():
-        raise StubLaunchError(f'Prompt path is not a file: {resolved}')
-    return f'Read the file at {resolved} and follow its instructions, working from the current directory.'
-
-
-def _stub_open_claude_tab(working_directory, title, arguments):
-    """Mirrors agent_cli.open_claude_tab's directory check closely enough to drive main()'s wiring under
-    test; the real implementation has its own direct coverage in test_agent_cli.py's OpenClaudeTabTests."""
-    directory = Path(os.path.abspath(working_directory))
-    if not directory.is_dir():
-        raise StubLaunchError(f'Working directory is not a directory: {working_directory}')
-    return directory
-
-
-def stub_agent_cli():
-    stub = types.SimpleNamespace(LaunchError=StubLaunchError, LaunchTimeout=StubLaunchTimeout)
-    stub.make_stdio_encoding_lossy = mock.Mock()
-    stub.prompt_file_argument = mock.Mock(side_effect=_stub_prompt_file_argument)
-    stub.open_claude_tab = mock.Mock(side_effect=_stub_open_claude_tab)
-    return stub
-
-
-def real_agent_cli_for_e2e(run):
-    """Load the real agent_cli.py fresh with its `launch_tab` default `run=subprocess.run` parameter bound
-    to `run` -- see test_launch_claude.py's copy of this helper for why the patch must be active during
-    the module's own load rather than merely at call time."""
-    with mock.patch('subprocess.run', side_effect=run):
-        spec = importlib.util.spec_from_file_location('agent_cli_for_open_claude_e2e_tests', AGENT_CLI)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    module.resolve_claude_executable = mock.Mock(return_value='/bin/claude')
-    module.sync_claude_standards = mock.Mock()
-    return module
 
 
 class OpenClaudeTests(unittest.TestCase):
@@ -72,8 +31,8 @@ class OpenClaudeTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix='open claude ')
         self.addCleanup(temp.cleanup)
         self.directory = temp.name
-        self.stub = stub_agent_cli()
-        patcher = mock.patch.object(OPEN_CLAUDE, '_load_agent_cli', return_value=self.stub)
+        self.agent_cli = launcher_test_support.real_agent_cli('agent_cli_for_open_claude_tests')
+        patcher = mock.patch.object(OPEN_CLAUDE, '_load_agent_cli', return_value=self.agent_cli)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -89,32 +48,45 @@ class OpenClaudeTests(unittest.TestCase):
         code, _, err = self.run_main('--resume', 'abc', '--continue')
         self.assertEqual(code, 1)
         self.assertIn('not both', err)
-        self.stub.open_claude_tab.assert_not_called()
+        self.agent_cli.launch_tab.assert_not_called()
 
     def test_prompt_and_prompt_path_are_mutually_exclusive(self):
         code, _, err = self.run_main('--prompt', 'hi', '--prompt-path', '/tmp/whatever')
         self.assertEqual(code, 1)
         self.assertIn('not both', err)
-        self.stub.open_claude_tab.assert_not_called()
+        self.agent_cli.launch_tab.assert_not_called()
 
     def test_a_long_inline_prompt_is_rejected(self):
         code, _, err = self.run_main('--prompt', 'x' * 501)
         self.assertEqual(code, 1)
         self.assertIn('--prompt-path', err)
-        self.stub.open_claude_tab.assert_not_called()
+        self.agent_cli.launch_tab.assert_not_called()
 
     def test_a_prompt_path_that_is_not_a_file_is_rejected(self):
         code, _, err = self.run_main('--prompt-path', self.directory)
         self.assertEqual(code, 1)
         self.assertIn('is not a file', err)
-        self.stub.open_claude_tab.assert_not_called()
+        self.agent_cli.launch_tab.assert_not_called()
 
-    def test_a_missing_working_directory_is_rejected(self):
+    def test_a_missing_working_directory_is_rejected_through_the_real_directory_check(self):
         out, err = io.StringIO(), io.StringIO()
+        missing = str(Path(self.directory) / 'missing')
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = OPEN_CLAUDE.main(['--working-directory', str(Path(self.directory) / 'missing')])
+            code = OPEN_CLAUDE.main(['--working-directory', missing])
         self.assertEqual(code, 1)
         self.assertIn('not a directory', err.getvalue())
+        self.assertIn(os.path.abspath(missing), err.getvalue())
+        self.agent_cli.launch_tab.assert_not_called()
+
+    def test_a_missing_directory_is_reported_even_when_the_prompt_path_is_also_invalid(self):
+        # H14: the directory is validated first, so its error is never shadowed by a later check.
+        out, err = io.StringIO(), io.StringIO()
+        argv = ['--working-directory', str(Path(self.directory) / 'missing'),
+                '--prompt-path', str(Path(self.directory) / 'missing-prompt.md')]
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = OPEN_CLAUDE.main(argv)
+        self.assertEqual(code, 1)
+        self.assertIn('Working directory is not a directory', err.getvalue())
 
     def test_a_symlinked_working_directory_reaches_the_tab_as_given(self):
         link = Path(self.directory).parent / (Path(self.directory).name + ' link')
@@ -127,70 +99,80 @@ class OpenClaudeTests(unittest.TestCase):
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = OPEN_CLAUDE.main(['--working-directory', str(link)])
         self.assertEqual(code, 0, err.getvalue())
-        self.assertEqual(self.stub.open_claude_tab.call_args.args[0], str(link))
+        self.assertEqual(self.agent_cli.launch_tab.call_args.args[0], link)
 
     # --- argument assembly ---
 
     def test_resume_reaches_launch_tab_as_resume_flag_and_id(self):
         self.run_main('--resume', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875')
-        arguments = self.stub.open_claude_tab.call_args.args[2]
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertIn('--resume', arguments)
         self.assertIn('a2bcd5c4-bf6d-4087-95e3-d7ba7f711875', arguments)
 
     def test_continue_reaches_launch_tab(self):
         self.run_main('--continue')
-        arguments = self.stub.open_claude_tab.call_args.args[2]
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertIn('--continue', arguments)
 
     def test_model_reaches_launch_tab(self):
         self.run_main('--model', 'claude-sonnet-5')
-        arguments = self.stub.open_claude_tab.call_args.args[2]
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(arguments[arguments.index('--model') + 1], 'claude-sonnet-5')
 
     def test_dangerously_skip_permissions_reaches_launch_tab(self):
         self.run_main('--dangerously-skip-permissions')
-        arguments = self.stub.open_claude_tab.call_args.args[2]
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertIn('--dangerously-skip-permissions', arguments)
 
     def test_an_inline_prompt_is_passed_through(self):
         self.run_main('--prompt', 'a short instruction')
-        arguments = self.stub.open_claude_tab.call_args.args[2]
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertIn('a short instruction', arguments)
 
     def test_a_prompt_path_becomes_the_read_the_file_sentence(self):
         prompt_path = Path(self.directory) / 'draft.md'
         prompt_path.write_text('do the thing\n')
         self.run_main('--prompt-path', str(prompt_path))
-        arguments = self.stub.open_claude_tab.call_args.args[2]
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         sentence = next(a for a in arguments if a.startswith('Read the file at'))
         self.assertIn(str(prompt_path.resolve()), sentence)
         self.assertIn('working from the current directory', sentence)
 
     def test_no_session_or_prompt_flags_means_no_extra_arguments(self):
         self.run_main()
-        arguments = self.stub.open_claude_tab.call_args.args[2]
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(arguments, [])
 
     def test_the_title_reaches_open_claude_tab(self):
         self.run_main('--title', 'My Tab')
-        args = self.stub.open_claude_tab.call_args.args
-        self.assertEqual(args[1], 'My Tab')
+        args = self.agent_cli.launch_tab.call_args.args
+        self.assertEqual(args[2], 'My Tab')
+
+    # --- forced environment, sync-before-launch (H10: order) ---
+
+    def test_force_environment_matches_the_native_claude_colour_contract(self):
+        self.run_main()
+        force = self.agent_cli.launch_tab.call_args.kwargs['force']
+        self.assertEqual(force, {'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
+
+    def test_standards_are_synced_before_launch_in_order(self):
+        parent = mock.Mock()
+        parent.attach_mock(self.agent_cli.resolve_claude_executable, 'resolve_claude_executable')
+        parent.attach_mock(self.agent_cli.sync_claude_standards, 'sync_claude_standards')
+        parent.attach_mock(self.agent_cli.launch_tab, 'launch_tab')
+        self.run_main()
+        self.assertEqual(
+            [call[0] for call in parent.mock_calls],
+            ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
+        )
+        self.assertEqual(self.agent_cli.sync_claude_standards.call_args.kwargs.get('claude'), '/bin/claude')
 
     # --- H6: stdio hardened against an unencodable title or path ---
 
     def test_stdio_is_hardened_against_encoding_errors(self):
-        self.run_main()
-        self.stub.make_stdio_encoding_lossy.assert_called_once()
-
-    def test_stdio_is_hardened_before_open_claude_tab_is_called(self):
-        parent = mock.Mock()
-        parent.attach_mock(self.stub.make_stdio_encoding_lossy, 'make_stdio_encoding_lossy')
-        parent.attach_mock(self.stub.open_claude_tab, 'open_claude_tab')
-        self.run_main()
-        self.assertEqual(
-            [call[0] for call in parent.mock_calls],
-            ['make_stdio_encoding_lossy', 'open_claude_tab'],
-        )
+        with mock.patch.object(self.agent_cli, 'make_stdio_encoding_lossy') as hardened:
+            self.run_main()
+        hardened.assert_called_once()
 
     # --- success / failure ---
 
@@ -200,17 +182,25 @@ class OpenClaudeTests(unittest.TestCase):
         self.assertIn("Launched claude tab 'Tab Name' in", out)
         self.assertIn(os.path.abspath(self.directory), out)
 
-    def test_a_launch_error_from_open_claude_tab_is_reported_and_exits_nonzero(self):
-        self.stub.open_claude_tab.side_effect = StubLaunchError('no terminal detected')
+    def test_a_launch_error_from_launch_tab_is_reported_and_exits_nonzero(self):
+        self.agent_cli.launch_tab.side_effect = self.agent_cli.LaunchError('no terminal detected')
         code, out, err = self.run_main()
         self.assertEqual(code, 1)
         self.assertIn('no terminal detected', err)
         self.assertNotIn('Launched', out)
 
+    def test_a_launch_error_from_resolving_claude_is_reported_and_exits_nonzero(self):
+        self.agent_cli.resolve_claude_executable.side_effect = self.agent_cli.LaunchError('no native claude found')
+        code, out, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn('no native claude found', err)
+        self.assertEqual(out, '')
+        self.agent_cli.launch_tab.assert_not_called()
+
     # --- H2: a LaunchTimeout is distinct from a definite failure ---
 
-    def test_a_launch_timeout_from_open_claude_tab_exits_3_and_tells_the_caller_not_to_retry_blind(self):
-        self.stub.open_claude_tab.side_effect = StubLaunchTimeout(
+    def test_a_launch_timeout_from_launch_tab_exits_3_and_tells_the_caller_not_to_retry_blind(self):
+        self.agent_cli.launch_tab.side_effect = self.agent_cli.LaunchTimeout(
             'Windows Terminal did not answer within 30 seconds; it may still have taken effect.'
         )
         code, out, err = self.run_main()
@@ -236,7 +226,7 @@ class OpenClaudeEndToEndTests(unittest.TestCase):
             self.calls.append((cmd, kwargs))
             return subprocess.CompletedProcess(cmd, 0, stdout='', stderr='')
 
-        self.agent_cli = real_agent_cli_for_e2e(fake_run)
+        self.agent_cli = launcher_test_support.real_agent_cli_for_e2e('agent_cli_for_open_claude_e2e_tests', fake_run)
 
         windows_patcher = mock.patch.object(self.agent_cli, 'IS_WINDOWS', False)
         windows_patcher.start()

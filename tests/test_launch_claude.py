@@ -1,5 +1,6 @@
 """launch_claude.py: option validation, argument assembly and real lane resolution, with
-launch_tab/sync/resolve_claude_executable stubbed but resolve_lane_model left real."""
+resolve_claude_executable/sync_claude_standards/launch_tab stubbed but everything else (the directory
+check, the prompt file check, resolve_lane_model and open_claude_tab's own orchestration) left real."""
 import contextlib
 import importlib.util
 import io
@@ -14,44 +15,17 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / '.agents/machine/utility/handoff-claude/scripts/launch_claude.py'
-AGENT_CLI = ROOT / '.agents/machine/scripts/agent_cli.py'
 CLAUDE_LANES = json.loads((ROOT / '.agents/lanes/claude.json').read_text(encoding='utf-8'))
+
+_TESTS_DIR = Path(__file__).resolve().parent
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
+import launcher_test_support  # noqa: E402  (after the sys.path fix-up above)
 
 SPEC = importlib.util.spec_from_file_location('launch_claude', SCRIPT)
 LAUNCH_CLAUDE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = LAUNCH_CLAUDE
 SPEC.loader.exec_module(LAUNCH_CLAUDE)
-
-
-def real_agent_cli(claude='/bin/claude'):
-    """The real shared library, so resolve_lane_model resolves through the real lane tables; only the
-    three functions that would otherwise touch a real executable or terminal are replaced."""
-    spec = importlib.util.spec_from_file_location('agent_cli_for_launch_claude_tests', AGENT_CLI)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    module.resolve_claude_executable = mock.Mock(return_value=claude)
-    module.sync_claude_standards = mock.Mock()
-    module.launch_tab = mock.Mock()
-    return module
-
-
-def real_agent_cli_for_e2e(run, claude='/bin/claude'):
-    """Load the real agent_cli.py fresh with its `launch_tab` default `run=subprocess.run` parameter bound
-    to `run`.
-
-    That default is fixed once, when the module's `def launch_tab(...)` line first executes, so the patch
-    must be in place while the module loads -- patching `subprocess.run` afterward would not reach a
-    default already bound to the original function object. `resolve_claude_executable` and
-    `sync_claude_standards` are replaced after loading instead, because open_claude_tab resolves both by a
-    plain name lookup in this module's globals at call time, not through a default parameter.
-    """
-    with mock.patch('subprocess.run', side_effect=run):
-        spec = importlib.util.spec_from_file_location('agent_cli_for_launch_claude_e2e_tests', AGENT_CLI)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    module.resolve_claude_executable = mock.Mock(return_value=claude)
-    module.sync_claude_standards = mock.Mock()
-    return module
 
 
 class LaunchClaudeTests(unittest.TestCase):
@@ -61,7 +35,7 @@ class LaunchClaudeTests(unittest.TestCase):
         self.directory = temp.name
         self.prompt_path = Path(self.directory) / 'draft prompt.md'
         self.prompt_path.write_text('Read this and continue.\n')
-        self.agent_cli = real_agent_cli()
+        self.agent_cli = launcher_test_support.real_agent_cli('agent_cli_for_launch_claude_tests')
         patcher = mock.patch.object(LAUNCH_CLAUDE, '_load_agent_cli', return_value=self.agent_cli)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -81,15 +55,26 @@ class LaunchClaudeTests(unittest.TestCase):
 
     # --- validation ---
 
-    def test_a_missing_working_directory_is_rejected(self):
+    def test_a_missing_working_directory_is_rejected_through_the_real_directory_check(self):
         out, err = io.StringIO(), io.StringIO()
-        argv = ['--working-directory', str(Path(self.directory) / 'missing'),
-                '--prompt-path', str(self.prompt_path)]
+        missing = str(Path(self.directory) / 'missing')
+        argv = ['--working-directory', missing, '--prompt-path', str(self.prompt_path)]
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = LAUNCH_CLAUDE.main(argv)
         self.assertEqual(code, 1)
         self.assertIn('not a directory', err.getvalue())
+        self.assertIn(os.path.abspath(missing), err.getvalue())
         self.agent_cli.launch_tab.assert_not_called()
+
+    def test_a_missing_directory_is_reported_even_when_the_prompt_path_is_also_invalid(self):
+        # H14: the directory is validated first, so its error is never shadowed by a later check.
+        out, err = io.StringIO(), io.StringIO()
+        argv = ['--working-directory', str(Path(self.directory) / 'missing'),
+                '--prompt-path', str(Path(self.directory) / 'missing-prompt.md')]
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = LAUNCH_CLAUDE.main(argv)
+        self.assertEqual(code, 1)
+        self.assertIn('Working directory is not a directory', err.getvalue())
 
     def test_a_prompt_path_that_is_not_a_file_is_rejected(self):
         out, err = io.StringIO(), io.StringIO()
@@ -118,9 +103,12 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 2)
         self.agent_cli.launch_tab.assert_not_called()
 
-    def test_an_invalid_effort_is_rejected_by_argparse(self):
+    def test_there_is_no_effort_flag(self):
+        # H11: an explicit effort could reach a model it was never priced for (e.g. --lane L1 --effort max
+        # reaching the frontier pair without --frontier) or a model that rejects it outright (L7's Haiku).
+        # Effort is only ever the one the resolved lane or frontier entry prices for its own model.
         with self.assertRaises(SystemExit) as raised:
-            self.run_main('--effort', 'ultra')
+            self.run_main('--effort', 'high')
         self.assertEqual(raised.exception.code, 2)
         self.agent_cli.launch_tab.assert_not_called()
 
@@ -132,15 +120,13 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(len(arguments), 1)
         self.assertTrue(arguments[0].startswith('Read the file at'))
 
-    def test_dangerously_skip_permissions_then_model_then_effort_then_the_prompt_sentence(self):
-        self.run_main('--dangerously-skip-permissions', '--model', 'explicit-model', '--effort', 'high')
+    def test_dangerously_skip_permissions_then_model_then_the_prompt_sentence(self):
+        self.run_main('--dangerously-skip-permissions', '--model', 'explicit-model')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(arguments[0], '--dangerously-skip-permissions')
         self.assertEqual(arguments[1], '--model')
         self.assertEqual(arguments[2], 'explicit-model')
-        self.assertEqual(arguments[3], '--effort')
-        self.assertEqual(arguments[4], 'high')
-        self.assertTrue(arguments[5].startswith('Read the file at'))
+        self.assertTrue(arguments[3].startswith('Read the file at'))
 
     def test_the_prompt_sentence_names_the_resolved_prompt_path_and_current_directory(self):
         self.run_main()
@@ -172,13 +158,7 @@ class LaunchClaudeTests(unittest.TestCase):
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(arguments[arguments.index('--model') + 1], CLAUDE_LANES['frontier']['model'])
 
-    # --- effort precedence, against the real lane table (H1) ---
-
-    def test_an_explicit_effort_is_passed_through_with_no_model_or_lane(self):
-        self.run_main('--effort', 'high')
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
-        self.assertEqual(arguments[arguments.index('--effort') + 1], 'high')
-        self.assertNotIn('--model', arguments)
+    # --- effort, against the real lane table (H1) -- always the lane/frontier's own, never a caller's ---
 
     def test_a_lane_with_a_priced_effort_passes_both_model_and_effort_in_order(self):
         self.assertIn('effort', CLAUDE_LANES['lanes']['L3'])  # sanity: the table really prices one
@@ -194,11 +174,6 @@ class LaunchClaudeTests(unittest.TestCase):
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertNotIn('--effort', arguments)
 
-    def test_an_explicit_effort_beats_the_lanes_own_effort(self):
-        self.run_main('--lane', 'L3', '--effort', 'low')
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
-        self.assertEqual(arguments[arguments.index('--effort') + 1], 'low')
-
     def test_an_explicit_model_beating_the_lane_drops_the_lanes_effort_too(self):
         self.run_main('--lane', 'L3', '--model', 'explicit-model')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
@@ -208,6 +183,11 @@ class LaunchClaudeTests(unittest.TestCase):
         self.run_main('--frontier')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(arguments[arguments.index('--effort') + 1], CLAUDE_LANES['frontier']['effort'])
+
+    def test_an_explicit_model_alone_passes_no_effort(self):
+        self.run_main('--model', 'explicit-model')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertNotIn('--effort', arguments)
 
     # --- forced environment, sync-before-launch ---
 
@@ -322,7 +302,7 @@ class LaunchClaudeEndToEndTests(unittest.TestCase):
             self.calls.append((cmd, kwargs))
             return subprocess.CompletedProcess(cmd, 0, stdout='', stderr='')
 
-        self.agent_cli = real_agent_cli_for_e2e(fake_run)
+        self.agent_cli = launcher_test_support.real_agent_cli_for_e2e('agent_cli_for_launch_claude_e2e_tests', fake_run)
 
         windows_patcher = mock.patch.object(self.agent_cli, 'IS_WINDOWS', False)
         windows_patcher.start()
