@@ -10,22 +10,21 @@ $ErrorActionPreference = 'Stop'
 $repository = Split-Path -Parent $PSScriptRoot
 $pluginSkills = Join-Path $repository 'plugins\machine\skills'
 
+$script:RequiredSkillScripts = @{
+    'bootstrap-capabilities' = 'scripts\bootstrap_capabilities.py'
+    'handoff-claude'         = 'scripts\launch_claude.py'
+    'handoff-codex'          = 'scripts\launch-codex.ps1'
+    'followup-codex'         = 'scripts\codex_followup.py'
+}
+
 function Get-MissingRequiredFiles {
     param(
         [Parameter(Mandatory)][string] $SkillDir,
         [Parameter(Mandatory)][string] $Name
     )
 
-    $relative = if ($Name -eq 'bootstrap-capabilities') {
-        'scripts\bootstrap_capabilities.py'
-    } elseif ($Name -eq 'handoff-claude') {
-        'scripts\launch_claude.py'
-    } elseif ($Name -eq 'followup-codex') {
-        'scripts\codex_followup.py'
-    } else {
-        $harness = $Name.Substring('handoff-'.Length)
-        "scripts\launch-$harness.ps1"
-    }
+    $relative = $script:RequiredSkillScripts[$Name]
+    if (-not $relative) { throw "No required script is mapped for skill '$Name'; add it to `$RequiredSkillScripts." }
     if (-not (Test-Path -LiteralPath (Join-Path $SkillDir $relative) -PathType Leaf)) {
         return @($relative)
     }

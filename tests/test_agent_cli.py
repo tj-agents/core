@@ -345,6 +345,43 @@ class LaneModelTests(unittest.TestCase):
             CLI.resolve_lane_model('codex', lane='L9')
 
 
+class PromptFileArgumentTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='agent cli prompt ')
+        self.addCleanup(temp.cleanup)
+        self.directory = Path(temp.name)
+
+    def test_a_prepared_prompt_file_becomes_the_read_the_file_sentence(self):
+        prompt = self.directory / 'draft prompt.md'
+        prompt.write_text('do the thing\n')
+        sentence = CLI.prompt_file_argument(str(prompt))
+        self.assertEqual(
+            sentence,
+            f'Read the file at {prompt.resolve()} and follow its instructions, working from the current directory.',
+        )
+
+    def test_a_prompt_path_that_is_not_a_file_is_a_launch_error(self):
+        with self.assertRaisesRegex(CLI.LaunchError, 'is not a file'):
+            CLI.prompt_file_argument(str(self.directory))
+
+
+class StdioEncodingTests(unittest.TestCase):
+    """make_stdio_encoding_lossy: H6 -- a title or path that a console code page cannot encode must not
+    crash the success print for a launch that already happened."""
+
+    def test_every_stream_with_reconfigure_is_switched_to_replace_errors(self):
+        stream = mock.Mock(spec=['reconfigure'])
+        with mock.patch.object(CLI.sys, 'stdout', stream), mock.patch.object(CLI.sys, 'stderr', stream):
+            CLI.make_stdio_encoding_lossy()
+        self.assertEqual(stream.reconfigure.call_count, 2)
+        stream.reconfigure.assert_called_with(errors='replace')
+
+    def test_a_stream_without_reconfigure_is_left_alone_rather_than_raising(self):
+        stream = object()
+        with mock.patch.object(CLI.sys, 'stdout', stream), mock.patch.object(CLI.sys, 'stderr', stream):
+            CLI.make_stdio_encoding_lossy()  # must not raise AttributeError
+
+
 def fake_run(results=()):
     """A `run` stand-in returning each (stdout, stderr, returncode) in turn and recording every call."""
     queue = list(results)
@@ -635,6 +672,59 @@ class LaunchTabTests(unittest.TestCase):
                 with self.assertRaisesRegex(CLI.LaunchError, 'No terminal'):
                     CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'DISPLAY': ':0'},
                                    run=fake_run(), popen=mock.Mock())
+
+
+class OpenClaudeTabTests(unittest.TestCase):
+    """open_claude_tab: the H8 helper shared by open-claude and handoff-claude so the directory check,
+    executable discovery, pre-launch standards sync and the forced colour environment have one owner."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='agent cli open tab ')
+        self.addCleanup(temp.cleanup)
+        self.directory = temp.name
+
+        self.resolve_claude_executable = mock.Mock(return_value='/bin/claude')
+        self.sync_claude_standards = mock.Mock()
+        self.launch_tab = mock.Mock()
+        for name, mocked in (
+            ('resolve_claude_executable', self.resolve_claude_executable),
+            ('sync_claude_standards', self.sync_claude_standards),
+            ('launch_tab', self.launch_tab),
+        ):
+            patcher = mock.patch.object(CLI, name, mocked)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        self.parent = mock.Mock()
+        self.parent.attach_mock(self.resolve_claude_executable, 'resolve_claude_executable')
+        self.parent.attach_mock(self.sync_claude_standards, 'sync_claude_standards')
+        self.parent.attach_mock(self.launch_tab, 'launch_tab')
+
+    def test_a_missing_working_directory_is_rejected_before_anything_else(self):
+        with self.assertRaisesRegex(CLI.LaunchError, 'not a directory'):
+            CLI.open_claude_tab(os.path.join(self.directory, 'missing'), 'Tab', [])
+        self.resolve_claude_executable.assert_not_called()
+        self.sync_claude_standards.assert_not_called()
+        self.launch_tab.assert_not_called()
+
+    def test_resolves_syncs_and_launches_in_order_with_the_forced_colour_environment(self):
+        result = CLI.open_claude_tab(self.directory, 'Tab', ['--flag'])
+
+        self.assertEqual(result, Path(os.path.abspath(self.directory)))
+        self.assertEqual(
+            [call[0] for call in self.parent.mock_calls],
+            ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
+        )
+        self.sync_claude_standards.assert_called_once_with(result, claude='/bin/claude', out=print)
+        self.launch_tab.assert_called_once_with(
+            result, '/bin/claude', 'Tab', arguments=['--flag'],
+            force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
+        )
+
+    def test_a_custom_out_reaches_sync_claude_standards(self):
+        lines = []
+        CLI.open_claude_tab(self.directory, 'Tab', [], out=lines.append)
+        self.sync_claude_standards.assert_called_once_with(mock.ANY, claude='/bin/claude', out=lines.append)
 
 
 @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX inner command is only ever started on POSIX')
