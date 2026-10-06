@@ -1,4 +1,3 @@
-#Requires -Version 7
 <#
 .SYNOPSIS
 List, inspect and close the other Claude CLI sessions on this machine, addressed by the tab title the
@@ -54,7 +53,7 @@ function Get-RecordedSessions {
     if (-not (Test-Path -LiteralPath $directory)) { return @() }
 
     Get-ChildItem -LiteralPath $directory -Filter '*.json' -File | ForEach-Object {
-        $entry = try { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } catch { $null }
+        $entry = try { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
         if (-not $entry) { return }
 
         $process = try { Get-Process -Id $entry.pid -ErrorAction Stop } catch { $null }
@@ -207,15 +206,16 @@ switch ($Action) {
     }
     'close' {
         $target = Find-Session -Sessions $sessions -Needle $Session
+        $label = if ($target.Title) { $target.Title } else { $target.SessionId }
         if (-not $target.Alive) {
-            Write-Output "'$($target.Title ?? $target.SessionId)' is already gone."
+            Write-Output "'$label' is already gone."
             break
         }
         if (-not $Force) {
-            $answer = Read-Host "Close '$($target.Title ?? $target.SessionId)' (pid $($target.Pid))? [y/N]"
+            $answer = Read-Host "Close '$label' (pid $($target.Pid))? [y/N]"
             if ($answer -notmatch '^(y|yes)$') { Write-Output 'Left running.'; break }
         }
         Stop-Process -Id $target.Pid -ErrorAction Stop
-        Write-Output "Closed '$($target.Title ?? $target.SessionId)' (pid $($target.Pid))."
+        Write-Output "Closed '$label' (pid $($target.Pid))."
     }
 }

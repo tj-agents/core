@@ -16,9 +16,12 @@ python -B "<skill-directory>/../../resources/machine/scripts/history.py" search 
 Select `--host claude` for Claude. Respect the named harness; otherwise use the current host. The default
 search is literal and case-insensitive over user/assistant message text. `--regex` explicitly enables a
 regular expression; `--show-lines` returns matching text only when the user needs it. Use `--project`,
-`--cwd`, `--count` or `--history-root` to narrow the request. Quote arguments for the calling shell.
+`--cwd`, `--worktree <directory>`, `--count` or `--history-root` to narrow the request. `--worktree`
+matches a recorded cwd or any tool-call input under that directory, across all projects. Quote arguments
+for the calling shell.
 
 The helper reads CODEX_HOME/sessions or CLAUDE_CONFIG_DIR/projects, with their native home defaults.
-Those are user data locations, not executable dependencies. It does not search tool payloads, write
-transcripts or upload data. Missing directories fail clearly; no matches produce an empty list.
+Those are user data locations, not executable dependencies. `--pattern` searches message text only;
+`--worktree` also checks tool-call inputs, without emitting them. It does not write transcripts or
+upload data. Missing directories fail clearly; no matches produce an empty list.
 Summarize relevant hits and returned resume commands without dumping raw transcripts or publishing data.
