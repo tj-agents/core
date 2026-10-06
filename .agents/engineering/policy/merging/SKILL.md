@@ -12,9 +12,10 @@ domain: process
 
 Merge authorization is scoped to the goal, not the PR. A user authorization to implement, execute, or
 deliver a goal is merge authorization for every PR that goal itself creates: each lands once its own
-review and required checks pass, with no per-PR re-approval, and the authorization survives handoffs,
-fresh sessions, and successive delivery bindings of the same goal. This section owns that scope rule;
-read "explicit authorization" in any delivery standard as this rule, never as a per-PR approval.
+review and required checks pass, with no per-PR re-approval. The authorization survives handoffs, fresh
+sessions, and successive delivery bindings of the same goal — each new PR's binding re-records it as
+mechanics, not a fresh approval. This section owns that scope rule; no delivery standard adds a per-PR
+approval requirement on top of it.
 
 A goal file's bare existence authorizes nothing — the authority is the user's observed instruction,
 recorded with the goal. What still gates a merge keeps its own typed owner: an explicit user limitation
