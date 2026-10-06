@@ -4,9 +4,9 @@
 > findings directly and report what changed. Tick each `[x]` as you land it. Pause only for a genuinely
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
-**Review status:** `in-progress`
-**Reviewed up to commit:** `7da0ed7827705dee3873bc44046130e4a1ab97e2`  `(2026-10-06)`
-**Judgment:** `changes-requested`
+**Review status:** `complete`
+**Reviewed up to commit:** `b638954b1bf3ceda0047cb08cf8c7d0d3d8d6597`  `(2026-10-06)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-06 — docs
 
@@ -73,7 +73,7 @@ GW5: binder points at the owning goal record. GW6: plan clause reconciled to the
 rewrapped. GW8: pointers folded into the sentences they qualify. Validation: test_process_standards
 21/21, test_goal_continuation + test_plan_artifacts 8/8.
 
-## Review pass — 2026-10-06 — incremental
+## Review pass — 2026-10-06 — incremental (inc)
 
 **Candidate base:** `7da0ed7827705dee3873bc44046130e4a1ab97e2`
 **Candidate head:** `a1dba1b2fda68ac8c745c59c1636c7195dfdc6e5`
@@ -106,10 +106,10 @@ directly (small mechanical delta); `docs_reachability.py` on the delta bundle tr
   disposition sentence above ("pins each pointer sentence and the mode default" in the loop) accurate,
   closing the native layer's work-order-accuracy finding.
 
-## Review pass — 2026-10-06 — incremental
+## Review pass — 2026-10-06 — incremental (inc2)
 
 **Candidate base:** `a1dba1b2fda68ac8c745c59c1636c7195dfdc6e5`
-**Candidate head:** `5fb895f154466a98d1d6c53fe29aa74a7fd41f22`
+**Candidate head:** `5fb895f15446bb287a859ac7fbd0c7772177f169`
 **Candidate branch:** `Fix/GoalWideMergeApproval`
 **Candidate scope:** `all`
 **Candidate path-set:** `sha256:1b3bfb03a155d60812c0be44b09b63e2920548a03bcf84cd7fec0444eb4764c6` `(4 paths)`
@@ -141,3 +141,42 @@ wait-then-merge), not authority, so the default escalates nothing.
 - [x] **GW16 — LOW — test-shape** — `.agents/hooks/tests/test_process_standards.py:224`
   The mode-default assertion is not an ownership pointer and did not belong in the pointer loop. Fixed:
   it stands as its own named check above the loop.
+
+Correction: this pass's candidate head was first transcribed from a 12-character print with a fabricated
+tail; corrected to the descriptor's real `5fb895f15446bb287a859ac7fbd0c7772177f169` before the next pass
+froze against it.
+
+## Review pass — 2026-10-06 — incremental (inc3)
+
+**Candidate base:** `5fb895f15446bb287a859ac7fbd0c7772177f169`
+**Candidate head:** `b638954b1bf3ceda0047cb08cf8c7d0d3d8d6597`
+**Candidate branch:** `Fix/GoalWideMergeApproval`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:beccbe2cdd3b404f6ec2061a4ba55fbeb73c14a14ca4be69ef9852cdbcb16726` `(2 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\goal-wide-merge-approval-review-inc3\review\07f3bc6d2cd610122fb682cc03477db27a50b65f4c8ac89e76923c17c3fa1606`
+**Candidate bundle identity:** `sha256:2f7dc3044fce411797ec0cf8a65d3c392121d28e184a173f8984c91edd50ff4a`
+**Work-order path:** `reviews/Fix-GoalWideMergeApproval.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: built-in `code-review` skill (high) over the delta. All retained findings concern this
+work order's own bookkeeping and resolve in this completion stamp; none changes reviewable content. One
+candidate dropped: deriving the test's bodies dict from the referrer tuples is a preference no loaded
+rule states — both tuples are adjacent in one method and a missed sync fails loudly either way.
+
+### Findings
+
+- [x] **GW17 — MEDIUM — accuracy** — `reviews/Fix-GoalWideMergeApproval.md:112`
+  Commit `b638954` recorded a fabricated inc2 candidate head; the correction to the descriptor's real
+  `5fb895f15446…` plus its inline note were working-tree only. Fixed: committed in this stamp.
+- [x] **GW18 — MEDIUM — review-lifecycle** — `reviews/Fix-GoalWideMergeApproval.md:8`
+  The top-level watermark stayed at `7da0ed7` across three synthesized passes instead of moving per pass.
+  Fixed: status `complete`, judgment `approved`, watermark at `b638954` (the last reviewable head); the
+  stamp commit after it is work-order-only, which the merge gate's own currency rule tolerates.
+- [x] **GW19 — LOW — review-lifecycle** — `reviews/Fix-GoalWideMergeApproval.md:130`
+  GW13 was ticked while its fix existed nowhere; this stamp is that fix, so the tick is now truthful.
+- [x] **GW20 — LOW — followability** — `reviews/Fix-GoalWideMergeApproval.md:109`
+  Three passes shared an identical heading. Fixed: run-id suffixes (inc, inc2, inc3).
+- [x] **GW21 — LOW — review-lifecycle** — `reviews/Fix-GoalWideMergeApproval.md:145`
+  The inc2 head correction mutates a frozen pass field; retained with its inline correction note as the
+  least-bad repair of a mis-transcription — the descriptor and bundle identity remain the authority.
