@@ -51,3 +51,12 @@ the route, whether or not the human authorized execution.
 Resolve when a live probe records the UserPromptSubmit payload for an agent hand-back and a task
 notification, and the route skips any prompt the payload or transcript marks as non-human, with a
 regression test for each.
+
+## Catalog digest guard keys entries by package id alone
+
+`scripts/check_generated_paths.py` compares catalog digests between the merge base and the PR by
+package id. If one id appeared in two releases, only the last release's digest would be compared, so a
+committed digest change in an earlier release would pass. The catalog currently holds one release.
+
+Resolve when the guard keys each digest by release id and package id, with a test covering two releases
+that share a package id.
