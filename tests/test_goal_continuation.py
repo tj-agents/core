@@ -44,7 +44,8 @@ class GoalContinuationTests(unittest.TestCase):
             self.assertEqual(len(startup), 4)
             handler = startup[3]["hooks"][0]
             if host == "claude":
-                self.assertEqual(handler["command"], f'python -B "${{{variable}}}/{helper}"')
+                self.assertEqual(handler["command"], "python")
+                self.assertEqual(handler["args"], ["-B", f"${{{variable}}}/{helper}"])
             else:
                 self.assertIn(f'"${{{variable}}}/{helper}"', handler["command"])
                 self.assertIn(f'"${{{variable}}}/{helper}"', handler["commandWindows"])
