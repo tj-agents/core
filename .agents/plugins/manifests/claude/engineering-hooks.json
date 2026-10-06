@@ -52,6 +52,7 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py@Bash|PowerShell",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py@Bash|PowerShell"
             ]
           }
@@ -71,7 +72,8 @@
               "--deadline",
               "25",
               "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
             ]
           }
         ],
@@ -92,7 +94,8 @@
               "25",
               "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py"
+              "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
             ]
           }
         ]
@@ -108,6 +111,15 @@
             "args": [
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"
+            ]
+          },
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
             ]
           }
         ]

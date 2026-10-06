@@ -21,6 +21,16 @@
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -67,6 +77,17 @@
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 8 \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
       }
     ],
     "UserPromptSubmit": [
@@ -77,6 +98,16 @@
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\"",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
       }
