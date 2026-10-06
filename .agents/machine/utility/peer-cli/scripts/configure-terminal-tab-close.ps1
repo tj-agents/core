@@ -29,6 +29,7 @@ $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $SettingsPath)) {
     throw "Windows Terminal settings not found at $SettingsPath."
 }
+$SettingsPath = (Resolve-Path -LiteralPath $SettingsPath).ProviderPath
 
 $text = Get-Content -LiteralPath $SettingsPath -Raw -Encoding UTF8
 
