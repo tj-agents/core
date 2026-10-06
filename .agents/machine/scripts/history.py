@@ -71,26 +71,52 @@ def normalize_for_match(value):
     return text.casefold() if os.name == 'nt' else text
 
 
-def _cwd_under(cwd, worktree_norm):
+_DRIVE_PATH = re.compile(r'^([a-z]):(/.*)?$')
+
+
+def _path_variants(worktree_norm):
+    """Every normalized spelling a session could record or run a command against.
+
+    A Windows drive path also appears as Git Bash's MSYS form (``/c/...``) and WSL's
+    ``/mnt/c/...``; both are how Claude's Bash tool and Codex shell calls write it.
+    """
+    variants = [worktree_norm]
+    match = _DRIVE_PATH.match(worktree_norm) if os.name == 'nt' else None
+    if match:
+        drive, rest = match.group(1), match.group(2) or ''
+        variants.append(f'/{drive}{rest}')
+        variants.append(f'/mnt/{drive}{rest}')
+    return variants
+
+
+def _cwd_under(cwd, worktree_norms):
     if not cwd:
         return False
     norm = normalize_for_match(cwd)
-    return norm == worktree_norm or norm.startswith(worktree_norm + '/')
+    return any(norm == variant or norm.startswith(variant + '/') for variant in worktree_norms)
 
 
-def _contains_path_token(text, worktree_norm):
+_PATH_CONTINUATION = r'[A-Za-z0-9_.-]'
+
+
+def _contains_path_token(text, worktree_norms):
     if not text:
         return False
     norm = normalize_for_match(text)
-    pattern = r'(?:\A|[\s/\'"])' + re.escape(worktree_norm) + r'(?:\Z|[\s/\'"])'
-    return re.search(pattern, norm) is not None
+    for variant in worktree_norms:
+        pattern = (r'(?<!' + _PATH_CONTINUATION + r')' + re.escape(variant)
+                   + r'(?!' + _PATH_CONTINUATION + r')')
+        if re.search(pattern, norm):
+            return True
+    return False
 
 
 def _parse_iso(value):
     try:
-        return datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
     except ValueError:
         return datetime.min.replace(tzinfo=timezone.utc)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def session(path, host):
@@ -162,7 +188,8 @@ def query(root, host, *, cwd=None, project=None, worktree=None, count=5, pattern
     if count < 1:
         raise ValueError('--count must be positive')
     expression = re.compile(pattern if regex else re.escape(pattern), re.I) if pattern is not None else None
-    worktree_norm = normalize_for_match(worktree) if worktree else None
+    worktree_norms = (_path_variants(normalize_for_match(Path(worktree).expanduser().resolve()))
+                       if worktree else None)
     files = root.rglob('*.jsonl') if host == 'codex' else root.glob('*/*.jsonl')
     results = []
     for path in sorted(files, key=lambda p: p.stat().st_mtime, reverse=True):
@@ -170,10 +197,10 @@ def query(root, host, *, cwd=None, project=None, worktree=None, count=5, pattern
         if not item:
             continue
         tool_strings = item.pop('tool_strings')
-        if worktree_norm:
-            if _cwd_under(item['cwd'], worktree_norm):
+        if worktree_norms:
+            if _cwd_under(item['cwd'], worktree_norms):
                 item['matched_by'] = 'cwd'
-            elif any(_contains_path_token(text, worktree_norm) for text in tool_strings):
+            elif any(_contains_path_token(text, worktree_norms) for text in tool_strings):
                 item['matched_by'] = 'tool'
             else:
                 continue
@@ -194,9 +221,9 @@ def query(root, host, *, cwd=None, project=None, worktree=None, count=5, pattern
         item['preview'] = next((re.sub(r'\s+', ' ', text)[:160] for _, role, text in messages
                                 if role == 'user' and not text.lstrip().startswith('<')), '(no user preview)')
         results.append(item)
-        if not worktree_norm and len(results) >= count:
+        if not worktree_norms and len(results) >= count:
             break
-    if worktree_norm:
+    if worktree_norms:
         results.sort(key=lambda it: _parse_iso(it['last_activity']), reverse=True)
         results = results[:count]
     return results
