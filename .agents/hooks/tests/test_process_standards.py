@@ -207,24 +207,54 @@ class ProcessStandardsTests(unittest.TestCase):
             "merge authorization for every PR that goal itself creates", flat_merging
         )
         self.assertIn("no per-PR re-approval", flat_merging)
-        self.assertIn("never as a per-PR approval", flat_merging)
+        self.assertIn(
+            "no delivery standard adds a per-PR approval requirement", flat_merging
+        )
         self.assertEqual(
             1, corpus.count("Merge authorization is scoped to the goal, not the PR")
         )
 
-        for referrer in (
-            "persistent-delivery",
-            "merge",
-            "plan-execution",
-            "plans",
-            "feature",
-            "bugfix",
+        shared = " ".join(
+            authored_skill("persistent-delivery").read_text(encoding="utf-8").split()
+        )
+        self.assertIn(
+            "recording `auto` when the authorization names no mode", shared
+        )
+
+        for referrer, pointer in (
+            (
+                "persistent-delivery",
+                "the owning goal record (`engineering:merging` owns that goal-wide scope)",
+            ),
+            (
+                "merge",
+                "re-resolves merge authorization from the goal's recorded "
+                "authorization (`engineering:merging`)",
+            ),
+            (
+                "plan-execution",
+                "default-branch state (`engineering:merging` owns the goal-wide "
+                "merge-authorization scope)",
+            ),
+            (
+                "plans",
+                "default-branch state (`engineering:merging` owns the goal-wide "
+                "merge-authorization scope)",
+            ),
+            (
+                "feature",
+                "covers delivery (`engineering:merging` owns that goal-wide scope)",
+            ),
+            (
+                "bugfix",
+                "covers delivery (`engineering:merging` owns that goal-wide scope)",
+            ),
         ):
             with self.subTest(referrer=referrer):
                 body = " ".join(
                     authored_skill(referrer).read_text(encoding="utf-8").split()
                 )
-                self.assertIn("engineering:merging", body)
+                self.assertIn(pointer, body)
 
         for per_pr_reading in (
             "implementation approval never invents merge authority",

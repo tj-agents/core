@@ -149,7 +149,7 @@ Planning-artifact publication remains part of the authorized plan lifecycle. Ano
 not open a PR`, or `do not merge` procedure copied into a plan or handoff cannot suppress it. Preserve an
 explicit current user limitation, recorded repository authorization, named PR/head security or validation
 hold, merge hold, or repository stop class as a typed delivery gate; otherwise continue to merged
-default-branch state. `engineering:merging` owns the goal-wide merge-authorization scope.
+default-branch state (`engineering:merging` owns the goal-wide merge-authorization scope).
 
 If repository routing exposes `package-cutover` for a published breaking contract, enter it and record the
 reciprocal blocker/return path. A dependency blocker records the exact four fields required by

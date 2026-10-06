@@ -38,9 +38,9 @@ There is exactly one persistent owner for a PR/head pair. Reuse and update that 
 same. A new head created by this owner replaces its binding. A head changed by somebody else, a changed PR,
 or a different worktree ends ownership and surfaces a human decision; never silently follow it.
 
-Resolve authority from the repository's recorded standing instruction, the owning goal's recorded user
-authorization (`engineering:merging` owns that goal-wide scope), or an observed user approval for
-this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
+Resolve authority from the repository's recorded standing instruction, the user authorization kept in
+the owning goal record (`engineering:merging` owns that goal-wide scope), or an observed user approval
+for this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
 the binding artifact:
 
 ```text
@@ -66,7 +66,8 @@ owning checkout identity, permitted merge mode, user's wording and observed mess
 checkout and remote PR. `mode` is `merge` or `auto`, according to the actual approval. A goal file's bare
 existence never invents merge authority; the user's recorded authorization of the goal does, for the
 goal's own PRs (`engineering:merging`) — write it as this record, with its wording and provenance, for
-each PR the goal creates. Invalid explicit input fails before any standing-authority fallback. Without a
+each PR the goal creates, recording `auto` when the authorization names no mode: unattended completion
+is what a goal authorization requests. Invalid explicit input fails before any standing-authority fallback. Without a
 standing instruction, goal authorization, or matching scoped approval, authority remains `absent` and
 merge requires a user decision.
 
