@@ -375,6 +375,17 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
     session = call(window, 'newSession')
     session_path = f'/Sessions/{session}'
     script_path = None
+
+    def abandon():
+        if script_path is not None:
+            shutil.rmtree(script_path.parent, ignore_errors=True)
+        # Konsole exposes no D-Bus call to close a session; ending its shell closes the tab this created.
+        try:
+            run([qdbus, service, session_path, 'sendText', 'exit\n'],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
     try:
         # setTitle alone is replaced by the tab-title format as soon as the foreground process changes, so
         # the format itself is set for both the local (0) and remote (1) contexts.
@@ -385,20 +396,18 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
         # fish), so the inner command never travels as that text: it is written to a private sh script whose
         # first line deletes it and its directory, and the only thing typed is `exec sh '<path>'`.
         script_path = _write_posix_script(posix_inner_command(directory, cleared, forced, executable, arguments))
+    except BaseException:
+        abandon()
+        raise
+
+    try:
         call(session_path, 'runCommand', f'exec sh {shlex.quote(str(script_path))}')
     except LaunchTimeout:
         # The command may already have been typed and be running; removing its script or typing `exit`
         # into the session now would break a launch that is actually under way.
         raise
     except BaseException:
-        if script_path is not None:
-            shutil.rmtree(script_path.parent, ignore_errors=True)
-        # Konsole exposes no D-Bus call to close a session; ending its shell closes the tab this created.
-        try:
-            run([qdbus, service, session_path, 'sendText', 'exit\n'],
-                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            pass
+        abandon()
         raise
 
 
