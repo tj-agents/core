@@ -1,4 +1,6 @@
 import importlib.util
+import contextlib
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -112,8 +114,88 @@ class Predicates(unittest.TestCase):
             payload.mkdir(parents=True)
             (payload / "tier.json").write_text(body, encoding="utf-8")
         diagnostics = []
-        self.assertEqual(gate.declarations([self.root], diagnostics=diagnostics), [])
+        found = gate.declarations([self.root], diagnostics=diagnostics)
+        self.assertEqual([item.id for item in found], ["broken@broken", "future@future"])
+        self.assertTrue(all(item.diagnostics for item in found))
         self.assertEqual([item["code"] for item in diagnostics], ["unreadable-declaration", "unsupported-version"])
+
+
+    def install(self, plugin, body):
+        cache = self.root / "config" / "plugins" / "cache"
+        payload = cache / "test-market" / plugin / "1"
+        skill = payload / "skills" / "rule"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: rule\nkind: convention\n---\n", encoding="utf-8")
+        if body is not None:
+            (payload / "tier.json").write_text(body if isinstance(body, str) else json.dumps(body), encoding="utf-8")
+        registry_path = cache.parent / "installed_plugins.json"
+        registry = json.loads(registry_path.read_text(encoding="utf-8")) if registry_path.exists() else {"plugins": {}}
+        registry["plugins"][plugin + "@test-market"] = [{"installPath": str(payload)}]
+        registry_path.write_text(json.dumps(registry), encoding="utf-8")
+        return cache, payload
+
+    def hook_payloads(self, plugin, payload):
+        return ({"cwd": str(self.root), "tool_name": "Skill", "tool_input": {"skill": plugin + ":rule"}},
+                {"cwd": str(self.root), "tool_name": "PowerShell",
+                 "tool_input": {"command": "Get-Content '" + str(payload / "skills" / "rule" / "SKILL.md") + "'"}})
+
+    def test_invalid_installed_declarations_block_both_hook_paths(self):
+        valid = {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}}
+        for body in (valid, dict(valid, detect={"not": {"file": "project.csproj"}}),
+                     dict(valid, owner_repository=17), dict(valid, schema_version=99), "{", []):
+            with self.subTest(body=body):
+                plugin = "invalid" + str(len(list((self.root / "config").glob("**/tier.json"))))
+                cache, payload = self.install(plugin, body)
+                with patch.object(gate, "cache_roots", return_value=[cache]):
+                    result = gate.assess(self.root)
+                    selection = next(item for item in result.selections if item["plugin_id"] == plugin + "@test-market")
+                    self.assertFalse(selection["matched"])
+                    self.assertTrue(selection["diagnostics"])
+                    for hook in self.hook_payloads(plugin, payload):
+                        stderr = io.StringIO()
+                        with contextlib.redirect_stderr(stderr):
+                            self.assertEqual(gate.gate(hook), 2)
+                        self.assertIn(str(payload / "tier.json"), stderr.getvalue())
+                        self.assertIn(selection["diagnostics"][0]["message"], stderr.getvalue())
+
+    def test_hook_diagnostics_identify_only_the_requested_plugin(self):
+        for plugin, predicate, message in (("unknown-fact", {"fact": "technology.unknown"}, "Provide scoped evidence for fact"),
+                                           ("unknown-context", {"context": {"key": "missing", "equals": "tommy"}}, "Provide scoped context")):
+            cache, payload = self.install(plugin, {"schema_version": 3, "tier": plugin,
+                                                  "applies": "stack-present", "detect": predicate})
+            with patch.object(gate, "cache_roots", return_value=[cache]):
+                for hook in self.hook_payloads(plugin, payload):
+                    stderr = io.StringIO()
+                    with contextlib.redirect_stderr(stderr):
+                        self.assertEqual(gate.gate(hook), 2)
+                    self.assertIn("Configuration diagnostic for " + plugin + "@test-market: detect:", stderr.getvalue())
+                    self.assertIn(message, stderr.getvalue())
+                    other_message = "Provide scoped context" if plugin == "unknown-fact" else "Provide scoped evidence for fact"
+                    self.assertNotIn(other_message, stderr.getvalue())
+
+    def test_mixed_validity_keeps_every_valid_convention_and_ordinary_plugins(self):
+        for version in (1, 2, 3):
+            detect = {"globs": ["*.csproj"]} if version < 3 else {"glob": "*.csproj"}
+            cache, _ = self.install("valid" + str(version), {"schema_version": version, "tier": "valid" + str(version),
+                                                            "applies": "stack-present", "detect": detect})
+        self.install("invalid", {"schema_version": 3, "tier": "invalid", "applies": "stack-present", "detect": {"all": []}})
+        self.install("unknown", {"schema_version": 3, "tier": "unknown", "applies": "stack-present", "detect": {"fact": "missing"}})
+        _, ordinary = self.install("ordinary", None)
+        with patch.object(gate, "cache_roots", return_value=[cache]):
+            result = gate.assess(self.root)
+            self.assertEqual([item.plugin for item, _ in result.applicable], ["valid1", "valid2", "valid3"])
+            self.assertNotIn("ordinary", [item.plugin for item in result.blocked])
+            listing = gate.conventions(self.root)
+            self.assertIn("Configuration diagnostic", listing)
+            self.assertIn("Provide scoped evidence for fact: missing", listing)
+            for version in (1, 2, 3):
+                self.assertIn("valid" + str(version) + " (", listing)
+            self.assertEqual(listing.count("  rule - "), 3)
+            for hook in self.hook_payloads("ordinary", ordinary):
+                self.assertEqual(gate.gate(hook), 0)
+            diagnostics = []
+            gate.declarations([cache], diagnostics=diagnostics)
+            self.assertFalse(any("ordinary" in item["path"] for item in diagnostics))
 
     def test_payload_checker_accepts_v3_and_rejects_invalid_composition(self):
         data = {"schema_version": 3, "tier": "example", "applies": "stack-present",
