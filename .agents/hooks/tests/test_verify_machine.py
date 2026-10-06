@@ -45,6 +45,21 @@ class VerifyMachineTests(unittest.TestCase):
             self.assertEqual([], verify_machine.audit(Path(temp)))
             self.assertEqual("missing_home", verify_machine.inspect(Path(temp) / "missing")[0]["code"])
 
+    def test_missing_toml_support_is_reported_only_for_existing_config(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(verify_machine, "tomllib", None):
+            home = Path(temp)
+            repository = home / "repo"
+            repository.mkdir()
+            self.assertEqual([], verify_machine.inspect(home, [repository]))
+            (home / ".codex").mkdir()
+            (home / ".codex" / "config.toml").write_text('notify = ["x"]\n', encoding="utf-8")
+            self.assertEqual(["python_3_11_required"], [item["code"] for item in verify_machine.inspect(home)])
+
+    def test_link_detection_does_not_need_path_stat_keywords(self):
+        with tempfile.TemporaryDirectory() as temp, \
+                mock.patch.object(verify_machine.Path, "stat", side_effect=TypeError("follow_symlinks")):
+            self.assertFalse(verify_machine._linked(Path(temp)))
+
     def test_reports_user_hooks_but_not_trust_hashes(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
@@ -69,17 +84,19 @@ class VerifyMachineTests(unittest.TestCase):
                 'plugins = { "browser@openai-bundled" = { enabled = true } }\n'
                 'marketplaces = { "openai-primary-runtime" = { source = "builtin" } }\n'
                 'hooks = { state = { trusted = "x" } }\n'
+                'agents = { reviewer = { config_file = "private-agent" } }\n'
                 '[profiles.work]\nnotify = ["secret-command"]\n'
                 'plugins = { "base@base-agents" = { enabled = true } }\n'
                 'marketplaces = { custom = { source = "tj-agents/core" } }\n'
                 'hooks = { state = { trusted = "x" }, custom = { command = "private" } }\n'
-                'model_instructions_file = "private-path"\n',
+                'model_instructions_file = "private-path"\n'
+                'agent = { model = "private-model" }\n',
                 encoding="utf-8",
             )
             findings = verify_machine.inspect(home)
             self.assertEqual(
-                ["profiles.work.notify", "profiles.work.plugins", "profiles.work.marketplaces",
-                 "profiles.work.hooks", "profiles.work.model_instructions_file"],
+                ["agents", "profiles.work.notify", "profiles.work.plugins", "profiles.work.marketplaces",
+                 "profiles.work.hooks", "profiles.work.model_instructions_file", "profiles.work.agents"],
                 [finding["setting"] for finding in findings],
             )
             self.assertNotIn("private", str(findings))
@@ -213,10 +230,10 @@ class VerifyMachineTests(unittest.TestCase):
             self.assertEqual(home / ".codex" / "agents", Path(findings[0]["path"]))
 
     def test_junction_detection_uses_reparse_attribute(self):
-        with mock.patch.object(verify_machine.Path, "stat") as stat_call:
-            stat_call.return_value.st_file_attributes = verify_machine.stat.FILE_ATTRIBUTE_REPARSE_POINT
-            with mock.patch.object(verify_machine.Path, "is_symlink", return_value=False):
-                self.assertTrue(verify_machine._linked(Path("junction")))
+        with mock.patch.object(verify_machine.os, "lstat") as lstat_call:
+            lstat_call.return_value.st_mode = verify_machine.stat.S_IFDIR
+            lstat_call.return_value.st_file_attributes = verify_machine.stat.FILE_ATTRIBUTE_REPARSE_POINT
+            self.assertTrue(verify_machine._linked(Path("junction")))
 
 
 if __name__ == "__main__":
