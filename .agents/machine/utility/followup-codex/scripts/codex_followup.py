@@ -19,6 +19,10 @@ class Rejected(FollowupError):
     pass
 
 
+class ReceiptMismatch(FollowupError):
+    pass
+
+
 def path_key(value):
     value = str(value)
     if value.startswith('\\\\?\\UNC\\'):
@@ -135,8 +139,11 @@ class Proxy:
         self.reader.join(timeout=3)
         if self.writer:
             self.writer.join(timeout=3)
-        self.process.stdin.close()
-        self.process.stdout.close()
+        for stream in (self.process.stdin, self.process.stdout):
+            try:
+                stream.close()
+            except (OSError, ValueError, RuntimeError):
+                pass
 
 
 def pages(proxy, method, params):
@@ -240,7 +247,7 @@ def validate_receipt(receipt, expected=None):
     if expected and any(receipt[key] != expected[key] for key in (
         'thread_id', 'cwd', 'codex_home', 'message_sha256',
     )):
-        raise FollowupError('Receipt belongs to a different target, profile or message')
+        raise ReceiptMismatch('Receipt belongs to a different target, profile or message')
 
 
 def main(argv=None):
@@ -259,6 +266,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     proxy = None
     receipt = None
+    reserved = False
     try:
         if not 0 < args.timeout <= 60:
             raise FollowupError('--timeout must be greater than zero and at most 60 seconds')
@@ -275,23 +283,42 @@ def main(argv=None):
                         'message_sha256': hashlib.sha256(message.encode('utf-8')).hexdigest()}
             receipt = json.loads(args.receipt.read_text(encoding='utf-8')) if exists else expected
             validate_receipt(receipt, expected)
+            if exists:
+                reserved = True
         else:
             receipt = json.loads(args.receipt.read_text(encoding='utf-8'))
             validate_receipt(receipt)
+            reserved = True
         proxy = Proxy(args.codex, receipt['codex_home'], deadline)
         proxy.initialize()
         if args.command == 'status' or exists:
             result = wait_for_delivery(proxy, receipt, False)
         else:
             result = send(proxy, receipt, args.receipt, message)
-    except (FollowupError, OSError, ValueError, KeyError, TypeError) as error:
-        reserved = args.receipt.exists()
-        result = {'status': 'rejected' if isinstance(error, Rejected) else (
-            'unverified' if reserved else 'unavailable'), 'detail': str(error),
-            'receipt': str(args.receipt), 'acknowledged': False,
-            'next_action': 'Check this receipt; do not resend.' if reserved else (
+    except (FollowupError, OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+        mismatch = isinstance(error, ReceiptMismatch)
+        if isinstance(error, Rejected):
+            status, next_action = 'rejected', 'Check this receipt; do not resend.'
+        elif mismatch:
+            status, next_action = 'unavailable', (
+                'Nothing was sent for this message by this run; this receipt path already holds a '
+                'receipt for a different message or target. Use a new receipt file for this message; '
+                'do not paste it blindly, since a different send may already exist under the existing '
+                'receipt.'
+            )
+        elif reserved or (args.command == 'send' and args.receipt.exists()):
+            status, next_action = 'unverified', 'Check this receipt; do not resend.'
+        elif args.command == 'status':
+            status, next_action = 'unavailable', (
+                'No valid receipt could be read for this thread. Delivery is unknown; check the target '
+                'session directly before resending anything.'
+            )
+        else:
+            status, next_action = 'unavailable', (
                 'No send was attempted. Provide the message for the user to paste into the target session.'
-            )}
+            )
+        result = {'status': status, 'detail': str(error), 'receipt': str(args.receipt),
+                  'acknowledged': False, 'next_action': next_action}
     finally:
         if proxy:
             proxy.close()
