@@ -1,41 +1,12 @@
-r"""PostToolUse hook: opening a PR binds its delivery owner, instead of someone remembering to.
-
-The waste this prevents is the whole babysitting loop. `persistent-delivery` and
-`persistent-workflow` already describe a delivery that drives itself from branch to merged, and
-`persistent_workflow_merge_gate.py` already refuses an unattended auto-merge that no continuation
-owns. Nothing ever *started* one. A PR was opened, the turn ended, and the next transition waited
-for a human to notice and say "carry on" - once per CI wait, once per red check, once per review,
-once per merge.
-
-So the trigger stops being "the model decided persistent-workflow is relevant" and becomes the PR
-existing, exactly as `skill_router.py` made the trigger the path being written. On a successful
-`gh pr create` this hook runs `.agents/workflows/workflow_ops.py delivery-bind`, which reads
-authoritative forge state once, resolves the repository's recorded standing merge authorization
-against the exact head's path set, and writes `.agents/persistent-workflow-binding.json`. Then it
-tells the agent - through the PostToolUse stderr channel, which cannot block because the tool has
-already run - that the owner is bound and which continuation now owes the wait.
-
-It never widens authority. The binding it writes records `absent` whenever the diff touches a
-stop-class path or the PR carries the hold label, and `absent` is what makes
-`delivery_runtime.decide()` return its `merge-authorization` human gate. Binding a delivery is not
-authorizing a merge; it is naming who is watching.
-
-Opt-in is `.agents/delivery-authorization.json`, the same table the resolver reads: a repo that has
-not recorded a standing instruction gets no automatic binding. A present but unreadable table is a
-loud stop, never a silent skip - the failure mode this repo cares about is a mechanism that looks
-wired and is inert.
-
-Claude only, for the reason `.agents/plugins/manifests/codex/engineering-hooks.json` already records for `red_run_gate.py`:
-Codex exposes no tool-result event, so there is nothing for this hook to register on there. Codex
-reaches the same binding through the `open-pr` procedure, which names the command.
-
-Contract: exit 0 = say nothing; exit 2 = stderr is fed back to the agent.
-"""
-
 import json
 import re
 import sys
 from pathlib import Path
+from git_auth_scope_gate import extract_command
+from merge_review_gate import canonical_merge_target_dir, is_codex_invocation, merge_target_dir
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workflows"))
+from pr_body import validate_pr_body
 
 from hook_runtime import (
     CommandTimeout,
@@ -53,13 +24,169 @@ for _stream in (sys.stdout, sys.stderr):
 CONFIG_FILE = ".agents/delivery-authorization.json"
 BINDING_FILE = ".agents/persistent-workflow-binding.json"
 HOOK_NAME = "delivery-binding-gate"
-SHELL_TOOLS = {"bash", "powershell"}
 RESULT_KEYS = ("tool_response", "tool_result", "tool_output")
 
-# `gh pr create`, in any flag order, and not `gh pr create --help` or a `gh pr view`.
-_PR_CREATE = re.compile(r"\bgh\s+pr\s+create\b")
-_HELP = re.compile(r"(?:^|\s)(?:--help|-h)(?:\s|$)")
 _PR_URL = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)")
+_TOKEN = re.compile(r"'[^']*'|\"[^\"]*\"|[;&|]+|[^\s'\";&|]+(?:'[^']*'|\"[^\"]*\")?")
+_CREATE_VALUE_FLAGS = {
+    "--title", "-t", "--head", "-H", "--base", "-B", "--assignee", "-a",
+    "--reviewer", "-r", "--label", "-l", "--milestone", "-m", "--project", "-p",
+    "--match-head-commit", "--add-assignee", "--remove-assignee", "--add-reviewer",
+    "--remove-reviewer", "--add-label", "--remove-label", "--add-project", "--remove-project",
+    "--body", "-b", "--body-file", "-F", "--repo", "-R",
+}
+_VALUE_FLAGS = {
+    "create": _CREATE_VALUE_FLAGS,
+    "new": _CREATE_VALUE_FLAGS,
+    "edit": _CREATE_VALUE_FLAGS,
+    "merge": {"--body", "-b", "--body-file", "-F", "--repo", "-R", "--subject", "-t",
+              "--author-email", "-A", "--match-head-commit"},
+}
+_MERGE_ALIASES = {"-m": "--merge", "-r": "--rebase", "-s": "--squash", "-d": "--delete-branch"}
+
+
+def pr_command(command):
+    tokens = []
+    end = 0
+    for match in _TOKEN.finditer(command):
+        if command[end:match.start()].strip():
+            return None
+        if "\n" in command[end:match.start()]:
+            tokens.append((";", ";"))
+        raw = match.group()
+        quoted = raw[0] in "\"'"
+        value = raw[1:-1] if quoted else raw
+        tokens.append((value, raw))
+        end = match.end()
+    if command[end:].strip():
+        return None
+    for index in range(len(tokens) - 2):
+        if tokens[index][1].lower() not in {"gh", "gh.exe"} or tokens[index + 1][1] != "pr":
+            continue
+        if index and tokens[index - 1][1] not in {"&&", ";", "&", "||", "|"}:
+            continue
+        operation = tokens[index + 2][0]
+        if operation in {"create", "new", "edit", "merge"}:
+            return operation, tokens[index + 3:], index
+    return None
+
+
+def literal(raw):
+    if raw.startswith("'") and raw.endswith("'"):
+        return raw[1:-1]
+    value = raw[1:-1] if raw.startswith('"') and raw.endswith('"') else raw
+    if any(char in value for char in "$`%!"):
+        raise ValueError("unresolved shell expression")
+    return value
+
+
+def command_options(tokens, operation):
+    values = {}
+    targets = []
+    body_flags = {"--body", "-b", "--body-file", "-F", "--repo", "-R"}
+    value_flags = _VALUE_FLAGS[operation]
+    index = 0
+    while index < len(tokens):
+        value, raw = tokens[index]
+        if any(char in raw for char in ";&|<>") and not raw.startswith(("'", '"')):
+            raise ValueError("ambiguous command composition")
+        attached = len(value) > 2 and value[:2] in value_flags
+        if attached:
+            key, equal = value[:2], False
+        else:
+            key, equal, _ = value.partition("=")
+        if key in value_flags:
+            if attached:
+                argument = raw[2:]
+                if argument.startswith("="):
+                    argument = argument[1:]
+            elif equal:
+                argument = raw.split("=", 1)[1]
+            else:
+                index += 1
+                if index >= len(tokens):
+                    raise ValueError(f"missing {key} value")
+                argument = tokens[index][1]
+            if key in values:
+                raise ValueError(f"duplicate {key}")
+            values[key] = literal(argument) if key in body_flags else argument
+        elif value.startswith("-"):
+            values[_MERGE_ALIASES.get(key, key) if operation == "merge" else key] = True
+        elif not value.startswith("-"):
+            targets.append(literal(raw))
+        index += 1
+    return values, targets
+
+
+def authoritative_body(root, pr, repo=None):
+    arguments = [sys.executable, "-B", str(workflow_ops(root)), "--root", str(root),
+                 "--workflow-run-id", "pr-body-check", "pr-body-check", "--pr", str(pr)]
+    if repo:
+        arguments += ["--repo", repo]
+    completed = run_command(arguments, capture_output=True, text=True, cwd=str(root),
+                            timeout=NETWORK_COMMAND_TIMEOUT_SECONDS)
+    try:
+        result = json.loads(completed.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        raise ValueError("authoritative PR body check returned no readable result")
+    if completed.returncode or not result.get("validation", {}).get("valid"):
+        errors = result.get("validation", {}).get("errors") or [result.get("error") or completed.stderr]
+        raise ValueError("; ".join(errors))
+    return result
+
+
+def validate_before(data, command, parsed):
+    operation, tokens, prefix = parsed
+    try:
+        options, targets = command_options(tokens, operation)
+        if "--help" in options or "-h" in options:
+            return 0
+        if operation in {"create", "new", "edit"} and {
+                "--fill", "--fill-first", "--fill-verbose", "--editor", "--web", "-w"
+        }.intersection(options):
+            raise ValueError("interactive or generated body cannot be inspected; supply a body file")
+        body_options = {"--body", "-b", "--body-file", "-F"}
+        if operation == "edit" and not body_options.intersection(options):
+            if not options or {"--editor", "--web", "-w"}.intersection(options):
+                raise ValueError("interactive body edit cannot be inspected; supply a body file")
+            return 0
+        if operation == "merge" and "--disable-auto" in options:
+            if not {"--auto", "--merge", "--squash", "--rebase", "--admin"}.intersection(options):
+                return 0
+        root = Path(working_directory(data)).resolve()
+        if operation == "merge":
+            normalized = re.sub(r"(?<= && )gh(?:\.exe)?(?= pr merge )", "gh", command, flags=re.IGNORECASE)
+            if " && gh pr merge " in normalized:
+                checkout, merge_args = normalized.split(" && gh pr merge ", 1)
+                normalized = checkout + " && gh pr merge " + " ".join(
+                    _MERGE_ALIASES.get(token, token) for token in merge_args.split(" ")
+                )
+            canonical = canonical_merge_target_dir(normalized)
+            if (is_codex_invocation(data) or prefix) and canonical is None:
+                raise ValueError('use exactly pushd "<absolute-checkout>" && gh pr merge <number> [merge options]')
+            root = Path(canonical or merge_target_dir(command, data)).resolve()
+            if not targets or not re.fullmatch(r"[1-9]\d*|https://github\.com/[^/]+/[^/]+/pull/[1-9]\d*", targets[0]):
+                raise ValueError("name the PR explicitly by number or URL")
+            authoritative_body(root, targets[0], options.get("--repo") or options.get("-R"))
+            return 0
+        if prefix:
+            raise ValueError("ambiguous command composition")
+        bodies = [options[key] for key in ("--body", "-b") if key in options]
+        files = [options[key] for key in ("--body-file", "-F") if key in options]
+        if len(bodies) + len(files) != 1:
+            raise ValueError("supply one explicit literal --body/-b or readable --body-file/-F")
+        if files:
+            if files[0] == "-":
+                raise ValueError("stdin body cannot be inspected")
+            body = (root / files[0]).read_text(encoding="utf-8-sig")
+        else:
+            body = bodies[0]
+        validation = validate_pr_body(body)
+        if not validation["valid"]:
+            raise ValueError("; ".join(validation["errors"]))
+    except (OSError, ValueError, CommandTimeout) as error:
+        announce(f"PR BODY GATE: {error}. Split into a simple gh command with a readable body file; supply nonempty What and Why sections.")
+    return 0
 
 
 def announce(message):
@@ -82,23 +209,18 @@ def tool_output(data):
 
 
 def created_pr(data):
-    """The PR number `gh pr create` printed, or None when it printed no PR URL.
-
-    A failed create prints no URL, so absence is the whole success test - this hook never re-reads
-    the forge to find out whether the command it just watched worked.
-    """
     match = _PR_URL.search(tool_output(data))
     return match.group(1) if match else None
 
 
 def working_directory(data):
-    for key in ("cwd", "working_directory", "workdir"):
-        value = data.get(key)
+    tool_input = data.get("tool_input") or {}
+    for key in ("workdir", "working_directory", "cwd"):
+        value = tool_input.get(key)
         if isinstance(value, str) and value.strip():
             return value
-    tool_input = data.get("tool_input") or {}
     for key in ("cwd", "working_directory", "workdir"):
-        value = tool_input.get(key)
+        value = data.get(key)
         if isinstance(value, str) and value.strip():
             return value
     return "."
@@ -211,13 +333,36 @@ def main():
         return 0
     if not isinstance(data, dict):
         return 0
-    if str(data.get("tool_name", "")).lower() not in SHELL_TOOLS:
+    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
+    parsed = pr_command(command) if command else None
+    validate_body = "--validate-body" in sys.argv or data.get("hook_event_name") == "PreToolUse"
+    if parsed is None:
+        if validate_body and command and re.match(r"^\s*gh(?:\.exe)?\s+pr\s+(?:create|new|edit|merge)\b", command, re.IGNORECASE):
+            announce("PR BODY GATE: command cannot be inspected. Split into a simple gh command with a readable body file.")
         return 0
-    command = (data.get("tool_input") or {}).get("command", "")
-    if not isinstance(command, str) or not _PR_CREATE.search(command) or _HELP.search(command):
+    if validate_body:
+        return validate_before(data, command, parsed)
+    operation, tokens, _ = parsed
+    if operation not in {"create", "new", "edit"}:
         return 0
     pr = created_pr(data)
-    if pr is None:
+    if operation in {"create", "new"} and pr is None:
+        return 0
+    try:
+        options, targets = command_options(tokens, operation)
+        if "--help" in options or "-h" in options:
+            return 0
+        if operation == "edit" and not {"--body", "-b", "--body-file", "-F"}.intersection(options):
+            return 0
+        url_match = _PR_URL.search(tool_output(data))
+        target = url_match.group(0) if operation in {"create", "new"} and url_match else (targets[0] if targets else None)
+        if target is None:
+            announce("PR BODY GATE: body edit requires an explicit PR target for authoritative validation.")
+        authoritative_body(Path(working_directory(data)).resolve(), target,
+                           options.get("--repo") or options.get("-R"))
+    except (OSError, ValueError, CommandTimeout) as error:
+        announce(f"PR BODY GATE: authoritative body validation failed: {error}. Repair the PR body and rerun pr-body-check.")
+    if operation == "edit":
         return 0
 
     root = find_config(working_directory(data))
@@ -281,5 +426,6 @@ if __name__ == "__main__":
         sys.exit(main())
     except SystemExit:
         raise
-    except Exception:  # noqa: BLE001 - a broken gate must never wedge a session
-        sys.exit(0)
+    except Exception as error:
+        sys.stderr.write(f"PR BODY GATE: cannot validate PR body: {error}")
+        sys.exit(2)
