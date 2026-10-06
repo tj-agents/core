@@ -122,10 +122,14 @@ Claude Code exports `TERM=xterm-256color`, which suits a Node CLI reading `suppo
 Rust/crossterm binary, and on native Windows an unset `TERM` is what selects the console's truecolor path
 — handing it a POSIX terminfo name instead caps the palette at 256 colours and visibly wrecks the theme.
 `COLORTERM` is not set on this machine either, so there is nothing for the leaked `TERM` to be overridden
-by. Do not "align" the two launchers; the runtimes differ, so the correct handling differs. On POSIX,
-`handoff-claude`'s shared `launch_tab` drops any forced `TERM` too, for the same reason this launcher
-clears it: the terminal that actually starts the tab sets `TERM` for that session itself, and forcing or
-clearing it here would fight that.
+by. Do not "align" the two launchers; the runtimes differ, so the correct handling differs.
+
+That Windows reasoning is specific to this launcher's current (Windows-only) `agent-cli.ps1` path, not a
+general POSIX rule. `agent_cli.py` -- the shared library behind `open-claude` and `handoff-claude` -- never
+forces or clears `TERM` on POSIX at all, for an unrelated reason: the terminal that actually starts the
+tab sets `TERM` for that session itself, and forcing or clearing it there would fight that. `handoff-codex`
+has not moved to that shared library yet; when it does, its own clearing stops being unconditional in the
+same way.
 
 Only variables observed in a real parent session are listed. Codex's own exported session state has not
 been read from one, so nothing is cleared on a guess.

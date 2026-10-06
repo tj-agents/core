@@ -47,3 +47,24 @@ started from Konsole opens its tab in that Konsole window, or fails if the windo
 Resolve when detection confirms the variable belongs to the terminal the caller is attached to, for
 example by matching the terminal's own record of its sessions against the caller's process ancestry,
 with a test for an inherited variable.
+
+## Windows Terminal option values may be escaped for a parse they never get
+
+`agent_cli._launch_windows_terminal` (and `agent-cli.ps1`'s `Invoke-AgentTerminalTab`) pass every
+`wt.exe` argument through `terminal_argument`, including `--title` and `--startingDirectory`, which are
+Windows Terminal's own option values rather than the launched command's arguments. The escaping
+`terminal_argument` applies models the second argv parse the tab's command arguments get after Windows
+Terminal's own `;`-split re-joins them (`CommandLineToArgvW` quote/backslash rules) — a parse option
+values may never receive at all, if Windows Terminal reads them off its own command line after only the
+`;` split. If so, a title or starting directory containing a quote or a trailing backslash would show its
+escapes literally in the tab (visible cosmetically, not a lost launch, since `;` is still escaped either
+way and nothing else in that value is Windows-Terminal-significant).
+
+Left unresolved rather than guessed: changing the escaping for option values without observing the real
+behaviour risks trading a cosmetic defect for a functional one.
+
+**Resolution condition.** A real `wt.exe` launch with a `--title` and a `--startingDirectory` containing a
+quote and a trailing backslash confirms whether Windows Terminal parses its own option values the same
+way as the tab's command arguments. If it does not, give option values their own escaping (likely just the
+existing `;` handling, with no `CommandLineToArgvW`-style quoting), with a test pinned to the confirmed
+behaviour.
