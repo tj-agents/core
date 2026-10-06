@@ -14,6 +14,10 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def command_line(hook):
+    return " ".join([hook["command"], *hook.get("args", [])])
+
+
 class PackagedEngineeringHooks(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='engineering package with spaces ')
@@ -44,7 +48,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                     (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
                 )
                 hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
-                command = hooks["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+                command = command_line(hooks["hooks"]["SessionStart"][0]["hooks"][0])
                 self.assertIn(chr(36) + "{" + variable + "}/" + script, command)
                 result = self.run_hook(script)
                 self.assertEqual(0, result.returncode, result.stderr)
@@ -80,7 +84,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                     (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
                 )
                 hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
-                command = hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
+                command = command_line(hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0])
                 self.assertIn(
                     chr(36) + "{" + variable + "}/hooks/workflow_route.py", command
                 )
@@ -133,7 +137,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
 
         def commands(manifest, event):
             return [
-                hook["command"]
+                command_line(hook)
                 for registration in manifest["hooks"].get(event, [])
                 for hook in registration.get("hooks", [])
             ]
@@ -141,7 +145,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertTrue(any("skill_router.py" in command for command in commands(base_codex, "PreToolUse")))
         codex_router = next(
             registration for registration in base_codex["hooks"]["PreToolUse"]
-            if any("skill_router.py" in hook["command"] for hook in registration["hooks"])
+            if any("skill_router.py" in command_line(hook) for hook in registration["hooks"])
         )
         self.assertIn("Bash", codex_router["matcher"])
         self.assertIn("apply_patch", codex_router["matcher"])

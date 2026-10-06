@@ -24,6 +24,7 @@
     "git-auth",
     "git-branching",
     "guide",
+    "guide-build",
     "handoff",
     "handoff-format",
     "incremental-review",
