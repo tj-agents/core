@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -34,6 +35,25 @@ def real_agent_cli(claude='/bin/claude'):
     return module
 
 
+def real_agent_cli_for_e2e(run, claude='/bin/claude'):
+    """Load the real agent_cli.py fresh with its `launch_tab` default `run=subprocess.run` parameter bound
+    to `run`.
+
+    That default is fixed once, when the module's `def launch_tab(...)` line first executes, so the patch
+    must be in place while the module loads -- patching `subprocess.run` afterward would not reach a
+    default already bound to the original function object. `resolve_claude_executable` and
+    `sync_claude_standards` are replaced after loading instead, because open_claude_tab resolves both by a
+    plain name lookup in this module's globals at call time, not through a default parameter.
+    """
+    with mock.patch('subprocess.run', side_effect=run):
+        spec = importlib.util.spec_from_file_location('agent_cli_for_launch_claude_e2e_tests', AGENT_CLI)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    module.resolve_claude_executable = mock.Mock(return_value=claude)
+    module.sync_claude_standards = mock.Mock()
+    return module
+
+
 class LaunchClaudeTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='launch claude ')
@@ -45,6 +65,12 @@ class LaunchClaudeTests(unittest.TestCase):
         patcher = mock.patch.object(LAUNCH_CLAUDE, '_load_agent_cli', return_value=self.agent_cli)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+        # For the call-order assertion (H10): attached to the same three mocks real_agent_cli() installed.
+        self.call_order = mock.Mock()
+        self.call_order.attach_mock(self.agent_cli.resolve_claude_executable, 'resolve_claude_executable')
+        self.call_order.attach_mock(self.agent_cli.sync_claude_standards, 'sync_claude_standards')
+        self.call_order.attach_mock(self.agent_cli.launch_tab, 'launch_tab')
 
     def run_main(self, *args):
         argv = ['--working-directory', self.directory, '--prompt-path', str(self.prompt_path), *args]
@@ -92,6 +118,12 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 2)
         self.agent_cli.launch_tab.assert_not_called()
 
+    def test_an_invalid_effort_is_rejected_by_argparse(self):
+        with self.assertRaises(SystemExit) as raised:
+            self.run_main('--effort', 'ultra')
+        self.assertEqual(raised.exception.code, 2)
+        self.agent_cli.launch_tab.assert_not_called()
+
     # --- argument assembly and order ---
 
     def test_no_model_lane_or_permission_flags_means_only_the_prompt_sentence(self):
@@ -100,13 +132,15 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(len(arguments), 1)
         self.assertTrue(arguments[0].startswith('Read the file at'))
 
-    def test_dangerously_skip_permissions_then_model_then_the_prompt_sentence(self):
-        self.run_main('--dangerously-skip-permissions', '--model', 'explicit-model')
+    def test_dangerously_skip_permissions_then_model_then_effort_then_the_prompt_sentence(self):
+        self.run_main('--dangerously-skip-permissions', '--model', 'explicit-model', '--effort', 'high')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(arguments[0], '--dangerously-skip-permissions')
         self.assertEqual(arguments[1], '--model')
         self.assertEqual(arguments[2], 'explicit-model')
-        self.assertTrue(arguments[3].startswith('Read the file at'))
+        self.assertEqual(arguments[3], '--effort')
+        self.assertEqual(arguments[4], 'high')
+        self.assertTrue(arguments[5].startswith('Read the file at'))
 
     def test_the_prompt_sentence_names_the_resolved_prompt_path_and_current_directory(self):
         self.run_main()
@@ -138,6 +172,43 @@ class LaunchClaudeTests(unittest.TestCase):
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         self.assertEqual(arguments[arguments.index('--model') + 1], CLAUDE_LANES['frontier']['model'])
 
+    # --- effort precedence, against the real lane table (H1) ---
+
+    def test_an_explicit_effort_is_passed_through_with_no_model_or_lane(self):
+        self.run_main('--effort', 'high')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(arguments[arguments.index('--effort') + 1], 'high')
+        self.assertNotIn('--model', arguments)
+
+    def test_a_lane_with_a_priced_effort_passes_both_model_and_effort_in_order(self):
+        self.assertIn('effort', CLAUDE_LANES['lanes']['L3'])  # sanity: the table really prices one
+        self.run_main('--lane', 'L3')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(arguments[arguments.index('--model') + 1], CLAUDE_LANES['lanes']['L3']['model'])
+        self.assertEqual(arguments[arguments.index('--effort') + 1], CLAUDE_LANES['lanes']['L3']['effort'])
+        self.assertLess(arguments.index('--model'), arguments.index('--effort'))
+
+    def test_a_lane_with_no_priced_effort_passes_no_effort_flag(self):
+        self.assertNotIn('effort', CLAUDE_LANES['lanes']['L7'])  # sanity: the table prices none
+        self.run_main('--lane', 'L7')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertNotIn('--effort', arguments)
+
+    def test_an_explicit_effort_beats_the_lanes_own_effort(self):
+        self.run_main('--lane', 'L3', '--effort', 'low')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(arguments[arguments.index('--effort') + 1], 'low')
+
+    def test_an_explicit_model_beating_the_lane_drops_the_lanes_effort_too(self):
+        self.run_main('--lane', 'L3', '--model', 'explicit-model')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertNotIn('--effort', arguments)
+
+    def test_frontier_resolves_its_own_effort(self):
+        self.run_main('--frontier')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(arguments[arguments.index('--effort') + 1], CLAUDE_LANES['frontier']['effort'])
+
     # --- forced environment, sync-before-launch ---
 
     def test_force_environment_matches_the_native_claude_colour_contract(self):
@@ -145,11 +216,18 @@ class LaunchClaudeTests(unittest.TestCase):
         force = self.agent_cli.launch_tab.call_args.kwargs['force']
         self.assertEqual(force, {'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
 
-    def test_standards_are_synced_before_launch(self):
+    def test_standards_are_synced_before_launch_in_order(self):
         self.run_main()
-        self.agent_cli.sync_claude_standards.assert_called_once()
+        self.assertEqual(
+            [call[0] for call in self.call_order.mock_calls],
+            ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
+        )
         self.assertEqual(self.agent_cli.sync_claude_standards.call_args.kwargs.get('claude'), '/bin/claude')
-        self.agent_cli.launch_tab.assert_called_once()
+
+    def test_stdio_is_hardened_against_encoding_errors(self):
+        with mock.patch.object(self.agent_cli, 'make_stdio_encoding_lossy') as hardened:
+            self.run_main()
+        hardened.assert_called_once()
 
     # --- success message ---
 
@@ -161,15 +239,26 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertIn('on the CLI default model', out)
         self.assertIn(f'with prompt {self.prompt_path.resolve()}', out)
 
-    def test_success_message_with_a_lane_reports_the_lane_and_resolved_model(self):
+    def test_success_message_with_a_lane_reports_the_lane_model_and_effort(self):
         code, out, _ = self.run_main('--lane', 'L3')
         self.assertEqual(code, 0)
-        self.assertIn(f"on lane L3 -> {CLAUDE_LANES['lanes']['L3']['model']}", out)
+        self.assertIn(
+            f"on lane L3 -> {CLAUDE_LANES['lanes']['L3']['model']} at {CLAUDE_LANES['lanes']['L3']['effort']}",
+            out,
+        )
 
-    def test_success_message_with_frontier_reports_the_frontier_tier_and_model(self):
+    def test_success_message_with_a_lane_with_no_effort_omits_at(self):
+        code, out, _ = self.run_main('--lane', 'L7')
+        self.assertEqual(code, 0)
+        self.assertIn(f"on lane L7 -> {CLAUDE_LANES['lanes']['L7']['model']} with prompt", out)
+
+    def test_success_message_with_frontier_reports_the_frontier_tier_model_and_effort(self):
         code, out, _ = self.run_main('--frontier')
         self.assertEqual(code, 0)
-        self.assertIn(f"on frontier -> {CLAUDE_LANES['frontier']['model']}", out)
+        self.assertIn(
+            f"on frontier -> {CLAUDE_LANES['frontier']['model']} at {CLAUDE_LANES['frontier']['effort']}",
+            out,
+        )
 
     def test_a_launch_error_from_launch_tab_is_reported_and_exits_nonzero(self):
         self.agent_cli.launch_tab.side_effect = self.agent_cli.LaunchError('no terminal detected')
@@ -186,6 +275,18 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(out, '')
         self.agent_cli.launch_tab.assert_not_called()
 
+    # --- H2: a LaunchTimeout is distinct from a definite failure ---
+
+    def test_a_launch_timeout_exits_3_and_tells_the_caller_not_to_retry_blind(self):
+        self.agent_cli.launch_tab.side_effect = self.agent_cli.LaunchTimeout(
+            'Windows Terminal did not answer within 30 seconds; it may still have taken effect.'
+        )
+        code, out, err = self.run_main()
+        self.assertEqual(code, 3)
+        self.assertIn('did not answer within 30 seconds', err)
+        self.assertIn('may already have opened', err)
+        self.assertNotIn('Launched', out)
+
     # --- symlinked working directory ---
 
     def test_a_symlinked_working_directory_reaches_the_tab_as_given(self):
@@ -201,6 +302,84 @@ class LaunchClaudeTests(unittest.TestCase):
             code = LAUNCH_CLAUDE.main(argv)
         self.assertEqual(code, 0, err.getvalue())
         self.assertEqual(self.agent_cli.launch_tab.call_args.args[0], link)
+
+
+class LaunchClaudeEndToEndTests(unittest.TestCase):
+    """main() through the REAL agent_cli.launch_tab and open_claude_tab (H7) -- only
+    resolve_claude_executable and sync_claude_standards are mocked. Exercises the real tmux handler, the
+    real environment scrub and the real argument assembly, with only `subprocess.run` faked."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='launch claude e2e ')
+        self.addCleanup(temp.cleanup)
+        self.directory = temp.name
+        self.prompt_path = Path(self.directory) / 'draft prompt.md'
+        self.prompt_path.write_text('Read this and continue.\n')
+
+        self.calls = []
+
+        def fake_run(cmd, **kwargs):
+            self.calls.append((cmd, kwargs))
+            return subprocess.CompletedProcess(cmd, 0, stdout='', stderr='')
+
+        self.agent_cli = real_agent_cli_for_e2e(fake_run)
+
+        windows_patcher = mock.patch.object(self.agent_cli, 'IS_WINDOWS', False)
+        windows_patcher.start()
+        self.addCleanup(windows_patcher.stop)
+
+        load_patcher = mock.patch.object(LAUNCH_CLAUDE, '_load_agent_cli', return_value=self.agent_cli)
+        load_patcher.start()
+        self.addCleanup(load_patcher.stop)
+
+        # Only TMUX is set, so the real detection order picks the tmux handler and nothing else (kitty,
+        # Konsole and Windows Terminal are each gated on their own, otherwise-absent, environment variable).
+        environ_patcher = mock.patch.dict(os.environ, {'TMUX': 'session'}, clear=True)
+        environ_patcher.start()
+        self.addCleanup(environ_patcher.stop)
+
+    def test_main_reaches_the_real_tmux_handler_with_the_exact_expected_argv(self):
+        argv = [
+            '--working-directory', self.directory,
+            '--prompt-path', str(self.prompt_path),
+            '--title', 'e2e handoff',
+            '--lane', 'L3',
+        ]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = LAUNCH_CLAUDE.main(argv)
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertEqual(len(self.calls), 1)
+        cmd, kwargs = self.calls[0]
+
+        self.assertEqual(cmd[:4], ['tmux', 'new-window', '-n', 'e2e handoff'])
+        self.assertEqual(cmd[4], '--')
+        inner = cmd[5:]
+        directory = str(Path(os.path.abspath(self.directory)))
+        self.assertEqual(inner[:5], ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', directory])
+        self.assertEqual(inner[5], 'env')
+
+        claude_index = inner.index('/bin/claude')
+        expected_prompt_sentence = (
+            f'Read the file at {self.prompt_path.resolve()} and follow its instructions, '
+            'working from the current directory.'
+        )
+        self.assertEqual(
+            inner[claude_index:],
+            ['/bin/claude', '--model', CLAUDE_LANES['lanes']['L3']['model'],
+             '--effort', CLAUDE_LANES['lanes']['L3']['effort'], expected_prompt_sentence],
+        )
+
+        env_args = inner[6:claude_index]
+        self.assertIn('-u', env_args)
+        self.assertIn('CLAUDECODE', env_args)
+        self.assertIn('AGENT_CLI_TAB_TITLE=e2e handoff', env_args)
+        self.assertIn('FORCE_COLOR=1', env_args)
+        # TERM is never forced or cleared on POSIX: the terminal that starts the tab sets it itself.
+        self.assertFalse(any(arg.startswith('TERM=') for arg in env_args))
+
+        self.assertEqual(kwargs.get('stdin'), subprocess.DEVNULL)
+        self.agent_cli.sync_claude_standards.assert_called_once()
 
 
 class InstalledLayoutTests(unittest.TestCase):
