@@ -297,9 +297,7 @@ def main(argv=None):
             result = send(proxy, receipt, args.receipt, message)
     except (FollowupError, OSError, ValueError, KeyError, TypeError, AttributeError) as error:
         mismatch = isinstance(error, ReceiptMismatch)
-        if isinstance(error, Rejected):
-            status, next_action = 'rejected', 'Check this receipt; do not resend.'
-        elif mismatch:
+        if mismatch:
             status, next_action = 'unavailable', (
                 'Nothing was sent for this message by this run; this receipt path already holds a '
                 'receipt for a different message or target. Use a new receipt file for this message; '
@@ -317,6 +315,8 @@ def main(argv=None):
             status, next_action = 'unavailable', (
                 'No send was attempted. Provide the message for the user to paste into the target session.'
             )
+        if isinstance(error, Rejected):
+            status = 'rejected'
         result = {'status': status, 'detail': str(error), 'receipt': str(args.receipt),
                   'acknowledged': False, 'next_action': next_action}
     finally:

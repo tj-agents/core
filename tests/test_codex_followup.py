@@ -254,6 +254,18 @@ class FollowupTests(unittest.TestCase):
         self.assertIn('different target', result['detail'])
         self.assertEqual([], proxy.calls)
 
+    def test_rejection_before_any_receipt_offers_the_message_for_paste(self):
+        class RejectingSession(Session):
+            def initialize(self):
+                raise FOLLOWUP.Rejected('unsupported')
+
+        code, result = self.run_main(self.arguments(), RejectingSession(self.receipt))
+        self.assertEqual(2, code)
+        self.assertEqual('rejected', result['status'])
+        self.assertIn('paste', result['next_action'])
+        self.assertNotIn('do not resend', result['next_action'])
+        self.assertFalse(self.receipt_path.exists())
+
     def test_preexisting_mismatched_receipt_does_not_claim_unverified(self):
         foreign = dict(self.receipt, message_sha256='different')
         self.receipt_path.write_text(json.dumps(foreign))
