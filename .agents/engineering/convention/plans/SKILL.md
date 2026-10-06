@@ -74,8 +74,8 @@ A plan, ledger, roadmap, or handoff may sequence delivery, but anonymous procedu
 push`, `do not open a PR`, or `do not merge` has no authority to suppress the standing plan-delivery contract.
 Location alone never makes a restriction stale: preserve an explicit current user limitation, recorded
 repository authorization, named PR/head security or validation hold, merge hold, or repository stop class as
-a typed delivery gate. When no such live authority is identified, continue to merged default-branch state.
-`engineering:merging` owns the goal-wide merge-authorization scope.
+a typed delivery gate. When no such live authority is identified, continue to merged default-branch state
+(`engineering:merging` owns the goal-wide merge-authorization scope).
 
 ## Shape of a plan
 
