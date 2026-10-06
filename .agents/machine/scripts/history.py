@@ -93,7 +93,7 @@ def _worktree_variants(worktree):
     """Variants of the path as given and as resolved; sessions record whichever spelling their shell used
     (8.3 short names, junctions, subst or mapped drives)."""
     path = Path(worktree).expanduser()
-    spellings = (normalize_for_match(path.absolute()), normalize_for_match(path.resolve()))
+    spellings = (normalize_for_match(os.path.abspath(path)), normalize_for_match(path.resolve()))
     return list(dict.fromkeys(variant for spelling in spellings for variant in _path_variants(spelling)))
 
 
