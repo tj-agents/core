@@ -67,19 +67,20 @@ GIT_TIMEOUT = 10
 
 
 class Declaration:
-    def __init__(self, plugin, marketplace, data, payload_dir=None, orphaned=False):
+    def __init__(self, plugin, marketplace, data, payload_dir=None, orphaned=False, diagnostics=()):
         self.plugin = plugin
-        self.schema_version = data["schema_version"]
+        self.schema_version = data.get("schema_version")
         self.marketplace = marketplace
-        self.tier = data["tier"]
-        self.applies = data["applies"]
-        self.stack = data.get("stack") or data["tier"]
+        self.tier = _text(data.get("tier")) or plugin
+        self.applies = data.get("applies")
+        self.stack = _text(data.get("stack")) or self.tier
         owner = data.get("owner_repository")
-        owner = [owner] if isinstance(owner, str) else list(owner or [])
+        owner = [owner] if isinstance(owner, str) else owner if isinstance(owner, list) else []
         self.owner_repositories = [_text(name).lower() for name in owner if _text(name)]
-        self.detect = data.get("detect") or {}
+        self.detect = data.get("detect") if isinstance(data.get("detect"), dict) else {}
         self.payload_dir = payload_dir
         self.orphaned = orphaned
+        self.diagnostics = tuple(diagnostics)
 
     @property
     def id(self):
@@ -328,28 +329,26 @@ def declarations(roots=None, project=None, diagnostics=None):
             version_directory = path.parent
             plugin = version_directory.parent.name
             marketplace = version_directory.parent.parent.name
+            problems = []
             try:
                 data = json.loads(path.read_text(encoding="utf-8-sig"))
+            except FileNotFoundError:
+                continue
             except (OSError, UnicodeError, ValueError):
-                if diagnostics is not None:
-                    diagnostics.append(diagnostic("unreadable-declaration", str(path), "Read a valid tier.json declaration"))
-                continue
-            if not isinstance(data, dict) or data.get("schema_version") not in SCHEMA_VERSIONS:
-                if diagnostics is not None:
-                    diagnostics.append(diagnostic("unsupported-version", str(path), "Supported tier schema versions: 1, 2, 3"))
-                continue
-            if data.get("schema_version") == 3:
-                problems = v3_declaration_diagnostics(data, str(path))
-                if problems:
-                    if diagnostics is not None:
-                        diagnostics.extend(problems)
-                    continue
-            if not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
-                if diagnostics is not None:
-                    diagnostics.append(diagnostic("malformed-declaration", str(path), "Declare tier and applies"))
-                continue
+                data = {}
+                problems.append(diagnostic("unreadable-declaration", str(path), "Read a valid tier.json declaration"))
+            if not isinstance(data, dict):
+                data = {}
+                problems.append(diagnostic("malformed-declaration", str(path), "Declare tier.json as an object"))
+            if not problems:
+                if data.get("schema_version") not in SCHEMA_VERSIONS:
+                    problems.append(diagnostic("unsupported-version", str(path), "Supported tier schema versions: 1, 2, 3"))
+                elif data.get("schema_version") == 3:
+                    problems.extend(v3_declaration_diagnostics(data, str(path)))
+                elif not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
+                    problems.append(diagnostic("malformed-declaration", str(path), "Declare tier and applies"))
             orphaned = (version_directory / ORPHAN_MARKER).exists()
-            declaration = Declaration(plugin, marketplace, data, version_directory, orphaned)
+            declaration = Declaration(plugin, marketplace, data, version_directory, orphaned, problems)
             preference = _preference(declaration, rank)
             current = candidates.get(declaration.id)
             if current is None or preference > current[0]:
@@ -358,7 +357,10 @@ def declarations(roots=None, project=None, diagnostics=None):
             current = found.get(identity)
             if current is None or (current.orphaned and not declaration.orphaned):
                 found[identity] = declaration
-    return sorted(found.values(), key=lambda declaration: declaration.tier)
+    selected = sorted(found.values(), key=lambda declaration: declaration.tier)
+    if diagnostics is not None:
+        diagnostics.extend(problem for declaration in selected for problem in declaration.diagnostics)
+    return selected
 
 
 def _preference(declaration, rank):
@@ -511,7 +513,7 @@ def overridden():
 def assess(root, found=None, facts=None, contexts=None):
     diagnostics = []
     selections = []
-    found = declarations(project=root, diagnostics=diagnostics) if found is None else found
+    found = declarations(project=root) if found is None else found
     if not found:
         return SelectionResult(root, diagnostics=diagnostics)
 
@@ -519,8 +521,14 @@ def assess(root, found=None, facts=None, contexts=None):
     identity = None
     ubiquitous, applicable, blocked = [], [], []
     for declaration in found:
-        if declaration.schema_version not in SCHEMA_VERSIONS:
-            diagnostics.append(diagnostic("unsupported-version", declaration.id, "Supported tier schema versions: 1, 2, 3"))
+        problems = declaration.diagnostics
+        if not problems and declaration.schema_version not in SCHEMA_VERSIONS:
+            problems = (diagnostic("unsupported-version", declaration.id, "Supported tier schema versions: 1, 2, 3"),)
+        if problems:
+            diagnostics.extend(problems)
+            selections.append({"plugin_id": declaration.id, "scope": str(root),
+                               "predicate": declaration.detect, "matched": False,
+                               "prerequisites": (), "evidence": (), "diagnostics": problems})
             blocked.append(declaration)
             continue
         if not declaration.gated:
@@ -617,13 +625,10 @@ def conventions(root, found=None):
     """The review's rule source: each applicable stack tier's shipped conventions, as one listing."""
     result = assess(root, found)
     _, applicable, _ = result
-    if result.diagnostics:
-        return "\n".join("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
-                         for problem in result.diagnostics)
-    if not applicable:
-        return "Tier gate - no stack tier applies to this project; no tier conventions to load."
-
-    lines = ["Tier gate - conventions of every tier that applies to this project."]
+    lines = ["Tier gate - conventions of every tier that applies to this project." if applicable else
+             "Tier gate - no stack tier applies to this project; no tier conventions to load."]
+    lines.extend("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
+                 for problem in result.diagnostics)
     for declaration, reason in applicable:
         skills = contract_skills(declaration.payload_dir)
         lines.append("")
@@ -656,7 +661,11 @@ def shell_command(payload):
     return _text(command)
 
 
-def refusal(declaration, subject, root):
+def refusal(declaration, subject, root, diagnostics=()):
+    if diagnostics:
+        return "Tier gate blocked " + subject + ".\n" + "\n".join(
+            "Configuration diagnostic for " + declaration.id + ": " + problem["path"] + ": " + problem["message"]
+            for problem in diagnostics)
     markers = [
         *(declaration.detect.get("files") or []),
         *(declaration.detect.get("globs") or []),
@@ -677,9 +686,15 @@ def refusal(declaration, subject, root):
     )
 
 
+def selection_diagnostics(result, declaration):
+    return tuple(problem for selection in result.selections if selection["plugin_id"] == declaration.id
+                 for problem in selection["diagnostics"])
+
+
 def gate(payload, found=None):
     root = project_root(payload)
-    _, _, blocked = assess(root, found)
+    result = assess(root, found)
+    _, _, blocked = result
     if not blocked:
         return 0
 
@@ -688,7 +703,7 @@ def gate(payload, found=None):
     if separator and skill:
         for declaration in blocked:
             if declaration.plugin == plugin:
-                print(refusal(declaration, "`" + name + "`", root), file=sys.stderr)
+                print(refusal(declaration, "`" + name + "`", root, selection_diagnostics(result, declaration)), file=sys.stderr)
                 return 2
 
     command = shell_command(payload)
@@ -697,7 +712,7 @@ def gate(payload, found=None):
         for declaration in blocked:
             if "/" + declaration.marketplace + "/" + declaration.plugin + "/" in haystack:
                 subject = "that read of a `" + declaration.tier + "` standard"
-                print(refusal(declaration, subject, root), file=sys.stderr)
+                print(refusal(declaration, subject, root, selection_diagnostics(result, declaration)), file=sys.stderr)
                 return 2
     return 0
 
