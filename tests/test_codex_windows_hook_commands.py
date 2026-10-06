@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -11,6 +12,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CodexWindowsHookCommands(unittest.TestCase):
+    def test_authored_pretool_budgets_leave_time_for_host_response(self):
+        names = []
+        for name in ("base", "engineering"):
+            manifest = json.loads(
+                (ROOT / ".agents" / "plugins" / "manifests" / "codex" / f"{name}-hooks.json")
+                .read_text(encoding="utf-8")
+            )
+            for group in manifest["hooks"]["PreToolUse"]:
+                for hook in group["hooks"]:
+                    command = hook["commandWindows"]
+                    budget = float(re.search(r"--timeout (\d+)", command)[1])
+                    script = command.rsplit("/", 1)[-1].rstrip('"')
+                    names.append(script)
+                    self.assertEqual(budget, 7 if script == "tier_gate.py" else 12)
+                    self.assertEqual(hook["timeout"] - budget, 3)
+        self.assertCountEqual(names, [
+            "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
+            "forge_poll_gate.py", "compact_output_gate.py",
+        ])
+
     def test_every_plugin_uses_host_expanded_plugin_root_and_pretool_adapter(self):
         for name in ("base", "engineering", "machine"):
             with self.subTest(plugin=name):
@@ -57,11 +78,15 @@ class CodexWindowsHookCommands(unittest.TestCase):
             crash.write_text("raise RuntimeError('probe failure')\n", encoding="utf-8")
             adapter = plugin / "hooks" / "pre_tool_use_adapter.py"
             failed_command = f'python -B "{adapter}" "{crash}"'
+            hung = root / "hung.py"
+            hung.write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+            hung_command = f'python -B "{adapter}" --timeout 1.5 "{hung}"'
 
             for shell in shells:
                 for active_command, expected_reason in (
                     (expanded, "missing-marketplace:never-shipped"),
                     (failed_command, "failed with exit code 1"),
+                    (hung_command, "timed out during child execution/output collection"),
                 ):
                     with self.subTest(shell=shell, reason=expected_reason):
                         arguments = ([shell, "-NoProfile", "-Command", active_command]
