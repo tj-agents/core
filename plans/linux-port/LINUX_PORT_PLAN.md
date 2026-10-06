@@ -30,8 +30,9 @@ The user authorized the whole port, one PR per step, including review and merge 
   `allow_remote_control socket-only`, in the user's dotfiles (tomjseery/dotfiles `a908963`). Only kitty
   processes started after that change have the socket.
 - Catalog digests are generated output. PRs leave them uncommitted; CI's guard rejects them (step 1).
-- Open: on Windows with no detected terminal but `wt.exe` present, keep today's
-  `wt.exe --window 0 new-tab` (proposed) or open a new window with a warning. Needed before step 2's handlers.
+- On Windows with no detected terminal but `wt.exe` present, keep today's `wt.exe --window 0 new-tab`:
+  still a tab, in the most recently used Windows Terminal window (user decision, 2026-10-06).
+- The Windows Terminal handler runs only on Windows; `WT_SESSION` reaching WSL through `WSLENV` is ignored.
 
 ## Steps and acceptance criteria
 
@@ -41,7 +42,7 @@ what still needs checking on Windows.
 - [x] Shared library `.agents/machine/scripts/agent_cli.py`: environment scrub, Claude/Codex executable
   discovery, standards sync, lane lookup, Windows Terminal argument escaping (#106).
 - [x] Kitty remote control in dotfiles, verified from a fresh kitty.
-- [ ] 1. CI guard rejects committed catalog digests, so concurrent PRs stop conflicting on them.
+- [x] 1. CI guard rejects committed catalog digests, so concurrent PRs stop conflicting on them (#107).
 - [ ] 2. `open-claude` -> `scripts/open_claude.py` with the tab handlers; SKILL.md updated; `.ps1`
   deleted. Verified by opening a real tab in kitty on this machine.
 - [ ] 3. `handoff-claude` -> Python, then `handoff-codex` -> Python (`codex_marketplace_sync.ps1` with it).
@@ -56,9 +57,10 @@ what still needs checking on Windows.
 
 ## Current progress
 
-Shared library merged (#106, after the interim path fix #105). Kitty configured. Step 1 in progress on
-`Fix/CatalogDigestGuard`.
+Shared library merged (#106, after the interim path fix #105). Kitty configured. Step 1 merged (#107).
+Step 2 on `Feature/OpenClaudePython`: ported, reviewed, review findings fixed; a real kitty tab was
+opened from `open_claude.py` on this machine.
 
 ## Next Steps
 
-Land step 1, then resolve the open Windows-fallback decision and start step 2.
+Land step 2, then start step 3 (`handoff-claude`).
