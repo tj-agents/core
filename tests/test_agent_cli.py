@@ -364,6 +364,11 @@ class LaunchTabTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(prefix='agent cli tab ')
         self.addCleanup(temp.cleanup)
         self.directory = str(Path(temp.name).resolve())
+        # The POSIX handlers run only on POSIX, so these tests run as POSIX on every platform; the Windows
+        # Terminal tests patch it back to Windows themselves.
+        patcher = mock.patch.object(CLI, 'IS_WINDOWS', False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_a_missing_working_directory_is_rejected_before_any_handler_runs(self):
         with self.assertRaisesRegex(CLI.LaunchError, 'not a directory'):
@@ -635,6 +640,7 @@ class LaunchTabTests(unittest.TestCase):
                                    run=fake_run(), popen=mock.Mock())
 
 
+@unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX inner command is only ever started on POSIX')
 class PosixInnerCommandExecutionTests(unittest.TestCase):
     """Actually runs the POSIX inner command (and the Konsole script that wraps it) through `sh`."""
 
