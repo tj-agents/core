@@ -45,6 +45,19 @@ class LaunchTimeout(LaunchError):
     """A terminal control command did not answer in time, so whether it took effect is unknown."""
 
 
+def make_stdio_encoding_lossy():
+    """Replace an unencodable character in a print rather than crashing it.
+
+    A console code page (Windows cp1252) or a redirected pipe can reject a character in a title or path
+    that the terminal itself displayed fine. Called once at the top of a launcher's `main`, before any
+    print: without it, a success message for a launch that already happened can raise UnicodeEncodeError
+    and get reported as a failure.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(errors='replace')
+
+
 def launch_environment(clear=(), force=None):
     """The environment changes a launched CLI needs: names to remove and values to set.
 
@@ -222,6 +235,18 @@ def sync_claude_standards(working_directory, claude=None, out=print):
     result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for line in result.stdout.splitlines():
         out(line)
+
+
+def prompt_file_argument(path):
+    """The 'Read the file at ...' sentence for a prepared prompt file, resolved and validated.
+
+    Shared by open-claude's `--prompt-path` and handoff-claude's `--prompt-path` so the wording and the
+    file check have one owner.
+    """
+    resolved = Path(path).resolve()
+    if not resolved.is_file():
+        raise LaunchError(f'Prompt path is not a file: {resolved}')
+    return f'Read the file at {resolved} and follow its instructions, working from the current directory.'
 
 
 def _lanes_module():
@@ -530,3 +555,30 @@ def launch_tab(working_directory, executable, title, arguments=(), clear=(), for
             return handler(directory, executable, title, arguments, cleared, forced, environ, run, popen)
 
     return _launch_new_window(directory, executable, title, arguments, cleared, forced, environ, run, popen)
+
+
+def open_claude_tab(working_directory, title, arguments, out=print):
+    """Resolve the native claude executable, sync standards and open the tab; returns the absolute directory.
+
+    Shared by open-claude and handoff-claude so the directory check, executable discovery, pre-launch
+    standards sync and the forced colour environment have one owner. Each caller keeps only its own
+    argument parsing, model/argument assembly, printing and exit codes.
+    """
+    # Absolute but not resolved: Claude Code keys a session's history by the directory string it started
+    # in, so a symlinked checkout or a Windows mapped or subst drive must reach the tab as given.
+    directory = Path(os.path.abspath(working_directory))
+    if not directory.is_dir():
+        raise LaunchError(f'Working directory is not a directory: {working_directory}')
+
+    claude = resolve_claude_executable()
+    sync_claude_standards(directory, claude=claude, out=out)
+
+    # Forced, not merely un-cleared: an automation-spawned terminal tab is not the interactive shell a
+    # human would have launched it from, so colour/terminal-capability auto-detection cannot be trusted to
+    # land on a good value on its own. FORCE_COLOR is the de-facto Node CLI convention (chalk/supports-color)
+    # to force colour outright. TERM=xterm-256color is forced the same way, but only ever reaches the
+    # session on Windows: launch_tab drops any forced TERM on POSIX, because the terminal that actually
+    # starts the tab sets TERM for that session itself, and forcing or clearing it here would fight that.
+    launch_tab(directory, claude, title, arguments=list(arguments), force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
+
+    return directory
