@@ -4,6 +4,8 @@ import importlib.util
 import io
 import json
 import os
+import shlex
+import shutil
 from pathlib import Path
 import stat
 import subprocess
@@ -93,6 +95,34 @@ def through_windows_terminal(executable, *arguments):
             '--suppressApplicationTitle', executable, *arguments]
     commands = split_subcommands([CLI.terminal_argument(value) for value in argv])
     return len(commands), deliver(commands[0])
+
+
+@unittest.skipUnless(CLI.IS_WINDOWS, 'the real CommandLineToArgvW exists only on Windows')
+class CommandLineModelTests(unittest.TestCase):
+    """Pins the Python model of CommandLineToArgvW to the real API, which the model stands in for elsewhere."""
+
+    def real(self, line):
+        import ctypes
+        from ctypes import wintypes
+        shell32 = ctypes.windll.shell32
+        shell32.CommandLineToArgvW.restype = ctypes.POINTER(wintypes.LPWSTR)
+        count = ctypes.c_int()
+        argv = shell32.CommandLineToArgvW(line, ctypes.byref(count))
+        try:
+            return [argv[i] for i in range(1, count.value)]
+        finally:
+            ctypes.windll.kernel32.LocalFree(argv)
+
+    def test_the_model_matches_the_real_api_for_every_delivered_command_line(self):
+        values = ['Phase one: migrate Auth; then Search.\nPhase two: verify "end to end"; report back.',
+                  'C:\\dir with space\\', 'next', 'C:\\two\\\\ trailing\\\\', 'a\\"b c', 'a\\\\"b',
+                  '"', 'say "hi"', 'x\\;y', 'a b\\;', 'a;b', ';', 'a\\\\;b c', 'tab\there too']
+        commands = split_subcommands([CLI.terminal_argument(value) for value in
+                                      ['--suppressApplicationTitle', 'C:\\Users\\Test User\\claude.exe', *values]])
+        self.assertEqual(len(commands), 1)
+        joined = 'stub.exe' + ''.join(' ' + (f'"{token}"' if ' ' in token else token) for token in commands[0][1:])
+        self.assertEqual(command_line_to_argv(joined), self.real(joined))
+        self.assertEqual(self.real(joined), ['C:\\Users\\Test User\\claude.exe', *values])
 
 
 class TerminalArgumentTests(unittest.TestCase):
@@ -333,12 +363,21 @@ class LaunchTabTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='agent cli tab ')
         self.addCleanup(temp.cleanup)
-        self.directory = temp.name
+        self.directory = str(Path(temp.name).resolve())
 
     def test_a_missing_working_directory_is_rejected_before_any_handler_runs(self):
         with self.assertRaisesRegex(CLI.LaunchError, 'not a directory'):
             CLI.launch_tab(os.path.join(self.directory, 'missing'), '/bin/exe', 'Tab',
                             environ={'TMUX': 'x'}, run=fake_run(), popen=mock.Mock())
+
+    def test_a_relative_working_directory_is_resolved_before_it_reaches_the_tab(self):
+        run = fake_run([('', '', 0)])
+        previous = os.getcwd()
+        os.chdir(self.directory)
+        self.addCleanup(os.chdir, previous)
+        CLI.launch_tab('.', '/bin/exe', 'Tab', environ={'TMUX': 'x'}, run=run, popen=mock.Mock())
+        self.assertIn(self.directory, run.calls[0][0])
+        self.assertNotIn('.', run.calls[0][0])
 
     def test_detection_order_tmux_wins_over_kitty_window_id(self):
         run = fake_run([('', '', 0)])
@@ -360,8 +399,8 @@ class LaunchTabTests(unittest.TestCase):
         CLI.launch_tab(self.directory, '/bin/exe', 'My Title', arguments=['--flag', 'v'],
                         environ={'TMUX': 'session'}, run=run, popen=mock.Mock())
         cmd, kwargs = run.calls[0]
-        self.assertEqual(cmd[:6], ['tmux', 'new-window', '-d', '-n', 'My Title', '--'])
-        inner = cmd[6:]
+        self.assertEqual(cmd[:5], ['tmux', 'new-window', '-n', 'My Title', '--'])
+        inner = cmd[5:]
         self.assertEqual(inner[:5], ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', self.directory])
         self.assertEqual(inner[5], 'env')
         self.assertIn('AGENT_CLI_TAB_TITLE=My Title', inner)
@@ -375,7 +414,7 @@ class LaunchTabTests(unittest.TestCase):
                         run=run, popen=mock.Mock())
         cmd, kwargs = run.calls[0]
         self.assertEqual(cmd[:4], ['kitty', '@', '--to', 'unix:/tmp/kitty-99'])
-        self.assertEqual(cmd[4:8], ['launch', '--type=tab', '--match', 'id:42'])
+        self.assertEqual(cmd[4:8], ['launch', '--type=tab', '--match', 'window_id:42'])
         self.assertEqual(cmd[8:10], ['--tab-title', 'A Tab'])
         self.assertEqual(cmd[10], 'sh')
         self.assertEqual(kwargs, {'stdin': subprocess.DEVNULL, 'capture_output': True, 'text': True, 'timeout': 30})
@@ -390,19 +429,34 @@ class LaunchTabTests(unittest.TestCase):
 
     def test_konsole_handler_exact_dbus_calls_and_script_invocation(self):
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
-        run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0)])
+        run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0), ('', '', 0)])
         with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus6' if name == 'qdbus6' else None):
             CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
         self.assertEqual(run.calls[0][0], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Windows/1', 'newSession'])
-        self.assertEqual(run.calls[1][0],
-                          ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7', 'setTitle', '1', 'A Tab'])
-        run_command = run.calls[2][0]
+        for call, context in zip(run.calls[1:3], ('0', '1')):
+            self.assertEqual(call[0], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7',
+                                       'setTabTitleFormat', context, 'A Tab'])
+        run_command = run.calls[3][0]
         self.assertEqual(run_command[:4], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7', 'runCommand'])
         self.assertTrue(run_command[4].startswith('exec sh '))
+        script = Path(shlex.split(run_command[4])[2])
+        self.addCleanup(shutil.rmtree, script.parent, True)
+        self.assertTrue(script.is_file())
+
+    def test_a_failed_konsole_run_command_removes_its_script(self):
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0), ('', 'no such session', 1)])
+        created = []
+        real_write = CLI._write_posix_script
+        with mock.patch.object(CLI, '_write_posix_script', side_effect=lambda inner: created.append(real_write(inner)) or created[-1]):
+            with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus6' if name == 'qdbus6' else None):
+                with self.assertRaisesRegex(CLI.LaunchError, 'no such session'):
+                    CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
+        self.assertFalse(created[0].parent.exists())
 
     def test_konsole_falls_back_to_qdbus_when_qdbus6_is_absent(self):
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
-        run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0)])
+        run = fake_run([('7', '', 0), ('', '', 0), ('', '', 0), ('', '', 0)])
         with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus' if name == 'qdbus' else None):
             CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
         self.assertEqual(run.calls[0][0][0], '/usr/bin/qdbus')
@@ -433,7 +487,7 @@ class LaunchTabTests(unittest.TestCase):
     def test_windows_terminal_handler_argv_escaped_and_env_passed_via_kwarg(self):
         run = fake_run([('', '', 0)])
         environ = {'WT_SESSION': 'abc', 'SOME_OTHER': 'x', 'CLAUDECODE': '1'}
-        with mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
+        with mock.patch.object(CLI, 'IS_WINDOWS', True), mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
             CLI.launch_tab(self.directory, 'C:\\exe with space\\claude.exe', 'A Title',
                             arguments=['--resume', 'id; two'], force={'FORCE_COLOR': '1'},
                             environ=environ, run=run, popen=mock.Mock())
@@ -451,16 +505,44 @@ class LaunchTabTests(unittest.TestCase):
 
     def test_windows_terminal_handler_failure_raises(self):
         run = fake_run([('', 'wt.exe: boom', 1)])
-        with mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
+        with mock.patch.object(CLI, 'IS_WINDOWS', True), mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
             with self.assertRaisesRegex(CLI.LaunchError, 'boom'):
                 CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'WT_SESSION': 'abc'}, run=run, popen=mock.Mock())
+
+    @unittest.skipIf(CLI.IS_WINDOWS, 'WT_SESSION is honoured on Windows')
+    def test_wt_session_inherited_into_wsl_is_not_treated_as_a_terminal(self):
+        run = fake_run([('', '', 0)])
+        with mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
+            CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'WT_SESSION': 'abc', 'TMUX': 'x'},
+                           run=run, popen=mock.Mock())
+            with self.assertRaisesRegex(CLI.LaunchError, 'no graphical display'):
+                CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'WT_SESSION': 'abc'},
+                               run=fake_run(), popen=mock.Mock())
+        self.assertEqual(run.calls[0][0][0], 'tmux')
+
+    def test_no_terminal_on_windows_with_wt_opens_a_tab_without_a_window_warning(self):
+        run = fake_run([('', '', 0)])
+        with mock.patch.object(CLI, 'IS_WINDOWS', True), mock.patch.object(CLI.shutil, 'which', return_value='C:/wt.exe'):
+            with contextlib.redirect_stderr(io.StringIO()) as captured:
+                CLI.launch_tab(self.directory, 'C:/claude.exe', 'Tab', environ={}, run=run, popen=mock.Mock())
+        self.assertEqual(run.calls[0][0][1:4], ['--window', '0', 'new-tab'])
+        self.assertEqual(captured.getvalue(), '')
+
+    @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX no-terminal fallback is exercised here')
+    def test_no_terminal_and_no_display_raises_rather_than_reporting_a_launch(self):
+        popen = mock.Mock()
+        with mock.patch.object(CLI.shutil, 'which', return_value='/usr/bin/xterm'):
+            with self.assertRaisesRegex(CLI.LaunchError, 'no graphical display'):
+                CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={}, run=fake_run(), popen=popen)
+        popen.assert_not_called()
 
     @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX no-terminal fallback is exercised here')
     def test_no_terminal_detected_posix_fallback_uses_popen_with_detached_stdio_and_warns(self):
         popen = mock.Mock()
         with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/xterm' if name == 'xterm' else None):
             with contextlib.redirect_stderr(io.StringIO()) as captured:
-                CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={}, run=fake_run(), popen=popen)
+                CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'WAYLAND_DISPLAY': 'wayland-0'},
+                               run=fake_run(), popen=popen)
         self.assertIn('no terminal', captured.getvalue())
         popen.assert_called_once()
         args, kwargs = popen.call_args
@@ -475,7 +557,8 @@ class LaunchTabTests(unittest.TestCase):
         with mock.patch.object(CLI.shutil, 'which', return_value=None):
             with contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaisesRegex(CLI.LaunchError, 'No terminal'):
-                    CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={}, run=fake_run(), popen=mock.Mock())
+                    CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'DISPLAY': ':0'},
+                                   run=fake_run(), popen=mock.Mock())
 
 
 class PosixInnerCommandExecutionTests(unittest.TestCase):
@@ -523,7 +606,7 @@ class PosixInnerCommandExecutionTests(unittest.TestCase):
         script_path = CLI._write_posix_script(inner)
         self.assertTrue(script_path.is_file())
         self.run_and_check(['sh', str(script_path)])
-        self.assertFalse(script_path.exists(), 'the Konsole script did not delete itself')
+        self.assertFalse(script_path.parent.exists(), 'the Konsole script did not delete itself and its directory')
 
 
 if __name__ == '__main__':
