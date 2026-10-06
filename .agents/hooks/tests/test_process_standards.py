@@ -214,14 +214,25 @@ class ProcessStandardsTests(unittest.TestCase):
             1, corpus.count("Merge authorization is scoped to the goal, not the PR")
         )
 
+        bodies = {
+            name: " ".join(authored_skill(name).read_text(encoding="utf-8").split())
+            for name in (
+                "persistent-delivery",
+                "merge",
+                "plan-execution",
+                "plans",
+                "feature",
+                "bugfix",
+            )
+        }
+        self.assertIn(
+            "an authorization naming no mode records `auto`",
+            bodies["persistent-delivery"],
+        )
         for referrer, pointer in (
             (
                 "persistent-delivery",
                 "the owning goal record (`engineering:merging` owns that goal-wide scope)",
-            ),
-            (
-                "persistent-delivery",
-                "an authorization naming no mode records `auto`",
             ),
             (
                 "merge",
@@ -248,10 +259,7 @@ class ProcessStandardsTests(unittest.TestCase):
             ),
         ):
             with self.subTest(referrer=referrer):
-                body = " ".join(
-                    authored_skill(referrer).read_text(encoding="utf-8").split()
-                )
-                self.assertIn(pointer, body)
+                self.assertIn(pointer, bodies[referrer])
 
         for per_pr_reading in (
             "implementation approval never invents merge authority",

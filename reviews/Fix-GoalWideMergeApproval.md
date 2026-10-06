@@ -105,3 +105,39 @@ directly (small mechanical delta); `docs_reachability.py` on the delta bundle tr
   loop as a second persistent-delivery pair, sharing the loop's normalization. This also makes the GW2
   disposition sentence above ("pins each pointer sentence and the mode default" in the loop) accurate,
   closing the native layer's work-order-accuracy finding.
+
+## Review pass — 2026-10-06 — incremental
+
+**Candidate base:** `a1dba1b2fda68ac8c745c59c1636c7195dfdc6e5`
+**Candidate head:** `5fb895f154466a98d1d6c53fe29aa74a7fd41f22`
+**Candidate branch:** `Fix/GoalWideMergeApproval`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:1b3bfb03a155d60812c0be44b09b63e2920548a03bcf84cd7fec0444eb4764c6` `(4 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\source\repos\tj-agents\core\.git\agent-workflow\runs\goal-wide-merge-approval-review-inc2\review\3bc3e24eba3d0f3fd02cc3725ebb3eadefe30eefb10ec8464853d5f7e722d396`
+**Candidate bundle identity:** `sha256:9942a21f25df9b87ab837dc9705d78dcebd47c47119f44f8b6ace0baa1d3dbed`
+**Work-order path:** `reviews/Fix-GoalWideMergeApproval.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: built-in `code-review` skill (high) over the delta; parent applied the docs lenses
+directly. One native candidate dropped by parent synthesis: "the generalized `auto` default escalates an
+exact-PR approval into unattended authority" misreads the contract — under a delivery binding both
+`merge` and `auto` complete without another user decision; the modes differ in mechanism (enqueue now vs
+wait-then-merge), not authority, so the default escalates nothing.
+
+### Findings
+
+- [x] **GW13 — MEDIUM — review-lifecycle** — `reviews/Fix-GoalWideMergeApproval.md:7`
+  Commit `5fb895f` carried the work order with pass 2 synthesized and its findings ticked while the
+  top-level status stayed `in-progress` and the watermark at `7da0ed7`, violating the synthesis-moves-
+  the-marker rule. Fix: the completion stamp after the final clean pass sets status `complete`, judgment
+  `approved`, and the watermark at the last reviewable head; recorded here so the committed history's
+  transient incoherence has its explanation.
+- [x] **GW14 — LOW — test-shape** — `.agents/hooks/tests/test_process_standards.py:223`
+  Two loop tuples shared the `persistent-delivery` subTest label. Fixed by the restructure below.
+- [x] **GW15 — LOW — accuracy** — `.agents/hooks/tests/test_process_standards.py:217`
+  The GW12 disposition claimed the double read was removed while the loop still re-read per tuple.
+  Fixed: bodies are now read once into a dict the loop and the mode-default assertion share.
+- [x] **GW16 — LOW — test-shape** — `.agents/hooks/tests/test_process_standards.py:224`
+  The mode-default assertion is not an ownership pointer and did not belong in the pointer loop. Fixed:
+  it stands as its own named check above the loop.
