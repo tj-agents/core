@@ -41,6 +41,16 @@
               "-B",
               "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/claude_terminal_profile.py"
             ]
+          },
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+              "--apply"
+            ]
           }
         ]
       }

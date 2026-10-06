@@ -309,8 +309,37 @@
               }
             ],
             "permissions": {
-              "claude_allow": [],
-              "codex_prefix_rules": []
+              "claude_allow": [
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)"
+              ],
+              "codex_prefix_rules": [
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3",
+                      "py"
+                    ],
+                    "-B",
+                    "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                  ],
+                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before any cleanup",
+                  "match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                    ]
+                  ]
+                }
+              ]
             }
           }
         },
@@ -372,6 +401,13 @@
             ],
             "hooks": [
               {
+                "path": ".agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
                 "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
                 "hosts": [
                   "claude",
@@ -405,8 +441,44 @@
               }
             ],
             "permissions": {
-              "claude_allow": [],
-              "codex_prefix_rules": []
+              "claude_allow": [
+                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
+                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)"
+              ],
+              "codex_prefix_rules": [
+                {
+                  "pattern": [
+                    [
+                      "powershell",
+                      "pwsh"
+                    ],
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                  ],
+                  "justification": "engineering:merge Step 5: finish closes this session's own CLI and removes its merged worktree after cleanup_proof.py approved it",
+                  "match": [
+                    [
+                      "powershell",
+                      "-NoProfile",
+                      "-ExecutionPolicy",
+                      "Bypass",
+                      "-File",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "powershell",
+                      "-NoProfile",
+                      "-File",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                    ]
+                  ]
+                }
+              ]
             }
           }
         }

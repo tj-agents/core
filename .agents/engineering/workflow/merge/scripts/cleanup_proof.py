@@ -1,7 +1,10 @@
 r"""Prove a merged worktree/branch is safe to remove, print the exact commands, record a receipt.
 
-Run from the primary checkout. Resolves the primary from the first `git worktree list --porcelain`
-entry, then applies these gates in order:
+Run from the primary checkout, or argument-less from inside the worktree being finished: with
+`--worktree`/`--branch`/`--head` omitted, each is derived from the invocation `cwd` (`git rev-parse
+--show-toplevel`, its branch and HEAD); with `--pr` omitted, it is resolved via `gh pr view <branch>`
+and cross-checked against a slice-3 cleanup obligation for that worktree when one is recorded. Resolves
+the primary from the first `git worktree list --porcelain` entry, then applies these gates in order:
 
 1. the target is a registered, non-primary, attached (non-detached) worktree on exactly the given
    branch and head;
@@ -14,8 +17,9 @@ All gates pass: prints `removable` and the exact `worktree remove`/`branch -d`/`
 exit 0. Any gate fails: prints `preserve: <reason>`, exit 1. Either way, a JSON receipt is written
 under `<AGENT_STATE_DIRECTORY|~/.agents-state>/merge-cleanup/receipts/`.
 
-`CLEANUP_PROOF_FORGE_FIXTURE` names a JSON file with optional `pr_view` and `open_prs` keys to replace
-the two `gh` calls for offline tests; absent, both call the real `gh` CLI.
+`CLEANUP_PROOF_FORGE_FIXTURE` names a JSON file with optional `pr_view`, `open_prs` and (for the
+argument-less `--pr` resolution) `pr_for_branch` keys to replace the `gh` calls for offline tests;
+absent, all three call the real `gh` CLI.
 """
 
 import argparse
@@ -76,6 +80,58 @@ def run_git(cwd, *args, timeout=GIT_TIMEOUT_SECONDS):
 
 def git_succeeds(cwd, *args, timeout=GIT_TIMEOUT_SECONDS):
     return run_git(cwd, *args, timeout=timeout).returncode == 0
+
+
+def derive_context(cwd):
+    result = run_git(cwd, "rev-parse", "--show-toplevel")
+    if result.returncode != 0:
+        raise Preserve("not inside a Git worktree; pass --worktree explicitly")
+    worktree = result.stdout.strip()
+    branch_result = run_git(worktree, "rev-parse", "--abbrev-ref", "HEAD")
+    branch = branch_result.stdout.strip() if branch_result.returncode == 0 else ""
+    if branch_result.returncode != 0 or branch in ("", "HEAD"):
+        raise Preserve(f"{worktree} HEAD is detached; pass --branch explicitly")
+    head_result = run_git(worktree, "rev-parse", "HEAD")
+    if head_result.returncode != 0:
+        raise Preserve(f"cannot resolve HEAD in {worktree}; pass --head explicitly")
+    return worktree, branch, head_result.stdout.strip()
+
+
+def obligation_for_worktree(worktree):
+    digest = hashlib.sha256(Path(worktree).resolve().as_posix().encode("utf-8")).hexdigest()
+    path = state_directory() / "merge-cleanup" / "obligations" / f"{digest}.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def resolve_pr(branch, repo, fixture, obligation):
+    if fixture is not None:
+        value = fixture.get("pr_for_branch")
+        if value is None:
+            raise Preserve(f"no PR recorded for branch {branch}; pass --pr explicitly")
+        number = int(value)
+    else:
+        result = gh(repo, "pr", "view", branch, "--json", "number")
+        if result.returncode != 0:
+            raise Preserve(f"gh pr view {branch} failed: {result.stderr.strip()}")
+        try:
+            data = json.loads(result.stdout)
+        except ValueError as error:
+            raise Preserve(f"gh pr view {branch} returned invalid JSON: {error}") from error
+        value = data.get("number") if isinstance(data, dict) else None
+        if not isinstance(value, int):
+            raise Preserve(f"gh pr view {branch} did not return a PR number")
+        number = value
+    if obligation is not None:
+        recorded_pr = obligation.get("pr")
+        if isinstance(recorded_pr, int) and recorded_pr != number:
+            raise Preserve(f"PR #{number} disagrees with the recorded obligation PR #{recorded_pr}")
+    return number
 
 
 def default_branch(cwd):
@@ -240,32 +296,47 @@ def run(args):
     cwd = Path.cwd()
     default = args.default or default_branch(cwd)
     fixture = load_fixture()
-    worktree = Path(args.worktree).resolve()
+    worktree_value = args.worktree
+    branch = args.branch
+    head = args.head
+    pr = args.pr
     verdict = "removable"
     reason = None
     merge_oid = None
     primary = None
     commands = []
     try:
-        primary, target = resolve_target(cwd, args.worktree, args.branch, args.head)
+        if worktree_value is None or branch is None or head is None:
+            derived_worktree, derived_branch, derived_head = derive_context(cwd)
+            worktree_value = worktree_value or derived_worktree
+            branch = branch or derived_branch
+            head = head or derived_head
+        worktree = Path(worktree_value).resolve()
+        obligation = obligation_for_worktree(worktree)
+        if pr is None:
+            pr = resolve_pr(branch, args.repo, fixture, obligation)
+        primary, target = resolve_target(cwd, worktree_value, branch, head)
         require_clean(target)
-        merge_oid = require_merged(args.pr, args.head, args.repo, fixture)
+        merge_oid = require_merged(pr, head, args.repo, fixture)
         require_contained(primary, default, merge_oid)
-        require_no_open_pr(args.branch, args.repo, fixture)
+        require_no_open_pr(branch, args.repo, fixture)
         commands = [
             f'git -C "{primary}" worktree remove -- "{target}"',
-            branch_deletion_command(primary, args.branch, default),
+            branch_deletion_command(primary, branch, default),
         ]
     except Preserve as error:
         verdict = "preserve"
         reason = error.reason
+        if worktree_value is None:
+            worktree_value = str(cwd)
 
+    worktree = Path(worktree_value).resolve()
     save_receipt(receipt_path(worktree), {
         "worktree": str(worktree),
         "primary": str(primary) if primary is not None else None,
-        "branch": args.branch,
-        "head": args.head,
-        "pr": args.pr,
+        "branch": branch,
+        "head": head,
+        "pr": pr,
         "merge_oid": merge_oid,
         "default": default,
         "verdict": verdict,
@@ -283,10 +354,10 @@ def run(args):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--worktree", required=True)
-    parser.add_argument("--branch", required=True)
-    parser.add_argument("--head", required=True)
-    parser.add_argument("--pr", required=True, type=int)
+    parser.add_argument("--worktree")
+    parser.add_argument("--branch")
+    parser.add_argument("--head")
+    parser.add_argument("--pr", type=int)
     parser.add_argument("--default")
     parser.add_argument("--repo")
     return parser.parse_args(argv)

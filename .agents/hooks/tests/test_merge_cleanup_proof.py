@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -74,11 +75,22 @@ def rebase_merge(primary, worktree, branch):
     return merge_oid, new_head
 
 
-def write_fixture(path, pr_view, open_prs=None):
+def write_fixture(path, pr_view, open_prs=None, pr_for_branch=None):
     path.write_text(
-        json.dumps({"pr_view": pr_view, "open_prs": open_prs if open_prs is not None else []}),
+        json.dumps({
+            "pr_view": pr_view,
+            "open_prs": open_prs if open_prs is not None else [],
+            "pr_for_branch": pr_for_branch,
+        }),
         encoding="utf-8",
     )
+
+
+def write_obligation(state_dir, worktree, pr):
+    digest = hashlib.sha256(Path(worktree).resolve().as_posix().encode("utf-8")).hexdigest()
+    path = Path(state_dir) / "merge-cleanup" / "obligations" / f"{digest}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"pr": pr}), encoding="utf-8")
 
 
 class CleanupProofTests(unittest.TestCase):
@@ -103,6 +115,14 @@ class CleanupProofTests(unittest.TestCase):
         if pass_default:
             args += ["--default", default]
         return subprocess.run(args, cwd=str(primary), capture_output=True, text=True, env=env)
+
+    def run_proof_bare(self, worktree, fixture=None):
+        env = dict(os.environ, AGENT_STATE_DIRECTORY=self.state.name)
+        if fixture is not None:
+            env["CLEANUP_PROOF_FORGE_FIXTURE"] = str(fixture)
+        return subprocess.run(
+            [sys.executable, str(SCRIPT)], cwd=str(worktree), capture_output=True, text=True, env=env,
+        )
 
     def run_commands(self, stdout):
         for line in stdout.strip().splitlines()[1:]:
@@ -267,6 +287,42 @@ class CleanupProofTests(unittest.TestCase):
         self.assertTrue(result.stdout.startswith("removable"))
         self.assertEqual(branch_before, git(primary, "symbolic-ref", "--short", "HEAD"))
         self.assertEqual(head_before, git(primary, "rev-parse", "HEAD"))
+
+    def test_argument_less_operation_derives_everything_from_the_worktree(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(result.stdout.startswith("removable"))
+        self.assertIn("worktree remove", result.stdout)
+
+    def test_argument_less_operation_preserves_on_obligation_pr_mismatch(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+        write_obligation(self.state.name, worktree, pr=99)
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(1, result.returncode)
+        self.assertTrue(result.stdout.startswith("preserve:"))
+        self.assertIn("obligation", result.stdout)
+        self.assertTrue(worktree.exists())
 
 
 if __name__ == "__main__":
