@@ -1,6 +1,6 @@
 # Repair Codex startup hook timeouts
 
-Status: implementing
+Status: native acceptance passed; preparing review
 
 PR: not opened
 
@@ -30,10 +30,14 @@ Raw evidence: `C:/Users/TOMMYS~1/AppData/Local/Temp/codex-hook-timing-4p2clpcw/`
 The bounded slice owns startup dispatch, package wiring, snapshot traversal and their regressions.
 The earlier pre-tool repair was merged separately; this work does not resume the cancelled prompt task.
 The source change preserves snapshot integrity verification while using cached directory entry metadata.
-Dispatcher, package-context and snapshot regressions pass. Native cold acceptance still reproduced
-engineering and machine timeouts, so source implementation alone does not satisfy completion.
-The next diagnostic instruments Python entry, snapshot verification, dispatch and exit in an isolated
-native profile to locate the remaining delay. Full validation belongs to PR CI.
+Dispatcher, package-context and snapshot regressions pass. Native instrumentation traced the remaining
+cold failure to serial file reads: individual PowerShell files took 1-4 seconds to read in native hook
+processes. Bounded concurrent reads retain every integrity check and deterministic hash framing.
+Cold plus two warm native starts now pass, with three completed SessionStart handlers each, all expected
+context and no timeout or dispatcher-overrun notice. Evidence is in
+`C:/Users/TommySeery/AppData/Local/Temp/codex-startup-verified-t_7d7vla/attempt-{0,1,2}.json` and
+workflow run `fix-startup-hook-timeouts`, label `native-parallel-startup-acceptance`.
+Full validation belongs to PR CI.
 
 ## Completion
 
@@ -44,4 +48,4 @@ native profile to locate the remaining delay. Full validation belongs to PR CI.
 
 ## Next action
 
-Resolve the remaining native startup failure, then freeze and review the passing candidate.
+Synchronize once, freeze and review the passing candidate, and deliver through CI.
