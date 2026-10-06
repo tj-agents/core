@@ -19,7 +19,9 @@ class HistoryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='synthetic history ')
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        # Resolved so it matches a --worktree argument after query() resolves it too (Windows
+        # short/long-name spelling, e.g. TOMMYS~1 vs TommySeery, would otherwise never line up).
+        self.root = Path(self.temp.name).resolve()
         self.cwd = self.root / 'project with spaces'
         self.cwd.mkdir()
 
@@ -155,6 +157,76 @@ class HistoryTests(unittest.TestCase):
         result = HISTORY.query(self.root / 'claude', 'claude', worktree=worktree)
         self.assertEqual([item['session'] for item in result], ['newer', 'older'])
 
+    def test_worktree_resolves_relative_path(self):
+        worktree_abs = self.root / 'repo' / '.worktrees' / 'Feature-Rel'
+        worktree_abs.mkdir(parents=True)
+        self.write('claude/project/rel-match.jsonl', [
+            dict(type='user', sessionId='rel-match', cwd=str(worktree_abs), timestamp='2026-01-06T00:00:00Z',
+                 message={'content': 'hi'})])
+        original = Path.cwd()
+        self.addCleanup(os.chdir, original)
+        os.chdir(worktree_abs)
+        result = HISTORY.query(self.root / 'claude', 'claude', worktree=Path('.'))
+        self.assertEqual([item['session'] for item in result], ['rel-match'])
+
+    def test_worktree_matches_git_bash_drive_spelling_on_windows(self):
+        if os.name != 'nt':
+            self.skipTest('MSYS path folding only applies on Windows')
+        worktree = self.root / 'repo' / '.worktrees' / 'Feature-Bash'
+        elsewhere = self.root / 'main-checkout'
+        drive = worktree.drive.rstrip(':').lower()
+        msys_path = f'/{drive}' + str(worktree)[len(worktree.drive):].replace('\\', '/')
+        self.write('claude/project/bash-match.jsonl', [
+            dict(type='user', sessionId='bash-match', cwd=str(elsewhere), timestamp='2026-01-07T00:00:00Z',
+                 message={'content': 'checking via bash'}),
+            dict(type='assistant', cwd=str(elsewhere), timestamp='2026-01-07T00:01:00Z',
+                 message={'content': [dict(type='tool_use', name='Bash', id='t1',
+                                            input={'command': f'git -C "{msys_path}" status'})]})])
+        result = HISTORY.query(self.root / 'claude', 'claude', worktree=worktree)
+        self.assertEqual([item['session'] for item in result], ['bash-match'])
+
+    def test_worktree_boundary_matches_shell_punctuation(self):
+        worktree = self.root / 'repo' / '.worktrees' / 'Fix-B'
+        elsewhere = self.root / 'main-checkout'
+        commands = [
+            f'cd {worktree}; git status',
+            f'(Get-Item {worktree})',
+            f'--git-dir={worktree}',
+        ]
+        for index, command in enumerate(commands):
+            self.write(f'claude/project/punct-{index}.jsonl', [
+                dict(type='user', sessionId=f'punct-{index}', cwd=str(elsewhere),
+                     timestamp='2026-01-08T00:00:00Z', message={'content': 'poke'}),
+                dict(type='assistant', cwd=str(elsewhere), timestamp='2026-01-08T00:01:00Z',
+                     message={'content': [dict(type='tool_use', name='Bash', id='t1',
+                                                input={'command': command})]})])
+        result = HISTORY.query(self.root / 'claude', 'claude', worktree=worktree)
+        self.assertEqual({item['session'] for item in result}, {'punct-0', 'punct-1', 'punct-2'})
+
+    def test_worktree_boundary_excludes_dotted_sibling_file(self):
+        worktree = self.root / 'repo' / '.worktrees' / 'Fix-A'
+        elsewhere = self.root / 'main-checkout'
+        backup = str(worktree) + '.bak'
+        self.write('claude/project/dotted-sibling.jsonl', [
+            dict(type='user', sessionId='dotted-sibling', cwd=str(elsewhere),
+                 timestamp='2026-01-09T00:00:00Z', message={'content': 'restoring a backup'}),
+            dict(type='assistant', cwd=str(elsewhere), timestamp='2026-01-09T00:01:00Z',
+                 message={'content': [dict(type='tool_use', name='Bash', id='t1',
+                                            input={'command': f'cp "{backup}" /tmp'})]})])
+        result = HISTORY.query(self.root / 'claude', 'claude', worktree=worktree)
+        self.assertEqual(result, [])
+
+    def test_worktree_sort_tolerates_naive_timestamp(self):
+        worktree = self.root / 'repo' / '.worktrees' / 'Feature-Naive'
+        self.write('claude/project/naive.jsonl', [
+            dict(type='user', sessionId='naive', cwd=str(worktree), timestamp='2026-01-02T00:00:00',
+                 message={'content': 'no offset here'})])
+        self.write('claude/project/aware.jsonl', [
+            dict(type='user', sessionId='aware', cwd=str(worktree), timestamp='2026-01-01T00:00:00Z',
+                 message={'content': 'has an offset'})])
+        result = HISTORY.query(self.root / 'claude', 'claude', worktree=worktree)
+        self.assertEqual([item['session'] for item in result], ['naive', 'aware'])
+
     def test_existing_selection_modes_unaffected_by_worktree_option(self):
         self.write('claude/project/plain.jsonl', [
             dict(type='user', sessionId='plain', cwd=str(self.cwd), message={'content': 'hi'})])
@@ -162,6 +234,12 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertNotIn('matched_by', result[0])
         self.assertIn('last_activity', result[0])
+
+
+    def test_search_skill_doc_does_not_contradict_worktree_tool_matching(self):
+        text = (ROOT / '.agents/machine/utility/search/SKILL.md').read_text(encoding='utf-8')
+        self.assertNotIn('does not search tool payloads', text)
+        self.assertIn('tool-call input', text)
 
 
 if __name__ == '__main__':
