@@ -462,7 +462,10 @@ class LaunchTabTests(unittest.TestCase):
 
     def test_a_symlinked_working_directory_is_kept_as_given(self):
         link = Path(self.directory).parent / (Path(self.directory).name + ' link')
-        link.symlink_to(self.directory)
+        try:
+            link.symlink_to(self.directory)
+        except OSError:
+            self.skipTest('this filesystem or account does not allow creating a symlink')
         self.addCleanup(link.unlink)
         run = fake_run([('', '', 0)])
         CLI.launch_tab(str(link), '/bin/exe', 'Tab', environ={'TMUX': 'x'}, run=run, popen=mock.Mock())
@@ -476,7 +479,6 @@ class LaunchTabTests(unittest.TestCase):
                 CLI.launch_tab(self.directory, '/bin/exe', 'Fix 100%d', environ=environ, run=run, popen=mock.Mock())
         self.assertEqual(run.calls, [])
 
-    @unittest.skipIf(CLI.IS_WINDOWS, 'checks POSIX handlers are skipped when pretending to be Windows')
     def test_posix_terminal_variables_are_ignored_on_windows(self):
         run = fake_run([('', '', 0)])
         with mock.patch.object(CLI, 'IS_WINDOWS', True), mock.patch.object(CLI.shutil, 'which', return_value='C:/wt.exe'):
@@ -553,7 +555,6 @@ class LaunchTabTests(unittest.TestCase):
             CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'TMUX': 'x'}, run=run, popen=popen)
         popen.assert_not_called()
 
-    @unittest.skipIf(CLI.IS_WINDOWS, 'TERM is only special-cased on POSIX')
     def test_term_is_never_forced_or_cleared_on_posix(self):
         run = fake_run([('', '', 0)])
         CLI.launch_tab(self.directory, '/bin/exe', 'Tab', clear=['TERM'],
@@ -588,7 +589,6 @@ class LaunchTabTests(unittest.TestCase):
             with self.assertRaisesRegex(CLI.LaunchError, 'boom'):
                 CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={'WT_SESSION': 'abc'}, run=run, popen=mock.Mock())
 
-    @unittest.skipIf(CLI.IS_WINDOWS, 'WT_SESSION is honoured on Windows')
     def test_wt_session_inherited_into_wsl_is_not_treated_as_a_terminal(self):
         run = fake_run([('', '', 0)])
         with mock.patch.object(CLI.shutil, 'which', return_value='/mnt/c/wt.exe'):
@@ -607,7 +607,6 @@ class LaunchTabTests(unittest.TestCase):
         self.assertEqual(run.calls[0][0][1:4], ['--window', '0', 'new-tab'])
         self.assertEqual(captured.getvalue(), '')
 
-    @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX no-terminal fallback is exercised here')
     def test_no_terminal_and_no_display_raises_rather_than_reporting_a_launch(self):
         popen = mock.Mock()
         with mock.patch.object(CLI.shutil, 'which', return_value='/usr/bin/xterm'):
@@ -615,7 +614,6 @@ class LaunchTabTests(unittest.TestCase):
                 CLI.launch_tab(self.directory, '/bin/exe', 'Tab', environ={}, run=fake_run(), popen=popen)
         popen.assert_not_called()
 
-    @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX no-terminal fallback is exercised here')
     def test_no_terminal_detected_posix_fallback_uses_popen_with_detached_stdio_and_warns(self):
         popen = mock.Mock()
         with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/xterm' if name == 'xterm' else None):
@@ -631,7 +629,6 @@ class LaunchTabTests(unittest.TestCase):
         self.assertEqual(kwargs.get('stdout'), subprocess.DEVNULL)
         self.assertEqual(kwargs.get('stderr'), subprocess.DEVNULL)
 
-    @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX no-terminal fallback is exercised here')
     def test_no_terminal_detected_posix_with_nothing_available_raises(self):
         with mock.patch.object(CLI.shutil, 'which', return_value=None):
             with contextlib.redirect_stderr(io.StringIO()):
