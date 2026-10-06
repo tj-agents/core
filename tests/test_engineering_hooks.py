@@ -220,12 +220,15 @@ class PackagedEngineeringHooks(unittest.TestCase):
                         for hook in group['hooks']]
             body = [command for command in commands if 'delivery_binding_gate.py' in command]
             self.assertEqual(1, len(body))
-            self.assertIn('--validate-body', body[0])
             if host == 'codex':
+                self.assertIn('--validate-body', body[0])
                 windows = [hook['commandWindows'] for group in data['hooks']['PreToolUse']
                            for hook in group['hooks'] if 'delivery_binding_gate.py' in hook['command']]
                 self.assertIn('pre_tool_use_adapter.py', windows[0])
                 self.assertIn('--validate-body', windows[0])
+            else:
+                self.assertIn('hook_dispatch.py', body[0])
+                self.assertIn('delivery_binding_gate.py@Bash|PowerShell', body[0])
 
     def test_credential_guard_blocks_widening_but_allows_read_only_status(self):
         for tool, field in (('Bash', 'command'), ('exec_command', 'cmd')):

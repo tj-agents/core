@@ -28,13 +28,21 @@ RESULT_KEYS = ("tool_response", "tool_result", "tool_output")
 
 _PR_URL = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)")
 _TOKEN = re.compile(r"'[^']*'|\"[^\"]*\"|[;&|]+|[^\s'\";&|]+(?:'[^']*'|\"[^\"]*\")?")
-_VALUE_FLAGS = {
+_CREATE_VALUE_FLAGS = {
     "--title", "-t", "--head", "-H", "--base", "-B", "--assignee", "-a",
     "--reviewer", "-r", "--label", "-l", "--milestone", "-m", "--project", "-p",
     "--match-head-commit", "--add-assignee", "--remove-assignee", "--add-reviewer",
     "--remove-reviewer", "--add-label", "--remove-label", "--add-project", "--remove-project",
     "--body", "-b", "--body-file", "-F", "--repo", "-R",
 }
+_VALUE_FLAGS = {
+    "create": _CREATE_VALUE_FLAGS,
+    "new": _CREATE_VALUE_FLAGS,
+    "edit": _CREATE_VALUE_FLAGS,
+    "merge": {"--body", "-b", "--body-file", "-F", "--repo", "-R", "--subject", "-t",
+              "--author-email", "-A", "--match-head-commit"},
+}
+_MERGE_ALIASES = {"-m": "--merge", "-r": "--rebase", "-s": "--squash", "-d": "--delete-branch"}
 
 
 def pr_command(command):
@@ -53,7 +61,7 @@ def pr_command(command):
     if command[end:].strip():
         return None
     for index in range(len(tokens) - 2):
-        if [raw for _, raw in tokens[index:index + 2]] != ["gh", "pr"]:
+        if tokens[index][1].lower() not in {"gh", "gh.exe"} or tokens[index + 1][1] != "pr":
             continue
         if index and tokens[index - 1][1] not in {"&&", ";", "&", "||", "|"}:
             continue
@@ -72,19 +80,25 @@ def literal(raw):
     return value
 
 
-def command_options(tokens):
+def command_options(tokens, operation):
     values = {}
     targets = []
     body_flags = {"--body", "-b", "--body-file", "-F", "--repo", "-R"}
+    value_flags = _VALUE_FLAGS[operation]
     index = 0
     while index < len(tokens):
         value, raw = tokens[index]
         if any(char in raw for char in ";&|<>") and not raw.startswith(("'", '"')):
             raise ValueError("ambiguous command composition")
         key, equal, _ = value.partition("=")
-        if key in _VALUE_FLAGS:
+        attached = not equal and len(key) > 2 and key[:2] in value_flags
+        if attached:
+            key = key[:2]
+        if key in value_flags:
             if equal:
                 argument = raw.split("=", 1)[1]
+            elif attached:
+                argument = raw[2:]
             else:
                 index += 1
                 if index >= len(tokens):
@@ -94,7 +108,7 @@ def command_options(tokens):
                 raise ValueError(f"duplicate {key}")
             values[key] = literal(argument) if key in body_flags else argument
         elif value.startswith("-"):
-            values[key] = True
+            values[_MERGE_ALIASES.get(key, key) if operation == "merge" else key] = True
         elif not value.startswith("-"):
             targets.append(literal(raw))
         index += 1
@@ -121,7 +135,7 @@ def authoritative_body(root, pr, repo=None):
 def validate_before(data, command, parsed):
     operation, tokens, prefix = parsed
     try:
-        options, targets = command_options(tokens)
+        options, targets = command_options(tokens, operation)
         if "--help" in options or "-h" in options:
             return 0
         if operation in {"create", "new", "edit"} and {
@@ -138,7 +152,13 @@ def validate_before(data, command, parsed):
                 return 0
         root = Path(working_directory(data)).resolve()
         if operation == "merge":
-            canonical = canonical_merge_target_dir(command)
+            normalized = re.sub(r"(?<= && )gh(?:\.exe)?(?= pr merge )", "gh", command, flags=re.IGNORECASE)
+            if " && gh pr merge " in normalized:
+                checkout, merge_args = normalized.split(" && gh pr merge ", 1)
+                normalized = checkout + " && gh pr merge " + " ".join(
+                    _MERGE_ALIASES.get(token, token) for token in merge_args.split(" ")
+                )
+            canonical = canonical_merge_target_dir(normalized)
             if (is_codex_invocation(data) or prefix) and canonical is None:
                 raise ValueError('use exactly pushd "<absolute-checkout>" && gh pr merge <number> [merge options]')
             root = Path(canonical or merge_target_dir(command, data)).resolve()
@@ -191,13 +211,13 @@ def created_pr(data):
 
 
 def working_directory(data):
-    for key in ("cwd", "working_directory", "workdir"):
-        value = data.get(key)
+    tool_input = data.get("tool_input") or {}
+    for key in ("workdir", "working_directory", "cwd"):
+        value = tool_input.get(key)
         if isinstance(value, str) and value.strip():
             return value
-    tool_input = data.get("tool_input") or {}
     for key in ("cwd", "working_directory", "workdir"):
-        value = tool_input.get(key)
+        value = data.get(key)
         if isinstance(value, str) and value.strip():
             return value
     return "."
@@ -312,24 +332,24 @@ def main():
         return 0
     command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
     parsed = pr_command(command) if command else None
+    validate_body = "--validate-body" in sys.argv or data.get("hook_event_name") == "PreToolUse"
     if parsed is None:
-        if "--validate-body" in sys.argv and command and re.match(r"^\s*gh\s+pr\s+(?:create|new|edit|merge)\b", command):
+        if validate_body and command and re.match(r"^\s*gh(?:\.exe)?\s+pr\s+(?:create|new|edit|merge)\b", command, re.IGNORECASE):
             announce("PR BODY GATE: command cannot be inspected. Split into a simple gh command with a readable body file.")
         return 0
-    if "--validate-body" in sys.argv:
+    if validate_body:
         return validate_before(data, command, parsed)
     operation, tokens, _ = parsed
     if operation not in {"create", "new", "edit"}:
-        return 0
-    if operation == "edit" and not any(value.split("=")[0] in {"--body", "-b", "--body-file", "-F"}
-                                        for value, _ in tokens):
         return 0
     pr = created_pr(data)
     if operation in {"create", "new"} and pr is None:
         return 0
     try:
-        options, targets = command_options(tokens)
+        options, targets = command_options(tokens, operation)
         if "--help" in options or "-h" in options:
+            return 0
+        if operation == "edit" and not {"--body", "-b", "--body-file", "-F"}.intersection(options):
             return 0
         url_match = _PR_URL.search(tool_output(data))
         target = url_match.group(0) if operation in {"create", "new"} and url_match else (targets[0] if targets else None)
