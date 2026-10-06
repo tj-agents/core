@@ -42,6 +42,24 @@ $ErrorActionPreference = 'Stop'
 
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 
+function Get-TabEntryProperty {
+    param($Entry, [string] $Name)
+
+    $property = $Entry.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    return $property.Value
+}
+
+function Test-PidStartedAtLive {
+    param([int] $ProcessId, [double] $PidStartedAt)
+
+    $process = try { Get-Process -Id $ProcessId -ErrorAction Stop } catch { $null }
+    $startTime = if ($process) { try { $process.StartTime } catch { $null } } else { $null }
+    if ($null -eq $startTime) { return $false }
+    $actual = ([DateTimeOffset]($startTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+    return [math]::Abs($actual - $PidStartedAt) -le 2.0
+}
+
 function Test-TabIsLive {
     param([string] $Title)
 
@@ -57,8 +75,14 @@ function Test-TabIsLive {
     } | Where-Object { $_ -and $_.title -eq $Title })
 
     if ($entries.Count -eq 0) { return $true }
+
     foreach ($entry in $entries) {
-        if (Get-Process -Id $entry.pid -ErrorAction SilentlyContinue) { return $true }
+        if ($null -eq (Get-TabEntryProperty -Entry $entry -Name 'pid_started_at')) { return $true }
+    }
+
+    foreach ($entry in $entries) {
+        $pidStartedAt = Get-TabEntryProperty -Entry $entry -Name 'pid_started_at'
+        if (Test-PidStartedAtLive -ProcessId $entry.pid -PidStartedAt $pidStartedAt) { return $true }
     }
     return $false
 }

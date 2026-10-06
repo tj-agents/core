@@ -32,8 +32,11 @@ drops scoping and shows every recorded session on the machine. Outside a git rep
 auto-scope and behaves like `-All`.
 
 `close` prompts unless `-Force`. A session records itself at SessionStart, so one started before that hook
-existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe` processes that own no entry, so
-a running CLI is never invisible just because it predates the registry.
+existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe`/`codex.exe` processes that own
+no entry, so a running CLI is never invisible just because it predates the registry.
+
+Liveness matches the recorded pid and its OS start time. An entry that cannot be matched is unknown, not
+dead, and `close` and `close-tab.ps1` refuse it without `-Force`.
 
 ## Closing the tab, not just the process
 
