@@ -29,8 +29,9 @@ starts exactly one successor, verifies launcher submission, and releases the ori
 
 When the transfer exists to release the current directory for removal, the handoff must make the successor
 the sole owner of the removal and final filesystem verification. After verified launcher submission the
-original stops repository-scoped work; it cannot end its own host session, so the successor closes it
-through `handoff`'s `machine:peer-cli` release procedure, and the original must not attempt the removal itself.
+original stops repository-scoped work; a completed delivery closes its own session through
+`engineering:merge` Step 5's `finish`; only when that is unavailable does the `handoff` successor own the
+removal, closing the predecessor through `machine:peer-cli`, and the original must not attempt the removal itself.
 The successor continues from the target checkout only after the predecessor no longer holds the old path,
 and treats any removal error or residual path as incomplete cleanup.
 

@@ -148,10 +148,11 @@ distinct transfer, reconcile the completed attempt and its current owner before 
    side-workstream writer lease, retain the original task's writer lease, and continue the original task.
    On failure, retain both task records and continue only work independent of the unlaunched side task.
 
-For a transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted,
-put that exact operation and its final filesystem verification in the successor's `## Next Steps`. The
+This transfer is the fallback when the owner cannot run `engineering:merge` Step 5's `finish` itself; for a
+transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted, put that
+exact operation and its final filesystem verification in the successor's `## Next Steps`. The
 predecessor must not perform the operation after launch: it ends repository-scoped activity and emits a
-recorded release marker. No tool lets it end its own host process or close its own window, so the
+recorded release marker. Without `finish` it cannot end its own host process or close its own window, so the
 successor's `## Next Steps` must gate the operation on that marker, then close the predecessor itself with
 `machine:peer-cli`: resolve the registry entry whose `cwd` is the target checkout (and the recorded session
 id or tab title when the goal names one); `close` verifies the recorded host pid and start time against the

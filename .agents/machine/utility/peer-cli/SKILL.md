@@ -63,6 +63,9 @@ Its two refusals both exist because they were broken first:
   closable in a window full of busy ones. A title with no registry entry predates the hook and counts as
   live, because unknown is not dead. `-Force` overrides.
 
+Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
+that through `finish.ps1`, beside these scripts.
+
 ## Closing a peer
 
 Close one when it is **finished or duplicating**, and say which and why before you do:
