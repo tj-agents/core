@@ -39,11 +39,24 @@ function Invoke-CodexHookTrust {
     param(
         [Parameter(Mandatory)][string] $CodexExecutable,
         [Parameter(Mandatory)][string] $WorkingDirectory,
-        [Parameter(Mandatory)][string] $HelperScript
+        [Parameter(Mandatory)][string] $HelperScript,
+        [Parameter(Mandatory)][string] $RunnerPath,
+        [double] $TimeoutSeconds = 60
     )
 
-    & python -B $HelperScript --codex $CodexExecutable --project $WorkingDirectory | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) { throw 'Codex could not trust tj-agents hooks' }
+    $python = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    $duration = $TimeoutSeconds.ToString('R', [Globalization.CultureInfo]::InvariantCulture)
+    $previousEncoding = [Console]::OutputEncoding
+    try {
+        [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+        $output = @(& $python.Source -B $RunnerPath --timeout $duration -- $python.Source -B $HelperScript --codex $CodexExecutable --project $WorkingDirectory 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        [Console]::OutputEncoding = $previousEncoding
+    }
+    $output | ForEach-Object { Write-Host $_ }
+    if ($exitCode -ne 0) { throw "Codex could not trust tj-agents hooks: $($output -join ' ')" }
 }
 
 function Sync-CodexStandards {
@@ -51,7 +64,8 @@ function Sync-CodexStandards {
     param(
         [Parameter(Mandatory)][string] $CodexExecutable,
         [Parameter(Mandatory)][string] $WorkingDirectory,
-        [ValidateRange(0.001, 3600)][double] $TimeoutSeconds = 60
+        [ValidateRange(0.001, 3600)][double] $TimeoutSeconds = 60,
+        [string] $HookTrustHelperScript = (Join-Path $PSScriptRoot 'codex_hook_trust.py')
     )
 
     Write-Host ('standards: refreshing Codex plugins ({0:g}s maximum)...' -f $TimeoutSeconds)
@@ -62,7 +76,7 @@ function Sync-CodexStandards {
     Push-Location -LiteralPath $resolved
     try {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bounded_process.py') -Destination $runnerSnapshot -ErrorAction Stop
-        $helper = Join-Path $PSScriptRoot 'codex_hook_trust.py'
+        $helper = $HookTrustHelperScript
         if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw "Codex hook trust helper missing: $helper" }
         $trustSnapshot = [IO.Path]::GetTempFileName()
         Copy-Item -LiteralPath $helper -Destination $trustSnapshot -Force
@@ -89,13 +103,13 @@ function Sync-CodexStandards {
             }
         }
         if (@($selected).Count -gt 0 -or @($inventory.installed | Where-Object { $_.enabled }).Count -gt 0) {
-            Invoke-CodexHookTrust -CodexExecutable $CodexExecutable -WorkingDirectory $resolved -HelperScript $trustSnapshot
+            Invoke-CodexHookTrust -CodexExecutable $CodexExecutable -WorkingDirectory $resolved -HelperScript $trustSnapshot -RunnerPath $runnerSnapshot -TimeoutSeconds ($TimeoutSeconds - $clock.Elapsed.TotalSeconds)
         }
         return @($selected)
     }
     finally {
         Pop-Location
         Remove-Item -LiteralPath $runnerSnapshot -Force -ErrorAction SilentlyContinue
-        if ($trustSnapshot) { Remove-Item -LiteralPath $trustSnapshot -Force }
+        if ($trustSnapshot) { Remove-Item -LiteralPath $trustSnapshot -Force -ErrorAction SilentlyContinue }
     }
 }
