@@ -18,6 +18,8 @@ function Get-MissingRequiredFiles {
 
     $relative = if ($Name -eq 'bootstrap-capabilities') {
         'scripts\bootstrap_capabilities.py'
+    } elseif ($Name -eq 'handoff-claude') {
+        'scripts\launch_claude.py'
     } else {
         $harness = $Name.Substring('handoff-'.Length)
         "scripts\launch-$harness.ps1"
@@ -74,7 +76,7 @@ $scratch = Join-Path ([System.IO.Path]::GetTempPath()) "base-agents-packaging-$(
 try {
     $source = Join-Path $pluginSkills 'handoff-claude'
     Copy-Item -LiteralPath $source -Destination $scratch -Recurse
-    Remove-Item -LiteralPath (Join-Path $scratch 'scripts\launch-claude.ps1') -Force
+    Remove-Item -LiteralPath (Join-Path $scratch 'scripts\launch_claude.py') -Force
 
     $missing = @(Get-UnpackagedSkillDirectoryReferences -SkillDir $scratch) + @(Get-MissingRequiredFiles -SkillDir $scratch -Name 'handoff-claude')
     if ($missing.Count -eq 0) {
