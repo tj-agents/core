@@ -97,8 +97,9 @@ def origin_owner(checkout):
             capture_output=True,
             text=True,
             check=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
         ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, subprocess.SubprocessError):
         return None
     match = _GITHUB_OWNER_RE.match(url)
     return match.group("owner").casefold() if match else None

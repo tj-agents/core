@@ -13,7 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 HOST_ROOTS = {
     "codex": re.compile(r"\$\{PLUGIN_ROOT\}/([^\"']+)"),
-    "claude": re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"']+)"),
+    "claude": re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"'@]+)"),
 }
 REQUIRED_KEYS = {"marketplaces", "plugins", "hooks", "permissions"}
 
@@ -36,8 +36,11 @@ def expected_hooks(root: Path, config: dict, plugin: str) -> list[dict]:
         for groups in payload.get("hooks", {}).values():
             for group in groups:
                 for hook in group.get("hooks", []):
-                    for field in ("command", "commandWindows"):
-                        command = hook.get(field, "")
+                    arguments = hook.get("args")
+                    parts = [hook.get("command", ""), hook.get("commandWindows", "")]
+                    if isinstance(arguments, list):
+                        parts.extend(argument for argument in arguments if isinstance(argument, str))
+                    for command in parts:
                         for match in HOST_ROOTS[host].finditer(command):
                             by_path.setdefault(match.group(1), set()).add(host)
     return [
