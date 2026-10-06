@@ -43,11 +43,13 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "25",
+              "--deny-on-timeout",
               "${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py@Bash|PowerShell",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/merge_review_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/harness_grant.py@Bash|PowerShell"

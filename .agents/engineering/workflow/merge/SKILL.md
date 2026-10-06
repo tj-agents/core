@@ -40,6 +40,17 @@ procedure that goes stale in the repo that renames one.
 
 ## Steps
 
+Immediately before every merge attempt, fetch the current PR body and require nonempty What and Why:
+
+```bash
+python <workflow-ops> --root <absolute-worktree> --workflow-run-id pr-body-<n> pr-body-check --pr <pr-url>
+```
+
+Resolve `<workflow-ops>` to `.agents/workflows/workflow_ops.py` in a source checkout or
+`workflows/workflow_ops.py` under the installed engineering package. Repair a failed body check through
+`engineering:open-pr`, preserving attribution, then repeat this fresh check before merging. PR body
+metadata can change without changing the head; a previous check or delivery binding cannot satisfy it.
+
 ### Scope lock — one source PR and only the automation it causes
 
 Record the current branch's PR number and remote head at entry and keep that delivery identity through the
@@ -207,7 +218,8 @@ continuation. A plan-managed binding with a workflow handoff keeps the one exist
 the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
 stage reconciles an existing successor layer or starts the next branch in a checkout selected under
 `engineering:git-branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
-watermark or merge authorization into the successor.
+watermark or delivery binding into the successor; the successor re-resolves merge authorization from the
+goal's recorded authorization (`engineering:merging`).
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
 remove that path. Move it to the fetched remote default before closing any linked worktree:

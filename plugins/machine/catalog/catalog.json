@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:2a653cd4ca79d0ef3b0cd68cb2aaf6722802224715be080dea85a2ae87b32ae2",
+          "digest": "sha256:a68420751ca5f7c2ab5bc9c0000dac9caa02fd83eb0abae1192f0386f97a3631",
           "harness": {
             "marketplaces": [
               {
@@ -74,7 +74,8 @@
               {
                 "path": "hooks/hook_dispatch.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
@@ -190,7 +191,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:2818084005646ced9ebcaa23c5236a7d81dfa87095cf550ade1653f66e0672cb",
+          "digest": "sha256:6b1a1490075984c2e31d397635d30326fac3e9e02cc5ba693bdaa13f436c41ad",
           "harness": {
             "marketplaces": [
               {
@@ -220,7 +221,8 @@
               {
                 "path": "hooks/delivery_binding_gate.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
@@ -252,7 +254,8 @@
               {
                 "path": "hooks/hook_dispatch.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
@@ -347,7 +350,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:cc6a5c4f504064d7d4ae967baaa244fc7806ff64f656056c9da9b26802edfb2d",
+          "digest": "sha256:8f31cc9c4f33c6f63bc3f50dd350ba12280701573684471d11014571d0ca2c30",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -367,6 +370,12 @@
                 "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
                 "hosts": [
                   "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/hook_dispatch.py",
+                "hosts": [
                   "codex"
                 ]
               },
