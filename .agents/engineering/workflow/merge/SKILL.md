@@ -281,8 +281,9 @@ if (Test-Path -LiteralPath $worktreeHelper -PathType Leaf) {
 Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout helper path is absent, do not
 skip cleanup. Apply the same gates with native Git from the primary checkout:
 
-1. Run `python "<skill-directory>/scripts/cleanup_proof.py" --worktree <target> --branch <branch> --head
-   <remote-head> --pr <n>`. It refuses the primary checkout, a detached or mismatched target, a dirty tree,
+1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py`; from
+   elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It refuses the
+   primary checkout, a detached or mismatched target, a dirty tree,
    a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
    squash/rebase-safe containment proof), and a still-open PR for the head; `preserve:` stops cleanup.
 2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
