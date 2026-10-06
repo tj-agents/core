@@ -48,7 +48,7 @@ import subprocess
 import sys
 
 
-SCHEMA_VERSIONS = (1, 2)
+SCHEMA_VERSIONS = (1, 2, 3)
 DECLARATION_NAME = "tier.json"
 ORPHAN_MARKER = ".orphaned_at"
 FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
@@ -69,6 +69,7 @@ GIT_TIMEOUT = 10
 class Declaration:
     def __init__(self, plugin, marketplace, data, payload_dir=None, orphaned=False):
         self.plugin = plugin
+        self.schema_version = data["schema_version"]
         self.marketplace = marketplace
         self.tier = data["tier"]
         self.applies = data["applies"]
@@ -91,6 +92,132 @@ class Declaration:
 
 def _text(value):
     return value if isinstance(value, str) else ""
+
+
+class PredicateResult:
+    def __init__(self, scope, matched=False, evidence=(), prerequisites=(), diagnostics=()):
+        self.scope = str(scope)
+        self.matched = matched and not diagnostics
+        self.evidence = tuple(dict.fromkeys(evidence))
+        self.prerequisites = tuple(dict.fromkeys(prerequisites))
+        self.diagnostics = tuple(diagnostics)
+
+
+def diagnostic(code, path, message):
+    return {"code": code, "path": path, "message": message}
+
+
+def predicate_diagnostics(node, path="detect"):
+    if not isinstance(node, dict) or len(node) != 1:
+        return [diagnostic("malformed-predicate", path, "Expected exactly one positive predicate operator")]
+    operator, value = next(iter(node.items()))
+    if operator in ("all", "any"):
+        if not isinstance(value, list) or not value:
+            return [diagnostic("malformed-predicate", path, operator + " requires a non-empty array")]
+        return [problem for index, child in enumerate(value)
+                for problem in predicate_diagnostics(child, f"{path}.{operator}[{index}]")]
+    if operator in ("file", "glob", "remote", "fact"):
+        if not isinstance(value, str) or not value:
+            return [diagnostic("malformed-predicate", path, operator + " requires a non-empty string")]
+        if operator == "remote":
+            try:
+                re.compile(value)
+            except re.error:
+                return [diagnostic("malformed-predicate", path, "Remote pattern does not compile")]
+        return []
+    if operator == "content":
+        if not isinstance(value, dict) or set(value) != {"glob", "pattern"} or any(
+                not isinstance(value[key], str) or not value[key] for key in ("glob", "pattern")):
+            return [diagnostic("malformed-predicate", path, "Content requires glob and pattern strings")]
+        try:
+            re.compile(value["pattern"])
+        except re.error:
+            return [diagnostic("malformed-predicate", path, "Content pattern does not compile")]
+        return []
+    if operator == "context":
+        if not isinstance(value, dict) or set(value) not in ({"key", "equals"}, {"key", "contains"}) or any(
+                not isinstance(item, str) or not item for item in value.values()):
+            return [diagnostic("malformed-predicate", path, "Context requires key and equals or contains strings")]
+        return []
+    return [diagnostic("unsupported-predicate", path, "Unsupported positive operator: " + str(operator))]
+
+
+def v3_declaration_diagnostics(data, path="tier.json"):
+    problems = []
+    unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect"}
+    if unknown:
+        problems.append(diagnostic("malformed-declaration", path, "Unknown declaration fields: " + ", ".join(sorted(unknown))))
+    if not isinstance(data.get("tier"), str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", data["tier"]):
+        problems.append(diagnostic("malformed-declaration", path, "Tier requires a lowercase tier identifier"))
+    if data.get("applies") not in ("always", "stack-present"):
+        problems.append(diagnostic("malformed-declaration", path, "Applies requires always or stack-present"))
+    if "stack" in data and (not isinstance(data["stack"], str) or not data["stack"]):
+        problems.append(diagnostic("malformed-declaration", path, "Stack requires a non-empty string"))
+    if "owner_repository" in data:
+        owner = data["owner_repository"]
+        owners = [owner] if isinstance(owner, str) else owner
+        if not isinstance(owners, list) or any(not isinstance(item, str) or not re.fullmatch(r"[^/ ]+/[^/ ]+", item)
+                                              for item in owners) or len(set(owners)) != len(owners):
+            problems.append(diagnostic("malformed-declaration", path, "Owner requires unique owner/name strings"))
+    if data.get("applies") == "stack-present" or "detect" in data:
+        problems.extend(predicate_diagnostics(data.get("detect"), path + ".detect"))
+    return problems
+
+
+def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
+    problems = predicate_diagnostics(node, path)
+    if problems:
+        return PredicateResult(root, diagnostics=problems)
+    operator, value = next(iter(node.items()))
+    if operator in ("all", "any"):
+        children = [evaluate_predicate(root, child, facts, contexts, f"{path}.{operator}[{index}]")
+                    for index, child in enumerate(value)]
+        matches = [child.matched for child in children]
+        return PredicateResult(root, all(matches) if operator == "all" else any(matches),
+                               [item for child in children if child.matched for item in child.evidence],
+                               [item for child in children for item in child.prerequisites],
+                               [item for child in children for item in child.diagnostics])
+    if operator == "fact":
+        if facts is None or value not in facts:
+            return PredicateResult(root, prerequisites=[value], diagnostics=[
+                diagnostic("unknown-fact", path, "Provide scoped evidence for fact: " + value)])
+        fact = facts[value]
+        if not isinstance(fact, PredicateResult) or fact.scope != str(root) or fact.diagnostics:
+            return PredicateResult(root, prerequisites=[value], diagnostics=[
+                diagnostic("invalid-fact", path, "Fact requires a valid result in this scope: " + value)])
+        return PredicateResult(root, fact.matched, fact.evidence, [value])
+    if operator == "context":
+        key = value["key"]
+        if contexts is None or key not in contexts:
+            return PredicateResult(root, prerequisites=["context:" + key], diagnostics=[
+                diagnostic("unknown-context", path, "Provide scoped context: " + key)])
+        actual = contexts[key]
+        comparison = value.get("equals", value.get("contains"))
+        if "equals" in value:
+            valid = isinstance(actual, str)
+            matched = actual == comparison
+        else:
+            valid = isinstance(actual, list) and all(isinstance(item, str) for item in actual)
+            matched = valid and comparison in actual
+        if not valid:
+            return PredicateResult(root, diagnostics=[diagnostic("invalid-context", path, "Context has incompatible value: " + key)])
+        return PredicateResult(root, matched, ["context " + key] if matched else [], ["context:" + key])
+    legacy = {"file": "files", "glob": "globs", "remote": "remote", "content": "content"}
+    matched, evidence = stack_present(root, {legacy[operator]: [value]})
+    return PredicateResult(root, matched, [evidence] if evidence else [])
+
+
+class SelectionResult:
+    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=()):
+        self.scope = str(scope)
+        self.ubiquitous = list(ubiquitous)
+        self.applicable = list(applicable)
+        self.blocked = list(blocked)
+        self.diagnostics = tuple(diagnostics)
+        self.selections = tuple(selections)
+
+    def __iter__(self):
+        return iter((self.ubiquitous, self.applicable, self.blocked))
 
 
 def cache_roots():
@@ -182,7 +309,7 @@ def installed_declarations(root, project=None):
     return ranked
 
 
-def declarations(roots=None, project=None):
+def declarations(roots=None, project=None, diagnostics=None):
     """One declaration per plugin: the first cache root that has it, at its installed version.
 
     Roots are in priority order, the running host's cache first. A cache with a host registry beside it
@@ -204,10 +331,22 @@ def declarations(roots=None, project=None):
             try:
                 data = json.loads(path.read_text(encoding="utf-8-sig"))
             except (OSError, UnicodeError, ValueError):
+                if diagnostics is not None:
+                    diagnostics.append(diagnostic("unreadable-declaration", str(path), "Read a valid tier.json declaration"))
                 continue
             if not isinstance(data, dict) or data.get("schema_version") not in SCHEMA_VERSIONS:
+                if diagnostics is not None:
+                    diagnostics.append(diagnostic("unsupported-version", str(path), "Supported tier schema versions: 1, 2, 3"))
                 continue
+            if data.get("schema_version") == 3:
+                problems = v3_declaration_diagnostics(data, str(path))
+                if problems:
+                    if diagnostics is not None:
+                        diagnostics.extend(problems)
+                    continue
             if not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
+                if diagnostics is not None:
+                    diagnostics.append(diagnostic("malformed-declaration", str(path), "Declare tier and applies"))
                 continue
             orphaned = (version_directory / ORPHAN_MARKER).exists()
             declaration = Declaration(plugin, marketplace, data, version_directory, orphaned)
@@ -369,17 +508,35 @@ def overridden():
     return {part.strip().lower() for part in raw.split(",") if part.strip()}
 
 
-def assess(root, found=None):
-    found = declarations(project=root) if found is None else found
+def assess(root, found=None, facts=None, contexts=None):
+    diagnostics = []
+    selections = []
+    found = declarations(project=root, diagnostics=diagnostics) if found is None else found
     if not found:
-        return [], [], []
+        return SelectionResult(root, diagnostics=diagnostics)
 
     forced = overridden()
     identity = None
     ubiquitous, applicable, blocked = [], [], []
     for declaration in found:
+        if declaration.schema_version not in SCHEMA_VERSIONS:
+            diagnostics.append(diagnostic("unsupported-version", declaration.id, "Supported tier schema versions: 1, 2, 3"))
+            blocked.append(declaration)
+            continue
         if not declaration.gated:
             ubiquitous.append(declaration)
+            continue
+        if declaration.schema_version == 3:
+            result = evaluate_predicate(root, declaration.detect, facts, contexts)
+            selections.append({"plugin_id": declaration.id, "scope": result.scope,
+                               "predicate": declaration.detect, "matched": result.matched,
+                               "prerequisites": result.prerequisites, "evidence": result.evidence,
+                               "diagnostics": result.diagnostics})
+            diagnostics.extend(result.diagnostics)
+            if result.matched:
+                applicable.append((declaration, declaration.stack + " detected"))
+            else:
+                blocked.append(declaration)
             continue
         if declaration.tier.lower() in forced:
             applicable.append((declaration, "forced by " + OVERRIDE_VARIABLE))
@@ -396,15 +553,18 @@ def assess(root, found=None):
             applicable.append((declaration, declaration.stack + " detected" + found_at))
         else:
             blocked.append(declaration)
-    return ubiquitous, applicable, blocked
+    return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections)
 
 
 def statement(root, found=None):
-    ubiquitous, applicable, blocked = assess(root, found)
-    if not applicable and not blocked:
+    result = assess(root, found)
+    ubiquitous, applicable, blocked = result
+    if not applicable and not blocked and not result.diagnostics:
         return ""
 
     lines = ["Tier gate - which standards apply in this project"]
+    lines.extend("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
+                 for problem in result.diagnostics)
     if ubiquitous:
         names = ", ".join(declaration.tier for declaration in ubiquitous)
         lines.append("Ubiquitous, always applies: " + names + ".")
@@ -455,7 +615,11 @@ def contract_skills(payload_dir):
 
 def conventions(root, found=None):
     """The review's rule source: each applicable stack tier's shipped conventions, as one listing."""
-    _, applicable, _ = assess(root, found)
+    result = assess(root, found)
+    _, applicable, _ = result
+    if result.diagnostics:
+        return "\n".join("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
+                         for problem in result.diagnostics)
     if not applicable:
         return "Tier gate - no stack tier applies to this project; no tier conventions to load."
 
@@ -507,8 +671,9 @@ def refusal(declaration, subject, root):
         "standard describes code this project does not contain. Use the ubiquitous core standards "
         "here instead.\n"
         "If this project really is " + declaration.stack + ", the detection is wrong: fix "
-        "`tier.json` in " + owner + " rather than working around it. To force it for this session "
-        "only, set " + OVERRIDE_VARIABLE + "=" + declaration.tier + "."
+        "`tier.json` in " + owner + " rather than working around it."
+        + (" To force it for this session only, set " + OVERRIDE_VARIABLE + "=" + declaration.tier + "."
+           if declaration.schema_version < 3 else "")
     )
 
 
