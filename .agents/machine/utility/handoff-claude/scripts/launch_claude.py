@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Hand prepared work to an independent Claude Code session in a new terminal tab.
 
-Run as `python3 launch_claude.py ...` (or `python` on Windows); the shebang and exec bit are not relied on.
+Run as `python launch_claude.py ...` on Windows (where `python3` is often the Microsoft Store alias stub
+rather than a real interpreter) and `python3 launch_claude.py ...` elsewhere; the shebang and exec bit are
+not relied on.
 """
 
 import argparse
 import importlib.util
-import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+
+_EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')
 
 
 def _load_agent_cli():
@@ -36,6 +39,7 @@ def parse_args(argv, agent_cli):
     parser.add_argument('--prompt-path', required=True)
     parser.add_argument('--title', default='Claude handoff')
     parser.add_argument('--model')
+    parser.add_argument('--effort', choices=_EFFORTS)
     parser.add_argument('--lane', choices=('L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'))
     parser.add_argument('--frontier', action='store_true')
     parser.add_argument('--dangerously-skip-permissions', action='store_true')
@@ -54,76 +58,64 @@ def parse_args(argv, agent_cli):
 
 
 def resolve_model(args, agent_cli):
-    """(model, tier text for the success message) per this launcher's selection precedence.
+    """(model, effort, tier text for the success message) per this launcher's selection precedence.
 
     An explicit --model wins, a --lane resolves through the shipped lane table, and neither leaves
     claude on its own configured default, same as an interactively launched session. The lane is never
     guessed here: a transport that inferred one from the prompt would quietly decide the cost of every
-    handoff.
+    handoff. A lane's effort travels with its model, but only when the lane actually resolved the model:
+    an explicit --model beating the lane means no lane effort applies either. An explicit --effort wins
+    over a lane's effort either way, mirroring how launch-codex.ps1's -ReasoningEffort beats the lane.
     """
     model = args.model
+    lane_effort = None
     tier = ''
     if args.frontier:
-        model, _ = agent_cli.resolve_lane_model('claude', frontier=True)
+        model, lane_effort = agent_cli.resolve_lane_model('claude', frontier=True)
         tier = 'frontier -> '
     elif not model and args.lane:
-        model, _ = agent_cli.resolve_lane_model('claude', lane=args.lane)
+        model, lane_effort = agent_cli.resolve_lane_model('claude', lane=args.lane)
         tier = f'lane {args.lane} -> '
 
-    return model, tier
+    effort = args.effort if args.effort is not None else lane_effort
+    return model, effort, tier
 
 
-def build_arguments(args, model, prompt_path):
+def build_arguments(args, model, effort, prompt_sentence):
     arguments = []
     if args.dangerously_skip_permissions:
         arguments.append('--dangerously-skip-permissions')
     if model:
         arguments += ['--model', model]
+    if effort:
+        arguments += ['--effort', effort]
 
-    arguments.append(f'Read the file at {prompt_path} and follow its instructions, working from the current directory.')
+    arguments.append(prompt_sentence)
     return arguments
 
 
 def main(argv=None):
     agent_cli = _load_agent_cli()
+    agent_cli.make_stdio_encoding_lossy()
     try:
         args = parse_args(argv, agent_cli)
 
-        # Absolute but not resolved: Claude Code keys a session's history by the directory string it
-        # started in, so a symlinked checkout or a Windows mapped or subst drive must reach the tab as
-        # given.
-        working_directory = Path(os.path.abspath(args.working_directory))
-        if not working_directory.is_dir():
-            raise agent_cli.LaunchError(f'Working directory is not a directory: {working_directory}')
-
+        prompt_sentence = agent_cli.prompt_file_argument(args.prompt_path)
         prompt_path = Path(args.prompt_path).resolve()
-        if not prompt_path.is_file():
-            raise agent_cli.LaunchError(f'Prompt path is not a file: {prompt_path}')
+        model, effort, tier = resolve_model(args, agent_cli)
+        arguments = build_arguments(args, model, effort, prompt_sentence)
 
-        claude = agent_cli.resolve_claude_executable()
-
-        model, tier = resolve_model(args, agent_cli)
-        arguments = build_arguments(args, model, prompt_path)
-
-        agent_cli.sync_claude_standards(working_directory, claude=claude)
-
-        # Forced, not merely un-cleared: an automation-spawned terminal tab is not the interactive shell
-        # a human would have launched it from, so colour/terminal-capability auto-detection cannot be
-        # trusted to land on a good value on its own. FORCE_COLOR is the de-facto Node CLI convention
-        # (chalk/supports-color) to force colour on outright; TERM=xterm-256color is a known-good profile
-        # every supported terminal fully supports, set explicitly rather than left blank so nothing falls
-        # back to a conservative dumb-terminal default.
-        agent_cli.launch_tab(
-            working_directory,
-            claude,
-            args.title,
-            arguments=arguments,
-            force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
-        )
+        working_directory = agent_cli.open_claude_tab(args.working_directory, args.title, arguments)
 
         selection = f'{tier}{model}' if model else 'the CLI default model'
+        if effort:
+            selection += f' at {effort}'
         print(f"Launched claude handoff tab '{args.title}' in {working_directory} on {selection} with prompt {prompt_path}")
         return 0
+    except agent_cli.LaunchTimeout as exc:
+        print(str(exc), file=sys.stderr)
+        print('The tab may already have opened; check the terminal before launching another.', file=sys.stderr)
+        return 3
     except agent_cli.LaunchError as exc:
         print(str(exc), file=sys.stderr)
         return 1
