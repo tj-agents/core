@@ -44,6 +44,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import subprocess
 import sys
 
@@ -81,6 +82,7 @@ class Declaration:
         self.payload_dir = payload_dir
         self.orphaned = orphaned
         self.diagnostics = tuple(diagnostics)
+        self.fact_definitions = data.get("fact_definitions", {})
 
     @property
     def id(self):
@@ -117,6 +119,15 @@ def predicate_diagnostics(node, path="detect"):
             return [diagnostic("malformed-predicate", path, operator + " requires a non-empty array")]
         return [problem for index, child in enumerate(value)
                 for problem in predicate_diagnostics(child, f"{path}.{operator}[{index}]")]
+    if operator == "dependency":
+        if not isinstance(value, dict) or set(value) not in ({"kind", "id"}, {"kind", "prefix"}) or value.get("kind") not in ("nuget", "npm", "sdk", "framework") or any(
+                not isinstance(item, str) or not item.strip() for item in value.values()):
+            return [diagnostic("malformed-predicate", path, "Dependency requires supported kind and exactly one literal id or prefix")]
+        return []
+    if operator == "project_dependency":
+        if not isinstance(value, dict) or set(value) != {"transitive", "where"} or not isinstance(value.get("transitive"), bool):
+            return [diagnostic("malformed-predicate", path, "Project dependency requires boolean transitive and positive where")]
+        return predicate_diagnostics(value["where"], path + ".project_dependency.where")
     if operator in ("file", "glob", "remote", "fact"):
         if not isinstance(value, str) or not value:
             return [diagnostic("malformed-predicate", path, operator + " requires a non-empty string")]
@@ -145,7 +156,7 @@ def predicate_diagnostics(node, path="detect"):
 
 def v3_declaration_diagnostics(data, path="tier.json"):
     problems = []
-    unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect"}
+    unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect", "fact_definitions"}
     if unknown:
         problems.append(diagnostic("malformed-declaration", path, "Unknown declaration fields: " + ", ".join(sorted(unknown))))
     if not isinstance(data.get("tier"), str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", data["tier"]):
@@ -162,7 +173,127 @@ def v3_declaration_diagnostics(data, path="tier.json"):
             problems.append(diagnostic("malformed-declaration", path, "Owner requires unique owner/name strings"))
     if data.get("applies") == "stack-present" or "detect" in data:
         problems.extend(predicate_diagnostics(data.get("detect"), path + ".detect"))
+    if "fact_definitions" in data:
+        problems.extend(fact_definition_diagnostics(data["fact_definitions"], data.get("detect"), path))
     return problems
+
+
+def fact_references(node):
+    if not isinstance(node, dict):
+        return set()
+    if "fact" in node and isinstance(node["fact"], str):
+        return {node["fact"]}
+    if "project_dependency" in node and isinstance(node["project_dependency"], dict):
+        return fact_references(node["project_dependency"].get("where"))
+    return {name for key in ("all", "any") if isinstance(node.get(key), list) for child in node[key]
+            for name in fact_references(child)}
+
+
+def fact_definition_diagnostics(definitions, detect=None, path="tier.json"):
+    if not isinstance(definitions, dict) or any(not isinstance(name, str) or not name.strip() for name in definitions):
+        return [diagnostic("malformed-fact-definitions", path, "Fact definitions require non-empty names and positive expressions")]
+    problems = [problem for name, node in definitions.items()
+                for problem in predicate_diagnostics(node, path + ".fact_definitions." + name)]
+    edges = {name: fact_references(node) for name, node in definitions.items()}
+    completed = set()
+    def visit(name, active):
+        if name in active:
+            problems.append(diagnostic("cyclic-fact-definition", path, "Fact definition cycle: " + " -> ".join(active + (name,))))
+            return
+        if name in completed:
+            return
+        for target in sorted(edges.get(name, ())):
+            visit(target, active + (name,))
+        completed.add(name)
+    for name in sorted(definitions):
+        visit(name, ())
+    return problems
+
+
+def compose_fact_definitions(declarations, facts=None):
+    declarations = list(declarations)
+    definitions, owners, problems = {}, {}, []
+    for declaration in declarations:
+        if declaration.diagnostics:
+            problems.extend(declaration.diagnostics)
+            continue
+        problems.extend(fact_definition_diagnostics(declaration.fact_definitions))
+        if not isinstance(declaration.fact_definitions, dict):
+            continue
+        for name, node in declaration.fact_definitions.items():
+            if name in definitions and definitions[name] != node:
+                problems.append(diagnostic("conflicting-fact-definition", declaration.id, name + ": conflicts with " + owners[name]))
+            else:
+                definitions[name], owners[name] = node, declaration.id
+    problems.extend(fact_definition_diagnostics(definitions))
+    references = set().union(*(fact_references(node) for node in definitions.values()),
+                             *(fact_references(item.detect) for item in declarations))
+    supplied = {name for name, result in (facts or {}).items() if isinstance(result, PredicateResult) and not result.diagnostics}
+    for name in sorted(references - set(definitions) - supplied):
+        problems.append(diagnostic("unknown-fact-definition", "composition", "Resolve referenced fact: " + name))
+    return definitions, problems
+
+
+_RUNTIME_MODULES = {}
+
+
+def runtime_module(name):
+    if name not in _RUNTIME_MODULES:
+        _RUNTIME_MODULES[name] = runpy.run_path(str(Path(__file__).with_name(name + ".py")))
+    return _RUNTIME_MODULES[name]
+
+
+def discover_projects(root):
+    return runtime_module("project_facts")["ProjectGraph"](root).discover()
+
+
+def load_standards_context(graph, data=None, additional_claims=()):
+    return runtime_module("standards_context")["StandardsContext"](graph).load(data, additional_claims)
+
+
+def evaluate_project(graph, identity, node, definitions=None, context=None, facts=None, active=()):
+    problems = predicate_diagnostics(node)
+    if problems or identity not in graph.projects:
+        return PredicateResult(identity, diagnostics=problems or [diagnostic("unknown-project", identity, "Select a discovered project manifest")])
+    operator, value = next(iter(node.items()))
+    definitions = definitions or {}
+    if operator in ("all", "any"):
+        children = [evaluate_project(graph, identity, child, definitions, context, facts, active) for child in value]
+        return PredicateResult(identity, all(child.matched for child in children) if operator == "all" else any(child.matched for child in children),
+                               [item for child in children if child.matched for item in child.evidence],
+                               [item for child in children for item in child.prerequisites],
+                               [item for child in children for item in child.diagnostics])
+    if operator == "dependency":
+        result = graph.dependency(identity, value, context.supplements if context else ())
+        return PredicateResult(identity, result["matched"], result["evidence"], diagnostics=result["diagnostics"])
+    if operator == "project_dependency":
+        targets, problems = graph.reachable(identity, value["transitive"])
+        children = [(evaluate_project(graph, target, value["where"], definitions, context, None, active), chain)
+                    for target, chain in targets]
+        return PredicateResult(identity, any(child.matched for child, _ in children),
+                               [item for child, chain in children if child.matched for item in (*chain, *child.evidence)],
+                               [item for child, _ in children for item in child.prerequisites],
+                               [*problems, *(item for child, _ in children for item in child.diagnostics)])
+    if operator == "fact" and value in definitions:
+        if value in active:
+            return PredicateResult(identity, diagnostics=[diagnostic("cyclic-fact-definition", value, "Remove the fact reference cycle")])
+        result = evaluate_project(graph, identity, definitions[value], definitions, context, facts, active + (value,))
+        return PredicateResult(identity, result.matched, result.evidence, [value, *result.prerequisites], result.diagnostics)
+    if operator == "context":
+        problems = context.diagnostics_for(identity) if context else []
+        if problems:
+            return PredicateResult(identity, diagnostics=problems)
+        values, evidence = context.for_project(identity) if context else ({"architecture": [], "adopted_suites": []}, [])
+        if value["key"].startswith("house.") and value["key"] not in values:
+            return PredicateResult(identity)
+        result = evaluate_predicate(graph.projects[identity].root, node, contexts=values)
+        return PredicateResult(identity, result.matched, evidence if result.matched else (), result.prerequisites, result.diagnostics)
+    if operator == "fact":
+        fact = (facts or {}).get(value)
+        if isinstance(fact, PredicateResult) and fact.scope == identity:
+            return PredicateResult(identity, fact.matched, fact.evidence, [value], fact.diagnostics)
+        return PredicateResult(identity, prerequisites=[value], diagnostics=[diagnostic("unknown-fact", value, "Provide a declared or scoped fact result")])
+    return PredicateResult(identity, diagnostics=[diagnostic("project-ownership-required", identity, "Source/file ownership predicates require the subsequent source-facts contract")])
 
 
 def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
@@ -170,6 +301,8 @@ def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
     if problems:
         return PredicateResult(root, diagnostics=problems)
     operator, value = next(iter(node.items()))
+    if operator in ("dependency", "project_dependency"):
+        return PredicateResult(root, diagnostics=[diagnostic("project-scope-required", path, "Evaluate this predicate with a discovered project identity")])
     if operator in ("all", "any"):
         children = [evaluate_predicate(root, child, facts, contexts, f"{path}.{operator}[{index}]")
                     for index, child in enumerate(value)]
