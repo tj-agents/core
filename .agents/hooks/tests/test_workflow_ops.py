@@ -343,6 +343,15 @@ class ReviewTests(RepositoryFixture):
         with self.assertRaisesRegex(ops.WorkflowOperationError, "incomplete"):
             ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
 
+    def test_cleanup_skips_recent_bundle_without_resolving_locations(self):
+        recent = ops.review_prepare(self.root, "recent", "origin/main", "HEAD", False)
+
+        with mock.patch.object(ops, "review_bundle_locations") as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_not_called()
+        self.assertTrue(Path(recent["bundle"]["directory"]).is_dir())
+
     def test_cleanup_removes_only_expired_repository_owned_bundles(self):
         expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
         recent = ops.review_prepare(self.root, "recent", "origin/main", "HEAD", False)
