@@ -82,7 +82,10 @@ class OpenClaudeTests(unittest.TestCase):
 
     def test_a_symlinked_working_directory_reaches_the_tab_as_given(self):
         link = Path(self.directory).parent / (Path(self.directory).name + ' link')
-        link.symlink_to(self.directory)
+        try:
+            link.symlink_to(self.directory)
+        except OSError:
+            self.skipTest('this filesystem or account does not allow creating a symlink')
         self.addCleanup(link.unlink)
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
