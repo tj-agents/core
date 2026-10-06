@@ -145,6 +145,38 @@ class HookTests(unittest.TestCase):
                 for flag in (f"-b'{BODY}'", "-Fvalid.md"):
                     self.assertEqual(0, self.run_gate(f"gh pr edit 42 {flag}", cwd=directory, codex=codex))
 
+    def test_equals_in_attached_body_values_are_preserved_and_checked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            valid = BODY.replace("Change.", "Change=updated.")
+            (root / "valid=x.md").write_text(valid, encoding="utf-8")
+            (root / "invalid=x.md").write_text("empty=bad", encoding="utf-8")
+            invalid_flags = ("-b'empty=bad'", "-b=empty=bad", "--body=empty=bad", "-Finvalid=x.md",
+                             "-F=invalid=x.md", "--body-file=invalid=x.md")
+            valid_flags = (f"-b'{valid}'", f"-b='{valid}'", f"--body='{valid}'", "-Fvalid=x.md",
+                           "-F=valid=x.md", "--body-file=valid=x.md")
+            for codex in (False, True):
+                for operation in ("create", "edit 42"):
+                    target = "https://github.com/example/test/pull/42" if operation == "create" else "42"
+                    for flag in invalid_flags:
+                        with self.subTest(codex=codex, operation=operation, flag=flag):
+                            self.assertEqual(2, self.run_gate(f"gh pr {operation} {flag}", cwd=directory, codex=codex))
+                            with patch.object(gate, "authoritative_body", side_effect=ValueError("Missing Why section")) as check:
+                                self.assertEqual(2, self.run_gate(f"gh pr {operation} {flag}",
+                                                                cwd=directory, codex=codex, pre=False))
+                                check.assert_called_once_with(root, target, None)
+                    for flag in valid_flags:
+                        with self.subTest(codex=codex, operation=operation, flag=flag):
+                            self.assertEqual(0, self.run_gate(f"gh pr {operation} {flag}", cwd=directory, codex=codex))
+                            with patch.object(gate, "authoritative_body") as check, patch.object(gate, "find_config", return_value=None):
+                                self.assertEqual(0, self.run_gate(f"gh pr {operation} {flag}",
+                                                                cwd=directory, codex=codex, pre=False))
+                                check.assert_called_once_with(root, target, None)
+            parsed = gate.pr_command("gh pr edit 42 -b'empty=bad'")
+            options, targets = gate.command_options(parsed[1], parsed[0])
+            self.assertEqual("empty=bad", options["-b"])
+            self.assertEqual(["42"], targets)
+
     def test_merge_flags_use_merge_option_semantics(self):
         for flags in ("-m", "-r", "-s", "-a", "-m -a", "-r -d", "-t 'subject' -b 'commit body'",
                       "-A author@example.com --match-head-commit abc123"):
