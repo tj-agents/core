@@ -51,6 +51,9 @@ function Set-FakeGhListing {
 function Set-Clipboard {
     param([string] $Value)
     $global:clipboardSetCalls++
+    if ($global:setClipboardShouldThrow) {
+        throw 'Requested Clipboard operation did not succeed.'
+    }
     Set-Content -LiteralPath $global:clipboardFile -Value $Value -NoNewline
 }
 
@@ -149,6 +152,46 @@ exit /b 2
     Assert-NotContains -Actual $promptOutput -Unexpected 'clipboard' -Message '-Prompt delivery must not mention the clipboard.'
     Assert-Contains -Actual $promptOutput -Expected 'Delivered' -Message '-Prompt delivery did not report success.'
 
+    # A busy clipboard: Set-Clipboard throws on a successful delivery. The success line must still be
+    # reported, with a clear-failed warning - never hidden behind the clipboard error.
+    Reset-FakeGh
+    Set-Content -LiteralPath $global:clipboardFile -Value 'github_pat_throwvalue' -NoNewline
+    Set-FakeGhListing -Name 'THROW_TOKEN'
+    $global:setClipboardShouldThrow = $true
+    $warnings = $null
+    $throwOutput = & $deliverScript -Destination gh-secret -Name 'THROW_TOKEN' -Repo 'owner/repo' -WarningVariable warnings -WarningAction SilentlyContinue
+    $global:setClipboardShouldThrow = $false
+    Assert-Contains -Actual $throwOutput -Expected 'Delivered' -Message 'A successful delivery must still report success when Set-Clipboard throws.'
+    Assert-Contains -Actual $throwOutput -Expected 'clipboard still holds the credential, clear it manually' -Message 'A Set-Clipboard failure must be reported as a failed clear.'
+    if (-not ($warnings | Where-Object { $_.Message -like '*clear it manually*' })) {
+        throw 'A failing Set-Clipboard did not emit the clear-it-manually warning.'
+    }
+    $unclearedClipboard = Get-Content -LiteralPath $global:clipboardFile -Raw
+    if ($unclearedClipboard.Trim() -cne 'github_pat_throwvalue') {
+        throw "A failing Set-Clipboard must leave the original value in place: '$unclearedClipboard'"
+    }
+
+    # A busy clipboard during a failing gh: the gh error must surface, not the clipboard error.
+    Reset-FakeGh
+    Set-Content -LiteralPath $global:clipboardFile -Value 'github_pat_bothfail' -NoNewline
+    $env:GH_FAKE_SET_EXIT = '1'
+    $global:setClipboardShouldThrow = $true
+    Assert-Throws -Script { & $deliverScript -Destination gh-secret -Name 'BOTHFAIL_TOKEN' -Repo 'owner/repo' -WarningAction SilentlyContinue } `
+        -ExpectedSubstring 'gh secret set failed' -Message 'A busy clipboard must not mask the original gh error.'
+    $global:setClipboardShouldThrow = $false
+
+    # Clipboard comparisons are case-sensitive: a case-variant of the delivered value is different content
+    # and must not be cleared.
+    Reset-FakeGh
+    Set-Content -LiteralPath $global:clipboardFile -Value 'github_pat_casevalue' -NoNewline
+    Set-FakeGhListing -Name 'CASE_TOKEN'
+    $env:GH_FAKE_CLOBBER_CLIPBOARD_FILE = $global:clipboardFile
+    $env:GH_FAKE_CLOBBER_VALUE = 'GITHUB_PAT_CASEVALUE'
+    $caseOutput = & $deliverScript -Destination gh-secret -Name 'CASE_TOKEN' -Repo 'owner/repo'
+    Assert-Contains -Actual $caseOutput -Expected 'already held different content, nothing cleared' -Message 'A case-variant clipboard value must be treated as different content and left uncleared.'
+    $finalCaseClipboard = Get-Content -LiteralPath $global:clipboardFile -Raw
+    Assert-Contains -Actual $finalCaseClipboard -Expected 'GITHUB_PAT_CASEVALUE' -Message 'The case-variant clipboard content must survive delivery untouched.'
+
     # -Visibility selected needs -SelectedRepos, and passes it through as --repos.
     Reset-FakeGh
     Set-FakeGhListing -Name 'ORG_TOKEN'
@@ -184,7 +227,7 @@ exit /b 2
 }
 finally {
     Remove-Item function:Get-Clipboard, function:Set-Clipboard, function:Read-Host -ErrorAction SilentlyContinue
-    Remove-Variable -Scope Global -Name clipboardFile, clipboardSetCalls, clipboardGetCalls, promptValue, readHostCalls -ErrorAction SilentlyContinue
+    Remove-Variable -Scope Global -Name clipboardFile, clipboardSetCalls, clipboardGetCalls, promptValue, readHostCalls, setClipboardShouldThrow -ErrorAction SilentlyContinue
     $env:PATH = $originalPath
     Reset-FakeGh
     if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }

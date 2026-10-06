@@ -82,7 +82,7 @@ try {
     }
     if ($null -ne $value) { $value = $value.Trim() }
     if ([string]::IsNullOrWhiteSpace($value)) {
-        throw 'No value found; copy the credential first, or rerun with -Prompt and paste once.'
+        throw 'No value found; recopy the value, or have Tommy run this script with -Prompt in his own interactive terminal to paste it directly.'
     }
     if ($value -match '\s') {
         throw 'The value contains whitespace, so this is not a single credential. Copy the credential and rerun.'
@@ -120,15 +120,17 @@ finally {
     if ($clearStatus -eq 'pending') {
         $current = $null
         try { $current = Get-Clipboard -Raw } catch { $current = $null }
-        if ($current -and $current.Trim() -eq $deliveredValue) {
-            Set-Clipboard -Value ' '
-            $after = $null
-            try { $after = Get-Clipboard -Raw } catch { $after = $null }
-            if ($null -ne $after -and $after.Trim() -ne $deliveredValue) {
-                $clearStatus = 'cleared'
+        if ($current -and $current.Trim() -ceq $deliveredValue) {
+            try {
+                Set-Clipboard -Value ' '
+                $after = $null
+                try { $after = Get-Clipboard -Raw } catch { $after = $null }
+                $clearStatus = if ($null -ne $after -and $after.Trim() -cne $deliveredValue) { 'cleared' } else { 'failed' }
             }
-            else {
+            catch {
                 $clearStatus = 'failed'
+            }
+            if ($clearStatus -eq 'failed') {
                 Write-Warning 'The clipboard still holds the credential after clearing; clear it manually. Windows clipboard history or cloud sync may also retain the earlier copy.'
             }
         }
