@@ -23,13 +23,13 @@ class CodexWindowsHookCommands(unittest.TestCase):
                 for hook in group["hooks"]:
                     command = hook["commandWindows"]
                     budget = float(re.search(r"--timeout (\d+)", command)[1])
-                    script = command.rsplit("/", 1)[-1].rstrip('"')
+                    script = command.rsplit("/", 1)[-1].split('"', 1)[0]
                     names.append(script)
-                    self.assertEqual(budget, 7 if script == "tier_gate.py" else 12)
+                    self.assertEqual(budget, {"tier_gate.py": 7, "delivery_binding_gate.py": 57}.get(script, 12))
                     self.assertEqual(hook["timeout"] - budget, 3)
         self.assertCountEqual(names, [
             "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
-            "forge_poll_gate.py", "compact_output_gate.py",
+            "forge_poll_gate.py", "compact_output_gate.py", "delivery_binding_gate.py",
         ])
 
     def test_every_plugin_uses_host_expanded_plugin_root_and_pretool_adapter(self):

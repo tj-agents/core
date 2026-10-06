@@ -40,6 +40,17 @@ procedure that goes stale in the repo that renames one.
 
 ## Steps
 
+Immediately before every merge attempt, fetch the current PR body and require nonempty What and Why:
+
+```bash
+python <workflow-ops> --root <absolute-worktree> --workflow-run-id pr-body-<n> pr-body-check --pr <pr-url>
+```
+
+Resolve `<workflow-ops>` to `.agents/workflows/workflow_ops.py` in a source checkout or
+`workflows/workflow_ops.py` under the installed engineering package. Repair a failed body check through
+`engineering:open-pr`, preserving attribution, then repeat this fresh check before merging. PR body
+metadata can change without changing the head; a previous check or delivery binding cannot satisfy it.
+
 ### Scope lock — one source PR and only the automation it causes
 
 Record the current branch's PR number and remote head at entry and keep that delivery identity through the
