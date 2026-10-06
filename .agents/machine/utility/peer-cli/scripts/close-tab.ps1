@@ -1,4 +1,3 @@
-#Requires -Version 7
 <#
 .SYNOPSIS
 Close a Windows Terminal tab by its title.
@@ -54,7 +53,7 @@ function Test-TabIsLive {
     if (-not (Test-Path -LiteralPath $directory)) { return $true }
 
     $entries = @(Get-ChildItem -LiteralPath $directory -Filter '*.json' -File | ForEach-Object {
-        try { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } catch { $null }
+        try { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
     } | Where-Object { $_ -and $_.title -eq $Title })
 
     if ($entries.Count -eq 0) { return $true }
