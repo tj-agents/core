@@ -206,6 +206,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/merge_cleanup_gate.py",
+      "destination": "hooks/merge_cleanup_gate.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/persistent_workflow_merge_gate.py",
       "destination": "hooks/persistent_workflow_merge_gate.py"
     },

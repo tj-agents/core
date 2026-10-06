@@ -70,6 +70,13 @@
         ]
       },
       {
+        "path": "hooks/merge_cleanup_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": "hooks/merge_review_gate.py",
         "hosts": [
           "claude"
