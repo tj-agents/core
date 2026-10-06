@@ -81,11 +81,12 @@ family an effort step below, and frontier spend is the user's provenance to gran
 hard-looking task — and it rejects `--lane` or `--model` beside it.
 
 A lane's effort travels with its resolved model (`--lane L4`, for example, resolves both a model and an
-effort from the table) and reaches `claude --effort <level>`, except when an explicit `--model` beat the
-lane — then no lane effort applies either, matching the model it would have paired with. An explicit
-`--effort '<low|medium|high|xhigh|max>'` always wins over a lane's own effort, the same way `-ReasoningEffort`
-beats a lane in `handoff-codex`. Some rungs (Claude's `L7`) price no effort at all, and the launcher passes
-none rather than inventing one.
+effort from the table) and reaches `claude --effort <level>` automatically. There is no separate `--effort`
+flag: an effort is only ever the one its own model was priced for, never a caller's pick paired with
+whichever model happens to be in play, so a lane always opens the exact session that rung's model and
+effort pair describes. An explicit `--model` beating the lane means no lane effort applies either,
+matching the model it would have paired with. Some rungs (Claude's `L7`) price no effort at all, and the
+launcher passes none rather than inventing one.
 
 A calling skill or workflow that ships its own resolved selection may still pass `--model` directly;
 that wins over `--lane`. What is no longer acceptable is inventing a model id at the call site.
@@ -100,9 +101,9 @@ Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is oft
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 Add `--lane '<L1..L7>'` (or `--frontier`) to have the launcher resolve the model and, where the table
-prices one, its effort, or `--model '<model-id>'` and `--effort '<level>'` for values the user named.
-Omitting them all lets the CLI fall back to its own configured default — the same behavior an
-interactively launched session gets.
+prices one, its effort, or `--model '<model-id>'` for a model the user named outright (never an effort of
+its own; see above). Omitting them all lets the CLI fall back to its own configured default — the same
+behavior an interactively launched session gets.
 
 Add `--dangerously-skip-permissions` **only when the user asks for it in that request**. It disables every
 permission prompt in the new window, so it is never a default and never inferred from the repository
