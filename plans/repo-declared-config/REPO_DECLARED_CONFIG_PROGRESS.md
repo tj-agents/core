@@ -1,4 +1,14 @@
 # Repo-declared agent configuration — progress
+
+## Machine-verifier slice (2026-10-06)
+
+The 2026-09-29 continuation strengthened `verify_machine.py` (parsed TOML, named profiles, hidden loose
+files, repository-local sources, redacted structured findings) per the plan's machine-verifier section;
+it lands with this branch. That session's transfer to a Sol successor was never acknowledged — the
+successor stopped when C: ran out of space — so the migration has no live owner. Its stale-snapshot
+diagnosis was fixed independently on main (PR #73). The Concertable scope-isolation slice exists only as
+unpushed commit `3bcb527` on `Concertable/agents` `Fix/PluginScopeIsolation`. Native role acceptance still
+waits on Tommy's approval to copy credentials.
 ## Typed Codex launcher checkpoint (2026-09-29)
 
 Claude's pre-load refresh and plugin-owned typed launcher merged in PRs #61 and #63, with a real
