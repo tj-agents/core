@@ -56,7 +56,7 @@ EXEMPT_RE = re.compile(
     r'|\bgh\s+pr\s+(?:view|checks|list)\b'
     r'|\bgh\s+run\s+(?:list|view|watch)\b'
     r'|\b(?:workflow_ops|cleanup_proof|agent_cli|transfer|merge_cleanup_gate)\.py\b'
-    r'|\b(?:worktrees|peer-cli|close-tab|launch-codex|launch-claude)\.ps1\b',
+    r'|\b(?:worktrees|peer-cli|close-tab|launch-codex|launch-claude|finish|finish_reaper)\.ps1\b',
     re.IGNORECASE,
 )
 PUSHD_RE = re.compile(r"""\bpushd\s+(?:"([^"]+)"|'([^']+)'|(\S+))""", re.IGNORECASE)
@@ -70,9 +70,10 @@ MESSAGE = (
     "- Not merged yet? Keep monitoring — `python .agents/workflows/workflow_ops.py ... "
     "monitor --kind pr --id {pr} --head {head}`, `gh pr view/checks` and `gh run list/view/watch` "
     "are never blocked.\n"
-    "- Merged? Run Step 5 now: `python \"{cleanup_proof}\" --worktree \"{worktree}\" --branch "
-    "{branch} --head {head} --pr {pr}`, apply the commands it approves, then retarget or hand off "
-    "per `engineering:merge` Step 5.\n"
+    "- Merged? Finish Step 6 and the report, then from inside {worktree} run `python -B {cleanup_proof}` "
+    "and `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>"
+    "\\scripts\\finish.ps1`, exactly, with no arguments: it closes this CLI and removes the worktree. "
+    "Elsewhere, follow `engineering:merge` Step 5.\n"
     "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
     "`python \"{hook_path}\" --clear \"{worktree}\"`.\n"
     "This repeats every 10 minutes until cleanup completes, a handoff launcher transfers it, "
