@@ -69,6 +69,17 @@ GATES = {
         import time
         time.sleep(60)
     """,
+    "arguments.py": """
+        import json, sys
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart",
+            "additionalContext": json.dumps(sys.argv[1:])}}))
+    """,
+    "silent_failure.py": """
+        raise SystemExit(1)
+    """,
+    "plain.py": """
+        print("PowerShell launcher installed")
+    """,
 }
 
 
@@ -152,6 +163,58 @@ class HookDispatchTests(unittest.TestCase):
         output, stderr = self.dispatch(["rebind.py"])
         self.assertEqual({}, output)
         self.assertEqual("", stderr)
+
+    def test_hook_groups_preserve_arguments_and_restore_them_for_siblings(self):
+        output, stderr = self.dispatch([
+            "--hook", "arguments.py", "--session-context", "--project", "path with spaces",
+            "--hook", "arguments.py",
+        ], event="SessionStart")
+        self.assertEqual('', stderr)
+        self.assertEqual('["--session-context", "--project", "path with spaces"]\n\n[]',
+                         output['hookSpecificOutput']['additionalContext'])
+
+    def test_session_start_failure_missing_script_and_block_keep_sibling_context(self):
+        for failed, evidence in [('crash.py', 'gate exploded'),
+                                 ('missing.py', 'FileNotFoundError'),
+                                 ('silent_failure.py', 'exit status 1')]:
+            with self.subTest(failed=failed):
+                output, stderr = self.dispatch([
+                    '--hook', 'context.py', '--hook', failed, '--hook', 'deny.py',
+                    '--hook', 'echo.py',
+                ], event='SessionStart')
+                context = output['hookSpecificOutput']['additionalContext']
+                self.assertIn('context from Bash', context)
+                self.assertIn('echo m1', context)
+                self.assertIn(evidence, context)
+                self.assertIn(evidence, output['systemMessage'])
+                self.assertIn(failed, stderr)
+                self.assertEqual('block', output['decision'])
+                self.assertEqual('deny reason', output['reason'])
+
+    def test_session_start_deadline_reports_stalled_and_skipped_scripts_in_context(self):
+        output, _ = self.dispatch([
+            '--deadline', '1', '--hook', 'context.py', '--hook', 'hang.py',
+            '--hook', 'arguments.py', '--session-context',
+        ], event='SessionStart')
+        context = output['hookSpecificOutput']['additionalContext']
+        self.assertIn('context from Bash', context)
+        self.assertIn('hang.py did not finish within 1s', context)
+        self.assertIn('these gates did not run: arguments.py', context)
+
+    def test_empty_hook_group_is_rejected(self):
+        result = subprocess.run(
+            [sys.executable, '-B', str(self.hooks / DISPATCH.name), '--hook'],
+            input='{}', capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(1, result.returncode)
+        self.assertIn('each --hook requires a script', result.stderr)
+
+    def test_session_start_plain_stdout_is_delivered_with_json_context(self):
+        output, stderr = self.dispatch(['--hook', 'plain.py', '--hook', 'echo.py'],
+                                       event='SessionStart')
+        self.assertEqual('', stderr)
+        self.assertEqual('PowerShell launcher installed\n\necho m1',
+                         output['hookSpecificOutput']['additionalContext'])
 
 
 class PackagedDispatchTests(unittest.TestCase):
