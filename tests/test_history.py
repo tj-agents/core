@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('history', ROOT / '.agents/machine/scripts/history.py')
@@ -168,6 +169,15 @@ class HistoryTests(unittest.TestCase):
         os.chdir(worktree_abs)
         result = HISTORY.query(self.root / 'claude', 'claude', worktree=Path('.'))
         self.assertEqual([item['session'] for item in result], ['rel-match'])
+
+    def test_worktree_keeps_the_given_spelling_when_resolve_changes_it(self):
+        worktree = self.root / 'mapped' / '.worktrees' / 'Feature-Map'
+        self.write('claude/project/mapped.jsonl', [
+            dict(type='user', sessionId='mapped', cwd=str(worktree), timestamp='2026-01-08T00:00:00Z',
+                 message={'content': 'on the mapped drive'})])
+        with mock.patch.object(HISTORY.Path, 'resolve', return_value=Path('//server/share/elsewhere')):
+            result = HISTORY.query(self.root / 'claude', 'claude', worktree=worktree)
+        self.assertEqual([item['session'] for item in result], ['mapped'])
 
     def test_worktree_matches_git_bash_drive_spelling_on_windows(self):
         if os.name != 'nt':

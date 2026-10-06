@@ -89,6 +89,14 @@ def _path_variants(worktree_norm):
     return variants
 
 
+def _worktree_variants(worktree):
+    """Variants of the path as given and as resolved; sessions record whichever spelling their shell used
+    (8.3 short names, junctions, subst or mapped drives)."""
+    path = Path(worktree).expanduser()
+    spellings = (normalize_for_match(path.absolute()), normalize_for_match(path.resolve()))
+    return list(dict.fromkeys(variant for spelling in spellings for variant in _path_variants(spelling)))
+
+
 def _cwd_under(cwd, worktree_norms):
     if not cwd:
         return False
@@ -188,8 +196,7 @@ def query(root, host, *, cwd=None, project=None, worktree=None, count=5, pattern
     if count < 1:
         raise ValueError('--count must be positive')
     expression = re.compile(pattern if regex else re.escape(pattern), re.I) if pattern is not None else None
-    worktree_norms = (_path_variants(normalize_for_match(Path(worktree).expanduser().resolve()))
-                       if worktree else None)
+    worktree_norms = _worktree_variants(worktree) if worktree else None
     files = root.rglob('*.jsonl') if host == 'codex' else root.glob('*/*.jsonl')
     results = []
     for path in sorted(files, key=lambda p: p.stat().st_mtime, reverse=True):
