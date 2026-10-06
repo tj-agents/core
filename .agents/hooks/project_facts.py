@@ -94,12 +94,12 @@ class ProjectGraph:
                 return None
         def visit(element, conditional=False):
             tag = element.tag.rsplit('}', 1)[-1]
-            conditional = conditional or bool(element.get('Condition')) or tag in ('Choose', 'When', 'Otherwise')
+            conditional = conditional or bool(element.get('Condition')) or tag in ('Choose', 'When', 'Otherwise', 'Target')
             if tag in ('PackageReference', 'FrameworkReference', 'Sdk', 'ProjectReference'):
                 reference = tag == 'ProjectReference'
                 kind = {'PackageReference': 'nuget', 'FrameworkReference': 'framework', 'Sdk': 'sdk'}.get(tag)
                 def key(value):
-                    return target_identity(value) if reference else value.lower() if kind == 'nuget' else value
+                    return target_identity(value) if reference else value.lower() if kind in ('nuget', 'framework') else value
                 def unknown(value=None):
                     if reference:
                         project.references.append({'target': key(value) if value else None, 'path': project.id, 'unknown': True})
@@ -118,7 +118,7 @@ class ProjectGraph:
                                                    if item['kind'] != kind or key(item['id']) != key(removed)]
                 exclusions = [value.strip() for value in (element.get('Exclude') or '').split(';') if value.strip()]
                 uncertain_exclusion = any(unresolved(value) or (reference and key(value) is None) for value in exclusions)
-                excluded = {key(value) for value in exclusions if not unresolved(value)}
+                excluded = {key(value) for value in exclusions if not unresolved(value) and key(value) is not None}
                 identity = element.get('Include') or element.get('Name')
                 for item in (identity or '').split(';'):
                     item = item.strip()
@@ -236,21 +236,22 @@ class ProjectGraph:
     def dependency(self, identity, rule, supplements=()):
         project = self.projects[identity]
         kind = rule['kind']
-        def matches(item):
+        def matches(item, uncertain=False):
             if item['kind'] not in (None, kind):
                 return False
             if item['id'] is None:
                 return True
-            actual = item['id'].lower() if kind == 'nuget' else item['id']
+            ignore_case = kind == 'nuget' or (uncertain and kind == 'framework')
+            actual = item['id'].lower() if ignore_case else item['id']
             expected = rule.get('id', rule.get('prefix'))
-            expected = expected.lower() if kind == 'nuget' else expected
+            expected = expected.lower() if ignore_case else expected
             return actual == expected if 'id' in rule else actual.startswith(expected)
         proven = [item for item in project.dependencies if matches(item)]
         supplemented = [item for item in supplements if item['project'] == identity and matches(item['dependency'])]
         evidence = [identity + ': ' + item['path'] for item in proven]
         evidence.extend(identity + ': ' + item['path'] + ' (' + item['reason'] + ')'
                         for entry in supplemented for item in entry['evidence'])
-        unresolved = [item for item in project.unknown if matches(item)]
+        unresolved = [item for item in project.unknown if matches(item, uncertain=True)]
         diagnostics = []
         if not supplemented and unresolved:
             diagnostics = [problem('unknown-dependency', item['path'], identity + ': resolve static ' + kind + ' dependency evidence')
