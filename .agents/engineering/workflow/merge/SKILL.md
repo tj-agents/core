@@ -236,21 +236,31 @@ or the session is already attached to the primary checkout, do not retarget or h
 and branch deletion in the current session.
 
 Only when the recorded target is a linked worktree, the host is attached to that target, and the target
-differs from the primary checkout, apply `base:cd` and retarget the host **before** a helper or native Git
-unregisters or removes it. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude
-and is not evidence that the old directory can be deleted.
+differs from the primary checkout, the session closes itself as the delivery's final action, after Step 6,
+any plan close-out and the report. Run gate 1 below, then from inside that worktree run exactly this, with
+no arguments and no leading `&`, because the harness allow rule matches only this string:
 
-- If the harness exposes its native host command interface, invoke `/cd <primary-checkout>` there and
-  continue only after the host confirms that the session is attached to the primary checkout.
-- If that interface is unavailable, invoke the unqualified `handoff` workflow once with the primary
-  checkout. Checkpoint the exact repository, merged PR, branch, remote head, target worktree, primary
-  checkout, and remote default. Put the remaining Step 5 cleanup and final inventory in the successor's
-  `## Next Steps`. After verified launcher submission the predecessor stops repository-scoped work; it
-  cannot end its own host session, so the successor's `## Next Steps` gates on the recorded release marker
-  and then closes the predecessor's CLI and tab through `handoff`'s `machine:peer-cli` release procedure,
-  and the predecessor does not run either cleanup path. The successor is the sole cleanup owner:
-  after closing the predecessor, it selects the helper or native-Git path below, requires
-  the physical target path to be absent, and then continues this delivery.
+```
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>\scripts\finish.ps1
+```
+
+It verifies the receipt, detaches a reaper that removes the worktree and branch once this session exits, and
+closes this session's CLI and tab. The reaper's result and the cleanup reminder surface any failure to the
+next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude and is not
+evidence that the old directory can be deleted.
+
+- Only when `finish.ps1` is unavailable or its preflight fails: if the harness exposes its native host
+  command interface, invoke `/cd <primary-checkout>` there and continue only after the host confirms that
+  the session is attached to the primary checkout.
+- Only when `finish.ps1` is unavailable or its preflight fails: if that interface is unavailable, invoke
+  the unqualified `handoff` workflow once with the primary checkout. Checkpoint the exact repository, merged
+  PR, branch, remote head, target worktree, primary checkout, and remote default. Put the remaining Step 5
+  cleanup and final inventory in the successor's `## Next Steps`. After verified launcher submission the
+  predecessor stops repository-scoped work; it cannot end its own host session, so the successor's
+  `## Next Steps` gates on the recorded release marker and then closes the predecessor's CLI and tab through
+  `handoff`'s `machine:peer-cli` release procedure, and the predecessor does not run either cleanup path. The
+  successor is the sole cleanup owner: after closing the predecessor, it selects the helper or native-Git
+  path below, requires the physical target path to be absent, and then continues this delivery.
 
 Do not make the user choose between these paths or teach them this lifecycle detail. Only the final manual
 `/cd` pause already defined by `base:cd` applies when the automatic handoff capability is genuinely
@@ -287,11 +297,11 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    current on it, and pre-existing user files must remain. Treat any removal error or residual target path
    as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
 
-**Step 5 is a blocking post-merge gate. Do not enter Step 6, report terminal delivery, or leave the cleanup
-for a later session until host retargeting plus the helper or native-Git path has produced the final
-inventory above.** The
-worktree-cleanup audit gate is a backstop that makes a missed cleanup visible, not a substitute for doing it
-immediately.
+**Step 5 is a blocking post-merge gate. Do not report terminal delivery or leave the cleanup for a later
+session until `finish.ps1` has run or host retargeting plus the helper or native-Git path has produced the
+final inventory above. Only the `finish.ps1` path may enter Step 6 first.** The
+worktree-cleanup audit gate and the merge-cleanup gate are backstops that make a missed cleanup visible, not
+a substitute for doing it immediately.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
 head, review evidence and delivery binding. When no successor exists, start the next branch from the
@@ -371,4 +381,4 @@ needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-stop. No preamble.
+run `finish.ps1` when the session is attached to the merged worktree, otherwise stop. No preamble.
