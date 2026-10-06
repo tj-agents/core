@@ -54,8 +54,8 @@ considered. That is what keeps it out of the code as running commentary.
 
 ## Keep commits within a reviewable delivery slice
 
-Use `engineering:git-branching` to choose PR boundaries. A phase may span several focused PRs, stacked
-when dependent. Keep related repairs and tests with their behavior, and split a substantial next concern
+Use `engineering:git-branching` to choose PR boundaries and deliver focused PRs sequentially by default.
+When a PR must build on an unmerged parent, maintain the required stack. Keep related repairs and tests with their behavior, and split a substantial next concern
 before it grows the current candidate. Publication and deployment dependencies are additional boundaries;
 they are not the only reasons to separate PRs. Commit cadence and one verified push per slice do not
 require combining the entire goal into one PR.

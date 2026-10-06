@@ -4,10 +4,6 @@
   "source_roots": [
     ".agents/machine"
   ],
-  "source_excludes": [
-    ".agents/catalog/catalog.json"
-  ],
-  "source_digest": "sha256:2abb8a4e94ada9ed587e67bce80c68d7c0760e6e7e39a52650d822505cdb3502",
   "requires": {
     "marketplaces": [
       {
@@ -21,7 +17,7 @@
     ],
     "hooks": [
       {
-        "path": ".agents/machine/peer-cli/scripts/register_session.py",
+        "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
         "hosts": [
           "claude",
           "codex"
@@ -31,6 +27,12 @@
         "path": "resources/machine/scripts/claude_terminal_profile.py",
         "hosts": [
           "claude"
+        ]
+      },
+      {
+        "path": "resources/machine/scripts/codex_terminal_profile.py",
+        "hosts": [
+          "codex"
         ]
       },
       {

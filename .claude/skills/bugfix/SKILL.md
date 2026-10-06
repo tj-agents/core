@@ -4,8 +4,6 @@ description: Diagnose and fix a defect, regression, crash, or incorrect existing
 
 kind: workflow
 domain: process
-model: claude-sonnet-5
-effort: high
 ---
 
 # Diagnose and repair a bug

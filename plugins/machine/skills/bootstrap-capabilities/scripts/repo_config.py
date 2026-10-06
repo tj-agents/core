@@ -144,9 +144,13 @@ def codex_settings(path: Path, sources: dict[str, dict], identities: dict[str, b
     prefix = unmanaged_codex(existing)
     lines = [MANAGED_START]
     for marketplace, release in sources.items():
+        sparse_paths = sorted({".agents/plugins", ".claude-plugin", *(
+            plugin["package_path"].split("/", 1)[0] for plugin in release["plugins"]
+        )})
         lines += [f"[marketplaces.{marketplace}]", 'source_type = "git"',
                   f'source = "https://github.com/{release["owner_repository"]}.git"',
-                  f'ref = "{release["revision"]}"', ""]
+                  f'ref = "{release["revision"]}"',
+                  f"sparse_paths = {json.dumps(sparse_paths)}", ""]
     for identity, enabled in identities.items():
         lines += [f'[plugins."{identity}"]', f"enabled = {str(enabled).lower()}", ""]
     lines.append(MANAGED_END)

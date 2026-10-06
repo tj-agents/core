@@ -1,12 +1,9 @@
 ---
 name: stack
-description: Create and maintain a dependent stack of focused GitHub pull requests. Use when a change needs stacked PRs, a child PR must target its parent branch, a parent changes after a child opens, or a stack must be landed from the bottom up.
+description: Maintain a required stack when work must build on an unmerged PR. Covers the concrete reason for overlap, verified parent branches, parent-targeted child PRs, cumulative validation and prompt bottom-up landing. Sequential delivery and checkout allocation follow git-branching.
 
 kind: operation
 domain: process
-model: claude-sonnet-5
-effort: high
-effort: high
 ---
 
 # Stacked pull requests

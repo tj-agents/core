@@ -44,6 +44,13 @@ REACT = {
     "detect": {"content": [{"glob": "package.json", "pattern": r"\"react\"\s*:"}]},
 }
 BASE = {"schema_version": 1, "tier": "base", "stack": "any project", "applies": "always"}
+INFONETICA = {
+    "schema_version": 2,
+    "tier": "infonetica",
+    "stack": "Infonetica work",
+    "applies": "stack-present",
+    "detect": {"remote": [r"^infonetica/"]},
+}
 
 
 def declaration(plugin, marketplace, data):
@@ -76,6 +83,135 @@ class DeclarationDiscovery(unittest.TestCase):
                 (payload / "tier.json").write_text(body, encoding="utf-8")
 
             self.assertEqual(gate.declarations([cache]), [])
+
+    def test_schema_version_two_is_accepted(self):
+        with tempfile.TemporaryDirectory() as cache:
+            payload = Path(cache) / "infonetica" / "infonetica" / "1.0.0"
+            payload.mkdir(parents=True)
+            (payload / "tier.json").write_text(json.dumps(INFONETICA), encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.tier for item in found], ["infonetica"])
+
+    def test_an_orphaned_version_never_shadows_a_live_one(self):
+        with tempfile.TemporaryDirectory() as cache:
+            live = Path(cache) / "dotagents" / "dotnet" / "aaa-old"
+            orphaned = Path(cache) / "dotagents" / "dotnet" / "zzz-new"
+            for payload in (live, orphaned):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            (orphaned / ".orphaned_at").write_text("", encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.payload_dir for item in found], [live])
+
+    def test_the_registry_installed_version_beats_every_other_cached_version(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            installed = cache / "dotagents" / "dotnet" / "aaa-installed"
+            for name in ("aaa-installed", "zzz-stale"):
+                payload = cache / "dotagents" / "dotnet" / name
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            os.utime(installed, (1, 1))
+            registry = {"plugins": {"dotnet@dotagents": [{"installPath": str(installed)}]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache])
+
+        self.assertEqual([item.payload_dir for item in found], [installed])
+
+    def test_a_project_scoped_install_answers_only_inside_its_project(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            user = cache / "dotagents" / "dotnet" / "user-version"
+            scoped = cache / "dotagents" / "dotnet" / "project-version"
+            for payload in (user, scoped):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            project = Path(config) / "project-x"
+            (project / "src").mkdir(parents=True)
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "user", "installPath": str(user)},
+                {"scope": "project", "projectPath": str(project), "installPath": str(scoped)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+            os.utime(scoped, (1, 1))
+
+            inside = gate.declarations([cache], project=project / "src")
+            elsewhere = gate.declarations([cache], project=Path(config) / "project-y")
+
+        self.assertEqual([item.payload_dir.name for item in inside], ["project-version"])
+        self.assertEqual([item.payload_dir.name for item in elsewhere], ["user-version"])
+
+    def test_a_project_install_without_a_declaration_leaves_the_user_install_answering(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            user = cache / "dotagents" / "dotnet" / "user-version"
+            user.mkdir(parents=True)
+            (user / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            legacy = cache / "dotagents" / "dotnet" / "pre-tier"
+            legacy.mkdir(parents=True)
+            project = Path(config) / "project"
+            project.mkdir()
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "user", "installPath": str(user)},
+                {"scope": "project", "projectPath": str(project), "installPath": str(legacy)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache], project=project)
+
+        self.assertEqual([item.payload_dir.name for item in found], ["user-version"])
+
+    def test_the_most_specific_project_install_wins(self):
+        with tempfile.TemporaryDirectory() as config:
+            cache = Path(config) / "plugins" / "cache"
+            outer, inner = cache / "dotagents" / "dotnet" / "outer", cache / "dotagents" / "dotnet" / "inner"
+            for payload in (outer, inner):
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+            os.utime(inner, (1, 1))
+            repos = Path(config) / "repos"
+            (repos / "app" / "src").mkdir(parents=True)
+            registry = {"plugins": {"dotnet@dotagents": [
+                {"scope": "project", "projectPath": str(repos), "installPath": str(outer)},
+                {"scope": "project", "projectPath": str(repos / "app"), "installPath": str(inner)},
+            ]}}
+            (cache.parent / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+
+            found = gate.declarations([cache], project=repos / "app" / "src")
+
+        self.assertEqual([item.payload_dir.name for item in found], ["inner"])
+
+    def test_the_gates_own_install_cache_precedes_the_home_caches(self):
+        with tempfile.TemporaryDirectory() as home:
+            own = Path(home) / ".codex" / "plugins" / "cache"
+            script = own / "base-agents" / "engineering" / "1.0.0" / "hooks" / "tier_gate.py"
+            script.parent.mkdir(parents=True)
+            (Path(home) / ".claude" / "plugins" / "cache").mkdir(parents=True)
+            cleared = {name: "" for name in (*gate.PLUGIN_ROOT_VARIABLES, "CLAUDE_CONFIG_DIR", "CODEX_HOME")}
+            with unittest.mock.patch.dict(os.environ, cleared), \
+                    unittest.mock.patch.object(gate, "__file__", str(script)), \
+                    unittest.mock.patch.object(gate.Path, "home", return_value=Path(home)):
+                roots = gate.cache_roots()
+
+        self.assertEqual(own.resolve(), roots[0])
+
+    def test_the_first_cache_root_answers_for_a_plugin_both_hosts_cache(self):
+        with tempfile.TemporaryDirectory() as claude, tempfile.TemporaryDirectory() as codex:
+            payloads = []
+            for cache, name in ((claude, "b693fe48ccd8"), (codex, "1.1.2")):
+                payload = Path(cache) / "dotagents" / "dotnet" / name
+                payload.mkdir(parents=True)
+                (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+                payloads.append(payload)
+
+            found = gate.declarations([claude, codex])
+
+        self.assertEqual([item.payload_dir for item in found], [payloads[0]])
 
 
 class TemporaryProject(unittest.TestCase):
@@ -118,6 +254,28 @@ class Detection(TemporaryProject):
 
         other = self.populated(json.dumps({"dependencies": {"vue": "3"}}), ["package.json"])
         present, _ = gate.stack_present(other, REACT["detect"])
+        self.assertFalse(present)
+
+    def test_a_remote_matcher_reads_the_origin_identity_not_the_tree(self):
+        project = self.populated("", ["README.md"])
+        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/Infonetica/cris-preaward-app.git"],
+            cwd=project,
+            check=True,
+        )
+        present, evidence = gate.stack_present(project, INFONETICA["detect"])
+        self.assertTrue(present)
+        self.assertEqual(evidence, "origin infonetica/cris-preaward-app")
+
+        unrelated = self.populated("", ["README.md"])
+        subprocess.run(["git", "init", "-q"], cwd=unrelated, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/tj-agents/core.git"],
+            cwd=unrelated,
+            check=True,
+        )
+        present, _ = gate.stack_present(unrelated, INFONETICA["detect"])
         self.assertFalse(present)
 
 
@@ -182,6 +340,54 @@ class SessionStatement(TemporaryProject):
         self.assertIn("Does not apply here: `react:*`", text)
         self.assertNotIn("Does not apply here: `dotnet", text)
 
+    def test_an_audit_can_inspect_source_without_adopting_inapplicable_rules(self):
+        found = [declaration("dotnet", "dotagents", DOTNET)]
+        text = gate.statement(self.project, found)
+        self.assertIn("standards-source audit", text)
+        self.assertIn("canonical source files", text)
+        self.assertIn("does not load them as governing instructions", text)
+        self.assertNotIn("do not read, invoke or cite", text)
+        self.assertIn("no stack tier applies", gate.conventions(self.project, found))
+
+
+class Conventions(TemporaryProject):
+    def installed(self, skills):
+        cache = tempfile.TemporaryDirectory()
+        self.addCleanup(cache.cleanup)
+        payload = Path(cache.name) / "dotagents" / "dotnet" / "1.0.0"
+        for name, kind in skills:
+            skill = payload / "skills" / name
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                f"---\nname: {name}\ndescription: rule\nkind: {kind}\n---\n\n# {name}\n",
+                encoding="utf-8",
+            )
+        (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
+        return gate.declarations([cache.name])
+
+    def test_legacy_new_and_mixed_payloads_discover_the_same_conventions(self):
+        (self.project / "Api.csproj").write_text("", encoding="utf-8")
+        excluded = [(kind, kind) for kind in ("operation", "policy", "utility", "workflow", "knowledge", "custom")]
+        for kinds in (("contract", "contract"), ("convention", "convention"), ("contract", "convention")):
+            with self.subTest(kinds=kinds):
+                found = self.installed(list(zip(("persistence", "style"), kinds)) + excluded)
+                payload = found[0].payload_dir
+                self.assertEqual([name for name, _ in gate.contract_skills(payload)], ["persistence", "style"])
+                text = gate.conventions(self.project, found)
+                self.assertIn("dotnet (.NET detected (Api.csproj)): 2 convention(s)", text)
+                self.assertIn("persistence", text)
+                self.assertIn("style", text)
+                for name, _ in excluded:
+                    self.assertNotIn("  " + name + " -", text)
+
+    def test_no_applicable_tier_is_said_explicitly(self):
+        for kind in ("contract", "convention"):
+            with self.subTest(kind=kind):
+                found = self.installed([("persistence", kind)])
+                text = gate.conventions(self.project, found)
+                self.assertIn("no stack tier applies", text)
+                self.assertNotIn("persistence", text)
+
 
 class Gate(TemporaryProject):
     def setUp(self):
@@ -215,6 +421,14 @@ class Gate(TemporaryProject):
     def test_naming_the_plugin_without_reading_a_standard_is_not_a_block(self):
         payload = {"tool_name": "Bash", "tool_input": {"command": "git log dotagents/dotnet"}}
         self.assertEqual(self.call(payload), 0)
+
+    def test_source_inspection_does_not_enable_skill_invocation(self):
+        command = 'cat ../standards/.agents/dotnet/contract/style/SKILL.md'
+        self.assertEqual(self.call({"tool_name": "shell", "tool_input": {"command": command}}), 0)
+        self.assertEqual(self.call({"tool_name": "Skill", "tool_input": {"skill": "dotnet:style"}}), 2)
+        _, applicable, blocked = gate.assess(self.project, self.found)
+        self.assertEqual(applicable, [])
+        self.assertEqual([item.tier for item in blocked], ["dotnet"])
 
     def test_an_unrecognized_payload_allows(self):
         self.assertEqual(self.call({"tool_name": "Read", "tool_input": {"file_path": "x"}}), 0)

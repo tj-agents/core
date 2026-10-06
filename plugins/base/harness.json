@@ -4,8 +4,6 @@
   "source_roots": [
     ".agents/base"
   ],
-  "source_excludes": [],
-  "source_digest": "sha256:627dbe1fb02e288b84fb0cc33699c28f7949e943a8b6a479458fc78327981fbd",
   "requires": {
     "marketplaces": [
       {
@@ -18,17 +16,30 @@
     ],
     "hooks": [
       {
-        "path": ".agents/base/agent-files/scripts/session-context.py",
+        "path": ".agents/base/policy/agent-files/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"
         ]
       },
       {
-        "path": ".agents/base/plan-artifacts/scripts/session-context.py",
+        "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"
+        ]
+      },
+      {
+        "path": ".agents/base/policy/plan-artifacts/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/hook_dispatch.py",
+        "hosts": [
+          "claude"
         ]
       },
       {

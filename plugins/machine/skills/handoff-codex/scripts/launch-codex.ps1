@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory)]
     [string] $WorkingDirectory,
@@ -27,9 +27,9 @@ $ErrorActionPreference = 'Stop'
 
 # The shared launch primitives, from the authored source layout or the installed package layout.
 $agentCli = @(
-    (Join-Path $PSScriptRoot '..\..\scripts\agent-cli.ps1'),
-    (Join-Path $PSScriptRoot '..\..\..\resources\machine\scripts\agent-cli.ps1'),
-    (Join-Path $PSScriptRoot '..\..\..\..\resources\machine\scripts\agent-cli.ps1')
+    (Join-Path $PSScriptRoot '../../../scripts/agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '../../../resources/machine/scripts/agent-cli.ps1'),
+    (Join-Path $PSScriptRoot '../../../../../resources/machine/scripts/agent-cli.ps1')
 ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 if (-not $agentCli) { throw "The shared agent-cli.ps1 library was not found relative to $PSScriptRoot." }
 . $agentCli
@@ -173,6 +173,10 @@ if ($BypassHookTrust) {
 }
 
 $arguments += "Read the file at $resolvedPromptPath and follow its instructions, working from the current directory."
+$sync = Join-Path (Split-Path -Parent $agentCli) 'codex_marketplace_sync.ps1'
+if (-not (Test-Path -LiteralPath $sync -PathType Leaf)) { throw "Codex sync script missing: $sync" }
+. $sync
+Sync-CodexStandards -CodexExecutable $codex.Path -WorkingDirectory $resolvedWorkingDirectory | Out-Null
 
 # TERM is CLEARED, never forced - the opposite of handoff-claude, and not an oversight. Claude Code
 # exports TERM=xterm-256color; Codex is a Rust/crossterm binary, and on native Windows an unset TERM is

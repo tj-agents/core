@@ -11,3 +11,19 @@ Resolve when preflight reads the canonical work order's continuous completed rev
 L1 now owns planning and design, but the workflow contract's `strategic` stage (architecture, major planning) is still derived from L3 in `.agents/workflows/hosts/*.json` and `STAGE_LANES`. Draft #39 repins the same stages for Codex, so the two changes would collide.
 
 Resolve when `strategic` is derived from L1 on both hosts, `STAGE_LANES` and the host pins agree, and the workflow contract tests pass.
+
+## Non-review workflows run helpers from the reviewed repository
+
+The review family resolves `workflow_ops.py`, `tier_gate.py` and `docs_reachability.py` from the installed
+engineering plugin root, so it runs in a repository with no `.agents/`. `plan-execution`, `feature`, `bugfix`,
+`merge`, `merging`, `open-pr`, `pr-preflight`, `remote-validation` and `persistent-delivery` still name
+`python .agents/workflows/workflow_ops.py`, which exists only inside core.
+
+Resolve when each of those skills names `<engineering>/workflows/workflow_ops.py --root <repository-root>`
+and the `test_review_native_layer.py` repository-helper check covers them.
+
+## Workflow skill resolution still assumes the former flat layout
+
+The `skills` operation defaults lifecycle names to `.agents/skills/<name>/SKILL.md`. Core now owns `feature` under `.agents/engineering/workflow/feature/`, so recording the lifecycle by name fails before producing its identity record. This predates the Sol 6.1 update and is independent of lane resolution.
+
+Resolve when lifecycle discovery uses the canonical scope/kind layout and regression coverage proves `skills --lifecycle feature` records the shipped owner in both source and installed package layouts.

@@ -16,7 +16,7 @@ $packagedLaunchers = @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Fi
     Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'agent-cli\.ps1' } |
     Select-Object -ExpandProperty FullName)
 $expectedLaunchers = @(
-    foreach ($tree in @('.agents\machine', 'codex-skills', 'skills')) {
+    foreach ($tree in @('.agents\machine\utility', 'codex-skills', 'skills')) {
         Join-Path $pluginRoot "$tree\handoff-claude\scripts\launch-claude.ps1"
         Join-Path $pluginRoot "$tree\handoff-codex\scripts\launch-codex.ps1"
         Join-Path $pluginRoot "$tree\open-claude\scripts\open-claude.ps1"
@@ -166,7 +166,13 @@ class Stub {
 using System;
 class Stub {
     static void Main(string[] args) {
-        Console.WriteLine("codex-cli 0.160.0");
+        if (args.Length >= 4 && args[0] == "plugin" && args[1] == "marketplace" && args[2] == "upgrade") {
+            Console.WriteLine("{\"selectedMarketplaces\":[],\"upgradedRoots\":[],\"errors\":[]}");
+        } else if (args.Length >= 3 && args[0] == "plugin" && args[1] == "list") {
+            Console.WriteLine("{\"installed\":[],\"available\":[]}");
+        } else {
+            Console.WriteLine("codex-cli 0.160.0");
+        }
         Environment.Exit(0);
     }
 }

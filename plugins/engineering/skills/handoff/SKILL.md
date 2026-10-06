@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Perform a context transfer by checkpointing the current goal, preparing a UTF-8 prompt and invoking one selected harness launcher. Unqualified handoff uses Codex; an explicit prompt-only request formats text without launching.
+description: Transfer the current goal or a distinct authorized side workstream to one selected harness session. Checkpoint and launch for a handoff request; format text only when explicitly asked for a prompt.
 kind: workflow
 domain: process
 ---

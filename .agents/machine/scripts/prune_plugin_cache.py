@@ -479,8 +479,41 @@ def run_pin(config_root, now, environ=None, home=None):
     return EXIT_OK
 
 
+def superseded_session(config_root, environ=None):
+    """The installed replacement for the plugin root this session loaded, when the registry moved on.
+
+    A process resolves its plugin roots once at startup and `/clear` keeps them, so an update made
+    since then reaches only new processes.
+    """
+    values = os.environ if environ is None else environ
+    loaded = values.get("CLAUDE_PLUGIN_ROOT")
+    if not loaded:
+        return None
+    try:
+        live = live_install_paths(config_root)
+    except RegistryUnusable:
+        return None
+    if normalize(loaded) in live:
+        return None
+    plugin = normalize(Path(loaded).parent)
+    replacements = sorted(path for path in live if normalize(Path(path).parent) == plugin)
+    return Path(replacements[0]) if replacements else None
+
+
 def run_notice(config_root, keep_previous, now, environ=None, home=None, stream=sys.stdout):
-    """One line when the cache has drifted, silence otherwise. Never removes anything."""
+    """One line when the cache has drifted, silence otherwise. Never removes anything.
+
+    A superseded session is stated every time, unthrottled: it is a fact about this session.
+    """
+    replacement = superseded_session(config_root, environ)
+    if replacement is not None:
+        loaded = Path((os.environ if environ is None else environ)["CLAUDE_PLUGIN_ROOT"])
+        print(
+            f"plugin session: this Claude process loaded {loaded.parent.name} {loaded.name}, but "
+            f"{replacement.name} is installed. /clear does not reload plugins; tell the user to "
+            "restart Claude Code before relying on this plugin's skills or hooks.",
+            file=stream,
+        )
     marker = state_directory(environ, home) / "plugin-cache-notice.json"
     if not notice_is_due(marker, now):
         return EXIT_OK
@@ -555,7 +588,8 @@ def build_parser():
     parser.add_argument(
         "--notice",
         action="store_true",
-        help="Throttled one-line session notice. Reports drift only; never removes.",
+        help="Throttled cache-drift line, plus an unthrottled line when this session runs a superseded "
+        "plugin root. Never removes.",
     )
     parser.add_argument(
         "--pin",

@@ -34,9 +34,10 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
             ),
         ),
         "claude": (
-            ("command", "${CLAUDE_PLUGIN_ROOT}", re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"']+)")),
+            ("command", "${CLAUDE_PLUGIN_ROOT}", re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"'@]+)")),
         ),
     }
+    exec_form_hosts = {"claude"}
     declarations = config.get("host_hook_sources", {})
     for plugin in plugins:
         declared = declarations.get(plugin, {})
@@ -85,10 +86,23 @@ def validate_hook_outputs(output: dict[str, bytes], config: dict, plugins: set[s
                             command = hook.get(field)
                             if not isinstance(command, str) or not command:
                                 raise ValueError(f"{hook_path}: command hook is missing {field}")
-                            wrong_roots = [token for token in known_roots if token != root_token and token in command]
-                            if wrong_roots:
+                            parts = [command]
+                            if host in exec_form_hosts:
+                                arguments = hook.get("args")
+                                if (
+                                    not isinstance(arguments, list)
+                                    or not all(isinstance(argument, str) for argument in arguments)
+                                    or any(character.isspace() for character in command)
+                                    or any(character.isspace() for argument in arguments for character in argument)
+                                ):
+                                    raise ValueError(
+                                        f"{hook_path}: {host} hooks must use exec form: an executable "
+                                        "command plus an args list, never a shell command line"
+                                    )
+                                parts.extend(arguments)
+                            if any(token != root_token and token in part for part in parts for token in known_roots):
                                 raise ValueError(f"{hook_path}: {field} uses the wrong plugin root")
-                            matches = list(script_pattern.finditer(command))
+                            matches = [match for part in parts for match in script_pattern.finditer(part)]
                             if not matches:
                                 raise ValueError(f"{hook_path}: {field} has no package-relative script")
                             for match in matches:
@@ -471,6 +485,25 @@ def expected_adapter_body(shared: dict, host: str) -> str:
     )
 
 
+def validate_host_neutral(config: dict, skills: dict[str, dict]) -> None:
+    patterns = {
+        host: [re.compile(term, re.MULTILINE) for term in terms]
+        for host, terms in config.get("host_only_terms", {}).items()
+    }
+    for name, shared in skills.items():
+        for document in sorted(shared["path"].parent.rglob("*.md")):
+            text = document.read_text(encoding="utf-8")
+            for host, compiled in patterns.items():
+                for pattern in compiled:
+                    match = pattern.search(text)
+                    if match:
+                        raise ValueError(
+                            f"{document.as_posix()}: {host}-only term {match.group(0)!r} belongs in "
+                            f".{host}/skills/{name}/SKILL.md, registered in extended_host_adapters, "
+                            "not the shared definition"
+                        )
+
+
 def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict:
     adapters: dict[str, dict[str, Path]] = {}
     extended = set(config.get("extended_host_adapters", []))
@@ -510,6 +543,10 @@ def validate_adapters(root: Path, config: dict, skills: dict[str, dict]) -> dict
                 if table.get("skill_supports_effort") and effort_key in rung:
                     if values.get("effort") != rung[effort_key]:
                         raise ValueError(f"{path}: effort does not resolve canonical lane {lane}")
+            elif "model" in values or "effort" in values:
+                raise ValueError(
+                    f"{path}: model/effort without a canonical lane re-points the session"
+                )
             match = FRONTMATTER.match(body)
             if match is None:
                 raise ValueError(f"{path}: adapter has no body")
@@ -650,6 +687,7 @@ def build(root: Path, validate_catalog_digests: bool = True):
         for path in (root / ".agents/plugins/harness").glob("*.json")
     }
     skills = discover(root, config)
+    validate_host_neutral(config, skills)
     adapters = validate_adapters(root, config, skills)
     plugins = validate_configuration(root, config)
     validate_default_selection(root, config, skills, compatibility)
@@ -825,7 +863,8 @@ def build(root: Path, validate_catalog_digests: bool = True):
             if entry["digest"] != actual_digest:
                 raise ValueError(
                     f"Catalog digest drift for {plugin_id}: expected {entry['digest']}, actual {actual_digest}. "
-                    "Run python -B scripts/update_catalog_digests.py"
+                    "Run python -B scripts/update_catalog_digests.py and leave the result uncommitted: "
+                    "main's post-merge regenerate job commits catalog digests"
                 )
 
     return config, output, skills, compatibility

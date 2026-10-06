@@ -15,10 +15,14 @@ the moment it is installed, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
-Two modes, one detection:
+Three modes, one detection:
 
 - `--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
   all when no stack tier is installed, because a statement about an empty set is pure noise.
+- `--conventions` lists, for every tier that applies here, the conventions its installed payload
+  ships - the skills whose front matter declares `kind: convention` or legacy `kind: contract`. This is what a review loads: the
+  applicable tiers' rules, resolved from the same installed declarations the gate reads, with nothing
+  wired into the reviewed repository.
 - No argument (PreToolUse) blocks invoking a skill that belongs to a tier whose stack is absent.
   Claude sends the `Skill` tool and the qualified name; Codex has no such tool, and its contract is a
   successful shell read of the tier's own `SKILL.md`, so a shell command naming a blocked plugin's
@@ -44,8 +48,11 @@ import subprocess
 import sys
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSIONS = (1, 2)
 DECLARATION_NAME = "tier.json"
+ORPHAN_MARKER = ".orphaned_at"
+FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
+CONVENTION_KINDS = frozenset({"contract", "convention"})
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 SHELL_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "exec", "local_shell"})
@@ -60,7 +67,7 @@ GIT_TIMEOUT = 10
 
 
 class Declaration:
-    def __init__(self, plugin, marketplace, data):
+    def __init__(self, plugin, marketplace, data, payload_dir=None, orphaned=False):
         self.plugin = plugin
         self.marketplace = marketplace
         self.tier = data["tier"]
@@ -70,6 +77,8 @@ class Declaration:
         owner = [owner] if isinstance(owner, str) else list(owner or [])
         self.owner_repositories = [_text(name).lower() for name in owner if _text(name)]
         self.detect = data.get("detect") or {}
+        self.payload_dir = payload_dir
+        self.orphaned = orphaned
 
     @property
     def id(self):
@@ -106,6 +115,10 @@ def cache_roots():
         if len(plugin_root.parents) >= 3:
             add(plugin_root.parents[2])
 
+    here = Path(__file__).resolve()
+    if len(here.parents) > 4 and here.parents[4].name == "cache":
+        add(here.parents[4])
+
     for variable in ("CLAUDE_CONFIG_DIR", "CODEX_HOME"):
         value = os.environ.get(variable)
         if value:
@@ -117,14 +130,74 @@ def cache_roots():
     return roots
 
 
-def declarations(roots=None):
+def _key(path):
+    return os.path.normcase(os.path.normpath(str(path)))
+
+
+def _resolved_key(path):
+    try:
+        return _key(Path(path).resolve())
+    except (OSError, ValueError):
+        return _key(path)
+
+
+def _within(key, ancestor):
+    return key == ancestor or key.startswith(ancestor.rstrip("\\/") + os.sep)
+
+
+def installed_declarations(root, project=None):
+    """Each installed `tier.json` the registry beside this cache names, with its scope rank, or None.
+
+    A project-scoped install outranks the user-scope one, the most specific project first; one scoped
+    to another project does not count. Reading only installed paths keeps the per-call cost
+    proportional to installed plugins, not to the stale versions a cache accumulates.
+    """
+    registry = Path(root).parent / "installed_plugins.json"
+    try:
+        plugins = json.loads(registry.read_text(encoding="utf-8-sig")).get("plugins")
+    except (OSError, UnicodeError, ValueError, AttributeError):
+        return None
+    if not isinstance(plugins, dict):
+        return None
+    cache = _resolved_key(root)
+    here = _resolved_key(project) if project is not None else None
+    ranked = {}
+    for entries in plugins.values():
+        for entry in entries if isinstance(entries, list) else ():
+            location = entry.get("installPath") if isinstance(entry, dict) else None
+            if not _text(location):
+                continue
+            scoped = _text(entry.get("projectPath"))
+            rank = -1
+            if scoped:
+                scope = _resolved_key(scoped)
+                if here is None or not _within(here, scope):
+                    continue
+                rank = len(scope)
+            ancestor = Path(location).parent.parent.parent
+            if _key(ancestor) != cache and _resolved_key(ancestor) != cache:
+                continue
+            path = Path(location) / DECLARATION_NAME
+            ranked[path] = max(rank, ranked.get(path, rank))
+    return ranked
+
+
+def declarations(roots=None, project=None):
+    """One declaration per plugin: the first cache root that has it, at its installed version.
+
+    Roots are in priority order, the running host's cache first. A cache with a host registry beside it
+    answers only for its installed versions; one without falls back to every cached version, newest first.
+    """
     found = {}
     for root in cache_roots() if roots is None else roots:
-        try:
-            paths = sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME))
-        except OSError:
-            continue
-        for path in paths:
+        ranked = installed_declarations(root, project)
+        if ranked is None:
+            try:
+                ranked = dict.fromkeys(sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME)), -1)
+            except OSError:
+                continue
+        candidates = {}
+        for path, rank in sorted(ranked.items()):
             version_directory = path.parent
             plugin = version_directory.parent.name
             marketplace = version_directory.parent.parent.name
@@ -132,13 +205,30 @@ def declarations(roots=None):
                 data = json.loads(path.read_text(encoding="utf-8-sig"))
             except (OSError, UnicodeError, ValueError):
                 continue
-            if not isinstance(data, dict) or data.get("schema_version") != SCHEMA_VERSION:
+            if not isinstance(data, dict) or data.get("schema_version") not in SCHEMA_VERSIONS:
                 continue
             if not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
                 continue
-            declaration = Declaration(plugin, marketplace, data)
-            found[declaration.id] = declaration
+            orphaned = (version_directory / ORPHAN_MARKER).exists()
+            declaration = Declaration(plugin, marketplace, data, version_directory, orphaned)
+            preference = _preference(declaration, rank)
+            current = candidates.get(declaration.id)
+            if current is None or preference > current[0]:
+                candidates[declaration.id] = (preference, declaration)
+        for identity, (_, declaration) in candidates.items():
+            current = found.get(identity)
+            if current is None or (current.orphaned and not declaration.orphaned):
+                found[identity] = declaration
     return sorted(found.values(), key=lambda declaration: declaration.tier)
+
+
+def _preference(declaration, rank):
+    """The most specific install scope, then live over orphaned, then the newest directory."""
+    try:
+        modified = declaration.payload_dir.stat().st_mtime
+    except OSError:
+        modified = 0.0
+    return (rank, not declaration.orphaned, modified)
 
 
 def project_root(payload):
@@ -240,6 +330,18 @@ def stack_present(root, detect):
     if matches:
         return True, matches[0]
 
+    remote_patterns = [_text(pattern) for pattern in detect.get("remote") or [] if _text(pattern)]
+    if remote_patterns:
+        identity = repository_identity(root)
+        if identity:
+            for pattern in remote_patterns:
+                try:
+                    expression = re.compile(pattern, re.IGNORECASE)
+                except re.error:
+                    continue
+                if expression.search(identity):
+                    return True, "origin " + identity
+
     for rule in detect.get("content") or []:
         if not isinstance(rule, dict):
             continue
@@ -268,7 +370,7 @@ def overridden():
 
 
 def assess(root, found=None):
-    found = declarations() if found is None else found
+    found = declarations(project=root) if found is None else found
     if not found:
         return [], [], []
 
@@ -315,8 +417,55 @@ def statement(root, found=None):
         )
         lines.append(
             "Does not apply here: " + names + ". Those standards describe code this project does "
-            "not contain - do not read, invoke or cite them here. A PreToolUse gate blocks them."
+            "not contain; do not invoke them or apply their rules to this project's code. "
+            "For an explicitly requested standards-source audit, read canonical source files as "
+            "the subject of the investigation and cite them as evidence. That inspection does not "
+            "load them as governing instructions or make their tier applicable. Installed skill "
+            "invocations and cached skill loads remain gated."
         )
+    return "\n".join(lines)
+
+
+def front_matter(text):
+    if not text.startswith("---"):
+        return ""
+    end = text.find("\n---", 3)
+    return text[:end] if end != -1 else ""
+
+
+def contract_skills(payload_dir):
+    if payload_dir is None:
+        return []
+    try:
+        entries = sorted((Path(payload_dir) / "skills").iterdir())
+    except OSError:
+        return []
+    skills = []
+    for entry in entries:
+        skill = entry / "SKILL.md"
+        try:
+            text = skill.read_text(encoding="utf-8-sig")
+        except OSError:
+            continue
+        match = FRONT_MATTER_KIND.search(front_matter(text))
+        if match and match.group(1) in CONVENTION_KINDS:
+            skills.append((entry.name, skill))
+    return skills
+
+
+def conventions(root, found=None):
+    """The review's rule source: each applicable stack tier's shipped conventions, as one listing."""
+    _, applicable, _ = assess(root, found)
+    if not applicable:
+        return "Tier gate - no stack tier applies to this project; no tier conventions to load."
+
+    lines = ["Tier gate - conventions of every tier that applies to this project."]
+    for declaration, reason in applicable:
+        skills = contract_skills(declaration.payload_dir)
+        lines.append("")
+        lines.append(declaration.tier + " (" + reason + "): " + str(len(skills)) + " convention(s)")
+        for name, path in skills:
+            lines.append("  " + name + " - " + str(path))
     return "\n".join(lines)
 
 
@@ -344,7 +493,11 @@ def shell_command(payload):
 
 
 def refusal(declaration, subject, root):
-    markers = [*(declaration.detect.get("files") or []), *(declaration.detect.get("globs") or [])]
+    markers = [
+        *(declaration.detect.get("files") or []),
+        *(declaration.detect.get("globs") or []),
+        *(declaration.detect.get("remote") or []),
+    ]
     patterns = ", ".join(str(marker) for marker in markers) or "its declared markers"
     owner = declaration.owner_repositories[0] if declaration.owner_repositories else declaration.id
     return (
@@ -388,6 +541,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
     parser.add_argument("--instruction-fragment", action="store_true")
+    parser.add_argument("--conventions", action="store_true")
     parser.add_argument("--project", default=None)
     arguments = parser.parse_args()
 
@@ -395,7 +549,7 @@ def main():
         print("tier gate: Python 3.9 or newer is required.", file=sys.stderr)
         return 0
 
-    emitting = arguments.session_context or arguments.instruction_fragment
+    emitting = arguments.session_context or arguments.instruction_fragment or arguments.conventions
     payload = {}
     if not emitting:
         try:
@@ -411,6 +565,10 @@ def main():
 
     if arguments.project:
         payload["cwd"] = arguments.project
+
+    if arguments.conventions:
+        print(conventions(project_root(payload)))
+        return 0
 
     if emitting:
         context = statement(project_root(payload))
