@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:073cf9869cac8513cb38d3564d60e8faf1121bc6c530cd09f4c6a20f7c4a1e82",
+          "digest": "sha256:4e5c9f0175e7507528faa402b8b7cfd169bfb6df193eb8fb5f55449120f37997",
           "harness": {
             "marketplaces": [
               {
@@ -190,7 +190,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:448cd029b36f0c831f78fc79ed712056580ab923f9d999278bc33e105b9236df",
+          "digest": "sha256:86f1dd4a0b9b8bcad02d3b1c5a25c2c4eb9d2a81946d0d59afbc6dcf396d41c6",
           "harness": {
             "marketplaces": [
               {
@@ -220,7 +220,8 @@
               {
                 "path": "hooks/delivery_binding_gate.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
