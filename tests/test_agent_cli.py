@@ -573,7 +573,8 @@ class LaunchTabTests(unittest.TestCase):
         cmd, kwargs = run.calls[0]
         self.assertEqual(cmd[0], '/mnt/c/wt.exe')
         self.assertEqual(cmd[1:7], ['--window', '0', 'new-tab', '--startingDirectory', self.directory, '--title'])
-        self.assertIn('--suppressApplicationTitle', cmd)
+        self.assertEqual(cmd[7:10], [CLI.terminal_argument('A Title'), '--suppressApplicationTitle',
+                                     CLI.terminal_argument('C:\\exe with space\\claude.exe')])
         self.assertIn(CLI.terminal_argument('id; two'), cmd)
         env = kwargs['env']
         self.assertEqual(env.get('FORCE_COLOR'), '1')
