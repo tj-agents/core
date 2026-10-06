@@ -352,7 +352,11 @@ class CanonicalEnvelopeShellTests(unittest.TestCase):
         if git is None:
             return None
         candidate = next(
-            (root / "bin" / "bash.exe" for root in Path(git).parents if (root / "bin" / "bash.exe").is_file()),
+            (
+                root / "bin" / "bash.exe"
+                for root in Path(git).resolve().parents
+                if (root / "bin" / "bash.exe").is_file()
+            ),
             None,
         )
         return str(candidate) if candidate else None
