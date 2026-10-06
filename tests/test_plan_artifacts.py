@@ -47,7 +47,8 @@ class PlanArtifactTests(unittest.TestCase):
             handler = hooks["hooks"]["SessionStart"][0]["hooks"][0]
             script = ".agents/base/policy/plan-artifacts/scripts/session-context.py"
             if host == "claude":
-                self.assertEqual(handler["command"], f'python -B "${{CLAUDE_PLUGIN_ROOT}}/{script}"')
+                self.assertEqual("python", handler["command"])
+                self.assertEqual(["-B", f"${{CLAUDE_PLUGIN_ROOT}}/{script}"], handler["args"])
             else:
                 self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["command"])
                 self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["commandWindows"])
@@ -70,8 +71,8 @@ class PlanArtifactTests(unittest.TestCase):
     def test_shell_command_runs_from_unrelated_path_with_spaces(self):
         shell = shutil.which("sh")
         if os.name == "nt" and shutil.which("git"):
-            git_bash = Path(shutil.which("git")).resolve().parents[1] / "bin/bash.exe"
-            shell = str(git_bash) if git_bash.is_file() else None
+            candidates = [ancestor / "bin/bash.exe" for ancestor in Path(shutil.which("git")).resolve().parents[:3]]
+            shell = next((str(candidate) for candidate in candidates if candidate.is_file()), None)
         if not shell:
             self.skipTest("No Bash/sh installed; native host probe must cover shell execution")
         for host in ("claude", "codex"):
@@ -85,6 +86,9 @@ class PlanArtifactTests(unittest.TestCase):
                        PLUGIN_DATA=str(self.root / "plugin data with spaces"))
             native_codex = os.name == "nt" and host == "codex"
             argv = command if native_codex else [shell, "-c", command]
+            if host == "claude":
+                argv = [command, *(argument.replace("${CLAUDE_PLUGIN_ROOT}", self.plugin.as_posix())
+                                   for argument in hook["args"])]
             result = subprocess.run(argv, shell=native_codex, cwd=self.cwd, env=env,
                                     input='{}', text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
