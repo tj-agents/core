@@ -63,6 +63,12 @@
         ]
       },
       {
+        "path": "hooks/hook_dispatch.py",
+        "hosts": [
+          "claude"
+        ]
+      },
+      {
         "path": "hooks/merge_review_gate.py",
         "hosts": [
           "claude"

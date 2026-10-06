@@ -1,4 +1,3 @@
-#Requires -Version 7
 <#
 .SYNOPSIS
 List, inspect and close the other Claude CLI sessions on this machine, addressed by the tab title the
@@ -54,7 +53,7 @@ function Get-RecordedSessions {
     if (-not (Test-Path -LiteralPath $directory)) { return @() }
 
     Get-ChildItem -LiteralPath $directory -Filter '*.json' -File | ForEach-Object {
-        $entry = try { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } catch { $null }
+        $entry = try { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
         if (-not $entry) { return }
 
         $process = try { Get-Process -Id $entry.pid -ErrorAction Stop } catch { $null }
@@ -109,10 +108,56 @@ function Test-UnderPath {
     param([string] $Path, [string] $Root)
 
     if (-not $Path -or -not $Root) { return $false }
-    $normalizedPath = $Path.TrimEnd('\', '/')
-    $normalizedRoot = $Root.TrimEnd('\', '/')
+    $separator = [string][IO.Path]::DirectorySeparatorChar
+    $normalizedPath = ($Path.TrimEnd('\', '/') -replace '[\\/]', $separator)
+    $normalizedRoot = ($Root.TrimEnd('\', '/') -replace '[\\/]', $separator)
     if ($normalizedPath.Equals($normalizedRoot, [StringComparison]::OrdinalIgnoreCase)) { return $true }
-    return $normalizedPath.StartsWith($normalizedRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+    return $normalizedPath.StartsWith($normalizedRoot + $separator, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-OrganizationRoot {
+    param([string] $RepoRoot)
+
+    $parent = (Get-Item -LiteralPath $RepoRoot).Parent
+    if ($parent) { return $parent.FullName }
+    return $null
+}
+
+function Get-ListScope {
+    param(
+        [object[]] $Sessions,
+        [switch] $All,
+        [string] $Under,
+        [string] $RepoRoot
+    )
+
+    $scoped = $Sessions
+    $scopeNote = $null
+    if (-not $All) {
+        if ($Under) {
+            $scopeRoot = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Under)
+            $scoped = @($Sessions | Where-Object {
+                -not $_.Recorded -or (Test-UnderPath -Path $_.Cwd -Root $scopeRoot)
+            })
+            $scopeNote = "scoped to '$scopeRoot'"
+        }
+        elseif ($RepoRoot) {
+            $orgRoot = Get-OrganizationRoot -RepoRoot $RepoRoot
+            $scopeRoot = if ($orgRoot) { $orgRoot } else { $RepoRoot }
+            $scoped = @($Sessions | Where-Object {
+                -not $_.Recorded -or (Test-UnderPath -Path $_.Cwd -Root $scopeRoot)
+            })
+            $scopeNote = "scoped to '$scopeRoot' (pass -All for every machine session, -Under <path> for a different scope)"
+        }
+        else {
+            $scopeNote = 'not in a git repository; showing every recorded session (pass -Under <path> to scope)'
+        }
+    }
+
+    [pscustomobject]@{
+        Sessions = @($scoped)
+        Note = $scopeNote
+    }
 }
 
 function Find-Session {
@@ -142,27 +187,10 @@ switch ($Action) {
     'list' {
         if ($sessions.Count -eq 0) { Write-Output 'No CLI sessions recorded.'; break }
 
-        $scoped = $sessions
-        $scopeNote = $null
-        if (-not $All) {
-            if ($Under) {
-                $scoped = @($sessions | Where-Object { Test-UnderPath -Path $_.Cwd -Root $Under })
-                $scopeNote = "scoped to '$Under'"
-            }
-            else {
-                $repoRoot = Get-RepoRoot
-                if ($repoRoot) {
-                    $orgRoot = (Get-Item -LiteralPath $repoRoot).Parent.FullName
-                    $scoped = @($sessions | Where-Object {
-                        (Test-UnderPath -Path $_.Cwd -Root $repoRoot) -or (Test-UnderPath -Path $_.Cwd -Root $orgRoot)
-                    })
-                    $scopeNote = "scoped to '$orgRoot' (pass -All for every machine session, -Under <path> for a different scope)"
-                }
-                else {
-                    $scopeNote = 'not in a git repository; showing every recorded session (pass -Under <path> to scope)'
-                }
-            }
-        }
+        $repoRoot = if ($All -or $Under) { $null } else { Get-RepoRoot }
+        $listScope = Get-ListScope -Sessions $sessions -All:$All -Under $Under -RepoRoot $repoRoot
+        $scoped = @($listScope.Sessions)
+        $scopeNote = $listScope.Note
 
         if ($scopeNote) { Write-Output $scopeNote }
         if ($scoped.Count -eq 0) {
@@ -178,15 +206,16 @@ switch ($Action) {
     }
     'close' {
         $target = Find-Session -Sessions $sessions -Needle $Session
+        $label = if ($target.Title) { $target.Title } else { $target.SessionId }
         if (-not $target.Alive) {
-            Write-Output "'$($target.Title ?? $target.SessionId)' is already gone."
+            Write-Output "'$label' is already gone."
             break
         }
         if (-not $Force) {
-            $answer = Read-Host "Close '$($target.Title ?? $target.SessionId)' (pid $($target.Pid))? [y/N]"
+            $answer = Read-Host "Close '$label' (pid $($target.Pid))? [y/N]"
             if ($answer -notmatch '^(y|yes)$') { Write-Output 'Left running.'; break }
         }
         Stop-Process -Id $target.Pid -ErrorAction Stop
-        Write-Output "Closed '$($target.Title ?? $target.SessionId)' (pid $($target.Pid))."
+        Write-Output "Closed '$label' (pid $($target.Pid))."
     }
 }
