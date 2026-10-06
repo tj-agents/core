@@ -1,6 +1,7 @@
 """SessionStart hook: record this session's id, tab title, directory and pid.
 
-`agent-cli.ps1` exports `AGENT_CLI_TAB_TITLE` when it launches a tab; a session started by hand exports
+The launchers export `AGENT_CLI_TAB_TITLE` when they open a tab (`agent_cli.py`'s `launch_tab`, and
+`agent-cli.ps1` for those not yet ported); a session started by hand exports
 nothing and records a null title. `peer-cli.ps1` reads these entries to resolve a session from the tab
 title a user can see, and the reverse.
 

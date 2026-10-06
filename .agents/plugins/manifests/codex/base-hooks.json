@@ -48,7 +48,7 @@
           {
             "type": "command",
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
             "timeout": 15
           }
         ],
@@ -59,7 +59,7 @@
           {
             "type": "command",
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/tier_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/tier_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 7 \"${PLUGIN_ROOT}/hooks/tier_gate.py\"",
             "timeout": 10
           }
         ],
