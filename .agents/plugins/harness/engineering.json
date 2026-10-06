@@ -33,7 +33,8 @@
       {
         "path": "hooks/delivery_binding_gate.py",
         "hosts": [
-          "claude"
+          "claude",
+          "codex"
         ]
       },
       {

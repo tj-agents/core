@@ -42,6 +42,7 @@ class ScopedApprovalTests(unittest.TestCase):
                        "source": "user message in session fixture at 2026-10-04T18:00:00Z"}
         self.record_path = self.root / "approval.json"
         self.value = {"number": 42, "url": "https://github.com/example/test/pull/42",
+                      "body": "## What\nChange\n## Why\nReason",
                       "headRefOid": HEAD, "headRefName": "feature", "state": "OPEN",
                       "files": [{"path": "README.md"}], "labels": [], "statusCheckRollup": []}
         for name, kwargs in (
@@ -268,6 +269,7 @@ class GateSubprocessTests(unittest.TestCase):
             json.dumps(
                 {
                     "number": 42,
+                    "body": "## What\nChange\n## Why\nReason",
                     "url": "https://github.com/Concertable/agents/pull/42",
                     "headRefOid": HEAD,
                     "headRefName": "Feature/Thing",
@@ -289,12 +291,12 @@ class GateSubprocessTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_hook(self, *, command=None, response=None, cwd=None):
+    def run_hook(self, *, command=None, response=None, cwd=None, dispatch=False, event="PostToolUse"):
         env = dict(os.environ)
         env["PATH"] = str(self.bindir) + os.pathsep + env["PATH"]
         payload = {
             "session_id": uuid.uuid4().hex,
-            "hook_event_name": "PostToolUse",
+            "hook_event_name": event,
             "tool_use_id": uuid.uuid4().hex,
             "tool_name": "Bash",
             "cwd": str(cwd or self.repo),
@@ -303,8 +305,9 @@ class GateSubprocessTests(unittest.TestCase):
             if response is not None
             else "https://github.com/Concertable/agents/pull/42\n",
         }
+        scripts = [str(HOOK.parent / "hook_dispatch.py"), str(HOOK)] if dispatch else [str(HOOK)]
         return subprocess.run(
-            [sys.executable, str(HOOK)], input=json.dumps(payload),
+            [sys.executable, *scripts], input=json.dumps(payload),
             capture_output=True, text=True, cwd=str(self.repo), env=env,
         )
 
@@ -376,6 +379,17 @@ class GateSubprocessTests(unittest.TestCase):
         result = self.run_hook(response="pull request create failed: a PR already exists")
         self.assertEqual(0, result.returncode)
         self.assertFalse((self.repo / ".agents" / "persistent-workflow-binding.json").exists())
+
+    def test_dispatcher_blocks_prewrite_body_and_keeps_postwrite_binding(self):
+        result = self.run_hook(command=CREATE + " -bempty", dispatch=True, event="PreToolUse")
+        self.assertEqual(0, result.returncode, result.stderr)
+        decision = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("deny", decision["permissionDecision"])
+        self.assertIn("Missing What section", decision["permissionDecisionReason"])
+        self.assertFalse((self.repo / ".agents" / "persistent-workflow-binding.json").exists())
+        result = self.run_hook(dispatch=True)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(42, self.binding()["pr"])
 
     def test_help_is_not_a_create(self):
         self.assertEqual(0, self.run_hook(command=CREATE + " --help").returncode)

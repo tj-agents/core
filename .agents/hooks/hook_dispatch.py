@@ -221,6 +221,9 @@ def main(argv: list[str]) -> int:
         except ValueError:
             deadline = None
         arguments = arguments[2:]
+    deny_on_timeout = arguments[:1] == ["--deny-on-timeout"]
+    if deny_on_timeout:
+        arguments = arguments[1:]
     if not arguments:
         print("hook-dispatch: name the gate scripts to run.", file=sys.stderr)
         return 1
@@ -268,6 +271,16 @@ def main(argv: list[str]) -> int:
     merged, diagnostics = merge(event, finished)
     if overrun:
         merged = overrun_notice(event, merged, deadline, names[len(finished):])
+        if deny_on_timeout and event == "PreToolUse":
+            specific = merged["hookSpecificOutput"]
+            if specific.get("permissionDecision") != "deny":
+                unfinished = [Path(name).name for name in names[len(finished):]]
+                specific["permissionDecision"] = "deny"
+                specific["permissionDecisionReason"] = (
+                    f"hook-dispatch: {unfinished[0]} did not finish before the deadline; "
+                    + "these gates did not run: " + (", ".join(unfinished[1:]) or "none")
+                    + ". Retry when every required hook can finish."
+                )
     if diagnostics:
         stderr.write(diagnostics + "\n")
     if merged:
