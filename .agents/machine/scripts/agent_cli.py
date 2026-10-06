@@ -224,7 +224,9 @@ def standards_sync_script():
 
 
 def sync_claude_standards(working_directory, claude=None, out=print):
-    """Refresh the registered standards before a Claude session opens. Never blocks the launch."""
+    """Refresh the registered standards before a Claude session opens. Never blocks the launch, and never
+    raises: a hung or failing check is reported as a `standards:` line, same as every other outcome here.
+    """
     script = standards_sync_script()
     if script is None:
         out('standards: claude_standards_sync.py was not found; this session loads the installed plugins')
@@ -232,13 +234,24 @@ def sync_claude_standards(working_directory, claude=None, out=print):
     arguments = [sys.executable, '-B', str(script), '--project', str(working_directory)]
     if claude:
         arguments += ['--claude', str(claude)]
-    result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        # errors='replace' rather than bare text=True: a byte sequence the check's own output cannot
+        # decode as UTF-8 must not turn "never blocks the launch" into a crash here instead.
+        result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 encoding='utf-8', errors='replace', timeout=120)
+    except subprocess.TimeoutExpired:
+        out('standards: the check did not finish within 120 seconds; this session loads the installed plugins')
+        return
+    except OSError as exc:
+        out(f'standards: the check could not be run ({exc}); this session loads the installed plugins')
+        return
     for line in result.stdout.splitlines():
         out(line)
 
 
 def prompt_file_argument(path):
-    """The 'Read the file at ...' sentence for a prepared prompt file, resolved and validated.
+    """(sentence, resolved_path) for a prepared prompt file: the 'Read the file at ...' sentence and the
+    same resolved Path, so a caller never re-resolves it for its own messages.
 
     Shared by open-claude's `--prompt-path` and handoff-claude's `--prompt-path` so the wording and the
     file check have one owner.
@@ -246,7 +259,40 @@ def prompt_file_argument(path):
     resolved = Path(path).resolve()
     if not resolved.is_file():
         raise LaunchError(f'Prompt path is not a file: {resolved}')
-    return f'Read the file at {resolved} and follow its instructions, working from the current directory.'
+    return f'Read the file at {resolved} and follow its instructions, working from the current directory.', resolved
+
+
+def resolve_tab_directory(path):
+    """The absolute-but-not-resolved working directory for a tab, validated to exist.
+
+    Not .resolve(): on Windows that rewrites a mapped or subst drive to its target, and Claude Code keys a
+    session's history by the directory string it was started in. Shared by launch_tab, open_claude_tab and
+    both Python launchers -- which call it first, before any prompt or lane handling -- so the directory
+    is always validated the same way and the error always names the same absolute path.
+    """
+    directory = Path(os.path.abspath(path))
+    if not directory.is_dir():
+        raise LaunchError(f'Working directory is not a directory: {directory}')
+    return directory
+
+
+def report_launch_failure(exc, err=None):
+    """Print a LaunchError (or LaunchTimeout) to `err` and return the exit code a launcher's `main` should
+    use: 3 for a LaunchTimeout, because the terminal control command itself timed out and the tab may
+    already have opened -- distinct from every other failure (1), where the launch did not happen.
+
+    `err` defaults to `None` rather than to `sys.stderr` directly: a default parameter is bound once, when
+    this function is defined, to whatever `sys.stderr` was at that moment -- not re-read at call time. A
+    caller that redirects `sys.stderr` after this module loads (every test here does) would otherwise
+    print to a stream nobody is capturing.
+    """
+    if err is None:
+        err = sys.stderr
+    print(str(exc), file=err)
+    if isinstance(exc, LaunchTimeout):
+        print('The tab may already have opened; check the terminal before launching another.', file=err)
+        return 3
+    return 1
 
 
 def _lanes_module():
@@ -397,7 +443,14 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
     def call(*args):
         return _client(run, [qdbus, service, *args], f'{qdbus} {args[-1] if len(args) < 3 else args[1]}')
 
-    session = call(window, 'newSession')
+    try:
+        session = call(window, 'newSession')
+    except LaunchTimeout as exc:
+        # No session id came back, so there is nothing here to close by typing into it; the D-Bus call may
+        # still have created an empty, untitled tab despite the timeout, and this is the only way to say
+        # so. A plain LaunchError, not a LaunchTimeout: there is no inner command running yet to disturb.
+        raise LaunchError(f'{exc} An empty Konsole tab may have been left open; check for one before retrying.') from None
+
     session_path = f'/Sessions/{session}'
     script_path = None
 
@@ -421,6 +474,11 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
         # fish), so the inner command never travels as that text: it is written to a private sh script whose
         # first line deletes it and its directory, and the only thing typed is `exec sh '<path>'`.
         script_path = _write_posix_script(posix_inner_command(directory, cleared, forced, executable, arguments))
+    except LaunchTimeout as exc:
+        # abandon() ends the empty tab (or tries to) before this raises, so the uncertainty a LaunchTimeout
+        # names no longer applies: no inner command was ever typed into this session.
+        abandon()
+        raise LaunchError(str(exc)) from None
     except BaseException:
         abandon()
         raise
@@ -527,12 +585,9 @@ def launch_tab(working_directory, executable, title, arguments=(), clear=(), for
     caller relies on. A detected handler that fails raises rather than falling back to a window: a silent
     new window is a worse surprise than a loud failure.
     """
-    # Made absolute here, because a relative path would be re-resolved against the terminal's own cwd in the
-    # tab. Not resolve(): on Windows that rewrites a mapped or subst drive to its target, and Claude Code
-    # keys a session's history by the directory string it was started in.
-    directory = Path(os.path.abspath(working_directory))
-    if not directory.is_dir():
-        raise LaunchError(f'Working directory is not a directory: {working_directory}')
+    # Made absolute here, because a relative path would be re-resolved against the terminal's own cwd in
+    # the tab.
+    directory = resolve_tab_directory(working_directory)
 
     clear = list(clear)
     force = dict(force or {})
@@ -564,11 +619,7 @@ def open_claude_tab(working_directory, title, arguments, out=print):
     standards sync and the forced colour environment have one owner. Each caller keeps only its own
     argument parsing, model/argument assembly, printing and exit codes.
     """
-    # Absolute but not resolved: Claude Code keys a session's history by the directory string it started
-    # in, so a symlinked checkout or a Windows mapped or subst drive must reach the tab as given.
-    directory = Path(os.path.abspath(working_directory))
-    if not directory.is_dir():
-        raise LaunchError(f'Working directory is not a directory: {working_directory}')
+    directory = resolve_tab_directory(working_directory)
 
     claude = resolve_claude_executable()
     sync_claude_standards(directory, claude=claude, out=out)
