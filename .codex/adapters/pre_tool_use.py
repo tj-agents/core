@@ -42,7 +42,7 @@ def windows_job():
     kernel.CreateJobObjectW.restype = ctypes.c_void_p
     kernel.SetInformationJobObject.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
     kernel.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-    kernel.TerminateJobObject.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+    kernel.GetCurrentProcess.restype = ctypes.c_void_p
     kernel.CloseHandle.argtypes = [ctypes.c_void_p]
     handle = kernel.CreateJobObjectW(None, None)
     if not handle:
@@ -52,6 +52,9 @@ def windows_job():
     if not kernel.SetInformationJobObject(handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
         kernel.CloseHandle(handle)
         raise OSError("hook lifetime job limits unavailable")
+    if not kernel.AssignProcessToJobObject(handle, kernel.GetCurrentProcess()):
+        kernel.CloseHandle(handle)
+        raise OSError("cannot assign hook adapter to lifetime job")
     return kernel, handle
 
 
@@ -116,8 +119,8 @@ def stop_tree(state, deadline):
     job = state.get("job")
     process = state.get("process")
     if job:
-        job[0].CloseHandle(job[1])
-    elif process:
+        return
+    if process:
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
@@ -152,18 +155,12 @@ def main():
     def execute(payload):
         if cancelled.is_set():
             raise TimeoutError()
-        if os.name == "nt":
-            job = windows_job()
-            with lock:
-                if cancelled.is_set():
-                    job[0].CloseHandle(job[1])
-                    raise TimeoutError()
-                state["job"] = job
         process = subprocess.Popen(
             [sys.executable, "-B", args.script, *args.arguments],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            creationflags=(subprocess.CREATE_NO_WINDOW | 4) if os.name == "nt" else 0,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             start_new_session=os.name != "nt",
+            env=dict(os.environ, PYTHONIOENCODING="utf-8"),
         )
         with lock:
             state["process"] = process
@@ -172,17 +169,14 @@ def main():
                 if os.name != "nt":
                     os.killpg(process.pid, signal.SIGKILL)
                 raise TimeoutError()
-            if os.name == "nt":
-                kernel, handle = state["job"]
-                if not kernel.AssignProcessToJobObject(handle, int(process._handle)):
-                    process.kill()
-                    raise OSError("cannot assign hook to lifetime job")
-                ntdll = ctypes.WinDLL("ntdll")
-                ntdll.NtResumeProcess.argtypes = [ctypes.c_void_p]
-                if ntdll.NtResumeProcess(int(process._handle)) != 0:
-                    raise OSError("cannot resume hook")
         stdout, stderr = process.communicate(payload)
         return process.returncode, stdout, stderr
+
+    if os.name == "nt":
+        try:
+            state["job"] = windows_job()
+        except OSError as error:
+            return deny(f"The Codex pre-tool hook {args.script} failed during containment: {error}")
 
     try:
         payload = run_until(read_object, active_deadline)
