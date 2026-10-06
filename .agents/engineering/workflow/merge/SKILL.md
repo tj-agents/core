@@ -210,7 +210,9 @@ stage reconciles an existing successor layer or starts the next branch in a chec
 watermark or merge authorization into the successor.
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
-remove that path. Move it to the fetched remote default before closing any linked worktree:
+remove that path. When it sits on the merged branch or the default, move it to the fetched remote default
+before closing any linked worktree; when it hosts any other branch, leave it there and run
+`git -C <primary-checkout> fetch origin <default>` only:
 
 ```bash
 git -C <primary-checkout> checkout <default>
@@ -233,9 +235,10 @@ and is not evidence that the old directory can be deleted.
   checkout. Checkpoint the exact repository, merged PR, branch, remote head, target worktree, primary
   checkout, and remote default. Put the remaining Step 5 cleanup and final inventory in the successor's
   `## Next Steps`. After verified launcher submission the predecessor stops repository-scoped work; it
-  cannot end its own host session, so releasing it is a human action the successor's `## Next Steps` names
-  as a gate, and it does not run either cleanup path. The successor is the sole cleanup owner:
-  after the predecessor no longer holds the target, it selects the helper or native-Git path below, requires
+  cannot end its own host session, so the successor's `## Next Steps` gates on the recorded release marker
+  and then closes the predecessor's CLI and tab through `handoff`'s `machine:peer-cli` release procedure,
+  and the predecessor does not run either cleanup path. The successor is the sole cleanup owner:
+  after closing the predecessor, it selects the helper or native-Git path below, requires
   the physical target path to be absent, and then continues this delivery.
 
 Do not make the user choose between these paths or teach them this lifecycle detail. Only the final manual
@@ -257,24 +260,20 @@ if (Test-Path -LiteralPath $worktreeHelper -PathType Leaf) {
 Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout helper path is absent, do not
 skip cleanup. Apply the same gates with native Git from the primary checkout:
 
-1. Record the target worktree's branch and head from `git worktree list --porcelain`. Refuse the primary
-   checkout, a detached target, or a target that does not exactly match the completed PR's recorded branch
-   and remote head.
-2. Run `git -C <target-worktree> status --porcelain=v2 --untracked-files=all`. Any output means stop: do not
-   remove a dirty worktree or discard tracked or untracked files.
-3. Fetch current refs. Require the completed PR to be `MERGED`, require
-   `git merge-base --is-ancestor <target-head> origin/<default>` to succeed, then run
-   `gh pr list --repo <owner/repo> --state open --head <branch> --json number,url`. Continue only when that
-   fresh query returns exactly `[]`. A closed-unmerged PR, unmerged head, or open PR preserves both the
-   worktree and branch.
-4. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
+1. Run `python "<skill-directory>/scripts/cleanup_proof.py" --worktree <target> --branch <branch> --head
+   <remote-head> --pr <n>`. It refuses the primary checkout, a detached or mismatched target, a dirty tree,
+   a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
+   squash/rebase-safe containment proof), and a still-open PR for the head; `preserve:` stops cleanup.
+2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
    the old local branch with the same lowercase `-d` only after it is no longer checked out. Double-quote each
-   path and run each command on its own; that exact form is what the plugin's harness grant approves.
-5. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
-   target must be absent, the local merged branch must be gone, the primary checkout must be current on the
-   remote default, and pre-existing user files must remain. Treat any removal error or residual target path
+   path and run each command on its own; that exact form is what the plugin's harness grant approves; when
+   `-d` refuses a squash- or rebase-merged branch, the proof covers exactly this head, so delete it with
+   `git -C <primary-checkout> branch -D <branch>`.
+3. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
+   target must be absent, the local merged branch must be gone, a primary checkout moved to the default must be
+   current on it, and pre-existing user files must remain. Treat any removal error or residual target path
    as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
 
 **Step 5 is a blocking post-merge gate. Do not enter Step 6, report terminal delivery, or leave the cleanup

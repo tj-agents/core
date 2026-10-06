@@ -367,12 +367,15 @@ class ProcessStandardsTests(unittest.TestCase):
             "Join-Path <primary-checkout> 'scripts/worktrees.ps1'",
             "Test-Path -LiteralPath $worktreeHelper -PathType Leaf",
             "If that exact primary-checkout helper path is absent, do not skip cleanup",
-            "status --porcelain=v2 --untracked-files=all",
-            "git merge-base --is-ancestor",
-            "gh pr list --repo <owner/repo> --state open --head <branch> --json number,url",
-            "fresh query returns exactly `[]`",
+            "cleanup_proof.py",
+            "a dirty tree",
+            "a merge commit absent from `origin/<default>`",
+            "a still-open PR for the head",
+            "`preserve:` stops cleanup",
             "worktree remove -- <target-worktree>",
             "branch -d <branch>",
+            "proof covers exactly this head, so delete it with",
+            "branch -D <branch>",
             "Step 5 is a blocking post-merge gate",
             "Do not enter Step 6",
             "never remove that path",
@@ -381,7 +384,6 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(required, flat)
 
         self.assertNotIn("worktree remove --force", cleanup)
-        self.assertNotIn("branch -D", cleanup)
 
     def test_merge_retargets_the_host_before_active_worktree_removal(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
