@@ -8,13 +8,27 @@ domain: process
 
 # Merging
 
+## What authorizes a merge
+
+Merge authorization is scoped to the goal, not the PR. A user authorization to implement, execute, or
+deliver a goal is merge authorization for every PR that goal itself creates: each lands once its own
+review and required checks pass, with no per-PR re-approval, and the authorization survives handoffs,
+fresh sessions, and successive delivery bindings of the same goal. This section owns that scope rule;
+read "explicit authorization" in any delivery standard as this rule, never as a per-PR approval.
+
+A goal file's bare existence authorizes nothing — the authority is the user's observed instruction,
+recorded with the goal. What still gates a merge keeps its own typed owner: an explicit user limitation
+or merge hold, a repository's stop classes, stop paths, hold labels and stricter recorded delivery rules,
+and the ordinary gates — current-head review and green checks. Outside the goal's own PRs nothing is
+covered: not another repository, not a PR the goal did not create, and never publishing to a package feed.
+
 ## Persistent continuation
 
 When a queue, check, publication, or generated sync will resolve after this turn, enter the current harness's
 persistent-workflow skill. It reads persistent-delivery, binds this exact PR/head/worktree and uses the native
 continuation mechanism. That owner classifies a real failure by test tier, dispatches its corresponding debug
-skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge only under
-explicit authorization. The shared monitor is the only foreground or persistent forge-wait mechanism.
+skill in a fresh context, rebinds after a push, obtains the required review, and reaches merge under the
+goal-scoped authorization above. The shared monitor is the only foreground or persistent forge-wait mechanism.
 
 This is hook-enforced. `.agents/hooks/persistent_workflow_merge_gate.py` refuses `gh pr merge … --auto` on
 a PR whose checks or merge queue have not settled unless a persistent-workflow binding
