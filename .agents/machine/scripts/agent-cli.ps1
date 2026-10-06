@@ -79,17 +79,9 @@ function Sync-ClaudeStandards {
 # contains a space and escaping nothing inside it, and the tab process re-parses that string by
 # CommandLineToArgvW rules. So a quote is eaten, and a trailing backslash in a spaced value escapes the
 # closing quote and swallows the next argument whole.
-function ConvertTo-TerminalArgument {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][AllowEmptyString()][string] $Value)
+function ConvertTo-EscapedArgumentText {
+    param([Parameter(Mandatory)][AllowEmptyString()][string] $Value, [bool] $Quoted)
 
-    # Windows Terminal quotes on a space and nothing else, so a line break or tab in a value with no space
-    # is dropped outright and no escape can carry it. A refused launch beats a silently shortened prompt.
-    if ($Value -match '[\r\n\t]' -and -not $Value.Contains(' ')) {
-        throw "Windows Terminal cannot carry a line break or tab in an argument containing no space, and would drop it: $Value"
-    }
-
-    $quoted = $Value.Contains(' ')
     $builder = [System.Text.StringBuilder]::new()
     $backslashes = 0
     foreach ($character in $Value.ToCharArray()) {
@@ -102,11 +94,32 @@ function ConvertTo-TerminalArgument {
         }
         $backslashes = 0
     }
-    [void]$builder.Append('\', $(if ($quoted) { 2 * $backslashes } else { $backslashes }))
+    [void]$builder.Append('\', $(if ($Quoted) { 2 * $backslashes } else { $backslashes }))
+    return $builder.ToString()
+}
+
+function ConvertTo-TerminalArgument {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyString()][string] $Value)
+
+    # Windows Terminal quotes on a space and nothing else, so a line break or tab in a value with no space
+    # is dropped outright and no escape can carry it. A refused launch beats a silently shortened prompt.
+    if ($Value -match '[\r\n\t]' -and -not $Value.Contains(' ')) {
+        throw "Windows Terminal cannot carry a line break or tab in an argument containing no space, and would drop it: $Value"
+    }
+
+    $escaped = ConvertTo-EscapedArgumentText -Value $Value -Quoted $Value.Contains(' ')
 
     # Escaped last, because Windows Terminal strips exactly one backslash before a semicolon, so this must
     # be the outermost layer for a value that legitimately ends a run of backslashes at a semicolon.
-    return $builder.ToString() -replace ';', '\;'
+    return $escaped -replace ';', '\;'
+}
+
+function ConvertTo-CommandLineArgument {
+    param([Parameter(Mandatory)][AllowEmptyString()][string] $Value)
+
+    if ($Value -and $Value -notmatch '[\s"]') { return $Value }
+    return '"' + (ConvertTo-EscapedArgumentText -Value $Value -Quoted $true) + '"'
 }
 
 # Opens the CLI as a new tab in the Windows Terminal window that most recently had focus.
@@ -163,9 +176,15 @@ function Invoke-AgentTerminalTab {
             [Environment]::SetEnvironmentVariable($name, $ForceEnvironment[$name], 'Process')
         }
 
-        & $terminal @($terminalArguments | ForEach-Object { ConvertTo-TerminalArgument $_ })
-        if ($LASTEXITCODE -ne 0) {
-            throw "Windows Terminal exited with code $LASTEXITCODE"
+        # Windows PowerShell 5.1 hands embedded quotes to a native program unescaped, so the command line is
+        # built here rather than by `&`, which keeps what wt receives identical on both hosts.
+        $commandLine = @($terminalArguments | ForEach-Object { ConvertTo-CommandLineArgument (ConvertTo-TerminalArgument $_) }) -join ' '
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new($terminal, $commandLine)
+        $startInfo.UseShellExecute = $false
+        $process = [System.Diagnostics.Process]::Start($startInfo)
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) {
+            throw "Windows Terminal exited with code $($process.ExitCode)"
         }
     }
     finally {
