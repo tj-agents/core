@@ -1,8 +1,8 @@
 # Repair Codex startup hook timeouts
 
-Status: native acceptance passed; preparing review
+Status: review finding repaired; CI blocked by GitHub billing
 
-PR: not opened
+PR: https://github.com/tj-agents/core/pull/119
 
 ## Goal and authority
 
@@ -39,6 +39,18 @@ context and no timeout or dispatcher-overrun notice. Evidence is in
 workflow run `fix-startup-hook-timeouts`, label `native-parallel-startup-acceptance`.
 Full validation belongs to PR CI.
 
+The candidate incorporates main at `fb365abb8478a87eb8f0129312c839b05debbc0a`. Combined dispatcher
+tests passed, all three startup handlers passed three native runs, and a fresh retry verified startup
+plus the first prompt after one transient first-prompt timeout. The native review found an old test
+assuming four Codex registrations; it is corrected and all four goal-continuation tests pass.
+The independent workflow lens found no other defect. The work order is
+`reviews/Fix-InjectHarnessPermissions.md`; incremental review covers the test correction.
+
+CI run `37521879275` on `39d77a80f2067f795c6b59b3fa62567cbb08c602` executed no steps. Both guard
+and verify jobs were rejected by GitHub for failed account payments or an insufficient spending limit.
+Resolver: the account billing administrator. Unblock: restore Actions billing/spending availability,
+then rerun CI on PR 119's current exact head. No merge or active-profile installation has occurred.
+
 ## Completion
 
 - Focused regressions prove hook arguments, context aggregation, block/failure reporting and launch count.
@@ -48,4 +60,7 @@ Full validation belongs to PR CI.
 
 ## Next action
 
-Synchronize once, freeze and review the passing candidate, and deliver through CI.
+Complete incremental review and preserve the clean watermark. After billing is restored, rerun exact-head
+CI, merge under the recorded standing authorization only when gates pass, and verify post-merge package
+generation. Do not repeat native startup tests unless executable startup code changes or a new failure
+requires them. Installation into the user's active profile remains outside the standing source-only grant.
