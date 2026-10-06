@@ -2,6 +2,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -152,7 +153,7 @@ class OpenClaudeTests(unittest.TestCase):
         code, out, _ = self.run_main('--title', 'Tab Name')
         self.assertEqual(code, 0)
         self.assertIn("Launched claude tab 'Tab Name' in", out)
-        self.assertIn(str(Path(self.directory).resolve()), out)
+        self.assertIn(os.path.abspath(self.directory), out)
 
     def test_a_launch_error_from_resolving_claude_is_reported_and_exits_nonzero(self):
         self.stub.resolve_claude_executable.side_effect = StubLaunchError('no native claude found')
