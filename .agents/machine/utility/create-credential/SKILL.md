@@ -41,7 +41,9 @@ step below.
    & '<skill-directory>\scripts\deliver-credential.ps1' -Destination gh-secret -Name '<SECRET_NAME>' -Repo '<owner/repo>' -ExpectedPrefix 'github_pat_'
    ```
 
-   When no clipboard is workable, add `-Prompt`: a masked prompt Tommy pastes into once.
+   When no clipboard is workable, `-Prompt` is Tommy's to run: tell him to open the script in his own
+   interactive terminal with `-Prompt` and paste the value once. The agent never runs `-Prompt` itself —
+   it has no stdin to paste into.
 7. **Verify at the destination.** The script confirms the secret is listed; anything further is
    proven by using the credential where it was needed, never by echoing it.
 8. **Record** name, scopes, expiry and destination — never the value — in the owning plan.
@@ -64,7 +66,7 @@ never on a command line. Adding one is one switch arm in the script and one row 
 
 | Destination | Delivers to |
 |---|---|
-| `gh-secret` | GitHub Actions secret, repository (`-Repo`) or organization (`-Org`, `-Visibility`). Org secrets do not reach private repositories on GitHub Free. |
+| `gh-secret` | GitHub Actions secret, repository (`-Repo`) or organization (`-Org`, `-Visibility`, and `-SelectedRepos` when `-Visibility selected`). Org secrets do not reach private repositories on GitHub Free. |
 
 A host permission layer may deny the first delivery run as credential handling. That denial is
 expected once: retry through the host's own recovery, and do not reroute the value through a more
@@ -79,3 +81,6 @@ exposed path to avoid the prompt.
 - `gh` is a prerequisite; a missing `gh` fails the step loudly rather than degrading into manual
   instructions. Browser automation is preferred, not required — its absence falls back to step 3's
   default-browser path, never to a blank form or a manual checklist.
+- Clearing the clipboard only removes the live value; Windows clipboard history and cloud clipboard
+  sync may still retain the copy. If that matters for a given credential, say so and offer to clear
+  history too.

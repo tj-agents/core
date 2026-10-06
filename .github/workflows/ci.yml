@@ -75,6 +75,12 @@ jobs:
           ./tests/codex-terminal-profile.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/codex-terminal-profile.tests.ps1
 
+      - name: credential delivery tests
+        shell: pwsh
+        run: |
+          ./tests/deliver-credential.tests.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/deliver-credential.tests.ps1
+
       - name: source layout and package tests
         shell: pwsh
         run: python -B -m unittest discover -s tests -p 'test_*.py' -v

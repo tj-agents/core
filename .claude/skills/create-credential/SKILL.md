@@ -20,7 +20,7 @@ ToolSearch call: `tabs_context_mcp`, `tabs_create_mcp`, `navigate`, `computer`, 
 page's actual selections with `read_page` before and after filling.
 
 If `claude-in-chrome` is unavailable, follow the canonical procedure's step 3 fallback: open the
-pre-filled URL with the default browser and deliver with the canonical script's `-Prompt` mode.
+pre-filled URL with the default browser.
 
 ## Recorded quirks (2026-10-03)
 
