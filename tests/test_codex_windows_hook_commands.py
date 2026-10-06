@@ -74,6 +74,9 @@ class CodexWindowsHookCommands(unittest.TestCase):
             environment = dict(os.environ)
             environment.pop("PLUGIN_ROOT", None)
             environment["PLUGIN_DATA"] = str(root / "plugin data")
+            codex_profile = root / "codex profile"
+            codex_profile.mkdir()
+            environment["CODEX_HOME"] = str(codex_profile)
             crash = root / "crash.py"
             crash.write_text("raise RuntimeError('probe failure')\n", encoding="utf-8")
             adapter = plugin / "hooks" / "pre_tool_use_adapter.py"

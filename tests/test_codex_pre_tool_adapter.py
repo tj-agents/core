@@ -26,11 +26,12 @@ class CodexPreToolAdapter(unittest.TestCase):
         script.write_text(source, encoding="utf-8")
         return script
 
-    def launch(self, source, timeout=1.5):
+    def launch(self, source, timeout=1.5, environment=None):
         script = self.script(source)
         process = subprocess.Popen(
             [sys.executable, "-B", str(ADAPTER), "--timeout", str(timeout), str(script)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=environment,
         )
         self.addCleanup(self.close_process, process)
         return process
@@ -55,7 +56,8 @@ class CodexPreToolAdapter(unittest.TestCase):
             "import json, sys\n"
             "value = json.load(sys.stdin)\n"
             "sys.stdout.buffer.write(json.dumps(value, ensure_ascii=False).encode('utf-8'))\n"
-            "sys.stderr.buffer.write('évidence'.encode('utf-8'))\n"
+            "sys.stderr.buffer.write('évidence'.encode('utf-8'))\n",
+            environment=dict(os.environ, PYTHONUTF8="0", PYTHONIOENCODING="cp1252"),
         )
         payload = {"text": 'café 雪 } { \\"', "nested": [{"x": 1}]}
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -145,67 +147,144 @@ class CodexPreToolAdapter(unittest.TestCase):
                 self.assertEqual(process.returncode, 0, stderr)
                 self.assertIn(reason, self.decision(stdout))
 
-    def test_windows_launch_is_hidden_suspended_and_contained_before_resume(self):
+    def test_windows_launch_is_hidden_and_adapter_contained_before_workers(self):
         spec = importlib.util.spec_from_file_location("pretool", ADAPTER)
         adapter = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(adapter)
         kernel = mock.Mock()
-        kernel.AssignProcessToJobObject.return_value = True
         process = mock.Mock()
-        process._handle = 123
         process.returncode = 0
         process.communicate.return_value = (b"", b"")
-        ntdll = mock.Mock()
-        ntdll.NtResumeProcess.return_value = 0
-        calls = mock.Mock()
-        calls.attach_mock(kernel.AssignProcessToJobObject, "assign")
-        calls.attach_mock(ntdll.NtResumeProcess, "resume")
-        with mock.patch.object(adapter.os, "name", "nt"), \
-             mock.patch.object(adapter, "windows_job", return_value=(kernel, 456)), \
-             mock.patch.object(adapter.ctypes, "WinDLL", return_value=ntdll, create=True), \
-             mock.patch.object(adapter.subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True), \
-             mock.patch.object(adapter.subprocess, "Popen", return_value=process) as popen, \
-             mock.patch.object(adapter, "read_object", return_value=b"{}"), \
-             mock.patch.object(adapter.sys, "argv", ["adapter", "--timeout", "2", "probe.py"]):
-            self.assertEqual(adapter.main(), 0)
-        self.assertEqual(popen.call_args.kwargs["creationflags"], 0x08000004)
-        self.assertFalse(popen.call_args.kwargs["start_new_session"])
-        self.assertEqual(calls.mock_calls, [mock.call.assign(456, 123), mock.call.resume(123)])
-        kernel.CloseHandle.assert_called_once_with(456)
+        events = []
 
-    def test_windows_delayed_launch_is_cancelled_without_resume(self):
-        spec = importlib.util.spec_from_file_location("pretool_cancelled", ADAPTER)
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        kernel = mock.Mock()
-        process = mock.Mock()
-        process._handle = 123
-        ntdll = mock.Mock()
-        launched = adapter.threading.Event()
+        def contained():
+            events.append("contained")
+            return kernel, 456
 
-        def delayed_launch(*args, **kwargs):
-            time.sleep(.3)
-            launched.set()
+        def read():
+            events.append("input")
+            return b"{}"
+
+        def launch(*args, **kwargs):
+            events.append("launch")
             return process
 
         with mock.patch.object(adapter.os, "name", "nt"), \
-             mock.patch.object(adapter, "windows_job", return_value=(kernel, 456)), \
-             mock.patch.object(adapter.ctypes, "WinDLL", return_value=ntdll, create=True), \
+             mock.patch.object(adapter, "windows_job", side_effect=contained), \
              mock.patch.object(adapter.subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True), \
-             mock.patch.object(adapter.subprocess, "Popen", side_effect=delayed_launch), \
-             mock.patch.object(adapter, "read_object", return_value=b"{}"), \
-             mock.patch.object(adapter, "deny", return_value=0) as deny, \
-             mock.patch.object(adapter.sys, "argv", ["adapter", "--timeout", ".1", "probe.py"]):
+             mock.patch.object(adapter.subprocess, "Popen", side_effect=launch) as popen, \
+             mock.patch.object(adapter, "read_object", side_effect=read), \
+             mock.patch.object(adapter.sys, "argv", ["adapter", "--timeout", "2", "probe.py"]):
             self.assertEqual(adapter.main(), 0)
-            self.assertTrue(launched.wait(1))
-            until = time.monotonic() + 1
-            while not process.kill.called and time.monotonic() < until:
-                time.sleep(.005)
-        deny.assert_called_once()
-        process.kill.assert_called_once()
-        ntdll.NtResumeProcess.assert_not_called()
-        kernel.AssignProcessToJobObject.assert_not_called()
+        self.assertEqual(popen.call_args.kwargs["creationflags"], 0x08000000)
+        self.assertFalse(popen.call_args.kwargs["start_new_session"])
+        self.assertEqual(popen.call_args.kwargs["env"]["PYTHONIOENCODING"], "utf-8")
+        self.assertEqual(events, ["contained", "input", "launch"])
+        kernel.CloseHandle.assert_not_called()
+        process.kill.assert_not_called()
+
+    def test_failed_adapter_job_assignment_denies_before_workers_or_processes(self):
+        spec = importlib.util.spec_from_file_location("pretool_job_failure", ADAPTER)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        kernel = mock.Mock()
+        kernel.CreateJobObjectW.return_value = 456
+        kernel.SetInformationJobObject.return_value = True
+        kernel.GetCurrentProcess.return_value = -1
+        kernel.AssignProcessToJobObject.return_value = False
+        with mock.patch.object(adapter.os, "name", "nt"), \
+             mock.patch.object(adapter.ctypes, "WinDLL", return_value=kernel, create=True), \
+             mock.patch.object(adapter, "run_until") as run_until, \
+             mock.patch.object(adapter.subprocess, "Popen") as popen, \
+             mock.patch.object(adapter, "deny", return_value=0) as deny, \
+             mock.patch.object(adapter.sys, "argv", ["adapter", "--timeout", "2", "probe.py"]):
+            self.assertEqual(adapter.main(), 0)
+        kernel.CreateJobObjectW.assert_called_once_with(None, None)
+        kernel.AssignProcessToJobObject.assert_called_once_with(456, -1)
         kernel.CloseHandle.assert_called_once_with(456)
+        run_until.assert_not_called()
+        popen.assert_not_called()
+        self.assertIn("containment", deny.call_args.args[0])
+
+    @unittest.skipUnless(os.name == "nt", "Windows job lifetime regression")
+    def test_adapter_exit_kills_descendants_before_delayed_popen_returns(self):
+        child_pid = self.root / "child.pid"
+        grandchild_pid = self.root / "grandchild.pid"
+        pending = self.root / "launch.pending"
+        grandchild_code = (
+            "import os,time\nfrom pathlib import Path\n"
+            f"path=Path({str(grandchild_pid)!r})\n"
+            "temporary=path.with_suffix('.tmp')\n"
+            "temporary.write_text(str(os.getpid()))\ntemporary.replace(path)\n"
+            "time.sleep(60)\n"
+        )
+        script = self.script(
+            "import os,subprocess,sys,time\nfrom pathlib import Path\n"
+            f"path=Path({str(child_pid)!r})\n"
+            "temporary=path.with_suffix('.tmp')\n"
+            "temporary.write_text(str(os.getpid()))\ntemporary.replace(path)\n"
+            f"subprocess.Popen([sys.executable, '-c', {grandchild_code!r}])\n"
+            "time.sleep(60)\n"
+        )
+        wrapper = self.root / "delayed launch.py"
+        wrapper.write_text(
+            "import importlib.util,os,subprocess,sys,time\nfrom pathlib import Path\n"
+            f"spec=importlib.util.spec_from_file_location('adapter', {str(ADAPTER)!r})\n"
+            "adapter=importlib.util.module_from_spec(spec)\nspec.loader.exec_module(adapter)\n"
+            "real_popen=subprocess.Popen\n"
+            "def delayed_popen(*args, **kwargs):\n"
+            " kwargs['creationflags'] &= ~4\n"
+            " process=real_popen(*args, **kwargs)\n"
+            f" while not Path({str(child_pid)!r}).exists() or not Path({str(grandchild_pid)!r}).exists():\n"
+            "  time.sleep(.005)\n"
+            f" path=Path({str(pending)!r})\n"
+            " temporary=path.with_suffix('.tmp')\n"
+            " temporary.write_text('blocked before process publication')\n"
+            " temporary.replace(path)\n"
+            " time.sleep(60)\n"
+            " return process\n"
+            "adapter.subprocess.Popen=delayed_popen\n"
+            f"sys.argv=[{str(ADAPTER)!r}, '--timeout', '3', {str(script)!r}]\n"
+            "sys.stdout.reconfigure(encoding='utf-8', errors='replace')\n"
+            "os._exit(adapter.main())\n",
+            encoding="utf-8",
+        )
+        started = time.monotonic()
+        process = subprocess.Popen(
+            [sys.executable, "-B", str(wrapper)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        self.addCleanup(self.close_process, process)
+        process.stdin.write(b"{}")
+        process.stdin.flush()
+        until = started + 2
+        while not pending.exists() and time.monotonic() < until:
+            time.sleep(.005)
+        self.assertTrue(pending.exists(), "Popen did not reach the blocked return interval")
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_uint]
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        handles = []
+
+        def cleanup_handle(handle):
+            if kernel.WaitForSingleObject(handle, 0) == 258:
+                kernel.TerminateProcess(handle, 1)
+            kernel.CloseHandle(handle)
+
+        for path in (child_pid, grandchild_pid):
+            handle = kernel.OpenProcess(0x101001, False, int(path.read_text()))
+            self.assertTrue(handle, f"Cannot observe descendant {path.name}")
+            handles.append(handle)
+            self.addCleanup(cleanup_handle, handle)
+        process.wait(timeout=5)
+        self.assertLess(time.monotonic() - started, 4.5)
+        self.assertEqual(process.returncode, 0, process.stderr.read())
+        self.assertIn("child execution/output collection", self.decision(process.stdout.read()))
+        for handle in handles:
+            self.assertEqual(kernel.WaitForSingleObject(handle, 1000), 0)
 
 
 if __name__ == "__main__":
