@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:2a653cd4ca79d0ef3b0cd68cb2aaf6722802224715be080dea85a2ae87b32ae2",
+          "digest": "sha256:4e5c9f0175e7507528faa402b8b7cfd169bfb6df193eb8fb5f55449120f37997",
           "harness": {
             "marketplaces": [
               {
@@ -190,7 +190,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:93d398dd7605342ca2b354d80b9d854bcc12cbd8ffd58fb65415f373f3d0c015",
+          "digest": "sha256:86f1dd4a0b9b8bcad02d3b1c5a25c2c4eb9d2a81946d0d59afbc6dcf396d41c6",
           "harness": {
             "marketplaces": [
               {
@@ -220,7 +220,8 @@
               {
                 "path": "hooks/delivery_binding_gate.py",
                 "hosts": [
-                  "claude"
+                  "claude",
+                  "codex"
                 ]
               },
               {
@@ -322,6 +323,7 @@
             "auto-memory",
             "bootstrap-capabilities",
             "clip",
+            "followup-codex",
             "handoff-claude",
             "handoff-codex",
             "last-conversation",
@@ -346,7 +348,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:5aca600c618b716241b48805dddc48c7933f80a5a0f925b351624bb4c0f442c8",
+          "digest": "sha256:cc6a5c4f504064d7d4ae967baaa244fc7806ff64f656056c9da9b26802edfb2d",
           "digest_excludes": [
             "catalog/catalog.json"
           ],

@@ -28,6 +28,7 @@ import argparse
 import json
 from pathlib import Path
 import re
+import runpy
 import sys
 
 
@@ -38,7 +39,7 @@ KIND_PATTERN = re.compile(r"[a-z]+")
 OWNER_PATTERN = re.compile(r"^[^/ ]+/[^/ ]+$")
 FRONT_FIELD = r"^{0}:[ \t]*(\S[^\r\n]*?)[ \t]*$"
 INDEX_ENTRY = re.compile(r"^- `([^`]+)`", re.MULTILINE)
-SCHEMA_VERSIONS = (1, 2)
+SCHEMA_VERSIONS = (1, 2, 3)
 IGNORED_PAYLOAD_ENTRIES = {".gitkeep"}
 
 
@@ -86,6 +87,11 @@ def check_tier_declaration(payload, problems):
             problems.append(f"{payload.name}: tier.json owner_repository entry {name!r} is not owner/name")
 
     detect = data.get("detect")
+    if data.get("schema_version") == 3:
+        validator = runpy.run_path(str(Path(__file__).with_name("tier_gate.py")))["v3_declaration_diagnostics"]
+        problems.extend(f"{payload.name}: {item['path']}: {item['message']}"
+                        for item in validator(data))
+        return
     if applies == "stack-present":
         if not isinstance(detect, dict) or not any(detect.get(key) for key in ("files", "globs", "content", "remote")):
             problems.append(f"{payload.name}: tier.json applies=stack-present but detect has no matcher")

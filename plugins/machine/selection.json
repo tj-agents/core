@@ -10,6 +10,7 @@
     "auto-memory",
     "bootstrap-capabilities",
     "clip",
+    "followup-codex",
     "handoff-claude",
     "handoff-codex",
     "last-conversation",

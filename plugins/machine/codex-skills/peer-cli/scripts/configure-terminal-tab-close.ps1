@@ -1,4 +1,3 @@
-#Requires -Version 7
 <#
 .SYNOPSIS
 Make Windows Terminal close a tab when its process exits.
@@ -30,8 +29,9 @@ $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $SettingsPath)) {
     throw "Windows Terminal settings not found at $SettingsPath."
 }
+$SettingsPath = (Resolve-Path -LiteralPath $SettingsPath).ProviderPath
 
-$text = Get-Content -LiteralPath $SettingsPath -Raw
+$text = Get-Content -LiteralPath $SettingsPath -Raw -Encoding UTF8
 
 if ($text -match '"closeOnExit"\s*:\s*"(?<value>[^"]+)"') {
     $current = $Matches.value
@@ -63,7 +63,7 @@ if (-not $PSCmdlet.ShouldProcess($SettingsPath, "Set closeOnExit to '$CloseOnExi
 
 $backup = "$SettingsPath.bak-$(Get-Date -Format 'yyyyMMddHHmmss')"
 Copy-Item -LiteralPath $SettingsPath -Destination $backup
-Set-Content -LiteralPath $SettingsPath -Value $updated -NoNewline -Encoding utf8
+[IO.File]::WriteAllText($SettingsPath, $updated, [Text.UTF8Encoding]::new($false))
 
 Write-Output "closeOnExit set to '$CloseOnExit'. Backup: $backup"
 Write-Output 'Windows Terminal picks this up immediately; no restart needed.'

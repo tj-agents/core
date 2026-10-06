@@ -80,9 +80,11 @@ try {
     if (Test-Path -LiteralPath $oldRouting) { throw 'Test setup is broken: the old routing file should not exist.' }
 
     # Windows Terminal is stubbed so no real terminal window opens. WT_STUB_LOG keeps the raw argument
-    # list the launcher handed it, which is what the flag assertions below read. The escaping Windows
-    # Terminal itself applies on the way to the tab process is covered directly in Python
-    # (test_agent_cli.py's TerminalArgumentTests and LaunchTabTests), not re-modelled here.
+    # list the launcher handed it, which is what the flag assertions below read, including the escaping
+    # round-trip test further down: agent-cli.ps1's ConvertTo-TerminalArgument/ConvertTo-CommandLineArgument
+    # are this PowerShell implementation's own escaping and are exercised directly here. The separate Python
+    # port in agent_cli.py has its own coverage in test_agent_cli.py's TerminalArgumentTests and
+    # LaunchTabTests; that suite says nothing about this one.
     $wtSource = @'
 using System;
 using System.IO;
@@ -153,6 +155,47 @@ class Stub {
         }
         if (-not (Test-Path -LiteralPath $wtLog)) {
             throw "The generated launcher did not reach the stub terminal: $launcher"
+        }
+    }
+
+    # --- the shared escaping survives a quote, a semicolon and a trailing backslash before a space ---
+    # -Title is the only free-form string launch-codex.ps1 hands to Invoke-AgentTerminalTab (open-claude and
+    # handoff-claude moved to Python, whose escaping test_agent_cli.py covers), so it carries these values. The
+    # stub only captures what wt.exe itself would receive (one hop); the backslash-quote sequences
+    # agent-cli.ps1 embeds are meant to survive Windows Terminal's own dumb re-quoting unmodified and are
+    # only resolved by the final child process's own argv parsing, and a `\;` is Windows Terminal's own
+    # unescape of the semicolon it split subcommands on. Both remaining hops are reproduced here so the
+    # comparison is against what the user's actual agent process would see, not this one intermediate hop.
+    Add-Type -Namespace StubTerminalTest -Name Argv -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("shell32.dll", SetLastError = true)]
+public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string commandLine, out int count);
+'@
+    function ConvertFrom-StubTerminalArgument {
+        param([Parameter(Mandatory)][AllowEmptyString()][string] $Value)
+        $unescaped = $Value -replace '\\;', ';'
+        $wrapped = if ($unescaped.Contains(' ')) { "fake.exe `"$unescaped`"" } else { "fake.exe $unescaped" }
+        $count = 0
+        $argv = [StubTerminalTest.Argv]::CommandLineToArgvW($wrapped, [ref] $count)
+        if ($argv -eq [IntPtr]::Zero) { throw 'CommandLineToArgvW failed.' }
+        return [System.Runtime.InteropServices.Marshal]::PtrToStringUni([System.Runtime.InteropServices.Marshal]::ReadIntPtr($argv, [IntPtr]::Size))
+    }
+    $title = 'say "hi" a;b'
+    $prompt = 'C:\two\ trailing\'
+    foreach ($value in @($title, $prompt)) {
+        Remove-Item -LiteralPath $wtLog -Force
+        & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title $value | Out-Null
+        $delivered = @([System.IO.File]::ReadAllText($wtLog) -split [char]0x1f)
+        $titleIndex = [array]::IndexOf($delivered, '--title') + 1
+        if ($titleIndex -le 0) { throw "launch-codex.ps1 did not pass --title through for: $value" }
+        # An unescaped semicolon is a split point to Windows Terminal itself (CommandLineToArgvW does not
+        # treat `;` specially, so it cannot catch this): every semicolon reaching the stub must have a
+        # backslash immediately before it, or a real launch would have been cut there.
+        if ($delivered[$titleIndex] -cmatch '(?<!\\);') {
+            throw "An unescaped semicolon would have split Windows Terminal's command line: $($delivered[$titleIndex])"
+        }
+        $reconstructed = ConvertFrom-StubTerminalArgument $delivered[$titleIndex]
+        if ($reconstructed -cne $value) {
+            throw "The title did not reach the launched process whole.`nSent:      $value`nDelivered: $($delivered[$titleIndex])`nReconstructed: $reconstructed"
         }
     }
 
