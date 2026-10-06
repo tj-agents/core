@@ -254,6 +254,67 @@ class FollowupTests(unittest.TestCase):
         self.assertIn('different target', result['detail'])
         self.assertEqual([], proxy.calls)
 
+    def test_preexisting_mismatched_receipt_does_not_claim_unverified(self):
+        foreign = dict(self.receipt, message_sha256='different')
+        self.receipt_path.write_text(json.dumps(foreign))
+        proxy = Session(self.receipt)
+        code, result = self.run_main(self.arguments(), proxy)
+        self.assertEqual(2, code)
+        self.assertEqual('unavailable', result['status'])
+        self.assertIn('Nothing was sent for this message', result['next_action'])
+        self.assertNotIn('do not resend', result['next_action'])
+        self.assertEqual([], proxy.calls)
+
+    def test_status_with_missing_receipt_does_not_invite_blind_paste(self):
+        missing = self.root / 'missing-receipt.json'
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = FOLLOWUP.main(['status', '--receipt', str(missing)])
+        result = json.loads(output.getvalue())
+        self.assertEqual(2, code)
+        self.assertEqual('unavailable', result['status'])
+        self.assertNotIn('paste', result['next_action'])
+        self.assertIn('check the target', result['next_action'].lower())
+
+    def test_status_disconnect_with_valid_receipt_stays_unverified(self):
+        self.receipt_path.write_text(json.dumps(self.receipt))
+
+        class DisconnectingSession(Session):
+            def request(self, method, params):
+                raise FOLLOWUP.FollowupError('Codex proxy disconnected')
+
+        code, result = self.run_main(['status', '--receipt', str(self.receipt_path)],
+                                      DisconnectingSession(self.receipt))
+        self.assertEqual(2, code)
+        self.assertEqual('unverified', result['status'])
+
+    def test_non_string_receipt_field_still_prints_json_status(self):
+        bad_receipt = dict(self.receipt, thread_id=12345)
+        self.receipt_path.write_text(json.dumps(bad_receipt))
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = FOLLOWUP.main(['status', '--receipt', str(self.receipt_path)])
+        result = json.loads(output.getvalue())
+        self.assertEqual(2, code)
+        self.assertEqual('unavailable', result['status'])
+        self.assertNotIn('paste', result['next_action'])
+
+    def test_odd_server_item_content_still_prints_json_status(self):
+        class OddSession(Session):
+            def request(self, method, params):
+                if method == 'thread/items/list':
+                    return {'data': [{'turnId': 'active-turn', 'item': {
+                        'type': 'userMessage', 'clientId': CLIENT, 'id': 'received',
+                        'content': ['not-a-dict'],
+                    }}]}
+                return super().request(method, params)
+
+        self.receipt_path.write_text(json.dumps(self.receipt))
+        code, result = self.run_main(['status', '--receipt', str(self.receipt_path)],
+                                      OddSession(self.receipt))
+        self.assertEqual(2, code)
+        self.assertEqual('unverified', result['status'])
+
 
 class ProxyTests(unittest.TestCase):
     def create_proxy(self, source, timeout=3):
@@ -364,6 +425,31 @@ for line in sys.stdin:
             with self.assertRaises(FOLLOWUP.FollowupError):
                 proxy.request('turn/start', {})
         write.assert_not_called()
+
+    def test_close_is_best_effort_when_stdin_close_raises(self):
+        proxy = self.create_proxy('import time; time.sleep(30)', timeout=0.2)
+        with patch.object(proxy.process.stdin, 'close', side_effect=BrokenPipeError('broken')):
+            proxy.close()
+        self.assertIsNotNone(proxy.process.poll())
+
+    def test_close_failure_does_not_suppress_the_printed_result(self):
+        directory = tempfile.TemporaryDirectory(prefix='followup close ')
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        message = root / 'message.txt'
+        message.write_text('exact message', encoding='utf-8')
+        receipt = root / 'receipt.json'
+        proxy = self.create_proxy('import time; time.sleep(30)', timeout=0.2)
+        output = io.StringIO()
+        with patch.object(FOLLOWUP, 'Proxy', return_value=proxy), \
+                patch.object(proxy.process.stdin, 'close', side_effect=BrokenPipeError('broken')), \
+                contextlib.redirect_stdout(output):
+            code = FOLLOWUP.main(['send', '--thread', THREAD, '--cwd', str(root),
+                                  '--codex-home', str(root), '--message-file', str(message),
+                                  '--receipt', str(receipt)])
+        result = json.loads(output.getvalue())
+        self.assertEqual(2, code)
+        self.assertIn(result['status'], ('unverified', 'unavailable'))
 
     def test_rpc_rejection_and_malformed_output_fail_explicitly(self):
         for source in [
