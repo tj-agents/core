@@ -48,6 +48,26 @@ try {
     $again = & (Join-Path $peerCli 'configure-terminal-tab-close.ps1') -SettingsPath $settings
     Assert ("$again" -ceq "closeOnExit is already 'always'.") "A second run did not detect the existing value: $again"
 
+    # --- configure-terminal-tab-close: a relative -SettingsPath resolves against $PWD, not the process
+    # directory --- Push-Location changes $PWD without changing [Environment]::CurrentDirectory, so a
+    # relative path handed to a raw .NET API (as the backup/write steps do) silently targets the wrong
+    # directory unless the script resolves it against $PWD first.
+    $relativeScratch = Join-Path $scratch 'relative'
+    New-Item -ItemType Directory -Path $relativeScratch -Force | Out-Null
+    $relativeSettings = Join-Path $relativeScratch 'settings.json'
+    [IO.File]::WriteAllText($relativeSettings, $original, $utf8)
+    $processDirectory = [Environment]::CurrentDirectory
+    Push-Location -LiteralPath $relativeScratch
+    try {
+        & (Join-Path $peerCli 'configure-terminal-tab-close.ps1') -SettingsPath 'settings.json' | Out-Null
+    } finally {
+        Pop-Location
+    }
+    Assert ([Environment]::CurrentDirectory -eq $processDirectory) 'Test setup invariant broken: Push-Location changed the process directory.'
+    $writtenRelative = $utf8.GetString([IO.File]::ReadAllBytes($relativeSettings))
+    Assert ($writtenRelative.Contains('"closeOnExit": "always"')) 'A relative -SettingsPath did not update the file at $PWD.'
+    Assert (-not (Test-Path -LiteralPath (Join-Path $processDirectory 'settings.json'))) 'A relative -SettingsPath wrote beside the process directory instead of $PWD.'
+
     Write-Output "PowerShell host compatibility tests passed under PowerShell $($PSVersionTable.PSVersion)."
 } finally {
     $env:AGENT_STATE_DIRECTORY = $originalStateDirectory
