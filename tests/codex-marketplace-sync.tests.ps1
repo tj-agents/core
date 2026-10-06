@@ -7,11 +7,13 @@ $script:failUpgrade = $false
 $script:emptyInventory = $false
 
 function Invoke-CodexHookTrust {
-    param([string] $CodexExecutable, [string] $WorkingDirectory, [string] $HelperScript)
+    param([string] $CodexExecutable, [string] $WorkingDirectory, [string] $HelperScript, [string] $RunnerPath, [double] $TimeoutSeconds)
     if ($CodexExecutable -ne 'Invoke-FakeCodex' -or $WorkingDirectory -ne $repository) {
         throw 'Hook trust received the wrong executable or project'
     }
     if (-not (Test-Path -LiteralPath $HelperScript)) { throw 'Hook trust was not preserved before refresh' }
+    if (-not (Test-Path -LiteralPath $RunnerPath)) { throw 'Hook trust did not receive the runner snapshot' }
+    if ($TimeoutSeconds -le 0 -or $TimeoutSeconds -gt 60) { throw 'Invalid remaining hook trust budget' }
     $script:calls.Add('trust tj-agents hooks')
 }
 
