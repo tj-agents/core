@@ -19,4 +19,4 @@ Chrome; it owns setup, tab binding and interaction. Do not substitute Computer U
 Playwright while that plugin is available.
 
 If no browser backend connects, follow the canonical procedure's step 3 fallback: open the
-pre-filled URL with `Start-Process '<url>'` and deliver with the canonical script's `-Prompt` mode.
+pre-filled URL with `Start-Process '<url>'`.
