@@ -317,6 +317,44 @@ class StandardsSyncTests(unittest.TestCase):
         (self.config / 'plugins' / 'installed_plugins.json').write_text('{not json')
         self.assertEqual(CLI.standards_sync_script(), CLI.HERE / 'claude_standards_sync.py')
 
+    def test_a_hung_check_reports_a_standards_line_and_never_raises(self):
+        install = self.base / 'install'
+        script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
+        script.parent.mkdir(parents=True)
+        script.write_text('print("unreachable")\n')
+        self.register(install)
+        lines = []
+        with mock.patch.object(CLI.subprocess, 'run', side_effect=subprocess.TimeoutExpired(cmd=['x'], timeout=120)):
+            CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
+        self.assertEqual(len(lines), 1)
+        self.assertIn('standards:', lines[0])
+        self.assertIn('did not finish', lines[0])
+
+    def test_a_failure_to_start_the_check_reports_a_standards_line_and_never_raises(self):
+        install = self.base / 'install'
+        script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
+        script.parent.mkdir(parents=True)
+        script.write_text('print("unreachable")\n')
+        self.register(install)
+        lines = []
+        with mock.patch.object(CLI.subprocess, 'run', side_effect=OSError('boom')):
+            CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
+        self.assertEqual(len(lines), 1)
+        self.assertIn('standards:', lines[0])
+        self.assertIn('boom', lines[0])
+
+    def test_output_that_is_not_valid_utf8_is_replaced_rather_than_fatal(self):
+        install = self.base / 'install'
+        script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
+        script.parent.mkdir(parents=True)
+        script.write_text("import sys\nsys.stdout.buffer.write(b'bad: \\xff\\xfe end\\n')\n")
+        self.register(install)
+        lines = []
+        CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
+        self.assertEqual(len(lines), 1)
+        self.assertIn('bad:', lines[0])
+        self.assertIn('end', lines[0])
+
 
 class LaneModelTests(unittest.TestCase):
     def table(self, harness):
@@ -351,10 +389,11 @@ class PromptFileArgumentTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.directory = Path(temp.name)
 
-    def test_a_prepared_prompt_file_becomes_the_read_the_file_sentence(self):
+    def test_a_prepared_prompt_file_becomes_the_read_the_file_sentence_and_its_resolved_path(self):
         prompt = self.directory / 'draft prompt.md'
         prompt.write_text('do the thing\n')
-        sentence = CLI.prompt_file_argument(str(prompt))
+        sentence, resolved = CLI.prompt_file_argument(str(prompt))
+        self.assertEqual(resolved, prompt.resolve())
         self.assertEqual(
             sentence,
             f'Read the file at {prompt.resolve()} and follow its instructions, working from the current directory.',
@@ -363,6 +402,66 @@ class PromptFileArgumentTests(unittest.TestCase):
     def test_a_prompt_path_that_is_not_a_file_is_a_launch_error(self):
         with self.assertRaisesRegex(CLI.LaunchError, 'is not a file'):
             CLI.prompt_file_argument(str(self.directory))
+
+
+class ResolveTabDirectoryTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='agent cli tab dir ')
+        self.addCleanup(temp.cleanup)
+        self.directory = temp.name
+
+    def test_an_existing_directory_is_returned_absolute_but_not_resolved(self):
+        previous = os.getcwd()
+        os.chdir(self.directory)
+        self.addCleanup(os.chdir, previous)
+        self.assertEqual(CLI.resolve_tab_directory('.'), Path(os.path.abspath('.')))
+
+    def test_a_missing_directory_is_a_launch_error_naming_the_absolute_path(self):
+        missing = os.path.join(self.directory, 'missing')
+        with self.assertRaisesRegex(CLI.LaunchError, 'not a directory'):
+            CLI.resolve_tab_directory(missing)
+        try:
+            CLI.resolve_tab_directory(missing)
+        except CLI.LaunchError as exc:
+            self.assertIn(os.path.abspath(missing), str(exc))
+
+    def test_a_symlinked_directory_is_kept_as_given(self):
+        link = Path(self.directory).parent / (Path(self.directory).name + ' link')
+        try:
+            link.symlink_to(self.directory)
+        except OSError:
+            self.skipTest('this filesystem or account does not allow creating a symlink')
+        self.addCleanup(link.unlink)
+        self.assertEqual(CLI.resolve_tab_directory(str(link)), link)
+
+
+class ReportLaunchFailureTests(unittest.TestCase):
+    def test_a_plain_launch_error_prints_once_and_returns_1(self):
+        err = io.StringIO()
+        code = CLI.report_launch_failure(CLI.LaunchError('no terminal detected'), err=err)
+        self.assertEqual(code, 1)
+        self.assertEqual(err.getvalue().strip(), 'no terminal detected')
+
+    def test_a_launch_timeout_prints_guidance_and_returns_3(self):
+        err = io.StringIO()
+        code = CLI.report_launch_failure(
+            CLI.LaunchTimeout('Windows Terminal did not answer within 30 seconds; it may still have taken effect.'),
+            err=err,
+        )
+        self.assertEqual(code, 3)
+        output = err.getvalue()
+        self.assertIn('did not answer within 30 seconds', output)
+        self.assertIn('may already have opened', output)
+
+    def test_the_default_err_follows_a_sys_stderr_redirected_after_this_module_loaded(self):
+        # A default parameter bound directly to sys.stderr would capture the stream object that existed
+        # when agent_cli.py was first loaded, not whatever sys.stderr is redirected to later -- exactly
+        # the mistake that silently swallowed every launcher error message under test until it was caught.
+        captured = io.StringIO()
+        with mock.patch.object(CLI.sys, 'stderr', captured):
+            code = CLI.report_launch_failure(CLI.LaunchError('no terminal detected'))
+        self.assertEqual(code, 1)
+        self.assertIn('no terminal detected', captured.getvalue())
 
 
 class StdioEncodingTests(unittest.TestCase):
@@ -544,6 +643,9 @@ class LaunchTabTests(unittest.TestCase):
         self.assertNotIn('sendText', [cmd[3] for cmd in calls])
 
     def test_a_timed_out_konsole_title_call_still_closes_the_empty_tab(self):
+        # H12: no inner command was ever typed into this session, so once abandon() has (tried to) close
+        # it, the uncertainty a LaunchTimeout names no longer applies -- this is a plain, definite
+        # LaunchError, not a LaunchTimeout.
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
         calls = []
 
@@ -554,10 +656,31 @@ class LaunchTabTests(unittest.TestCase):
             return subprocess.CompletedProcess(cmd, 0, stdout='7', stderr='')
 
         with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus6' if name == 'qdbus6' else None):
-            with self.assertRaises(CLI.LaunchTimeout):
+            with self.assertRaises(CLI.LaunchError) as caught:
                 CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
+        self.assertNotIsInstance(caught.exception, CLI.LaunchTimeout)
         self.assertEqual(calls[-1], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7', 'sendText', 'exit\n'])
         self.assertNotIn('runCommand', [cmd[3] for cmd in calls])
+
+    def test_a_timed_out_konsole_new_session_call_is_a_plain_error_naming_a_possible_empty_tab(self):
+        # H12: no session id came back, so there is nothing here to close by typing into it -- still a
+        # plain LaunchError, not a LaunchTimeout, because no inner command was ever at risk of being
+        # mid-flight.
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        calls = []
+
+        def run(cmd, **kwargs):
+            calls.append(cmd)
+            if cmd[3] == 'newSession':
+                raise subprocess.TimeoutExpired(cmd, 30)
+            return subprocess.CompletedProcess(cmd, 0, stdout='7', stderr='')
+
+        with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus6' if name == 'qdbus6' else None):
+            with self.assertRaises(CLI.LaunchError) as caught:
+                CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
+        self.assertNotIsInstance(caught.exception, CLI.LaunchTimeout)
+        self.assertIn('empty Konsole tab may have been left open', str(caught.exception))
+        self.assertEqual(len(calls), 1, 'nothing can be cleaned up without a session id to address it to')
 
     def test_a_failed_konsole_run_command_removes_its_script(self):
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}

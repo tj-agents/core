@@ -8,13 +8,19 @@ $ErrorActionPreference = 'Stop'
 # what an install actually delivers.
 
 $repository = Split-Path -Parent $PSScriptRoot
-$pluginSkills = Join-Path $repository 'plugins\machine\skills'
+$pluginRoot = Join-Path $repository 'plugins\machine'
+$pluginSkills = Join-Path $pluginRoot 'skills'
+# A host adapter's generated SKILL.md is only a redirect to this canonical copy -- its own body carries no
+# `<skill-directory>` references and no forbidden-path strings to find, so scanning the adapter alone would
+# silently pass regardless of what the canonical body actually says. Both copies are scanned below.
+$canonicalSkills = Join-Path $pluginRoot '.agents\machine\utility'
 
 $script:RequiredSkillScripts = @{
     'bootstrap-capabilities' = 'scripts\bootstrap_capabilities.py'
     'handoff-claude'         = 'scripts\launch_claude.py'
     'handoff-codex'          = 'scripts\launch-codex.ps1'
     'followup-codex'         = 'scripts\codex_followup.py'
+    'open-claude'            = 'scripts\open_claude.py'
 }
 
 function Get-MissingRequiredFiles {
@@ -52,21 +58,24 @@ function Get-UnpackagedSkillDirectoryReferences {
 # or an unpackaged path outside the skill's own folder. This is the exact shape of the confirmed defect.
 $forbiddenPatterns = @('routing/route.py', '.claude\routing', '$env:USERPROFILE', '%USERPROFILE%', '~/', '~\')
 
-$targets = @('bootstrap-capabilities', 'handoff-claude', 'handoff-codex', 'followup-codex')
+# Every mapped skill, sorted for a stable run order; adding a skill to $RequiredSkillScripts is now the
+# only place that needs to change to bring it under this check.
+$targets = @($script:RequiredSkillScripts.Keys | Sort-Object)
 
 foreach ($name in $targets) {
-    $dir = Join-Path $pluginSkills $name
-    if (-not (Test-Path -LiteralPath $dir)) { throw "Generated package is missing $name. Run pwsh .agents/sync-generated.ps1." }
+    foreach ($dir in @((Join-Path $pluginSkills $name), (Join-Path $canonicalSkills $name))) {
+        if (-not (Test-Path -LiteralPath $dir)) { throw "Generated package is missing $name at $dir. Run pwsh .agents/sync-generated.ps1." }
 
-    $missing = @(Get-UnpackagedSkillDirectoryReferences -SkillDir $dir) + @(Get-MissingRequiredFiles -SkillDir $dir -Name $name)
-    if ($missing.Count -gt 0) {
-        throw "$name references packaged dependencies the generated plugin does not contain: $($missing -join ', ')"
-    }
+        $missing = @(Get-UnpackagedSkillDirectoryReferences -SkillDir $dir) + @(Get-MissingRequiredFiles -SkillDir $dir -Name $name)
+        if ($missing.Count -gt 0) {
+            throw "$name ($dir) references packaged dependencies the generated plugin does not contain: $($missing -join ', ')"
+        }
 
-    $body = [System.IO.File]::ReadAllText((Join-Path $dir 'SKILL.md'))
-    foreach ($forbidden in $forbiddenPatterns) {
-        if ($body.Contains($forbidden)) {
-            throw "$name/SKILL.md references '$forbidden', a path this repo does not package."
+        $body = [System.IO.File]::ReadAllText((Join-Path $dir 'SKILL.md'))
+        foreach ($forbidden in $forbiddenPatterns) {
+            if ($body.Contains($forbidden)) {
+                throw "$name/SKILL.md ($dir) references '$forbidden', a path this repo does not package."
+            }
         }
     }
 }
