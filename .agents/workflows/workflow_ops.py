@@ -705,14 +705,16 @@ def cleanup_review_bundles(root, now=None):
             value = json.loads(descriptor_path.read_text(encoding="utf-8"))
             if not isinstance(value, dict) or not isinstance(value.get("bundle"), dict):
                 continue
-            candidate_key = review_candidate_key(value)
-            locations = review_bundle_locations(root, run_id, candidate_key)
             bundle = value["bundle"]
-            expected = ("directory", "patch", "paths", "tree", "tree_archive", "identity")
             validated_at = bundle.get("last_validated_at", value["created_at"])
             timestamp = datetime.fromisoformat(validated_at)
             if timestamp.tzinfo is None:
                 continue
+            if current - timestamp.astimezone(timezone.utc) < timedelta(seconds=REVIEW_BUNDLE_RETENTION_SECONDS):
+                continue
+            candidate_key = review_candidate_key(value)
+            locations = review_bundle_locations(root, run_id, candidate_key)
+            expected = ("directory", "patch", "paths", "tree", "tree_archive", "identity")
             owned = (
                 value.get("repository") == repository_slug(root)
                 and value.get("descriptor_id") == descriptor_identity(value)
@@ -720,7 +722,7 @@ def cleanup_review_bundles(root, now=None):
                 and not is_redirect(descriptor_path)
                 and all(bundle.get(name) == str(locations[name]) for name in expected)
             )
-            if not owned or current - timestamp.astimezone(timezone.utc) < timedelta(seconds=REVIEW_BUNDLE_RETENTION_SECONDS):
+            if not owned:
                 continue
             directory = locations["directory"]
             artifacts = [locations[name] for name in expected if name != "directory"]
