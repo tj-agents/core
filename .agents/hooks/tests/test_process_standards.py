@@ -196,6 +196,46 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn("exact run head", merging)
         self.assertIn("bound PR source head", merging)
 
+    def test_merge_authorization_is_goal_scoped_with_one_owner(self):
+        merging = authored_skill("merging").read_text(encoding="utf-8")
+        flat_merging = " ".join(merging.split())
+        corpus = " ".join(self.corpus().split())
+
+        self.assertIn("## What authorizes a merge", merging)
+        self.assertIn("Merge authorization is scoped to the goal, not the PR", flat_merging)
+        self.assertIn(
+            "merge authorization for every PR that goal itself creates", flat_merging
+        )
+        self.assertIn("no per-PR re-approval", flat_merging)
+        self.assertIn("never as a per-PR approval", flat_merging)
+        self.assertEqual(
+            1, corpus.count("Merge authorization is scoped to the goal, not the PR")
+        )
+
+        for referrer in (
+            "persistent-delivery",
+            "merge",
+            "plan-execution",
+            "plans",
+            "feature",
+            "bugfix",
+        ):
+            with self.subTest(referrer=referrer):
+                body = " ".join(
+                    authored_skill(referrer).read_text(encoding="utf-8").split()
+                )
+                self.assertIn("engineering:merging", body)
+
+        for per_pr_reading in (
+            "implementation approval never invents merge authority",
+            "reaches merge only under explicit authorization",
+            "never silently authorizes the successor",
+            "merge authorization into the successor",
+            "adds no authority for installation, publication, merging",
+        ):
+            with self.subTest(per_pr_reading=per_pr_reading):
+                self.assertNotIn(per_pr_reading, corpus)
+
     def test_techdebt_uses_mode_specific_isolation_and_picks_fast(self):
         body = authored_skill("techdebt").read_text(encoding="utf-8")
         flat = " ".join(body.split())

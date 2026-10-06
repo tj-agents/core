@@ -22,8 +22,9 @@ that work will continue unattended until its owner is initialized, its foregroun
 and a supported wake is registered. If the job cannot be initialized or claimed, state the concrete
 limitation and continue independent authorized work in the current session.
 
-Continuation preserves the existing goal and authority. It adds no authority for installation,
-publication, merging, broader scope, or a new external action. Stop at the applicable existing gate;
+Continuation preserves the existing goal and authority, the goal's recorded delivery authority included.
+It adds no authority for installation, publication, broader scope, or a new external action. Stop at the
+applicable existing gate;
 keep authorized preparation and repair moving when they do not depend on that gate.
 
 Before ending at a blocker, establish what action is blocked and whether diagnosis, repair or an owned

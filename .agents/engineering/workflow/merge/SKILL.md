@@ -207,7 +207,8 @@ continuation. A plan-managed binding with a workflow handoff keeps the one exist
 the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
 stage reconciles an existing successor layer or starts the next branch in a checkout selected under
 `engineering:git-branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
-watermark or merge authorization into the successor.
+watermark or delivery binding into the successor; the successor re-resolves merge authorization from the
+goal's recorded authorization (`engineering:merging`).
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
 remove that path. Move it to the fetched remote default before closing any linked worktree:
