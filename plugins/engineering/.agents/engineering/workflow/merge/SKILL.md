@@ -4,7 +4,6 @@ description: Land the current branch's PR through the merge queue and return to 
 
 kind: workflow
 domain: process
-lane: L4
 ---
 
 # Landing a PR through the merge queue
@@ -199,15 +198,15 @@ unchanged observations remain silent and never create a model turn or user-facin
   the failing run and next fix once, then debug it. Only after the PR is open and unlocked may a stable fix
   candidate create a new remote head.
 - Reconcile closed-without-merge, failed checks, sustained green-but-unadmitted, and timeout states before the
-  next source update. On merge, retain the result as evidence for the fresh worktree.
+  next source update. On merge, retain the result as evidence for the next delivery stage.
 
-### 5. Return to a clean base, and remove the merged worktree immediately
+### 5. Return to a clean base and retire any isolated checkout
 
 Before removing persistent state, inspect the completed delivery binding. A standalone PR removes its
 continuation. A plan-managed binding with a workflow handoff keeps the one existing continuation, closes only
 the merged PR binding, checkpoints the merge, and transfers to the recorded `plan-execution` stage. That
-stage reconciles an existing successor layer or creates its worktree and PR when none exists, before
-rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
+stage reconciles an existing successor layer or starts the next branch in a checkout selected under
+`engineering:git-branching`, before rebinding the same task to that layer's exact head and runs. Never carry the completed PR's review
 watermark or merge authorization into the successor.
 
 Resolve the primary checkout from the first `worktree` record in `git worktree list --porcelain`; never
@@ -233,8 +232,9 @@ and is not evidence that the old directory can be deleted.
 - If that interface is unavailable, invoke the unqualified `handoff` workflow once with the primary
   checkout. Checkpoint the exact repository, merged PR, branch, remote head, target worktree, primary
   checkout, and remote default. Put the remaining Step 5 cleanup and final inventory in the successor's
-  `## Next Steps`. After verified launcher submission the predecessor stops repository-scoped work and
-  releases its host session; it does not run either cleanup path. The successor is the sole cleanup owner:
+  `## Next Steps`. After verified launcher submission the predecessor stops repository-scoped work; it
+  cannot end its own host session, so releasing it is a human action the successor's `## Next Steps` names
+  as a gate, and it does not run either cleanup path. The successor is the sole cleanup owner:
   after the predecessor no longer holds the target, it selects the helper or native-Git path below, requires
   the physical target path to be absent, and then continues this delivery.
 
@@ -284,9 +284,9 @@ worktree-cleanup audit gate is a backstop that makes a missed cleanup visible, n
 immediately.
 
 If plan work remains, reconcile and continue an existing successor stack layer, including its base,
-head, review evidence and delivery binding. Create a new PR-scoped worktree from the updated base only
-when no successor exists, and resume the same ledger. If only remote gates remain and no active slice
-owns them, use a fresh close-out worktree.
+head, review evidence and delivery binding. When no successor exists, start the next branch from the
+updated base and select its checkout under `engineering:git-branching`; resume the same ledger. Remote
+observation alone needs no new checkout. Select a checkout when a substantive close-out edit is required.
 
 ### 6. Follow the publish and version-sync consequence to a terminal state
 
@@ -335,8 +335,9 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   build to discover the rest rather than starting a full local solution build. Record the red state once as a
   blocker, then commit fixes locally, run targeted builds, and make one stable push. GitHub retains replacement
   checks and merge evidence. Never push the source plan's recovery commits to either PR.
-- **Close plan-managed delivery from the fresh close-out worktree.** Once publication and sync are terminal,
-  record the final transition, delete the plan and ledger, and tick the owning roadmap item in one docs-only
+- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Once
+  publication and sync are terminal, record the final transition, delete the plan and ledger, and tick
+  the owning roadmap item in one docs-only
   closeout commit. Review it per `engineering:docs-review` — skipped for a pure close-out — and
   land it through `engineering:merge-docs`.
 
@@ -353,11 +354,11 @@ each create a checkpoint. Never create a commit merely to make the ledger agree 
 One short report: the PR that merged (number plus merge commit); whether the full suite ran because a
 positive trigger was present or was skipped by label because none was; that the base is synced; and that the
 branch — and its worktree, if the work was done in one — is cleaned up. For plan-managed work, that the
-close-out PR landed and its worktree was removed. Then the sync outcome: **nothing published, sync merged
+close-out PR landed and any isolated checkout was removed. Then the sync outcome: **nothing published, sync merged
 green at a new version, or sync went red and you migrated its consumers** (which files, now green) — never
 "merged, and left a red sync PR behind." If you stopped early, say exactly what is blocking and what is
 needed.
 
-Keep it terminal: verify green → enqueue → wait for `MERGED` → remove the worktree → sync the base → follow
-the sync PR to green or migrate it → land the plan close-out → remove the close-out worktree → summarize →
+Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
+follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
 stop. No preamble.

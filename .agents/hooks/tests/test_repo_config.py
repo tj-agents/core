@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "bootstrap-capabilities" / "scripts" / "repo_config.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "repo_config.py"
 sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("repo_config", SCRIPT)
 repo_config = importlib.util.module_from_spec(spec)
@@ -56,6 +56,8 @@ class RepoConfigTests(unittest.TestCase):
         self.assertIn('model = "test"', d)
         self.assertIn('source = "https://github.com/tj-agents/core.git"', d)
         self.assertIn('ref = "v2.1.16"', d)
+        self.assertIn('sparse_paths = [".agents/plugins", ".claude-plugin", "plugins"]', d)
+        self.assertIn('sparse_paths = [".agents/plugins", ".claude-plugin", "plugins"]', d)
         self.assertEqual(3, d.count('[plugins."'))
 
     def test_rejects_foreign_source(self):

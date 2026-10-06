@@ -155,6 +155,16 @@ class InspectionAndSkillTests(RepositoryFixture):
         self.assertEqual(self.git("rev-parse", "HEAD"), result["head"])
         self.assertEqual([], result["dirty_paths"])
 
+    def test_inspection_preserves_modified_and_renamed_paths_with_spaces(self):
+        path = self.root / ".agents" / "skills" / "feature" / "SKILL.md"
+        path.write_text("# Changed guidance\n", encoding="utf-8")
+        self.git("mv", "src/mapping.txt", "src/renamed mapping.txt")
+        result = ops.inspect_repository(self.root, "paths")
+        self.assertCountEqual(
+            [".agents/skills/feature/SKILL.md", "src/renamed mapping.txt", "src/mapping.txt"],
+            result["dirty_paths"],
+        )
+
     def test_skill_identity_loads_once_and_survives_context_recovery(self):
         lifecycle = "feature"
         first = ops.skill_identities(self.root, "run-1", lifecycle, [])
@@ -210,6 +220,20 @@ class ReviewTests(RepositoryFixture):
 
         self.assertEqual(["feature"], [rule["name"] for rule in result["rules"]])
         self.assertEqual(".agents/skills/feature/SKILL.md", result["rules"][0]["path"])
+
+    def test_review_prepare_keeps_plugin_owned_routes_and_deny_hits(self):
+        (self.root / ".agents" / "skill-routes.json").write_text(json.dumps({"routes": [{
+            "path": "^src/", "skills": ["dotnet:persistence"],
+            "deny": [{"pattern": "candidate", "reason": "no candidate text"}],
+        }]}), encoding="utf-8")
+        self.git("add", ".agents/skill-routes.json")
+        self.git("commit", "-q", "-m", "add plugin routing")
+
+        result = ops.review_prepare(self.root, "plugin-routed", "origin/main", "HEAD", False)
+
+        self.assertEqual([], result["rules"])
+        self.assertEqual(["dotnet:persistence"], result["routed_skills"])
+        self.assertEqual([["src/mapping.txt", "no candidate text"]], result["route_violations"])
 
     def test_opted_in_review_fails_visibly_when_router_runtime_is_missing(self):
         (self.root / ".agents" / "skill-routes.json").write_text(
@@ -272,7 +296,8 @@ class ReviewTests(RepositoryFixture):
         tree = self.git("rev-parse", f"{self.base}^{{tree}}")
         moved = self.git("commit-tree", tree, "-p", self.base, "-m", "unrelated empty base move")
         self.git("update-ref", "refs/remotes/origin/main", moved)
-        result = ops.delivery_preflight(self.root, "run-1", descriptor["artifact"], "origin/main")
+        with mock.patch.object(ops, "delivery_owner", return_value={"action": "create"}):
+            result = ops.delivery_preflight(self.root, "run-1", descriptor["artifact"], "origin/main")
         self.assertTrue(result["ready"])
         self.assertEqual([], result["blockers"])
 
@@ -280,9 +305,175 @@ class ReviewTests(RepositoryFixture):
         tree = self.git("rev-parse", f"{self.base}^{{tree}}")
         moved = self.git("commit-tree", tree, "-p", self.base, "-m", "base move")
         self.git("update-ref", "refs/remotes/origin/main", moved)
-        result = ops.delivery_preflight(self.root, "run-1", None, "origin/main")
+        with mock.patch.object(ops, "delivery_owner", return_value={"action": "create"}):
+            result = ops.delivery_preflight(self.root, "run-1", None, "origin/main")
         self.assertFalse(result["ready"])
         self.assertIn("base-ahead-before-final-review", result["blockers"])
+
+
+class DeliveryOwnershipTests(RepositoryFixture):
+    def setUp(self):
+        super().setUp()
+        self.url = "https://github.com/example/workflow-fixture/pull/12"
+        self.pr = {"number": 12, "url": self.url, "headRefName": "Feature/Delivery",
+                   "headRefOid": self.base, "baseRefName": "main", "state": "OPEN",
+                   "isCrossRepository": False}
+        self.branch_prs = []
+        self.forge_commands = []
+        original = ops.run_process
+
+        def run(arguments, root, **kwargs):
+            if arguments[0] != "gh":
+                return original(arguments, root, **kwargs)
+            self.forge_commands.append(arguments)
+            payload = self.pr if arguments[2] == "view" else self.branch_prs
+            return subprocess.CompletedProcess(arguments, 0, json.dumps(payload), "")
+
+        patcher = mock.patch.object(ops, "run_process", side_effect=run)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def ledger(self, pr):
+        path = "plans/work/WORK_PROGRESS.md"
+        self.commit("plans/work/WORK_PLAN.md", "# Work\n", "plan")
+        self.commit("plans/work/WORK_ROADMAP.md", "# Roadmap\n", "roadmap")
+        self.commit(path, "\n".join([
+            "# Work progress", "- Plan: `plans/work/WORK_PLAN.md`",
+            "- Roadmap: `plans/work/WORK_ROADMAP.md`", "- Roadmap item: `work/slice`",
+            f"- Worktree: `{self.root}`", f"- Branch: `{self.git('branch', '--show-current')}`",
+            f"- PR: `{pr}`", "", "## Next Steps", "", "Publish the verified correction.",
+            "Scope: whole plan", "Current slice: repair the existing delivery",
+            "Remaining scope: publish and review", "Done when: the owning review contains the repair",
+        ]) + "\n", "checkpoint")
+        return path
+
+    def test_correction_on_another_branch_routes_to_the_recorded_review(self):
+        ledger = self.ledger(self.url)
+        result = ops.delivery_preflight(self.root, "repair", None, None, ledger)
+        self.assertEqual("integrate", result["ownership"]["action"])
+        self.assertEqual(self.url, result["ownership"]["pr_url"])
+        self.assertEqual("Feature/Delivery", result["ownership"]["branch"])
+        self.assertFalse(result["ready"])
+        self.assertIn("delivery-integrate", result["blockers"])
+        self.assertEqual("view", self.forge_commands[0][2])
+        self.assertEqual(1, len(self.forge_commands))
+
+    def test_handoff_keeps_review_identity_when_execution_moves(self):
+        ledger = self.ledger(self.url)
+        successor = self.root.parent / "successor"
+        self.git("worktree", "add", "-q", "-b", "Fix/Successor", str(successor))
+        path = successor / ledger
+        text = path.read_text(encoding="utf-8").replace("Feature/Workflow-ops", "Fix/Successor")
+        path.write_text(text.replace(str(self.root), str(successor)), encoding="utf-8")
+        result = ops.delivery_preflight(successor, "successor-run", None, None, ledger)
+        self.assertEqual("Fix/Successor", result["identity"]["branch"])
+        self.assertEqual(self.url, result["ownership"]["pr_url"])
+        self.assertEqual("integrate", result["ownership"]["action"])
+
+    def test_separately_assessed_slice_can_create_its_own_review(self):
+        ledger = self.ledger("not opened")
+        result = ops.delivery_preflight(self.root, "new-slice", None, "origin/main", ledger)
+        self.assertEqual("create", result["ownership"]["action"])
+        self.assertTrue(result["ready"])
+        self.assertEqual("list", self.forge_commands[0][2])
+
+    def test_branch_without_a_review_leaves_scope_to_assess(self):
+        result = ops.delivery_preflight(self.root, "unknown", None, "origin/main")
+        self.assertEqual("assess-scope", result["ownership"]["action"])
+        self.assertFalse(result["ready"])
+
+    def test_untracked_document_directory_does_not_obscure_the_ownership_route(self):
+        path = self.root / "plans" / "notes"
+        path.mkdir(parents=True)
+        (path / "WORK PLAN.md").write_text("# Separate notes\n", encoding="utf-8")
+        result = ops.delivery_preflight(self.root, "notes", None, "origin/main")
+        self.assertEqual(["delivery-assess-scope"], result["blockers"])
+        self.assertEqual(["plans/notes/WORK PLAN.md"], result["documentation_dirty_paths"])
+        (path / "script.py").write_text("print('unfinished')\n", encoding="utf-8")
+        result = ops.delivery_preflight(self.root, "mixed", None, "origin/main")
+        self.assertIn("uncommitted-code", result["blockers"])
+        self.assertEqual(["plans/notes/script.py"], result["code_dirty_paths"])
+
+    def test_current_review_is_reused_when_the_ledger_has_not_caught_up(self):
+        ledger = self.ledger("not opened")
+        self.pr["headRefName"] = self.git("branch", "--show-current")
+        self.branch_prs = [self.pr]
+        result = ops.delivery_preflight(self.root, "existing", None, None, ledger)
+        self.assertEqual("update", result["ownership"]["action"])
+        self.assertEqual(self.url, result["ownership"]["pr_url"])
+        self.assertTrue(result["ready"])
+
+    def test_closed_review_is_reconciled_instead_of_replaced(self):
+        self.pr["state"] = "MERGED"
+        result = ops.delivery_preflight(self.root, "closed", None, None, pr_url=self.url)
+        self.assertEqual("reconcile-review", result["ownership"]["action"])
+        self.assertFalse(result["ready"])
+
+    def test_fork_review_requires_reconciliation_even_with_the_same_branch_name(self):
+        self.pr["isCrossRepository"] = True
+        self.pr["headRefName"] = self.git("branch", "--show-current")
+        result = ops.delivery_preflight(self.root, "fork", None, None, pr_url=self.url)
+        self.assertEqual("reconcile-review", result["ownership"]["action"])
+        self.assertFalse(result["ready"])
+
+    def test_conflicting_recorded_owners_require_reconciliation(self):
+        ledger = self.ledger(self.url)
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "owners disagree"):
+            ops.delivery_preflight(self.root, "conflict", None, None, ledger, self.url + "3")
+        self.assertEqual([], self.forge_commands)
+
+    def test_foreign_repository_owner_is_rejected_before_forge_access(self):
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "this repository"):
+            ops.delivery_preflight(self.root, "foreign", None, None,
+                                   pr_url="https://github.com/another/repo/pull/12")
+        self.assertEqual([], self.forge_commands)
+
+    def test_forge_failure_is_not_an_empty_branch_lookup(self):
+        original = ops.run_process
+
+        def unavailable(arguments, root, **kwargs):
+            if arguments[0] == "gh":
+                raise ops.WorkflowOperationError("forge unavailable")
+            return original(arguments, root, **kwargs)
+
+        with mock.patch.object(ops, "run_process", side_effect=unavailable):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "forge unavailable"):
+                ops.delivery_owner(self.root, "offline")
+
+    def test_existing_delivery_binding_resolves_the_review_before_branch_lookup(self):
+        binding = {
+            "repository": "example/workflow-fixture", "pr_url": self.url, "pr_number": 12,
+            "worktree": str(self.root), "branch": "Feature/Delivery", "remote_head_sha": self.base,
+            "pending_evidence": [],
+            "review": {"work_order": "reviews/Feature-Delivery.md",
+                       "work_order_order": ["native-general"], "reviewed_sha": None},
+            "merge_authorization": {"mode": "absent", "instruction": None},
+            "completion_condition": "review completes",
+        }
+        artifact = ops.delivery_runtime.artifact_from_binding(binding)
+        (self.root / ops.delivery_runtime.BINDING_FILE).write_text(json.dumps(artifact), encoding="utf-8")
+        result = ops.delivery_owner(self.root, "bound-correction")
+        self.assertEqual("binding", result["source"])
+        self.assertEqual("integrate", result["action"])
+        self.assertEqual(self.url, result["pr_url"])
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "owners disagree"):
+            ops.delivery_owner(self.root, "conflict", pr_url=self.url + "3")
+
+    def test_recorded_stack_base_is_used_for_preflight(self):
+        self.pr["headRefName"] = self.git("branch", "--show-current")
+        self.pr["baseRefName"] = "Feature/Parent"
+        self.git("update-ref", "refs/remotes/origin/Feature/Parent", self.base)
+        result = ops.delivery_preflight(self.root, "stack", None, None, pr_url=self.url)
+        self.assertTrue(result["ready"])
+        self.assertEqual("Feature/Parent", result["ownership"]["base"])
+
+    def test_cli_returns_a_blocked_exit_for_a_correction_branch(self):
+        ledger = self.ledger(self.url)
+        with mock.patch.object(ops, "emit") as emit:
+            code = ops.main(["--root", str(self.root), "--workflow-run-id", "cli", "delivery-preflight",
+                             "--ledger", ledger])
+        self.assertEqual(1, code)
+        self.assertEqual("integrate", emit.call_args.args[0]["ownership"]["action"])
 
 
 class ChangedPathsTests(RepositoryFixture):
