@@ -1,6 +1,6 @@
 ---
 name: open-claude
-description: Open a Claude Code CLI in a new Windows Terminal tab on an exact directory, optionally resuming a known session, with the full native colour TUI. Use when asked to open a Claude CLI, open a terminal running Claude, or reopen/resume a past conversation in its own window.
+description: Open a Claude Code CLI in a new terminal tab on an exact directory, optionally resuming a known session, with the full native colour TUI. Use when asked to open a Claude CLI, open a terminal running Claude, or reopen/resume a past conversation in its own window.
 
 kind: utility
 domain: machine

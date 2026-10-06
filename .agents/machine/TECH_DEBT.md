@@ -37,3 +37,13 @@ lifetime, or exposes the resolved set so a supervisor can.
 The pin is written by the Claude SessionStart hook only. Codex's `machine-hooks.json` runs
 `register_session.py` and not the reconcile, because the reconcile does not read Codex's cache at all
 (above). Resolving that entry resolves this one with it.
+
+## Launcher terminal detection trusts inherited environment variables
+
+`agent_cli.launch_tab` picks the terminal from `TMUX`, `KITTY_WINDOW_ID` and `KONSOLE_DBUS_WINDOW`.
+A GUI program started from a terminal inherits them, so a launcher run inside, for example, VS Code
+started from Konsole opens its tab in that Konsole window, or fails if the window has closed.
+
+Resolve when detection confirms the variable belongs to the terminal the caller is attached to, for
+example by matching the terminal's own record of its sessions against the caller's process ancestry,
+with a test for an inherited variable.
