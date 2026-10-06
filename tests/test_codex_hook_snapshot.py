@@ -19,6 +19,54 @@ SPEC.loader.exec_module(SNAPSHOT)
 
 
 class CodexHookSnapshotTests(unittest.TestCase):
+    def test_nested_text_binary_and_exclusions_keep_known_integrity_digests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            files = {
+                'nested/deeper/readme': b'end\r',
+                'nested/a.txt': 'café\r\n'.encode('utf-8'),
+                'nested/Z.bin': b'\xff\x00\r\n',
+                'A.txt': b'first\r\nsecond\rthird\n',
+                'catalog/catalog.json': b'catalog\r\n',
+                'hooks/codex.json': b'excluded bytes',
+            }
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            (root / 'empty directory').mkdir()
+            self.assertEqual('sha256:4cae22b1da621db254dd6f8cae7c0e630f64de733ba21a92b739f5173f54cb5d',
+                             SNAPSHOT.digest_tree(root, 'base'))
+            self.assertEqual('sha256:31d98d8abb3e0ea352cb87114db6c920bea86ade05e9ac72c6be9b1177789254',
+                             SNAPSHOT.digest_tree(root, 'machine'))
+
+    def test_file_directory_and_excluded_symbolic_links_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            root = temporary / 'package'
+            root.mkdir()
+            target_file = temporary / 'target.txt'
+            target_file.write_text('target', encoding='utf-8')
+            target_directory = temporary / 'target directory'
+            target_directory.mkdir()
+            for relative, target in [('file-link', target_file),
+                                     ('directory-link', target_directory),
+                                     ('hooks/codex.json', target_file),
+                                     ('catalog/catalog.json', target_file)]:
+                with self.subTest(relative=relative):
+                    link = root / relative
+                    link.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        link.symlink_to(target, target_is_directory=target.is_dir())
+                    except OSError as error:
+                        self.skipTest(f'Symbolic links unavailable: {error}')
+                    try:
+                        with self.assertRaises(SystemExit) as raised:
+                            SNAPSHOT.digest_tree(root, 'machine')
+                        self.assertEqual(2, raised.exception.code)
+                    finally:
+                        link.unlink()
+
     def test_each_generated_command_binds_to_its_package_bytes(self):
         for plugin in ("base", "engineering", "machine"):
             with self.subTest(plugin=plugin):

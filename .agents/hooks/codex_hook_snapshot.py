@@ -16,18 +16,26 @@ def digest_tree(root, plugin):
     excluded = {"hooks/codex.json"}
     if plugin == "machine":
         excluded.add("catalog/catalog.json")
+    files = []
+    directories = [(root, "")]
+    while directories:
+        directory, prefix = directories.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                relative = prefix + entry.name
+                if entry.is_symlink():
+                    fail("Codex hook package contains a symbolic link")
+                if entry.is_dir(follow_symlinks=False):
+                    directories.append((entry.path, relative + "/"))
+                elif entry.is_file(follow_symlinks=False):
+                    files.append((relative, entry.path))
+                else:
+                    fail("Codex hook package contains an unsupported entry")
     digest = hashlib.sha256()
-    for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
-        if path.is_symlink():
-            fail("Codex hook package contains a symbolic link")
-        if path.is_dir():
-            continue
-        if not path.is_file():
-            fail("Codex hook package contains an unsupported entry")
-        relative = path.relative_to(root).as_posix()
+    for relative, path in sorted(files):
         if relative in excluded:
             continue
-        content = path.read_bytes()
+        content = Path(path).read_bytes()
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
