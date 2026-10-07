@@ -270,9 +270,10 @@ def resolve_tab_directory(path):
     """The absolute-but-not-resolved working directory for a tab, validated to exist.
 
     Not .resolve(): on Windows that rewrites a mapped or subst drive to its target, and Claude Code keys a
-    session's history by the directory string it was started in. Shared by launch_tab, open_claude_tab and
-    both Python launchers -- which call it first, before any prompt or lane handling -- so the directory
-    is always validated the same way and the error always names the same absolute path.
+    session's history by the directory string it was started in. Called by both Python launchers first,
+    before any filesystem or lane-table work, so a bad directory is reported before anything else they
+    check; launch_tab calls it again for callers that reach it directly. The error always names the
+    absolute path.
     """
     directory = Path(os.path.abspath(path))
     if not directory.is_dir():
@@ -628,9 +629,7 @@ def open_claude_tab(working_directory, title, arguments, out=print):
 
     Shared by open-claude and handoff-claude so executable discovery, pre-launch standards sync and the
     forced colour environment have one owner. `working_directory` must already be resolved: both
-    launchers call resolve_tab_directory themselves first, before any prompt or lane handling, and
-    launch_tab (below) validates it again as the single remaining owner of that same check -- so a launch
-    validates the directory exactly once, not twice.
+    launchers call resolve_tab_directory first, and launch_tab checks it once more for its direct callers.
     """
     claude = resolve_claude_executable()
     sync_claude_standards(working_directory, claude=claude, out=out)
