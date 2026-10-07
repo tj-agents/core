@@ -207,6 +207,8 @@ class MergeCleanupGateTests(unittest.TestCase):
             'git commit -am "fix a bug; closes #123 | && done"',
             "./cleanup_proof.py --worktree x",
             "& 'C:\\plugins\\peer-cli\\scripts\\finish.ps1'",
+            'cd "' + str(worktree) + '"',
+            "popd",
         ):
             with self.subTest(command=command):
                 result = self.run_hook(self.payload(command, session="s1", cwd=str(worktree)))
@@ -224,6 +226,7 @@ class MergeCleanupGateTests(unittest.TestCase):
             "git stash push -u -m wip", "git rebase --continue", "git restore --staged x.txt",
             "git reset --hard", "gh api repos/org/repo/pulls/1", "gh workflow run ci.yml",
             "gh release create v1", "gh repo view", "echo plan > plan.md && git log",
+            "git worktree list | ForEach-Object { Remove-Item -Recurse $_ }",
         ):
             with self.subTest(command=command):
                 result = self.run_hook(self.payload(command, session="s1", cwd=str(worktree)))
@@ -445,6 +448,23 @@ class MergeCleanupGateTests(unittest.TestCase):
             data = json.loads(obligation_file.read_text(encoding="utf-8"))
             states[Path(data["worktree"]).name] = data["confirmed_merged"]
         self.assertEqual({"first-wt": False, "second-wt": True}, states)
+
+    def test_env_prefixed_and_relative_direct_merges_confirm_their_own_obligation(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        for command in (
+            f'pushd "{worktree}" && GH_REPO=org/repo gh pr merge 3 --squash',
+            f'cd "{worktree}" && gh pr merge --squash',
+        ):
+            with self.subTest(command=command):
+                self.run_hook(self.payload(command, codex=False, session="s1", cwd=str(worktree)))
+                path, _ = self.sole_obligation()
+                self.run_hook({
+                    "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
+                    "cwd": str(self.root), "tool_input": {"command": command}, "tool_response": "",
+                })
+                self.assertTrue(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
+                path.unlink()
 
     def test_failure_payload_error_text_is_read(self):
         bare, primary = init_repo(self.root)
