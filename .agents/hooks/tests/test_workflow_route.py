@@ -29,6 +29,22 @@ PLANNING_INTENT_CASES = (
     ("Continue planning the migration", "plan-authoring", "plan-authoring"),
     ("Implement the plan-authoring fix", "plan-execution", "plan-execution"),
     ("Do not draft a plan; implement it", None, "plan-execution"),
+    ("I want to continue planning the migration", "plan-authoring", "plan-authoring"),
+    ("I want you to only plan the migration", "plan-authoring", "plan-authoring"),
+    ("Please continue with planning only", "plan-authoring", "plan-authoring"),
+    ("Please resume with planning only", "plan-authoring", "plan-authoring"),
+    ("I want to draft the plan only", "plan-authoring", "plan-authoring"),
+    ("I don't want to continue planning the migration", None, None),
+    ("I don’t want you to continue with planning only", None, None),
+    ("I want you not to continue planning the migration", None, None),
+    ("I want you to not continue planning the migration", None, None),
+    ("Don't continue with planning only", None, None),
+    ("We discussed whether I want to only plan the migration", None, None),
+    ("I do not want you to only plan it; implement phase 2 of the plan",
+     "plan-execution", "plan-execution"),
+    ("I want to continue with the plan only", "plan-execution", "plan-execution"),
+    ("I want to implement the plan-authoring fix", "plan-execution", "plan-execution"),
+    ("I never want to only plan it; implement it", None, "plan-execution"),
 )
 
 
