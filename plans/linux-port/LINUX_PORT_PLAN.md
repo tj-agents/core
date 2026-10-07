@@ -43,8 +43,8 @@ what still needs checking on Windows.
   discovery, standards sync, lane lookup, Windows Terminal argument escaping (#106).
 - [x] Kitty remote control in dotfiles, verified from a fresh kitty.
 - [x] 1. CI guard rejects committed catalog digests, so concurrent PRs stop conflicting on them (#107).
-- [ ] 2. `open-claude` -> `scripts/open_claude.py` with the tab handlers; SKILL.md updated; `.ps1`
-  deleted. Verified by opening a real tab in kitty on this machine.
+- [x] 2. `open-claude` -> `scripts/open_claude.py` with the tab handlers; SKILL.md updated; `.ps1`
+  deleted. Verified by opening a real tab in kitty on this machine (#108).
 - [ ] 3. `handoff-claude` -> Python, then `handoff-codex` -> Python (`codex_marketplace_sync.ps1` with it).
   `engineering:handoff` works on Linux from here; verified with a real handoff.
 - [ ] 4. Terminal start hooks: `claude-profile.ps1`/`claude_terminal_profile.py` and `codex-profile.ps1`
@@ -58,9 +58,10 @@ what still needs checking on Windows.
 ## Current progress
 
 Shared library merged (#106, after the interim path fix #105). Kitty configured. Step 1 merged (#107).
-Step 2 on `Feature/OpenClaudePython`: ported, reviewed, review findings fixed; a real kitty tab was
-opened from `open_claude.py` on this machine.
+Step 2 merged (#108): `open-claude` ported, reviewed, review findings fixed; a real kitty tab was opened
+from `open_claude.py` on this machine. Step 3a (`handoff-claude`) on `Feature/HandoffClaudePython`:
+ported to `scripts/launch_claude.py`, `launch-claude.ps1` deleted, tests and SKILL.md updated.
 
 ## Next Steps
 
-Land step 2, then start step 3 (`handoff-claude`).
+Land step 3a, then 3b (`handoff-codex` -> Python, with `codex_marketplace_sync.ps1`).

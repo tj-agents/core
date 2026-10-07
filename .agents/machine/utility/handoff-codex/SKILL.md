@@ -117,12 +117,19 @@ Everything is **cleared**; nothing is forced. `NO_COLOR`, `TERM`, the session-bi
 `CLAUDE_CODE_CHILD_SESSION`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_PID`, the
 `CLAUDE_CODE_MESSAGING_*` pair, and the `WORKBOARD_*` pair.
 
-**`TERM` is cleared here and forced in `handoff-claude`, and that difference is deliberate.** Claude Code
-exports `TERM=xterm-256color`, which suits a Node CLI reading `supports-color`. Codex is a Rust/crossterm
-binary, and on native Windows an unset `TERM` is what selects the console's truecolor path — handing it a
-POSIX terminfo name instead caps the palette at 256 colours and visibly wrecks the theme. `COLORTERM` is
-not set on this machine either, so there is nothing for the leaked `TERM` to be overridden by. Do not
-"align" the two launchers; the runtimes differ, so the correct handling differs.
+**`TERM` is cleared here and forced in `handoff-claude` on Windows, and that difference is deliberate.**
+Claude Code exports `TERM=xterm-256color`, which suits a Node CLI reading `supports-color`. Codex is a
+Rust/crossterm binary, and on native Windows an unset `TERM` is what selects the console's truecolor path
+— handing it a POSIX terminfo name instead caps the palette at 256 colours and visibly wrecks the theme.
+`COLORTERM` is not set on this machine either, so there is nothing for the leaked `TERM` to be overridden
+by. Do not "align" the two launchers; the runtimes differ, so the correct handling differs.
+
+That Windows reasoning is specific to this launcher's current (Windows-only) `agent-cli.ps1` path, not a
+general POSIX rule. `agent_cli.py` -- the shared library behind `open-claude` and `handoff-claude` -- never
+forces or clears `TERM` on POSIX at all, for an unrelated reason: the terminal that actually starts the
+tab sets `TERM` for that session itself, and forcing or clearing it there would fight that. `handoff-codex`
+has not moved to that shared library yet; when it does, its own clearing stops being unconditional in the
+same way.
 
 Only variables observed in a real parent session are listed. Codex's own exported session state has not
 been read from one, so nothing is cleared on a guess.

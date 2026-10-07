@@ -128,10 +128,15 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
         self.git("commit", "-q", "-m", "change")
         home = self.root / "home"
         home.mkdir()
+        review_cache = self.root / "review-cache"
+        review_cache.mkdir()
         self.environment = {key: value for key, value in os.environ.items() if key not in (
             "CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT", "CODEX_HOME", "CLAUDE_CONFIG_DIR",
         )}
-        self.environment.update(HOME=str(home), USERPROFILE=str(home), PYTHONIOENCODING="utf-8")
+        self.environment.update(
+            HOME=str(home), USERPROFILE=str(home), PYTHONIOENCODING="utf-8",
+            TMP=str(review_cache), TEMP=str(review_cache),
+        )
 
     def git(self, *arguments):
         subprocess.run(
