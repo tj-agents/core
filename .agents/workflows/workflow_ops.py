@@ -497,7 +497,8 @@ def review_bundle_locations(root, workflow_run_id, candidate_key):
     root = repository_root(root)
     common = common_git_directory(root)
     temporary = Path(tempfile.gettempdir()).resolve()
-    for protected in (*worktree_roots(root), common):
+    protected_roots = (*worktree_roots(root), common)
+    for protected in protected_roots:
         try:
             temporary.relative_to(protected)
         except ValueError:
@@ -509,8 +510,14 @@ def review_bundle_locations(root, workflow_run_id, candidate_key):
     run_cache = repository_cache / compact_cache_key(os.path.normcase(str(run)))
     directory = run_cache / compact_candidate_key(candidate_key)
     for candidate in (cache, repository_cache, run_cache, directory):
-        if candidate.exists() and (is_redirect(candidate) or not candidate.is_dir()):
+        if is_redirect(candidate) or (candidate.exists() and not candidate.is_dir()):
             raise WorkflowOperationError("review bundle cache contains a redirected or invalid owned directory")
+    for protected in protected_roots:
+        try:
+            directory.resolve().relative_to(protected)
+        except ValueError:
+            continue
+        raise WorkflowOperationError("review bundle cache cannot be inside the checkout or common Git directory")
     private = run / "review" / candidate_key
     for candidate in (run, run / "review", private):
         if candidate.exists() and (is_redirect(candidate) or not candidate.is_dir()):
@@ -624,24 +631,32 @@ def expected_identity(value, path_bytes):
 
 def restore_review_bundle(root, value, locations):
     create_review_bundle_directory(locations)
-    paths_bytes = b"\0".join(item.encode("utf-8", errors="surrogateescape") for item in value["paths"])
-    patch = run_process(
-        ["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False
-    ).stdout
-    if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
-        raise WorkflowOperationError("review patch differs from the repository objects")
-    if hashlib.sha256(paths_bytes).hexdigest() != value["path_digest"]:
-        raise WorkflowOperationError("review path manifest differs from its descriptor")
-    locations["patch"].write_bytes(patch)
-    locations["paths"].write_bytes(paths_bytes)
-    archive = materialize_tree(root, value["head"], locations["tree_archive"], locations["tree"])
-    if hashlib.sha256(archive).hexdigest() != value["tree_archive_sha256"]:
-        raise WorkflowOperationError("review tree archive differs from the repository object")
-    if tree_content_digest(locations["tree"]) != value["tree_content_sha256"]:
-        raise WorkflowOperationError("repository tree differs from the materialized review identity")
-    atomic_json(locations["identity"], expected_identity(value, paths_bytes))
-    if sha256_file(locations["identity"]) != value["bundle"]["identity_sha256"]:
-        raise WorkflowOperationError("review identity manifest differs from its descriptor")
+    try:
+        paths_bytes = b"\0".join(item.encode("utf-8", errors="surrogateescape") for item in value["paths"])
+        patch = run_process(
+            ["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False
+        ).stdout
+        if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
+            raise WorkflowOperationError("review patch differs from the repository objects")
+        if hashlib.sha256(paths_bytes).hexdigest() != value["path_digest"]:
+            raise WorkflowOperationError("review path manifest differs from its descriptor")
+        locations["patch"].write_bytes(patch)
+        locations["paths"].write_bytes(paths_bytes)
+        archive = materialize_tree(root, value["head"], locations["tree_archive"], locations["tree"])
+        if hashlib.sha256(archive).hexdigest() != value["tree_archive_sha256"]:
+            raise WorkflowOperationError("review tree archive differs from the repository object")
+        if tree_content_digest(locations["tree"]) != value["tree_content_sha256"]:
+            raise WorkflowOperationError("repository tree differs from the materialized review identity")
+        atomic_json(locations["identity"], expected_identity(value, paths_bytes))
+        if sha256_file(locations["identity"]) != value["bundle"]["identity_sha256"]:
+            raise WorkflowOperationError("review identity manifest differs from its descriptor")
+    except Exception:
+        if not is_redirect(locations["directory"]):
+            try:
+                shutil.rmtree(locations["directory"])
+            except OSError:
+                pass
+        raise
 
 
 def validate_review_bundle(root, value, locations):
