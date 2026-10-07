@@ -51,6 +51,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'session_close.ps1')
 
 function Resolve-StateDirectory {
     param([string] $Provided)
@@ -122,6 +123,9 @@ function Find-ObligationPaths {
         if (-not $data) { continue }
         if ($SessionId) {
             if ((Get-EntryProperty -Entry $data -Name 'session_id') -eq $SessionId) { $matches.Add($file.FullName) }
+            elseif (Test-TransferredObligationCompleted -Obligation $data -StateDirectory $StateDirectory -ResolvedPrimary $ResolvedWorktree) {
+                $matches.Add($file.FullName)
+            }
             continue
         }
         $recorded = Get-EntryProperty -Entry $data -Name 'worktree'
@@ -169,11 +173,71 @@ function ConvertTo-UnixTime {
 function Test-ProcessExited {
     param([int] $ProcessId, [double] $StartedAt)
 
-    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-    if (-not $process) { return $true }
+    if ($ProcessId -le 0 -or -not (Test-PositiveFiniteNumber $StartedAt)) { return $false }
+    try { $process = Get-Process -Id $ProcessId -ErrorAction Stop }
+    catch {
+        return $_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'
+    }
+    if (-not $process) { return $false }
     $startTime = try { $process.StartTime } catch { $null }
     if ($null -eq $startTime) { return $false }
     return ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - $StartedAt) -gt 2.0)
+}
+
+function Test-PositiveFiniteNumber {
+    param($Value)
+
+    return ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal]) -and
+        [double] $Value -gt 0.0 -and -not [double]::IsNaN($Value) -and -not [double]::IsInfinity($Value)
+}
+
+function Test-TransferredObligationCompleted {
+    param($Obligation, [string] $StateDirectory, [string] $ResolvedPrimary)
+
+    try {
+        $session = Get-EntryProperty $Obligation 'session_id'
+        $transferredBy = Get-EntryProperty $Obligation 'transferred_by'
+        $exitRequired = Get-EntryProperty $Obligation 'session_exit_required'
+        $retained = Get-EntryProperty $Obligation 'checkout_retained'
+        if ($session -isnot [string] -or -not $session -or $transferredBy -isnot [string] -or $transferredBy -cne $session -or
+            -not (Test-PositiveFiniteNumber (Get-EntryProperty $Obligation 'transferred_at')) -or
+            $exitRequired -isnot [bool] -or -not $exitRequired -or $retained -isnot [bool] -or $retained) {
+            return $false
+        }
+        $primary = Get-EntryProperty $Obligation 'primary'
+        $target = Get-EntryProperty $Obligation 'worktree'
+        if ($primary -isnot [string] -or $target -isnot [string] -or
+            -not [IO.Path]::IsPathRooted($primary) -or -not [IO.Path]::IsPathRooted($target)) { return $false }
+        $primaryForm = Get-NormalizedPathForm $primary
+        $targetForm = Get-NormalizedPathForm $target
+        if ($primaryForm -notin @(Get-WorktreeComparisonForms $ResolvedPrimary) -or $targetForm -eq $primaryForm -or
+            (Test-Path -LiteralPath $target -ErrorAction Stop)) { return $false }
+        $inventory = Invoke-Git -Cwd $primary -Arguments @('worktree', 'list', '--porcelain')
+        $registered = @(Get-RegisteredWorktreePaths $inventory.Output)
+        if ($inventory.ExitCode -ne 0 -or $registered.Count -eq 0 -or
+            $primaryForm -notin @(Get-WorktreeComparisonForms $registered[0]) -or
+            (Test-WorktreeStillRegistered -PorcelainOutput $inventory.Output -ResolvedWorktree $target)) { return $false }
+
+        $entries = New-Object System.Collections.Generic.List[object]
+        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $StateDirectory 'cli-sessions') -Filter '*.json' -File -ErrorAction Stop) {
+            $entry = Read-JsonFile $file.FullName
+            if (-not $entry) { return $false }
+            $entrySession = Get-EntryProperty $entry 'session_id'
+            if ($entrySession -is [string] -and $entrySession -ceq $session) { $entries.Add($entry) }
+        }
+        if ($entries.Count -ne 1) { return $false }
+        $entry = $entries[0]
+        $processId = Get-EntryProperty $entry 'pid'
+        $processStart = Get-EntryProperty $entry 'pid_started_at'
+        $registryHost = Get-EntryProperty $entry 'host'
+        $cwd = Get-EntryProperty $entry 'cwd'
+        if (($processId -isnot [int] -and $processId -isnot [long]) -or $processId -le 0 -or $processId -gt [int]::MaxValue -or
+            -not (Test-PositiveFiniteNumber $processStart) -or $registryHost -isnot [string] -or $registryHost -notin @(Get-HostNames) -or
+            $cwd -isnot [string] -or -not [IO.Path]::IsPathRooted($cwd)) { return $false }
+        if (-not (Test-UnderOrEqual -Candidate (Get-NormalizedPathForm $cwd) -Root $targetForm)) { return $false }
+        return Test-ProcessExited -ProcessId $processId -StartedAt $processStart
+    }
+    catch { return $false }
 }
 
 function Get-EnvDouble {
@@ -433,7 +497,7 @@ try {
             status = 'session-closed'
             finished = (Now-Epoch)
         }
-        foreach ($path in @(Find-ObligationPaths -StateDirectory $resolvedState -SessionId $SessionId)) {
+        foreach ($path in @(Find-ObligationPaths -StateDirectory $resolvedState -ResolvedWorktree $Worktree -SessionId $SessionId)) {
             Remove-Item -LiteralPath $path -Force
         }
         return
