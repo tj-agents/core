@@ -48,11 +48,13 @@ wrong thing.
 **The clipboard is volatile and nothing tells you it changed.** Any copy anywhere on the machine
 replaces it — a terminal drag-select most of all, which lands plain text with the terminal's own
 wrapping and indentation baked in and no HTML flavour. A message copied several turns ago is not
-still there. If he says the backticks did not render, do NOT assume you omitted them: re-copy. On
-Windows the script writes and verifies both an HTML flavour and a plain flavour off the live
-clipboard at write time, and exits non-zero if the HTML is missing; on Linux and macOS it writes one
-plain flavour with the markdown kept intact. Either way, a bare "Copied ..." line means it truly
-landed at that moment — not that it survived since.
+still there. If he says the backticks did not render, do NOT assume you omitted them: re-copy. The
+script writes and verifies off the live clipboard at write time, and exits non-zero on a mismatch —
+on Windows both an HTML flavour and a plain flavour; on Linux an HTML flavour by default (via
+`wl-copy` or `xclip`), falling back to plain text with the markdown kept intact when only `xsel` is
+available, and saying so; on macOS always plain text with the markdown kept intact, because `pbcopy`
+has no HTML flavour at all. Either way, a bare "Copied ..." line means it truly landed at that
+moment — not that it survived since.
 
 ## A command Tommy has to run himself
 
