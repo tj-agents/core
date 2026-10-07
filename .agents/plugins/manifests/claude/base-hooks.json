@@ -67,8 +67,12 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "20",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py@Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py@Skill|Bash|PowerShell"
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py",
+              "--harness",
+              "claude",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py"
             ]
           }
         ],

@@ -90,8 +90,11 @@ def check_tier_declaration(payload, problems):
     if data.get("schema_version") == 3:
         validator = runpy.run_path(str(Path(__file__).with_name("tier_gate.py")))["v3_declaration_diagnostics"]
         problems.extend(f"{payload.name}: {item['path']}: {item['message']}"
-                        for item in validator(data))
+                        for item in validator(data, payload_dir=payload))
         return
+    for field in ("employer", "session_context"):
+        if field in data:
+            problems.append(f"{payload.name}: tier.json {field} requires schema_version 3")
     if applies == "stack-present":
         if not isinstance(detect, dict) or not any(detect.get(key) for key in ("files", "globs", "content", "remote")):
             problems.append(f"{payload.name}: tier.json applies=stack-present but detect has no matcher")
