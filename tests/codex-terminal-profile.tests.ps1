@@ -7,7 +7,7 @@ $codexHome = Join-Path $temp 'codex-home'
 $scripts = Join-Path $codexHome 'plugins/cache/base-agents/machine/9.9.9/resources/machine/scripts'
 New-Item -ItemType Directory -Path $bin, $scripts -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex-profile.ps1') -Destination $scripts
-Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.ps1') -Destination $scripts
+Copy-Item -LiteralPath (Join-Path $repository '.agents/machine/scripts/codex_marketplace_sync.py') -Destination $scripts
 $trustStub = @'
 import os
 from pathlib import Path
@@ -30,6 +30,11 @@ switch ($args -join ' ') {
     'exec' { 'LAUNCHED exec' }
     default { throw "Unexpected Codex call: $($args -join ' ')" }
 }
+# codex_marketplace_sync.py runs this fake as its own nested `pwsh -File` child process (it is now a
+# separate Python process rather than codex-profile.ps1's own PowerShell session), so the real process
+# exit code -- what that child process actually returns, not merely this script's own $LASTEXITCODE
+# convention variable -- must be set explicitly for the failed-upgrade case below to reach Python at all.
+exit $global:LASTEXITCODE
 '@
 Set-Content -LiteralPath (Join-Path $bin 'codex.ps1') -Value $fake
 $oldPath = $env:PATH

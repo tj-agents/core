@@ -1,0 +1,211 @@
+"""codex_marketplace_sync.py: a faithful Python port of codex_marketplace_sync.ps1's Sync-CodexStandards,
+exercised against a fake `codex` runner so no real marketplace, plugin or hook-trust call ever happens."""
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / '.agents/machine/scripts/codex_marketplace_sync.py'
+
+SPEC = importlib.util.spec_from_file_location('codex_marketplace_sync', SCRIPT)
+SYNC = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SYNC)
+
+
+def completed(argv, returncode=0, stdout='', stderr=''):
+    return subprocess.CompletedProcess(argv, returncode, stdout=stdout, stderr=stderr)
+
+
+class FakeCodex:
+    """Records every call made to it and answers the same fixed sequence the PowerShell test's
+    Invoke-FakeCodex function did, keyed off the command line rather than call order."""
+
+    def __init__(self, fail_upgrade=False, empty_inventory=False, trust_exit=0):
+        self.calls = []
+        self.fail_upgrade = fail_upgrade
+        self.empty_inventory = empty_inventory
+        self.trust_exit = trust_exit
+        self.trust_calls = []
+
+    def run(self, argv, cwd=None, **kwargs):
+        executable, *arguments = argv
+        if executable == sys.executable:
+            self.trust_calls.append((argv, cwd))
+            if self.trust_exit != 0:
+                return completed(argv, self.trust_exit, stdout='', stderr='trust failed')
+            return completed(argv, 0, stdout='trust tj-agents hooks\n')
+
+        self.calls.append(' '.join(arguments))
+        if arguments == ['plugin', 'marketplace', 'upgrade', '--json']:
+            if self.fail_upgrade:
+                return completed(argv, 1, stdout='upgrade failed')
+            return completed(argv, 0, stdout=json.dumps(
+                {'selectedMarketplaces': ['base-agents'], 'upgradedRoots': ['cache'], 'errors': []}
+            ))
+        if arguments == ['plugin', 'list', '--available', '--json']:
+            if self.empty_inventory:
+                return completed(argv, 0, stdout=json.dumps({'installed': [], 'available': []}))
+            return completed(argv, 0, stdout=json.dumps({
+                'installed': [
+                    {'pluginId': 'base@base-agents', 'enabled': True, 'marketplaceSource': {'sourceType': 'git'}},
+                    {'pluginId': 'local@local', 'enabled': True, 'marketplaceSource': {'sourceType': 'local'}},
+                ],
+                'available': [
+                    {'pluginId': 'engineering@base-agents', 'enabled': True, 'marketplaceSource': {'sourceType': 'git'}},
+                    {'pluginId': 'unused@base-agents', 'enabled': False, 'marketplaceSource': {'sourceType': 'git'}},
+                ],
+            }))
+        if len(arguments) == 4 and arguments[0] == 'plugin' and arguments[1] == 'add':
+            return completed(argv, 0, stdout=json.dumps({'pluginId': arguments[2]}))
+        raise AssertionError(f'Unexpected fake Codex command: {arguments}')
+
+
+class SyncCodexStandardsTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='codex marketplace sync ')
+        self.addCleanup(self.temp.cleanup)
+        self.project = Path(self.temp.name)
+        self.lines = []
+
+    def out(self, line):
+        self.lines.append(line)
+
+    def test_a_full_sync_refreshes_every_enabled_git_plugin_then_trusts_hooks_in_order(self):
+        fake = FakeCodex()
+        selected = SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+
+        self.assertEqual(selected, ['base@base-agents', 'engineering@base-agents'])
+        self.assertEqual(fake.calls, [
+            'plugin marketplace upgrade --json',
+            'plugin list --available --json',
+            'plugin add base@base-agents --json',
+            'plugin add engineering@base-agents --json',
+        ])
+        self.assertEqual(len(fake.trust_calls), 1)
+        self.assertEqual(self.lines, ['trust tj-agents hooks'])
+
+    def test_the_hook_trust_call_uses_the_current_interpreter_and_the_working_directory(self):
+        fake = FakeCodex()
+        SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+        (argv, cwd) = fake.trust_calls[0]
+        self.assertEqual(argv[0], sys.executable)
+        self.assertEqual(argv[1], '-B')
+        self.assertEqual(argv[3:], ['--codex', 'Invoke-FakeCodex', '--project', str(self.project.resolve())])
+        self.assertEqual(cwd, self.project.resolve())
+
+    def test_the_hook_trust_helper_snapshot_is_a_real_file_distinct_from_the_shipped_copy(self):
+        fake = FakeCodex()
+        SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+        (argv, _cwd) = fake.trust_calls[0]
+        snapshot = Path(argv[2])
+        self.assertNotEqual(snapshot, ROOT / '.agents/machine/scripts/codex_hook_trust.py')
+        # The snapshot lived in a temporary directory that is cleaned up once the sync returns.
+        self.assertFalse(snapshot.exists())
+
+    def test_an_empty_plugin_inventory_never_invokes_hook_trust(self):
+        fake = FakeCodex(empty_inventory=True)
+        selected = SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+
+        self.assertEqual(selected, [])
+        self.assertEqual(fake.calls, ['plugin marketplace upgrade --json', 'plugin list --available --json'])
+        self.assertEqual(fake.trust_calls, [])
+
+    def test_a_failed_marketplace_upgrade_blocks_the_rest_of_the_sync(self):
+        fake = FakeCodex(fail_upgrade=True)
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+
+        self.assertIn('upgrade failed', str(raised.exception))
+        self.assertEqual(fake.calls, ['plugin marketplace upgrade --json'])
+        self.assertEqual(fake.trust_calls, [])
+
+    def test_a_marketplace_upgrade_that_reports_errors_in_its_json_also_blocks_the_sync(self):
+        def run(argv, cwd=None, **kwargs):
+            if argv[1:] == ['plugin', 'marketplace', 'upgrade', '--json']:
+                return completed(argv, 0, stdout=json.dumps({'errors': ['offline']}))
+            raise AssertionError('No call beyond the upgrade should happen')
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('upgrade failed', str(raised.exception))
+
+    def test_a_mismatched_plugin_add_response_is_a_sync_error(self):
+        def run(argv, cwd=None, **kwargs):
+            arguments = argv[1:]
+            if arguments == ['plugin', 'marketplace', 'upgrade', '--json']:
+                return completed(argv, 0, stdout=json.dumps({'errors': []}))
+            if arguments == ['plugin', 'list', '--available', '--json']:
+                return completed(argv, 0, stdout=json.dumps({
+                    'installed': [{'pluginId': 'base@base-agents', 'enabled': True,
+                                   'marketplaceSource': {'sourceType': 'git'}}],
+                    'available': [],
+                }))
+            if arguments[:2] == ['plugin', 'add']:
+                return completed(argv, 0, stdout=json.dumps({'pluginId': 'wrong@base-agents'}))
+            raise AssertionError(arguments)
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('wrong@base-agents', str(raised.exception))
+        self.assertIn('base@base-agents', str(raised.exception))
+
+    def test_invalid_json_from_a_sync_command_is_a_sync_error(self):
+        def run(argv, cwd=None, **kwargs):
+            return completed(argv, 0, stdout='not json')
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('invalid JSON', str(raised.exception))
+
+    def test_a_failing_hook_trust_call_is_a_sync_error(self):
+        fake = FakeCodex(trust_exit=1)
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+        self.assertIn('could not trust', str(raised.exception))
+
+    def test_a_missing_hook_trust_helper_is_a_sync_error_before_any_codex_call(self):
+        import unittest.mock as mock
+        fake = FakeCodex()
+        with mock.patch.object(SYNC.Path, 'is_file', return_value=False):
+            with self.assertRaises(SYNC.SyncError) as raised:
+                SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+        self.assertIn('helper missing', str(raised.exception))
+        self.assertEqual(fake.calls, [])
+
+
+class MainCliTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='codex marketplace sync cli ')
+        self.addCleanup(self.temp.cleanup)
+        self.project = Path(self.temp.name)
+
+    def test_a_successful_sync_exits_zero(self):
+        import unittest.mock as mock
+        with mock.patch.object(SYNC, 'sync_codex_standards', return_value=['base@base-agents']) as synced:
+            code = SYNC.main(['--codex', '/bin/codex', '--project', str(self.project)])
+        self.assertEqual(code, 0)
+        synced.assert_called_once()
+        self.assertEqual(synced.call_args.args[0], '/bin/codex')
+
+    def test_a_sync_error_is_reported_and_exits_nonzero(self):
+        import io
+        import contextlib
+        import unittest.mock as mock
+        with mock.patch.object(SYNC, 'sync_codex_standards', side_effect=SYNC.SyncError('boom')):
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                code = SYNC.main(['--codex', '/bin/codex', '--project', str(self.project)])
+        self.assertEqual(code, 1)
+        self.assertIn('boom', err.getvalue())
+
+    def test_codex_and_project_are_required(self):
+        with self.assertRaises(SystemExit):
+            SYNC.main([])
+
+
+if __name__ == '__main__':
+    unittest.main()
