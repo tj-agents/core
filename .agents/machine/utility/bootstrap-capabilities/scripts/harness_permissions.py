@@ -90,7 +90,14 @@ def render_claude_allow(templates: list[str], plugin_root: Path | str) -> list[s
 
 def _render_codex_token(token: Any, plugin_root: Path | str, alternate: bool) -> Any:
     if isinstance(token, list):
-        return [_render_codex_token(item, plugin_root, alternate) for item in token]
+        rendered: list[Any] = []
+        for item in token:
+            result = _render_codex_token(item, plugin_root, alternate)
+            if isinstance(result, list):
+                rendered.extend(result)
+            else:
+                rendered.append(result)
+        return rendered
     if isinstance(token, str) and PLUGIN_ROOT_TOKEN in token:
         root_forward, root_backslash = path_spellings(plugin_root)
         if alternate:

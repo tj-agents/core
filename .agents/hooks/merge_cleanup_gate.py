@@ -52,9 +52,10 @@ CLEANUP_PROOF_RELATIVE = "engineering/workflow/merge/scripts/cleanup_proof.py"
 RESULT_KEYS = ("tool_response", "tool_result", "tool_output")
 
 EXEMPT_RE = re.compile(
-    r'\bgit(?:\s+-C\s+(?:"[^"]*"|\S+))?\s+(?:status|fetch|worktree|branch|checkout|switch|pull|push|rev-parse|log|diff)\b'
-    r'|\bgh\s+pr\s+(?:view|checks|list)\b'
-    r'|\bgh\s+run\s+(?:list|view|watch)\b'
+    r'\bgit(?:\s+-C\s+(?:"[^"]*"|\S+))?\s+(?:status|fetch|worktree|branch|checkout|switch|pull|push|rev-parse|log'
+    r'|diff|add|commit|merge|rebase|restore|stash|tag|show|remote|config|ls-files|ls-remote|cherry-pick|revert'
+    r'|reset|rm|mv)\b'
+    r'|\bgh\s+(?:pr|run|api|workflow|release|repo)\b'
     r'|\b(?:workflow_ops|cleanup_proof|agent_cli|transfer|merge_cleanup_gate)\.py\b'
     r'|\b(?:worktrees|peer-cli|close-tab|launch-codex|launch-claude|finish|finish_reaper)\.ps1\b',
     re.IGNORECASE,
@@ -72,7 +73,7 @@ MESSAGE = (
     "are never blocked.\n"
     "- Merged? Finish Step 6 and the report, then from inside {worktree} run `python -B {cleanup_proof}` "
     "and `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>"
-    "\\scripts\\finish.ps1`, exactly, with no arguments: it closes this CLI and removes the worktree. "
+    "/scripts/finish.ps1`, exactly, with no arguments: it closes this CLI and removes the worktree. "
     "Elsewhere, follow `engineering:merge` Step 5.\n"
     "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
     "`python \"{hook_path}\" --clear \"{worktree}\"`.\n"
@@ -178,18 +179,22 @@ def cwd_matches(cwd, obligation):
     return False
 
 
-def resolve_cleanup_proof_path():
+def resolve_cleanup_proof_path(codex):
     from hook_runtime import own_payload_root
 
     root = own_payload_root(__file__)
+    skill_root = "codex-skills" if codex else "skills"
+    host_entry = root / skill_root / "merge" / "scripts" / "cleanup_proof.py"
+    if host_entry.is_file():
+        return host_entry.as_posix()
     for candidate in (root / ".agents" / CLEANUP_PROOF_RELATIVE, root / CLEANUP_PROOF_RELATIVE):
         if candidate.is_file():
-            return str(candidate)
+            return candidate.as_posix()
     return None
 
 
-def deny_message(obligation):
-    cleanup_proof = resolve_cleanup_proof_path() or "engineering:merge Step 5's cleanup_proof.py"
+def deny_message(obligation, codex):
+    cleanup_proof = resolve_cleanup_proof_path(codex) or "engineering:merge Step 5's cleanup_proof.py"
     recorded_at = obligation.get("recorded_at")
     stamp = (
         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(recorded_at))
@@ -294,7 +299,7 @@ def evaluate_codex_obligation(obligation, session, cwd, now):
     nagged_at = obligation.get("nagged_at")
     if isinstance(nagged_at, (int, float)) and now - nagged_at < nag_cooldown_seconds():
         return None
-    return deny_message(obligation)
+    return deny_message(obligation, True)
 
 
 def codex_enforce(command, data):
@@ -347,18 +352,18 @@ def response_text(data):
     return "\n".join(parts)
 
 
-def handle_posttooluse(data):
-    from git_auth_scope_gate import extract_command
-    from merge_review_gate import is_merge_enable, pr_number
+MERGED_OUTPUT_RE = re.compile(r"merged pull request #?(?P<pr>\d+)", re.IGNORECASE)
+MERGE_STATE_RE = re.compile(r'"state"\s*:\s*"MERGED"|\bMERGED\b', re.IGNORECASE)
+MONITOR_COMMAND_RE = re.compile(
+    r"--id\s+(?P<monitor_pr>\d+)"
+    r"|\bpr\s+view\s+(?P<view_pr>\d+)\b"
+    r"|\bpr\s+checks\s+(?P<checks_pr>\d+)\b"
+    r"|\bpr\s+status\b",
+    re.IGNORECASE,
+)
 
-    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
-    if not command or not is_merge_enable(command):
-        return
-    if "MERGED" not in response_text(data):
-        return
-    pr = pr_number(command)
-    if not pr:
-        return
+
+def confirm_obligation_for_pr(pr):
     for path in iter_obligation_paths():
         obligation = load_obligation(path)
         if obligation is not None and obligation.get("pr") == pr:
@@ -366,12 +371,78 @@ def handle_posttooluse(data):
             save_obligation(path, obligation)
 
 
+def confirm_owning_session_obligations(session, pr):
+    for path in iter_obligation_paths():
+        obligation = load_obligation(path)
+        if obligation is None or obligation.get("session_id") != session:
+            continue
+        if pr is not None and obligation.get("pr") != pr:
+            continue
+        obligation["confirmed_merged"] = True
+        save_obligation(path, obligation)
+
+
+def handle_posttooluse(data):
+    from git_auth_scope_gate import extract_command
+    from merge_review_gate import is_merge_enable, pr_number
+
+    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
+    if not command:
+        return
+    text = response_text(data)
+
+    if is_merge_enable(command):
+        pr = pr_number(command)
+        match = MERGED_OUTPUT_RE.search(text)
+        if pr and match and match.group("pr") == pr:
+            confirm_obligation_for_pr(pr)
+        return
+
+    match = MONITOR_COMMAND_RE.search(command)
+    if not match or not MERGE_STATE_RE.search(text):
+        return
+    session = data.get("session_id") or data.get("sessionId")
+    if not session:
+        return
+    pr = match.group("monitor_pr") or match.group("view_pr") or match.group("checks_pr")
+    confirm_owning_session_obligations(session, pr)
+
+
+def handle_posttoolusefailure(data):
+    from git_auth_scope_gate import extract_command
+    from merge_review_gate import canonical_merge_target_dir, is_merge_enable, merge_target_dir
+
+    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
+    if not command or not is_merge_enable(command):
+        return
+    session = data.get("session_id") or data.get("sessionId")
+    if not session:
+        return
+    target = canonical_merge_target_dir(command) or pushd_target(command) or merge_target_dir(command, data)
+    if not target:
+        return
+    try:
+        worktree = Path(target).resolve()
+    except OSError:
+        return
+    path = obligation_path(worktree)
+    obligation = load_obligation(path)
+    if obligation is not None and obligation.get("session_id") == session:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
 def handle_stop(data):
+    from merge_review_gate import is_codex_invocation
+
     if data.get("stop_hook_active") or data.get("stopHookActive"):
         return
     session = data.get("session_id") or data.get("sessionId")
     if not session:
         return
+    codex = is_codex_invocation(data)
     for path in iter_obligation_paths():
         obligation = load_obligation(path)
         if (
@@ -380,7 +451,7 @@ def handle_stop(data):
             and obligation.get("confirmed_merged")
             and worktree_still_exists(obligation)
         ):
-            json.dump({"decision": "block", "reason": deny_message(obligation)}, sys.stdout)
+            json.dump({"decision": "block", "reason": deny_message(obligation, codex)}, sys.stdout)
             sys.stdout.write("\n")
             return
 
@@ -423,6 +494,17 @@ def handle_reminder(event, data):
         emit(event, "\n".join(reminder_line(obligation) for obligation in matched))
 
 
+def branch_ref_missing(primary, branch):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(primary), "show-ref", "--verify", "--quiet", "refs/heads/" + branch],
+            capture_output=True, text=True, timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 1
+
+
 def should_reconcile(obligation, now):
     worktree = obligation.get("worktree")
     if not isinstance(worktree, str) or not Path(worktree).is_dir():
@@ -431,7 +513,7 @@ def should_reconcile(obligation, now):
     if isinstance(recorded_at, (int, float)) and now - recorded_at > RECONCILE_MAX_AGE_SECONDS:
         return True
     primary, branch = obligation.get("primary"), obligation.get("branch")
-    if primary and branch and git(primary, "show-ref", "--verify", "--quiet", "refs/heads/" + branch) is None:
+    if primary and branch and branch != "HEAD" and branch_ref_missing(primary, branch):
         return True
     return False
 
@@ -487,6 +569,8 @@ def dispatch(argv):
         return handle_pretooluse(data)
     if event == "PostToolUse":
         handle_posttooluse(data)
+    elif event == "PostToolUseFailure":
+        handle_posttoolusefailure(data)
     elif event == "Stop":
         handle_stop(data)
     elif event in ("UserPromptSubmit", "SessionStart"):

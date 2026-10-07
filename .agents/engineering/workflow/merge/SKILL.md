@@ -239,10 +239,11 @@ and branch deletion in the current session.
 Only when the recorded target is a linked worktree, the host is attached to that target, and the target
 differs from the primary checkout, the session closes itself as the delivery's final action, after Step 6,
 any plan close-out and the report. Run gate 1 below, then from inside that worktree run exactly this, with
-no arguments and no leading `&`, because the harness allow rule matches only this string:
+no arguments and no leading `&`, because the harness allow rule matches only this string, written with
+forward slashes since the Bash tool strips backslashes:
 
 ```
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>\scripts\finish.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1
 ```
 
 It verifies the receipt, detaches a reaper that removes the worktree and branch once this session exits, and
