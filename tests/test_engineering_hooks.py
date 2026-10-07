@@ -133,6 +133,32 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertIn(f"engineering:{name} automatically selected", context)
                 self.assertEqual(canonical, context.split("\n\n", 1)[1])
 
+    def test_packaged_planning_intent_distinguishes_execution_and_authoring(self):
+        (self.cwd / "GOAL.md").write_text("# Goal\n\nStatus: in progress\n", encoding="utf-8")
+        for prompt, name in (
+            ("Implement phase 2 of the plan only, not phase 3", "plan-execution"),
+            ("Don’t only plan it, implement it", "plan-execution"),
+            ("Draft the plan without implementing it", "plan-authoring"),
+            ("Please revise the current plan only", "plan-authoring"),
+            ("Continue with the plan only", "plan-execution"),
+            ("Do not implement any changes yet", None),
+            ("Review the plan branch without implementing it", None),
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook("hooks/workflow_route.py", {
+                    "hook_event_name": "UserPromptSubmit", "prompt": prompt,
+                })
+                self.assertEqual(0, result.returncode, result.stderr)
+                if name is None:
+                    self.assertEqual("", result.stdout)
+                else:
+                    context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                    self.assertTrue(context.startswith(f"engineering:{name} automatically selected"))
+                    canonical = (
+                        self.package / f".agents/engineering/workflow/{name}/SKILL.md"
+                    ).read_text(encoding="utf-8").strip()
+                    self.assertEqual(canonical, context.split("\n\n", 1)[1])
+
     def test_host_manifests_register_supported_router_and_red_run_events(self):
         codex = json.loads((self.package / "hooks/codex.json").read_text(encoding="utf-8"))
         claude = json.loads((self.package / "hooks/claude.json").read_text(encoding="utf-8"))
