@@ -61,6 +61,8 @@ Shared library merged (#106, after the interim path fix #105). Kitty configured.
 Step 2 merged (#108): `open-claude` ported, reviewed, review findings fixed; a real kitty tab was opened
 from `open_claude.py` on this machine. Step 3a (`handoff-claude`) on `Feature/HandoffClaudePython`:
 ported to `scripts/launch_claude.py`, `launch-claude.ps1` deleted, tests and SKILL.md updated.
+Step 3b (`handoff-codex` -> Python, with `codex_marketplace_sync.ps1`) in progress on
+`Feature/HandoffCodexPython`.
 
 ## Next Steps
 
