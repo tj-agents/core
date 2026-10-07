@@ -116,6 +116,15 @@ function Get-TerminalTabs {
     }
 }
 
+function Resolve-TabMatches {
+    param([object[]] $Tabs, [string] $Title)
+
+    $exact = @($Tabs | Where-Object { $_.Title -eq $Title })
+    $wildcard = $exact.Count -eq 0
+    $matched = @(if ($wildcard) { $Tabs | Where-Object { $_.Title -like $Title } } else { $exact })
+    return [pscustomobject]@{ Matched = $matched; Wildcard = $wildcard }
+}
+
 function Close-Tab {
     param([object] $Tab)
 
@@ -149,10 +158,9 @@ if ($Json) {
     return
 }
 
-$exact = @($tabs | Where-Object { $_.Title -eq $Title })
-$wildcard = $exact.Count -eq 0
-
-$matched = if ($wildcard) { @($tabs | Where-Object { $_.Title -like $Title }) } else { $exact }
+$resolved = Resolve-TabMatches -Tabs $tabs -Title $Title
+$matched = $resolved.Matched
+$wildcard = $resolved.Wildcard
 
 if ($matched.Count -eq 0) {
     throw "No tab titled '$Title'. Run with -List to see what is open."
