@@ -30,6 +30,33 @@ before generation. Other project settings remain in place. Release commits are s
 the lock, while host settings pin the corresponding GitHub marketplace revision and plugin
 selection.
 
+For per-clone adoption, pass an explicit root and local scope. Local settings generation
+requires Python 3.11 or newer. Preview lists every changed output without writing:
+
+```powershell
+python -B '<skill-directory>\scripts\repo_config.py' `
+  --root C:\path\to\checkout --scope local `
+  --lock C:\path\to\checkout\.agents\capabilities.lock.json --mode preview
+```
+
+Use the same arguments with `--mode write` to apply or `--mode check` to detect drift.
+Local mode writes `.claude/settings.local.json`, `.codex/config.toml`, optional
+`.codex/rules/agent-harness.rules`, and `.agents/repo-capabilities.local.json` ownership
+state. It preserves unrelated native selections, settings and existing approvals, removes
+stale grants it added, and restores prior Claude values when owned selections become stale.
+Changed owned settings and collisions with unmanaged Codex tables fail before writing.
+Keep the ownership state with the clone; deleting it prevents safely updating existing
+managed Codex configuration or rules.
+
+All output paths are checked before mutation. Local mode rejects tracked targets and links
+that escape the explicit root, including links above missing output files. For a Git checkout,
+it maintains exact file exclusions through `git rev-parse --git-path info/exclude`; linked
+worktrees use their actual shared exclusion file. Explicit non-Git workspace roots are supported
+without exclusions. Locks and catalogs remain read inputs; this command does not compose them
+or change their tracking. A later adoption caller can use `plan(..., prospective_paths=[...])`
+or `preflight_paths(...)` to validate its own prospective lock, catalog and receipt paths.
+The default `--scope project` retains the existing project settings contract.
+
 After each repository has adopted its generated project settings, audit the machine before removing
 old user-profile behavior:
 
