@@ -33,3 +33,56 @@ no undeclared payload directory, every `skills/*/SKILL.md` carrying `name:` and 
 front matter, and `INDEX.md`/`selection.json` naming exactly the shipped skills. Every tier
 repository runs it in its own CI, so drift fails that repository's build instead of silently
 shipping a tier the gate cannot see or conventions a review cannot find.
+
+## Version 3 predicates and employer scope
+
+Version 3 uses one positive predicate instead of the legacy matcher arrays. `all` and `any`
+compose predicates; `file`, `glob`, `content`, and `remote` keep the repository detection above.
+`fact` requires scoped evidence and `context` compares a scoped string (`equals`) or list of
+strings (`contains`). Unknown facts, missing contexts and malformed branches produce diagnostics
+and prevent selection, including inside an otherwise matching `any`.
+
+An employer plugin declares a gated tier and the slug of its own shipped context skill:
+
+```json
+{
+  "schema_version": 3,
+  "tier": "example-employer",
+  "applies": "stack-present",
+  "detect": {"remote": "^example-company/"},
+  "employer": {"context_skill": "communication-context"}
+}
+```
+
+`context_skill` is a lowercase local skill slug, not a qualified name or path. The payload must
+ship readable `skills/communication-context/SKILL.md` with matching `name:` and lowercase
+`kind:` front matter. Its resolved path must stay inside that payload. The payload checker and
+runtime validate this contract. Employer metadata is supported only in version 3 and requires
+`applies: "stack-present"` with an ordinary positive detection predicate.
+
+The gate derives the reserved `employer` fact from valid installed employer declarations whose
+predicates genuinely match this project. A missing or malformed declaration, missing or invalid
+context skill, orphaned payload, owner-repository exemption, session override or caller-supplied
+`employer` fact cannot establish employer applicability. Employer predicates cannot reference
+`fact: "employer"` directly or within nested `all`/`any`. Version 3 selection does not use owner
+exemptions or `AGENTS_TIER_OVERRIDE`; versions 1 and 2 retain their existing behavior.
+
+A generic work tier can depend on this fact:
+
+```json
+{
+  "schema_version": 3,
+  "tier": "work",
+  "applies": "stack-present",
+  "detect": {"fact": "employer"},
+  "session_context": "Before drafting a human message, load the matching work:ask-* skill and clip the draft."
+}
+```
+
+`session_context` is an optional nonblank single line on a version 3 tier. SessionStart emits it
+only when that tier applies, including valid `always` tiers. It lists each genuinely matched
+employer's qualified context skill and exact installed `SKILL.md` path. Multiple matching employers
+are all reported; consuming workflows must resolve that ambiguity before choosing employer-specific
+contacts. No employer names are built into core and no per-repository settings or files are required.
+The existing Claude skill invocation and Codex cached skill-read gates refuse the work tier in
+personal projects. This gates application; hosts can still show blocked skills in their listings.
