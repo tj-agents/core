@@ -22,7 +22,8 @@ mispriced or unenforced standard across every
 consumed `tj-agents` plugin on both hosts. If it did, launch `engineering:handoff` in bounded
 side-workstream mode in the same turn under the standing authorization, before the original task resumes.
 An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Existing
-user limits and scope gates still apply.
+user limits and scope gates still apply. Questions ask for reasoning: explain and defend recommendations with
+evidence, change them only for new evidence or a stated user decision, and say what changed.
 
 ## A task has an owning lifecycle — load it before the first edit
 
