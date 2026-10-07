@@ -168,6 +168,23 @@ class SelectionProfilesTests(unittest.TestCase):
             with self.subTest(filename=filename), self.assertRaises(ValueError):
                 self.evaluate(filenames=[filename])
 
+    def test_invalid_scope_roots_raise_instead_of_returning_marker_selections(self):
+        file_root = self.root / 'file-root'
+        file_root.write_text('not a directory')
+        for root in [self.root / 'missing-root', file_root]:
+            for filenames in [[], ['x.cpp']]:
+                with self.subTest(root=root, filenames=filenames), self.assertRaisesRegex(ValueError, 'scope root'):
+                    profiles.evaluate(self.metadata, OWNER, CANDIDATES, root, filenames)
+
+    def test_nul_paths_are_rejected_before_marker_selection_or_document_reading(self):
+        with self.assertRaises(ValueError):
+            self.evaluate(filenames=['x\0.cpp'])
+        self.metadata['document'] = '.agents/skill\0-routes.json'
+        with self.assertRaises(ValueError):
+            profiles.validate_metadata(self.metadata, OWNER, CANDIDATES)
+        with self.assertRaises(ValueError):
+            self.evaluate(filenames=['x.cpp'])
+
 
 if __name__ == '__main__':
     unittest.main()

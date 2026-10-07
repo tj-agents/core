@@ -43,7 +43,8 @@ def _member(value, domain):
 
 
 def _relative(value):
-    _require(isinstance(value, str) and value and "\\" not in value and ":" not in value,
+    _require(isinstance(value, str) and value and "\\" not in value and ":" not in value and
+             "\0" not in value,
              "path must be canonical and relative")
     path = PurePosixPath(value)
     _require(path.parts and not path.is_absolute() and str(path) == value and
@@ -150,8 +151,6 @@ def _resolve(value, path):
 
 
 def _read_document(root, relative):
-    root = Path(root).resolve(strict=True)
-    _require(root.is_dir(), "scope root must be a directory")
     target = root.joinpath(*_relative(relative).parts)
     _require(target.resolve().is_relative_to(root), "document escapes scope root")
     if not target.exists():
@@ -168,6 +167,11 @@ def _read_document(root, relative):
 def evaluate(metadata, owner_package, candidate_ids, scope_root, filenames):
     """Evaluate against an explicit root and a complete list of relative filenames."""
     validate_metadata(metadata, owner_package, candidate_ids)
+    try:
+        scope_root = Path(scope_root).resolve(strict=True)
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
+        raise ValueError("scope root must resolve to an existing directory") from exc
+    _require(scope_root.is_dir(), "scope root must be a directory")
     filenames = sorted({_relative(v).as_posix() for v in filenames})
     markers = metadata["markers"]
     matches = [v for v in filenames if PurePosixPath(v).name in markers["basenames"] or
