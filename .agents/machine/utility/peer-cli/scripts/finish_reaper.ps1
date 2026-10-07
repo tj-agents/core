@@ -102,7 +102,7 @@ function Get-WorktreeComparisonForms {
 }
 
 function Find-ObligationPaths {
-    param([string] $StateDirectory, [string] $ResolvedWorktree)
+    param([string] $StateDirectory, [string] $ResolvedWorktree, [string] $SessionId)
 
     $directory = Join-Path $StateDirectory 'merge-cleanup/obligations'
     if (-not (Test-Path -LiteralPath $directory)) { return @() }
@@ -111,6 +111,10 @@ function Find-ObligationPaths {
     foreach ($file in Get-ChildItem -LiteralPath $directory -Filter '*.json' -File) {
         $data = Read-JsonFile -Path $file.FullName
         if (-not $data) { continue }
+        if ($SessionId) {
+            if ((Get-EntryProperty -Entry $data -Name 'session_id') -eq $SessionId) { $matches.Add($file.FullName) }
+            continue
+        }
         $recorded = Get-EntryProperty -Entry $data -Name 'worktree'
         if (-not $recorded) { continue }
         $recordedForms = @(Get-WorktreeComparisonForms -Path $recorded)
@@ -290,11 +294,8 @@ try {
             status = 'session-closed'
             finished = (Now-Epoch)
         }
-        foreach ($path in @(Find-ObligationPaths -StateDirectory $resolvedState -ResolvedWorktree $Worktree)) {
-            $obligation = Read-JsonFile -Path $path
-            if ((Get-EntryProperty -Entry $obligation -Name 'session_id') -eq $SessionId) {
-                Remove-Item -LiteralPath $path -Force
-            }
+        foreach ($path in @(Find-ObligationPaths -StateDirectory $resolvedState -SessionId $SessionId)) {
+            Remove-Item -LiteralPath $path -Force
         }
         return
     }
