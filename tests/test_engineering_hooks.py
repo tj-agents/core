@@ -24,15 +24,17 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='engineering package with spaces ')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
-        self.package = self.root / 'relocated plugin'
+        self.package = self.root / 'cache' / 'base-agents' / 'engineering' / '2.1.16'
         shutil.copytree(ROOT / 'plugins/engineering', self.package)
         self.cwd = self.root / 'unrelated caller'
         self.cwd.mkdir()
         review_cache = self.root / 'review cache'
         review_cache.mkdir()
+        plugin_data = self.root / 'plugin data'
         self.environment = dict(os.environ, PLUGIN_ROOT=str(self.package),
                                 CLAUDE_PLUGIN_ROOT=str(self.package), PYTHONIOENCODING='utf-8',
-                                TMP=str(review_cache), TEMP=str(review_cache))
+                                TMP=str(review_cache), TEMP=str(review_cache),
+                                PLUGIN_DATA=str(plugin_data))
 
     def run_hook(self, path, data=None, arguments=()):
         payload = dict(cwd=str(self.cwd), session_id=str(uuid.uuid4()),
@@ -41,6 +43,41 @@ class PackagedEngineeringHooks(unittest.TestCase):
         return subprocess.run([sys.executable, '-B', str(self.package / path), *arguments],
                               input=json.dumps(payload), capture_output=True, text=True,
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
+
+    def run_user_prompt_submit(self, host, prompt):
+        manifest = json.loads(
+            (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
+        )
+        hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
+        registration = hooks["hooks"]["UserPromptSubmit"]
+        self.assertEqual(1, len(registration))
+        self.assertEqual(1, len(registration[0]["hooks"]))
+        hook = registration[0]["hooks"][0]
+        if "args" in hook:
+            arguments = [
+                argument.replace("${CLAUDE_PLUGIN_ROOT}", str(self.package))
+                for argument in hook["args"]
+            ]
+        else:
+            command = hook["commandWindows" if os.name == "nt" else "command"].replace(
+                "${PLUGIN_ROOT}", str(self.package)
+            )
+            arguments = None
+        payload = {
+            "cwd": str(self.cwd),
+            "session_id": str(uuid.uuid4()),
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": prompt,
+        }
+        if arguments is None:
+            return subprocess.run(
+                command, shell=True, input=json.dumps(payload), capture_output=True,
+                text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=20,
+            )
+        return subprocess.run(
+            [sys.executable, *arguments], input=json.dumps(payload), capture_output=True,
+            text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=20,
+        )
 
     def test_each_host_context_uses_its_packaged_contract_without_mutating_the_caller(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
@@ -124,6 +161,44 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertNotEqual(before.splitlines()[0], after.splitlines()[0])
         self.assertIn("Canonical source changed.", after)
         self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_user_prompt_registration_dispatches_reminder_and_route_in_one_process(self):
+        reminder = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        router = "hooks/workflow_route.py"
+        cleanup = "hooks/merge_cleanup_gate.py"
+        for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
+            with self.subTest(host=host):
+                manifest = json.loads(
+                    (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
+                )
+                hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
+                registration = hooks["hooks"]["UserPromptSubmit"]
+                self.assertEqual(1, len(registration))
+                self.assertEqual(1, len(registration[0]["hooks"]))
+                command = command_line(registration[0]["hooks"][0])
+                self.assertIn("hook_dispatch.py", command)
+                self.assertLess(command.index(reminder), command.index(router))
+                if host == "codex":
+                    self.assertLess(command.index(router), command.index(cleanup))
+
+                ordinary = self.run_user_prompt_submit(host, "What should I work on?")
+                self.assertEqual(0, ordinary.returncode, ordinary.stderr)
+                ordinary_context = json.loads(ordinary.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("When the user calls out a mistake", ordinary_context)
+
+                (self.cwd / "GOAL.md").write_text(
+                    "# Goal\n\nStatus: in progress\n\nComplete every phase.\n", encoding="utf-8"
+                )
+                routed = self.run_user_prompt_submit(host, "Continue and complete the active goal.")
+                self.assertEqual(0, routed.returncode, routed.stderr)
+                routed_context = json.loads(routed.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("When the user calls out a mistake", routed_context)
+                self.assertIn("engineering:plan-execution automatically selected", routed_context)
+                self.assertLess(
+                    routed_context.index("When the user calls out a mistake"),
+                    routed_context.index("engineering:plan-execution automatically selected"),
+                )
+                (self.cwd / "GOAL.md").unlink()
 
     def test_prompt_context_reports_missing_and_empty_sections(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
