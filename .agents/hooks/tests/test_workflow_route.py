@@ -7,10 +7,45 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import uuid
 
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / ".agents/hooks/workflow_route.py"
+PLANNING_INTENT_CASES = (
+    ("Implement phase 2 of the plan only, not phase 3", "plan-execution", "plan-execution"),
+    ("Don't only plan it, implement it", None, "plan-execution"),
+    ("Don’t only plan it, implement it", None, "plan-execution"),
+    ("Don't only plan it; implement phase 2 of the plan", "plan-execution", "plan-execution"),
+    ("Draft the plan without implementing it", "plan-authoring", "plan-authoring"),
+    ("Draft the plan only", "plan-authoring", "plan-authoring"),
+    ("Please revise the current plan only", "plan-authoring", "plan-authoring"),
+    ("Continue with the plan only", "plan-execution", "plan-execution"),
+    ("Do not implement any changes yet", None, None),
+    ("Review the plan branch without implementing it", None, None),
+    ("Only plan the migration", "plan-authoring", "plan-authoring"),
+    ("Planning only: revise the plan", "plan-authoring", "plan-authoring"),
+    ("Resume planning the migration", "plan-authoring", "plan-authoring"),
+    ("Continue planning the migration", "plan-authoring", "plan-authoring"),
+    ("Implement the plan-authoring fix", "plan-execution", "plan-execution"),
+    ("Do not draft a plan; implement it", None, "plan-execution"),
+    ("I want to continue planning the migration", "plan-authoring", "plan-authoring"),
+    ("I want you to only plan the migration", "plan-authoring", "plan-authoring"),
+    ("Please continue with planning only", "plan-authoring", "plan-authoring"),
+    ("Please resume with planning only", "plan-authoring", "plan-authoring"),
+    ("I want to draft the plan only", "plan-authoring", "plan-authoring"),
+    ("I don't want to continue planning the migration", None, None),
+    ("I don’t want you to continue with planning only", None, None),
+    ("I want you not to continue planning the migration", None, None),
+    ("I want you to not continue planning the migration", None, None),
+    ("Don't continue with planning only", None, None),
+    ("We discussed whether I want to only plan the migration", None, None),
+    ("I do not want you to only plan it; implement phase 2 of the plan",
+     "plan-execution", "plan-execution"),
+    ("I want to continue with the plan only", "plan-execution", "plan-execution"),
+    ("I want to implement the plan-authoring fix", "plan-execution", "plan-execution"),
+    ("I never want to only plan it; implement it", None, "plan-execution"),
+)
 
 
 class WorkflowRouteSelectionTests(unittest.TestCase):
@@ -28,7 +63,8 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
     def run_hook(self, prompt, event="UserPromptSubmit"):
         return subprocess.run(
             [sys.executable, "-B", str(SCRIPT)],
-            input=json.dumps({"hook_event_name": event, "cwd": str(self.cwd), "prompt": prompt}),
+            input=json.dumps({"hook_event_name": event, "cwd": str(self.cwd), "prompt": prompt,
+                              "session_id": str(uuid.uuid4())}),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -46,6 +82,21 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertIn("engineering:plan-execution automatically selected", context)
         self.assertIn("source SHA-256", context)
         self.assertEqual(canonical, context.split("\n\n", 1)[1])
+
+    def test_planning_intent_routes_with_and_without_an_active_goal(self):
+        for active in (False, True):
+            if active:
+                self.write_goal()
+            for prompt, without_goal, with_goal in PLANNING_INTENT_CASES:
+                expected = with_goal if active else without_goal
+                with self.subTest(prompt=prompt, active_goal=active):
+                    result = self.run_hook(prompt)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    if expected is None:
+                        self.assertEqual("", result.stdout)
+                    else:
+                        context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                        self.assertTrue(context.startswith(f"engineering:{expected} automatically selected"))
 
     def test_resume_the_active_plan_routes_as_execution(self):
         self.write_goal()
@@ -238,6 +289,27 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
         self.assertTrue(context.startswith("workflow-route: the UserPromptSubmit hook did not deliver"))
         self.assertIn("engineering:plan-execution automatically selected", context)
         self.assertIsNone(self.run_hook("PreToolUse", tool_name="Bash"))
+
+    def test_planning_intent_recovery_matches_prompt_routing_and_delivers_once(self):
+        for active in (False, True):
+            goal = self.cwd / "GOAL.md"
+            if active:
+                goal.write_text("# Goal\n\nStatus: in progress\n", encoding="utf-8")
+            else:
+                goal.unlink()
+            for prompt, without_goal, with_goal in PLANNING_INTENT_CASES:
+                self.session = str(uuid.uuid4())
+                expected = with_goal if active else without_goal
+                with self.subTest(prompt=prompt, active_goal=active):
+                    self.write_transcript(prompt)
+                    recovered = self.run_hook("PreToolUse", tool_name="Read")
+                    if expected is None:
+                        self.assertIsNone(recovered)
+                    else:
+                        self.assertEqual("PreToolUse", recovered["hookEventName"])
+                        self.assertIn(f"engineering:{expected} automatically selected",
+                                      recovered["additionalContext"])
+                    self.assertIsNone(self.run_hook("PreToolUse", tool_name="Bash"))
 
     def test_a_prompt_without_an_origin_marker_is_still_recovered(self):
         self.write_transcript(self.PROMPT, kind=None)

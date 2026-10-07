@@ -115,6 +115,21 @@ class LaunchCodexTests(unittest.TestCase):
         self.assertIn('--frontier rejects --lane and --model', err)
         self.agent_cli.launch_tab.assert_not_called()
 
+    def test_lane_l7_is_rejected_for_in_session_clerical_work_only(self):
+        code, _, err = self.run_main('--lane', 'L7')
+        self.assertEqual(code, 1)
+        self.assertIn('--lane L7 is for in-session clerical work and cannot open a handoff', err)
+        self.agent_cli.launch_tab.assert_not_called()
+        self.sync.sync_codex_standards.assert_not_called()
+
+    def test_lane_l7_is_rejected_even_with_an_explicit_model(self):
+        # The lane itself is what a handoff can never open, not merely the model it would have paired
+        # with: rejected regardless of whether --model is also given.
+        code, _, err = self.run_main('--lane', 'L7', '--model', 'explicit-model')
+        self.assertEqual(code, 1)
+        self.assertIn('--lane L7 is for in-session clerical work and cannot open a handoff', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
     def test_frontier_still_accepts_an_explicit_reasoning_effort(self):
         self.run_main('--frontier', '--reasoning-effort', 'high')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']

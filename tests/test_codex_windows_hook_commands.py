@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 import unittest
 
+from native_plugin_inventory import empty_native_inventory_environment
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,6 +32,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
         self.assertCountEqual(names, [
             "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
             "forge_poll_gate.py", "compact_output_gate.py", "delivery_binding_gate.py",
+            "merge_cleanup_gate.py",
         ])
 
     def test_every_plugin_uses_host_expanded_plugin_root_and_pretool_adapter(self):
@@ -72,6 +75,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
                 "tool_input": {"command": "*** Begin Patch\n*** Add File: src/probe.cpp\n+int probe = 1;\n*** End Patch"},
             }
             environment = dict(os.environ)
+            environment = empty_native_inventory_environment(root, environment, ("codex",))
             environment.pop("PLUGIN_ROOT", None)
             environment["PLUGIN_DATA"] = str(root / "plugin data")
             codex_profile = root / "codex profile"

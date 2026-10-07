@@ -46,27 +46,29 @@ second tab for the same handoff.
 
 ## Model selection
 
-Pass `--lane L1`–`L7` and the launcher resolves the model from the canonical lane tables it ships under
+Configurable family aliases are rejected for handoffs; pass a full non-Haiku model ID or a supported lane.
+
+Pass `--lane L1`–`L6` and the launcher resolves the model from the canonical lane tables it ships under
 `resources/lanes` — the `engineering:lanes` ladder, and the repo's only model-name owner, so no caller has
 to know a model id and a retiering is one edit in one authored file. `--model` still wins for a model the
-user named outright. Supply neither and the CLI keeps its own configured default, exactly as an
-interactively launched session would.
+user named outright. Handoff never uses the CLI default: choose L1–L6, frontier, or an explicit
+non-Haiku model.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
-lane from the prompt would quietly decide the cost of every handoff. Choose by design, stakes, ambiguity
-and verifiability, from the hardest judgement inside the delegated work — never by how
-hard the work feels, and never raised by a merge, push or publish at its end, which the delivery gates
-govern:
+lane from the prompt would quietly decide the cost of every handoff. Choose the cheapest suitable rung by
+design, stakes, ambiguity and verifiability, from the hardest judgement inside the delegated work — never
+by how hard the work feels, file count, a handoff, or a merge, push or publish at its end, which the
+delivery gates govern:
 
 | Lane | For |
 |---|---|
 | `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
 | `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
 | `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
-| `L4` | Ordinary specified work that a compiler or a test suite will catch, delivery included. |
-| `L5` | Mechanical work whose shape is already decided. |
+| `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
+| `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
-| `L7` | Clerical work with a small input and no judgement to make. |
+| `L7` | In-session clerical work only; this launcher refuses it. |
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
@@ -98,20 +100,21 @@ A calling skill or workflow that ships its own resolved selection may still pass
 that wins over `--lane`. What is no longer acceptable is inventing a model id (or, per above, an
 unpaired effort) at the call site.
 
+The launcher requires `--lane L1`–`L6`, `--frontier`, or an explicit non-Haiku `--model`. It rejects L7
+and every Haiku family ID or alias before launch, and never trusts the hidden CLI default.
+
 Launch with `scripts/launch_claude.py`, beside this file:
 
 ```sh
-python3 '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
+python3 '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>' --lane '<L1..L6>'
 ```
 
 Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
-Add `--lane '<L1..L7>'` (or `--frontier`) to have the launcher resolve the model and, where the table
+Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve the model and, where the table
 prices one, its effort, or `--model '<model-id>'` for a model the user named outright, optionally paired
-with `--effort '<level>'` for that exact model (never with `--lane` or `--frontier`; see above). Omitting
-them all lets the CLI fall back to its own configured default — the same behavior an interactively
-launched session gets.
+with `--effort '<level>'` for that exact model (never with `--lane` or `--frontier`; see above).
 
 Add `--dangerously-skip-permissions` **only when the user asks for it in that request**. It disables every
 permission prompt in the new window, so it is never a default and never inferred from the repository
