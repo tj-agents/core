@@ -88,9 +88,10 @@ def main(argv=None):
     try:
         args = parse_args(argv, agent_cli)
 
-        # Validated first, before any prompt handling: whichever is wrong, the directory is the one thing
-        # every other step here depends on, and its error should never be shadowed by a later check that
-        # only looked irrelevant.
+        # parse_args already rejected any argparse-level contradiction (--resume with --continue, a prompt
+        # too long, etc.). What happens here is the first filesystem work, so the directory is checked
+        # before any of it -- whichever of it is also wrong, the directory's error is never shadowed by a
+        # later check that only looked irrelevant.
         working_directory = agent_cli.resolve_tab_directory(args.working_directory)
 
         arguments = build_arguments(args, agent_cli)
