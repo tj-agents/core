@@ -61,7 +61,7 @@ class RepositoryPermissionTests(unittest.TestCase):
     def test_every_ci_verify_command_is_allowed_for_both_shells(self):
         commands = verify_job_commands()
 
-        self.assertEqual(20, len(commands))
+        self.assertEqual(21, len(commands))
         for command in commands:
             with self.subTest(command=command):
                 self.assertTrue(self.auto_approved("PowerShell", command))

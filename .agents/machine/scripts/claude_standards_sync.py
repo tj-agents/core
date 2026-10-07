@@ -425,6 +425,20 @@ def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, exe
     return int(bool(problems))
 
 
+def apply_harness_permissions() -> None:
+    package_root = Path(__file__).resolve().parents[3]
+    script = package_root / ".agents" / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "harness_permissions_sync.py"
+    if not script.is_file():
+        return
+    try:
+        subprocess.run(
+            [sys.executable, "-B", str(script), "--apply"],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path.cwd())
@@ -433,7 +447,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     config = config_root(os.environ)
     try:
-        return synchronize(
+        code = synchronize(
             config,
             plugins_root(config, os.environ),
             arguments.project.resolve(),
@@ -443,7 +457,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     except Exception as error:  # noqa: BLE001
         print(f"standards: sync failed ({error}); this session loads the installed plugins")
-        return 1
+        code = 1
+    apply_harness_permissions()
+    return code
 
 
 if __name__ == "__main__":

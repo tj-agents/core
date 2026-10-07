@@ -25,6 +25,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($Lane -eq 'L7') {
+    throw '-Lane L7 is for in-session clerical work and cannot open a handoff.'
+}
+
 # The shared launch primitives, from the authored source layout or the installed package layout.
 $agentCli = @(
     (Join-Path $PSScriptRoot '../../../scripts/agent-cli.ps1'),
