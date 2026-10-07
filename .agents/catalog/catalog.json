@@ -373,6 +373,7 @@
             "auto-memory",
             "bootstrap-capabilities",
             "clip",
+            "create-credential",
             "followup-codex",
             "handoff-claude",
             "handoff-codex",
@@ -395,6 +396,7 @@
               "exe:powershell",
               "exe:codex",
               "exe:claude",
+              "exe:gh",
               "windows-terminal"
             ]
           },
