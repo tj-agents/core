@@ -123,6 +123,24 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
 
+    def test_callout_checks_standards_before_an_apology(self):
+        instructions = authored_skill("session-guidance").read_text(encoding="utf-8")
+        section = " ".join(
+            instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
+        )
+
+        self.assertTrue(section.startswith("When the user calls out a mistake, before apologizing"))
+        self.assertLess(section.index("before apologizing"), section.index("An apology"))
+        for phrase in (
+            "missing, ambiguous, contradictory, mispriced or unenforced",
+            "every consumed `tj-agents` plugin on both hosts",
+            "`engineering:handoff` in bounded side-workstream mode in the same turn",
+            "SendFeedback draft or local memory does not substitute",
+            "Existing user limits and scope gates still apply",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
     def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
         body = authored_skill("plan-execution").read_text(
             encoding="utf-8"
