@@ -224,6 +224,19 @@ function Resolve-OwnHost {
     return $null
 }
 
+function Test-OnlyHostAndConsoleChildren {
+    param([int] $ParentPid, [int] $HostPid)
+
+    $consoleStems = @('conhost', 'openconsole')
+    $children = @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $ParentPid" -ErrorAction SilentlyContinue)
+    foreach ($child in $children) {
+        if ([int] $child.ProcessId -eq $HostPid) { continue }
+        $childStem = [IO.Path]::GetFileNameWithoutExtension($child.Name).ToLowerInvariant()
+        if ($consoleStems -notcontains $childStem) { return $false }
+    }
+    return $true
+}
+
 function Get-ParentShellHost {
     param([pscustomobject] $OwnHost)
 
@@ -233,9 +246,13 @@ function Get-ParentShellHost {
     if (-not $parent) { return $null }
     $stem = [IO.Path]::GetFileNameWithoutExtension($parent.Name).ToLowerInvariant()
     if ($ShellProcessNames -notcontains $stem) { return $null }
+    $parentStarted = ConvertTo-UnixTime -Value $parent.CreationDate
+    $delta = $OwnHost.Started - $parentStarted
+    if ($delta -lt 0 -or $delta -gt 10.0) { return $null }
+    if (-not (Test-OnlyHostAndConsoleChildren -ParentPid ([int] $parent.ProcessId) -HostPid $OwnHost.Pid)) { return $null }
     return [pscustomobject]@{
         Pid     = [int] $parent.ProcessId
-        Started = ConvertTo-UnixTime -Value $parent.CreationDate
+        Started = $parentStarted
     }
 }
 
@@ -248,6 +265,24 @@ function Stop-VerifiedProcess {
     if ($null -eq $startTime) { return }
     if ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - $Target.Started) -gt 2.0) { return }
     Stop-Process -Id $Target.Pid -Force
+}
+
+function Stop-WrapperThenHost {
+    param([pscustomobject] $OwnHost, [pscustomobject] $ParentShell)
+
+    if ($ParentShell) { Stop-VerifiedProcess -Target $ParentShell }
+    Stop-VerifiedProcess -Target $OwnHost
+}
+
+function Test-ProcessVerifiedLive {
+    param($ProcessId, $StartedAt)
+
+    if ($null -eq $ProcessId -or $null -eq $StartedAt) { return $false }
+    $process = Get-Process -Id ([int] $ProcessId) -ErrorAction SilentlyContinue
+    if (-not $process) { return $false }
+    $startTime = try { $process.StartTime } catch { $null }
+    if ($null -eq $startTime) { return $false }
+    return ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - [double] $StartedAt) -le 2.0)
 }
 
 function Get-RecordedSessionEntries {
@@ -280,17 +315,28 @@ function Get-TitleAndAttachment {
     )
 
     $selfEntry = Get-OwnRegistryEntry -OwnHost $OwnHost
-    if ($selfEntry) {
-        $selfCwd = Get-EntryProperty -Entry $selfEntry -Name 'cwd'
-        return [pscustomobject]@{
-            Attached = (Test-UnderOrEqual -Candidate $selfCwd -Root $ResolvedWorktree)
-            Title    = Get-EntryProperty -Entry $selfEntry -Name 'title'
-        }
-    }
+    $selfCwd = if ($selfEntry) { Get-EntryProperty -Entry $selfEntry -Name 'cwd' } else { $null }
+    $attached = (Test-UnderOrEqual -Candidate $StartingLocation -Root $ResolvedWorktree) -or
+        (Test-UnderOrEqual -Candidate $selfCwd -Root $ResolvedWorktree)
     return [pscustomobject]@{
-        Attached = (Test-UnderOrEqual -Candidate $StartingLocation -Root $ResolvedWorktree)
-        Title    = $null
+        Attached = $attached
+        Title    = if ($selfEntry) { Get-EntryProperty -Entry $selfEntry -Name 'title' } else { $null }
     }
+}
+
+function Test-OtherLiveSessionClaimsWorktree {
+    param([string] $ResolvedWorktree, [pscustomobject] $OwnHost)
+
+    foreach ($entry in (Get-RecordedSessionEntries)) {
+        $entryPid = Get-EntryProperty -Entry $entry -Name 'pid'
+        $entryStart = Get-EntryProperty -Entry $entry -Name 'pid_started_at'
+        if ($entryPid -eq $OwnHost.Pid -and $null -ne $entryStart -and
+            [math]::Abs([double] $entryStart - $OwnHost.Started) -le 2.0) { continue }
+        $entryCwd = Get-EntryProperty -Entry $entry -Name 'cwd'
+        if (-not (Test-UnderOrEqual -Candidate $entryCwd -Root $ResolvedWorktree)) { continue }
+        if (Test-ProcessVerifiedLive -ProcessId $entryPid -StartedAt $entryStart) { return $true }
+    }
+    return $false
 }
 
 function Test-SingleRegistryEntryWithTitle {
@@ -303,14 +349,53 @@ function Test-SingleRegistryEntryWithTitle {
     return $count -eq 1
 }
 
+function ConvertFrom-TabListingJson {
+    param([string] $Text)
+
+    if (-not $Text -or -not $Text.Trim()) { return @() }
+    try { return @(ConvertFrom-Json -InputObject $Text | ForEach-Object { $_ }) } catch { return @() }
+}
+
+function Test-SingleLiveTabInListing {
+    param([object[]] $Tabs, [string] $Title)
+
+    $found = @($Tabs | Where-Object { $_.title -eq $Title })
+    return $found.Count -eq 1
+}
+
+function Get-LiveTerminalTabs {
+    $output = & (Join-Path $PSScriptRoot 'close-tab.ps1') -Json 2>$null
+    $text = (@($output) | ForEach-Object { [string] $_ }) -join "`n"
+    return (ConvertFrom-TabListingJson -Text $text)
+}
+
 function Test-SingleLiveTabWithTitle {
     param([string] $Title)
 
-    $output = & (Join-Path $PSScriptRoot 'close-tab.ps1') -List 2>$null
-    $lines = @($output | ForEach-Object { [string] $_ })
-    $pattern = '^\s*' + [regex]::Escape($Title) + '\s+\S+\s+\d+\s*$'
-    $matches = @($lines | Where-Object { $_ -match $pattern })
-    return $matches.Count -eq 1
+    return (Test-SingleLiveTabInListing -Tabs (Get-LiveTerminalTabs) -Title $Title)
+}
+
+function Invoke-SessionClose {
+    param(
+        [string] $CloseMode,
+        [pscustomobject] $Attachment,
+        [pscustomobject] $OwnHost,
+        [pscustomobject] $ParentShell
+    )
+
+    if ($CloseMode -eq 'process') {
+        Stop-WrapperThenHost -OwnHost $OwnHost -ParentShell $ParentShell
+        Write-Output "finish: closed host pid $($OwnHost.Pid) directly (AGENT_FINISH_CLOSE_MODE=process)."
+        return
+    }
+    if ($Attachment.Title -and
+        (Test-SingleRegistryEntryWithTitle -Title $Attachment.Title) -and
+        (Test-SingleLiveTabWithTitle -Title $Attachment.Title)) {
+        & (Join-Path $PSScriptRoot 'close-tab.ps1') $Attachment.Title -Force
+        return
+    }
+    Stop-WrapperThenHost -OwnHost $OwnHost -ParentShell $ParentShell
+    Write-Output "finish: closed host pid $($OwnHost.Pid) directly (no uniquely identified tab to close)."
 }
 
 function Format-CommandLineArgument {
@@ -378,6 +463,9 @@ $attachment = Get-TitleAndAttachment -ResolvedWorktree $resolvedWorktree -Starti
 if (-not $attachment.Attached) {
     throw "finish: '$resolvedWorktree' is not this session's own attachment; refusing to close or remove it."
 }
+if (Test-OtherLiveSessionClaimsWorktree -ResolvedWorktree $resolvedWorktree -OwnHost $ownHost) {
+    throw "finish: another live registered session's cwd is under '$resolvedWorktree'; refusing to close or remove it."
+}
 
 $parentShell = Get-ParentShellHost -OwnHost $ownHost
 
@@ -428,19 +516,4 @@ if (-not $started) {
     throw "finish: the reaper did not confirm it started within $spawnTimeoutSeconds seconds; nothing was closed."
 }
 
-$closeMode = $env:AGENT_FINISH_CLOSE_MODE
-if ($closeMode -eq 'process') {
-    Stop-VerifiedProcess -Target $ownHost
-    if ($parentShell) { Stop-VerifiedProcess -Target $parentShell }
-    Write-Output "finish: closed host pid $($ownHost.Pid) directly (AGENT_FINISH_CLOSE_MODE=process)."
-}
-elseif ($attachment.Title -and
-    (Test-SingleRegistryEntryWithTitle -Title $attachment.Title) -and
-    (Test-SingleLiveTabWithTitle -Title $attachment.Title)) {
-    & (Join-Path $PSScriptRoot 'close-tab.ps1') $attachment.Title -Force
-}
-else {
-    Stop-VerifiedProcess -Target $ownHost
-    if ($parentShell) { Stop-VerifiedProcess -Target $parentShell }
-    Write-Output "finish: closed host pid $($ownHost.Pid) directly (no uniquely identified tab to close)."
-}
+Invoke-SessionClose -CloseMode $env:AGENT_FINISH_CLOSE_MODE -Attachment $attachment -OwnHost $ownHost -ParentShell $parentShell

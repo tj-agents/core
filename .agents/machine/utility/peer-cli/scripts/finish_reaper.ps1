@@ -99,12 +99,13 @@ function Get-WorktreeComparisonForms {
     return $forms
 }
 
-function Find-ObligationPath {
+function Find-ObligationPaths {
     param([string] $StateDirectory, [string] $ResolvedWorktree)
 
     $directory = Join-Path $StateDirectory 'merge-cleanup/obligations'
-    if (-not (Test-Path -LiteralPath $directory)) { return $null }
+    if (-not (Test-Path -LiteralPath $directory)) { return @() }
     $targetForms = @(Get-WorktreeComparisonForms -Path $ResolvedWorktree)
+    $matches = New-Object System.Collections.Generic.List[string]
     foreach ($file in Get-ChildItem -LiteralPath $directory -Filter '*.json' -File) {
         $data = Read-JsonFile -Path $file.FullName
         if (-not $data) { continue }
@@ -112,10 +113,10 @@ function Find-ObligationPath {
         if (-not $recorded) { continue }
         $recordedForms = @(Get-WorktreeComparisonForms -Path $recorded)
         foreach ($form in $recordedForms) {
-            if ($targetForms -contains $form) { return $file.FullName }
+            if ($targetForms -contains $form) { $matches.Add($file.FullName); break }
         }
     }
-    return $null
+    return $matches
 }
 
 function Get-RegisteredWorktreePaths {
@@ -310,8 +311,7 @@ try {
         }
     }
 
-    $obligationPath = Find-ObligationPath -StateDirectory $resolvedState -ResolvedWorktree $Worktree
-    if ($obligationPath) {
+    foreach ($obligationPath in @(Find-ObligationPaths -StateDirectory $resolvedState -ResolvedWorktree $Worktree)) {
         try { Remove-Item -LiteralPath $obligationPath -Force } catch { }
     }
 }
