@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -198,7 +199,10 @@ def preflight_paths(root: Path, paths: list[Path], *, scope: str = "local", read
     root = root.expanduser().resolve()
     if not root.is_dir():
         raise bootstrap.BootstrapError(f"Repository root does not exist: {root}")
+    lexical_targets = [Path(os.path.abspath(path if path.is_absolute() else root / path)) for path in paths]
     targets = [contained(root, path) for path in paths]
+    if any(not path.is_relative_to(root) for path in lexical_targets):
+        raise bootstrap.BootstrapError("Target escapes repository root")
     exclude = None
     if not (root / ".git").exists():
         if any((parent / ".git").exists() for parent in root.parents):
@@ -208,7 +212,7 @@ def preflight_paths(root: Path, paths: list[Path], *, scope: str = "local", read
         if top != root:
             raise bootstrap.BootstrapError(f"Root is not the exact Git checkout: {root}")
         if scope == "local":
-            tracked_paths = sorted({relative for path in targets for relative in (path.relative_to(root).as_posix(), path.resolve().relative_to(root).as_posix())})
+            tracked_paths = sorted({relative for lexical, target in zip(lexical_targets, targets) for relative in (lexical.relative_to(root).as_posix(), target.relative_to(root).as_posix(), target.resolve().relative_to(root).as_posix())})
             tracked = bootstrap.git(run, ["ls-files", "--cached", "-z", "--", *tracked_paths], root)
             if tracked:
                 raise bootstrap.BootstrapError("Local targets are tracked: " + tracked.replace("\0", ", "))
