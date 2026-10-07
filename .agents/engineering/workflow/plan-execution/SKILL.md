@@ -103,10 +103,11 @@ it, or the next material checkpoint falls due.
 ## Run the continuous loop
 
 1. Reconcile stale material facts. For a project selecting the Concertable pre-launch profile, run
-   `python .agents/hooks/plan_graph.py --root . --plan <repo-relative *_PLAN.md>` before selecting or acting on
-   a phase. The selected plan is one input to the same pre-launch guard that governs every write. When it
+   Concertable's own adapter CLI before selecting or acting on
+   a phase; the selected plan is one input to the same pre-launch guard that governs every write. When it
    conflicts, correct it immediately to the direct replacement-and-deletion outcome and do not execute the
-   rejected phase. Validate the remaining plan graph and repository checkpoint before relying on recovery state.
+   rejected phase. Run `python -B .agents/hooks/plan_graph.py --root .` to validate the remaining plan graph
+   and repository checkpoint before relying on recovery state.
    Other repositories validate dependencies and checkpoints under their own selected policies, preserving published compatibility windows; they do not implicitly select the Concertable profile.
 2. Apply `engineering:git-branching` before implementation and at each scope expansion. Check the current
    PR's measured size against its recorded delivery slice. Split large dependent work into a stack,
