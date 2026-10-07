@@ -18,6 +18,8 @@ or a reprice is a one-file change per harness and every consumer inherits it. Th
 
 L1 is the most capable rung and L7 the cheapest. The same `LN` means the same *relative* capability on
 both harnesses, which is the whole point: one declaration, two resolutions.
+Relative capability does not require the same exact model family: paired rungs have the same role and price
+ordering even when a harness's available families differ.
 
 | Lane | For | Resolves to |
 |---|---|---|
@@ -123,6 +125,10 @@ not a lane change.
   launcher takes `--lane` (or `--frontier`); `machine:handoff-codex` still takes `-Lane` (or `-Frontier`)
   until its own Python port lands. Either way the calling agent judges the lane by the four questions and
   the launcher only prices it, never inferring one from the prompt.
+
+L7 is in-session clerical work only. Both handoff launchers reject it before opening a tab. Claude handoff
+also requires an explicit L1–L6 lane, frontier tier, or non-Haiku model, because an unchecked CLI default
+could otherwise select Haiku.
 
 ## Where the two ladders are not level — know these before trusting parity
 

@@ -45,6 +45,8 @@ session continues its independent active task.
    cheapest suitable lane for the remaining work per `engineering:lanes`. A merge, handoff, file count or
    delivery operation does not raise it: use L5 for small already-decided file deletion or move, config or
    docs cleanup, and L4 only for specified implementation that still needs code-level judgement.
+   L7 is in-session only and cannot open either handoff launcher. Claude handoff also requires an explicit
+   L1–L6 lane, frontier tier, or non-Haiku model; never leave that choice to the CLI default.
    Record the lane and a one-line reason beside the next action in the goal.
    Never launch a second successor because startup is slow or acknowledgement is delayed.
 4. Stop owned-path writes before invoking the launcher. Verify the launch result. A definite failure

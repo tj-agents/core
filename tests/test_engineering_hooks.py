@@ -109,6 +109,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertIn("source SHA-256", context)
                 self.assertNotIn(heading, context)
                 self.assertEqual(expected, context.split("\n\n", 1)[1])
+                self.assertIn("Questions ask for reasoning", context)
+                self.assertIn("only for new evidence or a stated user decision", context)
                 self.assertNotIn("## A task has an owning lifecycle", context)
                 self.assertLess(len(context), 1200)
 

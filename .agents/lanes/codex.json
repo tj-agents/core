@@ -55,7 +55,7 @@
       "model": "gpt-6-luna",
       "reasoning_effort": "low",
       "context_ceiling": null,
-      "why": "the small family at low effort. Clerical work with a small input: commit, push, pull, sync, one poll."
+      "why": "the small family at low effort. In-session clerical work with a small input: commit, push, pull, sync, one poll. Handoff launchers reject this rung."
     }
   },
 

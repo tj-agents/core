@@ -22,7 +22,7 @@ checkout.
 
 ## Model selection
 
-Pass `-Lane L1`–`L7` and the launcher resolves the model *and its reasoning effort* from the canonical
+Pass `-Lane L1`–`L6` and the launcher resolves the model *and its reasoning effort* from the canonical
 lane tables it ships under `resources/lanes` — the `engineering:lanes` ladder, and the repo's only
 model-name owner, so no caller has to know a model id and a retiering is one edit in one authored file.
 The pair matters here: a Codex model is priced and paced by both. An explicit `-Model` or
@@ -43,7 +43,7 @@ delivery gates govern:
 | `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
 | `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
-| `L7` | Clerical work with a small input and no judgement to make. |
+| `L7` | In-session clerical work only; this launcher refuses it. |
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
@@ -67,7 +67,7 @@ Launch with `scripts/launch-codex.ps1`, beside this file:
 & '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
 ```
 
-Add `-Lane '<L1..L7>'` (or `-Frontier`) to have the launcher resolve model and effort, or `-Model
+Add `-Lane '<L1..L6>'` (or `-Frontier`) to have the launcher resolve model and effort, or `-Model
 '<model-id>'` and `-ReasoningEffort '<level>'` for values the user named. Omitting them all lets
 `codex.exe` fall back to its own configured default — the same behavior an interactively launched
 session gets.
