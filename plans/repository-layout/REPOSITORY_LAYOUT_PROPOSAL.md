@@ -286,7 +286,7 @@ if caller_git == common:
         raise Refusal('Separately relocated primary Git directories are unsupported')
 elif caller_git.parent != common / 'worktrees':
     raise Refusal('The caller is not a conventional linked worktree')
-elif Path((caller_git / 'gitdir').read_text().strip()).resolve() != caller_root / '.git':
+elif (caller_git / (caller_git / 'gitdir').read_text().strip()).resolve() != caller_root / '.git':
     raise Refusal('Linked worktree registration does not match the caller')
 if common.name != '.git' or git(repository, 'rev-parse', '--is-bare-repository') != 'false':
     raise Refusal('An ordinary non-bare repository with its common .git directory is required')
@@ -302,7 +302,9 @@ target = repository / '.worktrees' / branch.replace('/', '-')
 The caller identity check must precede probing the common directory's parent: Git can infer that
 parent as a worktree even when a relocated primary lives elsewhere. Require the caller's resolved
 top-level path and Git directory to agree with its worktree registration. For a linked caller, verify
-both directions of its `.git` pointer and administrative `gitdir` file. Git does not retain enough
+both directions of its `.git` pointer and administrative `gitdir` file, resolving relative targets
+from the directory containing each pointer, including Git's relative-worktree configuration.
+Git does not retain enough
 metadata to distinguish every separately relocated primary through a linked caller; that layout is
 outside this helper's supported contract, and these checks do not claim universal detection of it.
 
