@@ -191,7 +191,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:03b2eed0cd13de950003ad4707008f3c3395998885e97bff78fa59d7ecd0df4e",
+          "digest": "sha256:febcf83860b8529ca8a13ffc221d27d04069243943d83c46a6f1c1f661f422fe",
           "harness": {
             "marketplaces": [
               {
@@ -333,7 +333,7 @@
                       "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
                     ]
                   ],
-                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before any cleanup",
+                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
                   "match": [
                     [
                       "python",
@@ -398,7 +398,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:ccc1edd17234cef718a9cb73c205e6d3522170327bf5b366aafa935661ca021b",
+          "digest": "sha256:058c8fcd9989386f2d36bcfe03f46af6408b5d7874a73ad876a325be56ac517e",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -465,7 +465,11 @@
                 "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
                 "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
                 "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)",
-                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)"
+                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)",
+                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1)",
+                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1)",
+                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1)",
+                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1)"
               ],
               "codex_prefix_rules": [
                 {
@@ -511,6 +515,52 @@
                       "-NoProfile",
                       "-File",
                       "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "powershell",
+                      "powershell.exe",
+                      "pwsh",
+                      "pwsh.exe"
+                    ],
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1",
+                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.ps1"
+                    ]
+                  ],
+                  "justification": "Close only this verified completed CLI session while retaining its checkout",
+                  "match": [
+                    [
+                      "powershell",
+                      "-NoProfile",
+                      "-ExecutionPolicy",
+                      "Bypass",
+                      "-File",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1"
+                    ],
+                    [
+                      "powershell.exe",
+                      "-NoProfile",
+                      "-ExecutionPolicy",
+                      "Bypass",
+                      "-File",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.ps1"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "powershell",
+                      "-NoProfile",
+                      "-File",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1"
                     ]
                   ]
                 }
