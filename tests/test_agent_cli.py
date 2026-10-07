@@ -833,8 +833,8 @@ class OpenClaudeTabTests(unittest.TestCase):
     """open_claude_tab: the H8 helper shared by open-claude and handoff-claude so executable discovery,
     pre-launch standards sync and the forced colour environment have one owner. H26: it no longer
     re-validates the working directory itself -- both launchers already call resolve_tab_directory before
-    calling this, and launch_tab (mocked below, with its own coverage in LaunchTabTests) remains the
-    single owner of that same check, so a launch validates the directory once, not twice."""
+    calling this, and launch_tab (mocked below, with its own coverage in LaunchTabTests) checks it again
+    for its direct callers."""
 
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='agent cli open tab ')
