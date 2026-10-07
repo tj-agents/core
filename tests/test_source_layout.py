@@ -94,7 +94,7 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/base/skills/plan-artifacts/scripts/session-context.py",
             "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
-            "plugins/machine/codex-skills/handoff-claude/scripts/launch-claude.ps1",
+            "plugins/machine/codex-skills/handoff-claude/scripts/launch_claude.py",
             "plugins/machine/resources/machine/scripts/history.py",
             "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
