@@ -1130,6 +1130,43 @@ Start-Sleep -Seconds 20
     }
 
     if (-not $FinishOnlyTests) {
+    & {
+        . (Join-Path $scriptsDirectory 'session_close.ps1')
+        function Get-RecordedSessionEntries { return $selectionEntries }
+        $selectionHost = [pscustomobject]@{ Pid = 71001; Started = 1700001000.0 }
+        $legacy = [pscustomobject]@{ session_id = 'legacy'; pid = 71001; pid_started_at = 1700001000.0 }
+        $selectionEntries = @($legacy)
+        Assert-Equal -Expected 'legacy' -Actual (Get-OwnRegistryEntry $selectionHost).session_id -Message 'Single legacy session was rejected.'
+        $older = [pscustomobject]@{ session_id = 'older'; pid = 71001; pid_started_at = 1700001000.0; started_at = 1700001001.0 }
+        $newer = [pscustomobject]@{ session_id = 'newer'; pid = 71001; pid_started_at = 1700001000.0; started_at = 1700001002.0 }
+        foreach ($orderedEntries in @(@($older, $newer), @($newer, $older))) {
+            $selectionEntries = $orderedEntries
+            Assert-Equal -Expected 'newer' -Actual (Get-OwnRegistryEntry $selectionHost).session_id -Message 'Latest registration selection depended on entry order.'
+        }
+        $previousSelectionCulture = [Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]::GetCultureInfo('fr-FR')
+            $fractionOlder = [pscustomobject]@{ session_id = 'fraction-older'; pid = 71001; pid_started_at = 1700001000.0; started_at = 1700001001.25 }
+            $fractionNewer = [pscustomobject]@{ session_id = 'fraction-newer'; pid = 71001; pid_started_at = 1700001000.0; started_at = 1700001001.75 }
+            $selectionEntries = @($fractionOlder, $fractionNewer)
+            Assert-Equal -Expected 'fraction-newer' -Actual (Get-OwnRegistryEntry $selectionHost).session_id -Message 'Fractional registration timestamps depended on current culture.'
+        }
+        finally { [Threading.Thread]::CurrentThread.CurrentCulture = $previousSelectionCulture }
+        $selectionEntries = @($older, $legacy)
+        Assert-True -Actual ($null -eq (Get-OwnRegistryEntry $selectionHost)) -Message 'Multiple sessions with missing registration timestamps were accepted.'
+        foreach ($invalidStarted in @('invalid', 'NaN', 'Infinity', 0, -1)) {
+            $invalid = [pscustomobject]@{ session_id = 'invalid'; pid = 71001; pid_started_at = 1700001000.0; started_at = $invalidStarted }
+            $selectionEntries = @($newer, $invalid)
+            Assert-True -Actual ($null -eq (Get-OwnRegistryEntry $selectionHost)) -Message 'Invalid registration timestamp was accepted.'
+        }
+        $tied = [pscustomobject]@{ session_id = 'tied'; pid = 71001; pid_started_at = 1700001000.0; started_at = 1700001002.0 }
+        $selectionEntries = @($older, $newer, $tied)
+        Assert-True -Actual ($null -eq (Get-OwnRegistryEntry $selectionHost)) -Message 'Ambiguous latest registration was accepted.'
+        $reused = [pscustomobject]@{ session_id = 'reused'; pid = 71001; pid_started_at = 1700000900.0; started_at = 1700001003.0 }
+        $selectionEntries = @($older, $reused)
+        Assert-Equal -Expected 'older' -Actual (Get-OwnRegistryEntry $selectionHost).session_id -Message 'Registration timestamp bypassed process-start verification.'
+    }
+    Write-Output 'PASS finish.tests.ps1: own registry selects unique latest registration and rejects ambiguity'
     $closeScript = if ($CloseScriptOverride) { $CloseScriptOverride } else { Join-Path $scriptsDirectory 'close.ps1' }
     $closeRoot = Join-Path $scratch 'close-only'
     New-Item -ItemType Directory -Path $closeRoot -Force | Out-Null
@@ -1148,11 +1185,19 @@ $current = Get-CimInstance Win32_Process -Filter "ProcessId=$PID"
 $owner = Get-CimInstance Win32_Process -Filter "ProcessId=$($current.ParentProcessId)"
 if ($owner.Name -ne 'agent-close-test.exe') { throw 'Fixture host identity mismatch' }
 $started = ([DateTimeOffset]($owner.CreationDate.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
-$entry = @{ session_id = 'close-test'; pid = [int] $owner.ProcessId; pid_started_at = $started; cwd = (Get-Location).Path; title = $null }
+$entry = @{ session_id = 'close-test'; pid = [int] $owner.ProcessId; pid_started_at = $started; cwd = (Get-Location).Path; title = $null; started_at = $started + 2 }
 if ($Mode -eq 'mismatch') { $entry.pid_started_at -= 30 }
 if ($Mode -eq 'wrong-cwd') { $entry.cwd = Join-Path (Get-Location).Path 'other' }
 $registry = Join-Path $env:AGENT_STATE_DIRECTORY 'cli-sessions'
 New-Item -ItemType Directory -Path $registry -Force | Out-Null
+if ($Mode -eq 'stale-session') {
+    $stale = $entry.Clone()
+    $stale.session_id = 'close-stale'
+    $stale.started_at = $started + 1
+    $stale.cwd = Split-Path -Parent (Get-Location).Path
+    $stale.cwd = Join-Path $stale.cwd 'outside'
+    [IO.File]::WriteAllText((Join-Path $registry 'a-stale.json'), ($stale | ConvertTo-Json))
+}
 if ($Mode -ne 'unknown') { [IO.File]::WriteAllText((Join-Path $registry 'own.json'), ($entry | ConvertTo-Json)) }
 [IO.File]::WriteAllText($Ready, [string] $PID)
 if ($Mode -eq 'unknown-host') { $env:AGENT_CLI_HOST_NAMES = 'agent-close-test-unrecognized' }
@@ -1170,14 +1215,18 @@ Start-Sleep -Seconds 120
     $closeShells = if ($TestShell) { @($TestShell) } else { @('pwsh', 'powershell.exe') }
     foreach ($closeShell in $closeShells) {
         if (-not (Get-Command $closeShell -ErrorAction SilentlyContinue)) { continue }
-        $closeModes = if ($TestMode) { @($TestMode) } else { @('good', 'unknown', 'unknown-host', 'mismatch', 'wrong-cwd') }
+        $closeModes = if ($TestMode) { @($TestMode) } else { @('good', 'unknown', 'unknown-host', 'mismatch', 'wrong-cwd', 'stale-session') }
         foreach ($mode in $closeModes) {
             $closeState = Join-Path $closeRoot "$closeShell-$mode"
             $closeReady = Join-Path $closeState 'ready'
             $closeOwn = Join-Path $closeState 'merge-cleanup/obligations/own.json'
             $closePeer = Join-Path $closeState 'merge-cleanup/obligations/peer.json'
+            $closeStale = Join-Path $closeState 'merge-cleanup/obligations/stale.json'
             Write-JsonFile -Path $closeOwn -Data @{ session_id = 'close-test'; worktree = $closeRepo.Primary }
             Write-JsonFile -Path $closePeer -Data @{ session_id = 'peer'; worktree = $closeRepo.Primary }
+            if ($mode -eq 'stale-session') {
+                Write-JsonFile -Path $closeStale -Data @{ session_id = 'close-stale'; worktree = $closeRepo.Primary }
+            }
             $env:AGENT_STATE_DIRECTORY = $closeState
             $env:AGENT_CLI_HOST_NAMES = 'agent-close-test'
             $env:AGENT_FINISH_CLOSE_MODE = 'process'
@@ -1194,7 +1243,7 @@ Start-Sleep -Seconds 120
                 $fixtureReady = Wait-Condition -Condition { Test-Path -LiteralPath $closeReady }
                 Assert-True -Actual $fixtureReady -Message "Close fixture did not become ready: $(Get-Content $fixtureError -Raw) $(Get-Content $fixtureOutput -Raw)"
                 $bootstrapPid = [int](Get-Content -LiteralPath $closeReady -Raw)
-                if ($mode -eq 'good') {
+                if ($mode -in @('good', 'stale-session')) {
                     $verifiedClosed = Wait-Condition -TimeoutSeconds 60 -Condition { -not (Test-Path -LiteralPath $closeOwn) }
                     $closeDetails = if (Test-Path -LiteralPath "$closeReady.output") { Get-Content -LiteralPath "$closeReady.output" -Raw } else { 'no child output' }
                     $observerDetails = @(Get-ChildItem (Join-Path $closeState 'merge-cleanup/results') -Filter '*.json' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Raw }) -join "`n"
@@ -1204,6 +1253,7 @@ Start-Sleep -Seconds 120
                     $records = @(Get-ChildItem (Join-Path $closeState 'merge-cleanup/results') -Filter '*.json' | ForEach-Object { Read-JsonFile $_.FullName })
                     Assert-Equal -Expected 'session-closed' -Actual $records[0].status -Message 'Close observer did not verify exit.'
                     Assert-True -Actual $records[0].checkout_retained -Message 'Close observer did not record retention.'
+                    Assert-Equal -Expected 'close-test' -Actual $records[0].session_id -Message 'Close observer recorded the obsolete session identity.'
                 }
                 else {
                     Assert-True -Actual (Wait-Condition -TimeoutSeconds 60 -Condition { Test-Path -LiteralPath "$closeReady.returned" }) -Message 'Refused close did not return.'
@@ -1218,6 +1268,9 @@ Start-Sleep -Seconds 120
                 $peerHost.Refresh()
                 Assert-False -Actual $peerHost.HasExited -Message 'Close killed another session.'
                 Assert-True -Actual (Test-Path -LiteralPath $closePeer) -Message 'Close cleared another session obligation.'
+                if ($mode -eq 'stale-session') {
+                    Assert-True -Actual (Test-Path -LiteralPath $closeStale) -Message 'Close cleared an obsolete session obligation.'
+                }
                 Write-Output "PASS finish.tests.ps1: close $closeShell $mode"
                 Assert-True -Actual (Test-Path -LiteralPath (Join-Path $closeRepo.Primary 'README.md')) -Message 'Close removed primary files.'
                 Assert-Equal -Expected $closeHead -Actual (Invoke-GitOrThrow -Cwd $closeRepo.Primary -Arguments @('show-ref')) -Message 'Close changed Git refs.'
