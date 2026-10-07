@@ -71,6 +71,13 @@
         ]
       },
       {
+        "path": "hooks/merge_cleanup_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": "hooks/merge_review_gate.py",
         "hosts": [
           "claude"
@@ -116,8 +123,33 @@
       }
     ],
     "permissions": {
-      "claude_allow": [],
-      "codex_prefix_rules": []
+      "claude_allow": [
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
+      ],
+      "codex_prefix_rules": [
+        {
+          "pattern": [
+            ["python", "python.exe", "python3", "py"],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+              "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
+              "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+            ]
+          ],
+          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before any cleanup",
+          "match": [
+            ["python", "-B", "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"],
+            ["python", "-B", "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"]
+          ],
+          "not_match": [
+            ["python", "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"]
+          ]
+        }
+      ]
     }
   }
 }
