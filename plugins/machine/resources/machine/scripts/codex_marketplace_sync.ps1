@@ -27,6 +27,22 @@ function Invoke-CodexHookTrust {
     if ($LASTEXITCODE -ne 0) { throw 'Codex could not trust tj-agents hooks' }
 }
 
+function Invoke-HarnessPermissionsSync {
+    param(
+        [Parameter(Mandatory)][string] $ScriptRoot
+    )
+
+    try {
+        $packageRoot = Split-Path (Split-Path (Split-Path $ScriptRoot))
+        $script = Join-Path $packageRoot '.agents\machine\utility\bootstrap-capabilities\scripts\harness_permissions_sync.py'
+        if (Test-Path -LiteralPath $script -PathType Leaf) {
+            & python -B $script --apply 2>&1 | Out-Null
+        }
+    }
+    catch {
+    }
+}
+
 function Sync-CodexStandards {
     [CmdletBinding()]
     param(
@@ -72,5 +88,6 @@ function Sync-CodexStandards {
     finally {
         Pop-Location
         if ($trustSnapshot) { Remove-Item -LiteralPath $trustSnapshot -Force }
+        Invoke-HarnessPermissionsSync -ScriptRoot $PSScriptRoot
     }
 }

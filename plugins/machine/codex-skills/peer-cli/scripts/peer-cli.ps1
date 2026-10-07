@@ -48,6 +48,43 @@ function Get-StateDirectory {
     Join-Path $root 'cli-sessions'
 }
 
+function Get-EntryProperty {
+    param($Entry, [string] $Name)
+
+    $property = $Entry.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    return $property.Value
+}
+
+function ConvertTo-UnixTime {
+    param([DateTime] $Value)
+
+    return ([DateTimeOffset]($Value.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+}
+
+function Get-SessionLiveness {
+    param(
+        [int] $ProcessId,
+        $PidStartedAt,
+        [double] $LegacyStartedAt
+    )
+
+    $process = try { Get-Process -Id $ProcessId -ErrorAction Stop } catch { $null }
+    # StartTime is null, not an exception, for a process this account cannot query (e.g. a reused pid
+    # now owned by another user's or a protected process) - that is not provably our session either.
+    $startTime = if ($process) { try { $process.StartTime } catch { $null } } else { $null }
+
+    if ($null -ne $PidStartedAt) {
+        if ($null -eq $startTime) { return $false }
+        $actual = ConvertTo-UnixTime -Value $startTime
+        return [math]::Abs($actual - $PidStartedAt) -le 2.0
+    }
+
+    if ($null -eq $startTime) { return $null }
+    return $startTime.ToUniversalTime() -le
+        [DateTimeOffset]::FromUnixTimeSeconds([long]$LegacyStartedAt).UtcDateTime.AddMinutes(1)
+}
+
 function Get-RecordedSessions {
     $directory = Get-StateDirectory
     if (-not (Test-Path -LiteralPath $directory)) { return @() }
@@ -56,13 +93,8 @@ function Get-RecordedSessions {
         $entry = try { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
         if (-not $entry) { return }
 
-        $process = try { Get-Process -Id $entry.pid -ErrorAction Stop } catch { $null }
-        # A pid is reused once its owner exits, so age-match before believing a live process is this one.
-        # StartTime is null, not an exception, for a process this account cannot query (e.g. a reused pid
-        # now owned by another user's or a protected process) - that is not provably our session either.
-        $startTime = if ($process) { try { $process.StartTime } catch { $null } } else { $null }
-        $alive = $null -ne $startTime -and $startTime.ToUniversalTime() -le
-            [DateTimeOffset]::FromUnixTimeSeconds([long]$entry.started_at).UtcDateTime.AddMinutes(1)
+        $pidStartedAt = Get-EntryProperty -Entry $entry -Name 'pid_started_at'
+        $alive = Get-SessionLiveness -ProcessId $entry.pid -PidStartedAt $pidStartedAt -LegacyStartedAt $entry.started_at
 
         [pscustomobject]@{
             Title     = $entry.title
@@ -79,7 +111,7 @@ function Get-UnrecordedSessions {
     param([object[]] $Known)
 
     $knownPids = @($Known | ForEach-Object { $_.Pid })
-    Get-Process -Name 'claude' -ErrorAction SilentlyContinue |
+    Get-Process -Name 'claude', 'codex' -ErrorAction SilentlyContinue |
         Where-Object { $_.Id -notin $knownPids } |
         ForEach-Object {
             [pscustomobject]@{
@@ -199,7 +231,9 @@ switch ($Action) {
         }
         $scoped |
             Sort-Object -Property @{ Expression = 'Alive'; Descending = $true }, 'Title' |
-            Format-Table -AutoSize Title, SessionId, Alive, Pid, Cwd
+            Format-Table -AutoSize Title, SessionId,
+                @{ Label = 'Alive'; Expression = { if ($null -eq $_.Alive) { '?' } else { $_.Alive } } },
+                Pid, Cwd
     }
     'resolve' {
         (Find-Session -Sessions $sessions -Needle $Session).SessionId
@@ -207,9 +241,13 @@ switch ($Action) {
     'close' {
         $target = Find-Session -Sessions $sessions -Needle $Session
         $label = if ($target.Title) { $target.Title } else { $target.SessionId }
-        if (-not $target.Alive) {
+        if ($target.Alive -eq $false) {
             Write-Output "'$label' is already gone."
             break
+        }
+        if ($null -eq $target.Alive -and -not $Force) {
+            throw "'$label' liveness is unknown (pid reused, or unrecorded start time). Refusing " +
+                "without -Force; check 'close-tab.ps1 -List' first."
         }
         if (-not $Force) {
             $answer = Read-Host "Close '$label' (pid $($target.Pid))? [y/N]"
