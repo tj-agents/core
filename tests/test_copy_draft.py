@@ -219,8 +219,10 @@ class PosixClipboardToolTests(unittest.TestCase):
         self.assertIsNone(tool.no_html_reason)
 
     def test_wayland_session_without_wl_clipboard_and_no_display_is_an_error_naming_the_package(self):
-        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-clipboard'):
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-clipboard') as raised:
             COPY_DRAFT.posix_clipboard_tool({'WAYLAND_DISPLAY': 'wayland-0'}, which_only())
+        # Without DISPLAY the X11 tools are never selected, so recommending them would mislead.
+        self.assertNotIn('xclip', str(raised.exception))
 
     def test_wayland_session_without_wl_copy_falls_back_to_xclip_when_display_is_also_set(self):
         # XWayland means a Wayland session can still have DISPLAY set; missing wl-copy is not fatal there.

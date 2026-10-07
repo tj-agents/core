@@ -250,9 +250,9 @@ def posix_clipboard_tool(environ, which):
 
     Wayland is checked first because a Wayland session under XWayland can still have DISPLAY set; without
     wl-copy/wl-paste on PATH, such a session falls back to the X11 tools rather than failing outright.
-    Either way, nothing usable in a Wayland session is one error, checked once, naming wl-clipboard first
-    (the native tool for the session actually running) and xclip/xsel as the XWayland fallback --
-    regardless of whether DISPLAY happened to be set too.
+    Either way, nothing usable in a Wayland session is one error, naming wl-clipboard first (the native
+    tool for the session actually running), and xclip/xsel only when DISPLAY is set, the one case they
+    could be used.
     """
     wayland = bool(environ.get('WAYLAND_DISPLAY'))
     x11 = bool(environ.get('DISPLAY'))
@@ -265,9 +265,9 @@ def posix_clipboard_tool(environ, which):
                 return _XCLIP
             if which('xsel'):
                 return _XSEL
+        fallback = ', or xclip/xsel as an XWayland fallback' if x11 else ''
         raise ClipboardError(
-            'No clipboard tool was found on PATH. Install wl-clipboard (provides wl-copy/wl-paste), or '
-            'xclip/xsel as an XWayland fallback.'
+            f'No clipboard tool was found on PATH. Install wl-clipboard (provides wl-copy/wl-paste){fallback}.'
         )
 
     if x11:
