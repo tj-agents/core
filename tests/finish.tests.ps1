@@ -1909,6 +1909,10 @@ gate.stamp_transfer('pwsh -File launch-codex.ps1 -Prompt continue', data)
     @'
 param([string] $Reaper, [string] $State, [string] $Checkout, [string] $FixtureTarget, [string] $Result, [int] $DeadPid, [double] $DeadStart, [string] $Failure)
 $ErrorActionPreference = 'Stop'
+if ($Failure -ne 'unc-control') {
+    Set-Location -LiteralPath $Checkout
+    [Environment]::CurrentDirectory = $Checkout
+}
 $fixtureStarted = ([DateTimeOffset]((Get-Process -Id $PID).StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
 foreach ($session in @('alive', 'pid-replacement')) {
     $path = Join-Path $State "cli-sessions/$session.json"
@@ -1926,6 +1930,22 @@ function Get-Process {
     if ($Id -eq 71002) { throw [UnauthorizedAccessException]::new('Fixture process query refused.') }
     if ($Id -eq 71003) { return }
     Microsoft.PowerShell.Management\Get-Process @PSBoundParameters
+}
+if ($Failure -eq 'unc-control') {
+    function Get-Item {
+        [CmdletBinding()] param([string] $LiteralPath)
+        if ($LiteralPath.StartsWith('\\fixture.invalid\share\')) { return [pscustomobject]@{ FullName = $LiteralPath } }
+        Microsoft.PowerShell.Management\Get-Item @PSBoundParameters
+    }
+    function Test-Path {
+        [CmdletBinding()] param([string] $LiteralPath)
+        if ($LiteralPath.StartsWith('\\fixture.invalid\share\')) { return $false }
+        Microsoft.PowerShell.Management\Test-Path @PSBoundParameters
+    }
+    function git {
+        $global:LASTEXITCODE = 0
+        Write-Output "worktree $Checkout`nHEAD fixture`nbranch refs/heads/main"
+    }
 }
 if ($Failure -eq 'git-error') {
     function git { $global:LASTEXITCODE = 128; Write-Output 'Fixture Git inventory failed.' }
@@ -1957,18 +1977,21 @@ if ($Failure -eq 'target-query-error') {
     $transferCases = @('predecessor-good', 'pid-replacement', 'alive', 'unreadable-process', 'process-api-error', 'empty-process-query',
         'missing-registry', 'missing-pid', 'fractional-pid', 'missing-start', 'invalid-start', 'zero-start', 'missing-host', 'unknown-host', 'wrong-session',
         'wrong-cwd', 'ambiguous-registry', 'no-transfer', 'wrong-transfer', 'invalid-transfer', 'retained', 'invalid-retention',
-        'existing-target', 'registered-target', 'cross-primary', 'primary-target', 'no-exit-required')
+        'existing-target', 'registered-target', 'cross-primary', 'primary-target', 'no-exit-required',
+        'root-relative-primary', 'drive-relative-primary', 'root-relative-target', 'drive-relative-target',
+        'root-relative-cwd', 'drive-relative-cwd', 'forward-slash-drive')
     $transferRefs = Invoke-GitOrThrow $transferRepo.Primary @('show-ref')
     $transferInventory = Invoke-GitOrThrow $transferRepo.Primary @('worktree', 'list', '--porcelain')
     foreach ($transferShell in $transferShells) {
         if (-not (Get-Command $transferShell -ErrorAction SilentlyContinue)) { continue }
-        foreach ($failure in @('none', 'git-error', 'registry-read-error', 'registry-list-error', 'registry-invalid-json', 'target-query-error')) {
+        foreach ($failure in @('none', 'git-error', 'registry-read-error', 'registry-list-error', 'registry-invalid-json', 'target-query-error', 'unc-control')) {
             $transferState = Join-Path $transferRoot "$transferShell-$failure"
             $transferOwn = Join-Path $transferState 'merge-cleanup/obligations/own.json'
             $transferPeer = Join-Path $transferState 'merge-cleanup/obligations/peer.json'
             Write-JsonFile $transferOwn @{ session_id = 'successor'; worktree = $transferRepo.Primary; session_exit_required = $true }
             Write-JsonFile $transferPeer @{ session_id = 'unrelated'; worktree = $transferResolved; session_exit_required = $true }
             $cases = if ($failure -eq 'none') { $transferCases } else { @('predecessor-good') }
+            $observerCheckout = $transferRepo.Primary
             foreach ($case in $cases) {
                 $obligation = @{}
                 foreach ($property in $transferPrototype.PSObject.Properties) { $obligation[$property.Name] = $property.Value }
@@ -1998,6 +2021,23 @@ if ($Failure -eq 'target-query-error') {
                     'cross-primary' { $obligation.primary = $foreignRepo.Primary }
                     'primary-target' { $obligation.worktree = $transferRepo.Primary; $entry.cwd = $transferRepo.Primary }
                     'no-exit-required' { $obligation.session_exit_required = $false }
+                    'root-relative-primary' { $obligation.primary = $transferRepo.Primary.Substring(2) }
+                    'drive-relative-primary' { $obligation.primary = $transferRepo.Primary.Substring(0, 2) + '.' }
+                    'root-relative-target' { $obligation.worktree = $transferResolved.Substring(2) }
+                    'drive-relative-target' { $obligation.worktree = $transferResolved.Substring(0, 2) + '..\feature-wt' }
+                    'root-relative-cwd' { $entry.cwd = $transferResolved.Substring(2) }
+                    'drive-relative-cwd' { $entry.cwd = $transferResolved.Substring(0, 2) + '..\feature-wt' }
+                    'forward-slash-drive' {
+                        $obligation.primary = $transferRepo.Primary.Replace('\', '/')
+                        $obligation.worktree = $transferResolved.Replace('\', '/')
+                        $entry.cwd = $transferResolved.Replace('\', '/') + '/subdirectory'
+                    }
+                }
+                if ($failure -eq 'unc-control') {
+                    $observerCheckout = '\\fixture.invalid\share\primary'
+                    $obligation.primary = $observerCheckout
+                    $obligation.worktree = '\\fixture.invalid\share\removed-linked'
+                    $entry.cwd = '\\fixture.invalid\share\removed-linked\subdirectory'
                 }
                 Write-JsonFile (Join-Path $transferState "merge-cleanup/obligations/$case.json") $obligation
                 if ($case -ne 'missing-registry') { Write-JsonFile (Join-Path $transferState "cli-sessions/$case.json") $entry }
@@ -2007,14 +2047,14 @@ if ($Failure -eq 'target-query-error') {
                 [IO.File]::WriteAllText((Join-Path $transferState 'cli-sessions/predecessor-good.json'), '{')
             }
             $transferResult = Join-Path $transferState 'merge-cleanup/results/close.json'
-            $transferOutput = & $transferShell -NoProfile -ExecutionPolicy Bypass -File $transferRunner -Reaper $reaperScript -State $transferState -Checkout $transferRepo.Primary -FixtureTarget $transferResolved -Result $transferResult -DeadPid $transferDead.Id -DeadStart $transferDeadStart -Failure $failure 2>&1
+            $transferOutput = & $transferShell -NoProfile -ExecutionPolicy Bypass -File $transferRunner -Reaper $reaperScript -State $transferState -Checkout $observerCheckout -FixtureTarget $transferResolved -Result $transferResult -DeadPid $transferDead.Id -DeadStart $transferDeadStart -Failure $failure 2>&1
             Assert-Equal 0 $LASTEXITCODE "Transferred observer failed: $transferOutput"
             $transferRecord = Read-JsonFile $transferResult
             Assert-Equal 'session-closed' $transferRecord.status "Successor exit was not verified for $transferShell $failure`: $($transferRecord.error)"
             Assert-False (Test-Path -LiteralPath $transferOwn) 'Successor obligation was not cleared.'
             Assert-True (Test-Path -LiteralPath $transferPeer) 'An unrelated session obligation was cleared.'
             foreach ($case in $cases) {
-                $shouldRemain = $failure -ne 'none' -or $case -notin @('predecessor-good', 'pid-replacement')
+                $shouldRemain = $failure -notin @('none', 'unc-control') -or $case -notin @('predecessor-good', 'pid-replacement', 'forward-slash-drive')
                 Assert-Equal $shouldRemain (Test-Path -LiteralPath (Join-Path $transferState "merge-cleanup/obligations/$case.json")) "Incorrect predecessor settlement for $transferShell $failure $case."
             }
             Assert-Equal $transferRefs (Invoke-GitOrThrow $transferRepo.Primary @('show-ref')) 'Observer changed Git refs.'

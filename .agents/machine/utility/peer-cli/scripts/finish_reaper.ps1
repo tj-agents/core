@@ -191,6 +191,16 @@ function Test-PositiveFiniteNumber {
         [double] $Value -gt 0.0 -and -not [double]::IsNaN($Value) -and -not [double]::IsInfinity($Value)
 }
 
+function Test-FullyQualifiedPath {
+    param($Path)
+
+    if ($Path -isnot [string] -or -not $Path) { return $false }
+    try { $root = ([IO.Path]::GetPathRoot($Path)).Replace('/', '\') }
+    catch { return $false }
+    return $root -match '^[a-z]:\\$' -or $root -match '^\\\\\?\\[a-z]:\\$' -or
+        $root -match '^\\\\(?:\?\\UNC\\)?(?![.?](?:\\|$))[^\\:*?"<>|]+\\[^\\:*?"<>|]+\\?$'
+}
+
 function Test-TransferredObligationCompleted {
     param($Obligation, [string] $StateDirectory, [string] $ResolvedPrimary)
 
@@ -206,8 +216,8 @@ function Test-TransferredObligationCompleted {
         }
         $primary = Get-EntryProperty $Obligation 'primary'
         $target = Get-EntryProperty $Obligation 'worktree'
-        if ($primary -isnot [string] -or $target -isnot [string] -or
-            -not [IO.Path]::IsPathRooted($primary) -or -not [IO.Path]::IsPathRooted($target)) { return $false }
+        if (-not (Test-FullyQualifiedPath $primary) -or -not (Test-FullyQualifiedPath $target) -or
+            -not (Test-FullyQualifiedPath $ResolvedPrimary)) { return $false }
         $primaryForm = Get-NormalizedPathForm $primary
         $targetForm = Get-NormalizedPathForm $target
         if ($primaryForm -notin @(Get-WorktreeComparisonForms $ResolvedPrimary) -or $targetForm -eq $primaryForm -or
@@ -233,7 +243,7 @@ function Test-TransferredObligationCompleted {
         $cwd = Get-EntryProperty $entry 'cwd'
         if (($processId -isnot [int] -and $processId -isnot [long]) -or $processId -le 0 -or $processId -gt [int]::MaxValue -or
             -not (Test-PositiveFiniteNumber $processStart) -or $registryHost -isnot [string] -or $registryHost -notin @(Get-HostNames) -or
-            $cwd -isnot [string] -or -not [IO.Path]::IsPathRooted($cwd)) { return $false }
+            -not (Test-FullyQualifiedPath $cwd)) { return $false }
         if (-not (Test-UnderOrEqual -Candidate (Get-NormalizedPathForm $cwd) -Root $targetForm)) { return $false }
         return Test-ProcessExited -ProcessId $processId -StartedAt $processStart
     }
