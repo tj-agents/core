@@ -46,6 +46,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from urllib.parse import urlsplit
 
 
 SCHEMA_VERSIONS = (1, 2, 3)
@@ -64,6 +65,7 @@ WALK_SKIP = frozenset({
 CONTENT_CANDIDATES = 20
 CONTENT_BYTES = 256 * 1024
 GIT_TIMEOUT = 10
+REMOTE_HOST_PATTERN = r"(?=.{1,253}\.?(?![\s\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?"
 
 
 class Declaration:
@@ -120,9 +122,11 @@ def predicate_diagnostics(node, path="detect"):
             return [diagnostic("malformed-predicate", path, operator + " requires a non-empty array")]
         return [problem for index, child in enumerate(value)
                 for problem in predicate_diagnostics(child, f"{path}.{operator}[{index}]")]
-    if operator in ("file", "glob", "remote", "fact"):
+    if operator in ("file", "glob", "remote", "remote_host", "fact"):
         if not isinstance(value, str) or not value:
             return [diagnostic("malformed-predicate", path, operator + " requires a non-empty string")]
+        if operator == "remote_host" and not re.fullmatch(REMOTE_HOST_PATTERN, value):
+            return [diagnostic("malformed-predicate", path, "Remote host requires an exact hostname")]
         if operator == "remote":
             try:
                 re.compile(value)
@@ -257,6 +261,10 @@ def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", em
         if not valid:
             return PredicateResult(root, diagnostics=[diagnostic("invalid-context", path, "Context has incompatible value: " + key)])
         return PredicateResult(root, matched, ["context " + key] if matched else [], ["context:" + key])
+    if operator == "remote_host":
+        host = repository_host(root)
+        matched = host is not None and host == value.rstrip(".").lower()
+        return PredicateResult(root, matched, ["origin host " + host] if matched else [])
     legacy = {"file": "files", "glob": "globs", "remote": "remote", "content": "content"}
     matched, evidence = stack_present(root, {legacy[operator]: [value]})
     return PredicateResult(root, matched, [evidence] if evidence else [])
@@ -452,6 +460,34 @@ def _git(root, arguments):
     if completed.returncode != 0:
         return None
     return completed.stdout
+
+
+def repository_host(root):
+    output = _git(root, ["config", "--get", "remote.origin.url"])
+    if output is None:
+        return None
+    origin = output.removesuffix("\n").removesuffix("\r")
+    if not origin or re.search(r"[\s\x00-\x1f\x7f\\]", origin):
+        return None
+    if "://" in origin:
+        try:
+            url = urlsplit(origin)
+            if url.scheme not in ("https", "http", "ssh", "git") or not url.hostname or "?" in origin or "#" in origin or url.netloc.endswith(":"):
+                return None
+            if url.port is not None and not 1 <= url.port <= 65535:
+                return None
+            host, path = url.hostname, url.path.lstrip("/")
+        except ValueError:
+            return None
+    else:
+        match = re.fullmatch(r"[^@/:]+@([^/:]+):(.+)", origin)
+        if match is None:
+            return None
+        host, path = match.groups()
+        path = path.lstrip("/")
+    if not re.fullmatch(REMOTE_HOST_PATTERN, host) or not path or any(part in ("", ".", "..") for part in path.rstrip("/").split("/")):
+        return None
+    return host.rstrip(".").lower()
 
 
 def repository_identity(root):

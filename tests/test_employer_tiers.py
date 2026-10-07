@@ -25,7 +25,7 @@ checker = load('check_tier_payload')
 WORK = {'schema_version': 3, 'tier': 'work', 'applies': 'stack-present',
         'detect': {'fact': 'employer'}, 'session_context': 'Load work:ask-person before drafting and clip the draft.'}
 EMPLOYER = {'schema_version': 3, 'tier': 'employer-a', 'applies': 'stack-present',
-            'owner_repository': 'publisher/employer-a', 'detect': {'remote': '^employer-a/'},
+            'owner_repository': 'publisher/employer-a', 'detect': {'all': [{'remote_host': 'example.test'}, {'remote': '^employer-a/'}]},
             'employer': {'context_skill': 'communication-context'}}
 
 
@@ -57,8 +57,11 @@ class EmployerScope(unittest.TestCase):
         return gate.declarations([self.cache], project=self.project)
 
     def remote(self, identity):
+        self.origin('git@example.test:' + identity + '.git')
+
+    def origin(self, url):
         subprocess.run(['git', 'init', '--quiet', str(self.project)], check=True, capture_output=True)
-        subprocess.run(['git', '-C', str(self.project), 'config', 'remote.origin.url', 'git@example.test:' + identity + '.git'],
+        subprocess.run(['git', '-C', str(self.project), 'config', 'remote.origin.url', url],
                        check=True, capture_output=True)
 
     def hooks(self):
@@ -74,13 +77,43 @@ class EmployerScope(unittest.TestCase):
         self.assertEqual(result.diagnostics, ())
         work = next(item for item in result.selections if item['plugin_id'] == 'work@test-market')
         self.assertEqual(work['prerequisites'], ('employer',))
-        self.assertEqual(work['evidence'], ('employer-a@test-market: origin employer-a/service',))
+        self.assertEqual(work['evidence'], ('employer-a@test-market: origin host example.test', 'employer-a@test-market: origin employer-a/service'))
         context = gate.statement(self.project, self.found())
         self.assertIn(str((employer / 'skills/communication-context/SKILL.md').resolve()), context)
         self.assertIn('employer-a:communication-context', context)
         self.assertEqual(context.count(WORK['session_context']), 1)
         for hook in self.hooks():
             self.assertEqual(gate.gate(hook, self.found()), 0)
+
+    def test_work_scope_requires_both_exact_host_and_owner_for_every_origin_form(self):
+        self.install('employer-a', EMPLOYER)
+        for url, applies in (
+                ('https://EXAMPLE.TEST/employer-a/service.git', True),
+                ('ssh://git@example.test/employer-a/service.git', True),
+                ('git@example.test:employer-a/service.git', True),
+                ('https://example.test.evil/employer-a/service.git', False),
+                ('https://evilexample.test/employer-a/service.git', False),
+                ('git@other.test:employer-a/service.git', False),
+                ('https://example.test/personal/service.git', False),
+                ('file:///employer-a/service.git', False),
+                ('C:/employer-a/service.git', False),
+                ('https:///employer-a/service.git', False)):
+            with self.subTest(url=url):
+                self.origin(url)
+                result = gate.assess(self.project, self.found())
+                self.assertEqual(any(item.plugin == 'work' for item, _ in result.applicable), applies)
+                self.assertEqual(bool(result.employers), applies)
+                self.assertEqual(WORK['session_context'] in gate.statement(self.project, self.found()), applies)
+                for hook in self.hooks():
+                    stderr = io.StringIO()
+                    with contextlib.redirect_stderr(stderr):
+                        verdict = gate.gate(hook, self.found())
+                    self.assertEqual(verdict, 0 if applies else 2, stderr.getvalue())
+        subprocess.run(['git', '-C', str(self.project), 'config', '--unset', 'remote.origin.url'],
+                       check=True, capture_output=True)
+        self.assertEqual(gate.assess(self.project, self.found()).applicable, [])
+        with patch.object(gate, '_git', return_value=None):
+            self.assertEqual(gate.assess(self.project, self.found()).applicable, [])
 
     def test_session_start_output_carries_context_only_for_the_matching_project(self):
         self.install('employer-a', EMPLOYER)
