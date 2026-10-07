@@ -303,15 +303,68 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertIn("MERGE CLEANUP GATE", matched.stderr)
 
 
-    def test_reconcile_clears_on_worktree_deletion(self):
+    def test_worktree_deletion_keeps_session_exit_enforcement_at_primary(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
         merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
         self.run_hook(self.payload(merge_command))
         path, _ = self.sole_obligation()
+        self.edit_obligation(path, recorded_at=time.time() - gate.DIRECT_GRACE_SECONDS - 1)
 
         git(primary, "worktree", "remove", "--force", str(worktree))
-        self.run_hook({"hook_event_name": "SessionStart", "cwd": str(primary)}, )
+        for event in ("SessionStart", "UserPromptSubmit"):
+            with self.subTest(event=event):
+                reminder = self.run_hook({"hook_event_name": event, "cwd": str(primary)})
+                self.assertEqual(0, reminder.returncode, reminder.stderr)
+                context = json.loads(reminder.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("PR #3", context)
+                self.assertIn("self-close is still required", context)
+        self.assertTrue(path.exists())
+
+        other_session = self.run_hook(self.payload(
+            "Set-Content -Path x.txt -Value 1", session="s2", cwd=str(primary)
+        ))
+        self.assertEqual(0, other_session.returncode, other_session.stderr)
+        denied = self.run_hook(self.payload("Set-Content -Path x.txt -Value 1", cwd=str(primary)))
+        self.assertEqual(2, denied.returncode, denied.stderr)
+        self.assertIn("MERGE CLEANUP GATE", denied.stderr)
+
+        unconfirmed_stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1"})
+        self.assertEqual(0, unconfirmed_stop.returncode, unconfirmed_stop.stderr)
+        self.assertEqual("", unconfirmed_stop.stdout.strip())
+        self.edit_obligation(path, confirmed_merged=True)
+        confirmed_stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1"})
+        self.assertEqual(0, confirmed_stop.returncode, confirmed_stop.stderr)
+        decision = json.loads(confirmed_stop.stdout)
+        self.assertEqual("block", decision["decision"])
+        self.assertIn("MERGE CLEANUP GATE", decision["reason"])
+        self.assertTrue(path.exists())
+
+        self.edit_obligation(
+            path,
+            transferred_at=time.time() - gate.TRANSFER_REARM_SECONDS - 1,
+            transferred_by="s1",
+            nagged_at=None,
+        )
+        retargeted = self.run_hook(self.payload(
+            "Set-Content -Path x.txt -Value 1", session="s2", cwd=str(primary)
+        ))
+        self.assertEqual(2, retargeted.returncode, retargeted.stderr)
+
+    def test_reconcile_clears_legacy_obligation_on_worktree_deletion(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        self.run_hook(self.payload(merge_command))
+        path, obligation = self.sole_obligation()
+        del obligation["session_exit_required"]
+        path.write_text(json.dumps(obligation), encoding="utf-8")
+
+        git(primary, "worktree", "remove", "--force", str(worktree))
+        self.assertIsNone(gate.evaluate_codex_obligation(obligation, "s1", str(primary), time.time()))
+        reminder = self.run_hook({"hook_event_name": "SessionStart", "cwd": str(primary)})
+        self.assertEqual(0, reminder.returncode, reminder.stderr)
+        self.assertEqual("", reminder.stdout.strip())
         self.assertFalse(path.exists())
 
     def test_primary_branch_deletion_keeps_session_close_obligation(self):
