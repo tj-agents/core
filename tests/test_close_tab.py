@@ -22,8 +22,6 @@ def run_with(shell):
 @unittest.skipUnless(os.name == "nt", "Windows is required")
 class CloseTabTests(unittest.TestCase):
     def test_windows_powershell_5(self):
-        # The strict-mode collection collapse this regresses only surfaces on Windows PowerShell 5.1;
-        # PowerShell 7 adds a Count/Length shim to scalars that silently masks it.
         if not shutil.which("powershell.exe"):
             self.skipTest("Windows PowerShell 5.1 is required")
         result = run_with("powershell.exe")

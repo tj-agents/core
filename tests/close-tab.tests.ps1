@@ -18,8 +18,6 @@ function Assert-False {
     if ($Actual -ne $false) { throw "$Message Actual: $Actual" }
 }
 
-# -List exits before the Title-matching parameter set, so this only loads functions; it runs under
-# Set-StrictMode Latest exactly as the production invocation does, which is what the regression needs.
 . $closeTabScript -List | Out-Null
 
 $zero = Resolve-TabMatches -Tabs @([pscustomobject]@{ Title = 'other-tab' }) -Title 'missing-tab'
