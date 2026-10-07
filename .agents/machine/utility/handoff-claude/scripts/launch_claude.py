@@ -37,6 +37,7 @@ def parse_args(argv, agent_cli):
     parser.add_argument('--prompt-path', required=True)
     parser.add_argument('--title', default='Claude handoff')
     parser.add_argument('--model')
+    parser.add_argument('--effort', choices=('low', 'medium', 'high', 'xhigh', 'max'))
     parser.add_argument('--lane', choices=('L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'))
     parser.add_argument('--frontier', action='store_true')
     parser.add_argument('--dangerously-skip-permissions', action='store_true')
@@ -51,22 +52,30 @@ def parse_args(argv, agent_cli):
             'request, not one selection among several.'
         )
 
+    # --effort exists only for a model the user named outright: a --lane or the frontier tier already
+    # carries its own effort for the model it resolves, so --effort beside either of them (or beside
+    # neither) would be a caller's guess paired with a model it was never priced for, which is exactly
+    # the defect this flag was removed and re-added to avoid.
+    if args.effort and not args.model:
+        raise agent_cli.LaunchError(
+            '--effort is only accepted together with an explicit --model: a --lane or the frontier tier '
+            'already carries its own effort for the model it resolves.'
+        )
+
     return args
 
 
 def resolve_model(args, agent_cli):
     """(model, effort, tier text for the success message) per this launcher's selection precedence.
 
-    An explicit --model wins and carries no effort of its own -- there is no --effort flag here, so an
-    effort can only ever be the one the resolved lane or frontier entry prices for its own model, never a
-    caller's guess paired with a model it was never priced for. A --lane or --frontier that actually
-    resolves the model also supplies whatever effort the table prices for it, or none, same as that rung
-    would get interactively; an explicit --model beating the lane means no lane effort applies either. The
-    lane is never guessed here: a transport that inferred one from the prompt would quietly decide the
-    cost of every handoff.
+    An explicit --model wins; its --effort (valid only alongside it, enforced in parse_args) travels with
+    it unchanged. A --lane or --frontier that actually resolves the model supplies whatever effort the
+    table prices for it, or none, same as that rung would get interactively; an explicit --model beating
+    the lane means no lane effort applies either. The lane is never guessed here: a transport that
+    inferred one from the prompt would quietly decide the cost of every handoff.
     """
     model = args.model
-    effort = None
+    effort = args.effort
     tier = ''
     if args.frontier:
         model, effort = agent_cli.resolve_lane_model('claude', frontier=True)
@@ -97,9 +106,10 @@ def main(argv=None):
     try:
         args = parse_args(argv, agent_cli)
 
-        # Validated first, before any prompt or lane handling: whichever is wrong, the directory is the
-        # one thing every other step here depends on, and its error should never be shadowed by a later
-        # check that only looked irrelevant.
+        # parse_args already rejected any argparse-level contradiction (a --frontier beside --lane or
+        # --model, an --effort without an explicit --model). What happens here is the first filesystem or
+        # lane-table work, so the directory is checked before any of it -- whichever of it is also wrong,
+        # the directory's error is never shadowed by a later check that only looked irrelevant.
         working_directory = agent_cli.resolve_tab_directory(args.working_directory)
 
         prompt_sentence, prompt_path = agent_cli.prompt_file_argument(args.prompt_path)

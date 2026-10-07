@@ -81,15 +81,22 @@ family an effort step below, and frontier spend is the user's provenance to gran
 hard-looking task — and it rejects `--lane` or `--model` beside it.
 
 A lane's effort travels with its resolved model (`--lane L4`, for example, resolves both a model and an
-effort from the table) and reaches `claude --effort <level>` automatically. There is no separate `--effort`
-flag: an effort is only ever the one its own model was priced for, never a caller's pick paired with
-whichever model happens to be in play, so a lane always opens the exact session that rung's model and
-effort pair describes. An explicit `--model` beating the lane means no lane effort applies either,
-matching the model it would have paired with. Some rungs (Claude's `L7`) price no effort at all, and the
-launcher passes none rather than inventing one.
+effort from the table) and reaches `claude --effort <level>` automatically — a lane always opens the
+exact session that rung's model and effort pair describes. An explicit `--model` beating the lane means
+no lane effort applies either, matching the model it would have paired with. Some rungs (Claude's `L7`)
+price no effort at all, and the launcher passes none rather than inventing one.
+
+`--effort '<low|medium|high|xhigh|max>'` is accepted only together with an explicit `--model`, for a
+calling skill or workflow (or a user) that already knows the exact pace it wants for a model it named
+outright — passing `--effort` alone, or beside `--lane`/`--frontier`, is rejected, because a lane or the
+frontier tier already carries its own effort for whichever model it resolves, and an effort picked
+without reference to a specific model is exactly the caller's-guess defect this restriction exists to
+prevent. `engineering:handoff`'s obligation to preserve a user-selected model, effort or frontier request
+is why this flag exists at all, not a general invitation to invent one.
 
 A calling skill or workflow that ships its own resolved selection may still pass `--model` directly;
-that wins over `--lane`. What is no longer acceptable is inventing a model id at the call site.
+that wins over `--lane`. What is no longer acceptable is inventing a model id (or, per above, an
+unpaired effort) at the call site.
 
 Launch with `scripts/launch_claude.py`, beside this file:
 
@@ -101,9 +108,10 @@ Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is oft
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 Add `--lane '<L1..L7>'` (or `--frontier`) to have the launcher resolve the model and, where the table
-prices one, its effort, or `--model '<model-id>'` for a model the user named outright (never an effort of
-its own; see above). Omitting them all lets the CLI fall back to its own configured default — the same
-behavior an interactively launched session gets.
+prices one, its effort, or `--model '<model-id>'` for a model the user named outright, optionally paired
+with `--effort '<level>'` for that exact model (never with `--lane` or `--frontier`; see above). Omitting
+them all lets the CLI fall back to its own configured default — the same behavior an interactively
+launched session gets.
 
 Add `--dangerously-skip-permissions` **only when the user asks for it in that request**. It disables every
 permission prompt in the new window, so it is never a default and never inferred from the repository
