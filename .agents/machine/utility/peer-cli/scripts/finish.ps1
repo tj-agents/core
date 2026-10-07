@@ -7,9 +7,11 @@ Close out a completed delivery: remove its worktree and branch, then close this 
 the merged worktree, is `engineering:merge` Step 5's self-close path: the target is this process's own
 `git rev-parse --show-toplevel`, which the preflight attachment check already requires to be this
 session's own worktree. It requires a fresh `removable` verdict from `cleanup_proof.py` for exactly that
-worktree, resolves the claude/codex host this session is actually running under, spawns a detached reaper
-that waits for that host to exit and then runs the approved `git worktree remove`/`branch -d|-D` from the
-primary checkout, and only then closes this session's own tab or process.
+worktree, whose recorded `head`/`branch` must still match the worktree's actual `HEAD` (a commit landed
+after `cleanup_proof.py` ran otherwise re-run it), resolves the claude/codex host this session is actually
+running under, spawns a detached reaper that waits for that host (and, if its parent process is a shell,
+that shell too) to exit and then runs the approved `git worktree remove`/`branch -d|-D` from the primary
+checkout, and only then closes this session's own tab or process.
 
 `-Worktree <target>` overrides the target explicitly; it exists for tests, not the documented invocation,
 since a Claude auto-mode allow rule for this script can only match an exact, argument-free command.
@@ -34,6 +36,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $ReceiptMaxAgeSeconds = 3600.0
+$ShellProcessNames = @('pwsh', 'powershell', 'cmd', 'bash', 'sh', 'zsh', 'fish', 'nu')
 
 function Get-StateDirectory {
     $override = $env:AGENT_STATE_DIRECTORY
@@ -50,32 +53,72 @@ function Get-EntryProperty {
     return $property.Value
 }
 
-function Get-Sha256Hex {
-    param([string] $Text)
+function Read-JsonFile {
+    param([string] $Path)
 
-    $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
-    $sha256 = [Security.Cryptography.SHA256]::Create()
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
+}
+
+function Get-NormalizedPathForm {
+    param([string] $Path)
+
+    if (-not $Path) { return $null }
+    $full = [IO.Path]::GetFullPath($Path)
+    return (($full -replace '\\', '/').TrimEnd('/')).ToLowerInvariant()
+}
+
+function Get-WorktreeComparisonForms {
+    param([string] $Path)
+
+    $forms = New-Object System.Collections.Generic.List[string]
+    $direct = Get-NormalizedPathForm -Path $Path
+    if ($direct) { $forms.Add($direct) }
     try {
-        $hashBytes = $sha256.ComputeHash($bytes)
+        $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+        $targetProperty = $item.PSObject.Properties['Target']
+        $targets = if ($targetProperty) { $targetProperty.Value } else { $null }
+        foreach ($target in @($targets)) {
+            if (-not $target) { continue }
+            $resolvedTarget = $target
+            if (-not [IO.Path]::IsPathRooted($resolvedTarget)) {
+                $resolvedTarget = Join-Path (Split-Path -Parent $item.FullName) $resolvedTarget
+            }
+            $form = Get-NormalizedPathForm -Path $resolvedTarget
+            if ($form) { $forms.Add($form) }
+        }
     }
-    finally {
-        $sha256.Dispose()
+    catch {
     }
-    return -join ($hashBytes | ForEach-Object { $_.ToString('x2') })
+    return $forms
 }
 
-function Get-WorktreeDigest {
-    param([string] $ResolvedWorktree)
+function Find-ReceiptPath {
+    param([string] $StateDirectory, [string] $ResolvedWorktree)
 
-    $posix = $ResolvedWorktree -replace '\\', '/'
-    return Get-Sha256Hex -Text $posix
-}
-
-function Get-ReceiptPath {
-    param([string] $ResolvedWorktree)
-
-    $digest = Get-WorktreeDigest -ResolvedWorktree $ResolvedWorktree
-    return Join-Path (Get-StateDirectory) "merge-cleanup/receipts/$digest.json"
+    $directory = Join-Path $StateDirectory 'merge-cleanup/receipts'
+    if (-not (Test-Path -LiteralPath $directory)) { return $null }
+    $targetForms = @(Get-WorktreeComparisonForms -Path $ResolvedWorktree)
+    $bestPath = $null
+    $bestRecordedAt = $null
+    foreach ($file in Get-ChildItem -LiteralPath $directory -Filter '*.json' -File) {
+        $data = Read-JsonFile -Path $file.FullName
+        if (-not $data) { continue }
+        $recorded = Get-EntryProperty -Entry $data -Name 'worktree'
+        if (-not $recorded) { continue }
+        $recordedForms = @(Get-WorktreeComparisonForms -Path $recorded)
+        $matches = $false
+        foreach ($form in $recordedForms) {
+            if ($targetForms -contains $form) { $matches = $true; break }
+        }
+        if (-not $matches) { continue }
+        $recordedAt = [double] (Get-EntryProperty -Entry $data -Name 'recorded_at')
+        if ($null -eq $bestRecordedAt -or $recordedAt -gt $bestRecordedAt) {
+            $bestPath = $file.FullName
+            $bestRecordedAt = $recordedAt
+        }
+    }
+    return $bestPath
 }
 
 function Get-ResolvedWorktree {
@@ -83,13 +126,6 @@ function Get-ResolvedWorktree {
 
     $item = Get-Item -LiteralPath $Path -ErrorAction Stop
     return $item.FullName.TrimEnd('\')
-}
-
-function Read-JsonFile {
-    param([string] $Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
 }
 
 function Test-UnderOrEqual {
@@ -113,11 +149,26 @@ function Resolve-TargetWorktree {
     return (@($toplevel)[0]).Trim()
 }
 
-function Get-FreshRemovableReceipt {
-    param([string] $ResolvedWorktree)
+function Test-WorktreeMatchesReceipt {
+    param([string] $ResolvedWorktree, [pscustomobject] $Receipt)
 
-    $path = Get-ReceiptPath -ResolvedWorktree $ResolvedWorktree
-    $receipt = Read-JsonFile -Path $path
+    $headOutput = & git -C $ResolvedWorktree rev-parse HEAD 2>$null
+    $headExit = $LASTEXITCODE
+    $branchOutput = & git -C $ResolvedWorktree rev-parse --abbrev-ref HEAD 2>$null
+    $branchExit = $LASTEXITCODE
+    if ($headExit -ne 0 -or $branchExit -ne 0) { return $false }
+    $currentHead = (@($headOutput)[0]).Trim()
+    $currentBranch = (@($branchOutput)[0]).Trim()
+    $receiptHead = Get-EntryProperty -Entry $Receipt -Name 'head'
+    $receiptBranch = Get-EntryProperty -Entry $Receipt -Name 'branch'
+    return ($currentHead -eq $receiptHead) -and ($currentBranch -eq $receiptBranch)
+}
+
+function Get-FreshRemovableReceipt {
+    param([string] $StateDirectory, [string] $ResolvedWorktree)
+
+    $path = Find-ReceiptPath -StateDirectory $StateDirectory -ResolvedWorktree $ResolvedWorktree
+    $receipt = if ($path) { Read-JsonFile -Path $path } else { $null }
     if (-not $receipt) {
         throw "finish: no cleanup_proof.py receipt recorded for '$ResolvedWorktree'. Run cleanup_proof.py first."
     }
@@ -129,9 +180,9 @@ function Get-FreshRemovableReceipt {
     if ($null -eq $recordedAt -or ($now - [double] $recordedAt) -gt $ReceiptMaxAgeSeconds) {
         throw "finish: the receipt for '$ResolvedWorktree' is stale (older than one hour). Run cleanup_proof.py again."
     }
-    $receiptWorktree = Get-EntryProperty -Entry $receipt -Name 'worktree'
-    if ($receiptWorktree -and (($receiptWorktree -replace '\\', '/') -ne ($ResolvedWorktree -replace '\\', '/'))) {
-        throw "finish: the receipt is for '$receiptWorktree', not '$ResolvedWorktree'."
+    if (-not (Test-WorktreeMatchesReceipt -ResolvedWorktree $ResolvedWorktree -Receipt $receipt)) {
+        throw "finish: '$ResolvedWorktree' HEAD/branch no longer match the receipt cleanup_proof.py recorded " +
+            "(a commit or branch change landed after it ran). Run cleanup_proof.py again."
     }
     return $receipt
 }
@@ -173,12 +224,52 @@ function Resolve-OwnHost {
     return $null
 }
 
+function Get-ParentShellHost {
+    param([pscustomobject] $OwnHost)
+
+    $process = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $($OwnHost.Pid)" -ErrorAction SilentlyContinue
+    if (-not $process) { return $null }
+    $parent = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $($process.ParentProcessId)" -ErrorAction SilentlyContinue
+    if (-not $parent) { return $null }
+    $stem = [IO.Path]::GetFileNameWithoutExtension($parent.Name).ToLowerInvariant()
+    if ($ShellProcessNames -notcontains $stem) { return $null }
+    return [pscustomobject]@{
+        Pid     = [int] $parent.ProcessId
+        Started = ConvertTo-UnixTime -Value $parent.CreationDate
+    }
+}
+
+function Stop-VerifiedProcess {
+    param([pscustomobject] $Target)
+
+    $process = Get-Process -Id $Target.Pid -ErrorAction SilentlyContinue
+    if (-not $process) { return }
+    $startTime = try { $process.StartTime } catch { $null }
+    if ($null -eq $startTime) { return }
+    if ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - $Target.Started) -gt 2.0) { return }
+    Stop-Process -Id $Target.Pid -Force
+}
+
 function Get-RecordedSessionEntries {
     $directory = Join-Path (Get-StateDirectory) 'cli-sessions'
     if (-not (Test-Path -LiteralPath $directory)) { return @() }
     return @(Get-ChildItem -LiteralPath $directory -Filter '*.json' -File | ForEach-Object {
         try { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
     } | Where-Object { $_ })
+}
+
+function Get-OwnRegistryEntry {
+    param([pscustomobject] $OwnHost)
+
+    foreach ($entry in (Get-RecordedSessionEntries)) {
+        $entryPid = Get-EntryProperty -Entry $entry -Name 'pid'
+        $entryStart = Get-EntryProperty -Entry $entry -Name 'pid_started_at'
+        if ($entryPid -eq $OwnHost.Pid -and $null -ne $entryStart -and
+            [math]::Abs([double] $entryStart - $OwnHost.Started) -le 2.0) {
+            return $entry
+        }
+    }
+    return $null
 }
 
 function Get-TitleAndAttachment {
@@ -188,25 +279,38 @@ function Get-TitleAndAttachment {
         [pscustomobject] $OwnHost
     )
 
-    $selfEntry = $null
-    $titleEntry = $null
-    foreach ($entry in (Get-RecordedSessionEntries)) {
-        $cwd = Get-EntryProperty -Entry $entry -Name 'cwd'
-        if (-not (Test-UnderOrEqual -Candidate $cwd -Root $ResolvedWorktree)) { continue }
-        if (-not $titleEntry) { $titleEntry = $entry }
-        $entryPid = Get-EntryProperty -Entry $entry -Name 'pid'
-        $entryStart = Get-EntryProperty -Entry $entry -Name 'pid_started_at'
-        if ($entryPid -eq $OwnHost.Pid -and $null -ne $entryStart -and
-            [math]::Abs([double] $entryStart - $OwnHost.Started) -le 2.0) {
-            $selfEntry = $entry
+    $selfEntry = Get-OwnRegistryEntry -OwnHost $OwnHost
+    if ($selfEntry) {
+        $selfCwd = Get-EntryProperty -Entry $selfEntry -Name 'cwd'
+        return [pscustomobject]@{
+            Attached = (Test-UnderOrEqual -Candidate $selfCwd -Root $ResolvedWorktree)
+            Title    = Get-EntryProperty -Entry $selfEntry -Name 'title'
         }
     }
-
-    $attached = ($null -ne $selfEntry) -or (Test-UnderOrEqual -Candidate $StartingLocation -Root $ResolvedWorktree)
-    [pscustomobject]@{
-        Attached = $attached
-        Title    = if ($titleEntry) { Get-EntryProperty -Entry $titleEntry -Name 'title' } else { $null }
+    return [pscustomobject]@{
+        Attached = (Test-UnderOrEqual -Candidate $StartingLocation -Root $ResolvedWorktree)
+        Title    = $null
     }
+}
+
+function Test-SingleRegistryEntryWithTitle {
+    param([string] $Title)
+
+    $count = 0
+    foreach ($entry in (Get-RecordedSessionEntries)) {
+        if ((Get-EntryProperty -Entry $entry -Name 'title') -eq $Title) { $count++ }
+    }
+    return $count -eq 1
+}
+
+function Test-SingleLiveTabWithTitle {
+    param([string] $Title)
+
+    $output = & (Join-Path $PSScriptRoot 'close-tab.ps1') -List 2>$null
+    $lines = @($output | ForEach-Object { [string] $_ })
+    $pattern = '^\s*' + [regex]::Escape($Title) + '\s+\S+\s+\d+\s*$'
+    $matches = @($lines | Where-Object { $_ -match $pattern })
+    return $matches.Count -eq 1
 }
 
 function Format-CommandLineArgument {
@@ -263,7 +367,7 @@ $startingLocation = (Get-Location).Path
 $targetWorktree = Resolve-TargetWorktree -Provided $Worktree
 $resolvedWorktree = Get-ResolvedWorktree -Path $targetWorktree
 $stateDirectory = Get-StateDirectory
-$receipt = Get-FreshRemovableReceipt -ResolvedWorktree $resolvedWorktree
+$receipt = Get-FreshRemovableReceipt -StateDirectory $stateDirectory -ResolvedWorktree $resolvedWorktree
 
 $ownHost = Resolve-OwnHost
 if (-not $ownHost) {
@@ -274,6 +378,8 @@ $attachment = Get-TitleAndAttachment -ResolvedWorktree $resolvedWorktree -Starti
 if (-not $attachment.Attached) {
     throw "finish: '$resolvedWorktree' is not this session's own attachment; refusing to close or remove it."
 }
+
+$parentShell = Get-ParentShellHost -OwnHost $ownHost
 
 # Release any lock this process holds on the target directory before the reaper tries to remove it -
 # Windows refuses to delete a directory that is any process's current location.
@@ -287,13 +393,13 @@ if (-not $PSCmdlet.ShouldProcess($resolvedWorktree, 'Spawn the cleanup reaper an
     return
 }
 
-$resultPath = Join-Path $stateDirectory ("merge-cleanup/results/" + (Get-WorktreeDigest -ResolvedWorktree $resolvedWorktree) + '.json')
-if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath -Force }
+$resultPath = Join-Path $stateDirectory ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
 
 $reaperScript = Join-Path $PSScriptRoot 'finish_reaper.ps1'
-$commandLine = Format-CommandLine -Parts @(
+$commandParts = @(
     'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $reaperScript,
     '-HostPid', $ownHost.Pid, '-HostStart', $ownHost.Started,
+    '-Head', (Get-EntryProperty -Entry $receipt -Name 'head'),
     '-Primary', (Get-EntryProperty -Entry $receipt -Name 'primary'),
     '-Worktree', $resolvedWorktree,
     '-Branch', (Get-EntryProperty -Entry $receipt -Name 'branch'),
@@ -301,6 +407,10 @@ $commandLine = Format-CommandLine -Parts @(
     '-Result', $resultPath,
     '-StateDirectory', $stateDirectory
 )
+if ($parentShell) {
+    $commandParts += @('-ParentPid', $parentShell.Pid, '-ParentStart', $parentShell.Started)
+}
+$commandLine = Format-CommandLine -Parts $commandParts
 
 if (-not (Start-DetachedReaper -CommandLine $commandLine)) {
     throw 'finish: could not spawn the cleanup reaper; neither CIM process creation nor the schtasks fallback succeeded.'
@@ -320,13 +430,17 @@ if (-not $started) {
 
 $closeMode = $env:AGENT_FINISH_CLOSE_MODE
 if ($closeMode -eq 'process') {
-    Stop-Process -Id $ownHost.Pid -Force
+    Stop-VerifiedProcess -Target $ownHost
+    if ($parentShell) { Stop-VerifiedProcess -Target $parentShell }
     Write-Output "finish: closed host pid $($ownHost.Pid) directly (AGENT_FINISH_CLOSE_MODE=process)."
 }
-elseif ($attachment.Title) {
+elseif ($attachment.Title -and
+    (Test-SingleRegistryEntryWithTitle -Title $attachment.Title) -and
+    (Test-SingleLiveTabWithTitle -Title $attachment.Title)) {
     & (Join-Path $PSScriptRoot 'close-tab.ps1') $attachment.Title -Force
 }
 else {
-    Stop-Process -Id $ownHost.Pid -Force
-    Write-Output "finish: closed host pid $($ownHost.Pid) directly (no recorded tab title)."
+    Stop-VerifiedProcess -Target $ownHost
+    if ($parentShell) { Stop-VerifiedProcess -Target $parentShell }
+    Write-Output "finish: closed host pid $($ownHost.Pid) directly (no uniquely identified tab to close)."
 }
