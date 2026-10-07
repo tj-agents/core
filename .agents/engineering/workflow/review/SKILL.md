@@ -53,7 +53,7 @@ review covers its layer against the parent; its tests still validate the cumulat
 main directly into each child as a substitute for reconciling the stack from its bottom.
 
 A review-only request over an already immutable remote or commit candidate omits `--synchronize`. The helper
-returns one compact descriptor and Git-private bundle containing the binary patch and NUL path manifest. It
+returns one compact Git-private descriptor and an external temporary bundle containing the binary patch and NUL path manifest. It
 also records the one synchronization, candidate identity, routed rule hashes, relevant lenses, security-path
 classification, and one wave.
 Do not reconstruct those facts through separate shell calls.
@@ -65,8 +65,9 @@ count, canonical work-order path, and new-or-append mode. Every later command an
 `<base>..<head>`, never a live replacement
 for `<head>`.
 
-The helper materializes the candidate bundle defined by `review-lifecycle` under repository-private Git
-state and validates the exact patch, NUL path manifest, descriptor identity, and hashes before returning.
+The helper stores the authoritative descriptor in repository-private Git state and materializes the candidate
+bundle defined by `review-lifecycle` in an external temporary cache. It validates the exact patch, NUL path
+manifest, descriptor identity, and hashes before returning.
 Add its paths and identities to every immutable-artifact set. A host without safe read-only Git reads this
 bundle; no reviewer depends on the implementation transcript.
 
