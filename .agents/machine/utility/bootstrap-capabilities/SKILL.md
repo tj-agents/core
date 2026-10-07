@@ -108,13 +108,15 @@ the entry records only that consumption platform and no additional declared exec
 prerequisites. Those defaults describe the supplied catalog, without establishing owner support.
 
 The composer reads immutable Git blobs, so working-tree edits cannot change its output. It checks
-the GitHub origin, both native marketplace/package identities, actual package versions, shipped
-skills, required harness declarations and their hook payloads. Top-level `selection.json`
+the GitHub origin, both native marketplace/package identities, actual `N.N.N` package versions
+supported by catalog v1, shipped skills, required harness declarations and their hook payloads. Top-level `selection.json`
 prerequisites/dependencies must agree with harness plugin requirements; local names qualify to
-the package's own marketplace. Skill-level library requirements do not become plugin edges.
+the package's own marketplace in both dependency edges and emitted harness declarations.
+Skill-level library requirements do not become plugin edges.
 Unresolved dependencies, contradictory owners, cycles and linked payloads fail before output.
 Each package keeps its own native version. The selected anchor supplies only the release grouping
 version; the full commit and `sha256-tree-v1` payload digest identify the snapshot. Composition
+requires every inspected Git object to be locally available, disables Git lazy fetching, and
 performs no fetch, snapshot execution, lock selection, installation or profile changes.
 
 ## Catalog and digest contract

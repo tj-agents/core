@@ -1,16 +1,21 @@
 import copy
 import json
+import os
+import shutil
+import stat
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / '.agents/machine/utility/bootstrap-capabilities/scripts'))
 import bootstrap_capabilities as bootstrap
 import compose_catalog as composer
+import repo_config
 
 
 class CatalogCompositionTests(unittest.TestCase):
@@ -168,6 +173,81 @@ class CatalogCompositionTests(unittest.TestCase):
         self.revision = self.git('rev-parse', 'HEAD')
         with self.assertRaisesRegex(bootstrap.BootstrapError, 'linked'):
             self.compose()
+
+    def test_catalog_v1_rejects_prerelease_and_build_versions(self):
+        original = self.revision
+        for version in ('1.2.3-rc.1', '1.2.3+build.4'):
+            with self.subTest(version=version):
+                self.git('reset', '--hard', original)
+                for host in ('codex', 'claude'):
+                    self.change_json(f'plugins/base/.{host}-plugin/plugin.json', lambda value: value.update(version=version))
+                self.commit()
+                with self.assertRaisesRegex(bootstrap.BootstrapError, 'catalog v1 N.N.N'):
+                    self.compose()
+
+    def test_local_harness_names_are_consumable_by_repository_declarations(self):
+        names = ('base', 'engineering', 'machine')
+        for name in names[1:]:
+            shutil.copytree(self.checkout / 'plugins/extra', self.checkout / f'plugins/{name}')
+        for host in ('claude', 'codex'):
+            entries = [{'name': name, 'source': f'./plugins/{name}' if host == 'claude' else
+                        {'source': 'local', 'path': f'./plugins/{name}'}} for name in names]
+            path = '.claude-plugin/marketplace.json' if host == 'claude' else '.agents/plugins/marketplace.json'
+            self.write_json(path, {'name': 'base-agents', 'plugins': entries})
+        for name in names:
+            for host in ('codex', 'claude'):
+                self.change_json(f'plugins/{name}/.{host}-plugin/plugin.json', lambda value: value.update(name=name))
+            self.change_json(f'plugins/{name}/selection.json', lambda value: value.update(plugin=name))
+            self.change_json(f'plugins/{name}/harness.json', lambda value: value.update(
+                plugin=f'base-agents/{name}', requires={**value['requires'],
+                    'marketplaces': [{'id': 'base-agents', 'repository': 'example/capabilities'}],
+                    'plugins': [name] if name == 'base' else [name, 'base']}))
+        self.commit()
+        document = self.document()
+        document['sources'][0]['plugins'] = list(names)
+        original_harness = (self.checkout / 'plugins/engineering/harness.json').read_bytes()
+        catalog = composer.compose_catalog(document, 'linux')
+        release = catalog['releases'][0]
+        engineering = next(plugin for plugin in release['plugins'] if plugin['name'] == 'engineering')
+        self.assertEqual(engineering['harness']['plugins'], ['base-agents/base', 'base-agents/engineering'])
+        self.assertEqual(engineering['dependencies']['required'], ['base-agents/base'])
+        self.assertEqual((self.checkout / 'plugins/engineering/harness.json').read_bytes(), original_harness)
+        lock = {'schema_version': 1, 'plugins': [
+            {'id': plugin['id'], 'release': release['id'], 'commit': self.revision,
+             'required_skills': [], 'path_scopes': [], 'exceptions': []} for plugin in release['plugins']]}
+        self.write_json('composed.json', catalog)
+        self.write_json('capabilities.lock.json', lock)
+        sources, identities, allow, rules = repo_config.declarations(self.checkout / 'capabilities.lock.json', self.checkout / 'composed.json')
+        self.assertEqual(set(sources), {'base-agents'})
+        self.assertEqual(identities, {f'{name}@base-agents': True for name in names})
+        self.assertEqual((allow, rules), ([], []))
+
+    def test_missing_promisor_blob_fails_without_fetch_or_object_writes(self):
+        provider_temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(provider_temporary.cleanup)
+        provider = Path(provider_temporary.name) / 'provider.git'
+        subprocess.run(['git', 'clone', '--bare', '--no-hardlinks', str(self.checkout), str(provider)],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        oid = self.git('rev-parse', f'{self.revision}:plugins/base/binary.dat')
+        subprocess.run(['git', '-C', str(provider), 'cat-file', '-e', oid],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        self.git('remote', 'add', 'provider', str(provider))
+        self.git('config', 'remote.provider.promisor', 'true')
+        self.git('config', 'remote.provider.partialclonefilter', 'blob:none')
+        self.git('config', 'extensions.partialClone', 'provider')
+        objects = self.checkout / '.git/objects'
+        missing_blob = objects / oid[:2] / oid[2:]
+        missing_blob.chmod(stat.S_IREAD | stat.S_IWRITE)
+        missing_blob.unlink()
+        before = {path.relative_to(objects).as_posix(): path.read_bytes() for path in objects.rglob('*') if path.is_file()}
+        trace = self.checkout / 'git-inspection.trace'
+        with mock.patch.dict(os.environ, {'GIT_TRACE': str(trace), 'GIT_NO_LAZY_FETCH': '0'}):
+            with self.assertRaisesRegex(bootstrap.BootstrapError, 'locally available blob|snapshot inspection failed'):
+                self.compose()
+        after = {path.relative_to(objects).as_posix(): path.read_bytes() for path in objects.rglob('*') if path.is_file()}
+        self.assertEqual(after, before)
+        self.assertNotIn('fetch', trace.read_text(encoding='utf-8').lower())
+        self.assertFalse((objects / oid[:2] / oid[2:]).exists())
 
     def test_source_catalog_policy_and_exclusions_are_preserved(self):
         policy = copy.deepcopy(self.compose())
