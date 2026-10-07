@@ -314,7 +314,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.run_hook({"hook_event_name": "SessionStart", "cwd": str(primary)}, )
         self.assertFalse(path.exists())
 
-    def test_reconcile_clears_on_branch_deletion_for_primary_checkout_delivery(self):
+    def test_primary_branch_deletion_keeps_session_close_obligation(self):
         bare, primary = init_repo(self.root)
         git(primary, "checkout", "-q", "-b", "feature")
         command = f'pushd "{primary}" && gh pr merge 3 --squash'
@@ -326,9 +326,9 @@ class MergeCleanupGateTests(unittest.TestCase):
         git(primary, "branch", "-D", "feature")
 
         self.run_hook({"hook_event_name": "SessionStart", "cwd": str(primary)})
-        self.assertFalse(path.exists())
+        self.assertTrue(path.exists())
 
-    def test_reconcile_clears_on_age(self):
+    def test_obligation_age_does_not_prove_session_exit(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
         merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
@@ -337,7 +337,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.edit_obligation(path, recorded_at=time.time() - gate.RECONCILE_MAX_AGE_SECONDS - 1)
 
         self.run_hook({"hook_event_name": "SessionStart", "cwd": str(primary)})
-        self.assertFalse(path.exists())
+        self.assertTrue(path.exists())
 
 
     def test_claude_posttooluse_confirms_and_stop_blocks_while_unconfirmed_and_active_pass(self):
@@ -709,7 +709,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual("block", decision["decision"])
 
 
-    def test_clear_removes_obligation(self):
+    def test_clear_retains_checkout_and_session_exit_obligation(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
         merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
@@ -718,7 +718,9 @@ class MergeCleanupGateTests(unittest.TestCase):
 
         result = self.run_hook(data=None, argv=["--clear", str(worktree)])
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertFalse(path.exists())
+        retained = json.loads(path.read_text())
+        self.assertTrue(retained["checkout_retained"])
+        self.assertTrue(retained["session_exit_required"])
 
 
     def test_reminder_prefix_match_and_common_dir_fallback(self):

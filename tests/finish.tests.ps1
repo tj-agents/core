@@ -1,3 +1,4 @@
+param([switch] $CloseOnlyTests, [switch] $FinishOnlyTests, [string] $TestShell, [string] $TestMode, [string] $CloseScriptOverride, [switch] $KeepScratch)
 $ErrorActionPreference = 'Stop'
 
 $repository = Split-Path -Parent $PSScriptRoot
@@ -319,6 +320,7 @@ try {
     $preflightState = Join-Path $scratch 'preflight-state'
     New-Item -ItemType Directory -Path $preflightState -Force | Out-Null
 
+    if (-not $CloseOnlyTests) {
     $noReceiptTarget = Join-Path $scratch 'no-receipt-target'
     New-Item -ItemType Directory -Path $noReceiptTarget -Force | Out-Null
     $noReceiptResult = Invoke-FinishProcess -Worktree $noReceiptTarget -Environment @{ AGENT_STATE_DIRECTORY = $preflightState }
@@ -1125,6 +1127,111 @@ Start-Sleep -Seconds 20
     Assert-True -Actual $duplicateClearedB -Message 'The reaper left a duplicate matching obligation file (under another path spelling) in place.'
 
     Write-Output 'PASS finish.tests.ps1: reaper removes every matching obligation file'
+    }
+
+    if (-not $FinishOnlyTests) {
+    $closeScript = if ($CloseScriptOverride) { $CloseScriptOverride } else { Join-Path $scriptsDirectory 'close.ps1' }
+    $closeRoot = Join-Path $scratch 'close-only'
+    New-Item -ItemType Directory -Path $closeRoot -Force | Out-Null
+    $closeRepo = New-TestRepo -Root $closeRoot
+    Invoke-GitOrThrow -Cwd $closeRepo.Primary -Arguments @('branch', 'keep-branch') | Out-Null
+    $closeHead = Invoke-GitOrThrow -Cwd $closeRepo.Primary -Arguments @('show-ref')
+    $closeHostPath = Join-Path $closeRoot 'agent-close-test.exe'
+    Copy-Item -LiteralPath $env:ComSpec -Destination $closeHostPath
+    $closeWrapperPath = Join-Path $closeRoot 'agent-close-test-wrapper.exe'
+    Copy-Item -LiteralPath $env:ComSpec -Destination $closeWrapperPath
+    $closeBootstrap = Join-Path $closeRoot 'bootstrap.ps1'
+    @'
+param([string] $Close, [string] $Mode, [string] $Ready)
+$ErrorActionPreference = 'Stop'
+$current = Get-CimInstance Win32_Process -Filter "ProcessId=$PID"
+$owner = Get-CimInstance Win32_Process -Filter "ProcessId=$($current.ParentProcessId)"
+if ($owner.Name -ne 'agent-close-test.exe') { throw 'Fixture host identity mismatch' }
+$started = ([DateTimeOffset]($owner.CreationDate.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+$entry = @{ session_id = 'close-test'; pid = [int] $owner.ProcessId; pid_started_at = $started; cwd = (Get-Location).Path; title = $null }
+if ($Mode -eq 'mismatch') { $entry.pid_started_at -= 30 }
+if ($Mode -eq 'wrong-cwd') { $entry.cwd = Join-Path (Get-Location).Path 'other' }
+$registry = Join-Path $env:AGENT_STATE_DIRECTORY 'cli-sessions'
+New-Item -ItemType Directory -Path $registry -Force | Out-Null
+if ($Mode -ne 'unknown') { [IO.File]::WriteAllText((Join-Path $registry 'own.json'), ($entry | ConvertTo-Json)) }
+[IO.File]::WriteAllText($Ready, [string] $PID)
+if ($Mode -eq 'unknown-host') { $env:AGENT_CLI_HOST_NAMES = 'agent-close-test-unrecognized' }
+$closeExit = 0
+try {
+    & $Close *> "$Ready.output"
+}
+catch {
+    $closeExit = 1
+    $_ | Out-File -FilePath "$Ready.output" -Append
+}
+[IO.File]::WriteAllText("$Ready.returned", [string] $closeExit)
+Start-Sleep -Seconds 120
+'@ | Set-Content -LiteralPath $closeBootstrap -Encoding UTF8
+    $closeShells = if ($TestShell) { @($TestShell) } else { @('pwsh', 'powershell.exe') }
+    foreach ($closeShell in $closeShells) {
+        if (-not (Get-Command $closeShell -ErrorAction SilentlyContinue)) { continue }
+        $closeModes = if ($TestMode) { @($TestMode) } else { @('good', 'unknown', 'unknown-host', 'mismatch', 'wrong-cwd') }
+        foreach ($mode in $closeModes) {
+            $closeState = Join-Path $closeRoot "$closeShell-$mode"
+            $closeReady = Join-Path $closeState 'ready'
+            $closeOwn = Join-Path $closeState 'merge-cleanup/obligations/own.json'
+            $closePeer = Join-Path $closeState 'merge-cleanup/obligations/peer.json'
+            Write-JsonFile -Path $closeOwn -Data @{ session_id = 'close-test'; worktree = $closeRepo.Primary }
+            Write-JsonFile -Path $closePeer -Data @{ session_id = 'peer'; worktree = $closeRepo.Primary }
+            $env:AGENT_STATE_DIRECTORY = $closeState
+            $env:AGENT_CLI_HOST_NAMES = 'agent-close-test'
+            $env:AGENT_FINISH_CLOSE_MODE = 'process'
+            $peerHost = Start-Process -FilePath $closeHostPath -ArgumentList '/c ping -n 121 127.0.0.1 >nul' -PassThru -WindowStyle Hidden
+            $closeCommand = "$closeShell -NoProfile -ExecutionPolicy Bypass -File `"$closeBootstrap`" -Close `"$closeScript`" -Mode $mode -Ready `"$closeReady`""
+            $wrappedCloseCommand = "`"$closeHostPath`" /c $closeCommand"
+            $fixtureCommand = Join-Path $closeState 'launch.cmd'
+            Set-Content -LiteralPath $fixtureCommand -Value $wrappedCloseCommand -Encoding ASCII
+            $fixtureOutput = Join-Path $closeState 'launch.stdout'
+            $fixtureError = Join-Path $closeState 'launch.stderr'
+            $closingHost = Start-Process -FilePath $closeWrapperPath -ArgumentList @('/c', "`"$fixtureCommand`"") -WorkingDirectory $closeRepo.Primary -PassThru -WindowStyle Hidden -RedirectStandardOutput $fixtureOutput -RedirectStandardError $fixtureError
+            $bootstrapPid = $null
+            try {
+                $fixtureReady = Wait-Condition -Condition { Test-Path -LiteralPath $closeReady }
+                Assert-True -Actual $fixtureReady -Message "Close fixture did not become ready: $(Get-Content $fixtureError -Raw) $(Get-Content $fixtureOutput -Raw)"
+                $bootstrapPid = [int](Get-Content -LiteralPath $closeReady -Raw)
+                if ($mode -eq 'good') {
+                    $verifiedClosed = Wait-Condition -TimeoutSeconds 60 -Condition { -not (Test-Path -LiteralPath $closeOwn) }
+                    $closeDetails = if (Test-Path -LiteralPath "$closeReady.output") { Get-Content -LiteralPath "$closeReady.output" -Raw } else { 'no child output' }
+                    $observerDetails = @(Get-ChildItem (Join-Path $closeState 'merge-cleanup/results') -Filter '*.json' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Raw }) -join "`n"
+                    Assert-True -Actual $verifiedClosed -Message "Verified close did not clear its own obligation: $closeDetails $observerDetails"
+                    $closingHost.Refresh()
+                    Assert-True -Actual $closingHost.HasExited -Message 'Own fake CLI remained alive after close.'
+                    $records = @(Get-ChildItem (Join-Path $closeState 'merge-cleanup/results') -Filter '*.json' | ForEach-Object { Read-JsonFile $_.FullName })
+                    Assert-Equal -Expected 'session-closed' -Actual $records[0].status -Message 'Close observer did not verify exit.'
+                    Assert-True -Actual $records[0].checkout_retained -Message 'Close observer did not record retention.'
+                }
+                else {
+                    Assert-True -Actual (Wait-Condition -TimeoutSeconds 60 -Condition { Test-Path -LiteralPath "$closeReady.returned" }) -Message 'Refused close did not return.'
+                    Assert-False -Actual ((Get-Content "$closeReady.returned" -Raw) -eq '0') -Message 'Invalid identity or attachment was accepted.'
+                    $refusalOutput = Get-Content -LiteralPath "$closeReady.output" -Raw
+                    $expectedRefusal = if ($mode -eq 'unknown-host') { 'cannot resolve an owning claude/codex host' } else { 'no verified registry attachment' }
+                    Assert-Contains -Actual $refusalOutput -Expected $expectedRefusal -Message 'Close failed for an unrelated reason.'
+                    $closingHost.Refresh()
+                    Assert-False -Actual $closingHost.HasExited -Message 'Invalid close killed its host.'
+                    Assert-True -Actual (Test-Path -LiteralPath $closeOwn) -Message 'Invalid close cleared the obligation.'
+                }
+                $peerHost.Refresh()
+                Assert-False -Actual $peerHost.HasExited -Message 'Close killed another session.'
+                Assert-True -Actual (Test-Path -LiteralPath $closePeer) -Message 'Close cleared another session obligation.'
+                Write-Output "PASS finish.tests.ps1: close $closeShell $mode"
+                Assert-True -Actual (Test-Path -LiteralPath (Join-Path $closeRepo.Primary 'README.md')) -Message 'Close removed primary files.'
+                Assert-Equal -Expected $closeHead -Actual (Invoke-GitOrThrow -Cwd $closeRepo.Primary -Arguments @('show-ref')) -Message 'Close changed Git refs.'
+                Assert-Equal -Expected '' -Actual (Invoke-GitOrThrow -Cwd $closeRepo.Primary -Arguments @('status', '--porcelain')) -Message 'Close changed Git state.'
+            }
+            finally {
+                foreach ($testPid in @($closingHost.Id, $peerHost.Id, $bootstrapPid)) {
+                    if ($testPid) { Stop-TestProcessTree $testPid }
+                }
+            }
+        }
+    }
+    Write-Output 'PASS finish.tests.ps1: close-only primary preservation and verified identity'
+    }
 }
 finally {
     $env:AGENT_STATE_DIRECTORY = $originalState
@@ -1132,7 +1239,8 @@ finally {
     $env:AGENT_FINISH_CLOSE_MODE = $originalCloseMode
     $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = $originalReaperTimeout
     $env:CLEANUP_PROOF_FORGE_FIXTURE = $originalFixture
-    if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($KeepScratch) { Write-Output "Scratch retained: $scratch" }
+    elseif (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 Write-Output 'PASS finish.tests.ps1'
