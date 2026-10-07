@@ -48,10 +48,14 @@ Changed owned settings and collisions with unmanaged Codex tables fail before wr
 Keep the ownership state with the clone; deleting it prevents safely updating existing
 managed Codex configuration or rules.
 
-All output paths are checked before mutation. Local mode rejects tracked targets and links
-that escape the explicit root, including links above missing output files. For a Git checkout,
-it maintains exact file exclusions through `git rev-parse --git-path info/exclude`; linked
-worktrees use their actual shared exclusion file. Explicit non-Git workspace roots are supported
+All output paths, including Git exclusions, are checked against each other and the lock,
+catalog and repository overlay by canonical path and file identity before mutation. Multiply
+linked output files are rejected. Local mode rejects tracked targets and links that escape
+the explicit root, including links above missing output files. A failed write restores the
+attempted outputs to their prior bytes so approvals and ownership remain paired on retry.
+For a Git checkout, it maintains exact file exclusions through
+`git rev-parse --git-path info/exclude`; linked worktrees use their actual shared exclusion
+file with separate blocks owned by each checkout. Explicit non-Git workspace roots are supported
 without exclusions. Locks and catalogs remain read inputs; this command does not compose them
 or change their tracking. A later adoption caller can use `plan(..., prospective_paths=[...])`
 or `preflight_paths(...)` to validate its own prospective lock, catalog and receipt paths.

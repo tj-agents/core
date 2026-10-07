@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -162,36 +163,63 @@ def contained(root: Path, path: Path) -> Path:
             raise bootstrap.BootstrapError(f"Target parent is not a directory: {ancestor}")
     if candidate.exists() and not candidate.is_file():
         raise bootstrap.BootstrapError(f"Target is not a file: {candidate}")
+    if candidate.is_file() and candidate.stat().st_nlink > 1:
+        raise bootstrap.BootstrapError(f"Target has multiple hard links: {candidate}")
     return candidate
 
 
-def preflight_paths(root: Path, paths: list[Path], *, scope: str = "local", run=subprocess.run) -> Path | None:
+def file_identity(path: Path):
+    if not path.exists():
+        return None
+    stat = path.stat()
+    return stat.st_dev, stat.st_ino
+
+
+def validate_aliases(targets: list[Path], read_paths: list[Path]) -> None:
+    canonical = set()
+    identities = set()
+    inputs = {path.resolve() for path in read_paths}
+    input_identities = {identity for path in read_paths if (identity := file_identity(path)) is not None}
+    for path in targets:
+        resolved = path.resolve()
+        identity = file_identity(path)
+        if resolved in canonical or identity is not None and identity in identities:
+            raise bootstrap.BootstrapError("Repository configuration targets alias the same file")
+        if resolved in inputs or identity is not None and identity in input_identities:
+            raise bootstrap.BootstrapError(f"Repository configuration target aliases a read input: {path}")
+        canonical.add(resolved)
+        if identity is not None:
+            identities.add(identity)
+
+
+def preflight_paths(root: Path, paths: list[Path], *, scope: str = "local", read_paths: list[Path] = (), run=subprocess.run) -> Path | None:
     if scope not in {"project", "local"}:
         raise bootstrap.BootstrapError(f"Unknown repository scope: {scope}")
     root = root.expanduser().resolve()
     if not root.is_dir():
         raise bootstrap.BootstrapError(f"Repository root does not exist: {root}")
     targets = [contained(root, path) for path in paths]
+    exclude = None
     if not (root / ".git").exists():
         if any((parent / ".git").exists() for parent in root.parents):
             raise bootstrap.BootstrapError(f"Root is not the exact Git checkout: {root}")
-        return None
-    top = Path(bootstrap.git(run, ["rev-parse", "--show-toplevel"], root)).resolve()
-    if top != root:
-        raise bootstrap.BootstrapError(f"Root is not the exact Git checkout: {root}")
-    if scope != "local":
-        return None
-    tracked_paths = sorted({relative for path in targets for relative in (path.relative_to(root).as_posix(), path.resolve().relative_to(root).as_posix())})
-    tracked = bootstrap.git(run, ["ls-files", "--cached", "-z", "--", *tracked_paths], root)
-    if tracked:
-        raise bootstrap.BootstrapError("Local targets are tracked: " + tracked.replace("\0", ", "))
-    common = Path(bootstrap.git(run, ["rev-parse", "--path-format=absolute", "--git-common-dir"], root)).resolve()
-    exclude = Path(bootstrap.git(run, ["rev-parse", "--git-path", "info/exclude"], root))
-    if not exclude.is_absolute():
-        exclude = root / exclude
-    if not exclude.resolve().is_relative_to(common):
-        raise bootstrap.BootstrapError(f"Git exclusion target escapes Git metadata: {exclude}")
-    contained(common, exclude)
+    else:
+        top = Path(bootstrap.git(run, ["rev-parse", "--show-toplevel"], root)).resolve()
+        if top != root:
+            raise bootstrap.BootstrapError(f"Root is not the exact Git checkout: {root}")
+        if scope == "local":
+            tracked_paths = sorted({relative for path in targets for relative in (path.relative_to(root).as_posix(), path.resolve().relative_to(root).as_posix())})
+            tracked = bootstrap.git(run, ["ls-files", "--cached", "-z", "--", *tracked_paths], root)
+            if tracked:
+                raise bootstrap.BootstrapError("Local targets are tracked: " + tracked.replace("\0", ", "))
+            common = Path(bootstrap.git(run, ["rev-parse", "--path-format=absolute", "--git-common-dir"], root)).resolve()
+            exclude = Path(bootstrap.git(run, ["rev-parse", "--git-path", "info/exclude"], root))
+            if not exclude.is_absolute():
+                exclude = root / exclude
+            if not exclude.resolve().is_relative_to(common):
+                raise bootstrap.BootstrapError(f"Git exclusion target escapes Git metadata: {exclude}")
+            contained(common, exclude)
+    validate_aliases([*targets, *([exclude] if exclude is not None else [])], read_paths)
     return exclude
 
 
@@ -290,16 +318,38 @@ def local_codex(path: Path, sources: dict, identities: dict, previous: str | Non
 
 def exclusion_text(path: Path, root: Path, targets: list[Path]) -> str:
     existing = text_at(path) or ""
-    if existing.count(EXCLUDE_START) != existing.count(EXCLUDE_END) or existing.count(EXCLUDE_START) > 1 or (EXCLUDE_START in existing and existing.index(EXCLUDE_START) > existing.index(EXCLUDE_END)):
-        raise bootstrap.BootstrapError(f"{path}: malformed managed exclusions")
-    if EXCLUDE_START in existing:
-        before, rest = existing.split(EXCLUDE_START, 1)
-        _, after = rest.split(EXCLUDE_END, 1)
-        existing = before + after.lstrip("\r\n")
-    relatives = {relative for path in targets for relative in (path.relative_to(root).as_posix(), path.resolve().relative_to(root).as_posix())}
+    owner = hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()
+    relatives = {relative for target in targets for relative in (target.relative_to(root).as_posix(), target.resolve().relative_to(root).as_posix())}
     patterns = {"/" + re.sub(r"([*?\[\] ])", r"\\\1", relative) for relative in relatives}
-    lines = [EXCLUDE_START, *sorted(patterns), EXCLUDE_END]
-    return existing + ("\n" if existing and not existing.endswith("\n") else "") + "\n".join(lines) + "\n"
+    block = "\n".join([EXCLUDE_START + " " + owner, *sorted(patterns), EXCLUDE_END + " " + owner]) + "\n"
+    kept = []
+    active = None
+    owners = set()
+    for line in existing.splitlines(keepends=True):
+        stripped = line.rstrip("\r\n")
+        if stripped.startswith(EXCLUDE_START):
+            suffix = stripped[len(EXCLUDE_START):]
+            if active is not None or suffix in owners or suffix and not re.fullmatch(r" [a-f0-9]{64}", suffix):
+                raise bootstrap.BootstrapError(f"{path}: malformed managed exclusions")
+            active = suffix
+            owners.add(suffix)
+            if suffix == " " + owner:
+                kept.append(block)
+        elif stripped.startswith(EXCLUDE_END):
+            if active is None or stripped != EXCLUDE_END + active:
+                raise bootstrap.BootstrapError(f"{path}: malformed managed exclusions")
+            if active != " " + owner:
+                kept.append(line)
+            active = None
+            continue
+        if active != " " + owner:
+            kept.append(line)
+    if active is not None:
+        raise bootstrap.BootstrapError(f"{path}: malformed managed exclusions")
+    existing = "".join(kept)
+    if " " + owner in owners:
+        return existing
+    return existing + ("\n" if existing and not existing.endswith("\n") else "") + block
 
 
 def plan(lock_path: Path, catalog_path: Path, *, root: Path | None = None, scope: str = "project", prospective_paths: list[Path] = (), execute=subprocess.run) -> dict[Path, str | None]:
@@ -311,9 +361,8 @@ def plan(lock_path: Path, catalog_path: Path, *, root: Path | None = None, scope
     rules_path = root / ".codex/rules/agent-harness.rules"
     state_path = root / LOCAL_STATE
     paths = [claude, codex, rules_path] + ([state_path] if scope == "local" else [])
-    exclude = preflight_paths(root, [*paths, *prospective_paths], scope=scope, run=execute)
-    if len({path.resolve() for path in paths}) != len(paths):
-        raise bootstrap.BootstrapError("Repository configuration targets alias the same file")
+    inputs = [lock_path, catalog_path, lock_path.resolve().parent / "repository-harness.json"]
+    exclude = preflight_paths(root, [*paths, *prospective_paths], scope=scope, read_paths=inputs, run=execute)
     sources, identities, allow, rules = declarations(lock_path, catalog_path)
     expected_rules = codex_rules(rules) if rules else None
     if scope == "local":
@@ -334,22 +383,45 @@ def plan(lock_path: Path, catalog_path: Path, *, root: Path | None = None, scope
     return targets
 
 
-def run(lock_path: Path, catalog_path: Path, mode: str, *, root: Path | None = None, scope: str = "project") -> list[str]:
-    if mode not in {"write", "check", "preview"}:
-        raise bootstrap.BootstrapError(f"Unknown repository mode: {mode}")
-    root = (root or lock_path.resolve().parent.parent).expanduser().resolve()
-    targets = plan(lock_path, catalog_path, root=root, scope=scope)
-    drift = []
-    for path, expected in targets.items():
-        if text_at(path) == expected:
-            continue
-        drift.append(path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path))
-        if mode == "write":
+def write_batch(targets: dict[Path, str | None]) -> None:
+    originals = {path: path.read_bytes() if path.is_file() else None for path in targets}
+    attempted = []
+    try:
+        for path, expected in targets.items():
+            attempted.append(path)
             if expected is None:
                 path.unlink()
             else:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(expected, encoding="utf-8")
+    except BaseException as error:
+        failures = []
+        for path in reversed(attempted):
+            before = originals[path]
+            try:
+                actual = path.read_bytes() if path.is_file() else None
+                if actual == before:
+                    continue
+                if before is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(before)
+            except OSError as rollback_error:
+                failures.append(f"{path}: {rollback_error}")
+        if failures:
+            raise bootstrap.BootstrapError("Repository configuration rollback failed: " + "; ".join(failures)) from error
+        raise
+
+
+def run(lock_path: Path, catalog_path: Path, mode: str, *, root: Path | None = None, scope: str = "project") -> list[str]:
+    if mode not in {"write", "check", "preview"}:
+        raise bootstrap.BootstrapError(f"Unknown repository mode: {mode}")
+    root = (root or lock_path.resolve().parent.parent).expanduser().resolve()
+    targets = plan(lock_path, catalog_path, root=root, scope=scope)
+    changed = {path: expected for path, expected in targets.items() if text_at(path) != expected}
+    drift = [path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path) for path in changed]
+    if mode == "write":
+        write_batch(changed)
     return drift
 
 
