@@ -24,23 +24,60 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='engineering package with spaces ')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
-        self.package = self.root / 'relocated plugin'
+        self.package = self.root / 'cache' / 'base-agents' / 'engineering' / '2.1.16'
         shutil.copytree(ROOT / 'plugins/engineering', self.package)
         self.cwd = self.root / 'unrelated caller'
         self.cwd.mkdir()
         review_cache = self.root / 'review cache'
         review_cache.mkdir()
+        plugin_data = self.root / 'plugin data'
         self.environment = dict(os.environ, PLUGIN_ROOT=str(self.package),
                                 CLAUDE_PLUGIN_ROOT=str(self.package), PYTHONIOENCODING='utf-8',
-                                TMP=str(review_cache), TEMP=str(review_cache))
+                                TMP=str(review_cache), TEMP=str(review_cache),
+                                PLUGIN_DATA=str(plugin_data))
 
-    def run_hook(self, path, data=None):
+    def run_hook(self, path, data=None, arguments=()):
         payload = dict(cwd=str(self.cwd), session_id=str(uuid.uuid4()),
                        hook_event_name='PreToolUse', tool_use_id=str(uuid.uuid4()))
         payload.update(data or {})
-        return subprocess.run([sys.executable, '-B', str(self.package / path)],
+        return subprocess.run([sys.executable, '-B', str(self.package / path), *arguments],
                               input=json.dumps(payload), capture_output=True, text=True,
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
+
+    def run_user_prompt_submit(self, host, prompt):
+        manifest = json.loads(
+            (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
+        )
+        hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
+        registration = hooks["hooks"]["UserPromptSubmit"]
+        self.assertEqual(1, len(registration))
+        self.assertEqual(1, len(registration[0]["hooks"]))
+        hook = registration[0]["hooks"][0]
+        if "args" in hook:
+            arguments = [
+                argument.replace("${CLAUDE_PLUGIN_ROOT}", str(self.package))
+                for argument in hook["args"]
+            ]
+        else:
+            command = hook["commandWindows" if os.name == "nt" else "command"].replace(
+                "${PLUGIN_ROOT}", str(self.package)
+            )
+            arguments = None
+        payload = {
+            "cwd": str(self.cwd),
+            "session_id": str(uuid.uuid4()),
+            "hook_event_name": "UserPromptSubmit",
+            "prompt": prompt,
+        }
+        if arguments is None:
+            return subprocess.run(
+                command, shell=True, input=json.dumps(payload), capture_output=True,
+                text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=20,
+            )
+        return subprocess.run(
+            [sys.executable, *arguments], input=json.dumps(payload), capture_output=True,
+            text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=20,
+        )
 
     def test_each_host_context_uses_its_packaged_contract_without_mutating_the_caller(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
@@ -74,6 +111,121 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("cannot read contract", result.stderr)
         self.assertEqual("", result.stdout)
+
+    def test_user_prompt_context_is_bounded_to_the_callout_section(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        heading = "## When the user calls out a mistake"
+
+        for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
+            with self.subTest(host=host):
+                manifest = json.loads(
+                    (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
+                )
+                hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
+                commands = [
+                    command_line(hook)
+                    for registration in hooks["hooks"]["UserPromptSubmit"]
+                    for hook in registration["hooks"]
+                ]
+                prompt_context = [
+                    command for command in commands
+                    if "session-context.py" in command and "--prompt-context" in command
+                ]
+                self.assertEqual(1, len(prompt_context))
+                self.assertIn(chr(36) + "{" + variable + "}/" + script, prompt_context[0])
+
+                result = self.run_hook(script, {"hook_event_name": "UserPromptSubmit"}, ("--prompt-context",))
+                self.assertEqual(0, result.returncode, result.stderr)
+                output = json.loads(result.stdout)["hookSpecificOutput"]
+                self.assertEqual("UserPromptSubmit", output["hookEventName"])
+                context = output["additionalContext"]
+                body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
+                expected = body.split(heading, 1)[1].split("\n## ", 1)[0].strip()
+                self.assertIn(str(contract), context)
+                self.assertIn("source SHA-256", context)
+                self.assertNotIn(heading, context)
+                self.assertEqual(expected, context.split("\n\n", 1)[1])
+                self.assertIn("Questions ask for reasoning", context)
+                self.assertIn("only for new evidence or a stated user decision", context)
+                self.assertNotIn("## A task has an owning lifecycle", context)
+                self.assertLess(len(context), 1200)
+
+        before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
+        contract.write_text(contract.read_text(encoding="utf-8").replace(
+            "Existing\nuser limits and scope gates still apply.",
+            "Existing\nuser limits and scope gates still apply. Canonical source changed.",
+        ), encoding="utf-8")
+        after = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertNotEqual(before, after)
+        self.assertNotEqual(before.splitlines()[0], after.splitlines()[0])
+        self.assertIn("Canonical source changed.", after)
+        self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_user_prompt_registration_dispatches_reminder_and_route_in_one_process(self):
+        reminder = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        router = "hooks/workflow_route.py"
+        cleanup = "hooks/merge_cleanup_gate.py"
+        for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
+            with self.subTest(host=host):
+                manifest = json.loads(
+                    (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
+                )
+                hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
+                registration = hooks["hooks"]["UserPromptSubmit"]
+                self.assertEqual(1, len(registration))
+                self.assertEqual(1, len(registration[0]["hooks"]))
+                command = command_line(registration[0]["hooks"][0])
+                self.assertIn("hook_dispatch.py", command)
+                self.assertLess(command.index(reminder), command.index(router))
+                if host == "codex":
+                    self.assertLess(command.index(router), command.index(cleanup))
+
+                ordinary = self.run_user_prompt_submit(host, "What should I work on?")
+                self.assertEqual(0, ordinary.returncode, ordinary.stderr)
+                ordinary_context = json.loads(ordinary.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("When the user calls out a mistake", ordinary_context)
+
+                (self.cwd / "GOAL.md").write_text(
+                    "# Goal\n\nStatus: in progress\n\nComplete every phase.\n", encoding="utf-8"
+                )
+                routed = self.run_user_prompt_submit(host, "Continue and complete the active goal.")
+                self.assertEqual(0, routed.returncode, routed.stderr)
+                routed_context = json.loads(routed.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("When the user calls out a mistake", routed_context)
+                self.assertIn("engineering:plan-execution automatically selected", routed_context)
+                self.assertLess(
+                    routed_context.index("When the user calls out a mistake"),
+                    routed_context.index("engineering:plan-execution automatically selected"),
+                )
+                (self.cwd / "GOAL.md").unlink()
+
+    def test_prompt_context_reports_missing_and_empty_sections(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        heading = "## When the user calls out a mistake"
+        original = contract.read_text(encoding="utf-8")
+
+        contract.write_text(original.replace(heading, heading + " \t", 1), encoding="utf-8")
+        whitespace = self.run_hook(script, arguments=("--prompt-context",))
+        self.assertEqual(0, whitespace.returncode, whitespace.stderr)
+
+        contract.write_text(original.replace(heading, "## Replaced heading"), encoding="utf-8")
+        missing = self.run_hook(script, arguments=("--prompt-context",))
+        self.assertNotEqual(0, missing.returncode)
+        self.assertIn("missing prompt context section", missing.stderr)
+        self.assertEqual("", missing.stdout)
+
+        before, remainder = original.split(heading, 1)
+        _, after = remainder.split("## A task has an owning lifecycle", 1)
+        contract.write_text(
+            before + heading + "\n\n## A task has an owning lifecycle" + after,
+            encoding="utf-8",
+        )
+        empty = self.run_hook(script, arguments=("--prompt-context",))
+        self.assertNotEqual(0, empty.returncode)
+        self.assertIn("is empty", empty.stderr)
+        self.assertEqual("", empty.stdout)
 
     def test_each_host_routes_an_active_goal_to_the_packaged_plan_execution_contract(self):
         (self.cwd / "GOAL.md").write_text(
@@ -132,6 +284,36 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 ).read_text(encoding="utf-8").strip()
                 self.assertIn(f"engineering:{name} automatically selected", context)
                 self.assertEqual(canonical, context.split("\n\n", 1)[1])
+
+    def test_packaged_planning_intent_distinguishes_execution_and_authoring(self):
+        (self.cwd / "GOAL.md").write_text("# Goal\n\nStatus: in progress\n", encoding="utf-8")
+        for prompt, name in (
+            ("Implement phase 2 of the plan only, not phase 3", "plan-execution"),
+            ("Don’t only plan it, implement it", "plan-execution"),
+            ("Draft the plan without implementing it", "plan-authoring"),
+            ("Please revise the current plan only", "plan-authoring"),
+            ("I want to continue planning the migration", "plan-authoring"),
+            ("I want you to only plan the migration", "plan-authoring"),
+            ("Please continue with planning only", "plan-authoring"),
+            ("I don't want to continue planning the migration", None),
+            ("Continue with the plan only", "plan-execution"),
+            ("Do not implement any changes yet", None),
+            ("Review the plan branch without implementing it", None),
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook("hooks/workflow_route.py", {
+                    "hook_event_name": "UserPromptSubmit", "prompt": prompt,
+                })
+                self.assertEqual(0, result.returncode, result.stderr)
+                if name is None:
+                    self.assertEqual("", result.stdout)
+                else:
+                    context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                    self.assertTrue(context.startswith(f"engineering:{name} automatically selected"))
+                    canonical = (
+                        self.package / f".agents/engineering/workflow/{name}/SKILL.md"
+                    ).read_text(encoding="utf-8").strip()
+                    self.assertEqual(canonical, context.split("\n\n", 1)[1])
 
     def test_host_manifests_register_supported_router_and_red_run_events(self):
         codex = json.loads((self.package / "hooks/codex.json").read_text(encoding="utf-8"))

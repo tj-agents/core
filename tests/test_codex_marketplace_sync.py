@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / '.agents/machine/scripts/codex_marketplace_sync.py'
@@ -30,10 +31,17 @@ class FakeCodex:
         self.empty_inventory = empty_inventory
         self.trust_exit = trust_exit
         self.trust_calls = []
+        self.harness_permission_calls = []
 
     def run(self, argv, cwd=None, **kwargs):
         executable, *arguments = argv
         if executable == sys.executable:
+            # apply_harness_permissions() also calls through sys.executable, in the sync's own `finally`
+            # -- recorded separately so it never gets mistaken for the hook-trust call it runs alongside.
+            script = arguments[1] if len(arguments) > 1 else ''
+            if script.endswith('harness_permissions_sync.py'):
+                self.harness_permission_calls.append((argv, cwd))
+                return completed(argv, 0, stdout='')
             self.trust_calls.append((argv, cwd))
             if self.trust_exit != 0:
                 return completed(argv, self.trust_exit, stdout='', stderr='trust failed')
@@ -161,6 +169,37 @@ class SyncCodexStandardsTests(unittest.TestCase):
             SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
         self.assertIn('invalid JSON', str(raised.exception))
 
+    def test_harness_permissions_converge_once_on_a_successful_sync(self):
+        fake = FakeCodex()
+        SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+
+        self.assertEqual(len(fake.harness_permission_calls), 1)
+        argv, _cwd = fake.harness_permission_calls[0]
+        self.assertEqual(argv[0], sys.executable)
+        self.assertEqual(argv[1], '-B')
+        self.assertTrue(argv[2].endswith('harness_permissions_sync.py'))
+        self.assertEqual(argv[3], '--apply')
+
+    def test_harness_permissions_still_converge_after_a_sync_error(self):
+        # The ps1 original ran this from a `finally`, so a raised SyncError must not skip it.
+        fake = FakeCodex(fail_upgrade=True)
+        with self.assertRaises(SYNC.SyncError):
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+        self.assertEqual(len(fake.harness_permission_calls), 1)
+
+    def test_a_harness_permissions_failure_never_becomes_a_sync_error(self):
+        fake = FakeCodex()
+
+        def failing_run(argv, cwd=None, **kwargs):
+            executable, *arguments = argv
+            script = arguments[1] if executable == sys.executable and len(arguments) > 1 else ''
+            if script.endswith('harness_permissions_sync.py'):
+                raise OSError('no python on this machine')
+            return fake.run(argv, cwd=cwd, **kwargs)
+
+        selected = SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=failing_run)
+        self.assertEqual(selected, ['base@base-agents', 'engineering@base-agents'])
+
     def test_a_failing_hook_trust_call_is_a_sync_error(self):
         fake = FakeCodex(trust_exit=1)
         with self.assertRaises(SYNC.SyncError) as raised:
@@ -168,13 +207,41 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.assertIn('could not trust', str(raised.exception))
 
     def test_a_missing_hook_trust_helper_is_a_sync_error_before_any_codex_call(self):
-        import unittest.mock as mock
         fake = FakeCodex()
         with mock.patch.object(SYNC.Path, 'is_file', return_value=False):
             with self.assertRaises(SYNC.SyncError) as raised:
                 SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
         self.assertIn('helper missing', str(raised.exception))
         self.assertEqual(fake.calls, [])
+
+
+class ApplyHarnessPermissionsTests(unittest.TestCase):
+    """apply_harness_permissions() in isolation: the fire-and-forget contract shared with
+    claude_standards_sync.py's own version of this function."""
+
+    def test_does_nothing_when_the_shared_script_is_missing(self):
+        calls = []
+        with mock.patch.object(SYNC.Path, 'is_file', return_value=False):
+            SYNC.apply_harness_permissions(run=lambda *a, **k: calls.append((a, k)))
+        self.assertEqual(calls, [])
+
+    def test_runs_the_real_shared_script_path_with_apply(self):
+        calls = []
+        SYNC.apply_harness_permissions(run=lambda *a, **k: calls.append((a, k)))
+        self.assertEqual(len(calls), 1)
+        (argv,), kwargs = calls[0]
+        self.assertEqual(argv[0], sys.executable)
+        self.assertEqual(argv[1], '-B')
+        self.assertTrue(argv[2].endswith('harness_permissions_sync.py'))
+        self.assertEqual(argv[3], '--apply')
+        self.assertEqual(kwargs.get('stdin'), SYNC.subprocess.DEVNULL)
+        self.assertEqual(kwargs.get('timeout'), 30)
+
+    def test_an_exception_from_run_is_swallowed(self):
+        def failing_run(*_args, **_kwargs):
+            raise OSError('no python on this machine')
+
+        SYNC.apply_harness_permissions(run=failing_run)  # must not raise
 
 
 class MainCliTests(unittest.TestCase):

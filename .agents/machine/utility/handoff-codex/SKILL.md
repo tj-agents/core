@@ -46,7 +46,7 @@ second tab for the same request.
 
 ## Model selection
 
-Pass `--lane L1`–`L7` and the launcher resolves the model *and its reasoning effort* from the canonical
+Pass `--lane L1`–`L6` and the launcher resolves the model *and its reasoning effort* from the canonical
 lane tables it ships under `resources/lanes` — the `engineering:lanes` ladder, and the repo's only
 model-name owner, so no caller has to know a model id and a retiering is one edit in one authored file.
 The pair matters here: a Codex model is priced and paced by both. An explicit `--model` or
@@ -54,20 +54,20 @@ The pair matters here: a Codex model is priced and paced by both. An explicit `-
 its own configured default, exactly as an interactively launched session would.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
-lane from the prompt would quietly decide the cost of every handoff. Choose by design, stakes, ambiguity
-and verifiability, from the hardest judgement inside the delegated work — never by how
-hard the work feels, and never raised by a merge, push or publish at its end, which the delivery gates
-govern:
+lane from the prompt would quietly decide the cost of every handoff. Choose the cheapest suitable rung by
+design, stakes, ambiguity and verifiability, from the hardest judgement inside the delegated work — never
+by how hard the work feels, file count, a handoff, or a merge, push or publish at its end, which the
+delivery gates govern:
 
 | Lane | For |
 |---|---|
 | `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
 | `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
 | `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
-| `L4` | Ordinary specified work that a compiler or a test suite will catch, delivery included. |
-| `L5` | Mechanical work whose shape is already decided. |
+| `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
+| `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
-| `L7` | Clerical work with a small input and no judgement to make. |
+| `L7` | In-session clerical work only; this launcher refuses it. |
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
@@ -96,10 +96,11 @@ python3 '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolu
 Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
-Add `--lane '<L1..L7>'` (or `--frontier`) to have the launcher resolve model and effort, or `--model
+Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve model and effort, or `--model
 '<model-id>'` and `--reasoning-effort '<level>'` for values the user named. Omitting them all lets
-`codex` fall back to its own configured default — the same behavior an interactively launched
-session gets.
+`codex` fall back to its own configured default — the same behavior an interactively launched session
+gets. The launcher rejects `--lane L7` before launch, with no terminal opened: that rung is for
+in-session clerical work and cannot open a handoff.
 
 Use `--bypass-hook-trust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
 user has not authorized repository hooks.

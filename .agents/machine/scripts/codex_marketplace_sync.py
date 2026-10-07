@@ -66,6 +66,28 @@ def invoke_codex_hook_trust(codex_executable, working_directory, helper_script, 
         raise SyncError('Codex could not trust tj-agents hooks')
 
 
+def apply_harness_permissions(run=subprocess.run):
+    """Converge this machine's declared harness permissions for every installed base-agents package.
+
+    Mirrors claude_standards_sync.py's apply_harness_permissions(): same three-parents-up hop from this
+    file to the package root (repository root in the authored layout, the package root in either packaged
+    layout) to the shared harness_permissions_sync.py, same fire-and-forget contract -- any failure here is
+    swallowed rather than turned into a sync failure, because a permissions converge is strictly additional
+    to a standards refresh. `run` is accepted (unlike the Claude original's hardcoded subprocess.run) so a
+    test's own fake `run` intercepts this call exactly like every other one in this module, rather than
+    reaching a real subprocess.
+    """
+    package_root = Path(__file__).resolve().parents[3]
+    script = package_root / '.agents' / 'machine' / 'utility' / 'bootstrap-capabilities' / 'scripts' / 'harness_permissions_sync.py'
+    if not script.is_file():
+        return
+    try:
+        run([sys.executable, '-B', str(script), '--apply'],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def sync_codex_standards(codex_executable, working_directory, out=print, run=subprocess.run):
     """Refresh every enabled git-sourced Codex plugin and trust tj-agents' own hooks among them.
 
@@ -75,40 +97,46 @@ def sync_codex_standards(codex_executable, working_directory, out=print, run=sub
     then trust any tj-agents hooks among them -- skipped only when there was nothing enabled to check at
     all. The hook trust helper is copied to a private temporary file before any of this runs, because the
     marketplace upgrade this triggers can replace the installed copy out from under a later read of it.
+    Converges this machine's declared harness permissions last, always, even when an earlier step raised --
+    the ps1 original ran it from a `finally`, after the same cleanup this function's own `with` block
+    performs on the way out.
     """
     resolved = Path(working_directory).resolve()
-    helper = HERE / 'codex_hook_trust.py'
-    if not helper.is_file():
-        raise SyncError(f'Codex hook trust helper missing: {helper}')
+    try:
+        helper = HERE / 'codex_hook_trust.py'
+        if not helper.is_file():
+            raise SyncError(f'Codex hook trust helper missing: {helper}')
 
-    with tempfile.TemporaryDirectory(prefix='codex-hook-trust-') as scratch:
-        snapshot = Path(scratch) / 'codex_hook_trust.py'
-        shutil.copyfile(helper, snapshot)
+        with tempfile.TemporaryDirectory(prefix='codex-hook-trust-') as scratch:
+            snapshot = Path(scratch) / 'codex_hook_trust.py'
+            shutil.copyfile(helper, snapshot)
 
-        upgrade = invoke_codex_sync_command(codex_executable, ['plugin', 'marketplace', 'upgrade', '--json'],
-                                             cwd=resolved, run=run)
-        errors = upgrade.get('errors') or []
-        if errors:
-            raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(errors)}')
+            upgrade = invoke_codex_sync_command(codex_executable, ['plugin', 'marketplace', 'upgrade', '--json'],
+                                                 cwd=resolved, run=run)
+            errors = upgrade.get('errors') or []
+            if errors:
+                raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(errors)}')
 
-        inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
-                                               cwd=resolved, run=run)
-        installed = inventory.get('installed') or []
-        available = inventory.get('available') or []
-        selected = sorted({
-            plugin['pluginId'] for plugin in (*installed, *available)
-            if plugin and plugin.get('enabled') and (plugin.get('marketplaceSource') or {}).get('sourceType') == 'git'
-        })
-        for identity in selected:
-            installed_result = invoke_codex_sync_command(codex_executable, ['plugin', 'add', identity, '--json'],
-                                                           cwd=resolved, run=run)
-            if installed_result.get('pluginId') != identity:
-                raise SyncError(f"Codex installed {installed_result.get('pluginId')} while refreshing {identity}")
+            inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                                   cwd=resolved, run=run)
+            installed = inventory.get('installed') or []
+            available = inventory.get('available') or []
+            selected = sorted({
+                plugin['pluginId'] for plugin in (*installed, *available)
+                if plugin and plugin.get('enabled') and (plugin.get('marketplaceSource') or {}).get('sourceType') == 'git'
+            })
+            for identity in selected:
+                installed_result = invoke_codex_sync_command(codex_executable, ['plugin', 'add', identity, '--json'],
+                                                               cwd=resolved, run=run)
+                if installed_result.get('pluginId') != identity:
+                    raise SyncError(f"Codex installed {installed_result.get('pluginId')} while refreshing {identity}")
 
-        if selected or any(plugin.get('enabled') for plugin in installed):
-            invoke_codex_hook_trust(codex_executable, resolved, snapshot, cwd=resolved, run=run, out=out)
+            if selected or any(plugin.get('enabled') for plugin in installed):
+                invoke_codex_hook_trust(codex_executable, resolved, snapshot, cwd=resolved, run=run, out=out)
 
-        return selected
+            return selected
+    finally:
+        apply_harness_permissions(run=run)
 
 
 def main(argv: list[str] | None = None) -> int:

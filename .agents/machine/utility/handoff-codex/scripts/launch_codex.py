@@ -65,6 +65,12 @@ def parse_args(argv, agent_cli):
             'request, not one selection among several.'
         )
 
+    # L7 work stays inside an existing session: rejected before anything else runs, regardless of
+    # whether --model is also given, because the lane itself -- not the model it would have paired
+    # with -- is what a handoff can never open.
+    if args.lane == 'L7':
+        raise agent_cli.LaunchError('--lane L7 is for in-session clerical work and cannot open a handoff.')
+
     return args
 
 

@@ -20,11 +20,13 @@ EXPECTED = {
     'engineering': (15, 12, [
         ('.agents/engineering/policy/session-guidance/scripts/session-context.py', []),
         ('hooks/worktree_cleanup_gate.py', []),
+        ('hooks/merge_cleanup_gate.py', []),
     ]),
     'machine': (10, 7, [
         ('.agents/machine/utility/peer-cli/scripts/register_session.py', []),
         ('resources/machine/scripts/reap_orphans.py', ['--notice']),
         ('resources/machine/scripts/codex_terminal_profile.py', []),
+        ('.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py', ['--apply']),
     ]),
 }
 
