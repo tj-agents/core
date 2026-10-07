@@ -19,14 +19,21 @@ EXECUTION = re.compile(
     re.IGNORECASE,
 )
 
-PLANNING_ONLY = re.compile(
-    r"\b(?:do\s+not|don't)\s+(?:execute|implement|make\s+changes)|"
-    r"\b(?:only\s+plan|plan(?:ning)?\s+only|without\s+(?:executing|implementing))\b|"
-    r"\b(?:continue|resume)\s+planning\b",
+PLANNING_DIRECTIVE = re.compile(
+    r"(?:^|[.!?;:,\n]|\b(?:and|but|then)\b)\s*"
+    r"(?:(?:please|can\s+you|could\s+you|would\s+you)\s+)*"
+    r"(?P<directive>(?P<negated>(?:do\s+not|don't|never|not)\s+)?"
+    r"(?:(?P<limited>only\s+plan|plan(?:ning)?\s+only|"
+    r"(?:continue|resume)\s+planning)\b(?!-)|"
+    r"(?P<author>plan\b(?!-)|(?:draft|write|create|revise|update|design)\s+"
+    r"(?:(?:a|an|the|this|that|our|my)\s+)?"
+    r"(?:(?:new|existing|current|phased)\s+)?plan\b(?!-))"
+    r"(?P<author_only>\s+only\b)?))",
     re.IGNORECASE,
 )
-PLANNING_REQUEST = re.compile(
-    r"\b(?:only\s+plan|plan(?:ning)?\s+only|(?:continue|resume)\s+planning)\b",
+EXECUTION_RESTRICTION = re.compile(
+    r"\b(?:do\s+not|don't)\s+(?:execute|implement|make\s+changes)\b|"
+    r"\bwithout\s+(?:executing|implementing)\b",
     re.IGNORECASE,
 )
 OWNER_REFERENCE = re.compile(r"\b(?:goal|plan|roadmap)\b", re.IGNORECASE)
@@ -88,7 +95,7 @@ def active_goal(cwd: Path) -> bool:
 
 def selects_plan_execution(prompt: str, cwd: Path) -> bool:
     """Return whether this prompt authorizes continued plan execution."""
-    if not prompt.strip() or PLANNING_ONLY.search(prompt):
+    if not prompt.strip():
         return False
     if re.search(r"\bplan-execution\b", prompt, re.IGNORECASE):
         return True
@@ -103,7 +110,7 @@ def selects_plan_execution(prompt: str, cwd: Path) -> bool:
 
 
 def selects_handoff(prompt: str, cwd: Path) -> bool:
-    if not prompt.strip() or PLANNING_ONLY.search(prompt):
+    if not prompt.strip():
         return False
     if DIRECT_HANDOFF.search(prompt):
         return True
@@ -144,14 +151,34 @@ def load_context(script: Path, relative_path: str, name: str) -> str:
     )
 
 
+def planning_intent(prompt: str) -> tuple[str | None, str]:
+    evidence = prompt.replace("\u2019", "'")
+    matches = list(PLANNING_DIRECTIVE.finditer(evidence))
+    for match in reversed(matches):
+        if match["negated"]:
+            start, end = match.span("directive")
+            evidence = evidence[:start] + " " + evidence[end:]
+    restricted = EXECUTION_RESTRICTION.search(evidence) is not None
+    authoring = any(
+        not match["negated"] and (
+            match["limited"] or match["author_only"] or (match["author"] and restricted)
+        )
+        for match in matches
+    )
+    return ("authoring" if authoring else "blocked" if restricted else None), evidence
+
+
 def route(prompt: str, cwd: Path) -> str | None:
-    if PLANNING_REQUEST.search(prompt):
+    intent, evidence = planning_intent(prompt)
+    if intent == "authoring":
         return load_context(
             Path(__file__), "engineering/workflow/plan-authoring/SKILL.md", "plan-authoring"
         )
-    if selects_handoff(prompt, cwd):
+    if intent == "blocked":
+        return None
+    if selects_handoff(evidence, cwd):
         return load_context(Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff")
-    if selects_plan_execution(prompt, cwd):
+    if selects_plan_execution(evidence, cwd):
         return load_context(
             Path(__file__), "engineering/workflow/plan-execution/SKILL.md", "plan-execution"
         )
