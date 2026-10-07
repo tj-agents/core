@@ -154,6 +154,51 @@ def local_branches(repository):
     return [line for line in git(repository, "for-each-ref", "--format=%(refname:strip=2)", "refs/heads").splitlines() if line]
 
 
+def refspec_matches(pattern, source):
+    if "*" not in pattern:
+        return pattern == source, ""
+    if pattern.count("*") != 1:
+        return False, ""
+    before, after = pattern.split("*", 1)
+    if len(source) < len(before) + len(after) or not source.startswith(before) or not source.endswith(after):
+        return False, ""
+    return True, source[len(before):len(source) - len(after) if after else None]
+
+
+def remote_fetch_specs(repository, remote):
+    try:
+        return git(repository, "config", "--get-all", f"remote.{remote}.fetch").splitlines()
+    except Refusal:
+        return []
+
+
+def maps_to(spec, source, destination):
+    body = spec.removeprefix("+")
+    source_pattern, separator, destination_pattern = body.partition(":")
+    if not separator:
+        return False
+    matches, wildcard = refspec_matches(source_pattern, source)
+    if not matches:
+        return False
+    return destination_pattern.replace("*", wildcard) == destination
+
+
+def ensure_remote_tracking_mapping(repository, remote, source, destination, branch):
+    specs = remote_fetch_specs(repository, remote)
+    for spec in specs:
+        if spec.startswith("^") and refspec_matches(spec[1:].partition(":")[0], source)[0]:
+            raise Refusal(f"Remote fetch configuration excludes {source}")
+    if any(maps_to(spec, source, destination) for spec in specs if not spec.startswith("^")):
+        return
+    git(repository, "remote", "set-branches", "--add", remote, branch)
+    if not any(
+        maps_to(spec, source, destination)
+        for spec in remote_fetch_specs(repository, remote)
+        if not spec.startswith("^")
+    ):
+        raise Refusal(f"Remote fetch configuration does not map {source} to {destination}")
+
+
 def registered_conflict(records, branch, target):
     desired_branch = branch.casefold()
     desired_path = identity(target)
@@ -327,6 +372,7 @@ def create(args):
                 if source_ref not in advertised:
                     raise Refusal(f"Remote branch does not exist: {args.branch}")
                 base_ref = f"refs/remotes/{args.remote}/{args.branch}"
+                ensure_remote_tracking_mapping(repository, args.remote, source_ref, base_ref, args.branch)
                 git(repository, "fetch", "--prune", args.remote, "+" + source_ref + ":" + base_ref)
                 base_head = git(repository, "rev-parse", "--verify", base_ref + "^{commit}").lower()
                 if base_head != advertised[source_ref] or base_head != expected_head:

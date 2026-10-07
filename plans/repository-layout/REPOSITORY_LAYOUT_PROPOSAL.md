@@ -1,6 +1,6 @@
 # Repository-owned plans, worktrees and TJ Agents adoption
 
-Status: approved outcome, execution in progress, 2026-10-07. Codex pickup verified; allocator implemented and focused checks green; source review next. Producer and consumer acceptance remain.
+Status: approved outcome, execution in progress, 2026-10-07. Codex pickup verified; allocator implemented; restoration correction verified, incremental review next. Producer and consumer acceptance remain.
 
 ## Authorization and ownership
 
@@ -167,7 +167,7 @@ Inspected shared plan, authoring, checkpoint and worktree contracts; read canoni
 README, current plan inventory, repo-declared configuration plan/progress and worktree registrations.
 Read the existing aggregate marketplace and kit READMEs. Read-only evidence explorers confirmed source
 ownership, explicit package closure, allocation defaults, host launch constraints and affected test areas.
-The approved outcome is authorized. The allocator design and corrections passed native review through ae60ebf; the specified producer implementation is now assigned to one L4 worker.
+The approved outcome is authorized. The allocator design and corrections passed native review through ae60ebf. Implementation review at 6383bbc retained one remote-tracking defect; the L4 correction is implemented and passes the full focused suite; incremental review follows.
 
 ## Execution ownership and evidence
 
@@ -345,7 +345,10 @@ For an existing local branch use `worktree add <target> <branch>` after its expe
 Refresh the selected remote with `fetch --prune` first, but derive its result exclusively from the local
 ref and required expected HEAD. For remote-only restoration use the explicit fetch mechanism above
 with the restored branch as `selected_branch`, verify expected HEAD, create from that SHA, then set
-the matching remote tracking ref. Re-read all selected local refs inside the allocation lock before add.
+the matching remote tracking ref. Before creating a remote-only restoration, retain the remote fetch
+mappings and ensure the selected branch maps to that tracking ref, adding only its exact mapping
+when absent. Preserve negative exclusions and refuse a restoration excluded by them before adding
+a branch or checkout; do not broaden those exclusions. Re-read all selected local refs inside the allocation lock before add.
 Use argument arrays and bounded subprocess timeouts, never a shell-built command. Serialize creation
 per common repository using an exclusive `.git/agent-worktree-allocation.lock`; its JSON records the
 PID, branch and target. Release only the lock this invocation acquired. An existing lock refuses and
@@ -405,13 +408,20 @@ one Windows symlink-capability skip; harness suite ran 10 with one Codex-CLI ava
 19 source-layout tests passed. Harness declaration check and generated-tree check passed (458 files,
 zero changed/pruned). Actual generated host scripts ran from external temporary consumer fixtures.
 The authored helper/tests/harness change is approximately 704 lines, below the substantive-size warning.
-Generated catalog/package refreshes remain outside the authored commit. Next action: review the
-committed code; current-main synchronization/delivery stays behind the explicit pending fetch gate.
+Generated catalog/package refreshes remain outside the authored commit. Native and independent code review completed at 6383bbc. One confirmed defect remains: remote-only
+restoration fails to set upstream when remote fetch configuration tracks only main. The L4 correction adds only the selected tracking mapping when needed and refuses exact/wildcard
+negative exclusions before creating the branch or checkout. The three changed restoration tests pass,
+including ordinary subsequent fetch, unchanged wildcard mapping and preserved exclusions. The initial
+19-test correction run had two new fixture setup errors and one symlink skip; the fixtures were repaired
+and the final full focused suite passed: 19 tests in 181.583 seconds, one Windows symlink skip.
+Both generated host copies ran outside this author checkout. The generated check (458 files), three
+harness manifests, plan graph and whitespace checks pass. Incremental review follows. Current-main synchronization/delivery stays behind the explicit
+pending fetch gate.
 Broader acceptance remains unchanged.
 
 ## Active delivery and side-owner evidence
 
-- Allocator producer: this branch; L4 implementation and focused checks complete, code review next,
+- Allocator producer: this branch; L4 implementation and restoration correction complete; all 19 allocator tests green with one symlink skip; delta review next,
   no PR yet. Guidance remains
   a following Docs slice. No allocator rollout is claimed before both land and native acceptance passes.
 - Claude plan policy: PR #133 merged as `957da2637b1e8c471877b96353b43174f5ddd324` after guard and
@@ -432,8 +442,11 @@ Broader acceptance remains unchanged.
 - Runtime package integrity: PR #138 merged as `4bf95d13320253d6545484f01c0becd511b703a4` after
   guard/verify passed at `e73218f241f9da7cf0d6cc6ed4a68f546cd8da61`. Its native owner remains in
   core/.worktrees/Fix-WorkflowBytecodeIntegrity with goal plans/workflow-bytecode-integrity/GOAL.md;
-  receive its result/cleanup evidence. Runtime entrypoints and child invocation now suppress bytecode
-  generation without weakening package trust. Installed-host/fleet acceptance is not established by this merge.
+  its RESULT.md has been received. It records 63 workflow, 30 continuation and 12 trust tests passing,
+  a reproduced pre-fix package mutation, and normal merge without --admin. Runtime entrypoints and child
+  invocation suppress bytecode generation without weakening package trust. The result checkout remains
+  intact pending the existing verified closeout gates. Installed-host/fleet acceptance is not established
+  by this merge.
 - Aggregate C: native Claude launch confirmed in
   C:/Users/TommySeery/source/repos/tj-agents/marketplace/.worktrees/Feature-CoreCatalogAdoption,
   goal plans/core-catalog-adoption/GOAL.md, base `62b527449045991582ebd44ac9b4e3005f2c2b8c`.
@@ -450,16 +463,34 @@ Broader acceptance remains unchanged.
   Native Claude startup-repair launch is confirmed in core/.worktrees/Fix-ReaperStartupHandshake,
   goal plans/reaper-startup-handshake/GOAL.md at base f9f5183. It owns only the acknowledged-start
   protocol and cancellation; pickup at f9f5183 and first source-reading action are verified. Its goal
-  preserves the other cleanup writer.
+  preserves the other cleanup writer. The owner reproduced the late-cleanup defect with disposable
+  fixtures, completed independent protocol readiness review, and now has one L4 worker implementing
+  started/accepted/armed acknowledgement with cancellation. No source delivery or native proof is claimed yet.
 
 First-consumer inventory is recorded in the existing adoption ledger: winwrap and sandbox-hwid have
 stack-only project settings and no core lock/composed catalog. The inspected C++ producer lacks owner
 release/harness records. Resolve that source-owner dependency before consumer composition.
 
+
+## Pending external decisions
+
+The user-facing questions are already pending; no answer has been received. Continue local allocator
+repair/review and receive independent side-owner results while these actions remain gated.
+
+| Blocked action | Resolver and concrete unblock action | Observable resume condition and next action |
+| --- | --- | --- |
+| Core fetch and post-merge synchronization/verification following PR #133 | Tommy decides whether the denied fetch/post-merge outcome may resume. The native classifier explicitly stopped it for `Merge Without Review`. | A direct approval is recorded; perform normal fetch, reconcile the allocator candidate against current main and follow ordinary review/CI delivery gates. |
+| PR #136 monitor/merge | Tommy decides whether its denied delivery may resume. Its scheduler request was rejected for `Merge Without Review`. | A direct approval is recorded; reconcile missing native/frozen review evidence, then monitor exact-head checks and use normal merge gates. |
+| Marketplace native pickup | Tommy approves folder trust for the exact Feature-CoreCatalogAdoption checkout. | Accept only that native trust prompt, verify a real pickup/first action, and continue the existing owner without relaunching. |
+
+The separate credential-copy hold in the adoption ledger remains in force. None of these decisions is
+inferred from elapsed time, another owner's progress, or a continuation wake. Local continuation owns
+this same goal and must checkpoint the current committed head before releasing its foreground lease.
+
 ## Next Steps
 
 Scope: whole goal through all remaining slices and terminal delivery.
-Current slice: review and deliver the shared allocator producer after its green focused checks; coordinate the independent
+Current slice: commit and incrementally review the verified allocator correction, then deliver the producer; coordinate the independent
 native policy, source-repair and aggregate owners without overlapping their writes.
 Remaining scope: allocator guidance, cleanup reliability, marketplace/kit delivery, every project and known
 machine migration, both-host acceptance, and verified retirement of obsolete flat checkouts.
@@ -468,8 +499,8 @@ are terminal; source-only changes or one merged PR do not complete this goal.
 
 1. Preserve this full-goal Codex owner and heartbeat its continuation lease. Resolve the post-merge
    core-fetch approval gate before that denied outcome is retried. Reconcile the L4 worker's
-   five-path implementation and test evidence, commit a focused green candidate, run native/routed review,
-   address findings and deliver its PR through exact-head CI and normal merge gates.
+   completed review at 6383bbc. The ALLOC1 writer has returned and the full 19-test focused rerun passed
+   with one symlink skip; commit the helper/tests/goal correction and run incremental review. Deliver its PR through exact-head CI and normal merge gates when unblocked.
 2. Receive results from the existing native side owners using their actual pickup/result artifacts and
    PR heads. Do not launch duplicates. Keep the adoption owner at
    plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md; its continuation checkpoint is present.

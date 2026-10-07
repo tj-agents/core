@@ -58,7 +58,7 @@ class WorktreeAllocatorTests(unittest.TestCase):
 
     def advance(self, branch="main"):
         path = self.seed / f"{branch.replace('/', '-')}.txt"
-        path.write_text(path.name + "\n", encoding="utf-8")
+        path.write_text((path.read_text(encoding="utf-8") if path.exists() else path.name + "\n") + "advance\n", encoding="utf-8")
         git(self.seed, "add", path.name)
         git(self.seed, "commit", "-m", "advance " + branch)
         git(self.seed, "push", "origin", branch)
@@ -122,11 +122,49 @@ class WorktreeAllocatorTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("refs/heads/Fix/Local", payload["base_ref"])
         remote_head = self.push_branch("Fix/Remote")
+        before = git(self.primary, "config", "--get-all", "remote.origin.fetch").splitlines()
         result, payload = self.invoke(self.primary, "Fix/Remote", "--existing", "--expected-head", remote_head)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("refs/remotes/origin/Fix/Remote", payload["base_ref"])
+        self.assertEqual(before, git(self.primary, "config", "--get-all", "remote.origin.fetch").splitlines())
         mismatch, _ = self.invoke(self.primary, "Fix/Other", "--existing", "--expected-head", remote_head)
         self.assertNotEqual(0, mismatch.returncode)
+
+    def test_remote_restoration_adds_exact_fetch_mapping_and_sets_upstream(self):
+        remote_head = self.push_branch("Fix/NarrowRemote")
+        git(self.primary, "config", "--unset-all", "remote.origin.fetch")
+        git(self.primary, "config", "--add", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+        before = git(self.primary, "config", "--get-all", "remote.origin.fetch").splitlines()
+        result, payload = self.invoke(self.primary, "Fix/NarrowRemote", "--existing", "--expected-head", remote_head)
+        self.assertEqual(0, result.returncode, result.stderr)
+        after = git(self.primary, "config", "--get-all", "remote.origin.fetch").splitlines()
+        self.assertEqual(before, [spec for spec in after if spec in before])
+        self.assertEqual(1, after.count("+refs/heads/Fix/NarrowRemote:refs/remotes/origin/Fix/NarrowRemote"))
+        self.assertEqual("origin/Fix/NarrowRemote", git(payload["worktree"], "rev-parse", "--abbrev-ref", "@{upstream}"))
+        git(self.seed, "checkout", "Fix/NarrowRemote")
+        advanced = self.advance("Fix/NarrowRemote")
+        git(self.seed, "checkout", "main")
+        git(self.primary, "fetch", "origin")
+        self.assertEqual(advanced, git(self.primary, "rev-parse", "refs/remotes/origin/Fix/NarrowRemote"))
+
+    def test_remote_restoration_refuses_negative_fetch_exclusion_before_creation(self):
+        for branch, exclusion in (
+            ("Fix/ExcludedWildcard", "^refs/heads/Fix/Excluded*"),
+            ("Fix/ExcludedExact", "^refs/heads/Fix/ExcludedExact"),
+        ):
+            with self.subTest(exclusion=exclusion):
+                remote_head = self.push_branch(branch)
+                git(self.primary, "config", "--unset-all", "remote.origin.fetch")
+                git(self.primary, "config", "--add", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+                git(self.primary, "config", "--add", "remote.origin.fetch", exclusion)
+                before = git(self.primary, "config", "--get-all", "remote.origin.fetch").splitlines()
+                result, _ = self.invoke(self.primary, branch, "--existing", "--expected-head", remote_head)
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("excludes", result.stderr)
+                self.assertEqual(before, git(self.primary, "config", "--get-all", "remote.origin.fetch").splitlines())
+                self.assertFalse((self.primary / ".worktrees" / branch.replace("/", "-")).exists())
+                local = run(["git", "show-ref", "--verify", "--quiet", "refs/heads/" + branch], cwd=self.primary, check=False)
+                self.assertNotEqual(0, local.returncode)
 
     def test_registered_and_flattened_or_case_collisions_refuse(self):
         created, _ = self.invoke(self.primary, "Feature/A-B")
