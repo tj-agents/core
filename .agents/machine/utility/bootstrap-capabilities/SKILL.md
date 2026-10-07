@@ -83,8 +83,14 @@ path, a NUL, its byte length, a NUL, and its bytes. Symlinks are rejected. A plu
 `digest_excludes`; the machine package excludes only `catalog/catalog.json`, whose own digest field would
 otherwise be self-referential. Schemas and every other bootstrap resource remain covered.
 
-A lock records full 40-character source commits. Catalog revisions are immutable release tags. `apply` resolves
-the tag and refuses it unless it equals the lock's commit; version strings alone never select content.
+A lock records full lowercase 40-character source commits. Catalog revisions accept semantic
+`vN.N.N` release tags or exact lowercase 40-character commit SHAs. A SHA revision must equal
+the lock and managed-state commit before preview or mutation. `apply` fetches tags through their
+tag refs and SHAs directly, then verifies the revision identifies the locked commit object.
+Branches, abbreviated or uppercase SHAs, object expressions, and tag-object SHAs are rejected.
+Offline verification uses the same identity checks; version strings alone never select content.
+Existing tag recovery retains its recorded prior/target checks. Matching legacy release and
+commit records may acquire the catalog SHA; ambiguous legacy identity remains an error.
 
 Do not use this utility to refresh a normal profile opportunistically. Use an isolated profile for projects that
 select incompatible releases, and keep authentication/trust decisions separate from package installation.
