@@ -351,7 +351,9 @@ class ExternalPluginSourceTests(StandardsSyncHarness):
         self.assertIn(f'at {pushed[:12]}: ext {pushed[:12]}', output)
 
     def test_plugin_source_shaped_differently_but_same_repository_is_tracked_as_native(self):
-        differently_shaped = str(self.remote)[:-4] + '/'
+        # Without the .git suffix git resolves the local bare repository on every platform; a
+        # trailing slash on that form only resolves through a Windows drive prefix's transport path.
+        differently_shaped = str(self.remote)[:-4]
         self.declare_sources({'base': differently_shaped, 'ext': str(self.plugin_remote)})
         self.enable({'base@core': True, 'ext@core': True})
         self.install('base@core')
