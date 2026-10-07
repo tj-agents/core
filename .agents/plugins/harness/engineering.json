@@ -2,7 +2,8 @@
   "schema_version": 1,
   "plugin": "base-agents/engineering",
   "source_roots": [
-    ".agents/engineering"
+    ".agents/engineering",
+    ".agents/workflows"
   ],
   "requires": {
     "marketplaces": [
