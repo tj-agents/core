@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,6 +13,7 @@ from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNTIME = ROOT / ".agents/workflows/continuation_runtime.py"
+WORKFLOWS = RUNTIME.parent
 FIXTURE = Path(__file__).parent / "fixtures/continuation_fixture.py"
 sys.path.insert(0, str(RUNTIME.parent))
 spec = importlib.util.spec_from_file_location("continuation_runtime", RUNTIME)
@@ -56,9 +58,9 @@ class ContinuationTests(unittest.TestCase):
                         "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
                         "--harness", "codex", "--actions", "edit", "test", *extra)
 
-    def cli(self, *args, code=0):
+    def cli(self, *args, code=0, env=None):
         result = subprocess.run([sys.executable, str(RUNTIME), *args], capture_output=True,
-                                text=True, timeout=30)
+                                text=True, timeout=30, env=env)
         self.assertEqual(result.returncode, code, result.stderr + result.stdout)
         return json.loads(result.stdout)
 
@@ -72,8 +74,8 @@ class ContinuationTests(unittest.TestCase):
         return ["wake", "--owner", str(self.owner), "--observer-command", sys.executable,
                 str(FIXTURE), "observer", "--host-command", sys.executable, str(FIXTURE), "host"]
 
-    def wake(self):
-        return self.cli(*self.wake_args())
+    def wake(self, env=None):
+        return self.cli(*self.wake_args(), env=env)
 
     def binding(self, status="IN_PROGRESS", conclusion=None):
         state = self.state()
@@ -129,6 +131,20 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(final["launches"], 2)
         self.assertTrue(Path(final["last_result"]).exists())
         self.assertEqual(self.wake()["launches"], 2)
+
+    def test_real_child_supervisor_boundary_suppresses_bytecode_without_ambient_env(self):
+        pycache = WORKFLOWS / "__pycache__"
+        if pycache.exists():
+            shutil.rmtree(pycache)
+        env = {key: value for key, value in os.environ.items()
+               if key not in {"PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX"}}
+        try:
+            result = self.wake(env=env)
+            self.assertEqual(result["state"], "complete")
+            self.assertEqual([], list(WORKFLOWS.rglob("*.pyc")))
+        finally:
+            if pycache.exists():
+                shutil.rmtree(pycache)
 
     def test_duplicate_wakes_kernel_lock_and_child(self):
         self.fixture("complete", sleep=6)

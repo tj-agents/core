@@ -13,10 +13,13 @@ Consumers commit the composed catalog and generated host settings; machine-local
 cannot supply a missing standard.
 
 For a substantive plan intended for execution, write an actual Markdown file before presenting the plan
-as ready. Follow applicable project plan conventions and an existing canonical owner; otherwise choose a
-descriptive filename in the working directory. A standalone directory needs no repository, roadmap,
-companion ledger, workflow provider, pull request, or publication. Quick answers and one-step tasks do
-not need ceremonial plans.
+as ready. A plan for repository work belongs in that repository: follow an existing declared plans or
+docs/plans convention, else default to `plans/<goal>/`; the active delivery branch's checkout owns
+current planning state. Before execution or handoff, promote any host-scratch draft into that repository
+owner, preserving its decisions/progress, and verify recovery references resolve to the promoted copy.
+A standalone, non-repository task keeps its own task-directory goal and needs no repository, roadmap,
+companion ledger, workflow provider, pull request, or publication; runtime state and secrets stay outside
+Git regardless of where the plan lives. Quick answers and one-step tasks do not need ceremonial plans.
 
 Whenever you create, revise, or resume a plan, include its exact absolute path as a clickable Markdown
 link in the response, including a fresh-session progress summary. A bare filename or relative link is
