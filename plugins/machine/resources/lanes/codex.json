@@ -30,11 +30,11 @@
       "why": "top general family at its default setting. Open-ended judgement that designs nothing: a diagnosis with no known answer, an investigation, weighing evidence a test cannot settle."
     },
     "L4": {
-      "summary": "Ordinary specified work that a compiler or a test suite will catch, delivery included.",
-      "model": "gpt-6.1-sol",
-      "reasoning_effort": "medium",
+      "summary": "Specified implementation that still needs code-level judgement.",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high",
       "context_ceiling": null,
-      "why": "the general family at reduced effort. Specified work that a compiler or a test suite will catch: features, bugfixes, review lenses, and the review, CI and merge that deliver them."
+      "why": "the workhorse family at high effort. Specified implementation that still needs code-level judgement: features, bugfixes and review lenses whose mistakes a compiler or a test suite will catch. Delivery never selects this rung."
     },
     "L5": {
       "summary": "Mechanical work whose shape is already decided.",
@@ -55,7 +55,7 @@
       "model": "gpt-6-luna",
       "reasoning_effort": "low",
       "context_ceiling": null,
-      "why": "the small family at low effort. Clerical work with a small input: commit, push, pull, sync, one poll."
+      "why": "the small family at low effort. In-session clerical work with a small input: commit, push, pull, sync, one poll. Handoff launchers reject this rung."
     }
   },
 
