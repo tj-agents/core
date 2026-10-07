@@ -140,14 +140,35 @@ function Get-RecordedSessionEntries {
 function Get-OwnRegistryEntry {
     param([pscustomobject] $OwnHost)
 
-    foreach ($entry in (Get-RecordedSessionEntries)) {
+    $matches = @(foreach ($entry in (Get-RecordedSessionEntries)) {
         $entryPid = Get-EntryProperty -Entry $entry -Name 'pid'
         $entryStart = Get-EntryProperty -Entry $entry -Name 'pid_started_at'
         if ($entryPid -eq $OwnHost.Pid -and $null -ne $entryStart -and
             [math]::Abs([double] $entryStart - $OwnHost.Started) -le 2.0) {
-            return $entry
+            $entry
         }
+    })
+    if ($matches.Count -eq 0) { return $null }
+    $latest = $null
+    $latestStarted = 0.0
+    $latestCount = 0
+    foreach ($entry in $matches) {
+        $registered = Get-EntryProperty -Entry $entry -Name 'started_at'
+        if ($matches.Count -eq 1 -and $null -eq $registered) { return $entry }
+        $started = 0.0
+        if (-not [double]::TryParse([Convert]::ToString($registered, [Globalization.CultureInfo]::InvariantCulture), [Globalization.NumberStyles]::Float,
+                [Globalization.CultureInfo]::InvariantCulture, [ref] $started) -or
+            [double]::IsNaN($started) -or [double]::IsInfinity($started) -or $started -le 0.0) {
+            return $null
+        }
+        if ($started -gt $latestStarted) {
+            $latest = $entry
+            $latestStarted = $started
+            $latestCount = 1
+        }
+        elseif ($started -eq $latestStarted) { $latestCount++ }
     }
+    if ($latestCount -eq 1) { return $latest }
     return $null
 }
 
