@@ -1,9 +1,13 @@
 import importlib.util
 import json
+import os
+import stat
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "repo_config.py"
@@ -18,7 +22,7 @@ class RepoConfigTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.lock = self.root / ".agents" / "capabilities.lock.json"
         self.lock.parent.mkdir()
         self.catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
@@ -187,6 +191,459 @@ class RepoConfigTests(unittest.TestCase):
         self.save_lock()
         with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "omits core plugins"):
             repo_config.run(self.lock, CATALOG, "write")
+
+    def local(self, mode="write", root=None):
+        return repo_config.run(self.lock, CATALOG, mode, root=root or self.root, scope="local")
+
+    def git(self, *arguments, root=None):
+        return subprocess.run(["git", "-c", "core.hooksPath=none", "-c", "commit.gpgsign=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "-C", str(root or self.root), *arguments], check=True, capture_output=True, encoding="utf-8").stdout.strip()
+
+    def overlay(self, allow):
+        path = self.lock.parent / "repository-harness.json"
+        path.write_text(json.dumps({"schema_version": 1, "requires": {"marketplaces": [], "plugins": [], "hooks": [], "permissions": {"claude_allow": allow, "codex_prefix_rules": []}}}), encoding="utf-8")
+        return path
+
+    def test_local_preview_is_complete_and_non_git_root_is_explicit(self):
+        destination = self.root / "aggregate"
+        destination.mkdir()
+        targets = repo_config.plan(self.lock, CATALOG, root=destination, scope="local")
+        self.assertEqual({".claude/settings.local.json", ".codex/config.toml", ".codex/rules/agent-harness.rules", repo_config.LOCAL_STATE}, {path.relative_to(destination.resolve()).as_posix() for path in targets})
+        before = self.lock.read_bytes()
+        self.local("preview", destination)
+        self.assertEqual([], list(destination.iterdir()))
+        self.local(root=destination)
+        self.assertEqual([], self.local("check", destination))
+        self.assertEqual(before, self.lock.read_bytes())
+        self.assertFalse((destination / ".git").exists())
+        self.assertFalse((destination / ".claude/settings.json").exists())
+
+    def test_local_preserves_foreign_selections_settings_and_approvals(self):
+        claude = self.root / ".claude/settings.local.json"
+        codex = self.root / ".codex/config.toml"
+        claude.parent.mkdir()
+        codex.parent.mkdir()
+        claude.write_text(json.dumps({"env": {"MODE": "test"}, "enabledPlugins": {"browser@foreign": True}, "extraKnownMarketplaces": {"foreign": {"source": "local"}}, "permissions": {"allow": ["Bash(manual)", "Bash(shared)"], "deny": ["Bash(forbidden)"], "ask": ["Bash(prompt)"]}}), encoding="utf-8")
+        prefix = 'model = "test"\n[plugins."browser@foreign"]\nenabled = true\n[marketplaces.foreign]\nsource = "local"\n'
+        codex.write_text(prefix, encoding="utf-8")
+        overlay = self.overlay(["Bash(shared)", "Bash(owned)"])
+        self.local()
+        first = {path: path.read_bytes() for path in repo_config.plan(self.lock, CATALOG, root=self.root, scope="local") if path.exists()}
+        self.local()
+        self.assertEqual(first, {path: path.read_bytes() for path in first})
+        overlay.unlink()
+        self.local()
+        settings = json.loads(claude.read_text(encoding="utf-8"))
+        self.assertIs(settings["enabledPlugins"]["browser@foreign"], True)
+        self.assertIn("foreign", settings["extraKnownMarketplaces"])
+        self.assertEqual({"MODE": "test"}, settings["env"])
+        self.assertEqual({"allow": ["Bash(manual)", "Bash(shared)"], "deny": ["Bash(forbidden)"], "ask": ["Bash(prompt)"]}, settings["permissions"])
+        self.assertTrue(codex.read_text(encoding="utf-8").startswith(prefix))
+
+    def test_local_restores_prior_value_when_selection_becomes_stale(self):
+        claude = self.root / ".claude/settings.local.json"
+        claude.parent.mkdir()
+        claude.write_text(json.dumps({"enabledPlugins": {"base@base-agents": False}}), encoding="utf-8")
+        self.local()
+        state = repo_config.local_state(self.root / repo_config.LOCAL_STATE)
+        settings, owned = repo_config.local_claude(claude, {}, {}, [], state["claude"])
+        self.assertEqual({"base@base-agents": False}, json.loads(settings)["enabledPlugins"])
+        self.assertEqual({}, owned["enabledPlugins"])
+        self.assertEqual({}, json.loads(settings)["extraKnownMarketplaces"])
+
+    def test_local_collision_and_changed_owned_keys_fail_before_any_mutation(self):
+        codex = self.root / ".codex/config.toml"
+        codex.parent.mkdir()
+        text = '[plugins."base@base-agents"]\nenabled = true\n'
+        codex.write_text(text, encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "collision"):
+            self.local()
+        self.assertFalse((self.root / ".claude").exists())
+        self.assertEqual(text, codex.read_text(encoding="utf-8"))
+        codex.unlink()
+        self.local()
+        claude = self.root / ".claude/settings.local.json"
+        settings = json.loads(claude.read_text(encoding="utf-8"))
+        settings["enabledPlugins"]["base@base-agents"] = False
+        claude.write_text(json.dumps(settings), encoding="utf-8")
+        unchanged = codex.read_bytes()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "owned setting was changed"):
+            self.local()
+        self.assertEqual(unchanged, codex.read_bytes())
+
+    def test_local_rejects_unowned_or_changed_codex_block_and_rules(self):
+        self.local()
+        codex = self.root / ".codex/config.toml"
+        codex.write_text(codex.read_text(encoding="utf-8").replace('enabled = true', 'enabled = false', 1), encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "not owned or was changed"):
+            self.local()
+        codex.unlink()
+        rules = self.root / ".codex/rules/agent-harness.rules"
+        rules.parent.mkdir(exist_ok=True)
+        rules.write_text("manual rule", encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "rules are not owned"):
+            self.local()
+        self.assertFalse(codex.exists())
+
+    def test_local_tracked_target_is_rejected_with_no_changes(self):
+        self.git("init", "--quiet")
+        codex = self.root / ".codex/config.toml"
+        codex.parent.mkdir()
+        codex.write_text('model = "keep"\n', encoding="utf-8")
+        self.git("add", ".codex/config.toml")
+        before = codex.read_bytes()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "tracked"):
+            self.local()
+        self.assertEqual(before, codex.read_bytes())
+        self.assertFalse((self.root / ".claude").exists())
+
+    def test_git_exclusions_preserve_unrelated_patterns_and_are_exact(self):
+        self.git("init", "--quiet")
+        exclude = self.root / ".git/info/exclude"
+        exclude.write_text("unrelated.log\nliteral\\ \n", encoding="utf-8")
+        preview = self.local("preview")
+        self.assertIn(".git/info/exclude", preview)
+        self.assertEqual("unrelated.log\nliteral\\ \n", exclude.read_text(encoding="utf-8"))
+        self.local()
+        content = exclude.read_text(encoding="utf-8")
+        self.assertTrue(content.startswith("unrelated.log\nliteral\\ \n"))
+        for relative in (".claude/settings.local.json", ".codex/config.toml", ".codex/rules/agent-harness.rules", repo_config.LOCAL_STATE):
+            self.assertIn("/" + relative + "\n", content)
+            self.assertEqual(relative, self.git("check-ignore", relative))
+        self.assertNotIn("/.claude/\n", content)
+        self.assertEqual([], self.local("check"))
+
+    def test_git_file_worktree_uses_common_info_exclude(self):
+        self.git("init", "--quiet")
+        self.git("commit", "--allow-empty", "--quiet", "-m", "Fixture")
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary).resolve() / "checkout"
+            self.git("worktree", "add", "--quiet", "-b", "fixture-worktree", str(destination))
+            self.assertTrue((destination / ".git").is_file())
+            targets = repo_config.plan(self.lock, CATALOG, root=destination, scope="local")
+            exclude = (self.root / ".git/info/exclude").resolve()
+            self.assertIn(exclude, [path.resolve() for path in targets])
+            self.local(root=destination)
+            self.assertEqual([], self.local("check", destination))
+            self.assertEqual(".codex/config.toml", self.git("check-ignore", ".codex/config.toml", root=destination))
+
+    def test_prospective_paths_reject_escape_tracked_and_non_directory_parent(self):
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "escapes"):
+            repo_config.preflight_paths(self.root, [Path("../escape.json")])
+        (self.root / ".codex").write_text("file", encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "parent is not a directory"):
+            self.local()
+        self.assertFalse((self.root / ".claude").exists())
+        (self.root / ".codex").unlink()
+        self.git("init", "--quiet")
+        prospective = self.root / "future.json"
+        prospective.write_text("tracked", encoding="utf-8")
+        self.git("add", "future.json")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "tracked"):
+            repo_config.plan(self.lock, CATALOG, root=self.root, scope="local", prospective_paths=[prospective])
+        self.assertFalse((self.root / ".claude").exists())
+
+    def test_escaping_link_with_missing_leaf_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            outside = Path(temporary).resolve()
+            link = self.root / ".codex"
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except OSError:
+                result = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(outside)], capture_output=True)
+                if result.returncode:
+                    self.skipTest("Directory links unavailable")
+            with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "escapes"):
+                self.local()
+            self.assertEqual([], list(outside.iterdir()))
+            self.assertFalse((self.root / ".claude").exists())
+
+    def test_malformed_ownership_and_exclusions_are_preflighted(self):
+        state = self.root / repo_config.LOCAL_STATE
+        state.write_text('{"schema_version":1,"claude":[]}', encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "ownership"):
+            self.local()
+        self.assertFalse((self.root / ".claude").exists())
+        state.unlink()
+        self.git("init", "--quiet")
+        exclude = self.root / ".git/info/exclude"
+        exclude.write_text(repo_config.EXCLUDE_START, encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "malformed managed exclusions"):
+            self.local()
+        self.assertFalse((self.root / ".claude").exists())
+
+    def test_non_git_subdirectory_cannot_bypass_checkout_tracking(self):
+        self.git("init", "--quiet")
+        child = self.root / "subdirectory"
+        child.mkdir()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "exact Git checkout"):
+            self.local(root=child)
+        self.assertEqual([], list(child.iterdir()))
+
+    def test_exclusion_parent_failure_is_detected_before_settings_write(self):
+        self.git("init", "--quiet")
+        info = self.root / ".git/info"
+        (info / "exclude").unlink()
+        info.rmdir()
+        info.write_text("blocked", encoding="utf-8")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "parent is not a directory"):
+            self.local()
+        self.assertFalse((self.root / ".claude").exists())
+
+    def test_prospective_exclusions_escape_pattern_metacharacters(self):
+        self.git("init", "--quiet")
+        target = self.root / "receipt[1].json"
+        targets = repo_config.plan(self.lock, CATALOG, root=self.root, scope="local", prospective_paths=[target])
+        exclude = self.root / ".git/info/exclude"
+        exclude.write_text(targets[exclude.resolve()], encoding="utf-8")
+        self.assertEqual("receipt[1].json", self.git("check-ignore", "receipt[1].json"))
+        result = subprocess.run(["git", "-C", str(self.root), "check-ignore", "receipt1.json"], capture_output=True)
+        self.assertEqual(1, result.returncode)
+
+    def test_local_stale_owned_rules_are_removed(self):
+        overlay = self.overlay([])
+        value = json.loads(overlay.read_text(encoding="utf-8"))
+        value["requires"]["permissions"]["codex_prefix_rules"] = [{"pattern": ["sample", "safe"], "justification": "Fixture approval", "match": ["sample safe"], "not_match": ["sample unsafe"]}]
+        overlay.write_text(json.dumps(value), encoding="utf-8")
+        self.local()
+        rules = self.root / ".codex/rules/agent-harness.rules"
+        self.assertIn('decision = "allow"', rules.read_text(encoding="utf-8"))
+        overlay.unlink()
+        self.assertIn(".codex/rules/agent-harness.rules", self.local("preview"))
+        self.assertTrue(rules.is_file())
+        self.local()
+        self.assertFalse(rules.exists())
+        self.assertEqual([], self.local("check"))
+
+    def test_tracked_config_behind_in_root_directory_link_is_rejected(self):
+        self.git("init", "--quiet")
+        shared = self.root / "shared"
+        shared.mkdir()
+        (shared / "config.toml").write_text('model = "keep"', encoding="utf-8")
+        self.git("add", "shared/config.toml")
+        link = self.root / ".codex"
+        try:
+            link.symlink_to(shared, target_is_directory=True)
+        except OSError:
+            result = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(shared)], capture_output=True)
+            if result.returncode:
+                self.skipTest("Directory links unavailable")
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "tracked"):
+            self.local()
+        self.assertFalse((self.root / ".claude").exists())
+        self.assertEqual('model = "keep"', (shared / "config.toml").read_text(encoding="utf-8"))
+
+    def test_two_host_targets_cannot_alias_the_same_missing_file(self):
+        claude = self.root / ".claude/settings.local.json"
+        claude.parent.mkdir()
+        original = Path.resolve
+        codex = self.root / ".codex/config.toml"
+
+        def physical_path(path, *args, **kwargs):
+            return original(codex if path == claude else path, *args, **kwargs)
+
+        with mock.patch.object(Path, "resolve", autospec=True, side_effect=physical_path):
+            with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "alias the same file"):
+                self.local()
+        self.assertFalse((self.root / ".codex").exists())
+        self.assertFalse((self.root / repo_config.LOCAL_STATE).exists())
+
+    def snapshot_files(self, root=None):
+        root = root or self.root
+        return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+    def directory_link(self, path, target):
+        try:
+            path.symlink_to(target, target_is_directory=True)
+        except OSError:
+            result = subprocess.run(["cmd", "/c", "mklink", "/J", str(path), str(target)], capture_output=True)
+            if result.returncode:
+                self.skipTest("Directory links unavailable")
+
+    def test_output_hardlinks_to_tracked_and_outside_files_are_rejected(self):
+        self.git("init", "--quiet")
+        codex = self.root / ".codex/config.toml"
+        codex.parent.mkdir()
+        tracked = self.root / "tracked.toml"
+        tracked.write_text('model = "keep"\n', encoding="utf-8")
+        self.git("add", "tracked.toml")
+        with tempfile.TemporaryDirectory() as temporary:
+            outside = Path(temporary) / "outside.toml"
+            outside.write_bytes(tracked.read_bytes())
+            for original in (tracked, outside):
+                with self.subTest(original=original):
+                    os.link(original, codex)
+                    before = self.snapshot_files()
+                    with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "multiple hard links"):
+                        self.local()
+                    self.assertEqual(before, self.snapshot_files())
+                    self.assertEqual(tracked.read_bytes(), original.read_bytes())
+                    codex.unlink()
+
+    def test_lock_catalog_and_overlay_cannot_be_output_paths(self):
+        claude = self.root / ".claude/settings.local.json"
+        claude.parent.mkdir()
+        for kind in ("lock", "catalog", "overlay"):
+            with self.subTest(kind=kind):
+                if kind == "lock":
+                    claude.write_bytes(self.lock.read_bytes())
+                    lock, catalog, prospective = claude, CATALOG, []
+                elif kind == "catalog":
+                    claude.write_bytes(CATALOG.read_bytes())
+                    lock, catalog, prospective = self.lock, claude, []
+                else:
+                    lock, catalog, prospective = self.lock, CATALOG, [self.overlay([])]
+                before = self.snapshot_files()
+                with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "aliases a read input"):
+                    repo_config.plan(lock, catalog, root=self.root, scope="local", prospective_paths=prospective)
+                self.assertEqual(before, self.snapshot_files())
+
+    def test_read_input_canonical_alias_is_rejected_before_writing(self):
+        claude = self.root / ".claude/settings.local.json"
+        claude.parent.mkdir()
+        claude.write_bytes(self.lock.read_bytes())
+        alias = self.root / "input-alias"
+        self.directory_link(alias, claude.parent)
+        before = claude.read_bytes()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "aliases a read input"):
+            repo_config.run(alias / claude.name, CATALOG, "write", root=self.root, scope="local")
+        self.assertEqual(before, claude.read_bytes())
+        self.assertFalse((self.root / ".codex").exists())
+        self.assertFalse((self.root / repo_config.LOCAL_STATE).exists())
+
+    def test_hardlinked_exclusion_is_rejected_before_settings_write(self):
+        self.git("init", "--quiet")
+        exclude = self.root / ".git/info/exclude"
+        with tempfile.TemporaryDirectory() as temporary:
+            outside = Path(temporary) / "exclude-copy"
+            os.link(exclude, outside)
+            before = self.snapshot_files()
+            with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "multiple hard links"):
+                self.local()
+            self.assertEqual(before, self.snapshot_files())
+            self.assertEqual(before[".git/info/exclude"], outside.read_bytes())
+
+    def test_read_input_file_identity_is_checked_even_with_distinct_paths(self):
+        alias = self.root / "alias-lock.json"
+        os.link(self.lock, alias)
+        before = self.snapshot_files()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "aliases a read input"):
+            repo_config.validate_aliases([alias], [self.lock])
+        self.assertEqual(before, self.snapshot_files())
+
+    def test_output_alias_of_git_exclusion_is_rejected_before_writing(self):
+        self.git("init", "--quiet")
+        exclude = self.root / ".git/info/exclude"
+        claude = self.root / ".claude/settings.local.json"
+        original = Path.resolve
+        before = self.snapshot_files()
+
+        def physical_path(path, *args, **kwargs):
+            return original(exclude if path == claude else path, *args, **kwargs)
+
+        with mock.patch.object(Path, "resolve", autospec=True, side_effect=physical_path):
+            with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "alias the same file"):
+                self.local()
+        self.assertEqual(before, self.snapshot_files())
+
+    def test_read_input_alias_of_git_exclusion_is_rejected_before_writing(self):
+        self.git("init", "--quiet")
+        exclude = self.root / ".git/info/exclude"
+        before = self.snapshot_files()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "aliases a read input"):
+            repo_config.plan(exclude, CATALOG, root=self.root, scope="local")
+        self.assertEqual(before, self.snapshot_files())
+
+    def test_failed_later_readonly_output_rolls_back_then_retry_removes_owned_grant(self):
+        claude = self.root / ".claude/settings.local.json"
+        codex = self.root / ".codex/config.toml"
+        claude.parent.mkdir()
+        codex.parent.mkdir()
+        claude.write_text(json.dumps({"permissions": {"allow": ["Bash(manual)"]}}), encoding="utf-8")
+        codex.write_text('model = "keep"\n', encoding="utf-8")
+        overlay = self.overlay(["Bash(owned)"])
+        before = self.snapshot_files()
+        codex.chmod(stat.S_IREAD)
+        try:
+            with self.assertRaises(PermissionError):
+                self.local()
+            self.assertEqual(before, self.snapshot_files())
+        finally:
+            codex.chmod(stat.S_IREAD | stat.S_IWRITE)
+        self.local()
+        state = repo_config.local_state(self.root / repo_config.LOCAL_STATE)
+        self.assertEqual(["Bash(owned)"], state["claude"]["allow"])
+        overlay.unlink()
+        self.local()
+        settings = json.loads(claude.read_text(encoding="utf-8"))
+        self.assertEqual(["Bash(manual)"], settings["permissions"]["allow"])
+        self.assertEqual([], self.local("check"))
+
+    def test_failed_final_exclusion_rolls_back_ownership_and_deleted_rules(self):
+        self.git("init", "--quiet")
+        overlay = self.overlay(["Bash(owned)"])
+        value = json.loads(overlay.read_text(encoding="utf-8"))
+        value["requires"]["permissions"]["codex_prefix_rules"] = [{"pattern": ["sample", "safe"], "justification": "Fixture approval", "match": ["sample safe"], "not_match": ["sample unsafe"]}]
+        overlay.write_text(json.dumps(value), encoding="utf-8")
+        self.local()
+        overlay.unlink()
+        prospective = self.root / "receipt.json"
+        targets = repo_config.plan(self.lock, CATALOG, root=self.root, scope="local", prospective_paths=[prospective])
+        changed = {path: expected for path, expected in targets.items() if repo_config.text_at(path) != expected}
+        exclude = self.root / ".git/info/exclude"
+        before = self.snapshot_files()
+        exclude.chmod(stat.S_IREAD)
+        try:
+            with self.assertRaises(PermissionError):
+                repo_config.write_batch(changed)
+            self.assertEqual(before, self.snapshot_files())
+        finally:
+            exclude.chmod(stat.S_IREAD | stat.S_IWRITE)
+        self.local()
+        self.assertFalse((self.root / ".codex/rules/agent-harness.rules").exists())
+        settings = json.loads((self.root / ".claude/settings.local.json").read_text(encoding="utf-8"))
+        self.assertEqual([], settings["permissions"]["allow"])
+
+    def test_linked_worktrees_retain_each_others_physical_exclusions(self):
+        self.git("init", "--quiet")
+        self.git("commit", "--allow-empty", "--quiet", "-m", "Fixture")
+        with tempfile.TemporaryDirectory() as temporary:
+            other = Path(temporary).resolve() / "checkout"
+            self.git("worktree", "add", "--quiet", "-b", "fixture-owned-exclusions", str(other))
+            first_physical = self.root / "first-native"
+            second_physical = other / "second-native"
+            first_physical.mkdir()
+            second_physical.mkdir()
+            self.directory_link(self.root / ".codex", first_physical)
+            self.directory_link(other / ".codex", second_physical)
+            self.local()
+            self.local(root=other)
+            self.local()
+            self.local(root=other)
+            for root, physical in ((self.root, "first-native/config.toml"), (other, "second-native/config.toml")):
+                self.assertEqual(physical, self.git("check-ignore", physical, root=root))
+                self.assertEqual([], self.local("check", root))
+            exclude = self.root / ".git/info/exclude"
+            content = exclude.read_text(encoding="utf-8")
+            self.assertIn("/first-native/config.toml\n", content)
+            self.assertIn("/second-native/config.toml\n", content)
+            self.assertEqual(2, content.count(repo_config.EXCLUDE_START))
+
+    def test_tracked_lexical_config_behind_in_root_junction_is_rejected_without_writes(self):
+        self.git("init", "--quiet")
+        self.local()
+        self.git("add", "--force", ".codex/config.toml")
+        codex = self.root / ".codex"
+        physical = self.root / "physical-codex"
+        codex.rename(physical)
+        self.directory_link(codex, physical)
+        self.overlay(["Bash(new-owned-grant)"])
+        before = self.snapshot_files()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "tracked.*\\.codex/config\\.toml"):
+            self.local()
+        self.assertEqual(before, self.snapshot_files())
+        self.assertEqual(before["physical-codex/config.toml"], (physical / "config.toml").read_bytes())
+        settings = json.loads((self.root / ".claude/settings.local.json").read_text(encoding="utf-8"))
+        self.assertNotIn("Bash(new-owned-grant)", settings["permissions"]["allow"])
 
 
 if __name__ == "__main__":
