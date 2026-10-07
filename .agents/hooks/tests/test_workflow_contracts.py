@@ -1030,8 +1030,9 @@ class WorkflowGenerationTests(unittest.TestCase):
             self.assertEqual([], list(outside.iterdir()))
 
     def test_codex_installer_rejects_a_reparse_point_in_a_profile_ancestor(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
+        # Every available host: Windows PowerShell and PowerShell 7 bind String.Split differently.
+        shells = [shell for shell in map(shutil.which, ("powershell.exe", "pwsh")) if shell]
+        self.assertNotEqual([], shells)
         script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1048,24 +1049,26 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.skipTest(created.stderr or created.stdout)
             else:
                 linked.symlink_to(outside, target_is_directory=True)
-            arguments = [shell, "-NoProfile"]
-            if Path(shell).name.lower() == "powershell.exe":
-                arguments += ["-ExecutionPolicy", "Bypass"]
-            completed = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(linked / "profile"),
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(0, completed.returncode)
-            self.assertIn("reparse point", completed.stderr)
-            self.assertEqual([], list(outside.iterdir()))
+            for shell in shells:
+                with self.subTest(shell=Path(shell).name):
+                    arguments = [shell, "-NoProfile"]
+                    if Path(shell).name.lower() == "powershell.exe":
+                        arguments += ["-ExecutionPolicy", "Bypass"]
+                    completed = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(linked / "profile"),
+                            "-Apply",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode)
+                    self.assertIn("reparse point", completed.stderr)
+                    self.assertEqual([], list(outside.iterdir()))
 
     def test_codex_installer_ignores_unrelated_source_agents(self):
         shell = shutil.which("powershell.exe") or shutil.which("pwsh")
