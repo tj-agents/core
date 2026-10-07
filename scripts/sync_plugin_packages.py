@@ -223,7 +223,12 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
     loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
     if "'" in loader:
         raise ValueError("Codex hook snapshot loader must use only double-quoted strings")
+    if "$" in loader or "`" in loader:
+        raise ValueError("Codex hook snapshot loader must not contain shell expansion characters")
     expression = "exec(" + repr(loader).replace('"', r'\x22') + ")"
+    # A POSIX shell turns each doubled backslash inside double quotes into one, so the escaped
+    # backslashes of the repr literal must be doubled again for `command`; Windows keeps them as is.
+    expressions = {"command": expression.replace("\\", "\\\\"), "commandWindows": expression}
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         excluded = ["hooks/codex.json"]
@@ -240,7 +245,7 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
                         if not command.startswith(prefix + '"${PLUGIN_ROOT}/'):
                             raise ValueError(f"Unsupported Codex {field} for {plugin}: {command}")
                         hook[field] = (
-                            prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
+                            prefix + f'-c "{expressions[field]}" "${{PLUGIN_ROOT}}" "{expected}" '
                             f'"{plugin}" ' + command[len(prefix):]
                         )
         output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
