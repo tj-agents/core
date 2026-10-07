@@ -281,12 +281,20 @@ function Format-CommandLine {
 function Start-DetachedReaper {
     param([string] $CommandLine)
 
+    $cimResult = $null
+    $cimCreated = $false
     try {
-        $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
-            -Arguments @{ CommandLine = $CommandLine } -ErrorAction Stop
-        if ($result.ReturnValue -eq 0) { return $true }
+        $cimResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+            -Arguments @{ CommandLine = $CommandLine } -ErrorAction Stop -OperationTimeoutSec 30
+        if ($cimResult.ReturnValue -eq 0) { $cimCreated = $true }
     }
     catch {
+    }
+
+    if ($cimCreated) {
+        $processId = $null
+        try { $processId = [int] $cimResult.ProcessId } catch { $processId = $null }
+        return @{ ProcessId = $processId; Method = 'cim' }
     }
 
     $taskName = 'agent-finish-reaper-' + [guid]::NewGuid().ToString('N')
@@ -296,7 +304,8 @@ function Start-DetachedReaper {
         & schtasks.exe /run /tn $taskName 2>$null | Out-Null
         $ran = $LASTEXITCODE -eq 0
         & schtasks.exe /delete /tn $taskName /f 2>$null | Out-Null
-        return $ran
+        if (-not $ran) { return $false }
+        return @{ ProcessId = $null; Method = 'schtasks' }
     }
     catch {
         return $false
