@@ -93,6 +93,16 @@ class LaneTableTests(unittest.TestCase):
             FAMILY_ORDER["codex"].index(lanes["L3"]["model"]),
         )
 
+    def test_l4_is_high_effort_and_differs_from_l3_on_both_hosts(self):
+        for host in HOST_IDS:
+            data = table(host)
+            key = data["effort_key"]
+            with self.subTest(host=host):
+                self.assertEqual("high", data["lanes"]["L4"][key])
+                self.assertNotEqual(
+                    data["lanes"]["L3"]["model"], data["lanes"]["L4"]["model"]
+                )
+
     def test_effort_is_declared_under_each_host_own_key_and_from_the_known_vocabulary(self):
         for host in HOST_IDS:
             data = table(host)

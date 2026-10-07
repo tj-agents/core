@@ -53,7 +53,7 @@
       "summary": "Clerical work with a small input and no judgement to make.",
       "model": "claude-haiku-4-5",
       "context_ceiling": 200000,
-      "why": "clerical work with a small input: commit, push, pull, sync, one poll. Carries NO effort key -- Haiku 4.5 rejects `effort` outright, which is also why this rung is a capability step and not just a price step.",
+      "why": "in-session clerical work with a small input: commit, push, pull, sync, one poll. Carries NO effort key -- Haiku 4.5 rejects `effort` outright, which is also why this rung is a capability step and not just a price step. Handoff launchers reject this rung.",
       "no_effort_reason": "claude-haiku-4-5 does not accept the effort parameter"
     }
   },
