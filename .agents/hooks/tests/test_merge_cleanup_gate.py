@@ -105,7 +105,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         data.update(fields)
         path.write_text(json.dumps(data), encoding="utf-8")
 
-    # -- recording ---------------------------------------------------------
 
     def test_merge_enable_records_obligation_for_canonical_target(self):
         bare, primary = init_repo(self.root)
@@ -143,7 +142,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(gate.DIRECT_GRACE_SECONDS, gate.grace_seconds(direct))
         self.assertEqual(gate.QUEUED_GRACE_SECONDS, gate.grace_seconds(queued))
 
-    # -- codex enforcement ---------------------------------------------------
 
     def test_deny_once_then_cooldown_then_denies_again_after_cooldown(self):
         bare, primary = init_repo(self.root)
@@ -202,6 +200,13 @@ class MergeCleanupGateTests(unittest.TestCase):
             'git commit -am "fix the red sync PR"', "git show HEAD",
             'gh pr create --title "sync" --body "fix"',
             "git commit -am x && git push",
+            "gh run view 123 --log-failed | Select-String error",
+            "gh pr view 3 --json state --jq '.state | ascii_downcase'",
+            "Set-Location x; git status",
+            "echo hi && git log",
+            'git commit -am "fix a bug; closes #123 | && done"',
+            "./cleanup_proof.py --worktree x",
+            "& 'C:\\plugins\\peer-cli\\scripts\\finish.ps1'",
         ):
             with self.subTest(command=command):
                 result = self.run_hook(self.payload(command, session="s1", cwd=str(worktree)))
@@ -218,7 +223,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         for command in (
             "git stash push -u -m wip", "git rebase --continue", "git restore --staged x.txt",
             "git reset --hard", "gh api repos/org/repo/pulls/1", "gh workflow run ci.yml",
-            "gh release create v1", "gh repo view", "echo hi && git log",
+            "gh release create v1", "gh repo view", "echo plan > plan.md && git log",
         ):
             with self.subTest(command=command):
                 result = self.run_hook(self.payload(command, session="s1", cwd=str(worktree)))
@@ -249,7 +254,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         ))
         self.assertEqual(0, result.returncode, result.stderr)
 
-    # -- ownership transfer --------------------------------------------------
 
     def test_launcher_command_is_exempt_stamps_transfer_and_owner_never_denied_after(self):
         bare, primary = init_repo(self.root)
@@ -295,7 +299,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(2, matched.returncode)
         self.assertIn("MERGE CLEANUP GATE", matched.stderr)
 
-    # -- reconcile ------------------------------------------------------------
 
     def test_reconcile_clears_on_worktree_deletion(self):
         bare, primary = init_repo(self.root)
@@ -333,7 +336,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.run_hook({"hook_event_name": "SessionStart", "cwd": str(primary)})
         self.assertFalse(path.exists())
 
-    # -- Claude PostToolUse / Stop --------------------------------------------
 
     def test_claude_posttooluse_confirms_and_stop_blocks_while_unconfirmed_and_active_pass(self):
         bare, primary = init_repo(self.root)
@@ -395,6 +397,67 @@ class MergeCleanupGateTests(unittest.TestCase):
                 obligation = json.loads(path.read_text(encoding="utf-8"))
                 self.assertTrue(obligation["confirmed_merged"], output)
                 path.unlink()
+
+    def test_dict_tool_response_with_merged_state_confirms(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.run_hook(self.payload(f'pushd "{worktree}" && gh pr merge 3 --squash --auto', codex=False, session="s1"))
+        path, _ = self.sole_obligation()
+        result = self.run_hook({
+            "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
+            "tool_input": {"command": "gh pr view 3 --json state"},
+            "tool_response": {"stdout": '{"state":"MERGED"}\n', "stderr": "", "interrupted": False},
+        })
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
+
+    def test_queued_or_piped_direct_merge_does_not_confirm(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        for command, output in (
+            (f'pushd "{worktree}" && gh pr merge 3 --squash', "! Pull request #3 will be added to the merge queue"),
+            (f'pushd "{worktree}" && gh pr merge 3 --squash 2>&1 | tail -5', ""),
+            (f'pushd "{worktree}" && gh pr merge 3 --squash; echo done', ""),
+        ):
+            with self.subTest(command=command):
+                self.run_hook(self.payload(command, codex=False, session="s1"))
+                path, _ = self.sole_obligation()
+                self.run_hook({
+                    "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
+                    "tool_input": {"command": command}, "tool_response": output,
+                })
+                self.assertFalse(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
+                path.unlink()
+
+    def test_direct_merge_confirms_only_its_own_worktree(self):
+        bare, primary = init_repo(self.root)
+        first = add_feature_worktree(primary, self.root, "first")
+        second = add_feature_worktree(primary, self.root, "second")
+        self.run_hook(self.payload(f'pushd "{first}" && gh pr merge 3 --squash --auto', codex=False, session="s1"))
+        second_command = f'pushd "{second}" && gh pr merge --squash'
+        self.run_hook(self.payload(second_command, codex=False, session="s1"))
+        self.run_hook({
+            "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
+            "tool_input": {"command": second_command}, "tool_response": "",
+        })
+        states = {}
+        for obligation_file in self.obligation_files():
+            data = json.loads(obligation_file.read_text(encoding="utf-8"))
+            states[Path(data["worktree"]).name] = data["confirmed_merged"]
+        self.assertEqual({"first-wt": False, "second-wt": True}, states)
+
+    def test_failure_payload_error_text_is_read(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash --delete-branch'
+        self.run_hook(self.payload(merge_command, codex=False, session="s1"))
+        path, _ = self.sole_obligation()
+        self.run_hook({
+            "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "session_id": "s1",
+            "tool_input": {"command": merge_command},
+            "error": "✓ Squashed and merged pull request org/repo#3 (feature)\nfailed to delete local branch feature",
+        })
+        self.assertTrue(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
 
     def test_auto_enqueue_output_does_not_confirm(self):
         bare, primary = init_repo(self.root)
@@ -506,8 +569,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         obligation = json.loads(path.read_text(encoding="utf-8"))
         self.assertFalse(obligation["confirmed_merged"])
 
-    # -- PostToolUseFailure never deletes; confirms only on merge evidence ----
-
     def test_posttoolusefailure_without_merge_evidence_leaves_obligation_unconfirmed(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
@@ -558,7 +619,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(path.exists())
 
-    # -- should_reconcile branch-absence precision ----------------------------
 
     def test_branch_ref_missing_is_false_on_a_non_one_exit_code(self):
         self.assertFalse(gate.branch_ref_missing(self.root / "does-not-exist", "feature"))
@@ -591,7 +651,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         }
         self.assertFalse(gate.should_reconcile(obligation, time.time()))
 
-    # -- incident replay -------------------------------------------------------
 
     def test_incident_replay_codex_denies_and_claude_stop_blocks(self):
         bare, primary = init_repo(self.root)
@@ -629,7 +688,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         decision = json.loads(stop.stdout)
         self.assertEqual("block", decision["decision"])
 
-    # -- manual clear ----------------------------------------------------------
 
     def test_clear_removes_obligation(self):
         bare, primary = init_repo(self.root)
@@ -642,7 +700,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertFalse(path.exists())
 
-    # -- reminders ---------------------------------------------------------------
 
     def test_reminder_prefix_match_and_common_dir_fallback(self):
         bare, primary = init_repo(self.root)
@@ -675,7 +732,6 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(0, no_match.returncode, no_match.stderr)
         self.assertEqual("", no_match.stdout.strip())
 
-    # -- fail-open --------------------------------------------------------------
 
     def test_fail_open_on_garbage_stdin(self):
         result = subprocess.run(

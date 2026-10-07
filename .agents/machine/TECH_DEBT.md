@@ -47,3 +47,22 @@ started from Konsole opens its tab in that Konsole window, or fails if the windo
 Resolve when detection confirms the variable belongs to the terminal the caller is attached to, for
 example by matching the terminal's own record of its sessions against the caller's process ancestry,
 with a test for an inherited variable.
+
+## finish.ps1 trusts the starting directory for attachment
+
+Run without arguments, `finish.ps1` treats the worktree containing its starting directory as its own and
+refuses only when another live registered session sits there. A session can therefore `cd` into another
+merged worktree and finish it. The receipt gates (merged at exactly that head, clean tree, no open PR) mean
+nothing unmerged is lost, but an unregistered session still attached there would lose its directory.
+
+**Resolution condition.** Every live CLI is registered with its current directory (the host reports cwd
+changes, or the registry records them), so attachment can be proven from the registry alone.
+
+## A shared parent shell can keep the worktree locked after finish
+
+`finish.ps1` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started
+by hand from a long-lived shell whose current directory is inside the worktree, that shell survives, Windows
+keeps the directory locked, and the reaper records a failed removal; the cleanup reminder then surfaces it.
+
+**Resolution condition.** The reaper can read another process's current directory, or the host records it,
+so finish can tell a shell that pins the worktree from one that does not.

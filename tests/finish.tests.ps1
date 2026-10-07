@@ -315,7 +315,6 @@ try {
     New-Item -ItemType Directory -Path $scratch -Force | Out-Null
     Add-Type -TypeDefinition $jobObjectSource -Language CSharp
 
-    # --- Preflight refusals -------------------------------------------------------------------------
 
     $preflightState = Join-Path $scratch 'preflight-state'
     New-Item -ItemType Directory -Path $preflightState -Force | Out-Null
@@ -381,7 +380,6 @@ try {
 
     Write-Output 'PASS finish.tests.ps1: preflight refusals'
 
-    # --- Job-breakaway proof ------------------------------------------------------------------------
 
     $breakawayRoot = Join-Path $scratch 'breakaway'
     New-Item -ItemType Directory -Path $breakawayRoot -Force | Out-Null
@@ -477,7 +475,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: job-breakaway proof'
 
-    # --- End-to-end squash-merge cleanup -------------------------------------------------------------
 
     $e2eRoot = Join-Path $scratch 'end-to-end'
     New-Item -ItemType Directory -Path $e2eRoot -Force | Out-Null
@@ -545,7 +542,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: end-to-end squash-merge cleanup'
 
-    # --- Reaper timeout path ------------------------------------------------------------------------
 
     $timeoutRoot = Join-Path $scratch 'timeout'
     New-Item -ItemType Directory -Path $timeoutRoot -Force | Out-Null
@@ -603,7 +599,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: reaper timeout path'
 
-    # --- Preflight refuses a moved HEAD after the receipt; the reaper preserves a moved branch ------------
 
     $r1aRoot = Join-Path $scratch 'r1-preflight-moved-head'
     New-Item -ItemType Directory -Path $r1aRoot -Force | Out-Null
@@ -670,7 +665,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: preflight refuses a moved HEAD; reaper preserves a moved branch'
 
-    # --- Own registry entry provides the tab title; attachment follows the PWD or the self entry's cwd -----
 
     $ownEntryRoot = Join-Path $scratch 'r3-peer-title'
     New-Item -ItemType Directory -Path $ownEntryRoot -Force | Out-Null
@@ -733,7 +727,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: own registry entry provides the tab title; attachment follows the PWD or the self entry cwd'
 
-    # --- The reaper waits for the parent shell pid too, not only the host pid -----------------------------
 
     $parentWaitRoot = Join-Path $scratch 'r7-parent-wait'
     New-Item -ItemType Directory -Path $parentWaitRoot -Force | Out-Null
@@ -791,7 +784,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: reaper waits for the parent shell pid too'
 
-    # --- Receipt lookup matches a worktree field that differs only in case ---------------------------------
 
     $caseLookupRoot = Join-Path $scratch 'r8-case-insensitive-receipt'
     New-Item -ItemType Directory -Path $caseLookupRoot -Force | Out-Null
@@ -823,7 +815,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: case-insensitive receipt lookup'
 
-    # --- A prefix-sharing sibling worktree does not defeat the exact registration check ---------------------
 
     $siblingRoot = Join-Path $scratch 'r12-prefix-sibling'
     New-Item -ItemType Directory -Path $siblingRoot -Force | Out-Null
@@ -865,7 +856,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: exact worktree registration check ignores a prefix-sharing sibling'
 
-    # --- Tab-uniqueness check parses close-tab.ps1 -Json output without touching UI Automation -------------
 
     $tabJsonRoot = Join-Path $scratch 'r14-tab-json-parse'
     New-Item -ItemType Directory -Path $tabJsonRoot -Force | Out-Null
@@ -912,7 +902,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: tab-uniqueness check parses close-tab.ps1 -Json output'
 
-    # --- Wrapper shell qualification requires timing and exclusive children; stops before the host ---------
 
     $wrapperRoot = Join-Path $scratch 'r15-wrapper-shell'
     New-Item -ItemType Directory -Path $wrapperRoot -Force | Out-Null
@@ -1027,7 +1016,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: wrapper shell qualification requires timing and exclusive children; stops before the host'
 
-    # --- Refuses when another live registered session's cwd is under the worktree ---------------------------
 
     $claimRoot = Join-Path $scratch 'r19-other-live-claim'
     New-Item -ItemType Directory -Path $claimRoot -Force | Out-Null
@@ -1090,7 +1078,6 @@ Start-Sleep -Seconds 20
 
     Write-Output 'PASS finish.tests.ps1: refuses when another live registered session claims the worktree'
 
-    # --- Reaper removes every matching obligation file, not only the first -----------------------------------
 
     $duplicateRoot = Join-Path $scratch 'r21-duplicate-obligations'
     New-Item -ItemType Directory -Path $duplicateRoot -Force | Out-Null
