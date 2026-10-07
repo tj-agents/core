@@ -93,6 +93,13 @@ def write_obligation(state_dir, worktree, pr):
     path.write_text(json.dumps({"pr": pr}), encoding="utf-8")
 
 
+def write_string_obligation(state_dir, worktree, pr):
+    digest = hashlib.sha256(Path(worktree).resolve().as_posix().encode("utf-8")).hexdigest()
+    path = Path(state_dir) / "merge-cleanup" / "obligations" / f"{digest}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"pr": str(pr)}), encoding="utf-8")
+
+
 class CleanupProofTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -311,6 +318,25 @@ class CleanupProofTests(unittest.TestCase):
         head = git(worktree, "rev-parse", "HEAD")
         merge_oid = merge_commit_merge(primary, "feature")
         write_obligation(self.state.name, worktree, pr=99)
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(1, result.returncode)
+        self.assertTrue(result.stdout.startswith("preserve:"))
+        self.assertIn("obligation", result.stdout)
+        self.assertTrue(worktree.exists())
+
+    def test_argument_less_operation_preserves_on_string_obligation_pr_mismatch(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+        write_string_obligation(self.state.name, worktree, pr=99)
 
         fixture = self.fixture_path()
         write_fixture(

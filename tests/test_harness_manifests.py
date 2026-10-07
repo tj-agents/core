@@ -20,6 +20,7 @@ sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
 INSTRUCTED_SCRIPTS = {"engineering": "cleanup_proof.py", "machine": "finish.ps1"}
+HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
 
 
 class HarnessManifestTests(unittest.TestCase):
@@ -99,6 +100,29 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                 )
                 matching_rules = [rule for rule in codex_rules if script in json.dumps(rule)]
                 self.assertEqual(1, len(matching_rules), f"{plugin}: expected exactly one Codex rule for {script}")
+
+    def test_host_entry_and_vendored_script_paths_are_both_declared(self):
+        for plugin, script in INSTRUCTED_SCRIPTS.items():
+            skill = HOST_ENTRY_SKILLS[plugin]
+            with self.subTest(plugin=plugin):
+                claude_allow, codex_rules = self.rendered(plugin)
+                matching = [entry.replace("\\", "/") for entry in claude_allow if script in entry]
+                self.assertTrue(
+                    any("/.agents/" in entry for entry in matching),
+                    f"{plugin}: missing the vendored .agents/ path for {script}",
+                )
+                self.assertTrue(
+                    any(f"/skills/{skill}/scripts/{script}" in entry for entry in matching),
+                    f"{plugin}: missing the host-entry skills/ path for {script}",
+                )
+                rules_text = json.dumps(
+                    [rule for rule in codex_rules if script in json.dumps(rule)]
+                ).replace("\\\\", "/")
+                self.assertIn(".agents/", rules_text, f"{plugin}: missing the vendored .agents/ Codex path")
+                self.assertIn(
+                    f"codex-skills/{skill}/scripts/{script}", rules_text,
+                    f"{plugin}: missing the host-entry codex-skills/ Codex path",
+                )
 
     def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
         codex = shutil.which("codex")

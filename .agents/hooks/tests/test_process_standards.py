@@ -475,7 +475,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
             "the session closes itself as the delivery's final action, after Step 6",
             'no arguments and no leading `&`, because the harness allow rule matches only this string',
-            'powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>\\scripts\\finish.ps1',
+            'powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1',
             "detaches a reaper that removes the worktree and branch once this session exits",
             "closes this session's CLI and tab",
             "Only when `finish.ps1` is unavailable or its preflight fails",

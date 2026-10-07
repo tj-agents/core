@@ -313,18 +313,25 @@
             "permissions": {
               "claude_allow": [
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)"
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
               ],
               "codex_prefix_rules": [
                 {
                   "pattern": [
                     [
                       "python",
+                      "python.exe",
                       "python3",
                       "py"
                     ],
                     "-B",
-                    "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                    [
+                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+                      "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
+                      "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+                    ]
                   ],
                   "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before any cleanup",
                   "match": [
@@ -332,6 +339,11 @@
                       "python",
                       "-B",
                       "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
                     ]
                   ],
                   "not_match": [
@@ -451,20 +463,28 @@
             "permissions": {
               "claude_allow": [
                 "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
-                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)"
+                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
+                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)",
+                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)"
               ],
               "codex_prefix_rules": [
                 {
                   "pattern": [
                     [
                       "powershell",
-                      "pwsh"
+                      "powershell.exe",
+                      "pwsh",
+                      "pwsh.exe"
                     ],
                     "-NoProfile",
                     "-ExecutionPolicy",
                     "Bypass",
                     "-File",
-                    "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1",
+                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.ps1"
+                    ]
                   ],
                   "justification": "engineering:merge Step 5: finish closes this session's own CLI and removes its merged worktree after cleanup_proof.py approved it",
                   "match": [
@@ -475,6 +495,14 @@
                       "Bypass",
                       "-File",
                       "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                    ],
+                    [
+                      "powershell.exe",
+                      "-NoProfile",
+                      "-ExecutionPolicy",
+                      "Bypass",
+                      "-File",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.ps1"
                     ]
                   ],
                   "not_match": [

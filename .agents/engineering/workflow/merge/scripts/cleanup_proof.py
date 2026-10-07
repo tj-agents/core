@@ -129,7 +129,7 @@ def resolve_pr(branch, repo, fixture, obligation):
         number = value
     if obligation is not None:
         recorded_pr = obligation.get("pr")
-        if isinstance(recorded_pr, int) and recorded_pr != number:
+        if recorded_pr is not None and str(recorded_pr) != str(number):
             raise Preserve(f"PR #{number} disagrees with the recorded obligation PR #{recorded_pr}")
     return number
 
