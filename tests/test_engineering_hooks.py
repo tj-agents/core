@@ -34,11 +34,11 @@ class PackagedEngineeringHooks(unittest.TestCase):
                                 CLAUDE_PLUGIN_ROOT=str(self.package), PYTHONIOENCODING='utf-8',
                                 TMP=str(review_cache), TEMP=str(review_cache))
 
-    def run_hook(self, path, data=None):
+    def run_hook(self, path, data=None, arguments=()):
         payload = dict(cwd=str(self.cwd), session_id=str(uuid.uuid4()),
                        hook_event_name='PreToolUse', tool_use_id=str(uuid.uuid4()))
         payload.update(data or {})
-        return subprocess.run([sys.executable, '-B', str(self.package / path)],
+        return subprocess.run([sys.executable, '-B', str(self.package / path), *arguments],
                               input=json.dumps(payload), capture_output=True, text=True,
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
 
@@ -74,6 +74,81 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("cannot read contract", result.stderr)
         self.assertEqual("", result.stdout)
+
+    def test_user_prompt_context_is_bounded_to_the_callout_section(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        heading = "## When the user calls out a mistake"
+
+        for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
+            with self.subTest(host=host):
+                manifest = json.loads(
+                    (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
+                )
+                hooks = json.loads((self.package / manifest["hooks"]).read_text(encoding="utf-8"))
+                commands = [
+                    command_line(hook)
+                    for registration in hooks["hooks"]["UserPromptSubmit"]
+                    for hook in registration["hooks"]
+                ]
+                prompt_context = [
+                    command for command in commands
+                    if "session-context.py" in command and "--prompt-context" in command
+                ]
+                self.assertEqual(1, len(prompt_context))
+                self.assertIn(chr(36) + "{" + variable + "}/" + script, prompt_context[0])
+
+                result = self.run_hook(script, {"hook_event_name": "UserPromptSubmit"}, ("--prompt-context",))
+                self.assertEqual(0, result.returncode, result.stderr)
+                output = json.loads(result.stdout)["hookSpecificOutput"]
+                self.assertEqual("UserPromptSubmit", output["hookEventName"])
+                context = output["additionalContext"]
+                body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
+                expected = body.split(heading, 1)[1].split("\n## ", 1)[0].strip()
+                self.assertIn(str(contract), context)
+                self.assertIn("source SHA-256", context)
+                self.assertNotIn(heading, context)
+                self.assertEqual(expected, context.split("\n\n", 1)[1])
+                self.assertNotIn("## A task has an owning lifecycle", context)
+                self.assertLess(len(context), 1200)
+
+        before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
+        contract.write_text(contract.read_text(encoding="utf-8").replace(
+            "Existing\nuser limits and scope gates still apply.",
+            "Existing\nuser limits and scope gates still apply. Canonical source changed.",
+        ), encoding="utf-8")
+        after = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertNotEqual(before, after)
+        self.assertNotEqual(before.splitlines()[0], after.splitlines()[0])
+        self.assertIn("Canonical source changed.", after)
+        self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_prompt_context_reports_missing_and_empty_sections(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
+        heading = "## When the user calls out a mistake"
+        original = contract.read_text(encoding="utf-8")
+
+        contract.write_text(original.replace(heading, heading + " \t", 1), encoding="utf-8")
+        whitespace = self.run_hook(script, arguments=("--prompt-context",))
+        self.assertEqual(0, whitespace.returncode, whitespace.stderr)
+
+        contract.write_text(original.replace(heading, "## Replaced heading"), encoding="utf-8")
+        missing = self.run_hook(script, arguments=("--prompt-context",))
+        self.assertNotEqual(0, missing.returncode)
+        self.assertIn("missing prompt context section", missing.stderr)
+        self.assertEqual("", missing.stdout)
+
+        before, remainder = original.split(heading, 1)
+        _, after = remainder.split("## A task has an owning lifecycle", 1)
+        contract.write_text(
+            before + heading + "\n\n## A task has an owning lifecycle" + after,
+            encoding="utf-8",
+        )
+        empty = self.run_hook(script, arguments=("--prompt-context",))
+        self.assertNotEqual(0, empty.returncode)
+        self.assertIn("is empty", empty.stderr)
+        self.assertEqual("", empty.stdout)
 
     def test_each_host_routes_an_active_goal_to_the_packaged_plan_execution_contract(self):
         (self.cwd / "GOAL.md").write_text(

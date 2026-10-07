@@ -90,6 +90,16 @@
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context"
+          }
+        ]
       }
     ]
   }

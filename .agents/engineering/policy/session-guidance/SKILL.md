@@ -14,6 +14,16 @@ with the project. The common maintained-plan contract is `base:plan-artifacts`. 
 continuation owner is `base:goal-continuation`; it selects `engineering:persistent-workflow` when
 an authorized task has a future decision that may outlive the current session.
 
+## When the user calls out a mistake
+
+When the user calls out a mistake, before apologizing or drafting feedback, check whether a governing
+standard caused or failed to prevent the mistake. This includes a missing, ambiguous, contradictory,
+mispriced or unenforced standard across every
+consumed `tj-agents` plugin on both hosts. If it did, launch `engineering:handoff` in bounded
+side-workstream mode in the same turn under the standing authorization, before the original task resumes.
+An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Existing
+user limits and scope gates still apply.
+
 ## A task has an owning lifecycle — load it before the first edit
 
 Authorized long-term or multi-phase work selects `engineering:plan-execution`, even when the user does
