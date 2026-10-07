@@ -116,10 +116,10 @@ not a lane change.
   live under the workflow contract's version rather than being re-resolved at dispatch. They are derived
   from the ladder and a test asserts they still agree with it, so a rung and its stage cannot drift apart
   — but the pin is the value the runtime reads.
-- **A handoff launcher** takes a lane (or frontier) flag per dispatch: `machine:handoff-claude`'s Python
-  launcher takes `--lane` (or `--frontier`); `machine:handoff-codex` still takes `-Lane` (or `-Frontier`)
-  until its own Python port lands. Either way the calling agent judges the lane by the four questions and
-  the launcher only prices it, never inferring one from the prompt.
+- **A handoff launcher** takes a lane (or frontier) flag per dispatch: both `machine:handoff-claude` and
+  `machine:handoff-codex`'s Python launchers take `--lane` (or `--frontier`), and `handoff-codex` also
+  takes `--reasoning-effort` for a Codex model named outright. Either way the calling agent judges the
+  lane by the four questions and the launcher only prices it, never inferring one from the prompt.
 
 ## Where the two ladders are not level — know these before trusting parity
 

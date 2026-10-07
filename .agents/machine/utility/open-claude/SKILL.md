@@ -12,8 +12,8 @@ route: infer
 Opens an interactive Claude Code session the user drives themselves. Its sibling `handoff-claude` is for
 delegating prepared work to a second Claude; this one is for putting a terminal in front of the user.
 The terminal invocation and the environment scrub belong to `scripts/agent_cli.py` under
-`resources/machine/scripts`, shared with `handoff-claude`. `handoff-codex` still uses the PowerShell
-`agent-cli.ps1` until its own Python port lands.
+`resources/machine/scripts`, shared with `handoff-claude` and `handoff-codex`. The terminal claude
+launcher (`claude-profile.ps1`) still uses the PowerShell `agent-cli.ps1` until its own Python port lands.
 
 Never open a Claude CLI by typing `claude` into a shell command, an npm shim such as `claude.cmd`, or
 `node.exe`, or any other intermediate process. Those resolve to the npm/NVM shim, which runs the TUI
