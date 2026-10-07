@@ -149,11 +149,17 @@ LINKED_SKILL_ROOTS = {
     "claude": ("skills",),
     "codex": (".agents/skills", ".codex/skills"),
 }
+class NativePluginDiscoveryError(Exception):
+    def __init__(self, harness, detail):
+        self.harness = harness
+        super().__init__(f"{harness} plugin inventory failed: {detail}")
+
+
 @functools.lru_cache(maxsize=2)
-def native_install_roots(harness):
+def _native_install_roots(harness):
     binary = shutil.which(harness)
     if binary is None:
-        return ()
+        return NativePluginDiscoveryError(harness, "CLI executable is unavailable")
     try:
         result = subprocess.run(
             [binary, "plugin", "list", "--json"], capture_output=True, text=True,
@@ -161,13 +167,22 @@ def native_install_roots(harness):
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         if result.returncode != 0:
-            return ()
+            return NativePluginDiscoveryError(
+                harness, f"CLI exited with status {result.returncode}"
+            )
         data = json.loads(result.stdout)
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return ()
-    plugins = data.get("installed", []) if harness == "codex" and isinstance(data, dict) else data
+    except subprocess.TimeoutExpired:
+        return NativePluginDiscoveryError(harness, "CLI timed out after 8 seconds")
+    except OSError as error:
+        return NativePluginDiscoveryError(harness, f"CLI could not run: {str(error)[:256]}")
+    except ValueError:
+        return NativePluginDiscoveryError(harness, "CLI returned invalid JSON")
+    if harness == "codex":
+        plugins = data.get("installed") if isinstance(data, dict) else None
+    else:
+        plugins = data
     if not isinstance(plugins, list):
-        return ()
+        return NativePluginDiscoveryError(harness, "CLI returned an invalid roster")
     roots = []
     for plugin in plugins:
         if not isinstance(plugin, dict) or not plugin.get("enabled"):
@@ -187,8 +202,25 @@ def native_install_roots(harness):
     return tuple(roots)
 
 
-def active_harness(tool_name, data):
+def native_install_roots(harness):
+    roots = _native_install_roots(harness)
+    if isinstance(roots, NativePluginDiscoveryError):
+        raise roots
+    return roots
+
+
+def discovery_diagnostic(error):
+    print(f"SKILL ROUTER - native plugin discovery infrastructure error: {error}\n"
+          f"Check `{error.harness} plugin list --json` and retry. This tool call was NOT run.",
+          file=sys.stderr)
+
+
+def active_harness(tool_name, data, explicit_harness=None):
     lowered = tool_name.lower()
+    if lowered not in WRITE_TOOLS:
+        return None
+    if explicit_harness is not None:
+        return explicit_harness
     if lowered == "bash" and data.get("turn_id"):
         return "codex"
     if lowered in CLAUDE_WRITE_TOOLS:
@@ -598,14 +630,26 @@ def resolved_skill(name, harness, following_alias=False):
     home, which is every utility and every route that names only one side.
     """
     wanted_plugin, _, bare = name.rpartition(":")
-    found = _readable_skill(bare, harness, wanted_plugin)
+    discovery_error = None
+    try:
+        found = _readable_skill(bare, harness, wanted_plugin)
+    except NativePluginDiscoveryError as error:
+        discovery_error = error
+        found = None
     if found is not None:
         return found
-    # Nothing answers to this name anywhere, which is what a rename looks like from here. One hop only:
-    # the alias table is a rename record, not a chain to walk.
     current = None if following_alias else skill_aliases().get(name)
     if current:
-        return resolved_skill(current, harness, True)
+        try:
+            aliased = resolved_skill(current, harness, True)
+        except NativePluginDiscoveryError:
+            if discovery_error is None:
+                raise
+        else:
+            if aliased is not None:
+                return aliased
+    if discovery_error is not None:
+        raise discovery_error
     return None
 
 
@@ -1220,7 +1264,11 @@ def verify_install(argv):
         return 2
 
     names = sorted({name for route in routes for name in route.get("skills") or []})
-    missing = [name for name in names if skill_description(name, harness) is None]
+    try:
+        missing = [name for name in names if skill_description(name, harness) is None]
+    except NativePluginDiscoveryError as error:
+        discovery_diagnostic(error)
+        return 2
     if missing:
         print(f"{harness} is missing {len(missing)} of {len(names)} routed skill(s):")
         for name in missing:
@@ -1239,6 +1287,14 @@ def main():
     if VERIFY_FLAG in sys.argv[1:]:
         sys.exit(verify_install(sys.argv[1:]))
 
+    explicit_harness = None
+    if "--harness" in sys.argv[1:]:
+        index = sys.argv.index("--harness")
+        explicit_harness = sys.argv[index + 1] if len(sys.argv) > index + 1 else None
+        if explicit_harness not in {"claude", "codex"}:
+            print("SKILL ROUTER - --harness requires claude or codex", file=sys.stderr)
+            sys.exit(2)
+
     try:
         data = json.load(sys.stdin)
     except ValueError:
@@ -1247,7 +1303,7 @@ def main():
     tool_name = data.get("tool_name")
     if not isinstance(tool_name, str):
         sys.exit(0)
-    harness = active_harness(tool_name, data)
+    harness = active_harness(tool_name, data, explicit_harness)
     if harness is None:
         sys.exit(0)
 
@@ -1287,7 +1343,11 @@ def main():
     if not routes:
         sys.exit(0)
 
-    missing_install = missing_routed_skills(routes, harness)
+    try:
+        missing_install = missing_routed_skills(routes, harness)
+    except NativePluginDiscoveryError as error:
+        discovery_diagnostic(error)
+        sys.exit(2)
     if missing_install:
         sys.stderr.write(
             "SKILL ROUTER - blocked, this repository requires unavailable standards:\n\n"
@@ -1504,4 +1564,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except NativePluginDiscoveryError as error:
+        discovery_diagnostic(error)
+        sys.exit(2)
