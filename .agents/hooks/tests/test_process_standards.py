@@ -442,21 +442,23 @@ class ProcessStandardsTests(unittest.TestCase):
             "Join-Path <primary-checkout> 'scripts/worktrees.ps1'",
             "Test-Path -LiteralPath $worktreeHelper -PathType Leaf",
             "If that exact primary-checkout helper path is absent, do not skip cleanup",
-            "status --porcelain=v2 --untracked-files=all",
-            "git merge-base --is-ancestor",
-            "gh pr list --repo <owner/repo> --state open --head <branch> --json number,url",
-            "fresh query returns exactly `[]`",
+            "cleanup_proof.py",
+            "a dirty tree",
+            "a merge commit absent from `origin/<default>`",
+            "a still-open PR for the head",
+            "`preserve:` stops cleanup",
             "worktree remove -- <target-worktree>",
             "branch -d <branch>",
+            "proof covers exactly this head, so delete it with",
+            "branch -D <branch>",
             "Step 5 is a blocking post-merge gate",
-            "Do not enter Step 6",
+            "Only the `finish.ps1` path may enter Step 6 first",
             "never remove that path",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
         self.assertNotIn("worktree remove --force", cleanup)
-        self.assertNotIn("branch -D", cleanup)
 
     def test_merge_retargets_the_host_before_active_worktree_removal(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
@@ -471,8 +473,12 @@ class ProcessStandardsTests(unittest.TestCase):
             "When the target is the primary checkout, or the session is already attached to the primary checkout, do not retarget or hand off",
             "continue cleanup and branch deletion in the current session",
             "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
-            "apply `base:cd` and retarget the host **before** a helper or native Git unregisters or removes it",
-            "retarget the host **before** a helper or native Git unregisters or removes it",
+            "the session closes itself as the delivery's final action, after Step 6",
+            'no arguments and no leading `&`, because the harness allow rule matches only this string',
+            'powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1',
+            "detaches a reaper that removes the worktree and branch once this session exits",
+            "closes this session's CLI and tab",
+            "Only when `finish.ps1` is unavailable or its preflight fails",
             "shell `cd`, or `git -C` does not retarget Codex or Claude",
             "invoke `/cd <primary-checkout>` there",
             "invoke the unqualified `handoff` workflow once with the primary checkout",
@@ -483,9 +489,9 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        self.assertLess(cleanup.index("apply `base:cd`"), cleanup.index("$worktreeHelper"))
+        self.assertLess(cleanup.index("finish.ps1"), cleanup.index("$worktreeHelper"))
         self.assertLess(
-            cleanup.index("apply `base:cd`"),
+            cleanup.index("finish.ps1"),
             cleanup.index("worktree remove -- <target-worktree>"),
         )
 
@@ -501,7 +507,10 @@ class ProcessStandardsTests(unittest.TestCase):
             cd,
         )
         self.assertIn(
-            "the original stops repository-scoped work; it cannot end its own host session", cd
+            "the original stops repository-scoped work; a completed delivery closes its own session "
+            "through `engineering:merge` Step 5's `finish`; only when that is unavailable does the "
+            "`handoff` successor own the removal, closing the predecessor through `machine:peer-cli`",
+            cd,
         )
         self.assertIn(
             "put that exact operation and its final filesystem verification in the "
