@@ -1,6 +1,6 @@
 # Repository-owned plans, worktrees and TJ Agents adoption
 
-Status: approved outcome, execution in progress, 2026-10-07. Codex pickup verified; allocator design approved and implementation active. Producer and consumer acceptance remain.
+Status: approved outcome, execution in progress, 2026-10-07. Codex pickup verified; allocator implemented and focused checks green; source review next. Producer and consumer acceptance remain.
 
 ## Authorization and ownership
 
@@ -400,24 +400,46 @@ ledger already contains its self-contained Next Steps. Review work orders remain
 the durable outcome. The relative-pointer correction passed native review without findings. Origin/main
 was merged at `99d2be1a7af69c1c9e42a38599bd76e095f02626` before releasing the L4 implementation writer.
 Its five paths are the helper, allocator tests, source-layout tests, engineering harness and harness tests.
-Next action: complete focused implementation verification, review the committed code and deliver the
-producer PR. Broader acceptance remains unchanged.
+The L4 writer returned its lease after implementation. Validation: allocator suite ran 17 tests with
+one Windows symlink-capability skip; harness suite ran 10 with one Codex-CLI availability skip; all
+19 source-layout tests passed. Harness declaration check and generated-tree check passed (458 files,
+zero changed/pruned). Actual generated host scripts ran from external temporary consumer fixtures.
+The authored helper/tests/harness change is approximately 704 lines, below the substantive-size warning.
+Generated catalog/package refreshes remain outside the authored commit. Next action: review the
+committed code; current-main synchronization/delivery stays behind the explicit pending fetch gate.
+Broader acceptance remains unchanged.
 
 ## Active delivery and side-owner evidence
 
-- Allocator producer: this branch; design complete, L4 implementation active, no PR yet. Guidance remains
+- Allocator producer: this branch; L4 implementation and focused checks complete, code review next,
+  no PR yet. Guidance remains
   a following Docs slice. No allocator rollout is claimed before both land and native acceptance passes.
-- Claude plan policy: core/.worktrees/Docs-RepoOwnedPlanConventions, PR #133. Its owner remains active;
-  checks were green at the earlier head and must be reconciled against its final head before delivery.
+- Claude plan policy: PR #133 merged as `957da2637b1e8c471877b96353b43174f5ddd324` after guard and
+  verify passed at head `7256473e12545620cf81c12ca2cc1ff38e776061`. Its native owner still owes the
+  generation/host-acceptance outcome; source merge alone does not close the overall policy acceptance.
+  Its Claude approval classifier subsequently denied `git fetch origin --quiet` in the primary core
+  checkout with reason `Merge Without Review`. The local native review covers source head 19f01b7,
+  the later 7256473 commit records that review, and exact-head CI passed. The merge command used
+  `--admin`; GitHub reports no classic branch protection or rulesets. Preserve the checkout and merge.
+  User approval to resume the rejected fetch/post-merge verification is pending; do not pursue that
+  denied outcome through another host. Independent allocator edits/tests remain authorized.
 - Checker command source repair: core/.worktrees/Docs-PlanGraphInvocation, verified Claude pickup,
-  PR #136. Fixes unsupported `--plan` examples; actual checker takes `--root` and `--json`.
-- Runtime package integrity: core/.worktrees/Fix-WorkflowBytecodeIntegrity, verified Claude pickup,
-  goal plans/workflow-bytecode-integrity/GOAL.md. Prevent runtime bytecode from poisoning strict native
-  package trust; no weakened package-file check or credential copying is authorized.
+  PR #136 at `c16894200817792249d62ee02e3c65b8d94d36fb`, guard/verify green. Its ScheduleWakeup
+  monitor/merge action was denied with `Merge Without Review`; a retry did not establish a working
+  monitor. User approval to resume that exact delivery is pending. Its local review marks source
+  `589c2c9` approved but omits frozen bundle/native-layer evidence; reconcile that gate before merge.
+  Fixes unsupported `--plan` examples; actual checker takes `--root` and `--json`.
+- Runtime package integrity: PR #138 merged as `4bf95d13320253d6545484f01c0becd511b703a4` after
+  guard/verify passed at `e73218f241f9da7cf0d6cc6ed4a68f546cd8da61`. Its native owner remains in
+  core/.worktrees/Fix-WorkflowBytecodeIntegrity with goal plans/workflow-bytecode-integrity/GOAL.md;
+  receive its result/cleanup evidence. Runtime entrypoints and child invocation now suppress bytecode
+  generation without weakening package trust. Installed-host/fleet acceptance is not established by this merge.
 - Aggregate C: native Claude launch confirmed in
   C:/Users/TommySeery/source/repos/tj-agents/marketplace/.worktrees/Feature-CoreCatalogAdoption,
   goal plans/core-catalog-adoption/GOAL.md, base `62b527449045991582ebd44ac9b4e3005f2c2b8c`.
-  Pickup is pending. It owns only marketplace design/delivery and returns the kit consumption contract.
+  Pickup is pending at Claude's native folder-trust prompt for this exact checkout, observed through
+  its named terminal tab. User approval to accept that prompt has been requested; do not relaunch.
+  It owns only marketplace design/delivery and returns the kit consumption contract.
   Preserve marketplace Feature/WorkPlugin and kit PR #4's overlapping taxonomy source changes. Kit needs
   its own subsequent checkout and PR; consumer rollout remains held on released producers and both hosts.
 - Closeout: startup timeout still leaves the detached reaper without a cancellation handshake. Independent
@@ -427,19 +449,25 @@ producer PR. Broader acceptance remains unchanged.
   identity is not established. PR #135 separately owns close-tab's single-match PowerShell fix.
   Native Claude startup-repair launch is confirmed in core/.worktrees/Fix-ReaperStartupHandshake,
   goal plans/reaper-startup-handshake/GOAL.md at base f9f5183. It owns only the acknowledged-start
-  protocol and cancellation; pickup remains pending. Its goal preserves the other cleanup writer.
+  protocol and cancellation; pickup at f9f5183 and first source-reading action are verified. Its goal
+  preserves the other cleanup writer.
+
+First-consumer inventory is recorded in the existing adoption ledger: winwrap and sandbox-hwid have
+stack-only project settings and no core lock/composed catalog. The inspected C++ producer lacks owner
+release/harness records. Resolve that source-owner dependency before consumer composition.
 
 ## Next Steps
 
 Scope: whole goal through all remaining slices and terminal delivery.
-Current slice: finish, validate and deliver the shared allocator producer; coordinate the independent
+Current slice: review and deliver the shared allocator producer after its green focused checks; coordinate the independent
 native policy, source-repair and aggregate owners without overlapping their writes.
 Remaining scope: allocator guidance, cleanup reliability, marketplace/kit delivery, every project and known
 machine migration, both-host acceptance, and verified retirement of obsolete flat checkouts.
 Done when: every acceptance criterion above passes and all resulting authorized PRs/adoption/cleanup gates
 are terminal; source-only changes or one merged PR do not complete this goal.
 
-1. Preserve this full-goal Codex owner and heartbeat its continuation lease. Reconcile the L4 worker's
+1. Preserve this full-goal Codex owner and heartbeat its continuation lease. Resolve the post-merge
+   core-fetch approval gate before that denied outcome is retried. Reconcile the L4 worker's
    five-path implementation and test evidence, commit a focused green candidate, run native/routed review,
    address findings and deliver its PR through exact-head CI and normal merge gates.
 2. Receive results from the existing native side owners using their actual pickup/result artifacts and
@@ -448,7 +476,8 @@ are terminal; source-only changes or one merged PR do not complete this goal.
 3. Deliver allocator guidance from updated main after the producer. Receive the existing native
    startup-repair owner's protocol/result, preserving the transferred-obligation writer and PR #135.
    Verify delayed acknowledgement, failed startup, shared claims, both native hosts and no late cleanup.
-4. Confirm aggregate pickup and its concrete producer/identity contract. Use a real Claude handoff for
+4. Resolve the aggregate checkout's native folder-trust gate with the user, accept only that exact
+   authorized prompt, then confirm pickup and the producer/identity contract. Use a real Claude handoff for
    kit after reconciling PR #4, keeping separate focused PRs and exact release/native acceptance gates.
 5. Extend the existing adoption owner for project/machine batches and goal/reference migrations. Before
    deletion, preserve dirty work, local-only history and active sessions and prove replacement ownership.

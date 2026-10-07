@@ -19,8 +19,12 @@ PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scr
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
-INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.ps1"), ("machine", "close.ps1"))
-HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
+INSTRUCTED_SCRIPTS = (
+    ("engineering", "cleanup_proof.py", "merge"),
+    ("engineering", "worktrees.py", "open-worktree"),
+    ("machine", "finish.ps1", "peer-cli"),
+    ("machine", "close.ps1", "peer-cli"),
+)
 
 
 class HarnessManifestTests(unittest.TestCase):
@@ -108,7 +112,7 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         return harness_permissions.render_permissions(manifest["requires"]["permissions"], self.PLUGIN_ROOT)
 
     def test_every_instructed_command_is_declared_for_both_hosts(self):
-        for plugin, script in INSTRUCTED_SCRIPTS:
+        for plugin, script, _ in INSTRUCTED_SCRIPTS:
             with self.subTest(plugin=plugin, script=script):
                 claude_allow, codex_rules = self.rendered(plugin)
                 matching = [entry for entry in claude_allow if script in entry]
@@ -124,8 +128,7 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                 self.assertEqual(1, len(matching_rules), f"{plugin}: expected exactly one Codex rule for {script}")
 
     def test_host_entry_and_vendored_script_paths_are_both_declared(self):
-        for plugin, script in INSTRUCTED_SCRIPTS:
-            skill = HOST_ENTRY_SKILLS[plugin]
+        for plugin, script, skill in INSTRUCTED_SCRIPTS:
             with self.subTest(plugin=plugin, script=script):
                 claude_allow, codex_rules = self.rendered(plugin)
                 matching = [entry.replace("\\", "/") for entry in claude_allow if script in entry]
@@ -170,7 +173,7 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
             self.skipTest("codex CLI not on PATH")
         rules = []
         checks = []
-        for plugin in dict.fromkeys(plugin for plugin, _ in INSTRUCTED_SCRIPTS):
+        for plugin in dict.fromkeys(plugin for plugin, _, _ in INSTRUCTED_SCRIPTS):
             _, codex_rules = self.rendered(plugin)
             rules += codex_rules
             checks.extend((plugin, rule["match"][0]) for rule in codex_rules)

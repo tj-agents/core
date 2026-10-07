@@ -15,6 +15,17 @@ The original Repo-declared config owner, session `01a0dedd-012f-7b10-8d89-dde586
 
 The repository-layout proposal is a dependency: [REPOSITORY_LAYOUT_PROPOSAL.md](../repository-layout/REPOSITORY_LAYOUT_PROPOSAL.md). Core's owner catalog contains only core releases; each producer owns its catalog and harness manifest. Consumer declarations and generated Claude/Codex settings must be committed and drift-checked. Do not tag a core-only catalog release for consumer adoption until the first `winwrap` and `sandbox-hwid` consumers have committed their composed catalogs.
 
+Current first-consumer source inventory (2026-10-07; read-only, no adoption changes):
+
+| Consumer | Observed checkout and declarations | Remaining gate |
+|---|---|---|
+| `cpp/windows/winwrap` | Primary `main` at `1355897c910b800ca516d315ffa68ccce26140c8`; code clean, existing root plan has historical delivery edits. Project host settings select `cpp`, `msvc`, `win32` from `cpp-agents`; no core selection, capability lock, composed catalog or drift check. | Reconcile exact core and C++ producer records, then create a bounded consumer adoption checkout. Preserve root plans and PLANNING.md. |
+| `cpp/windows/sandbox-hwid` | Primary `main` at `f7f42813b446bba772ddc5de1b9e5ec8809c139e`; code clean; same stack-only settings and missing declaration artifacts. Legacy `sandbox-hwid.worktrees/Docs-TraceGuideCodePath` at `d58d763721ee07e18b6a43dd3144ff063052a2d4` remains registered. | Reconcile native owner and references before moving that checkout. Preserve root plans, technical routes and docs/next-session.md teaching contract. |
+
+Both projects already keep plans in their repositories; the inspected files do not identify an active external goal to move. Neither tracked ignore file declares `.worktrees/`; the shipped allocator must establish its common-Git exclusion. Current project settings still rely on profile/global core roles and do not establish installed closure or host acceptance. Native session liveness was outside this inventory.
+
+The inspected canonical `tj-agents/cpp` checkout lacks an owner catalog and harness-manifest directory. Its producer must supply and validate exact release/harness records before composing the first consumer catalogs; core must not invent those records. Allocator/guidance delivery, aggregate identity reconciliation, both-host acceptance and the existing credential-copy gate remain open.
+
 Previously recorded machine inventory (2026-09-27; recheck before cleanup): canonical `core`, `cpp`, `react`, and `dotnet` checkouts exist. The old `base-agents` checkout has uncommitted work and live worktrees and is not retired. User-scope Claude state included Concertable and other marketplace/plugin/trust declarations; Codex had ten shared agents in `~/.codex/agents`. `sandbox-hwid` routes worked through user-scope installs. These are evidence to reconcile, not verified current state; do not remove machine state before consumer host acceptance.
 
 Native role acceptance is still held on approval to copy credentials. Do not copy credentials before that gate clears. Concertable scope-isolation commit `3bcb527` remains unpushed on `Concertable/agents` branch `Fix/PluginScopeIsolation`; keep it separate from this core work. Core's machine-verifier continuation is implemented, but it does not establish native or consumer acceptance. The stale-snapshot diagnosis was fixed independently in PR #73; do not report old PR #60 as still open without checking.
