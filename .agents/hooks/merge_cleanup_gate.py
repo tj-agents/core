@@ -155,7 +155,7 @@ def command_is_exempt(command):
 MESSAGE = (
     "MERGE CLEANUP GATE: `gh pr merge` for PR #{pr} ({branch}) ran from {worktree} at {time} "
     "and merge Step 5 cleanup has not completed.\n"
-    "- Not merged yet? Keep monitoring â€” `python .agents/workflows/workflow_ops.py ... "
+    "- Not merged yet? Keep monitoring — `python .agents/workflows/workflow_ops.py ... "
     "monitor --kind pr --id {pr} --head {head}`, `gh pr view/checks` and `gh run list/view/watch` "
     "are never blocked.\n"
     "- Merged? Finish Step 6 and the report. For a removable linked checkout, from inside {worktree} run `python -B {cleanup_proof}` "
@@ -371,7 +371,7 @@ def stamp_transfer(command, data):
 
 
 def evaluate_codex_obligation(obligation, session, cwd, now):
-    if not worktree_still_exists(obligation):
+    if not obligation.get("session_exit_required") and not worktree_still_exists(obligation):
         return None
     transferred_at = obligation.get("transferred_at")
     if transferred_at is None:
@@ -548,7 +548,7 @@ def handle_stop(data):
             obligation is not None
             and obligation.get("session_id") == session
             and obligation.get("confirmed_merged")
-            and worktree_still_exists(obligation)
+            and (obligation.get("session_exit_required") or worktree_still_exists(obligation))
         ):
             json.dump({"decision": "block", "reason": deny_message(obligation, codex)}, sys.stdout)
             sys.stdout.write("\n")
@@ -572,7 +572,8 @@ def emit(event, context):
 def handle_reminder(event, data):
     obligations = [
         obligation for obligation in (load_obligation(path) for path in iter_obligation_paths())
-        if obligation is not None and worktree_still_exists(obligation)
+        if obligation is not None
+        and (obligation.get("session_exit_required") or worktree_still_exists(obligation))
     ]
     if not obligations:
         return
@@ -605,6 +606,8 @@ def branch_ref_missing(primary, branch):
 
 
 def should_reconcile(obligation, now):
+    if obligation.get("session_exit_required"):
+        return False
     primary = obligation.get("primary")
     worktree = obligation.get("worktree")
     retained = obligation.get("checkout_retained") or (
@@ -615,8 +618,6 @@ def should_reconcile(obligation, now):
     worktree = obligation.get("worktree")
     if not isinstance(worktree, str) or not Path(worktree).is_dir():
         return True
-    if obligation.get("session_exit_required"):
-        return False
     recorded_at = obligation.get("recorded_at")
     if isinstance(recorded_at, (int, float)) and now - recorded_at > RECONCILE_MAX_AGE_SECONDS:
         return True
