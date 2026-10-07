@@ -336,12 +336,52 @@ class ReviewTests(RepositoryFixture):
         self.assertEqual(identity, Path(descriptor["bundle"]["identity"]).read_bytes())
         self.assertTrue(reconciled["review_required"])
 
+    def test_interrupted_restore_removes_owned_cache_and_retries_exact_identity(self):
+        for failure in ("materialize_tree", "atomic_json"):
+            with self.subTest(failure=failure):
+                descriptor = ops.review_prepare(self.root, failure, "origin/main", "HEAD", False)
+                artifact = Path(descriptor["artifact"])
+                stored = artifact.read_bytes()
+                identity = Path(descriptor["bundle"]["identity"]).read_bytes()
+                directory = Path(descriptor["bundle"]["directory"])
+                shutil.rmtree(directory)
+                with mock.patch.object(ops, failure, side_effect=OSError("interrupted restore")):
+                    with self.assertRaisesRegex(OSError, "interrupted restore"):
+                        ops.load_descriptor(self.root, failure, artifact)
+                self.assertFalse(directory.exists())
+                self.assertEqual(stored, artifact.read_bytes())
+                restored = ops.load_descriptor(self.root, failure, artifact)
+                self.assertEqual(descriptor["descriptor_id"], restored["descriptor_id"])
+                self.assertEqual(identity, Path(restored["bundle"]["identity"]).read_bytes())
+                original = json.loads(stored)
+                original["bundle"].pop("last_validated_at")
+                restored["bundle"].pop("last_validated_at")
+                self.assertEqual(original, restored)
+
+    def test_final_cache_inside_registered_worktree_is_rejected(self):
+        temporary = Path(ops.tempfile.gettempdir())
+        for depth in (0, 1):
+            with self.subTest(depth=depth):
+                locations = ops.review_bundle_locations(self.root, "nested/run", "a" * 64)
+                linked = temporary / "review"
+                if depth:
+                    linked = locations["directory"].parent.parent
+                self.git("worktree", "add", "-q", "-b", f"Fix/Cache-{depth}", str(linked))
+                try:
+                    with self.assertRaisesRegex(ops.WorkflowOperationError, "inside the checkout"):
+                        ops.review_bundle_locations(self.root, "nested/run", "a" * 64)
+                finally:
+                    self.git("worktree", "remove", "--force", str(linked))
+
     def test_partial_bundle_is_rejected_without_restoration(self):
         descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
         Path(descriptor["bundle"]["tree_archive"]).unlink()
+        identity = Path(descriptor["bundle"]["identity"]).read_bytes()
 
         with self.assertRaisesRegex(ops.WorkflowOperationError, "incomplete"):
             ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertTrue(Path(descriptor["bundle"]["directory"]).is_dir())
+        self.assertEqual(identity, Path(descriptor["bundle"]["identity"]).read_bytes())
 
     def test_cleanup_skips_recent_bundle_without_resolving_locations(self):
         recent = ops.review_prepare(self.root, "recent", "origin/main", "HEAD", False)
