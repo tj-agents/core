@@ -60,6 +60,7 @@ what still needs checking on Windows.
 Shared library merged (#106, after the interim path fix #105). Kitty configured. Step 1 merged (#107).
 Step 2 on `Feature/OpenClaudePython`: ported, reviewed, review findings fixed; a real kitty tab was
 opened from `open_claude.py` on this machine.
+Step 6 (`clip`) in progress on `Feature/ClipPython`.
 
 ## Next Steps
 
