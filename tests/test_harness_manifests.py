@@ -33,6 +33,28 @@ class HarnessManifestTests(unittest.TestCase):
             for plugin in release["plugins"]:
                 self.assertEqual(manifests[plugin["name"]]["requires"], plugin["harness"])
 
+    def test_additional_roots_require_canonical_owned_shipped_resources(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            shutil.copytree(ROOT / ".agents", root / ".agents")
+            path = root / ".agents/plugins/harness/machine.json"
+            original = json.loads(path.read_text(encoding="utf-8"))
+            HARNESS.synchronize(root, check=True)
+            for roots in (
+                [".agents/catalog/catalog.schema.json"],
+                [".agents/machine", ".agents/catalog/catalog.schema.json"],
+                [".agents/machine", ".agents/machine"],
+                [".agents/lanes", ".agents/machine", ".agents/workflows"],
+                [".agents/catalog/missing.json", ".agents/machine"],
+                [".agents/catalog/../catalog/catalog.schema.json", ".agents/machine"],
+                ["../outside", ".agents/machine"],
+            ):
+                with self.subTest(roots=roots):
+                    manifest = {**original, "source_roots": roots}
+                    path.write_text(json.dumps(manifest), encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        HARNESS.synchronize(root, check=True)
+
     def test_manifest_shape_carries_no_digest_fields(self):
         manifest = json.loads(
             (ROOT / ".agents/plugins/harness/base.json").read_text(encoding="utf-8")
