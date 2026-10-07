@@ -1,6 +1,6 @@
 # Repository-owned plans, worktrees and TJ Agents adoption
 
-Status: approved outcome, execution in progress, 2026-10-07. Mechanism design and producer/consumer acceptance remain.
+Status: approved outcome, execution in progress, 2026-10-07. Codex pickup verified; allocator design under review. Producer and consumer acceptance remain.
 
 ## Authorization and ownership
 
@@ -184,8 +184,13 @@ The approved outcome is authorized. Concrete helper design is the successor's fi
   and applies critical readiness before its own substantial-design implementation transfer when needed.
 - Pickup evidence: .agents/continuation/layout-pickup.json in this checkout, written by the successor,
   with harness, session identity, branch, head, first_action and timestamp. Never infer pickup from launch.
-- There is no scheduler/foreground continuation claim yet. Initialize through persistent-workflow when
-  a delayed result requires it, and establish its actual supported host controls before claiming persistence.
+- Codex session `01a11794-26f3-7fb2-accb-0df87faa5180` acknowledged pickup at head
+  `a2a15a5ea3f3b9bf36b51d6d6c3a34106372068a`. Its receipt is the path above.
+- Continuation owner `323cc6bbb879a40c0682dbf1` is initialized in `.agents/continuation/owner.json`.
+  The foreground lease binds verified Codex PID 46660. Windows task
+  `AgentStandards-Continuation-a156e0a2dcaa8334638e3580ba591621403fba42def006d35051c62f1d8fa943`
+  is registered at a 20-minute interval. An observed wake retained the foreground owner and launched
+  no child. Heartbeat during foreground work; checkpoint and yield before a scheduled takeover.
 - Do not retire this active goal checkout at the first PR merge; carry the same logical goal through
   successor slices and preserve recovery artifacts before worktree cleanup.
 
@@ -221,6 +226,118 @@ Resolve the standards-source defect as a focused slice: normal runtime imports m
 package's integrity on the next native handoff. Preserve the strict authored-byte comparison; do not simply
 ignore arbitrary executable extra files. Tests must exercise runtime import followed by native trust proof.
 This source repair belongs to the full-goal owner, separate from Claude's plan-policy paths.
+
+## Allocator mechanism and first delivery boundary
+
+The first producer slice adds creation to the installed `engineering:open-worktree` capability.
+There is no existing creator to extract: `shell/worktrees.ps1` selects existing trees, while PR #101's
+`scripts/worktrees.ps1` implements audit only. Preserve #101's audit ownership and tests. Its observed
+head is `2fd7eade30273d5efa6f11e7b424871083e12cc3`, base `Feature/SecretRefreshGrant`, state open,
+verify failed and guard cancelled. Its diagnostics are not a delivered allocator dependency.
+
+Author the helper at `.agents/engineering/operation/open-worktree/scripts/worktrees.py`.
+Python 3.9+ and Git are its only external prerequisites. Existing skill-resource generation ships the
+same source beside both host entries and in the package's canonical skill directory; consumers call
+their installed skill path. No consumer script, machine-local resolver, core checkout, shell profile,
+cross-plugin import or host-specific allocator is required.
+
+The interface is synchronous, emits one JSON result on stdout, sends failures to stderr and returns
+nonzero on refusal. A successful result includes `repository`, `worktree`, `branch`, `head`,
+`base_ref`, `base_head` and `created`. The helper never launches or closes a host, removes a worktree,
+resets a branch, stages files, commits, or chooses a delivery slice. Callers retain task/session ownership.
+
+```powershell
+python -B '<installed-open-worktree-directory>/scripts/worktrees.py' create --repository . --branch Feature/Example
+python -B '<installed-open-worktree-directory>/scripts/worktrees.py' create --repository . --branch Feature/Child --base Feature/Parent --expected-base <full-fetched-parent-sha>
+python -B '<installed-open-worktree-directory>/scripts/worktrees.py' create --repository . --branch Fix/Existing --existing --expected-head <full-branch-sha>
+```
+
+`--remote` defaults to `origin`. A new branch uses the remote's advertised default branch unless
+`--base` supplies its exact branch name. Bases are always fetched remote branches; a local-only stack
+parent must be published through its already-authorized owning workflow first. `--expected-base`
+binds a reviewed parent and fails on disagreement. `--existing` explicitly attaches an unregistered
+local branch, or creates its matching local tracking branch from the remote; `--expected-head` is
+mandatory and must match. Refuse an already registered branch and report its exact checkout for the
+caller to reconcile ownership. Ordinary task resumption reads that checkout without allocating another.
+
+Resolve paths from Git, independent of the caller's linked checkout:
+
+```python
+common = Path(git(caller, 'rev-parse', '--path-format=absolute', '--git-common-dir')).resolve()
+repository = common.parent
+if common.name != '.git' or git(repository, 'rev-parse', '--is-bare-repository') != 'false':
+    raise Refusal('An ordinary non-bare repository with its common .git directory is required')
+if Path(git(repository, 'rev-parse', '--path-format=absolute', '--git-common-dir')).resolve() != common:
+    raise Refusal('Common repository identity does not match')
+target = repository / '.worktrees' / branch.replace('/', '-')
+```
+
+Reject invalid Git branch names, non-capitalized type prefixes, option-like arguments, case variants
+of any existing local/remote branch, and existing target paths, including empty directories. Inspect
+all registered worktrees before creating anything; branch and path comparisons use case-folded normalized
+absolute identities on Windows. Refuse a registered target even if its directory is missing. Reject
+`.worktrees` symlinks/junctions/reparse points and require the resolved target parent to remain beneath
+the common root. Bare or separately relocated Git-directory layouts are explicit unsupported cases.
+
+Fetch the selected remote with pruning, resolve its advertised default using `ls-remote --symref`
+when no base was supplied, and resolve the exact `refs/remotes/<remote>/<base>` commit after fetching.
+Never silently fall back to local main or to the caller's branch after network/base failure. Validate
+the advertised default's commit against the fetched ref. Pin the Git add command to that full SHA so
+later remote movement cannot change the selected starting commit:
+
+```python
+git(repository, 'worktree', 'add', '--no-track', '-b', branch, str(target), base_head)
+```
+
+For an existing local branch use `worktree add <target> <branch>` after its expected-head check.
+For a remote-only branch create from its expected SHA, then set the matching remote tracking ref.
+Use argument arrays and bounded subprocess timeouts, never a shell-built command. Serialize creation
+per common repository using an exclusive `.git/agent-worktree-allocation.lock`; its JSON records the
+PID, branch and target. Release only the lock this invocation acquired. An existing lock refuses and
+requires ownership reconciliation; no age-based stealing. Git's own branch/path refusal still applies.
+
+Ensure `/.worktrees/` is ignored via common `.git/info/exclude` without touching tracked `.gitignore`.
+Preserve existing exclude content and verify Git ignores the target before adding it. Refuse if any
+tracked path lives beneath `.worktrees`, or if a negating rule prevents ignore. After Git succeeds,
+verify its registration, branch, HEAD, common directory and clean status. On any failure preserve
+partial Git/path evidence and report it; do not roll back by force-deleting a branch or directory.
+
+Expected slice: helper plus focused tests, packaging test and engineering harness declaration,
+approximately 500–800 substantive lines in four files. No launcher, audit, reaper, migration or
+marketplace changes belong in this PR. The parent owns design and the goal; one L4 worker owns these
+specified implementation paths. The helper's new invocation permissions are declared in the engineering
+harness using the existing `${PLUGIN_ROOT}` patterns, constrained to `python -B <helper> create`.
+No new hook or plugin dependency is introduced. Generated output is refreshed only for validation.
+
+Its follow-on guidance slice replaces open-worktree's inline allocation examples with this shipped
+interface after producer delivery, updates the wrapper references as needed, and preserves legacy audit
+discovery. It uses its own Docs branch; Claude's plan-policy paths remain disjoint. Until both producer
+and guidance land, consumer rollout remains pending. The integrity repair, cleanup reliability,
+aggregate/kit and adoption remain subsequent independently measured slices of this same goal.
+
+Verification: temporary bare remote plus ordinary clone, invocation from primary and linked checkout,
+non-main remote default, fetched base advancing beyond stale local main, exact stack-parent mismatch,
+local/remote restoration with expected SHA, registered branch refusal, flattened/case path collisions,
+dirty caller preservation, tracked or negated `.worktrees` exclusion, symlink/junction escape, fetch
+failure, stale allocation lock and partial-add failure preservation. Execute both generated host-local
+copies outside the author checkout against fixture consumers. Check harness manifests, package generation
+and the normal source suite. Native Claude/Codex adoption remains a later explicit acceptance gate.
+
+Implementation-path standards read: root AGENTS.md, README.md, SOURCE_LAYOUT.md, PACKAGING.md,
+`engineering:git-branching`, `engineering:open-worktree`, `engineering:plans` and `engineering:lanes`.
+The router found no local route table for the helper/test/manifest paths; no stack tier applies.
+Existing Python unittest and package-resource patterns in `tests/test_source_layout.py` govern tests.
+
+## Execution readiness
+
+Allocator verdict: awaiting independent design review. The examples and refusal behavior above resolve
+the first producer slice; they do not declare the remaining fleet migration mechanism ready.
+Execution authorization: implementation and normal goal delivery, as recorded under Authorization.
+Transfer: not required for this bounded helper refinement. This session is already the full-goal
+successor; retain it and dispatch one specified L4 implementation worker after design review.
+Next action: review this allocator mechanism against inspected callers, packaging and ownership evidence,
+resolve findings in this file, then implement the producer slice. Broader acceptance remains unchanged.
+
 ## Next Steps
 
 Scope: whole goal through all remaining slices and terminal delivery.
