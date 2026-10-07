@@ -76,35 +76,40 @@ def sidecar_path(environ: dict) -> Path:
     return state_directory(environ) / "harness-permissions.json"
 
 
-def claude_plugin_roots(environ: dict) -> set[Path]:
-    config = claude_config_root(environ)
-    data = read_json(config / "plugins" / "installed_plugins.json")
+def claude_plugin_roots(environ: dict, warnings: list[str]) -> tuple[set[Path], bool]:
+    path = claude_config_root(environ) / "plugins" / "installed_plugins.json"
+    if not path.is_file():
+        return set(), True
+    data = read_json(path)
     plugins = data.get("plugins") if isinstance(data, dict) else None
+    if not isinstance(plugins, dict):
+        warnings.append(f"{path}: cannot read installed plugin registry; leaving the Claude target untouched")
+        return set(), False
     roots: set[Path] = set()
-    if isinstance(plugins, dict):
-        for identity, entries in plugins.items():
-            if not isinstance(identity, str) or not identity.endswith(f"@{MARKETPLACE}"):
+    for identity, entries in plugins.items():
+        if not isinstance(identity, str) or not identity.endswith(f"@{MARKETPLACE}"):
+            continue
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
                 continue
-            if not isinstance(entries, list):
-                continue
-            for entry in entries:
-                if not isinstance(entry, dict):
-                    continue
-                path = entry.get("installPath")
-                if isinstance(path, str) and path:
-                    roots.add(Path(path))
-    return roots
+            install_path = entry.get("installPath")
+            if isinstance(install_path, str) and install_path:
+                roots.add(Path(install_path))
+    return roots, True
 
 
-def codex_plugin_roots(environ: dict) -> set[Path]:
+def codex_plugin_roots(environ: dict, warnings: list[str]) -> tuple[set[Path], bool]:
     base = codex_home(environ) / "plugins" / "cache" / MARKETPLACE
     roots: set[Path] = set()
     if not base.is_dir():
-        return roots
+        return roots, True
     try:
         plugin_dirs = list(base.iterdir())
-    except OSError:
-        return roots
+    except OSError as error:
+        warnings.append(f"{base}: cannot list the Codex plugin cache ({error}); leaving the Codex rules untouched")
+        return roots, False
     for plugin_dir in plugin_dirs:
         if not plugin_dir.is_dir() or plugin_dir.name.startswith("plugin-install-"):
             continue
@@ -115,7 +120,7 @@ def codex_plugin_roots(environ: dict) -> set[Path]:
         for version_dir in version_dirs:
             if version_dir.is_dir() and (version_dir / "harness.json").is_file():
                 roots.add(version_dir)
-    return roots
+    return roots, True
 
 
 def load_requires(root: Path, warnings: list[str]) -> dict | None:
@@ -142,12 +147,14 @@ def rendered_requirements(roots: set[Path], warnings: list[str]) -> list[dict]:
     return requirements
 
 
-def desired_permissions(environ: dict, warnings: list[str]) -> tuple[list[str], list[dict]]:
-    claude_requirements = rendered_requirements(claude_plugin_roots(environ), warnings)
-    codex_requirements = rendered_requirements(codex_plugin_roots(environ), warnings)
+def desired_permissions(environ: dict, warnings: list[str]) -> tuple[list[str], list[dict], bool, bool]:
+    claude_roots, claude_ok = claude_plugin_roots(environ, warnings)
+    codex_roots, codex_ok = codex_plugin_roots(environ, warnings)
+    claude_requirements = rendered_requirements(claude_roots, warnings)
+    codex_requirements = rendered_requirements(codex_roots, warnings)
     claude_allow, _ = harness_permissions.fold_permissions(claude_requirements)
     _, codex_rules = harness_permissions.fold_permissions(codex_requirements)
-    return claude_allow, codex_rules
+    return claude_allow, codex_rules, claude_ok, codex_ok
 
 
 def load_sidecar(environ: dict, warnings: list[str]) -> dict:
@@ -218,15 +225,15 @@ def synchronize(environ: dict, mode: str) -> tuple[list[str], list[str]]:
     if environ.get(OPT_OUT_ENV, "").strip().lower() == "off":
         return [], []
     warnings: list[str] = []
-    claude_allow, codex_rules = desired_permissions(environ, warnings)
+    claude_allow, codex_rules, claude_ok, codex_ok = desired_permissions(environ, warnings)
     sidecar = load_sidecar(environ, warnings)
     claude_path = claude_config_root(environ) / "settings.json"
-    claude_expected = claude_target_text(claude_path, claude_allow, sidecar, warnings)
+    claude_expected = claude_target_text(claude_path, claude_allow, sidecar, warnings) if claude_ok else None
     codex_path = codex_home(environ) / "rules" / "base-agents.rules"
-    codex_expected = codex_rules_text(codex_rules)
+    codex_expected = codex_rules_text(codex_rules) if codex_ok else None
 
     drifted: list[str] = []
-    if claude_expected is not None:
+    if claude_ok and claude_expected is not None:
         if current_text(claude_path) != claude_expected:
             drifted.append(str(claude_path))
             if mode == "apply":
@@ -234,7 +241,7 @@ def synchronize(environ: dict, mode: str) -> tuple[list[str], list[str]]:
         if mode == "apply":
             sidecar.setdefault("claude", {})[str(claude_path)] = sorted(claude_allow)
 
-    if current_text(codex_path) != codex_expected:
+    if codex_ok and current_text(codex_path) != codex_expected:
         drifted.append(str(codex_path))
         if mode == "apply":
             if codex_expected is None:
@@ -252,7 +259,9 @@ def synchronize(environ: dict, mode: str) -> tuple[list[str], list[str]]:
 
 def print_invocations(environ: dict, script_name: str) -> tuple[list[str], list[str]]:
     warnings: list[str] = []
-    roots = sorted(claude_plugin_roots(environ) | codex_plugin_roots(environ))
+    claude_roots, _ = claude_plugin_roots(environ, warnings)
+    codex_roots, _ = codex_plugin_roots(environ, warnings)
+    roots = sorted(claude_roots | codex_roots)
     lines: list[str] = []
     for root in roots:
         requires = load_requires(root, warnings)

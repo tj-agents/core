@@ -65,21 +65,28 @@
     "permissions": {
       "claude_allow": [
         "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
-        "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)"
+        "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
+        "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)",
+        "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)"
       ],
       "codex_prefix_rules": [
         {
           "pattern": [
-            ["powershell", "pwsh"],
+            ["powershell", "powershell.exe", "pwsh", "pwsh.exe"],
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",
             "-File",
-            "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+            [
+              "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1",
+              "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1",
+              "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.ps1"
+            ]
           ],
           "justification": "engineering:merge Step 5: finish closes this session's own CLI and removes its merged worktree after cleanup_proof.py approved it",
           "match": [
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"]
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"],
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.ps1"]
           ],
           "not_match": [
             ["powershell", "-NoProfile", "-File", "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"]

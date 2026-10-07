@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -167,6 +168,64 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertNotIn(str(self.settings_path()), drifted)
         self.assertTrue(any("cannot parse settings" in warning for warning in warnings))
         self.assertEqual("{not json", self.settings_path().read_text(encoding="utf-8"))
+
+    def test_unreadable_installed_plugins_json_warns_and_leaves_claude_target_untouched(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        SYNC.synchronize(self.environ, "apply")
+        before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertTrue(before)
+
+        installed_path = self.claude_config / "plugins" / "installed_plugins.json"
+        installed_path.write_text("{not json", encoding="utf-8")
+
+        drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertNotIn(str(self.settings_path()), drifted)
+        self.assertTrue(any("installed_plugins.json" in warning for warning in warnings), warnings)
+        after = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertEqual(before, after)
+
+    def test_malformed_shape_installed_plugins_json_warns_and_leaves_claude_target_untouched(self):
+        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        SYNC.synchronize(self.environ, "apply")
+        before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertTrue(before)
+
+        installed_path = self.claude_config / "plugins" / "installed_plugins.json"
+        installed_path.write_text(json.dumps({"version": 2, "plugins": "not-a-dict"}), encoding="utf-8")
+
+        drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertNotIn(str(self.settings_path()), drifted)
+        self.assertTrue(any("installed_plugins.json" in warning for warning in warnings), warnings)
+        after = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertEqual(before, after)
+
+    def test_genuinely_absent_installed_plugins_json_means_zero_roots_without_warning(self):
+        drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertEqual([], warnings)
+        self.assertFalse(self.settings_path().is_file())
+
+    def test_unlistable_codex_cache_directory_warns_and_leaves_codex_rules_untouched(self):
+        install_codex_plugin(self.codex_home, "machine", "2.0.0", codex_rules=[SAMPLE_RULE])
+        SYNC.synchronize(self.environ, "apply")
+        before = self.rules_path().read_bytes()
+
+        cache_base = self.codex_home / "plugins" / "cache" / "base-agents"
+        original_iterdir = Path.iterdir
+
+        def fake_iterdir(self_path):
+            if self_path == cache_base:
+                raise OSError("permission denied")
+            return original_iterdir(self_path)
+
+        with mock.patch.object(Path, "iterdir", fake_iterdir):
+            drifted, warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertNotIn(str(self.rules_path()), drifted)
+        self.assertTrue(any("Codex plugin cache" in warning for warning in warnings), warnings)
+        self.assertEqual(before, self.rules_path().read_bytes())
 
     def test_check_exit_codes(self):
         install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
