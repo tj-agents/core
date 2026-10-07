@@ -7,26 +7,35 @@ Launched through `Invoke-CimMethod Win32_Process Create` (or the `schtasks` fall
 to the WMI provider host rather than to `finish.ps1`, its caller's job object, or that caller's own
 process tree. It writes a `started` stamp to `-Result` immediately so the launcher can prove the spawn
 succeeded, then polls `-HostPid` (identity confirmed by `-HostStart`, since a pid is reused the moment it
-is free) until it exits or `-HostStart`/`AGENT_FINISH_REAPER_TIMEOUT_SECONDS` (default 600s) elapses.
+is free) and, when `-ParentPid` is given, that process too, until every one of them exits or
+`AGENT_FINISH_REAPER_TIMEOUT_SECONDS` (default 600s) elapses.
 
-A live host at timeout still holds its own current directory, so Windows cannot remove it either way;
-the worktree is left untouched and the result record carries a `timeout` status. Once the host is
-confirmed gone, it runs `git -C <primary> worktree remove -- <target>` (never `--force`) and
-`git branch -d|-D` from the primary, chosen the same way `cleanup_proof.py` does: `-d` only when the
-branch is still an ancestor of `origin/<default>`. Full success (path absent, unregistered, branch gone)
-clears the matching `merge_cleanup_gate.py` obligation, keyed by the identical worktree digest; any error
-leaves the obligation in place and is recorded in the result instead.
+A live host (or parent shell) at timeout still holds its own current directory, so Windows cannot remove
+it either way; the worktree is left untouched and the result record carries a `timeout` status. Once
+every watched process is confirmed gone, it runs `git -C <primary> worktree remove -- <target>` (never
+`--force`). Before deleting the branch it requires `refs/heads/<branch>` in the primary to still equal
+`-Head`, the proven tip `cleanup_proof.py` recorded: if a later commit moved the branch, the branch is
+left in place and the result records a `branch-preserved` status and why, while the worktree removal and
+obligation clearing still proceed. Otherwise it deletes the branch, choosing `-d` only when it is still
+an ancestor of `origin/<default>`, `-D` otherwise, the same policy `cleanup_proof.py` uses. Full success
+(path absent, unregistered) clears the matching `merge_cleanup_gate.py` obligation, located the same way
+`finish.ps1` locates its receipt: scanning `merge-cleanup/obligations/*.json` for a recorded `worktree`
+field that normalises to the same path; any error leaves the obligation in place and is recorded in the
+result instead.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [int] $HostPid,
     [Parameter(Mandatory)] [double] $HostStart,
+    [Parameter(Mandatory)] [string] $Head,
     [Parameter(Mandatory)] [string] $Primary,
     [Parameter(Mandatory)] [string] $Worktree,
     [Parameter(Mandatory)] [string] $Branch,
     [Parameter(Mandatory)] [string] $Default,
     [Parameter(Mandatory)] [string] $Result,
-    [string] $StateDirectory
+    [string] $StateDirectory,
+    [int] $ParentPid = -1,
+    [double] $ParentStart = -1
 )
 
 Set-StrictMode -Version Latest
@@ -41,31 +50,114 @@ function Resolve-StateDirectory {
     return (Join-Path $HOME '.agents-state')
 }
 
-function Get-Sha256Hex {
-    param([string] $Text)
+function Get-EntryProperty {
+    param($Entry, [string] $Name)
 
-    $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
-    $sha256 = [Security.Cryptography.SHA256]::Create()
-    try {
-        $hashBytes = $sha256.ComputeHash($bytes)
-    }
-    finally {
-        $sha256.Dispose()
-    }
-    return -join ($hashBytes | ForEach-Object { $_.ToString('x2') })
+    if ($null -eq $Entry) { return $null }
+    $property = $Entry.PSObject.Properties[$Name]
+    if ($null -eq $property) { return $null }
+    return $property.Value
 }
 
-function Get-WorktreeDigest {
-    param([string] $ResolvedWorktree)
+function Read-JsonFile {
+    param([string] $Path)
 
-    $posix = $ResolvedWorktree -replace '\\', '/'
-    return Get-Sha256Hex -Text $posix
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
+}
+
+function Get-NormalizedPathForm {
+    param([string] $Path)
+
+    if (-not $Path) { return $null }
+    $full = [IO.Path]::GetFullPath($Path)
+    return (($full -replace '\\', '/').TrimEnd('/')).ToLowerInvariant()
+}
+
+function Get-WorktreeComparisonForms {
+    param([string] $Path)
+
+    $forms = New-Object System.Collections.Generic.List[string]
+    $direct = Get-NormalizedPathForm -Path $Path
+    if ($direct) { $forms.Add($direct) }
+    try {
+        $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+        $targetProperty = $item.PSObject.Properties['Target']
+        $targets = if ($targetProperty) { $targetProperty.Value } else { $null }
+        foreach ($target in @($targets)) {
+            if (-not $target) { continue }
+            $resolvedTarget = $target
+            if (-not [IO.Path]::IsPathRooted($resolvedTarget)) {
+                $resolvedTarget = Join-Path (Split-Path -Parent $item.FullName) $resolvedTarget
+            }
+            $form = Get-NormalizedPathForm -Path $resolvedTarget
+            if ($form) { $forms.Add($form) }
+        }
+    }
+    catch {
+    }
+    return $forms
+}
+
+function Find-ObligationPath {
+    param([string] $StateDirectory, [string] $ResolvedWorktree)
+
+    $directory = Join-Path $StateDirectory 'merge-cleanup/obligations'
+    if (-not (Test-Path -LiteralPath $directory)) { return $null }
+    $targetForms = @(Get-WorktreeComparisonForms -Path $ResolvedWorktree)
+    foreach ($file in Get-ChildItem -LiteralPath $directory -Filter '*.json' -File) {
+        $data = Read-JsonFile -Path $file.FullName
+        if (-not $data) { continue }
+        $recorded = Get-EntryProperty -Entry $data -Name 'worktree'
+        if (-not $recorded) { continue }
+        $recordedForms = @(Get-WorktreeComparisonForms -Path $recorded)
+        foreach ($form in $recordedForms) {
+            if ($targetForms -contains $form) { return $file.FullName }
+        }
+    }
+    return $null
+}
+
+function Get-RegisteredWorktreePaths {
+    param([string] $PorcelainOutput)
+
+    $paths = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($PorcelainOutput -split "`n")) {
+        $trimmed = $line.TrimEnd("`r")
+        if ($trimmed.StartsWith('worktree ')) {
+            $paths.Add($trimmed.Substring('worktree '.Length))
+        }
+    }
+    return $paths
+}
+
+function Test-WorktreeStillRegistered {
+    param([string] $PorcelainOutput, [string] $ResolvedWorktree)
+
+    $targetForms = @(Get-WorktreeComparisonForms -Path $ResolvedWorktree)
+    foreach ($registered in (Get-RegisteredWorktreePaths -PorcelainOutput $PorcelainOutput)) {
+        $registeredForms = @(Get-WorktreeComparisonForms -Path $registered)
+        foreach ($form in $registeredForms) {
+            if ($targetForms -contains $form) { return $true }
+        }
+    }
+    return $false
 }
 
 function ConvertTo-UnixTime {
     param([DateTime] $Value)
 
     return ([DateTimeOffset]($Value.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+}
+
+function Test-ProcessExited {
+    param([int] $ProcessId, [double] $StartedAt)
+
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if (-not $process) { return $true }
+    $startTime = try { $process.StartTime } catch { $null }
+    if ($null -eq $startTime) { return $true }
+    return ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - $StartedAt) -gt 2.0)
 }
 
 function Get-EnvDouble {
@@ -112,16 +204,19 @@ Save-ResultRecord -Path $Result -Data @{
 }
 
 try {
+    $waitTargets = New-Object System.Collections.Generic.List[pscustomobject]
+    $waitTargets.Add([pscustomobject]@{ Pid = $HostPid; Started = $HostStart })
+    if ($ParentPid -gt 0) { $waitTargets.Add([pscustomobject]@{ Pid = $ParentPid; Started = $ParentStart }) }
+
     $timeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_REAPER_TIMEOUT_SECONDS' -Default 600.0
     $deadline = [DateTime]::UtcNow.AddSeconds($timeoutSeconds)
     $exited = $false
     while ([DateTime]::UtcNow -lt $deadline) {
-        $process = Get-Process -Id $HostPid -ErrorAction SilentlyContinue
-        if (-not $process) { $exited = $true; break }
-        $startTime = try { $process.StartTime } catch { $null }
-        if ($null -eq $startTime) { $exited = $true; break }
-        $actual = ConvertTo-UnixTime -Value $startTime
-        if ([math]::Abs($actual - $HostStart) -gt 2.0) { $exited = $true; break }
+        $allExited = $true
+        foreach ($target in $waitTargets) {
+            if (-not (Test-ProcessExited -ProcessId $target.Pid -StartedAt $target.Started)) { $allExited = $false; break }
+        }
+        if ($allExited) { $exited = $true; break }
         Start-Sleep -Milliseconds 500
     }
 
@@ -131,7 +226,7 @@ try {
             host_pid = $HostPid
             worktree = $Worktree
             status   = 'timeout'
-            error    = "host pid $HostPid did not exit within $timeoutSeconds seconds"
+            error    = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds"
             finished = (Now-Epoch)
         }
         return
@@ -150,25 +245,38 @@ try {
         return
     }
 
-    $ancestorCheck = Invoke-Git -Cwd $Primary -Arguments @('merge-base', '--is-ancestor', "refs/heads/$Branch", "origin/$Default")
-    $deleteFlag = if ($ancestorCheck.ExitCode -eq 0) { '-d' } else { '-D' }
-    $branchResult = Invoke-Git -Cwd $Primary -Arguments @('branch', $deleteFlag, $Branch)
-    if ($branchResult.ExitCode -ne 0) {
-        Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'failed'
-            error    = "git branch $deleteFlag $Branch failed: $($branchResult.Output)"
-            finished = (Now-Epoch)
+    $branchPreserved = $false
+    $branchPreservedReason = $null
+    $branchRef = Invoke-Git -Cwd $Primary -Arguments @('rev-parse', '--verify', '--quiet', "refs/heads/$Branch")
+    if ($branchRef.ExitCode -ne 0) {
+        $branchPreserved = $true
+        $branchPreservedReason = "refs/heads/$Branch no longer exists in $Primary"
+    }
+    elseif ($branchRef.Output.Trim() -ne $Head) {
+        $branchPreserved = $true
+        $branchPreservedReason = "refs/heads/$Branch is now $($branchRef.Output.Trim()), not the receipt head $Head"
+    }
+
+    if (-not $branchPreserved) {
+        $ancestorCheck = Invoke-Git -Cwd $Primary -Arguments @('merge-base', '--is-ancestor', "refs/heads/$Branch", "origin/$Default")
+        $deleteFlag = if ($ancestorCheck.ExitCode -eq 0) { '-d' } else { '-D' }
+        $branchResult = Invoke-Git -Cwd $Primary -Arguments @('branch', $deleteFlag, $Branch)
+        if ($branchResult.ExitCode -ne 0) {
+            Save-ResultRecord -Path $Result -Data @{
+                started  = $startedEpoch
+                host_pid = $HostPid
+                worktree = $Worktree
+                status   = 'failed'
+                error    = "git branch $deleteFlag $Branch failed: $($branchResult.Output)"
+                finished = (Now-Epoch)
+            }
+            return
         }
-        return
     }
 
     $pathAbsent = -not (Test-Path -LiteralPath $Worktree)
     $porcelain = (Invoke-Git -Cwd $Primary -Arguments @('worktree', 'list', '--porcelain')).Output
-    $normalizedWorktree = ($Worktree -replace '\\', '/')
-    $unregistered = -not (($porcelain -replace '\\', '/') -like "*$normalizedWorktree*")
+    $unregistered = -not (Test-WorktreeStillRegistered -PorcelainOutput $porcelain -ResolvedWorktree $Worktree)
 
     if (-not ($pathAbsent -and $unregistered)) {
         Save-ResultRecord -Path $Result -Data @{
@@ -182,16 +290,28 @@ try {
         return
     }
 
-    Save-ResultRecord -Path $Result -Data @{
-        started  = $startedEpoch
-        host_pid = $HostPid
-        worktree = $Worktree
-        status   = 'succeeded'
-        finished = (Now-Epoch)
+    if ($branchPreserved) {
+        Save-ResultRecord -Path $Result -Data @{
+            started  = $startedEpoch
+            host_pid = $HostPid
+            worktree = $Worktree
+            status   = 'branch-preserved'
+            reason   = $branchPreservedReason
+            finished = (Now-Epoch)
+        }
+    }
+    else {
+        Save-ResultRecord -Path $Result -Data @{
+            started  = $startedEpoch
+            host_pid = $HostPid
+            worktree = $Worktree
+            status   = 'succeeded'
+            finished = (Now-Epoch)
+        }
     }
 
-    $obligationPath = Join-Path $resolvedState ('merge-cleanup/obligations/' + (Get-WorktreeDigest -ResolvedWorktree $Worktree) + '.json')
-    if (Test-Path -LiteralPath $obligationPath) {
+    $obligationPath = Find-ObligationPath -StateDirectory $resolvedState -ResolvedWorktree $Worktree
+    if ($obligationPath) {
         try { Remove-Item -LiteralPath $obligationPath -Force } catch { }
     }
 }

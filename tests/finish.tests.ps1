@@ -335,9 +335,16 @@ try {
 
     $unattachedTarget = Join-Path $scratch 'unattached-target'
     New-Item -ItemType Directory -Path $unattachedTarget -Force | Out-Null
+    Invoke-GitOrThrow -Cwd $unattachedTarget -Arguments @('init', '-q', '-b', 'feature') | Out-Null
+    Invoke-GitOrThrow -Cwd $unattachedTarget -Arguments @('config', 'user.email', 't@example.com') | Out-Null
+    Invoke-GitOrThrow -Cwd $unattachedTarget -Arguments @('config', 'user.name', 't') | Out-Null
+    Set-Content -LiteralPath (Join-Path $unattachedTarget 'file.txt') -Value 'content' -Encoding UTF8
+    Invoke-GitOrThrow -Cwd $unattachedTarget -Arguments @('add', '.') | Out-Null
+    Invoke-GitOrThrow -Cwd $unattachedTarget -Arguments @('commit', '-q', '-m', 'init') | Out-Null
+    $unattachedHead = (Invoke-GitOrThrow -Cwd $unattachedTarget -Arguments @('rev-parse', 'HEAD')).Trim()
     $unattachedResolved = Get-ResolvedPath $unattachedTarget
     Write-JsonFile -Path (Get-ReceiptPath -StateDirectory $preflightState -ResolvedWorktree $unattachedResolved) -Data @{
-        worktree = $unattachedResolved; primary = $scratch; branch = 'feature'; head = ('a' * 40); pr = 1
+        worktree = $unattachedResolved; primary = $scratch; branch = 'feature'; head = $unattachedHead; pr = 1
         merge_oid = ('b' * 40); default = 'main'; verdict = 'removable'
         recorded_at = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
     }
@@ -405,7 +412,7 @@ while (-not (Test-Path -LiteralPath $Ready)) { Start-Sleep -Milliseconds 50 }
 
 $commandLine = Format-CommandLine -Parts @(
     'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $Reaper,
-    '-HostPid', $DeadPid, '-HostStart', $DeadStart, '-Primary', $DummyPrimary, '-Worktree', $DummyWorktree,
+    '-HostPid', $DeadPid, '-HostStart', $DeadStart, '-Head', ('a' * 40), '-Primary', $DummyPrimary, '-Worktree', $DummyWorktree,
     '-Branch', 'dummy', '-Default', 'main', '-Result', $ResultPath, '-StateDirectory', $StateDirectory
 )
 Start-DetachedReaper -CommandLine $commandLine | Out-Null
@@ -498,19 +505,25 @@ Start-Sleep -Seconds 20
     try {
         # The documented invocation: no arguments, run from inside the worktree, so the target comes from
         # `git rev-parse --show-toplevel` against the fake host's working directory, exactly as Step 5 runs it.
+        # A real `cmd.exe` wraps the fake host, standing in for the interactive shell a real tab runs under
+        # (register_session.py's own ancestor walk expects one): finish.ps1's R7 stop-process path stops that
+        # parent shell too, which would otherwise be this test runner's own process.
         $innerCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $finishScript"
-        $fakeHostProcess = Start-Process -FilePath $fakeCodex -ArgumentList @('/c', $innerCommand) `
+        $hostCommand = "`"$fakeCodex`" /c $innerCommand"
+        $fakeHostProcess = Start-Process -FilePath $env:ComSpec -ArgumentList @('/c', $hostCommand) `
             -WorkingDirectory $worktree -PassThru -WindowStyle Hidden
 
-        $resultPath = Get-ResultRecordPath -StateDirectory $e2eState -ResolvedWorktree $worktreeResolved
         $succeeded = Wait-Condition -TimeoutSeconds 60 -Condition {
-            $record = Read-JsonFile -Path $resultPath
-            $null -ne $record -and $record.status -eq 'succeeded'
+            $resultsDirectory = Join-Path $e2eState 'merge-cleanup\results'
+            if (-not (Test-Path -LiteralPath $resultsDirectory)) { return $false }
+            foreach ($file in (Get-ChildItem -LiteralPath $resultsDirectory -Filter '*.json' -File)) {
+                $record = Read-JsonFile -Path $file.FullName
+                if ($record -and $record.worktree -eq $worktreeResolved -and $record.status -eq 'succeeded') { return $true }
+            }
+            return $false
         }
         if (-not $succeeded) {
-            $record = Read-JsonFile -Path $resultPath
-            $detail = if ($record) { ($record | ConvertTo-Json -Compress) } else { '<no result file>' }
-            throw "The end-to-end cleanup did not reach 'succeeded' in time. Last record: $detail"
+            throw 'The end-to-end cleanup did not reach a succeeded result record in time.'
         }
     }
     finally {
@@ -538,6 +551,7 @@ Start-Sleep -Seconds 20
     $timeoutRepo = New-TestRepo -Root $timeoutRoot
     $timeoutWorktree = Add-FeatureWorktree -Primary $timeoutRepo.Primary -Root $timeoutRoot -Branch 'feature'
     $timeoutResolved = Get-ResolvedPath $timeoutWorktree
+    $timeoutHead = (Invoke-GitOrThrow -Cwd $timeoutWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
     $timeoutResult = Join-Path $timeoutRoot 'result.json'
     $timeoutState = Join-Path $timeoutRoot 'state'
 
@@ -554,6 +568,7 @@ Start-Sleep -Seconds 20
             $reaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
                 '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
                 '-HostPid', $aliveHost.Id, '-HostStart', $aliveStart,
+                '-Head', $timeoutHead,
                 '-Primary', $timeoutRepo.Primary, '-Worktree', $timeoutResolved,
                 '-Branch', 'feature', '-Default', 'main', '-Result', $timeoutResult,
                 '-StateDirectory', $timeoutState
@@ -586,6 +601,266 @@ Start-Sleep -Seconds 20
     }
 
     Write-Output 'PASS finish.tests.ps1: reaper timeout path'
+
+    # --- (v) R1: a commit after the receipt makes finish refuse, and the reaper preserves a moved branch --
+
+    $r1aRoot = Join-Path $scratch 'r1-preflight-moved-head'
+    New-Item -ItemType Directory -Path $r1aRoot -Force | Out-Null
+    $r1aState = Join-Path $r1aRoot 'state'
+    New-Item -ItemType Directory -Path $r1aState -Force | Out-Null
+    $r1aRepo = New-TestRepo -Root $r1aRoot
+    $r1aWorktree = Add-FeatureWorktree -Primary $r1aRepo.Primary -Root $r1aRoot -Branch 'feature'
+    $r1aHead = (Invoke-GitOrThrow -Cwd $r1aWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $r1aMergeOid = Invoke-SquashMerge -Primary $r1aRepo.Primary -Branch 'feature'
+    $r1aFixture = Join-Path $r1aRoot 'fixture.json'
+    Write-ForgeFixture -Path $r1aFixture -State 'MERGED' -HeadRefOid $r1aHead -MergeOid $r1aMergeOid
+    $r1aProof = Invoke-CleanupProof -Primary $r1aRepo.Primary -Worktree $r1aWorktree -Branch 'feature' -Head $r1aHead -Pr 1 -StateDirectory $r1aState -Fixture $r1aFixture
+    Assert-Equal -Expected 0 -Actual $r1aProof.ExitCode -Message "cleanup_proof.py did not approve the worktree before the post-receipt commit: $($r1aProof.Output)"
+
+    Set-Content -LiteralPath (Join-Path $r1aWorktree 'late.txt') -Value 'late change' -Encoding UTF8
+    Invoke-GitOrThrow -Cwd $r1aWorktree -Arguments @('add', '.') | Out-Null
+    Invoke-GitOrThrow -Cwd $r1aWorktree -Arguments @('commit', '-q', '-m', 'late commit') | Out-Null
+
+    $r1aResult = Invoke-FinishProcess -Worktree $r1aWorktree -Environment @{ AGENT_STATE_DIRECTORY = $r1aState }
+    Assert-False -Actual ($r1aResult.ExitCode -eq 0) -Message 'finish.ps1 did not refuse a worktree whose HEAD moved after the receipt was recorded.'
+    Assert-Contains -Actual $r1aResult.StdErr -Expected 'cleanup_proof.py again' -Message 'The moved-HEAD refusal did not tell the agent to re-run cleanup_proof.py.'
+    Assert-True -Actual (Test-Path -LiteralPath $r1aWorktree) -Message 'The worktree was removed despite the moved-HEAD refusal.'
+
+    $r1Root = Join-Path $scratch 'r1-branch-preserve'
+    New-Item -ItemType Directory -Path $r1Root -Force | Out-Null
+    $r1State = Join-Path $r1Root 'state'
+    $r1Repo = New-TestRepo -Root $r1Root
+    $r1Worktree = Add-FeatureWorktree -Primary $r1Repo.Primary -Root $r1Root -Branch 'feature'
+    $r1Resolved = Get-ResolvedPath $r1Worktree
+    $r1Head = (Invoke-GitOrThrow -Cwd $r1Worktree -Arguments @('rev-parse', 'HEAD')).Trim()
+
+    # A commit lands on the branch (e.g. from elsewhere sharing the repository) after the head above was
+    # proven: same tree as $r1Head, so the worktree's own files stay clean, but a different commit id.
+    $r1Tree = (Invoke-GitOrThrow -Cwd $r1Repo.Primary -Arguments @('rev-parse', "$r1Head^{tree}")).Trim()
+    $r1LateCommit = (Invoke-GitOrThrow -Cwd $r1Repo.Primary -Arguments @('commit-tree', $r1Tree, '-p', $r1Head, '-m', 'late commit')).Trim()
+    Invoke-GitOrThrow -Cwd $r1Repo.Primary -Arguments @('update-ref', 'refs/heads/feature', $r1LateCommit) | Out-Null
+
+    $r1Result = Join-Path $r1Root 'result.json'
+    $r1DeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $r1DeadHost.WaitForExit(5000) | Out-Null
+    $r1DeadStart = ([DateTimeOffset]($r1DeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $r1ReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $r1DeadHost.Id, '-HostStart', $r1DeadStart,
+        '-Head', $r1Head,
+        '-Primary', $r1Repo.Primary, '-Worktree', $r1Resolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $r1Result,
+        '-StateDirectory', $r1State
+    ) -PassThru -WindowStyle Hidden
+
+    $r1Wrote = Wait-Condition -TimeoutSeconds 30 -Condition {
+        $record = Read-JsonFile -Path $r1Result
+        $null -ne $record -and $null -ne $record.status
+    }
+    if (-not $r1Wrote -and (Get-Process -Id $r1ReaperProcess.Id -ErrorAction SilentlyContinue)) {
+        & taskkill.exe /PID $r1ReaperProcess.Id /T /F 2>$null | Out-Null
+    }
+
+    $r1Record = Read-JsonFile -Path $r1Result
+    Assert-True -Actual ($null -ne $r1Record) -Message 'The branch-preserve scenario did not write a result record.'
+    Assert-Equal -Expected 'branch-preserved' -Actual $r1Record.status -Message 'The reaper did not preserve a branch whose tip moved after the receipt head.'
+    Assert-True -Actual (-not (Test-Path -LiteralPath $r1Worktree)) -Message 'The worktree was not removed even though only the branch should be preserved.'
+    $r1BranchStillPresent = $(& git -C $r1Repo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
+    Assert-True -Actual $r1BranchStillPresent -Message 'The moved branch was deleted despite its tip no longer matching the receipt head.'
+
+    Write-Output 'PASS finish.tests.ps1: R1 head-must-match-receipt'
+
+    # --- (vi) R3: a peer registry entry in the same worktree with a different title is never chosen ------
+
+    $r3Root = Join-Path $scratch 'r3-peer-title'
+    New-Item -ItemType Directory -Path $r3Root -Force | Out-Null
+    $r3State = Join-Path $r3Root 'state'
+    New-Item -ItemType Directory -Path (Join-Path $r3State 'cli-sessions') -Force | Out-Null
+    $r3Worktree = Join-Path $r3Root 'worktree'
+    New-Item -ItemType Directory -Path $r3Worktree -Force | Out-Null
+    $r3Resolved = Get-ResolvedPath $r3Worktree
+    $r3DummySource = Join-Path $r3Root 'dummy-source'
+    New-Item -ItemType Directory -Path $r3DummySource -Force | Out-Null
+
+    $ownHostFake = [pscustomobject]@{ Pid = 123456; Started = 1700000000.125 }
+    Write-JsonFile -Path (Join-Path $r3State 'cli-sessions\own.json') -Data @{
+        session_id = 'own'; title = 'mine'; cwd = $r3Resolved; pid = $ownHostFake.Pid; pid_started_at = $ownHostFake.Started
+    }
+    Write-JsonFile -Path (Join-Path $r3State 'cli-sessions\peer.json') -Data @{
+        session_id = 'peer'; title = 'peer-tab'; cwd = $r3Resolved; pid = 987654; pid_started_at = 1600000000.0
+    }
+
+    $previousR3State = $env:AGENT_STATE_DIRECTORY
+    $env:AGENT_STATE_DIRECTORY = $r3State
+    try {
+        $r3Attachment = & {
+            try { . $finishScript -Worktree $r3DummySource } catch { }
+            Get-TitleAndAttachment -ResolvedWorktree $r3Resolved -StartingLocation $r3Resolved -OwnHost $ownHostFake
+        }
+    }
+    finally {
+        $env:AGENT_STATE_DIRECTORY = $previousR3State
+    }
+    Assert-Equal -Expected 'mine' -Actual $r3Attachment.Title -Message "The tab title came from a peer's registry entry instead of this session's own one."
+    Assert-True -Actual $r3Attachment.Attached -Message "This session's own registry entry, with a cwd under the worktree, was not recognized as attached."
+
+    $r3OutsideState = Join-Path $r3Root 'state-outside'
+    New-Item -ItemType Directory -Path (Join-Path $r3OutsideState 'cli-sessions') -Force | Out-Null
+    $r3OutsideCwd = Join-Path $r3Root 'outside-cwd'
+    New-Item -ItemType Directory -Path $r3OutsideCwd -Force | Out-Null
+    Write-JsonFile -Path (Join-Path $r3OutsideState 'cli-sessions\own-outside.json') -Data @{
+        session_id = 'own-outside'; title = 'mine-outside'; cwd = (Get-ResolvedPath $r3OutsideCwd)
+        pid = $ownHostFake.Pid; pid_started_at = $ownHostFake.Started
+    }
+    $previousR3OutsideState = $env:AGENT_STATE_DIRECTORY
+    $env:AGENT_STATE_DIRECTORY = $r3OutsideState
+    try {
+        $r3OutsideAttachment = & {
+            try { . $finishScript -Worktree $r3DummySource } catch { }
+            Get-TitleAndAttachment -ResolvedWorktree $r3Resolved -StartingLocation $r3Resolved -OwnHost $ownHostFake
+        }
+    }
+    finally {
+        $env:AGENT_STATE_DIRECTORY = $previousR3OutsideState
+    }
+    Assert-False -Actual $r3OutsideAttachment.Attached -Message "A self registry entry whose cwd is outside the worktree was wrongly treated as attached via `$PWD."
+
+    Write-Output 'PASS finish.tests.ps1: R3 own-entry-only tab title'
+
+    # --- (vii) R7: the reaper waits for the parent shell pid too, not only the host pid -------------------
+
+    $r7Root = Join-Path $scratch 'r7-parent-wait'
+    New-Item -ItemType Directory -Path $r7Root -Force | Out-Null
+    $r7Repo = New-TestRepo -Root $r7Root
+    $r7Worktree = Add-FeatureWorktree -Primary $r7Repo.Primary -Root $r7Root -Branch 'feature'
+    $r7Resolved = Get-ResolvedPath $r7Worktree
+    $r7Head = (Invoke-GitOrThrow -Cwd $r7Worktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $r7Result = Join-Path $r7Root 'result.json'
+    $r7State = Join-Path $r7Root 'state'
+
+    $r7DeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $r7DeadHost.WaitForExit(5000) | Out-Null
+    $r7DeadStart = ([DateTimeOffset]($r7DeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $r7AliveParent = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'ping -n 60 127.0.0.1 > nul' -PassThru -WindowStyle Hidden
+    try {
+        $r7AliveStart = ([DateTimeOffset]($r7AliveParent.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+        $previousR7ReaperTimeout = $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS
+        $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = '2'
+        $r7ReaperProcess = $null
+        try {
+            $r7ReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+                '-HostPid', $r7DeadHost.Id, '-HostStart', $r7DeadStart,
+                '-ParentPid', $r7AliveParent.Id, '-ParentStart', $r7AliveStart,
+                '-Head', $r7Head,
+                '-Primary', $r7Repo.Primary, '-Worktree', $r7Resolved,
+                '-Branch', 'feature', '-Default', 'main', '-Result', $r7Result,
+                '-StateDirectory', $r7State
+            ) -PassThru -WindowStyle Hidden
+
+            $r7Wrote = Wait-Condition -TimeoutSeconds 30 -Condition {
+                $record = Read-JsonFile -Path $r7Result
+                $null -ne $record -and $null -ne $record.status
+            }
+            if (-not $r7Wrote -and (Get-Process -Id $r7ReaperProcess.Id -ErrorAction SilentlyContinue)) {
+                & taskkill.exe /PID $r7ReaperProcess.Id /T /F 2>$null | Out-Null
+            }
+        }
+        finally {
+            $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = $previousR7ReaperTimeout
+        }
+    }
+    finally {
+        if (Get-Process -Id $r7AliveParent.Id -ErrorAction SilentlyContinue) {
+            & taskkill.exe /PID $r7AliveParent.Id /T /F 2>$null | Out-Null
+        }
+    }
+
+    $r7Record = Read-JsonFile -Path $r7Result
+    Assert-True -Actual ($null -ne $r7Record) -Message 'The parent-shell-wait scenario did not write a result record.'
+    Assert-Equal -Expected 'timeout' -Actual $r7Record.status -Message 'The reaper did not wait for the parent shell pid before timing out.'
+    Assert-True -Actual (Test-Path -LiteralPath $r7Worktree) -Message 'The worktree was removed despite the parent shell still running.'
+
+    Write-Output 'PASS finish.tests.ps1: R7 parent-shell wait'
+
+    # --- (viii) R8: a receipt is found when its worktree field differs only in case ------------------------
+
+    $r8Root = Join-Path $scratch 'r8-case-insensitive-receipt'
+    New-Item -ItemType Directory -Path $r8Root -Force | Out-Null
+    $r8State = Join-Path $r8Root 'state'
+    $r8Target = Join-Path $r8Root 'Case-Target'
+    New-Item -ItemType Directory -Path $r8Target -Force | Out-Null
+    $r8Resolved = Get-ResolvedPath $r8Target
+    $r8DummySource = Join-Path $r8Root 'dummy-source'
+    New-Item -ItemType Directory -Path $r8DummySource -Force | Out-Null
+
+    $r8ReceiptPath = Join-Path $r8State 'merge-cleanup\receipts\mixed-case-receipt.json'
+    Write-JsonFile -Path $r8ReceiptPath -Data @{
+        worktree    = $r8Resolved.ToUpperInvariant()
+        primary     = $scratch
+        branch      = 'feature'
+        head        = ('a' * 40)
+        pr          = 1
+        merge_oid   = ('b' * 40)
+        default     = 'main'
+        verdict     = 'removable'
+        recorded_at = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+    }
+
+    $r8Found = & {
+        try { . $finishScript -Worktree $r8DummySource } catch { }
+        Find-ReceiptPath -StateDirectory $r8State -ResolvedWorktree $r8Resolved
+    }
+    Assert-Equal -Expected $r8ReceiptPath -Actual $r8Found -Message 'A receipt whose recorded worktree differs only in case was not found by Find-ReceiptPath.'
+
+    Write-Output 'PASS finish.tests.ps1: R8 case-insensitive receipt lookup'
+
+    # --- (ix) R12: a prefix-sharing sibling worktree does not defeat the exact registration check -----------
+
+    $r12Root = Join-Path $scratch 'r12-prefix-sibling'
+    New-Item -ItemType Directory -Path $r12Root -Force | Out-Null
+    $r12State = Join-Path $r12Root 'state'
+    $r12Repo = New-TestRepo -Root $r12Root
+    $r12Worktree = Add-FeatureWorktree -Primary $r12Repo.Primary -Root $r12Root -Branch 'feature'
+    $r12Resolved = Get-ResolvedPath $r12Worktree
+    $r12Head = (Invoke-GitOrThrow -Cwd $r12Worktree -Arguments @('rev-parse', 'HEAD')).Trim()
+
+    # A sibling worktree whose path is a superstring of the target's, so a substring match on porcelain
+    # output would misread the target as still registered after it is actually removed.
+    Invoke-GitOrThrow -Cwd $r12Repo.Primary -Arguments @('branch', 'feature-sibling', 'main') | Out-Null
+    $r12SiblingWorktree = $r12Worktree + '-sibling'
+    Invoke-GitOrThrow -Cwd $r12Repo.Primary -Arguments @('worktree', 'add', '-q', $r12SiblingWorktree, 'feature-sibling') | Out-Null
+
+    $r12Result = Join-Path $r12Root 'result.json'
+    $r12DeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $r12DeadHost.WaitForExit(5000) | Out-Null
+    $r12DeadStart = ([DateTimeOffset]($r12DeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $r12ReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $r12DeadHost.Id, '-HostStart', $r12DeadStart,
+        '-Head', $r12Head,
+        '-Primary', $r12Repo.Primary, '-Worktree', $r12Resolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $r12Result,
+        '-StateDirectory', $r12State
+    ) -PassThru -WindowStyle Hidden
+
+    $r12Wrote = Wait-Condition -TimeoutSeconds 60 -Condition {
+        $record = Read-JsonFile -Path $r12Result
+        $null -ne $record -and $null -ne $record.status
+    }
+    if (-not $r12Wrote -and (Get-Process -Id $r12ReaperProcess.Id -ErrorAction SilentlyContinue)) {
+        & taskkill.exe /PID $r12ReaperProcess.Id /T /F 2>$null | Out-Null
+    }
+
+    $r12Record = Read-JsonFile -Path $r12Result
+    Assert-True -Actual ($null -ne $r12Record) -Message 'The prefix-sibling scenario did not write a result record.'
+    Assert-Equal -Expected 'succeeded' -Actual $r12Record.status -Message 'A prefix-sharing sibling worktree made the registration check misread the removed target as still registered.'
+
+    Write-Output 'PASS finish.tests.ps1: R12 exact registration check'
 }
 finally {
     $env:AGENT_STATE_DIRECTORY = $originalState
