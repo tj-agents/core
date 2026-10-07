@@ -1,9 +1,8 @@
 """SessionStart hook: record this session's id, tab title, directory and pid.
 
-The launchers export `AGENT_CLI_TAB_TITLE` when they open a tab (`agent_cli.py`'s `launch_tab`, and
-`agent-cli.ps1` for those not yet ported); a session started by hand exports
-nothing and records a null title. `peer-cli.ps1` reads these entries to resolve a session from the tab
-title a user can see, and the reverse.
+The launchers export `AGENT_CLI_TAB_TITLE` when they open a tab (`agent_cli.py`'s `launch_tab`); a
+session started by hand exports nothing and records a null title. `peer-cli.ps1` reads these entries to
+resolve a session from the tab title a user can see, and the reverse.
 
 Contract: exit 0 always. Bookkeeping must never stop a session starting.
 """

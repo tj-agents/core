@@ -1,8 +1,9 @@
 """Shared launch primitives for the native agent CLIs, on Windows and POSIX.
 
-Imported by open-claude and handoff-claude so the environment scrub, executable discovery, standards
-sync, lane lookup and terminal argument escaping have one owner. handoff-codex still uses the PowerShell
-agent-cli.ps1 until its own Python port lands. Not runnable on its own.
+Imported by open-claude, handoff-claude and handoff-codex so the environment scrub, executable discovery,
+standards sync, lane lookup and terminal argument escaping have one owner. The terminal claude launcher
+(claude-profile.ps1) still uses the PowerShell agent-cli.ps1 until its own Python port lands. Not runnable
+on its own.
 """
 
 import glob

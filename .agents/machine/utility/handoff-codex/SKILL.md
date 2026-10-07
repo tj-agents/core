@@ -10,23 +10,47 @@ route: infer
 # Codex handoff
 
 The sibling of `handoff-claude`, for handing work to Codex rather than to a second Claude Code. Either
-harness can run either launcher — both only spawn a Windows Terminal tab, so neither depends on the
+harness can run either launcher — both only spawn a terminal tab, so neither depends on the
 harness it is invoked from. What the prompt itself must contain is the `handoff` skill's subject, not
 this one's.
 
 Write the complete handoff prompt to a UTF-8 file before launching. Never relay a substantial prompt
-through nested command strings or place its contents directly in the Windows Terminal invocation.
+through nested command strings or place its contents directly in the terminal invocation.
 
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
+It opens a new tab in the terminal this process is running inside (Windows Terminal, tmux, kitty or
+Konsole).
+
+## One tab, and never a second
+
+The launcher **exits non-zero** on failure and prints `Launched codex-cli <version> from <path> on
+<selection>` on success. `standards:` lines before it report the pre-launch plugin refresh and hook trust,
+which never block the launch.
+
+Exit code **3 is distinct from every other failure**: it means the terminal control command timed out
+after the tab may already have opened, not that the launch definitely failed. Check the terminal for the
+tab before doing anything else; never relaunch automatically on exit 3. Any other non-zero exit means the
+launch did not happen.
+
+**Never verify a launch by listing processes, and never re-run the launcher because one looked absent.**
+A tab takes seconds to appear and a process listing is trivially misread — an unsorted `Select-Object
+-First 3` is enough to miss the newest one. Re-running puts two agents on the same task in the same
+repository, which is worse than no handoff at all: they collide on the same files with neither aware of
+the other.
+
+If the launcher printed its confirmation, the handoff happened. Report it and stop. If it exited
+non-zero, say so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a
+second tab for the same request.
+
 ## Model selection
 
-Pass `-Lane L1`–`L7` and the launcher resolves the model *and its reasoning effort* from the canonical
+Pass `--lane L1`–`L7` and the launcher resolves the model *and its reasoning effort* from the canonical
 lane tables it ships under `resources/lanes` — the `engineering:lanes` ladder, and the repo's only
 model-name owner, so no caller has to know a model id and a retiering is one edit in one authored file.
-The pair matters here: a Codex model is priced and paced by both. An explicit `-Model` or
-`-ReasoningEffort` still wins for whichever half the user named outright. Supply none and the CLI keeps
+The pair matters here: a Codex model is priced and paced by both. An explicit `--model` or
+`--reasoning-effort` still wins for whichever half the user named outright. Supply none and the CLI keeps
 its own configured default, exactly as an interactively launched session would.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
@@ -52,61 +76,64 @@ planning alone does not call for this launcher. After a massive plan that was a 
 `engineering:plans` normally transfers execution to one fresh harness from a durable phased plan, even in
 the same checkout. Apply its context criteria and judgment to cases between those sizes.
 
-`-Frontier` selects the tier above the ladder from the same table, model and effort together. **Pass it
+`--frontier` selects the tier above the ladder from the same table, model and effort together. **Pass it
 only when the user explicitly asked for that tier or its model by name.** No lane resolves to the tier —
 L1 prices the same family an effort step below, and frontier spend is the user's provenance to grant,
-never a reward for a hard-looking task — and it rejects `-Lane` or `-Model` beside it. `-ReasoningEffort` is the one flag it still accepts, winning over the
-tier's own effort, for a user who named the pace as well as the tier.
+never a reward for a hard-looking task — and it rejects `--lane` or `--model` beside it.
+`--reasoning-effort` is the one flag it still accepts, winning over the tier's own effort, for a user who
+named the pace as well as the tier.
 
-A calling skill or workflow that ships its own resolved selection may still pass `-Model` and `-ReasoningEffort` directly;
-that wins over `-Lane`. What is no longer acceptable is inventing a model id at the call site.
+A calling skill or workflow that ships its own resolved selection may still pass `--model` and
+`--reasoning-effort` directly; that wins over `--lane`. What is no longer acceptable is inventing a model
+id at the call site.
 
-Launch with `scripts/launch-codex.ps1`, beside this file:
+Launch with `scripts/launch_codex.py`, beside this file:
 
-```powershell
-& '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
+```sh
+python3 '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
 ```
 
-Add `-Lane '<L1..L7>'` (or `-Frontier`) to have the launcher resolve model and effort, or `-Model
-'<model-id>'` and `-ReasoningEffort '<level>'` for values the user named. Omitting them all lets
-`codex.exe` fall back to its own configured default — the same behavior an interactively launched
+Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+alias stub rather than a real interpreter, and it fails rather than running the launcher.
+
+Add `--lane '<L1..L7>'` (or `--frontier`) to have the launcher resolve model and effort, or `--model
+'<model-id>'` and `--reasoning-effort '<level>'` for values the user named. Omitting them all lets
+`codex` fall back to its own configured default — the same behavior an interactively launched
 session gets.
 
-Use `-BypassHookTrust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
+Use `--bypass-hook-trust` for Tommy's personal repositories. Omit it for an untrusted checkout or when the
 user has not authorized repository hooks.
 
 ## Which executable it starts, and why the choice is not free
 
-It starts a **native** `codex.exe` directly as the Windows Terminal tab process. Do not replace it with
-the npm/NVM `codex` shim, `codex.cmd`, `codex.ps1`, `node.exe`, or an intermediate PowerShell command:
-those launch paths have produced a degraded monochrome/non-interactive TUI.
+It starts a **native** `codex` executable directly as the terminal tab process. Do not replace it with
+the npm/NVM `codex` shim, `node`, or an intermediate shell command: those launch paths have produced a
+degraded monochrome/non-interactive TUI.
 
-There is more than one native `codex.exe` on a machine, and **the newest file is not the newest build**:
+There is more than one native `codex` executable on a machine, and **the newest file is not the newest
+build**:
 
 - The npm package ships a vendored native binary per platform under its own `node_modules`; the thing on
   PATH is only a JavaScript entry point in front of it. The launcher takes the binary, not the entry point.
-- The desktop app caches each downloaded runtime in a hash-named directory and *adds* rather than
-  replaces, so that folder accumulates stale payloads indefinitely.
+- On Windows, the desktop app additionally caches each downloaded runtime in a hash-named directory and
+  *adds* rather than replaces, so that folder accumulates stale payloads indefinitely.
 
-So the launcher enumerates both sources, asks each candidate for `--version`, and picks the highest
-**version**, ranking a prerelease below the release it precedes. It replaces two defects, not one: the
-old launcher searched only the desktop cache, so the npm build was never a candidate at all, and within
-that cache it ranked by `LastWriteTime` — landing on 0.151.0-alpha.7.1. Date-ranking stays wrong even
-once both sources are searched, because a freshly downloaded alpha's file is newer than the release it
-precedes.
+So the launcher enumerates every source for the current platform, asks each candidate for `--version`,
+and picks the highest **version**, ranking a prerelease below the release it precedes. It replaces two
+defects, not one: the old Windows-only launcher searched only the desktop cache, so the npm build was
+never a candidate at all, and within that cache it ranked by file modification time — landing on a stale
+alpha. Date-ranking stays wrong even once every source is searched, because a freshly downloaded alpha's
+file is newer than the release it precedes.
 
-**The model roster is gated on the CLI version.** The stale build could not offer the current roster whatever
-the account was entitled to. That is why the launcher fails loudly below `-MinimumVersion` (default
-`0.154.0`, the oldest build observed to carry the current roster) rather than quietly running an old one. If it refuses, run
-`npm install -g @openai/codex@latest` — do not lower the floor to get past it.
+**The model roster is gated on the CLI version.** A stale build could not offer the current roster
+whatever the account was entitled to. That is why the launcher fails loudly below `--minimum-version`
+(default `0.154.0`, the oldest build observed to carry the current roster) rather than quietly running an
+old one. If it refuses, run `npm install -g @openai/codex@latest` — do not lower the floor to get past it.
 
-It opens as a **new tab in the current Windows Terminal window**, not a new OS window — the `wt.exe`
-invocation passes `--window 0`, WT's documented sentinel for "the window that most recently had focus."
-This is not the same as omitting `--window` entirely: `windowingBehavior` is unset in this machine's WT
-settings, so the *default* behavior with no `--window` flag at all is `useNew` — always a new window.
-`--window 0` is the only thing that overrides that default; do not "simplify" this back to no flag, or to
-`--window new`, which forces the opposite. Handing off several related tasks against the same repository
-means several tabs in this one window, not several windows.
+It opens as a **new tab in the terminal this process is already running inside** (Windows Terminal, tmux,
+kitty or Konsole), never a new window — the same shared tab-opening behaviour `handoff-claude` and
+`open-claude` use. Handing off several related tasks against the same repository means several tabs in
+the same terminal, not several windows.
 
 ## The parent session's environment must not leak
 
@@ -122,14 +149,10 @@ Claude Code exports `TERM=xterm-256color`, which suits a Node CLI reading `suppo
 Rust/crossterm binary, and on native Windows an unset `TERM` is what selects the console's truecolor path
 — handing it a POSIX terminfo name instead caps the palette at 256 colours and visibly wrecks the theme.
 `COLORTERM` is not set on this machine either, so there is nothing for the leaked `TERM` to be overridden
-by. Do not "align" the two launchers; the runtimes differ, so the correct handling differs.
-
-That Windows reasoning is specific to this launcher's current (Windows-only) `agent-cli.ps1` path, not a
-general POSIX rule. `agent_cli.py` -- the shared library behind `open-claude` and `handoff-claude` -- never
-forces or clears `TERM` on POSIX at all, for an unrelated reason: the terminal that actually starts the
-tab sets `TERM` for that session itself, and forcing or clearing it there would fight that. `handoff-codex`
-has not moved to that shared library yet; when it does, its own clearing stops being unconditional in the
-same way.
+by. Do not "align" the two launchers; the runtimes differ, so the correct handling differs. On POSIX this
+clearing has no effect either way: the shared `agent_cli.py` library behind every launcher here never
+forces or clears `TERM` on POSIX at all, because the terminal that actually starts the tab sets `TERM` for
+that session itself, and forcing or clearing it here would fight that.
 
 Only variables observed in a real parent session are listed. Codex's own exported session state has not
 been read from one, so nothing is cleared on a guess.

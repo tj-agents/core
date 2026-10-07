@@ -122,8 +122,8 @@ it with the npm/NVM `claude` shim, `claude.cmd`, `claude.ps1`, `node.exe`, or an
 command — the same launch paths that produced a degraded monochrome, non-interactive TUI for Codex.
 
 The terminal invocation and the environment scrub belong to `scripts/agent_cli.py` under
-`resources/machine/scripts`, shared with `open-claude`. `handoff-codex` still uses the PowerShell
-`agent-cli.ps1` until its own Python port lands.
+`resources/machine/scripts`, shared with `open-claude` and `handoff-codex`. The terminal claude launcher
+(`claude-profile.ps1`) still uses the PowerShell `agent-cli.ps1` until its own Python port lands.
 
 This is an unmanaged handoff. Do not invoke Agent Workboard, pass Workboard tokens, bind the session to
 Workboard state, or imply that the new window will checkpoint workflow status.
