@@ -51,19 +51,65 @@ CLEANUP_PROOF_RELATIVE = "engineering/workflow/merge/scripts/cleanup_proof.py"
 
 RESULT_KEYS = ("tool_response", "tool_result", "tool_output")
 
-EXEMPT_RE = re.compile(
-    r'\bgit(?:\s+-C\s+(?:"[^"]*"|\S+))?\s+(?:status|fetch|worktree|branch|checkout|switch|pull|push|rev-parse|log'
-    r'|diff|add|commit|merge|rebase|restore|stash|tag|show|remote|config|ls-files|ls-remote|cherry-pick|revert'
-    r'|reset|rm|mv)\b'
-    r'|\bgh\s+(?:pr|run|api|workflow|release|repo)\b'
-    r'|\b(?:workflow_ops|cleanup_proof|agent_cli|transfer|merge_cleanup_gate)\.py\b'
-    r'|\b(?:worktrees|peer-cli|close-tab|launch-codex|launch-claude|finish|finish_reaper)\.ps1\b',
+EXEMPT_GIT_VERBS = (
+    "status", "fetch", "worktree", "branch", "checkout", "switch", "pull", "push",
+    "rev-parse", "log", "diff", "show", "add", "commit", "merge", "remote",
+    "ls-files", "ls-remote",
+)
+EXEMPT_GH_VERBS = (
+    r"pr\s+(?:view|checks|list|create|edit|ready|comment|merge)",
+    r"run\s+(?:list|view|watch|rerun)",
+)
+EXEMPT_PY_SCRIPTS = (
+    "workflow_ops.py", "cleanup_proof.py", "agent_cli.py", "transfer.py", "merge_cleanup_gate.py",
+)
+EXEMPT_PS1_SCRIPTS = (
+    "worktrees.ps1", "peer-cli.ps1", "close-tab.ps1", "launch-codex.ps1",
+    "launch-claude.ps1", "finish.ps1", "finish_reaper.ps1",
+)
+
+SEGMENT_SPLIT_RE = re.compile(r"&&|\|\||[;|]")
+LEADING_SEGMENT_RE = re.compile(r"\A(?:pushd|cd)\s+\S", re.IGNORECASE)
+GIT_SEGMENT_RE = re.compile(
+    r'\Agit(?:\s+-C\s+(?:"[^"]*"|\S+))?\s+(?:' + "|".join(EXEMPT_GIT_VERBS) + r')\b',
     re.IGNORECASE,
 )
+GH_SEGMENT_RE = re.compile(r'\Agh\s+(?:' + "|".join(EXEMPT_GH_VERBS) + r')\b', re.IGNORECASE)
+PY_SEGMENT_RE = re.compile(
+    r'\A\S*?\bpython3?(?:\.exe)?\b.*?\b(?:' + "|".join(re.escape(s) for s in EXEMPT_PY_SCRIPTS) + r')\b',
+    re.IGNORECASE,
+)
+PS1_SEGMENT_RE = re.compile(
+    r'\A\S*?\b(?:powershell|pwsh)(?:\.exe)?\b.*?\b(?:' + "|".join(re.escape(s) for s in EXEMPT_PS1_SCRIPTS) + r')\b',
+    re.IGNORECASE,
+)
+
 PUSHD_RE = re.compile(r"""\bpushd\s+(?:"([^"]+)"|'([^']+)'|(\S+))""", re.IGNORECASE)
 LAUNCHER_RE = re.compile(
     r"launch-codex\.ps1|launch-claude\.ps1|agent_cli\.py|transfer\.py", re.IGNORECASE
 )
+
+
+def segment_is_exempt(segment):
+    segment = segment.strip()
+    if not segment:
+        return True
+    return bool(
+        GIT_SEGMENT_RE.match(segment)
+        or GH_SEGMENT_RE.match(segment)
+        or PY_SEGMENT_RE.match(segment)
+        or PS1_SEGMENT_RE.match(segment)
+    )
+
+
+def command_is_exempt(command):
+    segments = SEGMENT_SPLIT_RE.split(command)
+    if segments and LEADING_SEGMENT_RE.match(segments[0].strip()):
+        segments = segments[1:]
+    if not segments:
+        return True
+    return all(segment_is_exempt(segment) for segment in segments)
+
 
 MESSAGE = (
     "MERGE CLEANUP GATE: `gh pr merge` for PR #{pr} ({branch}) ran from {worktree} at {time} "
@@ -304,7 +350,7 @@ def evaluate_codex_obligation(obligation, session, cwd, now):
 
 def codex_enforce(command, data):
     paths = iter_obligation_paths()
-    if not paths or EXEMPT_RE.search(command):
+    if not paths or command_is_exempt(command):
         return 0
     session = data.get("session_id") or data.get("sessionId")
     cwd = data.get("cwd")
@@ -352,13 +398,14 @@ def response_text(data):
     return "\n".join(parts)
 
 
-MERGED_OUTPUT_RE = re.compile(r"merged pull request #?(?P<pr>\d+)", re.IGNORECASE)
-MERGE_STATE_RE = re.compile(r'"state"\s*:\s*"MERGED"|\bMERGED\b', re.IGNORECASE)
+MERGED_OUTPUT_RE = re.compile(
+    r"merged pull request\s+(?:[\w.-]+/[\w.-]+)?#?(?P<pr>\d+)", re.IGNORECASE
+)
+MERGE_STATE_RE = re.compile(r'"state"\s*:\s*"merged"', re.IGNORECASE)
 MONITOR_COMMAND_RE = re.compile(
     r"--id\s+(?P<monitor_pr>\d+)"
     r"|\bpr\s+view\s+(?P<view_pr>\d+)\b"
-    r"|\bpr\s+checks\s+(?P<checks_pr>\d+)\b"
-    r"|\bpr\s+status\b",
+    r"|\bpr\s+checks\s+(?P<checks_pr>\d+)\b",
     re.IGNORECASE,
 )
 
@@ -376,7 +423,8 @@ def confirm_owning_session_obligations(session, pr):
         obligation = load_obligation(path)
         if obligation is None or obligation.get("session_id") != session:
             continue
-        if pr is not None and obligation.get("pr") != pr:
+        recorded_pr = obligation.get("pr")
+        if pr is not None and recorded_pr is not None and recorded_pr != pr:
             continue
         obligation["confirmed_merged"] = True
         save_obligation(path, obligation)
@@ -392,10 +440,15 @@ def handle_posttooluse(data):
     text = response_text(data)
 
     if is_merge_enable(command):
+        if "--auto" in command:
+            return
         pr = pr_number(command)
-        match = MERGED_OUTPUT_RE.search(text)
-        if pr and match and match.group("pr") == pr:
+        if pr:
             confirm_obligation_for_pr(pr)
+            return
+        session = data.get("session_id") or data.get("sessionId")
+        if session:
+            confirm_owning_session_obligations(session, None)
         return
 
     match = MONITOR_COMMAND_RE.search(command)
@@ -410,28 +463,14 @@ def handle_posttooluse(data):
 
 def handle_posttoolusefailure(data):
     from git_auth_scope_gate import extract_command
-    from merge_review_gate import canonical_merge_target_dir, is_merge_enable, merge_target_dir
+    from merge_review_gate import is_merge_enable
 
     command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
     if not command or not is_merge_enable(command):
         return
-    session = data.get("session_id") or data.get("sessionId")
-    if not session:
-        return
-    target = canonical_merge_target_dir(command) or pushd_target(command) or merge_target_dir(command, data)
-    if not target:
-        return
-    try:
-        worktree = Path(target).resolve()
-    except OSError:
-        return
-    path = obligation_path(worktree)
-    obligation = load_obligation(path)
-    if obligation is not None and obligation.get("session_id") == session:
-        try:
-            path.unlink()
-        except OSError:
-            pass
+    match = MERGED_OUTPUT_RE.search(response_text(data))
+    if match:
+        confirm_obligation_for_pr(match.group("pr"))
 
 
 def handle_stop(data):
