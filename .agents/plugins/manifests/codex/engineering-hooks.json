@@ -7,8 +7,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\""
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
       }
@@ -57,6 +57,17 @@
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
       }
     ],
     "UserPromptSubmit": [
@@ -67,6 +78,16 @@
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\"",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
       }

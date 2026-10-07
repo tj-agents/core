@@ -27,3 +27,13 @@ and the `test_review_native_layer.py` repository-helper check covers them.
 The `skills` operation defaults lifecycle names to `.agents/skills/<name>/SKILL.md`. Core now owns `feature` under `.agents/engineering/workflow/feature/`, so recording the lifecycle by name fails before producing its identity record. This predates the Sol 6.1 update and is independent of lane resolution.
 
 Resolve when lifecycle discovery uses the canonical scope/kind layout and regression coverage proves `skills --lifecycle feature` records the shipped owner in both source and installed package layouts.
+
+## Codex keeps a merge-cleanup obligation after a failed merge
+
+`merge_cleanup_gate.py` records its obligation at PreToolUse, before `gh pr merge` runs. Claude reports a
+failed merge through PostToolUseFailure and never blocks Stop on an unconfirmed obligation, but Codex has no
+result event, so after a failed or rejected merge it nags once every 10 minutes until `--clear` or the
+7-day reconcile drops the obligation.
+
+**Resolution condition.** Codex publishes a tool-result or failure event that hooks can consume; wire the
+gate's failure handler to it and delete the obligation when the merge reports no success.
