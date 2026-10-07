@@ -49,7 +49,8 @@ GIT_TIMEOUT_SECONDS = 5
 
 CLEANUP_PROOF_RELATIVE = "engineering/workflow/merge/scripts/cleanup_proof.py"
 
-RESULT_KEYS = ("tool_response", "tool_result", "tool_output")
+RESULT_KEYS = ("tool_response", "tool_result", "tool_output", "tool_error", "error")
+TEXT_FIELDS = ("stdout", "stderr", "output", "content", "error", "message")
 
 EXEMPT_GIT_VERBS = (
     "status", "fetch", "worktree", "branch", "checkout", "switch", "pull", "push",
@@ -68,8 +69,12 @@ EXEMPT_PS1_SCRIPTS = (
     "launch-claude.ps1", "finish.ps1", "finish_reaper.ps1",
 )
 
-SEGMENT_SPLIT_RE = re.compile(r"&&|\|\||[;|]")
-LEADING_SEGMENT_RE = re.compile(r"\A(?:pushd|cd)\s+\S", re.IGNORECASE)
+NEUTRAL_SEGMENT_RE = re.compile(
+    r"\A(?:Select-String|Select-Object|Where-Object|ForEach-Object|Sort-Object|Measure-Object|Out-String"
+    r"|Out-Null|ConvertFrom-Json|ConvertTo-Json|Format-\w+|Write-Output|Write-Host|echo|head|tail|grep"
+    r"|jq|sort|wc|cat|popd|Pop-Location|Set-Location|Push-Location|cd|pushd)\b",
+    re.IGNORECASE,
+)
 GIT_SEGMENT_RE = re.compile(
     r'\Agit(?:\s+-C\s+(?:"[^"]*"|\S+))?\s+(?:' + "|".join(EXEMPT_GIT_VERBS) + r')\b',
     re.IGNORECASE,
@@ -81,6 +86,13 @@ PY_SEGMENT_RE = re.compile(
 )
 PS1_SEGMENT_RE = re.compile(
     r'\A\S*?\b(?:powershell|pwsh)(?:\.exe)?\b.*?\b(?:' + "|".join(re.escape(s) for s in EXEMPT_PS1_SCRIPTS) + r')\b',
+    re.IGNORECASE,
+)
+
+DIRECT_SCRIPT_SEGMENT_RE = re.compile(
+    r"""\A(?:&\s*)?['"]?[^\s'"]*?\b(?:"""
+    + "|".join(re.escape(s) for s in EXEMPT_PY_SCRIPTS + EXEMPT_PS1_SCRIPTS)
+    + r""")['"]?(?:\s|\Z)""",
     re.IGNORECASE,
 )
 
@@ -99,16 +111,45 @@ def segment_is_exempt(segment):
         or GH_SEGMENT_RE.match(segment)
         or PY_SEGMENT_RE.match(segment)
         or PS1_SEGMENT_RE.match(segment)
+        or DIRECT_SCRIPT_SEGMENT_RE.match(segment)
     )
 
 
+def shell_segments(command):
+    segments, current, quote, index = [], [], None, 0
+    while index < len(command):
+        char = command[index]
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = None
+        elif char in "'\"":
+            quote = char
+            current.append(char)
+        elif command.startswith("&&", index) or command.startswith("||", index):
+            segments.append("".join(current))
+            current = []
+            index += 1
+        elif char in ";|":
+            segments.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+        index += 1
+    segments.append("".join(current))
+    return [segment.strip() for segment in segments if segment.strip()]
+
+
+def segment_is_neutral(segment):
+    return ">" not in segment and NEUTRAL_SEGMENT_RE.match(segment) is not None
+
+
 def command_is_exempt(command):
-    segments = SEGMENT_SPLIT_RE.split(command)
-    if segments and LEADING_SEGMENT_RE.match(segments[0].strip()):
-        segments = segments[1:]
-    if not segments:
-        return True
-    return all(segment_is_exempt(segment) for segment in segments)
+    segments = shell_segments(command)
+    meaningful = [segment for segment in segments if not segment_is_neutral(segment)]
+    if not meaningful:
+        return not segments
+    return all(segment_is_exempt(segment) for segment in meaningful)
 
 
 MESSAGE = (
@@ -384,24 +425,37 @@ def handle_pretooluse(data):
     return codex_enforce(command, data)
 
 
+def collect_text(value, parts):
+    if isinstance(value, str):
+        parts.append(value)
+    elif isinstance(value, dict):
+        fields = [value[field] for field in TEXT_FIELDS if isinstance(value.get(field), str)]
+        if fields:
+            parts.extend(fields)
+            return
+        try:
+            parts.append(json.dumps(value))
+        except TypeError:
+            parts.append(str(value))
+    elif isinstance(value, list):
+        for item in value:
+            collect_text(item, parts)
+    elif value is not None:
+        parts.append(str(value))
+
+
 def response_text(data):
     parts = []
     for key in RESULT_KEYS:
-        value = data.get(key)
-        if isinstance(value, str):
-            parts.append(value)
-        elif value is not None:
-            try:
-                parts.append(json.dumps(value))
-            except TypeError:
-                parts.append(str(value))
+        collect_text(data.get(key), parts)
     return "\n".join(parts)
 
 
 MERGED_OUTPUT_RE = re.compile(
     r"merged pull request\s+(?:[\w.-]+/[\w.-]+)?#?(?P<pr>\d+)", re.IGNORECASE
 )
-MERGE_STATE_RE = re.compile(r'"state"\s*:\s*"merged"', re.IGNORECASE)
+MERGE_STATE_RE = re.compile(r'\\?"state\\?"\s*:\s*\\?"merged\\?"', re.IGNORECASE)
+QUEUED_OUTPUT_RE = re.compile(r"merge queue|automatically merged|auto-merge", re.IGNORECASE)
 MONITOR_COMMAND_RE = re.compile(
     r"--id\s+(?P<monitor_pr>\d+)"
     r"|\bpr\s+view\s+(?P<view_pr>\d+)\b"
@@ -418,6 +472,25 @@ def confirm_obligation_for_pr(pr):
             save_obligation(path, obligation)
 
 
+def merge_is_final_segment(command):
+    segments = shell_segments(command)
+    return bool(segments) and re.match(r"gh\s+pr\s+merge\b", segments[-1], re.IGNORECASE) is not None
+
+
+def confirm_obligation_for_target(command, data):
+    from merge_review_gate import canonical_merge_target_dir, merge_target_dir
+
+    target = canonical_merge_target_dir(command) or pushd_target(command) or merge_target_dir(command, data)
+    try:
+        path = obligation_path(Path(target).resolve())
+    except OSError:
+        return
+    obligation = load_obligation(path)
+    if obligation is not None:
+        obligation["confirmed_merged"] = True
+        save_obligation(path, obligation)
+
+
 def confirm_owning_session_obligations(session, pr):
     for path in iter_obligation_paths():
         obligation = load_obligation(path)
@@ -432,7 +505,7 @@ def confirm_owning_session_obligations(session, pr):
 
 def handle_posttooluse(data):
     from git_auth_scope_gate import extract_command
-    from merge_review_gate import is_merge_enable, pr_number
+    from merge_review_gate import is_merge_enable
 
     command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
     if not command:
@@ -440,15 +513,9 @@ def handle_posttooluse(data):
     text = response_text(data)
 
     if is_merge_enable(command):
-        if "--auto" in command:
+        if "--auto" in command or QUEUED_OUTPUT_RE.search(text) or not merge_is_final_segment(command):
             return
-        pr = pr_number(command)
-        if pr:
-            confirm_obligation_for_pr(pr)
-            return
-        session = data.get("session_id") or data.get("sessionId")
-        if session:
-            confirm_owning_session_obligations(session, None)
+        confirm_obligation_for_target(command, data)
         return
 
     match = MONITOR_COMMAND_RE.search(command)
