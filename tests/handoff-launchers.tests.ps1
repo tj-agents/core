@@ -286,8 +286,16 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
     if ($launched -notmatch [regex]::Escape("lane L4 -> $($codexTable.lanes.L4.model) at $($codexTable.lanes.L4.reasoning_effort)")) { throw 'launch-codex.ps1 did not report the lane, model and effort it launched.' }
     if ($capturedArgs -notmatch "model_reasoning_effort=$($codexTable.lanes.L4.reasoning_effort)") { throw 'launch-codex.ps1 did not resolve -Lane L4 to its effort.' }
 
-    # --- handoff-codex: an explicit -Model survives a -Lane, which still fills the effort half ---
     Remove-Item -LiteralPath $wtLog -Force
+    foreach ($modelOverride in @('', 'explicitly-named-model')) {
+        $rejected = $false
+        try { & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L7' -Model $modelOverride }
+        catch { $rejected = $_.Exception.Message -like '*L7 is for in-session clerical work*' }
+        if (-not $rejected) { throw 'launch-codex.ps1 did not reject L7 with the expected handoff restriction.' }
+        if (Test-Path -LiteralPath $wtLog) { throw 'launch-codex.ps1 opened a terminal after rejecting L7.' }
+    }
+
+    # --- handoff-codex: an explicit -Model survives a -Lane, which still fills the effort half ---
     $launched = & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L4' -Model 'explicitly-named-model' 6>&1 | Out-String
     $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
     if ($launched -notmatch [regex]::Escape("on explicitly-named-model at $($codexTable.lanes.L4.reasoning_effort)")) { throw 'launch-codex.ps1 labelled an explicit -Model as the lane model.' }

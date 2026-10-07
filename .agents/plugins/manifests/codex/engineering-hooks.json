@@ -76,18 +76,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
       }

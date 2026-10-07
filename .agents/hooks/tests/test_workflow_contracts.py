@@ -93,7 +93,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(
             {
                 "strategic": "gpt-6.1-sol",
-                "implementation": "gpt-6.1-sol",
+                "implementation": "gpt-5.6-terra",
                 "mechanical": "gpt-6-luna",
                 "review": "gpt-5.3-codex-spark",
                 "critical": "gpt-6.1-sol",
@@ -115,7 +115,7 @@ class WorkflowContractTests(unittest.TestCase):
                 "strategic": [],
                 "implementation": [],
                 "mechanical": [],
-                "review": ["gpt-6.1-sol"],
+                "review": ["gpt-5.6-terra"],
                 "critical": [],
             },
             {
@@ -1281,13 +1281,14 @@ class HostAdapterTests(unittest.TestCase):
             "codex",
             dispatch,
             probe=probe,
-            available_models={"gpt-6.1-sol"},
+            available_models={"gpt-5.6-terra"},
         )
 
         self.assertEqual("review", invocation["semantic_stage"])
         self.assertEqual("gpt-5.3-codex-spark", invocation["primary_model"])
-        self.assertEqual("gpt-6.1-sol", invocation["model"])
+        self.assertEqual("gpt-5.6-terra", invocation["model"])
         self.assertEqual("fallback", invocation["model_selection"])
+        self.assertEqual("medium", invocation["reasoning_effort"])
         self.assertEqual("default", invocation["agent_name"])
         self.assertEqual("review_lens", invocation["role_agent_name"])
         self.assertEqual("../roles/review-lens.md", invocation["role_body"])
@@ -1317,12 +1318,13 @@ class HostAdapterTests(unittest.TestCase):
         self.assertEqual("model-unavailable", fallback["reason_code"])
         self.assertEqual("fallback", fallback["parent_transition"])
         self.assertEqual("gpt-5.3-codex-spark", fallback["failed_model"])
-        self.assertEqual("gpt-6.1-sol", fallback["next_model"])
+        self.assertEqual("gpt-5.6-terra", fallback["next_model"])
 
         retry_dispatch = self.dispatch("review-lens", "dispatch-002")
         retry = registry.prepare("codex", retry_dispatch, probe=probe)
-        self.assertEqual("gpt-6.1-sol", retry["model"])
+        self.assertEqual("gpt-5.6-terra", retry["model"])
         self.assertEqual("fallback", retry["model_selection"])
+        self.assertEqual("medium", retry["reasoning_effort"])
         self.assertEqual("default", retry["agent_name"])
 
         exhausted = registry.report_model_unavailable(
@@ -1332,7 +1334,7 @@ class HostAdapterTests(unittest.TestCase):
             "Sol is unavailable.",
         )
         self.assertEqual("pause", exhausted["parent_transition"])
-        self.assertEqual("gpt-6.1-sol", exhausted["failed_model"])
+        self.assertEqual("gpt-5.6-terra", exhausted["failed_model"])
         self.assertIsNone(exhausted["next_model"])
 
     def test_claude_nondefault_stage_uses_general_purpose_without_a_fallback(self):
