@@ -246,6 +246,18 @@ nonzero on refusal. A successful result includes `repository`, `worktree`, `bran
 `base_ref`, `base_head` and `created`. The helper never launches or closes a host, removes a worktree,
 resets a branch, stages files, commits, or chooses a delivery slice. Callers retain task/session ownership.
 
+Paths and refs are strings, SHAs are full hexadecimal commit IDs, and `created` is boolean. It means
+this call created the worktree, so every successful `create` returns `true`, including restoration.
+`base_ref` and `base_head` always name the verified source ref and commit used for this checkout;
+neither is nullable. New creation uses the fetched remote base, local restoration uses its local
+branch ref, and remote-only restoration uses its fetched remote branch ref. `head` equals `base_head`.
+
+```json
+{"repository":"C:/repos/example","worktree":"C:/repos/example/.worktrees/Feature-Example","branch":"Feature/Example","head":"1111111111111111111111111111111111111111","base_ref":"refs/remotes/origin/main","base_head":"1111111111111111111111111111111111111111","created":true}
+{"repository":"C:/repos/example","worktree":"C:/repos/example/.worktrees/Fix-Existing","branch":"Fix/Existing","head":"2222222222222222222222222222222222222222","base_ref":"refs/heads/Fix/Existing","base_head":"2222222222222222222222222222222222222222","created":true}
+{"repository":"C:/repos/example","worktree":"C:/repos/example/.worktrees/Fix-Existing","branch":"Fix/Existing","head":"3333333333333333333333333333333333333333","base_ref":"refs/remotes/origin/Fix/Existing","base_head":"3333333333333333333333333333333333333333","created":true}
+```
+
 ```powershell
 python -B '<installed-open-worktree-directory>/scripts/worktrees.py' create --repository . --branch Feature/Example
 python -B '<installed-open-worktree-directory>/scripts/worktrees.py' create --repository . --branch Feature/Child --base Feature/Parent --expected-base <full-fetched-parent-sha>
@@ -259,6 +271,8 @@ binds a reviewed parent and fails on disagreement. `--existing` explicitly attac
 local branch, or creates its matching local tracking branch from the remote; `--expected-head` is
 mandatory and must match. Refuse an already registered branch and report its exact checkout for the
 caller to reconcile ownership. Ordinary task resumption reads that checkout without allocating another.
+Reject `--existing` combined with `--base` or `--expected-base`, and reject `--expected-head` without
+`--existing`. Ref names and configured remote names are validated before constructing refspecs.
 
 Resolve paths from Git, independent of the caller's linked checkout:
 
@@ -269,8 +283,17 @@ if common.name != '.git' or git(repository, 'rev-parse', '--is-bare-repository')
     raise Refusal('An ordinary non-bare repository with its common .git directory is required')
 if Path(git(repository, 'rev-parse', '--path-format=absolute', '--git-common-dir')).resolve() != common:
     raise Refusal('Common repository identity does not match')
+if git(repository, 'rev-parse', '--is-inside-work-tree') != 'true':
+    raise Refusal('The common directory parent is not the primary worktree')
+if Path(git(repository, 'rev-parse', '--show-toplevel')).resolve() != repository:
+    raise Refusal('Separately relocated Git directories are unsupported')
 target = repository / '.worktrees' / branch.replace('/', '-')
 ```
+
+Every Git subprocess receives an environment with inherited repository selectors removed: `GIT_DIR`,
+`GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
+`GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_CEILING_DIRECTORIES`, and `GIT_DISCOVERY_ACROSS_FILESYSTEM`.
+This follows the existing `worktree_cleanup_gate.py` boundary. Preserve normal authentication settings.
 
 Reject invalid Git branch names, non-capitalized type prefixes, option-like arguments, case variants
 of any existing local/remote branch, and existing target paths, including empty directories. Inspect
@@ -279,18 +302,32 @@ absolute identities on Windows. Refuse a registered target even if its directory
 `.worktrees` symlinks/junctions/reparse points and require the resolved target parent to remain beneath
 the common root. Bare or separately relocated Git-directory layouts are explicit unsupported cases.
 
-Fetch the selected remote with pruning, resolve its advertised default using `ls-remote --symref`
-when no base was supplied, and resolve the exact `refs/remotes/<remote>/<base>` commit after fetching.
-Never silently fall back to local main or to the caller's branch after network/base failure. Validate
-the advertised default's commit against the fetched ref. Pin the Git add command to that full SHA so
-later remote movement cannot change the selected starting commit:
+Read the selected remote's branch advertisement with `ls-remote --symref <remote> HEAD refs/heads/*`.
+Use its symbolic HEAD branch when no base was supplied; an explicit base selects that exact advertised
+head. Include the advertised branch names in collision checks, even if the clone's configured fetch
+mapping excludes them. Fetch the selected base explicitly and compare its commit with the advertisement:
+
+```python
+source_ref = 'refs/heads/' + selected_branch
+base_ref = 'refs/remotes/' + remote + '/' + selected_branch
+git(repository, 'fetch', '--prune', remote, '+' + source_ref + ':' + base_ref)
+base_head = git(repository, 'rev-parse', '--verify', base_ref + '^{commit}')
+if base_head != advertised_heads[source_ref]:
+    raise Refusal('The selected remote branch changed; inspect and retry')
+```
+
+This overrides a narrowed configured fetch mapping for the selected source. Never silently fall back
+to local main or the caller's branch after network/base failure. Pin add to the verified full SHA:
 
 ```python
 git(repository, 'worktree', 'add', '--no-track', '-b', branch, str(target), base_head)
 ```
 
 For an existing local branch use `worktree add <target> <branch>` after its expected-head check.
-For a remote-only branch create from its expected SHA, then set the matching remote tracking ref.
+Refresh the selected remote with `fetch --prune` first, but derive its result exclusively from the local
+ref and required expected HEAD. For remote-only restoration use the explicit fetch mechanism above
+with the restored branch as `selected_branch`, verify expected HEAD, create from that SHA, then set
+the matching remote tracking ref. Re-read all selected local refs inside the allocation lock before add.
 Use argument arrays and bounded subprocess timeouts, never a shell-built command. Serialize creation
 per common repository using an exclusive `.git/agent-worktree-allocation.lock`; its JSON records the
 PID, branch and target. Release only the lock this invocation acquired. An existing lock refuses and
@@ -319,7 +356,8 @@ Verification: temporary bare remote plus ordinary clone, invocation from primary
 non-main remote default, fetched base advancing beyond stale local main, exact stack-parent mismatch,
 local/remote restoration with expected SHA, registered branch refusal, flattened/case path collisions,
 dirty caller preservation, tracked or negated `.worktrees` exclusion, symlink/junction escape, fetch
-failure, stale allocation lock and partial-add failure preservation. Execute both generated host-local
+failure, narrowed fetch mappings with a stale explicit base, separately relocated `.git` directories,
+hostile inherited Git selectors, stale allocation lock and partial-add failure preservation. Execute both generated host-local
 copies outside the author checkout against fixture consumers. Check harness manifests, package generation
 and the normal source suite. Native Claude/Codex adoption remains a later explicit acceptance gate.
 
@@ -330,13 +368,16 @@ Existing Python unittest and package-resource patterns in `tests/test_source_lay
 
 ## Execution readiness
 
-Allocator verdict: awaiting independent design review. The examples and refusal behavior above resolve
+Allocator verdict: full design review completed with three findings now addressed; delta review pending.
+The examples and refusal behavior above resolve
 the first producer slice; they do not declare the remaining fleet migration mechanism ready.
 Execution authorization: implementation and normal goal delivery, as recorded under Authorization.
 Transfer: not required for this bounded helper refinement. This session is already the full-goal
 successor; retain it and dispatch one specified L4 implementation worker after design review.
-Next action: review this allocator mechanism against inspected callers, packaging and ownership evidence,
-resolve findings in this file, then implement the producer slice. Broader acceptance remains unchanged.
+Review owner: `reviews/Feature-RepositoryOwnedLayout.md`; native and independent read-only evidence
+covered the frozen design at `fe7ddc8`. Changes define output semantics, explicit refspec freshness and
+primary-root verification. Next action: review the corrected design delta, then dispatch the producer
+implementation at L4. Broader acceptance remains unchanged.
 
 ## Next Steps
 

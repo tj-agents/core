@@ -1,214 +1,69 @@
-# Repo-declared agent configuration — progress
-
-## Machine-verifier slice (2026-10-06)
-
-The 2026-09-29 continuation strengthened `verify_machine.py` (parsed TOML, named profiles, hidden loose
-files, repository-local sources, redacted structured findings) per the plan's machine-verifier section;
-it lands with this branch. That session's transfer to a Sol successor was never acknowledged — the
-successor stopped when C: ran out of space — so the migration has no live owner. Its stale-snapshot
-diagnosis was fixed independently on main (PR #73). The Concertable scope-isolation slice exists only as
-unpushed commit `3bcb527` on `Concertable/agents` `Fix/PluginScopeIsolation`. Native role acceptance still
-waits on Tommy's approval to copy credentials.
-## Typed Codex launcher checkpoint (2026-09-29)
-
-Claude's pre-load refresh and plugin-owned typed launcher merged in PRs #61 and #63, with a real
-PowerShell acceptance run. Codex PR #60's original typed wrapper still depended on a checkout.
-This branch now moves the `codex` wrapper into the machine plugin. A Codex SessionStart hook wires
-both PowerShell profiles to resolve that plugin from Codex's active installed version. The typed
-command and native handoff refresh enabled Git plugins before launching a session. Synthetic
-PowerShell and profile tests pass; packaged hooks, exact-head CI and real installed-host acceptance
-remain. Project release pins still bound what the refresh can load.
-
-## Cross-PC startup refresh checkpoint (2026-09-28)
-
-Tommy clarified that a standards push on another PC must reach the next Claude and Codex CLI sessions on every developer PC. Current committed release pins do not advance from a push alone. Claude first-session refresh and live-cache safety were handed to an independent Claude CLI in `Fix/ClaudeStandardsSync`. The Codex branch `Fix/CodexStandardsSync` adds a pre-launch marketplace refresh for the PowerShell CLI wrapper and native handoff launcher, then refreshes enabled Git plugins. An isolated Codex probe found the full Git marketplace clone timed out, while sparse checkout succeeded, so the generated marketplace config now declares package sparse paths. The focused startup sync, launcher, and config tests passed. The generated package was refreshed. The remaining decision is the update channel: auto-review rejected changing every generated ref from an immutable release to moving `main`, citing unreviewed executable code. Installed-host acceptance, exact package checks, review, and delivery remain. Neither host can yet be claimed to load latest pushes on every PC.
+# Repo-declared agent configuration progress
 
 - Plan: `plans/repo-declared-config/REPO_DECLARED_CONFIG_PLAN.md`
 - Roadmap: `plans/repo-declared-config/REPO_DECLARED_CONFIG_ROADMAP.md`
 - Roadmap item: `repo-declared-config/migrate-agent-state`
-Status: phase 1 in progress; full repo-declared migration remains open (2026-09-28).
+- Worktree: `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Feature-RepositoryOwnedLayout`
+- Branch: `Feature/RepositoryOwnedLayout`
+- PR: not opened for adoption
+- Dependency/package gates: reconcile producer releases/catalogs and consumer state for the first adoption batch; native producer/host acceptance remains required
+- Last reconciled: 2026-10-07; goal/session and worktree state supplied by current owner
 
-PR #48 merged at `1f7a928` and Codex hook snapshots (#59) at `531c0fd`. Claude's pre-load
-refresh and plugin-owned terminal wrapper merged in PRs #61 and #63 and passed live acceptance on
-this PC. Codex's matching launcher is in open PR #60. A repository's committed release pin still
-limits the version either host may load.
-Tommy authorized end-to-end implementation, PR delivery and merging on 2026-09-27.
+## Current state
 
-## Current state (2026-09-27)
+The original Repo-declared config owner, session `01a0dedd-012f-7b10-8d89-dde5869ded40` (PID 17300), is dead. Its attempted transfer was never acknowledged. Codex full-goal session `01a11794-26f3-7fb2-accb-0df87faa5180` now coordinates this existing adoption owner under the user's repository-layout authorization. No adoption PR exists; fleet completion has not been verified.
 
-- The plan covers per-machine migration and retirement of duplicated shared hooks and agents.
-- This PC (first machine):
-  - All four canonical repositories are cloned under
-    `C:\Users\tommy\source\repos\tj-agents\{core,cpp,react,dotnet}`.
-  - The old `base-agents` checkout has uncommitted work/live worktrees and is not retired.
-  - Claude has core plus `concertable@agents` at user scope, so product hooks still load in
-    unrelated repositories.
-  - Claude user settings retain `tomjseery/*` sources, plugins and global Concertable trust text;
-    migrate those declarations into their owning repositories.
-  - `~/.codex/agents` holds the ten shared Codex agents installed by core's engineering
-    package (owned via `.base-agents-delivery.json`); Codex cannot load agents from plugins, so
-    the plan must decide how this stays repository-declared.
-- `sandbox-hwid` (first consumer): routes resolve for Claude and Codex after cpp-agents v0.3.0
-  adoption, but through user-scope installs.
-- On this PC, Codex's failing user-scope `notify` entry and temporary plugin-cache junctions
-  were removed. Core 2.1.12 is installed; a live-session update still needs a repository-owned
-  repair and acceptance test. No local cache alias is supported.
-- The phase-2 generator derives both host configs from a lock and owner-authored catalog,
-  requires core's plugins, validates GitHub sources against release owners, and checks drift.
-- Merged current `origin/main` (which released 2.1.12 and added native plugin activation checks).
-  Reconciled the router: moved skills require explicit aliases, so disabled plugins stay
-  unavailable. Core's Windows hook smoke test passes. The `codex.CMD` probe and shared hook
-  runner use `CREATE_NO_WINDOW`; live-session popup acceptance remains pending.
-- Concertable migration cannot delete duplicates wholesale: product hooks import its router
-  and its generator emits shared agents. Settle those boundaries before cutover.
-- Core now has a read-only machine verifier under `bootstrap-capabilities`. Focused tests pass;
-  on this PC it finds 34 own-agent profile entries (2 settings groups, 5 marketplaces,
-  15 plugins, 12 loose agents/skills). Host-bundled runtime marketplaces are excluded.
-  No user-scope cleanup is safe until the corresponding consumers adopt project settings.
-- Tommy authorized the whole repo-declared configuration plan through every repository's
-  normal merge path. The plan now explicitly includes standards-owned harness manifests,
-  generated project permission rules, CI enforcement of manifest/config drift, phase-2-first
-  adoption in winwrap and sandbox-hwid, and a permanent always-on authoring rule. The separate
-  `plans/conditional-skill-routes/` plan owns route conditionality and does not replace this
-  plan's harness-installation contract.
-- Tommy corrected the ownership boundary on 2026-09-27: core must not name or synchronize
-  other standards repositories. Its catalog now holds only its own release; consumers commit
-  the selected owners' records and the generator reads those without a source roster.
+The repository-layout proposal is a dependency: [REPOSITORY_LAYOUT_PROPOSAL.md](../repository-layout/REPOSITORY_LAYOUT_PROPOSAL.md). Core's owner catalog contains only core releases; each producer owns its catalog and harness manifest. Consumer declarations and generated Claude/Codex settings must be committed and drift-checked. Do not tag a core-only catalog release for consumer adoption until the first `winwrap` and `sandbox-hwid` consumers have committed their composed catalogs.
 
-## Phase 1 inventory (2026-09-23)
+Previously recorded machine inventory (2026-09-27; recheck before cleanup): canonical `core`, `cpp`, `react`, and `dotnet` checkouts exist. The old `base-agents` checkout has uncommitted work and live worktrees and is not retired. User-scope Claude state included Concertable and other marketplace/plugin/trust declarations; Codex had ten shared agents in `~/.codex/agents`. `sandbox-hwid` routes worked through user-scope installs. These are evidence to reconcile, not verified current state; do not remove machine state before consumer host acceptance.
 
-Source: `Concertable/agent-standards` `origin/main` at `eae6cc6`. GitHub now redirects that
-repository to `Concertable/agents`, which is the name its README and `standards_currency.py` use.
-Its authored hooks live in `.agents/hooks/` (shared), `.claude/hooks/` and `.codex/hooks/`;
-`plugins/concertable/hooks/` is its generated payload.
+Native role acceptance is still held on approval to copy credentials. Do not copy credentials before that gate clears. Concertable scope-isolation commit `3bcb527` remains unpushed on `Concertable/agents` branch `Fix/PluginScopeIsolation`; keep it separate from this core work. Core's machine-verifier continuation is implemented, but it does not establish native or consumer acceptance. The stale-snapshot diagnosis was fixed independently in PR #73; do not report old PR #60 as still open without checking.
 
-**Finding: the harness is already in core; phase 1 retires Concertable's duplicates.** Core's
-`engineering` plugin ships and wires the skill router, every delivery gate and the ten lane/workflow
-agents for both hosts. With `concertable` also enabled, each gate runs twice. **The copies have
-diverged in both directions since 2026-09-20**, so a duplicate is deleted from concertable only
-after its Concertable-ahead changes are ported into core; otherwise those fixes are lost. Beyond
-that, only generic pieces core lacks move.
-
-### Already in core — converge, core becomes the only copy
-
-| Hook | State vs core | Action |
-|---|---|---|
-| `compact_output_gate`, `forge_poll_gate`, `git_auth_scope_gate`, `plan_handoff_stop`, `plan_handoff_stop_launcher`, `worktree_cleanup_gate` | identical | none in core; concertable drops its copy |
-| `hook_runtime` | concertable ahead: `run_command`, `NETWORK_COMMAND_TIMEOUT_SECONDS` | port into core |
-| `merge_review_gate`, `red_run_gate`, `delivery_binding_gate`, `persistent_workflow_merge_gate` | concertable ahead: `gh`/`git` calls through `run_command` with timeouts; `red_run_gate` lists `invocable_name` | port into core |
-| `skill_router` | both ahead. Concertable: `invocable_name`, `_mask_quoted`, `_readable_skill`, `announce_drift`, `currency_failure`. Core: `skill_aliases`, `deleted_targets`, `unresolved_existing_deny_hits` | three-way merge in core |
-| `plan_graph` | concertable's copy imports `prelaunch_conventions` (product policy); core's is generic | keep core |
-| `docs_reachability` | core newer | keep core |
-
-Tests follow their hook: identical tests need nothing; `test_hook_runtime`,
-`test_delivery_bind_paths` and `test_standing_authorization` are generic and missing from core;
-diverged tests (`test_skill_router`, `test_red_run_gate`, `test_merge_review_gate`,
-`test_delivery_binding_gate`, `test_lane_tables`, `test_workflow_*`, `test_goal_preflight`,
-`test_plan_graph`, `test_docs_reachability`, `lane_expectations` fixture) merge with their hook.
-
-### Generic, not in core — deferred to phase 3, stays in Concertable until then
-
-| Hook | Role | Note |
-|---|---|---|
-| `standards_currency` (+ test) | SessionStart currency check; also used by the router's `currency_failure` | hard-codes `Concertable/agents` manifest URL; key it to the owning marketplace's repository |
-| `standards_enforcement_gate` (+ test) | commit/push/PR boundary gate driven by route `enforcement` rules | mechanism is generic; rules stay in each repository's routes |
-| `.claude/hooks/claude_marketplace_refresh` (+ `test_claude_marketplace_refresh`, `test_claude_settings_path`) | Claude SessionStart `plugin marketplace update` for managed plugins | reads the machine install roster; phase 2 replaces that input with the repository's declared plugins, phase 3 extends it into self-heal |
-
-### Not moved
-
-| Hook | Classification | Reason |
-|---|---|---|
-| `always_on_instructions`, `dev_rules` (+ tests) | Concertable-specific content | injects `standards/process/ALWAYS_ON_INSTRUCTIONS.md` and the product rule catalogue; core's `session-guidance` SessionStart already covers the generic injection mechanism |
-| `prelaunch_conventions` | Concertable-specific | product pre-launch policy used by concertable's `plan_graph` and route generator |
-| `ci_change_classifier` (+ test) | Concertable-specific | concertable's own CI helper; not wired as a hook |
-| `.claude/hooks/claude_marketplace_autoupdate` | retire | writes user-scope `extraKnownMarketplaces` in `~/.claude/settings.json`, which the plan's rule forbids; generated repository settings (phase 2) replace it |
-| `.codex/hooks/codex_delivery` (+ test) | generic, deferred | installs Codex agents into `~/.codex/agents`; core already has `install-workflow-agents.ps1`. Decide in phase 2 with the open Codex-agents question |
-| `test_hook_manifests`, `test_gen_skill_routes`, `test_capability_selection` | Concertable-specific | test concertable's own manifests, route generator and capability selection |
-| `test_plugin_pruning` | generic, check | compare with core's `prune_plugin_cache` coverage before moving |
-
-### Agents and skills in `plugins/concertable`
-
-| Item | State vs core `engineering` | Action |
-|---|---|---|
-| `agents/*.md` (10) | duplicates. Concertable ahead: rung-specific `description`s (L1 "Irreversible work…", L5 "Clerical work…") and `kind`. Core ahead: `tools` | port descriptions and `kind` into core's authored agent source, then retire |
-| `codex-agents/*.toml` (10) | duplicates. Same descriptions; core ahead with `sandbox_mode` | port descriptions, then retire |
-| `skills/persistent-workflow` (+ `codex-skills`) | duplicate of `engineering:persistent-workflow`; core is the newer canonical form | retire |
-| `skills/always-on-instructions`, `skills/reset-test-explorer`, and every other skill | Concertable-product or .NET/React stack contracts | stay |
-
-### Additional authored-source audit (2026-09-26)
-
-The shared lanes and workflow contract/runtime/role/fixture blobs match this core branch.
-Core is ahead on other workflow files; Concertable's explicit UTF-8 decoding was ported with
-a non-ASCII test. Its `kind: lens` differs from core's `kind: review`. Its Codex project-agent
-installer differs from core's profile delivery; phase 2 must settle repository-owned delivery.
-
-| Source | Classification | Action |
-|---|---|---|
-| `.agents/plugins/marketplace.json`, `payloads.json`, `install-roster.json`, `install-helpers.ps1` | Concertable product marketplace and its local installer | keep marketplace payload; retire local roster/install behavior after repo config adoption |
-| `scripts/provision-agents.ps1`, `provision-project-capabilities.ps1`, `start-concertable-agent.ps1` | product provisioning and host launch built around local capability state | replace with core generator/bootstrap and repository declarations in phase 2; do not copy to core |
-| `scripts/docker-health.ps1` | Concertable product test infrastructure | keep with Concertable |
-| `scripts/worktrees.ps1`, `delivery-continuation.ps1` | generic mechanisms coupled to Concertable delivery policy | compare against core's worktree and workflow delivery utilities before retirement; not a hook duplicate |
-| `.claude/.codex` hook wiring and agents | generated/product adapters containing the duplicate shared hooks and ten agents already inventoried | retire shared entries only after core is enabled in the project; keep product hooks |
-| `standards/process`, `standards/rules`, `standards/dotnet`, `standards/react`, `.agents/skills` | Concertable product and stack contracts | keep product rules; compare named .NET/React skills against scope repos during consumer adoption |
-| `.agents/routes`, profile, enforcement and standards manifest | Concertable repository policy | migrate its capability selection to repo-declared config; never move its rules into core |
-
-The shared-name `.agents/skills` in Concertable and `tj-agents/dotnet`/`react` have no
-byte-identical source files; names alone are insufficient evidence for deletion. They require
-behavioral comparison when the Concertable consumer is migrated.
+The update-channel decision remains unresolved: immutable release pins do not advance on pushes; automatic review rejected changing generated refs to moving `main` because that would run unreviewed executable code. Keep the approved release-pinned behavior until an update channel is accepted. Native Claude/Codex acceptance, including live-session refresh safety, remains pending.
 
 ## Next Steps
 
-**Goal: every capability has exactly one copy.** Remove all duplication between `Concertable/agents`
-and the tj-agents repositories (`core`, `dotnet`, `react`). Concertable keeps only
-Concertable-product content; core contains no Concertable reference in code, names, URLs or wording
-(user decision, 2026-09-23). The currency gate, enforcement gate and marketplace refresh are **not**
-moved into core; phase 3 rebuilds currency as self-heal.
+Reconcile exact producer releases/catalogs and existing consumer state before the first `winwrap`/`sandbox-hwid` adoption batch. Confirm each producer's release identity, harness record and host requirements, then compare those with both consumers' current declarations and generated settings. Resolve producer/native acceptance gates before implementation. Do not claim consumer migration complete from core-side generation or verifier results.
 
 Scope: whole plan: core-owned generic harness and repo-declared configuration for every consumer and machine.
-Current slice: Claude pre-load standards refresh (`Fix/ClaudeStandardsSync`).
-Adopt owner catalogs and generated settings in winwrap and sandbox-hwid before tagging a release with
-the core-only bundled catalog; main-tracking installs already carry it since PR #48.
-Remaining scope: consumer config, self-heal, live-update safety, machine verifier, and adoption everywhere.
-Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no
-machine-local behavioural state on each machine.
+Current slice: reconcile producer releases/catalogs and existing `winwrap`/`sandbox-hwid` consumer state before the first adoption batch.
+Remaining scope: producer records, consumer config, self-heal, live-update safety, machine verifier acceptance, and adoption in every consumer and machine.
+Done when: both hosts pass the plan's acceptance checks in every consumer and the verifier reports no machine-local behavioural state on each machine.
 
-Completed on this branch: shared hook timeouts and Windows no-console launches; quote-aware and
-foreign-path-safe router writes; explicit moved-skill aliases; red-run invocation names; lane metadata;
-UTF-8 workflow output; and the first lock-to-host-config generator. The Concertable authored-source
-inventory above distinguishes generic duplicates from product content. The merged hook suite passed
-625 tests with 8 skips; package sync, plan graph, and committed-head catalog checks passed. The
-repository suite's Windows shell test passed on focused rerun after sandbox denial and one transient
-PowerShell startup timeout.
+1. Verify the selected producers' exact releases, owner catalogs, harness manifests and native acceptance; preserve the credential-copy hold.
+2. Reconcile `winwrap` and `sandbox-hwid` state; adopt owner catalogs, generated settings and drift checks only after producer/native gates clear. Prove the Claude launcher allow rule in a trusted auto-mode session and record any host limitation.
+3. In a fresh `Concertable/agents` worktree from `origin/main`, select released `base`, `engineering`, and `machine@base-agents` beside `concertable`; then retire only verified shared duplicates while preserving product rules, hooks and stack contracts. Compare shared-name .NET/React skills behaviorally before deletion.
+4. Add repository-owned repair and live-session cache safety; adopt every remaining consumer and machine, remove obsolete user-scope behavioral state only after host acceptance, and rerun the verifier until all plan acceptance criteria pass.
 
-The core branch now has three authored harness manifests, a source-digest and hook-wiring
-validator, catalog/package harness copies, composed Claude permissions and Codex rules, a consumer
-catalog lookup beside the lock, and no hard-coded non-core marketplace roster in runtime source.
-The core catalog contains only `base-agents`; each other standards owner must publish and check its
-own release records. Focused validation: 31 bootstrap integration tests, 6 config tests, 4 harness
-tests, 16 source-layout tests and the Windows shell hook regression passed. The 632-test shared
-runtime suite had one failure because its fixture copied the catalog before the final digest refresh;
-that exact workflow-generation test passed when rerun against the refreshed catalog. The other
-631 completed without failure (8 skipped). PR #48's first exact-head CI found that the new source
-digest varied between LF and CRLF checkouts; it now normalizes text line endings. Its next CI
-found a Windows 8.3 temp-path alias in the new digest tests; the walker now resolves its root.
-Both have regression tests; local drift checks pass. Review, push, and CI remain.
+## Completed work
 
-1. Done: PR #48 merged the core-only catalog and harness slice. Do not tag a release with it until the
-   first consumers have committed their own composed catalogs.
-2. Add owner-authored release and harness records in each selected standards repository, then adopt
-   the generator and manifests in winwrap and sandbox-hwid first. Commit generated
-   Claude/Codex config plus consumer drift checks, and prove the Claude launcher allow rule in a
-   real trusted auto-mode session; record any host limitation honestly.
-3. In a fresh `Concertable/agents` worktree from `origin/main`, select the released `base`,
-   `engineering`, and `machine@base-agents` alongside `concertable` in project settings. Then remove
-   its duplicated hooks, ten agents in both host forms, and `persistent-workflow` skill. Preserve
-   product-only rules, hooks, and stack contracts. Compare its generic worktree and delivery scripts
-   with core utilities before retiring them. Verify each host loads one copy of every shared gate,
-   lane, and skill.
-4. Add the repository-owned repair path for missing or stale skills. Keep plugin refresh
-   safe for a live session, including stale hook paths and invisible Windows child processes.
-   Claude's pre-load refresh and 14-day orphan window are delivered by `Fix/ClaudeStandardsSync`;
-   Codex's equivalent is owned by `Fix/CodexStandardsSync`.
-5. Adopt the other consumers named in the plan. After each host passes,
-   remove obsolete user-scope behavioral entries on this PC, run the machine verifier, and record
-   acceptance. Repeat the same procedure on every other machine until the plan closes.
+- Phase 1/core harness: PR #48 merged core-only catalog and generic harness; Codex hook snapshots #59; Claude pre-load refresh and plugin-owned typed launcher merged in #61/#63 with live PowerShell acceptance. These releases do not complete consumer adoption.
+- Phase 2/core generator: lock-to-host-config generator, three authored harness manifests, owner-catalog validation, source/wiring checks, composed host permissions, and consumer drift support are present on the current branch. Source-owned manifests and policy scope remain authoritative; core must not own other standards repositories' release rosters.
+- Machine verifier: parsed TOML, named profiles, hidden loose files, repository-local sources, redacted findings and read-only CLI were added in the 2026-09-29 continuation. This verifies inventory only; machine cleanup and native acceptance remain open.
+- Dated source inventory (2026-09-23 to 2026-09-26; source was `Concertable/agent-standards` at `eae6cc6`, now `Concertable/agents`):
+
+| Inventory | Recorded evidence and disposition |
+|---|---|
+| Shared hooks already in core | Identical: `compact_output_gate`, `forge_poll_gate`, `git_auth_scope_gate`, `plan_handoff_stop`, `plan_handoff_stop_launcher`, `worktree_cleanup_gate`; retain core copies. Port Concertable advances in `hook_runtime` (`run_command`, timeout), `merge_review_gate`, `red_run_gate` (`invocable_name`), `delivery_binding_gate`, `persistent_workflow_merge_gate`; three-way merge `skill_router` (Concertable: `invocable_name`, `_mask_quoted`, `_readable_skill`, `announce_drift`, `currency_failure`; core: `skill_aliases`, `deleted_targets`, `unresolved_existing_deny_hits`). Keep core `plan_graph` and `docs_reachability`.
+| Associated tests | Generic missing tests: `test_hook_runtime`, `test_delivery_bind_paths`, `test_standing_authorization`. Merge diverged `test_skill_router`, `test_red_run_gate`, `test_merge_review_gate`, `test_delivery_binding_gate`, `test_lane_tables`, `test_workflow_*`, `test_goal_preflight`, `test_plan_graph`, `test_docs_reachability`, and `lane_expectations` fixture with their hooks.
+| Generic, deferred to phase 3 | `standards_currency` (+ test; URL is Concertable-specific and must key off owning marketplace); `standards_enforcement_gate` (+ test; mechanism generic, rules remain consumer-owned); Claude `claude_marketplace_refresh` and settings tests (replace machine roster in phase 2, extend to self-heal in phase 3).
+| Not moved / retire | Concertable-specific `always_on_instructions`, `dev_rules`, `prelaunch_conventions`, `ci_change_classifier` and their product tests stay. Retire `claude_marketplace_autoupdate` (writes forbidden user-scope marketplace state). Compare `codex_delivery` (+ test) with core agent delivery; compare `test_plugin_pruning` with core cache-pruning coverage. `test_hook_manifests`, `test_gen_skill_routes`, `test_capability_selection` remain Concertable-specific.
+| Plugin agents and skills | Ten `agents/*.md` and ten `codex-agents/*.toml` duplicate core lanes; port rung descriptions and `kind` while retaining core `tools`/`sandbox_mode`, then retire. Retire duplicate `persistent-workflow`; keep product and .NET/React skills.
+| Additional authored sources | Keep Concertable marketplace payload; retire local roster/install behavior after adoption. Replace product provisioning/launch scripts with declarations and core bootstrap, not copies in core. Keep Docker test infrastructure. Compare generic worktree/delivery scripts before retirement. Retire only shared generated hook/agent entries after core is enabled; keep product hooks/rules, stack contracts and repository policy in Concertable. Shared-name .NET/React skills are not byte-identical and require behavioral comparison.
+
+## Verification
+
+No current adoption verification. Historical core-candidate checks only: shared runtime suite 632 tests had one fixture-order failure; the workflow-generation test passed after catalog digest refresh, with 631 others passing and 8 skipped. Focused bootstrap/config/harness/source-layout and Windows shell checks were recorded passing. Exact-head CI found LF/CRLF source-digest variation and a Windows 8.3 temp-path alias; both received regression fixes. PR #73 independently fixed stale-snapshot diagnosis. These results do not prove current consumer or installed-host acceptance.
+
+## Reviews
+
+Current review state unknown; no reviewed-up-to watermark recorded for this adoption.
+
+## Decisions, discoveries, blockers, and deviations
+
+- Whole-plan implementation and normal per-repository merge delivery were authorized 2026-09-27. Repository-layout work has its separate current user authorization; see the linked proposal dependency.
+- Each standards owner publishes its own release identity, source, digest and harness requirements. Consumers compose selected owner records; core must not synchronize a roster of other standards repositories.
+- Phase 2 for `winwrap` and `sandbox-hwid` has priority. It does not waive producer release/catalog reconciliation or native acceptance.
+- Native credential copying remains gated. The old `base-agents` checkout and unpushed Concertable scope-isolation work must be preserved until their owners resolve them.
+- Keep immutable release pins pending an approved update channel. A marketplace cache refresh alone does not prove next-session cross-PC currency or live-session safety.
+- Concertable removal requires project-scope enablement first; its product hooks import product policy and its generator emits shared agents. Preserve product-only rules/hooks and compare stack skills before removal.
