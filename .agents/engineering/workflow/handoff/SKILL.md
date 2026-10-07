@@ -148,14 +148,17 @@ distinct transfer, reconcile the completed attempt and its current owner before 
    side-workstream writer lease, retain the original task's writer lease, and continue the original task.
    On failure, retain both task records and continue only work independent of the unlaunched side task.
 
-For a transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted,
-put that exact operation and its final filesystem verification in the successor's `## Next Steps`. The
-predecessor must not perform the operation after launch: it ends repository-scoped activity. No tool lets it
-end its own host process or close its own window, so releasing the host session is a human action; the
-successor's `## Next Steps` must name that release as a gate (who closes or redirects the predecessor's
-window) before the operation. The successor waits until that gate clears, then performs the operation from
-the target checkout and treats a command error or residual path as incomplete rather than accepting partial
-Git cleanup.
+This transfer is the fallback when the owner cannot run `engineering:merge` Step 5's `finish` itself; for a
+transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted, put that
+exact operation and its final filesystem verification in the successor's `## Next Steps`. The
+predecessor must not perform the operation after launch: it ends repository-scoped activity and emits a
+recorded release marker. Without `finish` it cannot end its own host process or close its own window, so the
+successor's `## Next Steps` must gate the operation on that marker, then close the predecessor itself with
+`machine:peer-cli`: resolve the registry entry whose `cwd` is the target checkout (and the recorded session
+id or tab title when the goal names one); `close` verifies the recorded host pid and start time against the
+live process, `close-tab.ps1` takes the tab, and an unverifiable entry stays open with the user named as
+resolver. The successor then performs the operation from the target checkout and treats a command error or
+residual path as incomplete rather than accepting partial Git cleanup.
 
 If discovery cannot resolve the launcher, report the missing capability and required selection. Continue
 independent authorized work where possible. Never claim transfer occurred or silently substitute a
