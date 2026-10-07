@@ -12,6 +12,7 @@ import sys
 import time
 import uuid
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from delivery_runtime import BINDING_FILE, PersistentDeliveryRouter, binding_from_artifact, DeliveryContractViolation
 from workflow_ops import atomic_json, parse_status_checks, repository_slug
@@ -376,7 +377,7 @@ def launch(path, state, binding, evidence, executable):
         "CONTINUATION_RESULT_PATH": str(result), "CONTINUATION_NONCE": nonce,
         "CONTINUATION_OWNER_ID": state["owner_id"]}})
     with (path.parent / f"launch-{nonce}.log").open("wb") as output:
-        process = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_child",
+        process = subprocess.Popen([sys.executable, "-B", str(Path(__file__).resolve()), "_child",
                                     "--owner", str(path), "--payload", str(payload_path)],
                                    stdout=output, stderr=output,
                                    start_new_session=os.name != "nt")
