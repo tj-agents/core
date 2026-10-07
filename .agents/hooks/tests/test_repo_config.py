@@ -342,6 +342,32 @@ class RepoConfigTests(unittest.TestCase):
             repo_config.plan(self.lock, CATALOG, root=self.root, scope="local", prospective_paths=[prospective])
         self.assertFalse((self.root / ".claude").exists())
 
+    def test_untracked_bracket_output_does_not_match_different_indexed_path(self):
+        self.git("init", "--quiet")
+        tracked = self.root / ".agents/catalog/catalog.json"
+        tracked.parent.mkdir()
+        tracked.write_text("tracked", encoding="utf-8")
+        self.git("add", tracked.relative_to(self.root).as_posix())
+        prospective = tracked.with_name("catalo[g].json")
+        targets = repo_config.plan(self.lock, CATALOG, root=self.root, scope="local", prospective_paths=[prospective])
+        repo_config.write_batch({path: expected for path, expected in targets.items() if repo_config.text_at(path) != expected})
+        self.assertEqual("tracked", tracked.read_text(encoding="utf-8"))
+        self.assertFalse(prospective.exists())
+        self.assertTrue((self.root / ".claude/settings.local.json").is_file())
+        self.assertTrue((self.root / repo_config.LOCAL_STATE).is_file())
+
+    def test_exact_indexed_bracket_output_is_rejected_without_writes(self):
+        self.git("init", "--quiet")
+        prospective = self.root / ".agents/catalog/catalo[g].json"
+        prospective.parent.mkdir()
+        prospective.write_text("tracked", encoding="utf-8")
+        self.git("--literal-pathspecs", "add", prospective.relative_to(self.root).as_posix())
+        before = self.snapshot_files()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, r"tracked.*catalo\[g\]\.json"):
+            targets = repo_config.plan(self.lock, CATALOG, root=self.root, scope="local", prospective_paths=[prospective])
+            repo_config.write_batch({path: expected for path, expected in targets.items() if repo_config.text_at(path) != expected})
+        self.assertEqual(before, self.snapshot_files())
+
     def test_escaping_link_with_missing_leaf_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             outside = Path(temporary).resolve()
