@@ -27,7 +27,7 @@ def git(checkout: Path, arguments: list[str], data: bytes | None = None) -> byte
     environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     environment["GIT_NO_LAZY_FETCH"] = "1"
     result = subprocess.run(
-        ["git", "-C", str(checkout), *arguments], input=data,
+        ["git", "--no-lazy-fetch", "-C", str(checkout), *arguments], input=data,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, check=False,
     )
     if result.returncode:
