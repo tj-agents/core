@@ -38,6 +38,12 @@ shipping a tier the gate cannot see or conventions a review cannot find.
 
 Version 3 uses one positive predicate instead of the legacy matcher arrays. `all` and `any`
 compose predicates; `file`, `glob`, `content`, and `remote` keep the repository detection above.
+`remote_host` compares an exact origin hostname case-insensitively, normalizing a final DNS dot. It
+accepts HTTP(S), SSH and Git URLs and `user@host:path` SCP origins. Local paths, `file:` origins,
+malformed origins and missing or unreadable origins do not match. Hostnames are literal DNS names;
+URLs, ports, patterns and wildcards are invalid predicate values. Combine host and owner matching
+with `all` when an organisation must be bound to its Git host; `remote` retains its legacy
+owner/name behavior without a host restriction.
 `fact` requires scoped evidence and `context` compares a scoped string (`equals`) or list of
 strings (`contains`). Unknown facts, missing contexts and malformed branches produce diagnostics
 and prevent selection, including inside an otherwise matching `any`.
@@ -49,7 +55,7 @@ An employer plugin declares a gated tier and the slug of its own shipped context
   "schema_version": 3,
   "tier": "example-employer",
   "applies": "stack-present",
-  "detect": {"remote": "^example-company/"},
+  "detect": {"all": [{"remote_host": "git.example.test"}, {"remote": "^example-company/"}]},
   "employer": {"context_skill": "communication-context"}
 }
 ```
