@@ -693,6 +693,84 @@ class ReviewTests(RepositoryFixture):
         self.assertTrue(result["review_required"])
         self.assertIn("candidate-head-changed", result["reasons"])
 
+    def incremental_descriptor(self):
+        watermark = self.head
+        self.commit("src/mapping.txt", "incremental candidate\n", "incremental candidate")
+        return ops.review_prepare(self.root, "run-1", watermark, "HEAD", False)
+
+    def advance_trunk(self, path, text):
+        self.git("switch", "-q", "main")
+        moved = self.commit(path, text, "upstream change")
+        self.git("update-ref", "refs/remotes/origin/main", moved)
+        self.git("switch", "-q", "Feature/Workflow-ops")
+
+    def test_incremental_review_with_unchanged_trunk_preserves_review(self):
+        descriptor = self.incremental_descriptor()
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertFalse(result["review_required"])
+        self.assertFalse(result["base_moved"])
+        self.assertTrue(result["exact_head"])
+
+    def test_incremental_review_with_disjoint_trunk_movement_preserves_delivery(self):
+        descriptor = self.incremental_descriptor()
+        self.advance_trunk("src/unrelated.txt", "upstream\n")
+        with mock.patch.object(ops, "delivery_owner", return_value={"action": "create"}):
+            result = ops.delivery_preflight(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertTrue(result["review"]["base_moved"])
+        self.assertFalse(result["review"]["review_required"])
+        self.assertTrue(result["ready"])
+
+    def test_incremental_review_with_relevant_trunk_movement_requires_review(self):
+        descriptor = self.incremental_descriptor()
+        self.advance_trunk("src/mapping.txt", "upstream\n")
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+        self.assertTrue(result["base_moved"])
+
+    def test_incremental_review_with_routed_rule_movement_requires_review(self):
+        self.commit(".agents/skill-routes.json", json.dumps({
+            "routes": [{"path": "^src/", "skills": ["feature"]}]
+        }), "route source review")
+        descriptor = self.incremental_descriptor()
+        self.advance_trunk(".agents/skills/feature/SKILL.md", "# Updated rule\n")
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+
+    def test_incremental_review_with_candidate_movement_requires_review(self):
+        descriptor = self.incremental_descriptor()
+        self.commit("src/later.txt", "later\n", "later candidate")
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertEqual(["candidate-head-changed"], result["reasons"])
+        self.assertFalse(result["exact_head"])
+
+    def test_incremental_review_without_recorded_trunk_base_remains_conservative(self):
+        with mock.patch.object(ops, "trunk_range", return_value=(None, [])):
+            descriptor = self.incremental_descriptor()
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+
+    def test_incremental_review_with_nonancestral_trunk_base_remains_conservative(self):
+        tree = self.git("rev-parse", f"{self.base}^{{tree}}")
+        unrelated = self.git("commit-tree", tree, "-m", "unrelated history")
+        with mock.patch.object(ops, "trunk_range", return_value=(unrelated, [])):
+            descriptor = self.incremental_descriptor()
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+
+    def test_full_review_with_relevant_trunk_movement_requires_review(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        self.advance_trunk("src/mapping.txt", "upstream\n")
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertEqual(["base-changed-relevant-evidence"], result["reasons"])
+
+    def test_stack_review_uses_its_recorded_parent_base(self):
+        parent = self.head
+        self.commit("src/child.txt", "child\n", "stack child")
+        descriptor = ops.review_prepare(self.root, "run-1", parent, "HEAD", False)
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], parent)
+        self.assertFalse(result["base_moved"])
+        self.assertFalse(result["review_required"])
+
     def test_delivery_preflight_preserves_review_after_unrelated_base_movement(self):
         descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
         tree = self.git("rev-parse", f"{self.base}^{{tree}}")
