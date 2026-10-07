@@ -3,6 +3,9 @@
 import importlib.util
 import json
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -11,6 +14,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sync_harness_manifests.py")
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
+
+PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts"
+sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
+import harness_permissions  # noqa: E402
+
+INSTRUCTED_SCRIPTS = {"engineering": "cleanup_proof.py", "machine": "finish.ps1"}
+HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
 
 
 class HarnessManifestTests(unittest.TestCase):
@@ -66,6 +76,76 @@ class HarnessManifestTests(unittest.TestCase):
         requires["marketplaces"][0]["repository"] = "another-org/core"
         with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+
+
+class HarnessPermissionCoverageTests(unittest.TestCase):
+    PLUGIN_ROOT = r"C:\scratch\base-agents-root"
+
+    def rendered(self, plugin):
+        manifest = json.loads((ROOT / f".agents/plugins/harness/{plugin}.json").read_text(encoding="utf-8"))
+        return harness_permissions.render_permissions(manifest["requires"]["permissions"], self.PLUGIN_ROOT)
+
+    def test_every_instructed_command_is_declared_for_both_hosts(self):
+        for plugin, script in INSTRUCTED_SCRIPTS.items():
+            with self.subTest(plugin=plugin):
+                claude_allow, codex_rules = self.rendered(plugin)
+                matching = [entry for entry in claude_allow if script in entry]
+                self.assertTrue(
+                    any(entry.startswith("Bash(") for entry in matching),
+                    f"{plugin}: missing a Bash( entry for {script}",
+                )
+                self.assertTrue(
+                    any(entry.startswith("PowerShell(") for entry in matching),
+                    f"{plugin}: missing a PowerShell( entry for {script}",
+                )
+                matching_rules = [rule for rule in codex_rules if script in json.dumps(rule)]
+                self.assertEqual(1, len(matching_rules), f"{plugin}: expected exactly one Codex rule for {script}")
+
+    def test_host_entry_and_vendored_script_paths_are_both_declared(self):
+        for plugin, script in INSTRUCTED_SCRIPTS.items():
+            skill = HOST_ENTRY_SKILLS[plugin]
+            with self.subTest(plugin=plugin):
+                claude_allow, codex_rules = self.rendered(plugin)
+                matching = [entry.replace("\\", "/") for entry in claude_allow if script in entry]
+                self.assertTrue(
+                    any("/.agents/" in entry for entry in matching),
+                    f"{plugin}: missing the vendored .agents/ path for {script}",
+                )
+                self.assertTrue(
+                    any(f"/skills/{skill}/scripts/{script}" in entry for entry in matching),
+                    f"{plugin}: missing the host-entry skills/ path for {script}",
+                )
+                rules_text = json.dumps(
+                    [rule for rule in codex_rules if script in json.dumps(rule)]
+                ).replace("\\\\", "/")
+                self.assertIn(".agents/", rules_text, f"{plugin}: missing the vendored .agents/ Codex path")
+                self.assertIn(
+                    f"codex-skills/{skill}/scripts/{script}", rules_text,
+                    f"{plugin}: missing the host-entry codex-skills/ Codex path",
+                )
+
+    def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
+        codex = shutil.which("codex")
+        if not codex:
+            self.skipTest("codex CLI not on PATH")
+        rules = []
+        checks = []
+        for plugin in INSTRUCTED_SCRIPTS:
+            _, codex_rules = self.rendered(plugin)
+            rules += codex_rules
+            checks.extend((plugin, rule["match"][0]) for rule in codex_rules)
+        with tempfile.TemporaryDirectory() as raw:
+            rules_path = Path(raw) / "base-agents.rules"
+            rules_path.write_text("\n".join(harness_permissions.codex_rule_lines(rules)), encoding="utf-8")
+            for plugin, tokens in checks:
+                with self.subTest(plugin=plugin):
+                    result = subprocess.run(
+                        [codex, "execpolicy", "check", "--rules", str(rules_path),
+                         "--resolve-host-executables", "--", *tokens],
+                        capture_output=True, text=True,
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertIn('"decision":"allow"', result.stdout.replace(" ", ""))
 
 
 if __name__ == "__main__":

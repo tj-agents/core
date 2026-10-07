@@ -1,12 +1,17 @@
-"""SessionStart hook: record this session's id, tab title, directory and pid.
+"""SessionStart hook: record this session's id, tab title, directory and host pid.
 
 The launchers export `AGENT_CLI_TAB_TITLE` when they open a tab (`agent_cli.py`'s `launch_tab`); a
 session started by hand exports nothing and records a null title. `peer-cli.ps1` reads these entries to
 resolve a session from the tab title a user can see, and the reverse.
 
+Codex runs hooks through a shell, so the parent pid is a transient shell rather than the CLI. The
+recorded pid is the nearest `claude` or `codex` ancestor, with its OS start time so a reused pid is
+never mistaken for the live host.
+
 Contract: exit 0 always. Bookkeeping must never stop a session starting.
 """
 
+import collections
 import json
 import os
 import sys
@@ -16,12 +21,245 @@ from pathlib import Path
 
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
 TITLE_ENV = "AGENT_CLI_TAB_TITLE"
+HOST_NAMES_ENV = "AGENT_CLI_HOST_NAMES"
+DEFAULT_HOST_NAMES = frozenset({"claude", "codex"})
+MAX_ANCESTOR_DEPTH = 10
+
+FILETIME_EPOCH_DELTA = 11644473600
+FILETIME_TICKS_PER_SECOND = 10_000_000
+
+ProcessInfo = collections.namedtuple("ProcessInfo", "pid ppid name started_at")
 
 
 def state_directory():
     override = os.environ.get(STATE_DIRECTORY_ENV)
     root = Path(override) if override else Path.home() / ".agents-state"
     return root / "cli-sessions"
+
+
+def read_host_names():
+    override = os.environ.get(HOST_NAMES_ENV)
+    if not override:
+        return DEFAULT_HOST_NAMES
+    names = {part.strip().casefold() for part in override.split(",") if part.strip()}
+    return frozenset(names) if names else DEFAULT_HOST_NAMES
+
+
+def stem(name):
+    if not name:
+        return ""
+    return Path(str(name)).stem.casefold()
+
+
+def resolve_host_pid(start_pid, lookup, host_names, depth_cap=MAX_ANCESTOR_DEPTH):
+    current = start_pid
+    seen = set()
+    for _ in range(depth_cap):
+        if current is None or current in seen:
+            return None
+        seen.add(current)
+        info = lookup(current)
+        if info is None:
+            return None
+        if stem(info.name) in host_names:
+            return info
+        current = info.ppid
+    return None
+
+
+def resolve_recorded_pid(ppid, lookup=None, host_names=None, depth_cap=MAX_ANCESTOR_DEPTH):
+    if host_names is None:
+        host_names = read_host_names()
+    if lookup is None:
+        try:
+            lookup = build_process_lookup()
+        except Exception:
+            lookup = None
+
+    match = None
+    if lookup is not None:
+        try:
+            match = resolve_host_pid(ppid, lookup, host_names, depth_cap)
+        except Exception:
+            match = None
+    if match is not None:
+        return match.pid, stem(match.name), match.started_at
+
+    started = None
+    if lookup is not None:
+        try:
+            info = lookup(ppid)
+            if info is not None:
+                started = info.started_at
+        except Exception:
+            started = None
+    return ppid, None, started
+
+
+def _windows_process_table():
+    import ctypes
+    from ctypes import wintypes
+
+    MAX_PATH = 260
+    TH32CS_SNAPPROCESS = 0x00000002
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    INVALID_HANDLE_VALUE = -1
+
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", ctypes.c_wchar * MAX_PATH),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.c_void_p]
+    kernel32.Process32FirstW.restype = wintypes.BOOL
+    kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.c_void_p]
+    kernel32.Process32NextW.restype = wintypes.BOOL
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.GetProcessTimes.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    ]
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+
+    def started_at(pid):
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return None
+        try:
+            creation, exited, kernel, user = (wintypes.FILETIME() for _ in range(4))
+            if not kernel32.GetProcessTimes(
+                handle, ctypes.byref(creation), ctypes.byref(exited),
+                ctypes.byref(kernel), ctypes.byref(user),
+            ):
+                return None
+            ticks = (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+            if not ticks:
+                return None
+            return ticks / FILETIME_TICKS_PER_SECOND - FILETIME_EPOCH_DELTA
+        finally:
+            kernel32.CloseHandle(handle)
+
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snapshot in (None, 0) or ctypes.c_ssize_t(snapshot).value == INVALID_HANDLE_VALUE:
+        raise OSError(ctypes.get_last_error(), "cannot snapshot the process table")
+    entry = PROCESSENTRY32W()
+    entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+    table = {}
+    try:
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+            return table
+        while True:
+            pid = int(entry.th32ProcessID)
+            table[pid] = ProcessInfo(
+                pid=pid,
+                ppid=int(entry.th32ParentProcessID),
+                name=str(entry.szExeFile),
+                started_at=started_at(pid),
+            )
+            if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                break
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return table
+
+
+def _linux_boot_time():
+    with open("/proc/stat", encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("btime"):
+                return float(line.split()[1])
+    raise OSError("btime not found in /proc/stat")
+
+
+def _linux_clock_ticks():
+    try:
+        return os.sysconf("SC_CLK_TCK")
+    except (ValueError, OSError, AttributeError):
+        return 100
+
+
+def _linux_lookup(pid):
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        name_start = raw.index("(")
+        name_end = raw.rindex(")")
+    except ValueError:
+        return None
+    name = raw[name_start + 1:name_end]
+    fields = raw[name_end + 2:].split()
+    try:
+        ppid = int(fields[1])
+        starttime_ticks = int(fields[19])
+    except (IndexError, ValueError):
+        return None
+    try:
+        started_at = _linux_boot_time() + starttime_ticks / _linux_clock_ticks()
+    except OSError:
+        return None
+    return ProcessInfo(pid=pid, ppid=ppid, name=name, started_at=started_at)
+
+
+def _parse_ps_lstart(text):
+    import datetime
+
+    try:
+        return datetime.datetime.strptime(text.strip(), "%a %b %d %H:%M:%S %Y").timestamp()
+    except ValueError:
+        return None
+
+
+def _ps_lookup(pid):
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["ps", "-o", "ppid=,comm=,lstart=", "-p", str(pid)],
+            capture_output=True, text=True, timeout=2, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    line = result.stdout.strip()
+    if not line:
+        return None
+    parts = line.split(None, 2)
+    if len(parts) < 3:
+        return None
+    try:
+        ppid = int(parts[0])
+    except ValueError:
+        return None
+    return ProcessInfo(pid=pid, ppid=ppid, name=parts[1], started_at=_parse_ps_lstart(parts[2]))
+
+
+def build_process_lookup():
+    if os.name == "nt":
+        return _windows_process_table().get
+    if sys.platform == "linux":
+        return _linux_lookup
+    return _ps_lookup
 
 
 def read_payload():
@@ -36,17 +274,24 @@ def read_payload():
     return value if isinstance(value, dict) else {}
 
 
-def record(data):
+def record(data, lookup=None, host_names=None):
     session = data.get("session_id") or data.get("sessionId")
     if not session:
         return None
+    pid, host, pid_started_at = resolve_recorded_pid(
+        os.getppid(), lookup=lookup, host_names=host_names,
+    )
     entry = {
         "session_id": str(session),
         "title": os.environ.get(TITLE_ENV) or None,
         "cwd": data.get("cwd") or os.getcwd(),
-        "pid": os.getppid(),
+        "pid": pid,
         "started_at": time.time(),
     }
+    if pid_started_at is not None:
+        entry["pid_started_at"] = pid_started_at
+    if host is not None:
+        entry["host"] = host
     destination = state_directory() / f"{session}.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
