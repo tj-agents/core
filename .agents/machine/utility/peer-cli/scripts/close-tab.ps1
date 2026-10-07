@@ -28,6 +28,9 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'List')]
     [switch] $List,
 
+    [Parameter(Mandatory, ParameterSetName = 'Json')]
+    [switch] $Json,
+
     # Act on a wildcard's matches rather than only reporting them.
     [Parameter(ParameterSetName = 'Close')]
     [switch] $All,
@@ -135,6 +138,14 @@ $tabs = @(Get-TerminalTabs)
 if ($List) {
     if ($tabs.Count -eq 0) { Write-Output 'No Windows Terminal tabs found.'; return }
     $tabs | Format-Table -AutoSize Title, Live, TerminalId
+    return
+}
+
+if ($Json) {
+    $payload = @($tabs | ForEach-Object {
+        [pscustomobject]@{ title = $_.Title; live = $_.Live; terminalId = $_.TerminalId }
+    })
+    Write-Output (ConvertTo-Json -InputObject $payload -Depth 4)
     return
 }
 
