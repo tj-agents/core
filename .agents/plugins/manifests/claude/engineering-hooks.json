@@ -119,6 +119,13 @@
             "command": "python",
             "args": [
               "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "--deadline",
+              "12",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py",
+              "--prompt-context",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"
             ]
           }
