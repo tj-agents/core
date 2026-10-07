@@ -24,8 +24,8 @@ both harnesses, which is the whole point: one declaration, two resolutions.
 | **L1** | planning and design of any size — authoring a plan that takes a design position, architecture, a data model or contract, a mechanism choice; never implementation, review or delivery | the frontier family, on the ladder only for this shape of work |
 | **L2** | high-stakes judgement that designs nothing — a diagnosis of a production failure, a security or migration review | top general family, the setting above its default |
 | **L3** | open-ended judgement that designs nothing — a diagnosis with no known answer, an investigation | top general family, default setting |
-| **L4** | specified work a compiler or suite will catch — features, bugfixes, review lenses, and the review, CI and merge that deliver them | the workhorse family, high setting |
-| **L5** | mechanical work whose shape is already decided — scripted edits, docs, ledger upkeep | the workhorse family, reduced setting |
+| **L4** | specified implementation that still needs code-level judgement — features, bugfixes and review lenses whose mistakes a compiler or suite will catch | the workhorse family, high setting |
+| **L5** | mechanical work whose shape is already decided — including small file deletions or moves, config or docs cleanup, and removing or migrating `CLAUDE.local.md` once its destination or rule is decided | a cheaper family or reduced workhorse setting |
 | **L6** | bulk clerical work whose input outgrows the cheapest rung — a monitor loop, a long transcript, a big diff | the cheapest model that still holds the input |
 | **L7** | clerical work with a small input — commit, push, pull, sync, one poll | the cheapest usable model |
 
@@ -45,7 +45,8 @@ any size is that one shape.
 
 **No declaration means inherit the session's model** — not a default rung. A lane is opt-in per skill, so
 adding one is a visible, reviewable decision and no skill silently changes model because a default moved.
-L4 is what ordinary work declares; declare it explicitly rather than relying on absence.
+Declare the cheapest suitable lane explicitly rather than relying on absence: use L4 only for specified
+implementation that still needs code-level judgement, and L5 for small already-decided mechanical work.
 
 ## Choosing a rung — four questions, in this order
 
@@ -55,15 +56,17 @@ L4 is what ordinary work declares; declare it explicitly rather than relying on 
 2. **Stakes.** For work that designs nothing: how costly, and how hard to undo, is a wrong call? A
    diagnosis or review with a lot riding on it — production, security, stored data — is L2.
 3. **Ambiguity.** Is the answer known and this is typing, or is the problem open? Open is never below L3;
-   fully specified is never above L4.
-4. **Verifiability.** What catches the mistake — a compiler, a test suite, or only human judgement?
-   Compiler-caught work drops a rung; judgement-only work does not.
+   specified implementation that still needs code-level judgement is L4; small already-decided file
+   deletion or move, config or docs cleanup is L5. File count, a handoff, or a merge does not raise it.
+4. **Verifiability.** What catches the mistake — a compiler, a test suite, or only human judgement? Use
+   verification to choose the cheapest rung that still supplies the required judgement; automated checks do
+   not remove unresolved design or diagnosis.
 
 **Delivery never raises a lane.** Take the rung from the hardest judgement inside the delegated work,
 never from the operations at its end. Nearly every change ends in a merge, push, publish or release, so
 reading that as irreversibility would put almost every job on L1. Those steps are governed by the delivery
 gates — review, CI, the merge queue, release checks — never by model tier. Implementation, review and
-delivery are never above L3, and L1 is only ever planning or design.
+delivery never select L1; a high-stakes review may select L2 under the stakes question.
 
 Nothing here says "how hard does this feel". A long mechanical edit is still L5; a one-paragraph plan that
 picks a mechanism is still L1. One extra axis applies at the floor alone: clerical work is L7 only while
@@ -128,9 +131,9 @@ not a lane change.
    long transcript fails on L7 where L6 would not. The Claude table records that ceiling; the Codex one
    records `null`, meaning *unrecorded*, not unlimited.
 2. **The floor is a different kind of drop on each harness.** Claude's L7 drops to a small-window model;
-   Codex's L7 drops to the proven previous-generation family at its lowest setting, with no recorded
-   ceiling. Work that genuinely needs a big-window floor has L6, which stops the drop one family early —
-   on Claude the workhorse at its lowest setting, on Codex the small current-generation family.
+   Codex's L7 is the small family at its lowest setting, with no recorded ceiling. Work that genuinely
+   needs a big-window floor has L6, which keeps Claude on the workhorse with its full context and Codex at
+   higher effort in the small family.
 3. **A specialist model is a second axis, not a rung.** Codex's review stage names its own review-tuned
    model with a fallback — chosen for the *kind* of work, not its capability rank. Such a choice is
    declared as a `specialist` on the stage, never as its own lane, and it then owns its effort too;

@@ -53,18 +53,18 @@ user named outright. Supply neither and the CLI keeps its own configured default
 interactively launched session would.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
-lane from the prompt would quietly decide the cost of every handoff. Choose by design, stakes, ambiguity
-and verifiability, from the hardest judgement inside the delegated work — never by how
-hard the work feels, and never raised by a merge, push or publish at its end, which the delivery gates
-govern:
+lane from the prompt would quietly decide the cost of every handoff. Choose the cheapest suitable rung by
+design, stakes, ambiguity and verifiability, from the hardest judgement inside the delegated work — never
+by how hard the work feels, file count, a handoff, or a merge, push or publish at its end, which the
+delivery gates govern:
 
 | Lane | For |
 |---|---|
 | `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
 | `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
 | `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
-| `L4` | Ordinary specified work that a compiler or a test suite will catch, delivery included. |
-| `L5` | Mechanical work whose shape is already decided. |
+| `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
+| `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
 | `L7` | Clerical work with a small input and no judgement to make. |
 
