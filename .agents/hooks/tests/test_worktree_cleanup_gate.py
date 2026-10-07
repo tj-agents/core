@@ -1,34 +1,58 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[3]
 HOOK = ROOT / ".agents" / "hooks" / "worktree_cleanup_gate.py"
+sys.path.insert(0, str(HOOK.parent))
+import worktree_cleanup_gate
 
 
 class WorktreeCleanupGateTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir=ROOT)
+        self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.repo = Path(self.temp.name) / "repo"
+        self.repo = Path(self.temp.name).resolve() / "repo"
+        self.assertFalse(self.repo.is_relative_to(ROOT))
         (self.repo / ".agents").mkdir(parents=True)
 
-    def configure(self, output, exit_code=0):
-        audit = self.repo / "audit.py"
+    def git(self, repo, *args):
+        environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+        result = subprocess.run(
+            ["git", "-C", str(repo), *args], env=environment,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        return result.stdout.strip()
+
+    def initialize(self, repo):
+        repo.mkdir(parents=True, exist_ok=True)
+        self.git(repo, "init")
+
+    def configure(self, output, exit_code=0, repo=None):
+        repo = repo or self.repo
+        (repo / ".agents").mkdir(parents=True, exist_ok=True)
+        audit = repo / "audit.py"
         audit.write_text(
             f"import sys\nsys.stdout.write({output!r})\nsys.exit({exit_code})\n",
             encoding="utf-8",
         )
-        (self.repo / ".agents" / "worktree-cleanup-gate.json").write_text(
+        (repo / ".agents" / "worktree-cleanup-gate.json").write_text(
             json.dumps({"audit_command": [sys.executable, str(audit)]}), encoding="utf-8"
         )
 
-    def invoke(self, event="Stop"):
+    def invoke(self, event="Stop", cwd=None, environment=None):
+        cwd = cwd or self.repo
+        environment = environment if environment is not None else {
+            key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")
+        }
         return subprocess.run(
             [sys.executable, str(HOOK)],
             input=json.dumps(
@@ -36,12 +60,13 @@ class WorktreeCleanupGateTests(unittest.TestCase):
                     "hook_event_name": event,
                     "session_id": f"worktree-cleanup-{uuid.uuid4().hex}",
                     "turn_id": "turn-1",
-                    "cwd": str(self.repo),
+                    "cwd": str(cwd),
                 }
             ),
             capture_output=True,
             text=True,
-            cwd=self.repo,
+            cwd=cwd,
+            env=environment,
             check=False,
         )
 
@@ -80,6 +105,120 @@ class WorktreeCleanupGateTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
+
+    def test_non_git_descendant_does_not_inherit_ancestor_config(self):
+        self.configure("ORPHAN_FOLDER outside\n")
+        child = self.repo / "child"
+        child.mkdir()
+
+        result = self.invoke(cwd=child)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+
+    def test_nested_repository_does_not_inherit_outer_repository_config(self):
+        self.initialize(self.repo)
+        self.configure("ORPHAN_FOLDER outside\n")
+        nested = self.repo / "nested"
+        self.initialize(nested)
+        child = nested / "child"
+        child.mkdir()
+
+        for cwd in (nested, child):
+            with self.subTest(cwd=cwd):
+                result = self.invoke(cwd=cwd)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("", result.stdout)
+
+    def test_linked_worktree_does_not_inherit_outer_repository_config(self):
+        self.initialize(self.repo)
+        tracked = self.repo / "tracked.txt"
+        tracked.write_text("fixture", encoding="utf-8")
+        self.git(self.repo, "add", "tracked.txt")
+        self.git(self.repo, "-c", "user.name=Cleanup Gate Test", "-c",
+                 "user.email=cleanup-gate@example.invalid", "commit", "-m", "fixture")
+        self.configure("ORPHAN_FOLDER outside\n")
+        linked = self.repo / "linked"
+        self.git(self.repo, "worktree", "add", "--detach", str(linked))
+        child = linked / "child"
+        child.mkdir()
+
+        result = self.invoke(cwd=child)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+        self.configure("ORPHAN_FOLDER linked\n", repo=linked)
+        response = json.loads(self.invoke(cwd=child).stdout)
+        self.assertIn("ORPHAN_FOLDER linked", response["reason"])
+
+    def test_repository_descendant_finds_root_and_nearest_config(self):
+        self.initialize(self.repo)
+        self.configure("ORPHAN_FOLDER root\n")
+        intermediate = self.repo / "intermediate"
+        child = intermediate / "child"
+        child.mkdir(parents=True)
+
+        response = json.loads(self.invoke(cwd=child).stdout)
+        self.assertIn("ORPHAN_FOLDER root", response["reason"])
+        self.configure("ORPHAN_FOLDER nearest\n", repo=intermediate)
+        response = json.loads(self.invoke(cwd=child).stdout)
+        self.assertIn("ORPHAN_FOLDER nearest", response["reason"])
+        self.assertNotIn("ORPHAN_FOLDER root", response["reason"])
+
+    def test_inherited_repository_selectors_do_not_override_cwd(self):
+        self.initialize(self.repo)
+        self.configure("ORPHAN_FOLDER outside\n")
+        nested = self.repo / "nested"
+        self.initialize(nested)
+        child = nested / "child"
+        child.mkdir()
+        environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+        environment.update(GIT_DIR=str(self.repo / ".git"), GIT_WORK_TREE=str(self.repo))
+
+        result = self.invoke(cwd=child, environment=environment)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+        self.configure("ORPHAN_FOLDER nested\n", repo=nested)
+        response = json.loads(self.invoke(cwd=child, environment=environment).stdout)
+        self.assertIn("ORPHAN_FOLDER nested", response["reason"])
+
+    def test_direct_non_git_config_does_not_require_git_discovery(self):
+        self.configure("ORPHAN_FOLDER direct\n")
+        with mock.patch.object(worktree_cleanup_gate.subprocess, "run") as discovery:
+            self.assertEqual(self.repo / ".agents" / "worktree-cleanup-gate.json",
+                             worktree_cleanup_gate.find_config(self.repo))
+        discovery.assert_not_called()
+
+    def test_discovery_failure_does_not_inherit_ancestor_config(self):
+        self.configure("ORPHAN_FOLDER outside\n")
+        child = self.repo / "child"
+        child.mkdir()
+        for error in (OSError("git unavailable"), subprocess.TimeoutExpired("git", 10)):
+            with self.subTest(error=error), mock.patch.object(
+                worktree_cleanup_gate.subprocess, "run", side_effect=error
+            ) as discovery:
+                self.assertIsNone(worktree_cleanup_gate.find_config(child))
+                self.assertEqual(10, discovery.call_args.kwargs["timeout"])
+
+    def test_discovered_root_must_contain_cwd(self):
+        self.configure("ORPHAN_FOLDER outside\n")
+        child = self.repo / "child"
+        child.mkdir()
+        unrelated = Path(self.temp.name) / "unrelated"
+        unrelated.mkdir()
+        discovery = subprocess.CompletedProcess(["git"], 0, str(unrelated), "")
+        with mock.patch.object(worktree_cleanup_gate.subprocess, "run", return_value=discovery):
+            self.assertIsNone(worktree_cleanup_gate.find_config(child))
+
+    def test_cwd_and_root_resolution_failures_return_no_config(self):
+        for error in (OSError("unavailable"), RuntimeError("symlink loop"), ValueError("invalid path")):
+            with self.subTest(error=error), mock.patch.object(Path, "resolve", side_effect=error):
+                self.assertIsNone(worktree_cleanup_gate.find_config(self.repo))
+        discovery = subprocess.CompletedProcess(["git"], 0, str(self.repo), "")
+        with mock.patch.object(worktree_cleanup_gate.subprocess, "run", return_value=discovery), \
+                mock.patch.object(Path, "resolve", side_effect=[self.repo, OSError("root unavailable")]):
+            self.assertIsNone(worktree_cleanup_gate.find_config(self.repo))
 
 
 if __name__ == "__main__":
