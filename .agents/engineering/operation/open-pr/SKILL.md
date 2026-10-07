@@ -135,7 +135,7 @@ but `engineering:merge` must verify that its base is eligible before acting. Aft
 reconcile the child and refresh this binding so the continuation does not rely on stale topology.
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind --pr <n>
+python <workflow-ops> --root <delivery-checkout> --workflow-run-id delivery-bind-pr-<n> delivery-bind --pr <n>
 ```
 
 It resolves the repository's recorded standing merge authorization against this head and writes the binding
