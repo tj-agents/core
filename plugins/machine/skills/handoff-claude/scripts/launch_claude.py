@@ -8,10 +8,15 @@ not relied on.
 
 import argparse
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+
+
+def is_haiku_model(model):
+    return re.search(r'(^|[^a-z0-9])haiku($|[^a-z0-9])', model.lower()) is not None
 
 
 def _load_agent_cli():
@@ -62,6 +67,18 @@ def parse_args(argv, agent_cli):
             'already carries its own effort for the model it resolves.'
         )
 
+    if args.lane == 'L7':
+        raise agent_cli.LaunchError('--lane L7 is for in-session clerical work and cannot open a handoff.')
+
+    if args.model and is_haiku_model(args.model):
+        raise agent_cli.LaunchError('--model cannot select the Haiku family for a handoff.')
+
+    if not (args.frontier or args.lane or args.model):
+        raise agent_cli.LaunchError(
+            'handoff requires --lane L1-L6, --frontier, or an explicit non-Haiku --model; '
+            'the CLI default is not verified for handoff.'
+        )
+
     return args
 
 
@@ -83,6 +100,12 @@ def resolve_model(args, agent_cli):
     elif not model and args.lane:
         model, effort = agent_cli.resolve_lane_model('claude', lane=args.lane)
         tier = f'lane {args.lane} -> '
+
+    if model and model.strip().lower().split('[', 1)[0] in ('default', 'sonnet', 'opus', 'opusplan'):
+        raise agent_cli.LaunchError('handoff requires a full model ID; configurable family aliases are not verified.')
+
+    if model and is_haiku_model(model):
+        raise agent_cli.LaunchError('resolved selection cannot use the Haiku family for a handoff.')
 
     return model, effort, tier
 
