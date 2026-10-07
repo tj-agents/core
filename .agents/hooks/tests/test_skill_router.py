@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import shutil
@@ -38,6 +39,37 @@ class SkillRouterTests(unittest.TestCase):
             "kind: workflow\ndomain: process\n---\n\n# Feature\n",
             encoding="utf-8",
         )
+        self.bin = self.base / "bin"
+        self.bin.mkdir()
+        self.inventory = self.base / "inventory.json"
+        self.inventory.write_text(json.dumps({"codex": {"installed": []}, "claude": []}), encoding="utf-8")
+        self.inventory_calls = self.base / "inventory-calls.txt"
+        inventory_script = self.bin / "inventory.py"
+        inventory_script.write_text(
+            "import json, pathlib, sys\n"
+            f"inventory = json.loads(pathlib.Path({str(self.inventory)!r}).read_text(encoding='utf-8'))\n"
+            f"with pathlib.Path({str(self.inventory_calls)!r}).open('a', encoding='utf-8') as calls:\n"
+            "    calls.write(sys.argv[1] + '\\n')\n"
+            "value = inventory[sys.argv[1]]\n"
+            "if isinstance(value, dict) and '_exit' in value:\n"
+            "    sys.exit(value['_exit'])\n"
+            "print(value['_raw'] if isinstance(value, dict) and '_raw' in value else json.dumps(value))\n",
+            encoding="utf-8",
+        )
+        for harness in ("codex", "claude"):
+            if os.name == "nt":
+                launcher = self.bin / f"{harness}.cmd"
+                launcher.write_text(
+                    f'@"{sys.executable}" "{inventory_script}" {harness} %*\n', encoding="utf-8"
+                )
+            else:
+                launcher = self.bin / harness
+                launcher.write_text(
+                    f'#!{sys.executable}\nimport runpy, sys\nsys.argv.insert(1, {harness!r})\n'
+                    f'runpy.run_path({str(inventory_script)!r}, run_name="__main__")\n',
+                    encoding="utf-8",
+                )
+                launcher.chmod(0o755)
 
     def routes(self, value):
         (self.repo / ".agents" / "skill-routes.json").write_text(
@@ -52,7 +84,222 @@ class SkillRouterTests(unittest.TestCase):
         env["USERPROFILE"] = str(self.base / "home")
         env["CODEX_HOME"] = str(self.base / "home" / ".codex")
         env["CLAUDE_CONFIG_DIR"] = str(self.base / "home" / ".claude")
+        env["PATH"] = str(self.bin) + os.pathsep + env.get("PATH", "")
         return env
+
+    def load_router(self):
+        sys.path.insert(0, str(HOOKS))
+        self.addCleanup(sys.path.remove, str(HOOKS))
+        spec = importlib.util.spec_from_file_location(f"router_{uuid.uuid4().hex}", self.router)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def set_inventory(self, harness, value):
+        inventory = json.loads(self.inventory.read_text(encoding="utf-8"))
+        inventory[harness] = value
+        self.inventory.write_text(json.dumps(inventory), encoding="utf-8")
+
+    def test_native_discovery_failures_are_typed_and_cached(self):
+        cases = (
+            (None, None, "unavailable"),
+            ("codex", subprocess.TimeoutExpired("codex", 8), "timed out after 8 seconds"),
+            ("codex", OSError("launch failed"), "could not run"),
+            ("codex", subprocess.CompletedProcess([], 3, ""), "status 3"),
+            ("codex", subprocess.CompletedProcess([], 0, "{"), "invalid JSON"),
+            ("codex", subprocess.CompletedProcess([], 0, "{}"), "invalid roster"),
+            ("codex", subprocess.CompletedProcess([], 0, "[]"), "invalid roster"),
+            ("claude", subprocess.CompletedProcess([], 0, '{"installed": []}'), "invalid roster"),
+        )
+        for binary, result, expected in cases:
+            with self.subTest(expected=expected, binary=binary):
+                module = self.load_router()
+                harness = binary or "codex"
+                with patch.object(module.shutil, "which", return_value=binary) as which, patch.object(
+                    module.subprocess, "run",
+                    side_effect=result if isinstance(result, Exception) else None,
+                    return_value=result,
+                ) as run:
+                    errors = []
+                    for _ in range(2):
+                        with self.assertRaises(module.NativePluginDiscoveryError) as raised:
+                            module.native_install_roots(harness)
+                        self.assertIn(expected, str(raised.exception))
+                        errors.append(raised.exception)
+                    self.assertIs(errors[0], errors[1])
+                    which.assert_called_once_with(harness)
+                    self.assertEqual(0 if binary is None else 1, run.call_count)
+                    if binary is not None:
+                        self.assertEqual(8, run.call_args.kwargs["timeout"])
+
+    def test_successful_native_inventory_is_cached_and_resolves_enabled_plugins(self):
+        module = self.load_router()
+        other = self.base / "other"
+        with patch.object(module.shutil, "which", return_value="claude"), patch.object(
+            module.subprocess, "run", return_value=subprocess.CompletedProcess(
+                [], 0, json.dumps([{"enabled": True, "installPath": str(other)},
+                                   {"enabled": False, "installPath": str(self.base / "disabled")}])
+            )
+        ) as run:
+            self.assertEqual((other,), module.native_install_roots("claude"))
+            self.assertEqual((other,), module.native_install_roots("claude"))
+            run.assert_called_once()
+
+    def test_own_and_linked_skills_resolve_without_native_discovery(self):
+        module = self.load_router()
+        linked = self.base / "home" / ".agents" / "skills" / "linked"
+        linked.mkdir(parents=True)
+        (linked / "SKILL.md").write_text("---\ndescription: Linked skill.\n---\n", encoding="utf-8")
+        with patch.dict(os.environ, self.environment()), patch.object(
+            module.shutil, "which", side_effect=AssertionError("CLI lookup was unnecessary")
+        ):
+            self.assertIsNotNone(module.resolved_skill("engineering:feature", "codex"))
+            self.assertIsNotNone(module.resolved_skill("linked", "codex"))
+
+    def test_local_alias_resolves_after_cached_native_discovery_failure(self):
+        module = self.load_router()
+        with patch.dict(os.environ, self.environment()), patch.object(
+            module.shutil, "which", return_value=None
+        ) as which, patch.object(module, "skill_aliases", return_value={
+            "base:feature": "engineering:feature", "base:never-shipped": "engineering:never-shipped"
+        }):
+            for _ in range(2):
+                self.assertIsNotNone(module.resolved_skill("base:feature", "codex"))
+            with self.assertRaises(module.NativePluginDiscoveryError) as original:
+                module.native_install_roots("codex")
+            with self.assertRaises(module.NativePluginDiscoveryError) as missing:
+                module.resolved_skill("base:never-shipped", "codex")
+            self.assertIs(original.exception, missing.exception)
+            which.assert_called_once_with("codex")
+
+    def test_native_enabled_plugin_skills_resolve_for_both_harnesses(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["installed:native"]}]})
+        for harness in ("codex", "claude"):
+            root = (self.base / "home" / ".codex" / "plugins" / "cache" / "marketplace"
+                    / "installed" / "1.0") if harness == "codex" else self.base / "installed"
+            skill = root / "skills" / "native"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\ndescription: Native installed skill.\n---\n", encoding="utf-8")
+            inventory = {"installed": [{"enabled": True, "marketplaceName": "marketplace",
+                                         "name": "installed", "version": "1.0"}]} if harness == "codex" else [
+                {"enabled": True, "installPath": str(root)}
+            ]
+            self.set_inventory(harness, inventory)
+            self.inventory_calls.unlink(missing_ok=True)
+            result = self.run_router(("--verify-install", harness))
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertEqual([harness], self.inventory_calls.read_text(encoding="utf-8").splitlines())
+
+    def test_discovery_failures_block_hook_and_verify_with_infrastructure_diagnostic(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["missing:one", "missing:two"]}]})
+        for harness in ("codex", "claude"):
+            for value in ({"_exit": 7}, {"_raw": "{"}, {"installed": "invalid"}):
+                with self.subTest(harness=harness, value=value):
+                    self.set_inventory(harness, value)
+                    for arguments, payload in (
+                        (("--verify-install", harness), None),
+                        ((), {"tool_name": "apply_patch" if harness == "codex" else "Write",
+                              "cwd": str(self.repo), "session_id": str(uuid.uuid4()),
+                              "tool_input": {"file_path": "src/item.py", "content": "value = 2\n"}}),
+                    ):
+                        self.inventory_calls.unlink(missing_ok=True)
+                        result = self.run_router(arguments, payload)
+                        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+                        self.assertIn("native plugin discovery infrastructure error", result.stderr)
+                        self.assertNotIn("unavailable standards", result.stderr)
+                        self.assertNotIn("Install or enable", result.stdout + result.stderr)
+                        self.assertNotIn("Traceback", result.stderr)
+                        self.assertEqual([harness], self.inventory_calls.read_text(encoding="utf-8").splitlines())
+
+    def test_valid_empty_inventory_reports_missing_standards(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["missing:one", "missing:two"]}]})
+        for harness in ("codex", "claude"):
+            self.inventory_calls.unlink(missing_ok=True)
+            result = self.run_router(("--verify-install", harness))
+            self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+            self.assertIn("missing 2 of 2", result.stdout)
+            self.assertNotIn("infrastructure", result.stdout + result.stderr)
+            self.assertEqual([harness], self.inventory_calls.read_text(encoding="utf-8").splitlines())
+
+    def bash_payload(self, **extra):
+        return {
+            "hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": str(self.repo),
+            "tool_use_id": str(uuid.uuid4()), "session_id": str(uuid.uuid4()),
+            "tool_input": {"command": "echo value > src/item.py"}, **extra,
+        }
+
+    def test_explicit_claude_bash_with_turn_id_uses_claude_skill_proof(self):
+        payload = self.bash_payload(turn_id=str(uuid.uuid4()))
+        result = self.run_router(("--harness", "claude"), payload)
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("Invoke the skill(s)", result.stderr)
+        self.assertNotIn("READ THIS WHOLE FILE", result.stderr)
+        transcript = self.base / "claude-transcript.jsonl"
+        transcript.write_text("\n".join(json.dumps(entry) for entry in (
+            {"message": {"content": [{"type": "tool_use", "name": "Skill", "id": "loaded",
+                                       "input": {"skill": "feature"}}]}},
+            {"message": {"content": [{"type": "tool_result", "tool_use_id": "loaded",
+                                       "content": "Feature loaded."}]}},
+        )), encoding="utf-8")
+        payload["transcript_path"] = str(transcript)
+        payload["tool_use_id"] = str(uuid.uuid4())
+        result = self.run_router(("--harness", "claude"), payload)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_explicit_codex_bash_without_turn_id_requires_file_read_proof(self):
+        result = self.run_router(("--harness", "codex"), self.bash_payload())
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("READ THIS WHOLE FILE", result.stderr)
+        self.assertIn("Read each file named above", result.stderr)
+        self.assertNotIn("Invoke the skill(s)", result.stderr)
+
+    def test_explicit_harness_does_not_route_nonwrite_tools(self):
+        self.routes({"routes": [{"path": "^src/", "skills": ["missing:feature"]}]})
+        for harness in ("codex", "claude"):
+            result = self.run_router(("--harness", harness), self.bash_payload(tool_name="Read"))
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertEqual("", result.stderr)
+        self.assertFalse(self.inventory_calls.exists())
+
+    def test_invalid_or_missing_explicit_harness_fails_closed(self):
+        for arguments in (("--harness",), ("--harness", "other")):
+            result = self.run_router(arguments, self.bash_payload())
+            self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+            self.assertIn("--harness requires claude or codex", result.stderr)
+
+    def test_claude_manifest_dispatch_passes_explicit_host_to_router(self):
+        manifest = json.loads((HOOKS.parent / "plugins" / "manifests" / "claude" / "base-hooks.json").read_text(
+            encoding="utf-8"
+        ))
+        group = manifest["hooks"]["PreToolUse"][0]
+        self.assertEqual("Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|Skill", group["matcher"])
+        arguments = group["hooks"][0]["args"]
+        self.assertEqual([
+            "--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/skill_router.py", "--harness", "claude",
+            "--hook", "${CLAUDE_PLUGIN_ROOT}/hooks/tier_gate.py",
+        ], arguments[4:])
+        local_arguments = [str(self.router) if value.endswith("/skill_router.py") else
+                           str(HOOKS / Path(value).name) if value.startswith("${CLAUDE_PLUGIN_ROOT}/hooks/") else value
+                           for value in arguments]
+        result = subprocess.run(
+            [sys.executable, *local_arguments], cwd=self.repo,
+            input=json.dumps(self.bash_payload(turn_id=str(uuid.uuid4()))), capture_output=True,
+            text=True, encoding="utf-8", env=self.environment(), timeout=30,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        verdict = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("deny", verdict["permissionDecision"])
+        self.assertIn("Invoke the skill(s)", verdict["permissionDecisionReason"])
+        self.assertNotIn("READ THIS WHOLE FILE", verdict["permissionDecisionReason"])
+
+    def test_codex_manifest_pins_host_in_unix_and_windows_commands(self):
+        manifest = json.loads((HOOKS.parent / "plugins" / "manifests" / "codex" / "base-hooks.json").read_text(
+            encoding="utf-8"
+        ))
+        router = manifest["hooks"]["PreToolUse"][0]["hooks"][0]
+        self.assertTrue(router["command"].endswith('"${PLUGIN_ROOT}/hooks/skill_router.py" --harness codex'))
+        self.assertTrue(router["commandWindows"].endswith('"${PLUGIN_ROOT}/hooks/skill_router.py" --harness codex'))
+        self.assertIn("--timeout 12", router["commandWindows"])
 
     def run_router(self, arguments=(), payload=None):
         return subprocess.run(

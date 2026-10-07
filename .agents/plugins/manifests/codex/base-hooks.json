@@ -17,8 +17,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/skill_router.py\"",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/skill_router.py\" --harness codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/skill_router.py\" --harness codex",
             "timeout": 15
           }
         ],

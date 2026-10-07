@@ -5,8 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py\" --hook \"${PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py\" --notice --hook \"${PLUGIN_ROOT}/resources/machine/scripts/codex_terminal_profile.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py\" --hook \"${PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py\" --notice --hook \"${PLUGIN_ROOT}/resources/machine/scripts/codex_terminal_profile.py\"",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py\" --hook \"${PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py\" --notice --hook \"${PLUGIN_ROOT}/resources/machine/scripts/codex_terminal_profile.py\" --hook \"${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py\" --apply",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 7 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py\" --hook \"${PLUGIN_ROOT}/resources/machine/scripts/reap_orphans.py\" --notice --hook \"${PLUGIN_ROOT}/resources/machine/scripts/codex_terminal_profile.py\" --hook \"${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py\" --apply",
             "timeout": 10
           }
         ]

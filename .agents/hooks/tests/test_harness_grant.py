@@ -1,7 +1,10 @@
+import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -87,12 +90,13 @@ class HarnessGrantTests(unittest.TestCase):
         run_git(self.root, "worktree", "add", "-q", "--detach", str(self.merged_tree), "merged")
         run_git(self.root, "worktree", "add", "-q", "--detach", str(self.unmerged_tree), "unmerged")
 
-    def run_hook(self, command, tool="Bash", codex=False):
+    def run_hook(self, command, tool="Bash", codex=False, env=None):
         payload = {"tool_name": tool, "cwd": str(self.root), "tool_input": {"command": command}}
         if codex:
             payload["turn_id"] = "t1"
         return subprocess.run(
-            [sys.executable, str(HOOK)], input=json.dumps(payload), capture_output=True, text=True
+            [sys.executable, str(HOOK)], input=json.dumps(payload), capture_output=True, text=True,
+            env=env,
         )
 
     def assert_granted(self, command, **kwargs):
@@ -166,6 +170,97 @@ class HarnessGrantTests(unittest.TestCase):
     def test_other_tools_and_commands_are_ignored(self):
         self.assert_not_granted(self.git_c("merge --no-edit origin/main"), tool="Edit")
         self.assert_not_granted("git status")
+
+
+class ReceiptGrantTests(unittest.TestCase):
+    """A squash-merge-shaped branch: not an ancestor of origin/main, so only a receipt helps."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        base = Path(self.temp.name).resolve()
+        self.root = base / "repo"
+        self.root.mkdir()
+        run_git(self.root, "init", "-q", "-b", "main")
+        run_git(self.root, "config", "user.email", "t@example.com")
+        run_git(self.root, "config", "user.name", "t")
+        run_git(self.root, "commit", "-q", "--allow-empty", "-m", "base")
+        run_git(self.root, "remote", "add", "origin", "https://github.com/tj-agents/sample.git")
+        run_git(self.root, "update-ref", "refs/remotes/origin/main", "HEAD")
+        run_git(self.root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        run_git(self.root, "branch", "squashed")
+        run_git(self.root, "checkout", "-q", "squashed")
+        run_git(self.root, "commit", "-q", "--allow-empty", "-m", "squashed away")
+        self.head = run_git(self.root, "rev-parse", "HEAD")
+        run_git(self.root, "checkout", "-q", "main")
+        self.squashed_tree = base / "squashed-tree"
+        run_git(self.root, "worktree", "add", "-q", str(self.squashed_tree), "squashed")
+
+        self.state = tempfile.TemporaryDirectory()
+        self.addCleanup(self.state.cleanup)
+        self.env = dict(os.environ, AGENT_STATE_DIRECTORY=self.state.name)
+
+    def write_receipt(self, worktree, branch, head, verdict="removable", age_seconds=0):
+        directory = Path(self.state.name) / "merge-cleanup" / "receipts"
+        directory.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha256(Path(worktree).resolve().as_posix().encode("utf-8")).hexdigest()
+        data = {
+            "worktree": str(Path(worktree).resolve()),
+            "branch": branch,
+            "head": head,
+            "verdict": verdict,
+            "recorded_at": time.time() - age_seconds,
+        }
+        (directory / f"{digest}.json").write_text(json.dumps(data), encoding="utf-8")
+
+    def run_hook(self, command, tool="Bash", env=None):
+        payload = {"tool_name": tool, "cwd": str(self.root), "tool_input": {"command": command}}
+        return subprocess.run(
+            [sys.executable, str(HOOK)], input=json.dumps(payload), capture_output=True, text=True,
+            env=self.env if env is None else env,
+        )
+
+    def assert_granted(self, command, **kwargs):
+        result = self.run_hook(command, **kwargs)
+        self.assertEqual(0, result.returncode, result.stderr)
+        decision = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("allow", decision["permissionDecision"])
+
+    def assert_not_granted(self, command, **kwargs):
+        result = self.run_hook(command, **kwargs)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+
+    def git_c(self, rest):
+        return 'git -C "' + str(self.root) + '" ' + rest
+
+    def test_removing_a_worktree_with_a_fresh_matching_receipt_is_granted(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head)
+        self.assert_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+
+    def test_deleting_with_d_or_capital_d_is_granted_by_a_fresh_matching_receipt(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head)
+        self.assert_granted(self.git_c("branch -d squashed"))
+        self.assert_granted(self.git_c("branch -D squashed"))
+
+    def test_a_stale_receipt_is_not_granted(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head, age_seconds=60 * 60 + 1)
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+        self.assert_not_granted(self.git_c("branch -D squashed"))
+
+    def test_a_head_mismatched_receipt_is_not_granted(self):
+        self.write_receipt(self.squashed_tree, "squashed", "0" * 40)
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+        self.assert_not_granted(self.git_c("branch -D squashed"))
+
+    def test_an_absent_receipt_is_not_granted(self):
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+        self.assert_not_granted(self.git_c("branch -D squashed"))
+
+    def test_a_preserve_verdict_receipt_is_not_granted(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head, verdict="preserve")
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+        self.assert_not_granted(self.git_c("branch -D squashed"))
 
 
 if __name__ == "__main__":
