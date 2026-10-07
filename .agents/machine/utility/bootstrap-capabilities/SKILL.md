@@ -148,7 +148,8 @@ Unresolved dependencies, contradictory owners, cycles and linked payloads fail b
 Each package keeps its own native version. The selected anchor supplies only the release grouping
 version; the full commit and `sha256-tree-v1` payload digest identify the snapshot. Composition
 requires every inspected Git object to be locally available, disables Git lazy fetching, and
-performs no fetch, snapshot execution, lock selection, installation or profile changes.
+performs no fetch, snapshot execution, lock selection, installation or profile changes. Git must
+support `--no-lazy-fetch`; unsupported versions fail before inspecting snapshot objects.
 
 ## Catalog and digest contract
 
