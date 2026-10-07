@@ -31,7 +31,7 @@ def find_config(cwd):
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"], cwd=base, env=environment,
-            capture_output=True, text=True, timeout=10, check=False,
+            capture_output=True, text=True, encoding="utf-8", timeout=10, check=False,
         )
         if result.returncode or not result.stdout.strip():
             return None
