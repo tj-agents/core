@@ -1190,7 +1190,7 @@ if ($Mode -eq 'mismatch') { $entry.pid_started_at -= 30 }
 if ($Mode -eq 'wrong-cwd') { $entry.cwd = Join-Path (Get-Location).Path 'other' }
 $registry = Join-Path $env:AGENT_STATE_DIRECTORY 'cli-sessions'
 New-Item -ItemType Directory -Path $registry -Force | Out-Null
-if ($Mode -eq 'stale-session') {
+if ($Mode -in @('stale-session', 'retargeted-session')) {
     $stale = $entry.Clone()
     $stale.session_id = 'close-stale'
     $stale.started_at = $started + 1
@@ -1215,17 +1215,24 @@ Start-Sleep -Seconds 120
     $closeShells = if ($TestShell) { @($TestShell) } else { @('pwsh', 'powershell.exe') }
     foreach ($closeShell in $closeShells) {
         if (-not (Get-Command $closeShell -ErrorAction SilentlyContinue)) { continue }
-        $closeModes = if ($TestMode) { @($TestMode) } else { @('good', 'unknown', 'unknown-host', 'mismatch', 'wrong-cwd', 'stale-session') }
+        $closeModes = if ($TestMode) { @($TestMode) } else { @('good', 'unknown', 'unknown-host', 'mismatch', 'wrong-cwd', 'stale-session', 'retargeted-session') }
         foreach ($mode in $closeModes) {
             $closeState = Join-Path $closeRoot "$closeShell-$mode"
             $closeReady = Join-Path $closeState 'ready'
             $closeOwn = Join-Path $closeState 'merge-cleanup/obligations/own.json'
             $closePeer = Join-Path $closeState 'merge-cleanup/obligations/peer.json'
             $closeStale = Join-Path $closeState 'merge-cleanup/obligations/stale.json'
+            $closeRemoved = Join-Path $closeState 'merge-cleanup/obligations/removed.json'
+            $removedWorktree = Join-Path $closeRoot 'removed-linked'
             Write-JsonFile -Path $closeOwn -Data @{ session_id = 'close-test'; worktree = $closeRepo.Primary }
             Write-JsonFile -Path $closePeer -Data @{ session_id = 'peer'; worktree = $closeRepo.Primary }
-            if ($mode -eq 'stale-session') {
-                Write-JsonFile -Path $closeStale -Data @{ session_id = 'close-stale'; worktree = $closeRepo.Primary }
+            if ($mode -in @('stale-session', 'retargeted-session')) {
+                $staleWorktree = if ($mode -eq 'retargeted-session') { $removedWorktree } else { $closeRepo.Primary }
+                Write-JsonFile -Path $closeStale -Data @{ session_id = 'close-stale'; worktree = $staleWorktree }
+            }
+            if ($mode -eq 'retargeted-session') {
+                Assert-False -Actual (Test-Path -LiteralPath $removedWorktree) -Message 'Retargeted fixture still has its removed checkout.'
+                Write-JsonFile -Path $closeRemoved -Data @{ session_id = 'close-test'; worktree = $removedWorktree; session_exit_required = $true }
             }
             $env:AGENT_STATE_DIRECTORY = $closeState
             $env:AGENT_CLI_HOST_NAMES = 'agent-close-test'
@@ -1243,8 +1250,10 @@ Start-Sleep -Seconds 120
                 $fixtureReady = Wait-Condition -Condition { Test-Path -LiteralPath $closeReady }
                 Assert-True -Actual $fixtureReady -Message "Close fixture did not become ready: $(Get-Content $fixtureError -Raw) $(Get-Content $fixtureOutput -Raw)"
                 $bootstrapPid = [int](Get-Content -LiteralPath $closeReady -Raw)
-                if ($mode -in @('good', 'stale-session')) {
-                    $verifiedClosed = Wait-Condition -TimeoutSeconds 60 -Condition { -not (Test-Path -LiteralPath $closeOwn) }
+                if ($mode -in @('good', 'stale-session', 'retargeted-session')) {
+                    $verifiedClosed = Wait-Condition -TimeoutSeconds 60 -Condition {
+                        -not (Test-Path -LiteralPath $closeOwn) -and -not (Test-Path -LiteralPath $closeRemoved)
+                    }
                     $closeDetails = if (Test-Path -LiteralPath "$closeReady.output") { Get-Content -LiteralPath "$closeReady.output" -Raw } else { 'no child output' }
                     $observerDetails = @(Get-ChildItem (Join-Path $closeState 'merge-cleanup/results') -Filter '*.json' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Raw }) -join "`n"
                     Assert-True -Actual $verifiedClosed -Message "Verified close did not clear its own obligation: $closeDetails $observerDetails"
@@ -1254,6 +1263,7 @@ Start-Sleep -Seconds 120
                     Assert-Equal -Expected 'session-closed' -Actual $records[0].status -Message 'Close observer did not verify exit.'
                     Assert-True -Actual $records[0].checkout_retained -Message 'Close observer did not record retention.'
                     Assert-Equal -Expected 'close-test' -Actual $records[0].session_id -Message 'Close observer recorded the obsolete session identity.'
+                    Assert-Equal -Expected ($closeRepo.Primary -replace '\\', '/') -Actual ($records[0].worktree -replace '\\', '/') -Message 'Close observer recorded the previous checkout.'
                 }
                 else {
                     Assert-True -Actual (Wait-Condition -TimeoutSeconds 60 -Condition { Test-Path -LiteralPath "$closeReady.returned" }) -Message 'Refused close did not return.'
@@ -1268,7 +1278,7 @@ Start-Sleep -Seconds 120
                 $peerHost.Refresh()
                 Assert-False -Actual $peerHost.HasExited -Message 'Close killed another session.'
                 Assert-True -Actual (Test-Path -LiteralPath $closePeer) -Message 'Close cleared another session obligation.'
-                if ($mode -eq 'stale-session') {
+                if ($mode -in @('stale-session', 'retargeted-session')) {
                     Assert-True -Actual (Test-Path -LiteralPath $closeStale) -Message 'Close cleared an obsolete session obligation.'
                 }
                 Write-Output "PASS finish.tests.ps1: close $closeShell $mode"
