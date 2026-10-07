@@ -9,24 +9,26 @@ backtick spans rendered as monospace `<code>`) and a plain Unicode text flavour 
 then verifies both off the live clipboard. `--plain-only` writes only the literal text, unchanged, as
 CF_UNICODETEXT, and that is still verified by reading it back.
 
-On Linux, `wl-copy`/`xclip` can each set only one clipboard MIME type per invocation, so this is a choice,
-not a combination: default mode copies one `text/html` flavour built from the same escaped-and-code-spanned
-fragment Windows uses, so a paste into Teams still renders backtick spans as monospace -- but a plain-text
-target (a terminal, a plain text field) reads nothing useful from it. `--plain-only` copies the literal
-text as plain instead, everywhere, for exactly that case. `xsel` cannot set an explicit MIME type, so with
-only `xsel` available (no `xclip`, no Wayland) default mode falls back to plain text with the markdown left
-intact and says so. macOS's `pbcopy` has no HTML flavour either, so macOS always copies plain text with the
-markdown intact, and says so.
+On Linux, default mode copies a `text/html` flavour built from the same escaped-and-code-spanned fragment
+Windows uses, via `wl-copy`/`xclip`, so a paste into Teams still renders backtick spans as monospace (see
+`.agents/machine/TECH_DEBT.md`, "clip offers one clipboard flavour per copy on Linux"). `--plain-only`
+copies the literal text as plain instead, everywhere. `xsel` cannot set an explicit MIME type, so with
+only `xsel` available (no `xclip`, no Wayland) default mode falls back to plain text with the markdown
+left intact and says so. macOS's `pbcopy` has no HTML flavour either, so macOS always copies plain text
+with the markdown intact, and says so.
 
 The pure text transforms (normalising, backtick unwrapping, HTML escaping, HTML fragment/document
-construction, CF_HTML offset construction, code span counting) are plain functions, testable on any OS.
-The clipboard backends are small, platform- or environment-selected functions that take
-`run`/`which`/`environ` as arguments so tests can inject stubs without ever touching a real clipboard.
+construction, CF_HTML offset construction, visible-text extraction, code span counting) are plain
+functions, testable on any OS. The clipboard backends are small, platform- or environment-selected
+functions that take `run`/`which`/`environ` as arguments so tests can inject stubs without ever touching
+a real clipboard.
 """
 
 import argparse
 from collections import namedtuple
 import ctypes
+import html
+from html.parser import HTMLParser
 import os
 from pathlib import Path
 import re
@@ -51,6 +53,7 @@ class ClipboardError(Exception):
 
 _BACKTICK_SPAN = re.compile(r'`([^`]+)`')
 _TRAILING_WHITESPACE = re.compile(r'\s+\Z')
+_WHITESPACE_RUN = re.compile(r'\s+')
 
 
 def normalise_draft(raw):
@@ -116,6 +119,53 @@ def build_full_html(fragment):
     return f'<html><head><meta charset="utf-8"></head><body>{fragment}</body></html>'
 
 
+def collapse_whitespace(text):
+    return _WHITESPACE_RUN.sub(' ', text).strip()
+
+
+class _TagStripper(HTMLParser):
+    """Collects the literal text data between tags, with `<br>` recorded as a newline.
+
+    `convert_charrefs=False` so entities reach `handle_entityref`/`handle_charref` rather than being
+    unescaped here; they are re-emitted as their original `&name;`/`&#name;` text and unescaped once, by
+    `html.unescape`, in `html_visible_text` below, rather than every call site reimplementing that step.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self._parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'br':
+            self._parts.append('\n')
+
+    def handle_data(self, data):
+        self._parts.append(data)
+
+    def handle_entityref(self, name):
+        self._parts.append(f'&{name};')
+
+    def handle_charref(self, name):
+        self._parts.append(f'&#{name};')
+
+    def text(self):
+        return ''.join(self._parts)
+
+
+def html_visible_text(markup):
+    """The human-readable text `markup` renders as: tags stripped via `html.parser` (not regex), entities
+    unescaped, `<br>` turned into a newline, and runs of whitespace collapsed to one space.
+
+    Used to verify an HTML clipboard read-back against the draft's own text regardless of how a
+    clipboard tool re-serves the markup -- different attribute order, an added attribute, or reformatted
+    whitespace must not fail verification; a change in the actual words must.
+    """
+    stripper = _TagStripper()
+    stripper.feed(markup)
+    stripper.close()
+    return collapse_whitespace(html.unescape(stripper.text()))
+
+
 _CF_HTML_HEADER = (
     'Version:0.9\r\n'
     'StartHTML:{0:010d}\r\n'
@@ -143,84 +193,89 @@ def build_cf_html(fragment):
     return text, start_html, end_html, start_fragment, end_fragment
 
 
+def extract_cf_html_fragment(cf_html_text):
+    """The payload between CF_HTML's `<!--StartFragment-->`/`<!--EndFragment-->` markers, or None.
+
+    Reading back a decoded CF_HTML string by its own HTML comment markers avoids re-deriving byte offsets
+    from a `str` that has already been through UTF-8 decoding -- the markers are exactly where this
+    module's own `build_cf_html` put them, and that is what a paste target actually keys off too.
+    """
+    start_marker, end_marker = '<!--StartFragment-->', '<!--EndFragment-->'
+    start = cf_html_text.find(start_marker)
+    end = cf_html_text.find(end_marker)
+    if start == -1 or end == -1 or end < start:
+        return None
+    return cf_html_text[start + len(start_marker):end]
+
+
 # --- POSIX (Linux, macOS) backend ---------------------------------------------------------------
-
-
-def _no_env_override(environ):
-    return None
-
-
-def _pbcopy_env_override(environ):
-    # pbcopy/pbpaste pick their text encoding from the locale; forcing a UTF-8 one here is what keeps
-    # non-ASCII draft text (accents, emoji) intact rather than silently mangled on some machines.
-    env = dict(environ)
-    env['LANG'] = 'en_US.UTF-8'
-    env['LC_CTYPE'] = 'en_US.UTF-8'
-    return env
-
 
 # html_copy_argv/html_paste_argv are None for a tool that cannot set an explicit MIME type (xsel) or has
 # no HTML concept at all (pbcopy); copy_posix falls back to the plain flavour for those, using
 # no_html_reason (also None when the tool does support HTML) to say why in the success line.
+# env_overrides is a dict merged over the real environment for this tool's own invocations -- empty for
+# every tool except pbcopy.
 PosixTool = namedtuple(
     'PosixTool',
-    'label copy_argv paste_argv html_copy_argv html_paste_argv env_override no_html_reason',
+    'label copy_argv paste_argv html_copy_argv html_paste_argv env_overrides no_html_reason',
 )
 
 _WL_COPY = PosixTool(
     'wl-copy',
     ['wl-copy'], ['wl-paste', '--no-newline'],
     ['wl-copy', '--type', 'text/html'], ['wl-paste', '--type', 'text/html'],
-    _no_env_override, None,
+    {}, None,
 )
 _XCLIP = PosixTool(
     'xclip',
     ['xclip', '-selection', 'clipboard'], ['xclip', '-selection', 'clipboard', '-o'],
     ['xclip', '-selection', 'clipboard', '-t', 'text/html'],
     ['xclip', '-selection', 'clipboard', '-t', 'text/html', '-o'],
-    _no_env_override, None,
+    {}, None,
 )
 _XSEL = PosixTool(
     'xsel', ['xsel', '--clipboard', '--input'], ['xsel', '--clipboard', '--output'], None, None,
-    _no_env_override, 'xsel cannot set an HTML flavour',
+    {}, 'xsel cannot set an HTML flavour',
 )
 _PBCOPY = PosixTool(
     'pbcopy', ['pbcopy'], ['pbpaste'], None, None,
-    _pbcopy_env_override, 'pbcopy has no HTML flavour',
+    # pbcopy/pbpaste pick their text encoding from the locale; forcing a UTF-8 one here is what keeps
+    # non-ASCII draft text (accents, emoji) intact rather than silently mangled on some machines.
+    {'LANG': 'en_US.UTF-8', 'LC_CTYPE': 'en_US.UTF-8'}, 'pbcopy has no HTML flavour',
 )
 
 
 def posix_clipboard_tool(environ, which):
     """The PosixTool this environment selects, or a ClipboardError naming what to install.
 
-    Wayland is checked first because a Wayland session under XWayland can still have DISPLAY set.
-    Without wl-copy/wl-paste on PATH, a Wayland session that also has DISPLAY set falls back to the X11
-    tools rather than failing outright. When nothing at all works in a Wayland session, the error
-    recommends wl-clipboard first regardless of whether DISPLAY happens to be set too, since that is the
-    native tool for the session actually running; xclip/xsel are named only as the XWayland fallback.
+    Wayland is checked first because a Wayland session under XWayland can still have DISPLAY set; without
+    wl-copy/wl-paste on PATH, such a session falls back to the X11 tools rather than failing outright.
+    Either way, nothing usable in a Wayland session is one error, checked once, naming wl-clipboard first
+    (the native tool for the session actually running) and xclip/xsel as the XWayland fallback --
+    regardless of whether DISPLAY happened to be set too.
     """
     wayland = bool(environ.get('WAYLAND_DISPLAY'))
     x11 = bool(environ.get('DISPLAY'))
 
-    if wayland and which('wl-copy') and which('wl-paste'):
-        return _WL_COPY
+    if wayland:
+        if which('wl-copy') and which('wl-paste'):
+            return _WL_COPY
+        if x11:
+            if which('xclip'):
+                return _XCLIP
+            if which('xsel'):
+                return _XSEL
+        raise ClipboardError(
+            'No clipboard tool was found on PATH. Install wl-clipboard (provides wl-copy/wl-paste), or '
+            'xclip/xsel as an XWayland fallback.'
+        )
 
     if x11:
         if which('xclip'):
             return _XCLIP
         if which('xsel'):
             return _XSEL
-        if wayland:
-            raise ClipboardError(
-                'No clipboard tool was found on PATH. Install wl-clipboard (provides wl-copy/wl-paste) for '
-                'this Wayland session, or xclip/xsel as an XWayland fallback.'
-            )
         raise ClipboardError('No X11 clipboard tool was found on PATH. Install xclip or xsel.')
-
-    if wayland:
-        raise ClipboardError(
-            'No Wayland clipboard tool was found on PATH. Install wl-clipboard (provides wl-copy/wl-paste).'
-        )
 
     if sys.platform == 'darwin':
         if which('pbcopy') and which('pbpaste'):
@@ -238,20 +293,39 @@ def _clipboard_failure(label, returncode, stderr):
     return ClipboardError(f'{message}: {detail}' if detail else f'{message}.')
 
 
-def _run_clipboard_process(run, argv, label, env=None, timeout=10, input_text=None, capture_stdout=False):
+_TRANSIENT_READBACK_PATTERNS = ('nothing is copied', 'no suitable type', 'target not available', 'no selection')
+
+
+def _is_transient_readback_failure(stderr):
+    """Whether a nonzero read-back exit names a known "owner not ready yet" shape worth retrying.
+
+    wl-paste says "Nothing is copied" when no owner has claimed the selection yet; xclip says "No suitable
+    type" or "target not available" for the same instant; xsel says "no selection". Any other nonzero
+    exit is treated as a real failure -- retrying an error this has no reason to believe is transient
+    would just spend the whole retry budget repeating it before reporting the same thing anyway.
+    """
+    lowered = (stderr or '').lower()
+    return any(pattern in lowered for pattern in _TRANSIENT_READBACK_PATTERNS)
+
+
+def _run_clipboard_process(run, argv, label, env=None, timeout=10, input_text=None, capture_stdout=False,
+                            may_fork=False):
     """Runs one clipboard tool invocation; returns (returncode, stdout_text, stderr_text).
 
-    Never raises for a nonzero exit -- a read-back's nonzero exit (wl-paste's "Nothing is copied", xclip's
-    "target not available") is routine while a just-started owner is still taking over, not necessarily a
-    real failure, so the retry loop around a read-back needs the chance to try again. Only a process that
-    could not even be started or answer within the timeout becomes a ClipboardError here.
+    Never raises for a nonzero exit -- that is left to the caller, since a read-back's nonzero exit can be
+    routine while a just-started owner is still taking over (see `_is_transient_readback_failure`), not
+    necessarily a real failure. Only a process that could not even be started or answer within the timeout
+    becomes a ClipboardError here.
 
-    stdout is discarded (DEVNULL) unless `capture_stdout` -- a copy command's stdout is never read. stderr
-    always goes to a private temporary file rather than a PIPE: wl-copy, xclip and xsel each fork a
-    long-lived background process that goes on serving the selection after this call returns, and that
-    fork inherits this call's stdio. A PIPE stays open (and communicate() keeps waiting on it) until every
-    process holding it exits, so a copy that actually succeeded immediately would hang until the timeout. A
-    plain file has no such problem, so the failing tool's own stderr can still be reported.
+    stdout is discarded (DEVNULL) unless `capture_stdout` -- a copy command's stdout is never read.
+
+    stderr is captured differently depending on `may_fork`. A copy command (`may_fork=True`) -- wl-copy,
+    xclip, xsel -- forks a long-lived background process that goes on serving the selection after this
+    call returns, and that fork inherits this call's stdio; a PIPE would stay open (and communicate() keep
+    waiting on it) until that fork also exits, so a copy that actually succeeded immediately would hang
+    until the timeout. A private temporary file has no such problem, so the failing tool's own stderr can
+    still be reported. A read-back command never forks, so its stderr is captured the ordinary way, via
+    PIPE, alongside its stdout.
 
     Both streams are decoded explicitly as UTF-8 with decoding errors replaced, rather than left to the
     process's locale -- the locale is exactly what forcing LANG/LC_CTYPE for pbcopy/pbpaste routes around.
@@ -265,15 +339,23 @@ def _run_clipboard_process(run, argv, label, env=None, timeout=10, input_text=No
     if env is not None:
         kwargs['env'] = env
 
-    with tempfile.TemporaryFile(mode='w+', encoding='utf-8', errors='replace') as stderr_file:
+    stderr_file = tempfile.TemporaryFile(mode='w+', encoding='utf-8', errors='replace') if may_fork else None
+    try:
+        kwargs['stderr'] = stderr_file if may_fork else subprocess.PIPE
         try:
-            result = run(argv, stderr=stderr_file, **kwargs)
+            result = run(argv, **kwargs)
         except subprocess.TimeoutExpired:
             raise ClipboardError(f'{label} did not answer within {timeout} seconds.') from None
         except OSError as exc:
             raise ClipboardError(f'{label} could not be run: {exc}') from None
-        stderr_file.seek(0)
-        stderr_text = stderr_file.read()
+        if may_fork:
+            stderr_file.seek(0)
+            stderr_text = stderr_file.read()
+        else:
+            stderr_text = result.stderr or ''
+    finally:
+        if stderr_file is not None:
+            stderr_file.close()
 
     stdout_text = result.stdout if capture_stdout else ''
     return result.returncode, (stdout_text or ''), stderr_text
@@ -281,7 +363,7 @@ def _run_clipboard_process(run, argv, label, env=None, timeout=10, input_text=No
 
 def _run_copy(run, argv, text, label, env=None, timeout=10):
     returncode, _, stderr = _run_clipboard_process(
-        run, argv, label, env=env, timeout=timeout, input_text=text, capture_stdout=False,
+        run, argv, label, env=env, timeout=timeout, input_text=text, capture_stdout=False, may_fork=True,
     )
     if returncode != 0:
         raise _clipboard_failure(label, returncode, stderr)
@@ -290,26 +372,30 @@ def _run_copy(run, argv, text, label, env=None, timeout=10):
 def _read_back_with_retry(run, argv, label, is_ok, env=None, attempts=5, total_timeout=1.0):
     """Reads back up to `attempts` times, pausing between tries, until `is_ok` accepts the output.
 
-    wl-copy hands the selection to a forked server and returns before that server is necessarily ready to
-    answer a read; an immediate read-back can see the previous (or empty) selection, or the tool can exit
-    nonzero rather than return anything at all (wl-paste's "Nothing is copied", xclip's "target not
-    available") while that handoff is still in flight. The same latency has been seen from xclip/xsel.
-    Retrying for up to `total_timeout` seconds rides that out instead of failing a copy that would read
-    back correctly a moment later. Only once every attempt has exited nonzero does this raise, carrying the
-    last attempt's stderr; a zero-exit mismatch is left for the caller, which knows what the right message
-    for that content mismatch is.
+    A nonzero exit is retried only when `_is_transient_readback_failure` recognises its stderr as the
+    owner-not-ready-yet shape; any other nonzero exit fails immediately with that attempt's own stderr.
+    If every retried attempt keeps exiting nonzero (transiently), the last one's tool failure is raised,
+    carrying its stderr. If at least one attempt exits zero but its content is never accepted by `is_ok`,
+    the last such zero-exit output is returned instead, so the caller raises its own content-mismatch
+    message -- a read-back that worked but did not match is a different failure from the tool never
+    answering at all.
     """
     delay = total_timeout / attempts
-    returncode, output, stderr = 1, '', ''
+    returncode, stderr = 1, ''
+    last_zero_exit_output = None
     for attempt in range(attempts):
         returncode, output, stderr = _run_clipboard_process(run, argv, label, env=env, capture_stdout=True)
-        if returncode == 0 and is_ok(output):
-            return output
+        if returncode == 0:
+            if is_ok(output):
+                return output
+            last_zero_exit_output = output
+        elif not _is_transient_readback_failure(stderr):
+            raise _clipboard_failure(label, returncode, stderr)
         if attempt < attempts - 1:
             time.sleep(delay)
-    if returncode != 0:
+    if last_zero_exit_output is None:
         raise _clipboard_failure(label, returncode, stderr)
-    return output
+    return last_zero_exit_output
 
 
 def copy_posix(text, plain_only, environ=None, which=shutil.which, run=subprocess.run):
@@ -318,22 +404,22 @@ def copy_posix(text, plain_only, environ=None, which=shutil.which, run=subproces
     Default mode copies an HTML flavour (so Teams renders backtick spans as monospace) when the selected
     tool supports setting one; otherwise -- xsel, or macOS's pbcopy -- it falls back to the plain flavour
     with the markdown left intact, and the returned message says so. `--plain-only` always copies the
-    literal text as plain, on every tool. wl-copy/xclip can only set one MIME type per copy, so default
-    mode is HTML-only even on tools that support it: nothing a plain-text paste target can read (see
-    `.agents/machine/TECH_DEBT.md`, "clip offers one clipboard flavour per copy on Linux").
+    literal text as plain, on every tool. See `.agents/machine/TECH_DEBT.md`, "clip offers one clipboard
+    flavour per copy on Linux".
     """
     environ = os.environ if environ is None else environ
     tool = posix_clipboard_tool(environ, which)
-    env = tool.env_override(environ)
+    env = {**environ, **tool.env_overrides} if tool.env_overrides else None
 
     if not plain_only and tool.html_copy_argv:
         fragment = build_html_fragment(text)
         spans = count_code_spans(fragment)
         html_document = build_full_html(fragment)
+        expected_visible = collapse_whitespace(unwrap_backtick_spans(text))
         _run_copy(run, tool.html_copy_argv, html_document, f'{tool.label} copy', env=env)
 
         def html_ok(output):
-            return _TRAILING_WHITESPACE.sub('', output) == html_document
+            return html_visible_text(output) == expected_visible and count_code_spans(output) == spans
 
         landed_html = _read_back_with_retry(run, tool.html_paste_argv, f'{tool.label} paste', html_ok, env=env)
         if not html_ok(landed_html):
@@ -404,6 +490,8 @@ def _windows_api():
     kernel32.GlobalUnlock.restype = wintypes.BOOL
     kernel32.GlobalSize.argtypes = [wintypes.HANDLE]
     kernel32.GlobalSize.restype = ctypes.c_size_t
+    kernel32.GlobalFree.argtypes = [wintypes.HANDLE]
+    kernel32.GlobalFree.restype = wintypes.HANDLE
 
     return user32, kernel32
 
@@ -413,7 +501,10 @@ def _create_message_window(user32):
 
     OpenClipboard(NULL) leaves the clipboard with no owning window at all; EmptyClipboard followed by
     SetClipboardData with no owner is exactly the shape that has been seen failing SetClipboardData, so a
-    throwaway `STATIC`-class window parented to HWND_MESSAGE stands in as the owner instead.
+    throwaway `STATIC`-class window parented to HWND_MESSAGE stands in as the owner instead. Raises before
+    the caller ever opens or empties the clipboard, rather than falling back to OpenClipboard(NULL): a copy
+    that cannot get a real owner is better refused than silently landed without the ownership semantics the
+    rest of this backend was written to rely on.
     """
     import ctypes.wintypes as wintypes
 
@@ -421,19 +512,6 @@ def _create_message_window(user32):
     if not hwnd:
         raise ClipboardError('CreateWindowExW failed while preparing a clipboard owner window.')
     return hwnd
-
-
-def _acquire_clipboard_owner(user32):
-    """The message window handle, or None when creating one failed -- OpenClipboard(NULL) still works.
-
-    A window-less copy is worse (no real owner, see `_create_message_window`) but not worthless, so a
-    failure to create the window falls back to the old OpenClipboard(NULL) behaviour instead of failing
-    the whole copy over what is meant to be a belt-and-suspenders improvement.
-    """
-    try:
-        return _create_message_window(user32)
-    except ClipboardError:
-        return None
 
 
 def _open_clipboard(user32, hwnd, retries=10, delay=0.05):
@@ -453,20 +531,23 @@ def _set_clipboard_bytes(user32, kernel32, clipboard_format, data):
         raise ClipboardError('GlobalAlloc failed while preparing clipboard data.')
     pointer = kernel32.GlobalLock(handle)
     if not pointer:
+        kernel32.GlobalFree(handle)
         raise ClipboardError('GlobalLock failed while preparing clipboard data.')
     try:
         ctypes.memmove(pointer, data, size)
     finally:
         kernel32.GlobalUnlock(handle)
-    # Once SetClipboardData succeeds the system owns the handle; it must not be freed here.
+    # Ownership passes to the system only once SetClipboardData succeeds; on failure this call still owns
+    # the handle and must free it, or it leaks.
     if not user32.SetClipboardData(clipboard_format, handle):
+        kernel32.GlobalFree(handle)
         raise ClipboardError('SetClipboardData failed.')
 
 
 def _read_windows_clipboard(user32, kernel32, html_format, hwnd):
     _open_clipboard(user32, hwnd)
     try:
-        html = None
+        cf_html = None
         if user32.IsClipboardFormatAvailable(html_format):
             handle = user32.GetClipboardData(html_format)
             if handle:
@@ -477,7 +558,7 @@ def _read_windows_clipboard(user32, kernel32, html_format, hwnd):
                         raw = ctypes.string_at(pointer, size)
                     finally:
                         kernel32.GlobalUnlock(handle)
-                    html = raw.split(b'\x00', 1)[0].decode('utf-8', errors='replace')
+                    cf_html = raw.split(b'\x00', 1)[0].decode('utf-8', errors='replace')
 
         plain = None
         if user32.IsClipboardFormatAvailable(CF_UNICODETEXT):
@@ -489,7 +570,7 @@ def _read_windows_clipboard(user32, kernel32, html_format, hwnd):
                         plain = ctypes.wstring_at(pointer)
                     finally:
                         kernel32.GlobalUnlock(handle)
-        return html, plain
+        return cf_html, plain
     finally:
         user32.CloseClipboard()
 
@@ -508,13 +589,16 @@ def copy_windows(text, plain_only):
 
     cf_html_bytes = None
     spans = 0
+    expected_visible = None
     if not plain_only:
         fragment = build_html_fragment(text)
         spans = count_code_spans(fragment)
+        expected_visible = collapse_whitespace(unwrap_backtick_spans(text))
         cf_html_text, *_ = build_cf_html(fragment)
         cf_html_bytes = cf_html_text.encode('utf-8') + b'\x00'
 
-    hwnd = _acquire_clipboard_owner(user32)
+    # Raises before the clipboard is ever opened or emptied if no owner window can be created.
+    hwnd = _create_message_window(user32)
     try:
         _open_clipboard(user32, hwnd)
         try:
@@ -528,10 +612,9 @@ def copy_windows(text, plain_only):
 
         # Verify off the live clipboard, in every mode: a plain-only round trip can pass on its own, but
         # verifying nothing is what let a stale or empty clipboard pass for a successful plain-only copy.
-        landed_html, landed_plain = _read_windows_clipboard(user32, kernel32, html_format, hwnd)
+        landed_cf_html, landed_plain = _read_windows_clipboard(user32, kernel32, html_format, hwnd)
     finally:
-        if hwnd:
-            user32.DestroyWindow(hwnd)
+        user32.DestroyWindow(hwnd)
 
     if _TRAILING_WHITESPACE.sub('', landed_plain or '') != plain:
         raise ClipboardError('Clipboard verification failed: plain flavour did not round-trip.')
@@ -541,11 +624,14 @@ def copy_windows(text, plain_only):
 
     # Verify BOTH flavours off the live clipboard. A plain-only round trip can pass while the HTML is
     # absent, which is exactly how a paste loses its code formatting.
-    if landed_html is None:
+    if landed_cf_html is None:
         raise ClipboardError(
             'Clipboard verification failed: no HTML flavour present. Something overwrote the clipboard.'
         )
-    landed_spans = count_code_spans(landed_html)
+    landed_fragment = extract_cf_html_fragment(landed_cf_html) or ''
+    if html_visible_text(landed_fragment) != expected_visible:
+        raise ClipboardError('Clipboard verification failed: HTML flavour did not round-trip.')
+    landed_spans = count_code_spans(landed_fragment)
     if landed_spans != spans:
         raise ClipboardError(
             f'Clipboard verification failed: expected {spans} code spans, found {landed_spans} on the clipboard.'
