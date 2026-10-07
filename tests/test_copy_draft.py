@@ -1,7 +1,8 @@
 """copy_draft.py: pure text transforms, POSIX backend selection/argv, and (Windows-only) a real ctypes round trip.
 
-Never writes to this machine's real clipboard: this machine has a live Wayland session, so the POSIX
-backend tests inject a fake `run`/`which`/`environ` rather than calling wl-copy/wl-paste for real.
+Never writes to this machine's real clipboard, and never touches the primary selection either: this
+machine has a live Wayland session, so the POSIX backend tests inject a fake `run`/`which`/`environ`
+rather than calling wl-copy/wl-paste/xclip/xsel/pbcopy for real.
 """
 import importlib.util
 import os
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / '.agents/machine/utility/clip/scripts/copy_draft.py'
@@ -52,6 +54,17 @@ class ReadDraftFileTests(unittest.TestCase):
         path = Path(self.temp.name) / 'draft.txt'
         path.write_bytes('café é\r\nsecond line\r\n'.encode('utf-8'))
         self.assertEqual(COPY_DRAFT.read_draft_file(str(path)), 'café é\nsecond line')
+
+    def test_a_leading_bom_is_dropped(self):
+        path = Path(self.temp.name) / 'bom.txt'
+        path.write_bytes(b'\xef\xbb\xbf' + 'hello\nworld'.encode('utf-8'))
+        self.assertEqual(COPY_DRAFT.read_draft_file(str(path)), 'hello\nworld')
+
+    def test_non_utf8_bytes_are_a_clear_one_line_error(self):
+        path = Path(self.temp.name) / 'latin1.txt'
+        path.write_bytes('café'.encode('latin-1'))  # 0xe9 with no continuation byte is invalid UTF-8.
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'not valid UTF-8'):
+            COPY_DRAFT.read_draft_file(str(path))
 
 
 class UnwrapBacktickSpansTests(unittest.TestCase):
@@ -100,6 +113,15 @@ class BuildHtmlFragmentTests(unittest.TestCase):
         self.assertNotIn('<div>', fragment)
 
 
+class BuildFullHtmlTests(unittest.TestCase):
+    def test_wraps_the_fragment_in_a_minimal_utf8_document(self):
+        document = COPY_DRAFT.build_full_html('a <code>b</code>')
+        self.assertTrue(document.startswith('<html>'))
+        self.assertIn('<meta charset="utf-8">', document)
+        self.assertIn('<body>a <code>b</code></body>', document)
+        self.assertTrue(document.endswith('</html>'))
+
+
 class CountCodeSpansTests(unittest.TestCase):
     def test_counts_every_opening_code_tag(self):
         fragment = COPY_DRAFT.build_html_fragment('`a` `b` `c`')
@@ -134,60 +156,75 @@ class BuildCfHtmlTests(unittest.TestCase):
             self.assertIn(field, text)
 
 
-class PosixClipboardArgvTests(unittest.TestCase):
-    def which_only(self, *names):
-        allowed = set(names)
-        return lambda name: f'/usr/bin/{name}' if name in allowed else None
+def which_only(*names):
+    allowed = set(names)
+    return lambda name: f'/usr/bin/{name}' if name in allowed else None
 
-    def test_wayland_session_selects_wl_copy(self):
-        copy_argv, paste_argv, label = COPY_DRAFT.posix_clipboard_argv(
-            {'WAYLAND_DISPLAY': 'wayland-0'}, self.which_only('wl-copy', 'wl-paste')
-        )
-        self.assertEqual(copy_argv, ['wl-copy'])
-        self.assertEqual(paste_argv, ['wl-paste', '--no-newline'])
-        self.assertEqual(label, 'wl-copy')
 
-    def test_wayland_session_without_wl_clipboard_is_an_error_naming_the_package(self):
+class PosixClipboardToolTests(unittest.TestCase):
+    def test_wayland_session_selects_wl_copy_with_an_html_flavour(self):
+        tool = COPY_DRAFT.posix_clipboard_tool({'WAYLAND_DISPLAY': 'wayland-0'}, which_only('wl-copy', 'wl-paste'))
+        self.assertEqual(tool.label, 'wl-copy')
+        self.assertEqual(tool.copy_argv, ['wl-copy'])
+        self.assertEqual(tool.paste_argv, ['wl-paste', '--no-newline'])
+        self.assertEqual(tool.html_copy_argv, ['wl-copy', '--type', 'text/html'])
+        self.assertEqual(tool.html_paste_argv, ['wl-paste', '--type', 'text/html'])
+
+    def test_wayland_session_without_wl_clipboard_and_no_display_is_an_error_naming_the_package(self):
         with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-clipboard'):
-            COPY_DRAFT.posix_clipboard_argv({'WAYLAND_DISPLAY': 'wayland-0'}, self.which_only())
+            COPY_DRAFT.posix_clipboard_tool({'WAYLAND_DISPLAY': 'wayland-0'}, which_only())
 
-    def test_x11_session_prefers_xclip(self):
-        copy_argv, paste_argv, label = COPY_DRAFT.posix_clipboard_argv(
-            {'DISPLAY': ':0'}, self.which_only('xclip', 'xsel')
+    def test_wayland_session_without_wl_copy_falls_back_to_xclip_when_display_is_also_set(self):
+        # XWayland means a Wayland session can still have DISPLAY set; missing wl-copy is not fatal there.
+        tool = COPY_DRAFT.posix_clipboard_tool(
+            {'WAYLAND_DISPLAY': 'wayland-0', 'DISPLAY': ':0'}, which_only('xclip')
         )
-        self.assertEqual(copy_argv, ['xclip', '-selection', 'clipboard'])
-        self.assertEqual(paste_argv, ['xclip', '-selection', 'clipboard', '-o'])
-        self.assertEqual(label, 'xclip')
+        self.assertEqual(tool.label, 'xclip')
 
-    def test_x11_session_falls_back_to_xsel(self):
-        copy_argv, paste_argv, label = COPY_DRAFT.posix_clipboard_argv(
-            {'DISPLAY': ':0'}, self.which_only('xsel')
+    def test_wayland_session_without_wl_copy_falls_back_to_xsel_when_display_is_also_set(self):
+        tool = COPY_DRAFT.posix_clipboard_tool(
+            {'WAYLAND_DISPLAY': 'wayland-0', 'DISPLAY': ':0'}, which_only('xsel')
         )
-        self.assertEqual(copy_argv, ['xsel', '--clipboard', '--input'])
-        self.assertEqual(paste_argv, ['xsel', '--clipboard', '--output'])
-        self.assertEqual(label, 'xsel')
+        self.assertEqual(tool.label, 'xsel')
+
+    def test_x11_session_prefers_xclip_with_an_html_flavour(self):
+        tool = COPY_DRAFT.posix_clipboard_tool({'DISPLAY': ':0'}, which_only('xclip', 'xsel'))
+        self.assertEqual(tool.label, 'xclip')
+        self.assertEqual(tool.copy_argv, ['xclip', '-selection', 'clipboard'])
+        self.assertEqual(tool.paste_argv, ['xclip', '-selection', 'clipboard', '-o'])
+        self.assertEqual(tool.html_copy_argv, ['xclip', '-selection', 'clipboard', '-t', 'text/html'])
+        self.assertEqual(tool.html_paste_argv, ['xclip', '-selection', 'clipboard', '-t', 'text/html', '-o'])
+
+    def test_x11_session_falls_back_to_xsel_with_no_html_flavour(self):
+        tool = COPY_DRAFT.posix_clipboard_tool({'DISPLAY': ':0'}, which_only('xsel'))
+        self.assertEqual(tool.label, 'xsel')
+        self.assertEqual(tool.copy_argv, ['xsel', '--clipboard', '--input'])
+        self.assertEqual(tool.paste_argv, ['xsel', '--clipboard', '--output'])
+        self.assertIsNone(tool.html_copy_argv)
+        self.assertIsNone(tool.html_paste_argv)
 
     def test_x11_session_without_either_tool_is_an_error(self):
         with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'xclip or xsel'):
-            COPY_DRAFT.posix_clipboard_argv({'DISPLAY': ':0'}, self.which_only())
+            COPY_DRAFT.posix_clipboard_tool({'DISPLAY': ':0'}, which_only())
 
-    def test_darwin_selects_pbcopy(self):
+    def test_darwin_selects_pbcopy_with_no_html_flavour(self):
         real_platform = COPY_DRAFT.sys.platform
         COPY_DRAFT.sys.platform = 'darwin'
         try:
-            copy_argv, paste_argv, label = COPY_DRAFT.posix_clipboard_argv({}, self.which_only('pbcopy', 'pbpaste'))
+            tool = COPY_DRAFT.posix_clipboard_tool({}, which_only('pbcopy', 'pbpaste'))
         finally:
             COPY_DRAFT.sys.platform = real_platform
-        self.assertEqual(copy_argv, ['pbcopy'])
-        self.assertEqual(paste_argv, ['pbpaste'])
-        self.assertEqual(label, 'pbcopy')
+        self.assertEqual(tool.label, 'pbcopy')
+        self.assertEqual(tool.copy_argv, ['pbcopy'])
+        self.assertEqual(tool.paste_argv, ['pbpaste'])
+        self.assertIsNone(tool.html_copy_argv)
 
     def test_no_session_detected_is_an_error(self):
         real_platform = COPY_DRAFT.sys.platform
         COPY_DRAFT.sys.platform = 'linux'
         try:
             with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'No supported clipboard session'):
-                COPY_DRAFT.posix_clipboard_argv({}, self.which_only('wl-copy', 'xclip', 'pbcopy'))
+                COPY_DRAFT.posix_clipboard_tool({}, which_only('wl-copy', 'xclip', 'pbcopy'))
         finally:
             COPY_DRAFT.sys.platform = real_platform
 
@@ -211,70 +248,181 @@ def make_run(results):
 
 
 class CopyPosixTests(unittest.TestCase):
-    """Exercises the exact argv/stdin copy_posix sends, with a fake `run` -- never the real clipboard."""
+    """Exercises the exact argv/stdin/env copy_posix sends, with a fake `run` -- never a real clipboard."""
 
-    def which_only(self, *names):
-        allowed = set(names)
-        return lambda name: f'/usr/bin/{name}' if name in allowed else None
+    def setUp(self):
+        # The retry loop sleeps for real between attempts; stubbed out so a mismatch test does not cost
+        # up to a second of wall-clock time for nothing.
+        patcher = mock.patch.object(COPY_DRAFT.time, 'sleep', return_value=None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
-    def test_wl_copy_is_called_with_stdin_text_and_wl_paste_reads_it_back(self):
-        run = make_run([FakeResult(stdout=''), FakeResult(stdout='hello world')])
+    # --- default mode copies HTML when the tool supports it ---
+
+    def test_wl_copy_default_mode_copies_html_with_the_type_flag_and_counts_code_spans(self):
+        run = make_run([
+            FakeResult(stdout=''),
+            FakeResult(stdout=COPY_DRAFT.build_full_html(COPY_DRAFT.build_html_fragment('run `az login` now'))),
+        ])
         message = COPY_DRAFT.copy_posix(
-            'hello world',
-            environ={'WAYLAND_DISPLAY': 'wayland-0'},
-            which=self.which_only('wl-copy', 'wl-paste'),
-            run=run,
+            'run `az login` now', plain_only=False,
+            environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
         )
         (copy_argv, copy_kwargs), (paste_argv, paste_kwargs) = run.calls
-        self.assertEqual(copy_argv, ['wl-copy'])
-        self.assertEqual(copy_kwargs['input'], 'hello world')
-        self.assertNotIn('stdin', copy_kwargs)
-        self.assertEqual(paste_argv, ['wl-paste', '--no-newline'])
-        self.assertEqual(paste_kwargs['stdin'], subprocess.DEVNULL)
-        self.assertNotIn('input', paste_kwargs)
-        self.assertIn('Copied 11 chars', message)
-        self.assertIn('markdown kept for the paste target', message)
+        self.assertEqual(copy_argv, ['wl-copy', '--type', 'text/html'])
+        self.assertIn('<code', copy_kwargs['input'])
+        self.assertEqual(paste_argv, ['wl-paste', '--type', 'text/html'])
+        self.assertIn('1 code spans', message)
+        self.assertIn('HTML verified', message)
 
-    def test_backticks_travel_intact_through_the_posix_backend(self):
-        run = make_run([FakeResult(stdout=''), FakeResult(stdout='run `az login` now')])
+    def test_xclip_default_mode_copies_html_with_the_type_flag(self):
+        run = make_run([
+            FakeResult(stdout=''),
+            FakeResult(stdout=COPY_DRAFT.build_full_html(COPY_DRAFT.build_html_fragment('`a` `b`'))),
+        ])
         message = COPY_DRAFT.copy_posix(
-            'run `az login` now',
-            environ={'DISPLAY': ':0'},
-            which=self.which_only('xclip'),
-            run=run,
+            '`a` `b`', plain_only=False, environ={'DISPLAY': ':0'}, which=which_only('xclip'), run=run,
         )
-        self.assertIn('Copied', message)
-        copy_argv, copy_kwargs = run.calls[0]
-        self.assertEqual(copy_kwargs['input'], 'run `az login` now')
+        copy_argv, _ = run.calls[0]
+        paste_argv, _ = run.calls[1]
+        self.assertEqual(copy_argv, ['xclip', '-selection', 'clipboard', '-t', 'text/html'])
+        self.assertEqual(paste_argv, ['xclip', '-selection', 'clipboard', '-t', 'text/html', '-o'])
+        self.assertIn('2 code spans', message)
 
-    def test_a_readback_mismatch_is_an_error(self):
-        run = make_run([FakeResult(stdout=''), FakeResult(stdout='something else')])
-        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'did not read back'):
+    def test_a_code_span_count_mismatch_in_the_html_readback_is_an_error(self):
+        run = make_run([FakeResult(stdout='')] + [FakeResult(stdout='<html><body>no spans here</body></html>')] * 5)
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'expected 1 code spans, found 0'):
             COPY_DRAFT.copy_posix(
-                'hello world',
-                environ={'WAYLAND_DISPLAY': 'wayland-0'},
-                which=self.which_only('wl-copy', 'wl-paste'),
-                run=run,
+                'run `az login` now', plain_only=False,
+                environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
             )
 
-    def test_trailing_whitespace_in_the_readback_is_stripped_before_comparing(self):
+    def test_the_html_readback_is_retried_before_reporting_a_mismatch(self):
+        run = make_run([
+            FakeResult(stdout=''),
+            FakeResult(stdout='<html><body></body></html>'),  # stale/empty selection, as wl-paste can see
+            FakeResult(stdout=COPY_DRAFT.build_full_html(COPY_DRAFT.build_html_fragment('`az login`'))),
+        ])
+        message = COPY_DRAFT.copy_posix(
+            '`az login`', plain_only=False,
+            environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
+        )
+        self.assertEqual(len(run.calls), 3)
+        self.assertIn('1 code spans', message)
+
+    # --- xsel/pbcopy have no HTML flavour, so default mode falls back to plain and says so ---
+
+    def test_xsel_only_falls_back_to_plain_text_and_says_so(self):
+        run = make_run([FakeResult(stdout=''), FakeResult(stdout='run `az login` now')])
+        message = COPY_DRAFT.copy_posix(
+            'run `az login` now', plain_only=False,
+            environ={'DISPLAY': ':0'}, which=which_only('xsel'), run=run,
+        )
+        copy_argv, _ = run.calls[0]
+        self.assertEqual(copy_argv, ['xsel', '--clipboard', '--input'])
+        self.assertIn('xsel cannot set an HTML flavour', message)
+
+    def test_pbcopy_falls_back_to_plain_text_and_says_so(self):
+        real_platform = COPY_DRAFT.sys.platform
+        COPY_DRAFT.sys.platform = 'darwin'
+        try:
+            run = make_run([FakeResult(stdout=''), FakeResult(stdout='run `az login` now')])
+            message = COPY_DRAFT.copy_posix(
+                'run `az login` now', plain_only=False,
+                environ={}, which=which_only('pbcopy', 'pbpaste'), run=run,
+            )
+        finally:
+            COPY_DRAFT.sys.platform = real_platform
+        self.assertIn('pbcopy has no HTML flavour', message)
+
+    def test_pbcopy_and_pbpaste_run_with_a_utf8_locale_env(self):
+        real_platform = COPY_DRAFT.sys.platform
+        COPY_DRAFT.sys.platform = 'darwin'
+        try:
+            run = make_run([FakeResult(stdout=''), FakeResult(stdout='café')])
+            COPY_DRAFT.copy_posix(
+                'café', plain_only=False, environ={'PATH': '/usr/bin'},
+                which=which_only('pbcopy', 'pbpaste'), run=run,
+            )
+        finally:
+            COPY_DRAFT.sys.platform = real_platform
+        copy_env = run.calls[0][1]['env']
+        paste_env = run.calls[1][1]['env']
+        self.assertEqual(copy_env['LANG'], 'en_US.UTF-8')
+        self.assertEqual(copy_env['LC_CTYPE'], 'en_US.UTF-8')
+        self.assertEqual(copy_env['PATH'], '/usr/bin')
+        self.assertEqual(paste_env['LANG'], 'en_US.UTF-8')
+
+    # --- --plain-only always copies the literal text, everywhere ---
+
+    def test_plain_only_copies_literal_text_even_when_the_tool_supports_html(self):
+        run = make_run([FakeResult(stdout=''), FakeResult(stdout='run `az login` now')])
+        message = COPY_DRAFT.copy_posix(
+            'run `az login` now', plain_only=True,
+            environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
+        )
+        copy_argv, copy_kwargs = run.calls[0]
+        self.assertEqual(copy_argv, ['wl-copy'])
+        self.assertEqual(copy_kwargs['input'], 'run `az login` now')
+        self.assertIn('plain text only', message)
+
+    def test_backticks_travel_intact_through_plain_only(self):
+        run = make_run([FakeResult(stdout=''), FakeResult(stdout='run `az login` now')])
+        COPY_DRAFT.copy_posix(
+            'run `az login` now', plain_only=True,
+            environ={'DISPLAY': ':0'}, which=which_only('xclip'), run=run,
+        )
+        copy_kwargs = run.calls[0][1]
+        self.assertEqual(copy_kwargs['input'], 'run `az login` now')
+
+    def test_trailing_whitespace_in_the_plain_readback_is_stripped_before_comparing(self):
         run = make_run([FakeResult(stdout=''), FakeResult(stdout='hello world   \n')])
         message = COPY_DRAFT.copy_posix(
-            'hello world',
-            environ={'WAYLAND_DISPLAY': 'wayland-0'},
-            which=self.which_only('wl-copy', 'wl-paste'),
-            run=run,
+            'hello world', plain_only=True,
+            environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
         )
         self.assertIn('Copied 11 chars', message)
+
+    def test_the_plain_readback_is_retried_before_reporting_a_mismatch(self):
+        run = make_run([FakeResult(stdout=''), FakeResult(stdout=''), FakeResult(stdout='hello world')])
+        message = COPY_DRAFT.copy_posix(
+            'hello world', plain_only=True,
+            environ={'DISPLAY': ':0'}, which=which_only('xclip'), run=run,
+        )
+        self.assertEqual(len(run.calls), 3)
+        self.assertIn('plain text only', message)
+
+    def test_a_plain_readback_mismatch_is_an_error_after_retries_are_exhausted(self):
+        run = make_run([FakeResult(stdout='')] + [FakeResult(stdout='something else')] * 5)
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'did not read back'):
+            COPY_DRAFT.copy_posix(
+                'hello world', plain_only=True,
+                environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
+            )
+
+    # --- the copy command's own stdio, and failures of it ---
+
+    def test_the_copy_command_discards_stdout_and_stderr_instead_of_capturing_them(self):
+        run = make_run([FakeResult(stdout=''), FakeResult(stdout='hello world')])
+        COPY_DRAFT.copy_posix(
+            'hello world', plain_only=True,
+            environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
+        )
+        copy_kwargs = run.calls[0][1]
+        self.assertEqual(copy_kwargs['stdout'], subprocess.DEVNULL)
+        self.assertEqual(copy_kwargs['stderr'], subprocess.DEVNULL)
+        self.assertNotIn('stdin', copy_kwargs)
+        paste_kwargs = run.calls[1][1]
+        self.assertEqual(paste_kwargs['stdout'], subprocess.PIPE)
+        self.assertEqual(paste_kwargs['stderr'], subprocess.PIPE)
+        self.assertEqual(paste_kwargs['stdin'], subprocess.DEVNULL)
 
     def test_a_nonzero_exit_from_the_copy_tool_is_an_error(self):
         run = make_run([FakeResult(returncode=1, stderr='no selection owner')])
-        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'no selection owner'):
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-copy copy failed'):
             COPY_DRAFT.copy_posix(
-                'hello world',
-                environ={'WAYLAND_DISPLAY': 'wayland-0'},
-                which=self.which_only('wl-copy', 'wl-paste'),
-                run=run,
+                'hello world', plain_only=True,
+                environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
             )
 
     def test_a_timeout_from_the_copy_tool_is_an_error(self):
@@ -283,25 +431,28 @@ class CopyPosixTests(unittest.TestCase):
 
         with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'did not answer within'):
             COPY_DRAFT.copy_posix(
-                'hello world',
-                environ={'WAYLAND_DISPLAY': 'wayland-0'},
-                which=self.which_only('wl-copy', 'wl-paste'),
-                run=run,
+                'hello world', plain_only=True,
+                environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
             )
 
     def test_no_clipboard_tool_found_is_an_error_naming_the_package(self):
         with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-clipboard'):
             COPY_DRAFT.copy_posix(
-                'hello world',
-                environ={'WAYLAND_DISPLAY': 'wayland-0'},
-                which=self.which_only(),
-                run=make_run([]),
+                'hello world', plain_only=True,
+                environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only(), run=make_run([]),
             )
 
 
 @unittest.skipUnless(os.name == 'nt', 'Exercises the real Windows clipboard via ctypes; Windows only.')
 class WindowsCtypesRoundTripTests(unittest.TestCase):
     """Runs only on Windows. Writes to the real clipboard there -- never on this (Linux) machine."""
+
+    def _read_clipboard(self, user32, kernel32, html_format):
+        hwnd = COPY_DRAFT._create_message_window(user32)
+        try:
+            return COPY_DRAFT._read_windows_clipboard(user32, kernel32, html_format, hwnd)
+        finally:
+            user32.DestroyWindow(hwnd)
 
     def test_both_flavours_round_trip_through_the_real_clipboard(self):
         text = "run `az login` now\n\nsecond paragraph"
@@ -310,19 +461,19 @@ class WindowsCtypesRoundTripTests(unittest.TestCase):
 
         user32, kernel32 = COPY_DRAFT._windows_api()
         html_format = user32.RegisterClipboardFormatW('HTML Format')
-        html, plain = COPY_DRAFT._read_windows_clipboard(user32, kernel32, html_format)
+        html, plain = self._read_clipboard(user32, kernel32, html_format)
         self.assertIsNotNone(html)
         self.assertIn('<code', html)
         self.assertEqual(plain, COPY_DRAFT.unwrap_backtick_spans(text))
 
-    def test_plain_only_writes_literal_text_with_no_html_flavour(self):
+    def test_plain_only_writes_literal_text_with_no_html_flavour_and_is_verified(self):
         text = 'a literal `command` to run'
         message = COPY_DRAFT.copy_windows(text, plain_only=True)
         self.assertIn('plain text only', message)
 
         user32, kernel32 = COPY_DRAFT._windows_api()
         html_format = user32.RegisterClipboardFormatW('HTML Format')
-        html, plain = COPY_DRAFT._read_windows_clipboard(user32, kernel32, html_format)
+        html, plain = self._read_clipboard(user32, kernel32, html_format)
         self.assertIsNone(html)
         self.assertEqual(plain, text)
 
