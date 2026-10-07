@@ -602,6 +602,92 @@ Start-Sleep -Seconds 20
     Write-Output 'PASS finish.tests.ps1: reaper timeout path'
 
 
+    $stderrWarningRoot = Join-Path $scratch 'reaper-stderr-warning'
+    New-Item -ItemType Directory -Path $stderrWarningRoot -Force | Out-Null
+    $stderrWarningState = Join-Path $stderrWarningRoot 'state'
+    $stderrWarningRepo = New-TestRepo -Root $stderrWarningRoot
+    $stderrWarningWorktree = Add-FeatureWorktree -Primary $stderrWarningRepo.Primary -Root $stderrWarningRoot -Branch 'feature'
+    $stderrWarningResolved = Get-ResolvedPath $stderrWarningWorktree
+    $stderrWarningHead = (Invoke-GitOrThrow -Cwd $stderrWarningWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+
+    Invoke-GitOrThrow -Cwd $stderrWarningRepo.Primary -Arguments @('checkout', '-q', 'main') | Out-Null
+    Invoke-GitOrThrow -Cwd $stderrWarningRepo.Primary -Arguments @('merge', '-q', '--no-ff', '-m', 'merge feature', 'feature') | Out-Null
+    Invoke-GitOrThrow -Cwd $stderrWarningRepo.Primary -Arguments @('push', '-q', 'origin', 'main') | Out-Null
+    Invoke-GitOrThrow -Cwd $stderrWarningRepo.Primary -Arguments @('reset', '--hard', 'HEAD~1') | Out-Null
+
+    $stderrWarningResult = Join-Path $stderrWarningRoot 'result.json'
+    $stderrWarningDeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $stderrWarningDeadHost.WaitForExit(5000) | Out-Null
+    $stderrWarningDeadStart = ([DateTimeOffset]($stderrWarningDeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $stderrWarningReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $stderrWarningDeadHost.Id, '-HostStart', $stderrWarningDeadStart,
+        '-Head', $stderrWarningHead,
+        '-Primary', $stderrWarningRepo.Primary, '-Worktree', $stderrWarningResolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $stderrWarningResult,
+        '-StateDirectory', $stderrWarningState
+    ) -PassThru -WindowStyle Hidden
+
+    $stderrWarningWrote = Wait-Condition -TimeoutSeconds 60 -Condition {
+        $record = Read-JsonFile -Path $stderrWarningResult
+        $null -ne $record -and $null -ne $record.status
+    }
+    if (-not $stderrWarningWrote -and (Get-Process -Id $stderrWarningReaperProcess.Id -ErrorAction SilentlyContinue)) {
+        Stop-TestProcessTree $stderrWarningReaperProcess.Id
+    }
+
+    $stderrWarningRecord = Read-JsonFile -Path $stderrWarningResult
+    Assert-True -Actual ($null -ne $stderrWarningRecord) -Message 'The stderr-warning scenario did not write a result record.'
+    Assert-Equal -Expected 'succeeded' -Actual $stderrWarningRecord.status -Message "The reaper recorded $($stderrWarningRecord.status) instead of succeeded for a branch -d that only warned on stderr: $($stderrWarningRecord.error)"
+    Assert-False -Actual (Test-Path -LiteralPath $stderrWarningWorktree) -Message 'The worktree was not removed despite a successful reaper run.'
+    $stderrWarningBranchStillPresent = $(& git -C $stderrWarningRepo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
+    Assert-False -Actual $stderrWarningBranchStillPresent -Message 'The feature branch still exists despite a successful branch -d.'
+
+    Write-Output 'PASS finish.tests.ps1: reaper records success despite a stderr warning under Windows PowerShell'
+
+
+    $alreadyRemovedRoot = Join-Path $scratch 'reaper-already-removed'
+    New-Item -ItemType Directory -Path $alreadyRemovedRoot -Force | Out-Null
+    $alreadyRemovedState = Join-Path $alreadyRemovedRoot 'state'
+    $alreadyRemovedRepo = New-TestRepo -Root $alreadyRemovedRoot
+    $alreadyRemovedWorktree = Add-FeatureWorktree -Primary $alreadyRemovedRepo.Primary -Root $alreadyRemovedRoot -Branch 'feature'
+    $alreadyRemovedResolved = Get-ResolvedPath $alreadyRemovedWorktree
+    $alreadyRemovedHead = (Invoke-GitOrThrow -Cwd $alreadyRemovedWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+
+    Invoke-GitOrThrow -Cwd $alreadyRemovedRepo.Primary -Arguments @('worktree', 'remove', '--', $alreadyRemovedWorktree) | Out-Null
+
+    $alreadyRemovedResult = Join-Path $alreadyRemovedRoot 'result.json'
+    $alreadyRemovedDeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $alreadyRemovedDeadHost.WaitForExit(5000) | Out-Null
+    $alreadyRemovedDeadStart = ([DateTimeOffset]($alreadyRemovedDeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $alreadyRemovedReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $alreadyRemovedDeadHost.Id, '-HostStart', $alreadyRemovedDeadStart,
+        '-Head', $alreadyRemovedHead,
+        '-Primary', $alreadyRemovedRepo.Primary, '-Worktree', $alreadyRemovedResolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $alreadyRemovedResult,
+        '-StateDirectory', $alreadyRemovedState
+    ) -PassThru -WindowStyle Hidden
+
+    $alreadyRemovedWrote = Wait-Condition -TimeoutSeconds 60 -Condition {
+        $record = Read-JsonFile -Path $alreadyRemovedResult
+        $null -ne $record -and $null -ne $record.status
+    }
+    if (-not $alreadyRemovedWrote -and (Get-Process -Id $alreadyRemovedReaperProcess.Id -ErrorAction SilentlyContinue)) {
+        Stop-TestProcessTree $alreadyRemovedReaperProcess.Id
+    }
+
+    $alreadyRemovedRecord = Read-JsonFile -Path $alreadyRemovedResult
+    Assert-True -Actual ($null -ne $alreadyRemovedRecord) -Message 'The already-removed scenario did not write a result record.'
+    Assert-Equal -Expected 'succeeded' -Actual $alreadyRemovedRecord.status -Message "The reaper recorded $($alreadyRemovedRecord.status) instead of succeeded for an already-removed worktree: $($alreadyRemovedRecord.error)"
+    $alreadyRemovedBranchStillPresent = $(& git -C $alreadyRemovedRepo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
+    Assert-False -Actual $alreadyRemovedBranchStillPresent -Message 'The feature branch still exists despite the already-removed worktree being treated as success.'
+
+    Write-Output 'PASS finish.tests.ps1: reaper treats an already-removed worktree as success'
+
+
     $r1aRoot = Join-Path $scratch 'r1-preflight-moved-head'
     New-Item -ItemType Directory -Path $r1aRoot -Force | Out-Null
     $r1aState = Join-Path $r1aRoot 'state'
