@@ -1,7 +1,9 @@
 ﻿$ErrorActionPreference = 'Stop'
 
-# End-to-end validation of the generated handoff launchers, per PACKAGING.md: neither must require a
-# machine-local file this plugin does not ship. Runs against the actual generated package
+# End-to-end validation of the generated PowerShell handoff launcher, per PACKAGING.md: it must not
+# require a machine-local file this plugin does not ship. handoff-claude's own Python launcher has its
+# own tests in test_launch_claude.py; this file covers launch-codex.ps1 and the terminal claude/session
+# recovery entry points that still dot-source agent-cli.ps1. Runs against the actual generated package
 # (plugins/machine/skills/...), from an isolated fake profile with no `.claude\routing\route.py` anywhere,
 # an unrelated working directory, and paths containing spaces. Windows Terminal is stubbed so no real
 # terminal window opens; a fake codex.exe is compiled so launch-codex.ps1's own version-discovery step
@@ -9,14 +11,12 @@
 
 $repository = Split-Path -Parent $PSScriptRoot
 $pluginRoot = Join-Path $repository 'plugins\machine'
-$claudeLauncher = Join-Path $repository 'plugins\machine\skills\handoff-claude\scripts\launch-claude.ps1'
 $codexLauncher = Join-Path $repository 'plugins\machine\skills\handoff-codex\scripts\launch-codex.ps1'
 $packagedLaunchers = @(Get-ChildItem -LiteralPath $pluginRoot -Recurse -File -Filter '*.ps1' |
     Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'agent-cli\.ps1' } |
     Select-Object -ExpandProperty FullName)
 $expectedLaunchers = @(
     foreach ($tree in @('.agents\machine\utility', 'codex-skills', 'skills')) {
-        Join-Path $pluginRoot "$tree\handoff-claude\scripts\launch-claude.ps1"
         Join-Path $pluginRoot "$tree\handoff-codex\scripts\launch-codex.ps1"
     }
     Join-Path $pluginRoot 'resources\machine\scripts\claude-profile.ps1'
@@ -45,6 +45,8 @@ $originalClaudeConfig = $env:CLAUDE_CONFIG_DIR
 $originalUserProfile = $env:USERPROFILE
 $originalLocalAppData = $env:LOCALAPPDATA
 $originalWtLog = $env:WT_STUB_LOG
+$originalPSModuleAnalysisCachePath = $env:PSModuleAnalysisCachePath
+$moduleAnalysisCachePath = Join-Path $scratch 'powershell cache\ModuleAnalysisCache'
 
 function New-Stub {
     param(
@@ -74,6 +76,8 @@ try {
     foreach ($dir in @($fakeProfile, $fakeLocalAppData, $binDir, $workDir, $promptDir)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $moduleAnalysisCachePath) | Out-Null
+    $env:PSModuleAnalysisCachePath = $moduleAnalysisCachePath
 
     # The confirmed defect's precondition: the old resolver is absent, and nothing here recreates it.
     $oldRouting = Join-Path $fakeProfile '.claude\routing\route.py'
@@ -144,6 +148,45 @@ class Stub {
     $env:LOCALAPPDATA = $fakeLocalAppData
     $env:WT_STUB_LOG = $wtLog
 
+    $cacheProbeCwd = Join-Path $scratch "cache probe $([guid]::NewGuid().ToString('N'))"
+    $cacheProbePath = Join-Path $scratch 'powershell cache\DiscoveryProbeCache'
+    New-Item -ItemType Directory -Path $cacheProbeCwd | Out-Null
+    $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $cacheProbeCommand = @'
+$ErrorActionPreference = 'Stop'
+if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+    throw 'The module cache regression requires Windows PowerShell 5.1.'
+}
+Get-Module -ListAvailable | Out-Null
+Get-Command * | Out-Null
+$deadline = [DateTime]::UtcNow.AddSeconds(20)
+while (-not (Test-Path -LiteralPath $env:PSModuleAnalysisCachePath -PathType Leaf) -and [DateTime]::UtcNow -lt $deadline) {
+    Start-Sleep -Milliseconds 100
+}
+if (-not (Test-Path -LiteralPath $env:PSModuleAnalysisCachePath -PathType Leaf)) {
+    throw 'Windows PowerShell module discovery did not create the explicit scratch cache.'
+}
+if ((Get-Item -LiteralPath $env:PSModuleAnalysisCachePath).Length -eq 0) {
+    throw 'Windows PowerShell module discovery created an empty cache.'
+}
+if (Test-Path -LiteralPath (Join-Path (Get-Location).Path 'Microsoft')) {
+    throw 'Windows PowerShell module discovery polluted its working directory.'
+}
+'@
+    $cacheProbeEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cacheProbeCommand))
+    $env:PSModuleAnalysisCachePath = $cacheProbePath
+    Push-Location $cacheProbeCwd
+    try {
+        & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $cacheProbeEncoded
+        if ($LASTEXITCODE -ne 0) { throw 'The Windows PowerShell module cache regression failed.' }
+    } finally {
+        Pop-Location
+        $env:PSModuleAnalysisCachePath = $moduleAnalysisCachePath
+    }
+    if (-not (Test-Path -LiteralPath $cacheProbePath -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $cacheProbeCwd 'Microsoft'))) {
+        throw 'Windows PowerShell module discovery escaped the explicit scratch cache.'
+    }
+
     # Every generated discovery layout must load the shipped shared library and reach the stub terminal.
     # The packaged canonical `.agents/machine/.../scripts` copy is one directory deeper than the host
     # `skills` and `codex-skills` copies; exercising all six catches a resolver that supports only one.
@@ -151,7 +194,6 @@ class Stub {
         if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
         switch (Split-Path -Leaf $launcher) {
             'launch-codex.ps1' { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'layout test' | Out-Null }
-            'launch-claude.ps1' { & $launcher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'layout test' | Out-Null }
             default { throw "Unexpected generated launcher: $launcher" }
         }
         if (-not (Test-Path -LiteralPath $wtLog)) {
@@ -174,8 +216,8 @@ class Stub {
     }
 
     # --- the shared escaping survives a quote, a semicolon and a trailing backslash before a space ---
-    # -Title is the only free-form string either launcher still hands to Invoke-AgentTerminalTab (an
-    # inline -Prompt moved to Python with open-claude), so it is what carries these values through. The
+    # -Title is the only free-form string launch-codex.ps1 hands to Invoke-AgentTerminalTab (open-claude and
+    # handoff-claude moved to Python, whose escaping test_agent_cli.py covers), so it carries these values. The
     # stub only captures what wt.exe itself would receive (one hop); the backslash-quote sequences
     # agent-cli.ps1 embeds are meant to survive Windows Terminal's own dumb re-quoting unmodified and are
     # only resolved by the final child process's own argv parsing, and a `\;` is Windows Terminal's own
@@ -198,10 +240,10 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
     $prompt = 'C:\two\ trailing\'
     foreach ($value in @($title, $prompt)) {
         Remove-Item -LiteralPath $wtLog -Force
-        & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title $value | Out-Null
+        & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title $value | Out-Null
         $delivered = @([System.IO.File]::ReadAllText($wtLog) -split [char]0x1f)
         $titleIndex = [array]::IndexOf($delivered, '--title') + 1
-        if ($titleIndex -le 0) { throw "launch-claude.ps1 did not pass --title through for: $value" }
+        if ($titleIndex -le 0) { throw "launch-codex.ps1 did not pass --title through for: $value" }
         # An unescaped semicolon is a split point to Windows Terminal itself (CommandLineToArgvW does not
         # treat `;` specially, so it cannot catch this): every semicolon reaching the stub must have a
         # backslash immediately before it, or a real launch would have been cut there.
@@ -214,24 +256,8 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
         }
     }
 
-    # --- handoff-claude: no -Model means the harness picks its own default ---
-    $env:WT_STUB_LOG = $wtLog
-    if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
-    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff'
-    if (-not (Test-Path -LiteralPath $wtLog)) { throw 'launch-claude.ps1 did not invoke the (stubbed) terminal.' }
-    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
-    if ($capturedArgs -match '--model') { throw 'launch-claude.ps1 passed --model when none was given.' }
-    if ($capturedArgs -notmatch [regex]::Escape($claudeBin + '\claude.exe')) {
-        throw 'launch-claude.ps1 did not target the packaged/discovered claude.exe.'
-    }
-
-    # --- handoff-claude: an explicit -Model is passed straight through ---
-    Remove-Item -LiteralPath $wtLog -Force
-    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Model 'claude-sonnet-5'
-    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
-    if ($capturedArgs -notmatch 'claude-sonnet-5') { throw 'launch-claude.ps1 did not pass an explicit -Model through.' }
-
     # --- handoff-codex: no -Model/-ReasoningEffort means the harness picks its own default ---
+    $env:WT_STUB_LOG = $wtLog
     Remove-Item -LiteralPath $wtLog -Force
     $output = & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' 6>&1 2>&1 | Out-String
     if (-not (Test-Path -LiteralPath $wtLog)) { throw 'launch-codex.ps1 did not invoke the (stubbed) terminal.' }
@@ -247,38 +273,10 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
     $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
     if ($capturedArgs -notmatch 'gpt-5-codex') { throw 'launch-codex.ps1 did not pass an explicit -Model through.' }
     if ($capturedArgs -notmatch 'model_reasoning_effort=high') { throw 'launch-codex.ps1 did not pass -ReasoningEffort through.' }
-    # Lane and frontier expectations come from the tables the plugin actually ships, so a retiering there
-    # can never silently disagree with what these launchers pass through.
-    $claudeTable = Get-Content -LiteralPath (Join-Path $repository 'plugins\machine\resources\lanes\claude.json') -Raw | ConvertFrom-Json
+    # Lane and frontier expectations come from the table the plugin actually ships, so a retiering there
+    # can never silently disagree with what this launcher passes through. Claude's own lane and frontier
+    # resolution is exercised against the real table in test_launch_claude.py, not here.
     $codexTable = Get-Content -LiteralPath (Join-Path $repository 'plugins\machine\resources\lanes\codex.json') -Raw | ConvertFrom-Json
-
-    # --- handoff-claude: -Lane resolves through the shipped lane table ---
-    Remove-Item -LiteralPath $wtLog -Force
-    $launched = & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L3' 6>&1 | Out-String
-    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
-    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.lanes.L3.model)) { throw 'launch-claude.ps1 did not resolve -Lane L3 through the shipped table.' }
-    if ($launched -notmatch [regex]::Escape("lane L3 -> $($claudeTable.lanes.L3.model)")) { throw 'launch-claude.ps1 did not report the lane and model it launched.' }
-
-    # --- handoff-claude: an explicit -Model still beats -Lane ---
-    Remove-Item -LiteralPath $wtLog -Force
-    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane 'L3' -Model 'explicitly-named-model'
-    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
-    if ($capturedArgs -notmatch 'explicitly-named-model') { throw 'launch-claude.ps1 let -Lane override an explicit -Model.' }
-    if ($capturedArgs -match [regex]::Escape($claudeTable.lanes.L3.model)) { throw 'launch-claude.ps1 passed the lane model alongside an explicit -Model.' }
-
-    # --- handoff-claude: -Frontier resolves the tier above the ladder ---
-    Remove-Item -LiteralPath $wtLog -Force
-    & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier
-    $capturedArgs = [System.IO.File]::ReadAllText($wtLog)
-    if ($capturedArgs -notmatch [regex]::Escape($claudeTable.frontier.model)) { throw 'launch-claude.ps1 did not resolve -Frontier to the frontier model.' }
-
-    # --- handoff-claude: -Frontier rejects a competing selection instead of ranking it ---
-    foreach ($conflict in @(@{ Lane = 'L1' }, @{ Model = 'explicitly-named-model' })) {
-        $rejected = $false
-        try { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Frontier @conflict }
-        catch { $rejected = $true }
-        if (-not $rejected) { throw "launch-claude.ps1 accepted -Frontier together with $($conflict.Keys -join ',')." }
-    }
 
     # --- handoff-codex: -Lane resolves both model and effort ---
     Remove-Item -LiteralPath $wtLog -Force
@@ -314,9 +312,9 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
     # --- an out-of-ladder lane is rejected at the parameter surface, never silently defaulted ---
     foreach ($undefined in @('L0', 'L9')) {
         $rejected = $false
-        try { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane $undefined }
+        try { & $codexLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test handoff' -Lane $undefined }
         catch { $rejected = $true }
-        if (-not $rejected) { throw "launch-claude.ps1 accepted the undefined lane $undefined." }
+        if (-not $rejected) { throw "launch-codex.ps1 accepted the undefined lane $undefined." }
     }
 
     # --- the resolver's own guard also rejects a lane its table does not price: ValidateSet reaches the
@@ -342,15 +340,9 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
         }
     }))
     $env:PATH = "$binDir;$pythonDir;$gitDir;$env:SystemRoot\System32;$env:SystemRoot"
-    foreach ($start in @(
-            { & $claudeLauncher -WorkingDirectory $workDir -PromptPath $promptPath -Title 'test sync' })) {
-        if (Test-Path -LiteralPath $wtLog) { Remove-Item -LiteralPath $wtLog -Force }
-        $output = & $start 6>&1 | Out-String
-        if ($output -notmatch 'standards: could not check core .*this session loads base 0123456789ab') {
-            throw "A Claude launcher did not report the unreachable standards before launching:`n$output"
-        }
-        if (-not (Test-Path -LiteralPath $wtLog)) { throw 'A failed standards check stopped a Claude launch.' }
-    }
+    # handoff-claude's own standards-before-launch check moved to test_launch_claude.py with sync_claude_standards
+    # mocked; the fake plugin registry set up above is exercised below by the terminal claude function and
+    # session recovery instead, which still check standards through this same real claude_standards_sync.py path.
 
     $claudeStubLog = Join-Path $scratch 'claude-stub.log'
     $env:CLAUDE_STUB_LOG = $claudeStubLog
@@ -397,6 +389,11 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalUserProfile
     $env:LOCALAPPDATA = $originalLocalAppData
+    if ($null -eq $originalPSModuleAnalysisCachePath) {
+        Remove-Item Env:\PSModuleAnalysisCachePath -ErrorAction SilentlyContinue
+    } else {
+        $env:PSModuleAnalysisCachePath = $originalPSModuleAnalysisCachePath
+    }
     if ($null -ne $originalClaudeConfig) { $env:CLAUDE_CONFIG_DIR = $originalClaudeConfig }
     Remove-Item Env:\CLAUDE_STUB_LOG -ErrorAction SilentlyContinue
     if ($null -eq $originalWtLog) { Remove-Item Env:\WT_STUB_LOG -ErrorAction SilentlyContinue } else { $env:WT_STUB_LOG = $originalWtLog }

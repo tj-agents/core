@@ -1,6 +1,7 @@
 import importlib.util
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -146,6 +147,34 @@ class CompactRunTests(RepositoryFixture):
         with self.assertRaisesRegex(ops.WorkflowOperationError, "escapes"):
             ops.inspect_repository(self.root, "../outside")
 
+    def test_run_id_rejects_an_alias_to_another_run_inside_the_state_root(self):
+        runs = ops.state_root(self.root) / "runs"
+        target = runs / "target"
+        target.mkdir(parents=True)
+        alias = runs / "alias"
+        if sys.platform == "win32":
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(alias), str(target)],
+                capture_output=True, check=True,
+            )
+            self.addCleanup(alias.rmdir)
+        else:
+            alias.symlink_to(target, target_is_directory=True)
+            self.addCleanup(alias.unlink)
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "redirected"):
+            ops.run_root(self.root, "alias/nested")
+
+    def test_run_id_rejects_a_redirected_workflow_state_root(self):
+        state = ops.state_root(self.root)
+        original_redirect = ops.is_redirect
+        with mock.patch.object(
+            ops, "is_redirect",
+            side_effect=lambda path: Path(path) == state or original_redirect(path),
+        ):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "redirected"):
+                ops.run_root(self.root, "run-1")
+
 
 class InspectionAndSkillTests(RepositoryFixture):
     def test_inspection_consolidates_repository_identity(self):
@@ -185,7 +214,77 @@ class InspectionAndSkillTests(RepositoryFixture):
 class ReviewTests(RepositoryFixture):
     def setUp(self):
         super().setUp()
+        cache = Path(self.temp.name) / "review-cache"
+        cache.mkdir()
+        patcher = mock.patch.object(ops.tempfile, "gettempdir", return_value=str(cache))
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.head = self.commit("src/mapping.txt", "candidate\n", "candidate")
+
+    def test_failed_initial_routing_removes_the_unpublished_bundle_and_allows_retry(self):
+        with mock.patch.object(ops, "route_findings", side_effect=OSError("routing failed")):
+            with self.assertRaisesRegex(OSError, "routing failed"):
+                ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        result = ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
+
+    def test_failed_descriptor_publication_removes_the_unpublished_bundle_and_allows_retry(self):
+        original_atomic_json = ops.atomic_json
+
+        def fail_publication(path, value):
+            if Path(path).name == "descriptor.json":
+                raise OSError("publication failed")
+            original_atomic_json(path, value)
+
+        with mock.patch.object(ops, "atomic_json", side_effect=fail_publication):
+            with self.assertRaisesRegex(OSError, "publication failed"):
+                ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        result = ops.review_prepare(self.root, "retry", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
+
+    def test_rejected_preexisting_unpublished_bundle_is_preserved(self):
+        result = ops.review_prepare(self.root, "existing", "origin/main", "HEAD", False)
+        Path(result["artifact"]).unlink()
+        directory = Path(result["bundle"]["directory"])
+        original_patch = Path(result["bundle"]["patch"]).read_bytes()
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "already exists"):
+            ops.review_prepare(self.root, "existing", "origin/main", "HEAD", False)
+
+        self.assertTrue(directory.is_dir())
+        self.assertEqual(original_patch, Path(result["bundle"]["patch"]).read_bytes())
+
+    def test_cleanup_locked_expired_bundle_does_not_block_unrelated_preparation(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+        original_rmtree = ops.shutil.rmtree
+
+        def remove_unlocked(path, *args, **kwargs):
+            if Path(path) == Path(expired["bundle"]["directory"]):
+                raise PermissionError("bundle locked")
+            return original_rmtree(path, *args, **kwargs)
+
+        with mock.patch.object(ops.shutil, "rmtree", side_effect=remove_unlocked):
+            result = ops.review_prepare(self.root, "unrelated", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
+        self.assertTrue(Path(expired["bundle"]["directory"]).is_dir())
+
+    def test_cleanup_malformed_descriptor_does_not_block_unrelated_preparation(self):
+        for name, value in (("list", []), ("bundle-list", {"bundle": []})):
+            path = ops.run_root(self.root, name) / "review" / "candidate" / "descriptor.json"
+            ops.atomic_json(path, value)
+
+        result = ops.review_prepare(self.root, "unrelated", "origin/main", "HEAD", False)
+
+        self.assertTrue(Path(result["artifact"]).is_file())
 
     def test_small_candidate_gets_one_minimal_isolated_wave(self):
         result = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
@@ -200,6 +299,309 @@ class ReviewTests(RepositoryFixture):
         path_bytes = Path(result["bundle"]["paths"]).read_bytes()
         self.assertFalse(path_bytes.endswith(b"\0"))
         self.assertEqual(hashlib.sha256(path_bytes).hexdigest(), result["path_digest"])
+
+    def test_materialized_review_tree_is_outside_the_checkout_and_common_git_directory(self):
+        result = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        tree = Path(result["bundle"]["tree"]).resolve()
+        common = Path(self.git("rev-parse", "--path-format=absolute", "--git-common-dir")).resolve()
+        with self.assertRaises(ValueError):
+            tree.relative_to(self.root.resolve())
+        with self.assertRaises(ValueError):
+            tree.relative_to(common)
+
+    def test_temp_cache_under_another_registered_worktree_is_rejected(self):
+        linked = self.root.parent / "linked"
+        self.git("worktree", "add", "-q", "-b", "Fix/Linked", str(linked))
+        self.addCleanup(lambda: subprocess.run(
+            ["git", "worktree", "remove", "--force", str(linked)], cwd=self.root,
+            capture_output=True, text=True,
+        ))
+        with mock.patch.object(ops.tempfile, "gettempdir", return_value=str(self.root / "temporary")):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "inside the checkout"):
+                ops.review_bundle_locations(linked, "nested/run", "a" * 64)
+
+    def test_wholly_missing_bundle_restores_the_frozen_identity_after_head_moves(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        original = json.loads(Path(descriptor["artifact"]).read_text(encoding="utf-8"))
+        identity = Path(descriptor["bundle"]["identity"]).read_bytes()
+        shutil.rmtree(descriptor["bundle"]["directory"])
+        self.commit("src/later.txt", "later\n", "later candidate")
+
+        reconciled = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+
+        restored = json.loads(Path(descriptor["artifact"]).read_text(encoding="utf-8"))
+        self.assertEqual(original["descriptor_id"], restored["descriptor_id"])
+        self.assertEqual(original["created_at"], restored["created_at"])
+        self.assertEqual(original["synchronization"], restored["synchronization"])
+        self.assertEqual(identity, Path(descriptor["bundle"]["identity"]).read_bytes())
+        self.assertTrue(reconciled["review_required"])
+
+    def test_interrupted_restore_removes_owned_cache_and_retries_exact_identity(self):
+        for failure in ("materialize_tree", "atomic_json"):
+            with self.subTest(failure=failure):
+                descriptor = ops.review_prepare(self.root, failure, "origin/main", "HEAD", False)
+                artifact = Path(descriptor["artifact"])
+                stored = artifact.read_bytes()
+                identity = Path(descriptor["bundle"]["identity"]).read_bytes()
+                directory = Path(descriptor["bundle"]["directory"])
+                shutil.rmtree(directory)
+                with mock.patch.object(ops, failure, side_effect=OSError("interrupted restore")):
+                    with self.assertRaisesRegex(OSError, "interrupted restore"):
+                        ops.load_descriptor(self.root, failure, artifact)
+                self.assertFalse(directory.exists())
+                self.assertEqual(stored, artifact.read_bytes())
+                restored = ops.load_descriptor(self.root, failure, artifact)
+                self.assertEqual(descriptor["descriptor_id"], restored["descriptor_id"])
+                self.assertEqual(identity, Path(restored["bundle"]["identity"]).read_bytes())
+                original = json.loads(stored)
+                original["bundle"].pop("last_validated_at")
+                restored["bundle"].pop("last_validated_at")
+                self.assertEqual(original, restored)
+
+    def test_final_cache_inside_registered_worktree_is_rejected(self):
+        temporary = Path(ops.tempfile.gettempdir())
+        for depth in (0, 1):
+            with self.subTest(depth=depth):
+                locations = ops.review_bundle_locations(self.root, "nested/run", "a" * 64)
+                linked = temporary / "review"
+                if depth:
+                    linked = locations["directory"].parent.parent
+                self.git("worktree", "add", "-q", "-b", f"Fix/Cache-{depth}", str(linked))
+                try:
+                    with self.assertRaisesRegex(ops.WorkflowOperationError, "inside the checkout"):
+                        ops.review_bundle_locations(self.root, "nested/run", "a" * 64)
+                finally:
+                    self.git("worktree", "remove", "--force", str(linked))
+
+    def test_partial_bundle_is_rejected_without_restoration(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        Path(descriptor["bundle"]["tree_archive"]).unlink()
+        identity = Path(descriptor["bundle"]["identity"]).read_bytes()
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "incomplete"):
+            ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+        self.assertTrue(Path(descriptor["bundle"]["directory"]).is_dir())
+        self.assertEqual(identity, Path(descriptor["bundle"]["identity"]).read_bytes())
+
+    def test_cleanup_skips_recent_bundle_without_resolving_locations(self):
+        recent = ops.review_prepare(self.root, "recent", "origin/main", "HEAD", False)
+
+        with mock.patch.object(ops, "review_bundle_locations") as locations:
+            ops.cleanup_review_bundles(self.root)
+
+        locations.assert_not_called()
+        self.assertTrue(Path(recent["bundle"]["directory"]).is_dir())
+
+    def test_cleanup_never_scans_legacy_payload_trees(self):
+        payloads = []
+        for name, with_descriptor in (("stored", True), ("unpublished", False)):
+            candidate = ops.run_root(self.root, name) / "review" / ("a" * 64)
+            payload = candidate / "tree"
+            payload.mkdir(parents=True)
+            payloads.append(payload)
+            if with_descriptor:
+                ops.atomic_json(candidate / "descriptor.json", {"bundle": {}})
+        original_scandir = ops.os.scandir
+
+        def scan_namespace(path):
+            self.assertNotIn(Path(path), payloads)
+            return original_scandir(path)
+
+        with mock.patch.object(ops.os, "scandir", side_effect=scan_namespace), mock.patch.object(
+            getattr(Path, "_globber", ops.os), "scandir", side_effect=scan_namespace
+        ):
+            ops.cleanup_review_bundles(self.root)
+
+    def test_descriptor_scan_preserves_nested_review_and_candidate_named_runs(self):
+        runs = ops.state_root(self.root) / "runs"
+        paths = []
+        for run_id in ("nested/run", "review/" + "b" * 64 + "/nested", "namespace/tree/run"):
+            descriptor = ops.run_root(self.root, run_id) / "review" / ("c" * 64) / "descriptor.json"
+            ops.atomic_json(descriptor, {"bundle": {}})
+            paths.append(descriptor)
+
+        self.assertCountEqual(paths, ops.review_descriptor_paths(runs))
+
+    def test_descriptor_scan_does_not_traverse_directory_junctions(self):
+        runs = ops.state_root(self.root) / "runs"
+        runs.mkdir(parents=True)
+        target = Path(self.temp.name) / "foreign-run"
+        descriptor = target / "review" / ("d" * 64) / "descriptor.json"
+        ops.atomic_json(descriptor, {"bundle": {}})
+        alias = runs / "alias"
+        if sys.platform == "win32":
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(alias), str(target)],
+                capture_output=True, check=True,
+            )
+            self.addCleanup(alias.rmdir)
+        else:
+            alias.symlink_to(target, target_is_directory=True)
+            self.addCleanup(alias.unlink)
+        original_scandir = ops.os.scandir
+
+        def scan_namespace(path):
+            self.assertNotEqual(alias, Path(path))
+            return original_scandir(path)
+
+        with mock.patch.object(ops.os, "scandir", side_effect=scan_namespace):
+            self.assertEqual([], list(ops.review_descriptor_paths(runs)))
+
+    def test_descriptor_scan_rejects_redirected_roots_and_descriptors(self):
+        runs = ops.state_root(self.root) / "runs"
+        descriptor = ops.run_root(self.root, "stored") / "review" / ("e" * 64) / "descriptor.json"
+        ops.atomic_json(descriptor, {"bundle": {}})
+        original_redirect = ops.is_redirect
+        for redirected in (runs.parent, runs, descriptor):
+            with self.subTest(redirected=redirected), mock.patch.object(
+                ops, "is_redirect", side_effect=lambda path: Path(path) == redirected or original_redirect(path)
+            ):
+                self.assertEqual([], list(ops.review_descriptor_paths(runs)))
+
+    def test_cleanup_removes_only_expired_repository_owned_bundles(self):
+        expired = ops.review_prepare(self.root, "expired", "origin/main", "HEAD", False)
+        recent = ops.review_prepare(self.root, "recent", "origin/main", "HEAD", False)
+        descriptor_path = Path(expired["artifact"])
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor["bundle"]["last_validated_at"] = "2000-01-01T00:00:00+00:00"
+        ops.atomic_json(descriptor_path, descriptor)
+        foreign = Path(expired["bundle"]["directory"]).parent / "foreign"
+        foreign.mkdir()
+
+        ops.cleanup_review_bundles(self.root)
+
+        self.assertFalse(Path(expired["bundle"]["directory"]).exists())
+        self.assertTrue(Path(recent["bundle"]["directory"]).is_dir())
+        self.assertTrue(foreign.is_dir())
+
+    def test_complete_legacy_bundle_migrates_without_changing_frozen_identity(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        descriptor_path = Path(descriptor["artifact"])
+        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
+        legacy = ops.legacy_review_bundle_locations(locations)
+        for name in ("patch", "paths", "tree", "tree_archive", "identity"):
+            shutil.move(str(Path(stored["bundle"][name])), str(legacy[name]))
+        Path(stored["bundle"]["directory"]).rmdir()
+        identity_sha = stored["bundle"]["identity_sha256"]
+        stored["bundle"].update({name: str(legacy[name]) for name in (
+            "directory", "patch", "paths", "tree", "tree_archive", "identity"
+        )})
+        ops.atomic_json(descriptor_path, stored)
+
+        with mock.patch.object(ops, "remove_legacy_review_payload"):
+            loaded = ops.load_descriptor(self.root, "run-1", descriptor_path)
+
+        self.assertEqual(descriptor["descriptor_id"], loaded["descriptor_id"])
+        self.assertEqual(identity_sha, loaded["bundle"]["identity_sha256"])
+        self.assertTrue(Path(loaded["bundle"]["tree"]).is_dir())
+        self.assertTrue(legacy["tree"].is_dir())
+        ops.load_descriptor(self.root, "run-1", descriptor_path)
+        self.assertFalse(legacy["tree"].exists())
+
+    def test_absent_legacy_bundle_restores_the_stored_frozen_identity(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        descriptor_path = Path(descriptor["artifact"])
+        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
+        legacy = ops.legacy_review_bundle_locations(locations)
+        identity = Path(stored["bundle"]["identity"]).read_bytes()
+        shutil.rmtree(stored["bundle"]["directory"])
+        stored["bundle"].update({name: str(legacy[name]) for name in (
+            "directory", "patch", "paths", "tree", "tree_archive", "identity"
+        )})
+        ops.atomic_json(descriptor_path, stored)
+
+        loaded = ops.load_descriptor(self.root, "run-1", descriptor_path)
+
+        self.assertEqual(descriptor["descriptor_id"], loaded["descriptor_id"])
+        self.assertEqual(identity, Path(loaded["bundle"]["identity"]).read_bytes())
+
+    def test_interrupted_legacy_descriptor_publication_reuses_the_complete_external_bundle(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        descriptor_path = Path(descriptor["artifact"])
+        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
+        legacy = ops.legacy_review_bundle_locations(locations)
+        for name in ("patch", "paths", "tree", "tree_archive", "identity"):
+            shutil.move(str(Path(stored["bundle"][name])), str(legacy[name]))
+        Path(stored["bundle"]["directory"]).rmdir()
+        identity = legacy["identity"].read_bytes()
+        stored["bundle"].update({name: str(legacy[name]) for name in (
+            "directory", "patch", "paths", "tree", "tree_archive", "identity"
+        )})
+        ops.atomic_json(descriptor_path, stored)
+        original_atomic_json = ops.atomic_json
+
+        def interrupt_descriptor_publication(path, value):
+            if Path(path) == descriptor_path and value["bundle"]["directory"] == str(locations["directory"]):
+                raise OSError("interrupted publication")
+            original_atomic_json(path, value)
+
+        with mock.patch.object(ops, "atomic_json", side_effect=interrupt_descriptor_publication):
+            with self.assertRaisesRegex(OSError, "interrupted publication"):
+                ops.load_descriptor(self.root, "run-1", descriptor_path)
+
+        loaded = ops.load_descriptor(self.root, "run-1", descriptor_path)
+
+        self.assertEqual(descriptor["descriptor_id"], loaded["descriptor_id"])
+        self.assertEqual(identity, Path(loaded["bundle"]["identity"]).read_bytes())
+        self.assertFalse(legacy["tree"].exists())
+
+    def test_tampered_legacy_bundle_is_not_rewritten(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        descriptor_path = Path(descriptor["artifact"])
+        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
+        legacy = ops.legacy_review_bundle_locations(locations)
+        for name in ("patch", "paths", "tree", "tree_archive", "identity"):
+            shutil.move(str(Path(stored["bundle"][name])), str(legacy[name]))
+        Path(stored["bundle"]["directory"]).rmdir()
+        stored["bundle"].update({name: str(legacy[name]) for name in (
+            "directory", "patch", "paths", "tree", "tree_archive", "identity"
+        )})
+        ops.atomic_json(descriptor_path, stored)
+        legacy["patch"].write_bytes(b"forged")
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "legacy review patch hash"):
+            ops.load_descriptor(self.root, "run-1", descriptor_path)
+
+        self.assertEqual(str(legacy["directory"]), json.loads(descriptor_path.read_text(encoding="utf-8"))["bundle"]["directory"])
+        self.assertFalse(Path(descriptor["bundle"]["directory"]).exists())
+
+    def test_redirected_legacy_candidate_directory_is_not_migrated(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        descriptor_path = Path(descriptor["artifact"])
+        stored = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        locations = ops.review_bundle_locations(self.root, "run-1", descriptor_path.parent.name)
+        legacy = ops.legacy_review_bundle_locations(locations)
+        stored["bundle"].update({name: str(legacy[name]) for name in (
+            "directory", "patch", "paths", "tree", "tree_archive", "identity"
+        )})
+        ops.atomic_json(descriptor_path, stored)
+        original_redirect = ops.is_redirect
+
+        with mock.patch.object(
+            ops,
+            "is_redirect",
+            side_effect=lambda path: Path(path) == legacy["directory"] or original_redirect(path),
+        ):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "descriptor namespace"):
+                ops.load_descriptor(self.root, "run-1", descriptor_path)
+
+        self.assertEqual(str(legacy["directory"]), json.loads(descriptor_path.read_text(encoding="utf-8"))["bundle"]["directory"])
+
+    def test_review_run_cannot_be_reused_on_another_branch(self):
+        ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        self.git("switch", "-q", "-c", "Feature/Another-review")
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "another branch"):
+            ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+
+        self.assertEqual(
+            1,
+            ops.review_prepare(self.root, "run-2", "origin/main", "HEAD", False)["waves"],
+        )
 
     def test_review_prepare_resolves_rules_with_the_packaged_router(self):
         route_table = self.root / ".agents" / "skill-routes.json"

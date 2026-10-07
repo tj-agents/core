@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Open an interactive Claude Code CLI in a new terminal tab on an exact directory.
 
-Run as `python3 open_claude.py ...` (or `python` on Windows); the shebang and exec bit are not relied on.
+Run as `python open_claude.py ...` on Windows (where `python3` is often the Microsoft Store alias stub
+rather than a real interpreter) and `python3 open_claude.py ...` elsewhere; the shebang and exec bit are
+not relied on.
 """
 
 import argparse
 import importlib.util
-import os
 from pathlib import Path
 import sys
 
@@ -73,10 +74,8 @@ def build_arguments(args, agent_cli):
         arguments += ['--model', args.model]
 
     if args.prompt_path:
-        resolved_prompt_path = Path(args.prompt_path).resolve()
-        if not resolved_prompt_path.is_file():
-            raise agent_cli.LaunchError(f'Prompt path is not a file: {resolved_prompt_path}')
-        arguments.append(f'Read the file at {resolved_prompt_path} and follow its instructions, working from the current directory.')
+        sentence, _ = agent_cli.prompt_file_argument(args.prompt_path)
+        arguments.append(sentence)
     elif args.prompt:
         arguments.append(args.prompt)
 
@@ -85,33 +84,24 @@ def build_arguments(args, agent_cli):
 
 def main(argv=None):
     agent_cli = _load_agent_cli()
+    agent_cli.make_stdio_encoding_lossy()
     try:
         args = parse_args(argv, agent_cli)
 
-        # Absolute but not resolved: Claude Code keys a session's history by the directory string it started
-        # in, so a symlinked checkout or a Windows mapped or subst drive must reach the tab as given.
-        working_directory = Path(os.path.abspath(args.working_directory))
-        if not working_directory.is_dir():
-            raise agent_cli.LaunchError(f'Working directory is not a directory: {working_directory}')
+        # parse_args already rejected any argparse-level contradiction (--resume with --continue, a prompt
+        # too long, etc.). What happens here is the first filesystem work, so the directory is checked
+        # before any of it -- whichever of it is also wrong, the directory's error is never shadowed by a
+        # later check that only looked irrelevant.
+        working_directory = agent_cli.resolve_tab_directory(args.working_directory)
 
-        claude = agent_cli.resolve_claude_executable()
         arguments = build_arguments(args, agent_cli)
 
-        agent_cli.sync_claude_standards(working_directory, claude=claude)
-
-        agent_cli.launch_tab(
-            working_directory,
-            claude,
-            args.title,
-            arguments=arguments,
-            force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
-        )
+        agent_cli.open_claude_tab(working_directory, args.title, arguments)
 
         print(f"Launched claude tab '{args.title}' in {working_directory}")
         return 0
     except agent_cli.LaunchError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        return agent_cli.report_launch_failure(exc)
 
 
 if __name__ == '__main__':
