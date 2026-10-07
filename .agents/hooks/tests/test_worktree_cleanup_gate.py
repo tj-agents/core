@@ -22,12 +22,20 @@ class WorktreeCleanupGateTests(unittest.TestCase):
         self.repo = Path(self.temp.name).resolve() / "repo"
         self.assertFalse(self.repo.is_relative_to(ROOT))
         (self.repo / ".agents").mkdir(parents=True)
+        self.git_config = Path(self.temp.name) / "empty-git-config"
+        self.git_config.write_text("", encoding="utf-8")
+        self.git_template = Path(self.temp.name) / "empty-git-template"
+        self.git_template.mkdir()
 
     def git(self, repo, *args):
         environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+        environment.update(
+            GIT_CONFIG_GLOBAL=str(self.git_config), GIT_CONFIG_SYSTEM=str(self.git_config),
+            GIT_CONFIG_NOSYSTEM="1", GIT_TEMPLATE_DIR=str(self.git_template),
+        )
         result = subprocess.run(
             ["git", "-C", str(repo), *args], env=environment,
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", check=False,
         )
         self.assertEqual(0, result.returncode, result.stderr)
         return result.stdout.strip()
@@ -48,13 +56,13 @@ class WorktreeCleanupGateTests(unittest.TestCase):
             json.dumps({"audit_command": [sys.executable, str(audit)]}), encoding="utf-8"
         )
 
-    def invoke(self, event="Stop", cwd=None, environment=None):
+    def invoke(self, event="Stop", cwd=None, environment=None, python_options=()):
         cwd = cwd or self.repo
         environment = environment if environment is not None else {
             key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")
         }
         return subprocess.run(
-            [sys.executable, str(HOOK)],
+            [sys.executable, *python_options, str(HOOK)],
             input=json.dumps(
                 {
                     "hook_event_name": event,
@@ -219,6 +227,49 @@ class WorktreeCleanupGateTests(unittest.TestCase):
         with mock.patch.object(worktree_cleanup_gate.subprocess, "run", return_value=discovery), \
                 mock.patch.object(Path, "resolve", side_effect=[self.repo, OSError("root unavailable")]):
             self.assertIsNone(worktree_cleanup_gate.find_config(self.repo))
+
+    def test_unicode_repository_with_python_utf8_mode_disabled(self):
+        repo = self.repo / "repo-\u00e9"
+        self.initialize(repo)
+        self.configure("ORPHAN_FOLDER unicode\n", repo=repo)
+        child = repo / "child"
+        child.mkdir()
+        environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+        environment["PYTHONUTF8"] = "0"
+
+        result = self.invoke(cwd=child, environment=environment, python_options=("-X", "utf8=0"))
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotEqual("", result.stdout)
+        self.assertIn("ORPHAN_FOLDER unicode", json.loads(result.stdout)["reason"])
+
+    def test_linked_worktree_fixture_ignores_hostile_global_signing_config(self):
+        home = Path(self.temp.name) / "hostile-home"
+        home.mkdir()
+        (home / ".gitconfig").write_text(
+            "[commit]\n\tgpgSign = true\n[gpg]\n\tprogram = nonexistent-review-fixture-signer\n",
+            encoding="utf-8",
+        )
+        with mock.patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home),
+                                          "XDG_CONFIG_HOME": str(home / "xdg")}):
+            self.test_linked_worktree_does_not_inherit_outer_repository_config()
+
+    def test_fixture_ignores_hostile_global_and_environment_templates(self):
+        home = Path(self.temp.name) / "hostile-home"
+        template = home / "template"
+        template.mkdir(parents=True)
+        (template / "hostile-template-marker").write_text("fixture", encoding="utf-8")
+        (home / ".gitconfig").write_text(
+            f'[init]\n\ttemplateDir = "{template.as_posix()}"\n'
+            f'[core]\n\thooksPath = "{(home / "hooks").as_posix()}"\n',
+            encoding="utf-8",
+        )
+        with mock.patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home),
+                                          "XDG_CONFIG_HOME": str(home / "xdg"),
+                                          "GIT_TEMPLATE_DIR": str(template)}):
+            self.initialize(self.repo)
+            self.assertFalse((self.repo / ".git" / "hostile-template-marker").exists())
+            self.assertNotIn("core.hookspath", self.git(self.repo, "config", "--list").lower())
 
 
 if __name__ == "__main__":
