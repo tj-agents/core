@@ -54,7 +54,9 @@ function Assert-SafeDeliveryPath([string] $Path) {
         throw "Codex agent delivery path contains a reparse point: $root"
     }
     $relative = $fullPath.Substring($root.Length)
-    foreach ($segment in @($relative.Split(@(
+    # [char[]] is required: PowerShell 7 binds a plain array to Split(string, options), joining the
+    # separators into one string that never matches, so no ancestor would be checked.
+    foreach ($segment in @($relative.Split([char[]]@(
         [System.IO.Path]::DirectorySeparatorChar,
         [System.IO.Path]::AltDirectorySeparatorChar
     ), [System.StringSplitOptions]::RemoveEmptyEntries))) {
