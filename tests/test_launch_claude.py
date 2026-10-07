@@ -354,7 +354,7 @@ class LaunchClaudeTests(unittest.TestCase):
             self.skipTest('this filesystem or account does not allow creating a symlink')
         self.addCleanup(link.unlink)
         out, err = io.StringIO(), io.StringIO()
-        argv = ['--working-directory', str(link), '--prompt-path', str(self.prompt_path)]
+        argv = ['--working-directory', str(link), '--prompt-path', str(self.prompt_path), '--lane', 'L3']
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = LAUNCH_CLAUDE.main(argv)
         self.assertEqual(code, 0, err.getvalue())
