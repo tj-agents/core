@@ -27,15 +27,17 @@ result instead.
 param(
     [Parameter(Mandatory)] [int] $HostPid,
     [Parameter(Mandatory)] [double] $HostStart,
-    [Parameter(Mandatory)] [string] $Head,
-    [Parameter(Mandatory)] [string] $Primary,
+    [string] $Head,
+    [string] $Primary,
     [Parameter(Mandatory)] [string] $Worktree,
-    [Parameter(Mandatory)] [string] $Branch,
-    [Parameter(Mandatory)] [string] $Default,
+    [string] $Branch,
+    [string] $Default,
     [Parameter(Mandatory)] [string] $Result,
     [string] $StateDirectory,
     [int] $ParentPid = -1,
-    [double] $ParentStart = -1
+    [double] $ParentStart = -1,
+    [switch] $CloseOnly,
+    [string] $SessionId
 )
 
 Set-StrictMode -Version Latest
@@ -100,7 +102,7 @@ function Get-WorktreeComparisonForms {
 }
 
 function Find-ObligationPaths {
-    param([string] $StateDirectory, [string] $ResolvedWorktree)
+    param([string] $StateDirectory, [string] $ResolvedWorktree, [string] $SessionId)
 
     $directory = Join-Path $StateDirectory 'merge-cleanup/obligations'
     if (-not (Test-Path -LiteralPath $directory)) { return @() }
@@ -109,6 +111,10 @@ function Find-ObligationPaths {
     foreach ($file in Get-ChildItem -LiteralPath $directory -Filter '*.json' -File) {
         $data = Read-JsonFile -Path $file.FullName
         if (-not $data) { continue }
+        if ($SessionId) {
+            if ((Get-EntryProperty -Entry $data -Name 'session_id') -eq $SessionId) { $matches.Add($file.FullName) }
+            continue
+        }
         $recorded = Get-EntryProperty -Entry $data -Name 'worktree'
         if (-not $recorded) { continue }
         $recordedForms = @(Get-WorktreeComparisonForms -Path $recorded)
@@ -157,7 +163,7 @@ function Test-ProcessExited {
     $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if (-not $process) { return $true }
     $startTime = try { $process.StartTime } catch { $null }
-    if ($null -eq $startTime) { return $true }
+    if ($null -eq $startTime) { return $false }
     return ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - $StartedAt) -gt 2.0)
 }
 
@@ -183,6 +189,38 @@ function Save-ResultRecord {
     Move-Item -LiteralPath $temp -Destination $Path
 }
 
+function Save-CloseStartupRecord {
+    param([string] $Path, [double] $Started, [int] $HostPid, [string] $Worktree)
+
+    $assemblyName = if ($PSVersionTable.PSEdition -eq 'Desktop') {
+        'System.Runtime.Serialization, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'
+    } else {
+        'System.Runtime.Serialization.Json'
+    }
+    $null = [Reflection.Assembly]::Load($assemblyName)
+    $settings = [Runtime.Serialization.Json.DataContractJsonSerializerSettings]::new()
+    $settings.UseSimpleDictionaryFormat = $true
+    $receipt = [Collections.Generic.Dictionary[string,object]]::new()
+    $receipt.Add('started', $Started)
+    $receipt.Add('host_pid', $HostPid)
+    $receipt.Add('worktree', $Worktree)
+    $serializer = [Runtime.Serialization.Json.DataContractJsonSerializer]::new($receipt.GetType(), $settings)
+    $stream = [IO.MemoryStream]::new()
+    try {
+        $serializer.WriteObject($stream, $receipt)
+        $json = [Text.Encoding]::UTF8.GetString($stream.ToArray())
+    }
+    finally {
+        $stream.Dispose()
+    }
+    $directory = [IO.Path]::GetDirectoryName($Path)
+    $null = [IO.Directory]::CreateDirectory($directory)
+    $temp = [IO.Path]::Combine($directory, '.' + [IO.Path]::GetFileName($Path) + '.' + $PID + '.tmp')
+    [IO.File]::WriteAllText($temp, $json, [Text.UTF8Encoding]::new($false))
+    if ([IO.File]::Exists($Path)) { [IO.File]::Delete($Path) }
+    [IO.File]::Move($temp, $Path)
+}
+
 function Invoke-Git {
     param([string] $Cwd, [string[]] $Arguments)
 
@@ -197,11 +235,22 @@ function Now-Epoch {
 
 $resolvedState = Resolve-StateDirectory -Provided $StateDirectory
 $startedEpoch = Now-Epoch
+if ($CloseOnly) {
+    if (-not $SessionId) { throw 'close observer requires a session identity.' }
+}
+elseif (-not $Head -or -not $Primary -or -not $Branch -or -not $Default) {
+    throw 'cleanup reaper requires the complete removal receipt.'
+}
 
-Save-ResultRecord -Path $Result -Data @{
-    started  = $startedEpoch
-    host_pid = $HostPid
-    worktree = $Worktree
+if ($CloseOnly) {
+    Save-CloseStartupRecord -Path $Result -Started $startedEpoch -HostPid $HostPid -Worktree $Worktree
+}
+else {
+    Save-ResultRecord -Path $Result -Data @{
+        started  = $startedEpoch
+        host_pid = $HostPid
+        worktree = $Worktree
+    }
 }
 
 try {
@@ -229,6 +278,24 @@ try {
             status   = 'timeout'
             error    = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds"
             finished = (Now-Epoch)
+        }
+        return
+    }
+
+    if ($CloseOnly) {
+        Save-ResultRecord -Path $Result -Data @{
+            started = $startedEpoch
+            host_pid = $HostPid
+            host_started_at = $HostStart
+            session_id = $SessionId
+            worktree = $Worktree
+            checkout_retained = $true
+            session_exited = $true
+            status = 'session-closed'
+            finished = (Now-Epoch)
+        }
+        foreach ($path in @(Find-ObligationPaths -StateDirectory $resolvedState -SessionId $SessionId)) {
+            Remove-Item -LiteralPath $path -Force
         }
         return
     }
