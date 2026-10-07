@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -14,12 +15,36 @@ VIOLATION_STATES = ("MERGED_NOT_IN_MAIN", "ORPHAN_FOLDER")
 def find_config(cwd):
     try:
         base = Path(cwd).resolve()
-    except OSError:
+    except (OSError, RuntimeError, ValueError):
+        return None
+    direct = base / CONFIG_FILE
+    if direct.is_file():
+        return direct
+    environment = {
+        key: value for key, value in os.environ.items()
+        if key.upper() not in {
+            "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+        }
+    }
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], cwd=base, env=environment,
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+        if result.returncode or not result.stdout.strip():
+            return None
+        root = Path(result.stdout.strip()).resolve()
+        base.relative_to(root)
+    except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired):
         return None
     for candidate in (base, *base.parents):
         path = candidate / CONFIG_FILE
         if path.is_file():
             return path
+        if candidate == root:
+            break
     return None
 
 
