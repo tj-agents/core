@@ -2,6 +2,7 @@
   "schema_version": 1,
   "plugin": "base-agents/machine",
   "source_roots": [
+    ".agents/catalog/catalog.schema.json",
     ".agents/machine"
   ],
   "requires": {
