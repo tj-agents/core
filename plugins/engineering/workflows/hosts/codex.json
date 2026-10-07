@@ -40,8 +40,8 @@
       "unavailable": "decision"
     },
     "implementation": {
-      "model": "gpt-6.1-sol",
-      "reasoning_effort": "medium",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high",
       "unavailable": "typed-parent-fallback"
     },
     "mechanical": {
@@ -53,7 +53,7 @@
       "model": "gpt-5.3-codex-spark",
       "specialist": "gpt-5.3-codex-spark",
       "fallback_models": [
-        "gpt-6.1-sol"
+        "gpt-5.6-terra"
       ],
       "reasoning_effort": "medium",
       "unavailable": "decision"
@@ -113,8 +113,8 @@
         "implementation",
         "review"
       ],
-      "model": "gpt-6.1-sol",
-      "reasoning_effort": "medium",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high",
       "sandbox_mode": "read-only",
       "kind": "review"
     },

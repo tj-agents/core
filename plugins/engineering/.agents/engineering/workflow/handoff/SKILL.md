@@ -41,8 +41,12 @@ session continues its independent active task.
    For a critical plan selected by `plan-authoring`'s readiness decision, use the verified execution
    pickup procedure below. Otherwise write the prompt
    to a UTF-8 file and invoke the selected launcher's packaged script once, following its loaded
-   instructions. Preserve a user-selected model, effort or frontier request; otherwise choose the lane the
-   remaining work is worth per `engineering:lanes` and pass it, or inherit defaults when no lane is clear.
+   instructions. Preserve a user-selected model, effort or frontier request; otherwise choose and pass the
+   cheapest suitable lane for the remaining work per `engineering:lanes`. A merge, handoff, file count or
+   delivery operation does not raise it: use L5 for small already-decided file deletion or move, config or
+   docs cleanup, and L4 only for specified implementation that still needs code-level judgement.
+   L7 is in-session only and cannot open either handoff launcher. Claude handoff also requires an explicit
+   L1–L6 lane, frontier tier, or non-Haiku model; never leave that choice to the CLI default.
    Record the lane and a one-line reason beside the next action in the goal.
    Never launch a second successor because startup is slow or acknowledgement is delayed.
 4. Stop owned-path writes before invoking the launcher. Verify the launch result. A definite failure

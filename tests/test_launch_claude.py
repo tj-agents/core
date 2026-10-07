@@ -58,7 +58,7 @@ class LaunchClaudeTests(unittest.TestCase):
     def test_a_missing_working_directory_is_rejected_through_the_real_directory_check(self):
         out, err = io.StringIO(), io.StringIO()
         missing = str(Path(self.directory) / 'missing')
-        argv = ['--working-directory', missing, '--prompt-path', str(self.prompt_path)]
+        argv = ['--working-directory', missing, '--prompt-path', str(self.prompt_path), '--lane', 'L4']
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = LAUNCH_CLAUDE.main(argv)
         self.assertEqual(code, 1)
@@ -70,7 +70,7 @@ class LaunchClaudeTests(unittest.TestCase):
         # H14: the directory is validated first, so its error is never shadowed by a later check.
         out, err = io.StringIO(), io.StringIO()
         argv = ['--working-directory', str(Path(self.directory) / 'missing'),
-                '--prompt-path', str(Path(self.directory) / 'missing-prompt.md')]
+                '--prompt-path', str(Path(self.directory) / 'missing-prompt.md'), '--lane', 'L4']
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = LAUNCH_CLAUDE.main(argv)
         self.assertEqual(code, 1)
@@ -78,7 +78,7 @@ class LaunchClaudeTests(unittest.TestCase):
 
     def test_a_prompt_path_that_is_not_a_file_is_rejected(self):
         out, err = io.StringIO(), io.StringIO()
-        argv = ['--working-directory', self.directory, '--prompt-path', self.directory]
+        argv = ['--working-directory', self.directory, '--prompt-path', self.directory, '--lane', 'L4']
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = LAUNCH_CLAUDE.main(argv)
         self.assertEqual(code, 1)
@@ -139,11 +139,47 @@ class LaunchClaudeTests(unittest.TestCase):
 
     # --- argument assembly and order ---
 
-    def test_no_model_lane_or_permission_flags_means_only_the_prompt_sentence(self):
-        self.run_main()
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
-        self.assertEqual(len(arguments), 1)
-        self.assertTrue(arguments[0].startswith('Read the file at'))
+    def test_no_selection_is_rejected_before_launch(self):
+        code, _, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn('requires --lane L1-L6, --frontier, or an explicit non-Haiku --model', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
+    def test_prohibited_handoff_selections_are_rejected_before_launch(self):
+        for arguments in (
+            ('--lane', 'L7'),
+            ('--lane', 'L7', '--model', 'explicit-model'),
+            ('--model', CLAUDE_LANES['lanes']['L7']['model']),
+            ('--model', 'haiku'),
+            ('--model', 'claude-haiku'),
+            ('--model', 'haiku-4-5'),
+            ('--model', 'claude-haiku-4.5'),
+            ('--model', 'claude-haiku-4-5-20251001'),
+            ('--model', 'claude-3-5-haiku-latest'),
+            ('--model', 'claude-3-haiku@20240307'),
+            ('--model', 'anthropic.claude-3-haiku-20240307-v1:0'),
+            ('--model', 'sonnet'),
+            ('--model', 'opus'),
+            ('--model', 'opusplan'),
+            ('--model', 'default'),
+            ('--model', 'sonnet[1m]'),
+        ):
+            with self.subTest(arguments=arguments):
+                code, _, err = self.run_main(*arguments)
+                self.assertEqual(code, 1)
+                self.assertIn('handoff', err)
+                self.agent_cli.launch_tab.assert_not_called()
+
+    def test_a_repointed_non_l7_lane_cannot_resolve_to_haiku(self):
+        with mock.patch.object(
+            self.agent_cli,
+            'resolve_lane_model',
+            return_value=('claude-3-5-haiku-latest', None),
+        ):
+            code, _, err = self.run_main('--lane', 'L6')
+        self.assertEqual(code, 1)
+        self.assertIn('resolved selection cannot use the Haiku family', err)
+        self.agent_cli.launch_tab.assert_not_called()
 
     def test_dangerously_skip_permissions_then_model_then_the_prompt_sentence(self):
         self.run_main('--dangerously-skip-permissions', '--model', 'explicit-model')
@@ -154,16 +190,16 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertTrue(arguments[3].startswith('Read the file at'))
 
     def test_the_prompt_sentence_names_the_resolved_prompt_path_and_current_directory(self):
-        self.run_main()
+        self.run_main('--model', 'explicit-model')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
         sentence = arguments[-1]
         self.assertIn(str(self.prompt_path.resolve()), sentence)
         self.assertIn('working from the current directory', sentence)
 
-    def test_no_model_means_no_model_flag_reaches_launch_tab(self):
-        self.run_main()
+    def test_an_explicit_non_haiku_model_reaches_launch_tab(self):
+        self.run_main('--model', 'explicit-model')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
-        self.assertNotIn('--model', arguments)
+        self.assertIn('--model', arguments)
 
     # --- model precedence, against the real lane table ---
 
@@ -193,11 +229,11 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(arguments[arguments.index('--effort') + 1], CLAUDE_LANES['lanes']['L3']['effort'])
         self.assertLess(arguments.index('--model'), arguments.index('--effort'))
 
-    def test_a_lane_with_no_priced_effort_passes_no_effort_flag(self):
+    def test_l7_cannot_bypass_handoff_with_its_missing_effort(self):
         self.assertNotIn('effort', CLAUDE_LANES['lanes']['L7'])  # sanity: the table prices none
-        self.run_main('--lane', 'L7')
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
-        self.assertNotIn('--effort', arguments)
+        code, _, err = self.run_main('--lane', 'L7')
+        self.assertEqual(code, 1)
+        self.assertIn('cannot open a handoff', err)
 
     def test_an_explicit_model_beating_the_lane_drops_the_lanes_effort_too(self):
         self.run_main('--lane', 'L3', '--model', 'explicit-model')
@@ -217,12 +253,12 @@ class LaunchClaudeTests(unittest.TestCase):
     # --- forced environment, sync-before-launch ---
 
     def test_force_environment_matches_the_native_claude_colour_contract(self):
-        self.run_main()
+        self.run_main('--model', 'explicit-model')
         force = self.agent_cli.launch_tab.call_args.kwargs['force']
         self.assertEqual(force, {'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
 
     def test_standards_are_synced_before_launch_in_order(self):
-        self.run_main()
+        self.run_main('--model', 'explicit-model')
         self.assertEqual(
             [call[0] for call in self.call_order.mock_calls],
             ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
@@ -231,7 +267,7 @@ class LaunchClaudeTests(unittest.TestCase):
 
     def test_stdio_is_hardened_against_encoding_errors(self):
         with mock.patch.object(self.agent_cli, 'make_stdio_encoding_lossy') as hardened:
-            self.run_main()
+            self.run_main('--model', 'explicit-model')
         hardened.assert_called_once()
 
     def test_stdio_is_hardened_before_open_claude_tab_is_called(self):
@@ -243,7 +279,7 @@ class LaunchClaudeTests(unittest.TestCase):
                 mock.patch.object(self.agent_cli, 'open_claude_tab', wraps=self.agent_cli.open_claude_tab) as tab:
             parent.attach_mock(hardened, 'make_stdio_encoding_lossy')
             parent.attach_mock(tab, 'open_claude_tab')
-            self.run_main()
+            self.run_main('--model', 'explicit-model')
         self.assertEqual(
             [call[0] for call in parent.mock_calls],
             ['make_stdio_encoding_lossy', 'open_claude_tab'],
@@ -251,12 +287,12 @@ class LaunchClaudeTests(unittest.TestCase):
 
     # --- success message ---
 
-    def test_success_message_with_no_selection_reports_the_cli_default_model(self):
-        code, out, _ = self.run_main('--title', 'Tab Name')
+    def test_success_message_with_an_explicit_model_reports_that_model(self):
+        code, out, _ = self.run_main('--title', 'Tab Name', '--model', 'explicit-model')
         self.assertEqual(code, 0)
         self.assertIn("Launched claude handoff tab 'Tab Name' in", out)
         self.assertIn(os.path.abspath(self.directory), out)
-        self.assertIn('on the CLI default model', out)
+        self.assertIn('on explicit-model', out)
         self.assertIn(f'with prompt {self.prompt_path.resolve()}', out)
 
     def test_success_message_with_a_lane_reports_the_lane_model_and_effort(self):
@@ -267,10 +303,11 @@ class LaunchClaudeTests(unittest.TestCase):
             out,
         )
 
-    def test_success_message_with_a_lane_with_no_effort_omits_at(self):
-        code, out, _ = self.run_main('--lane', 'L7')
-        self.assertEqual(code, 0)
-        self.assertIn(f"on lane L7 -> {CLAUDE_LANES['lanes']['L7']['model']} with prompt", out)
+    def test_success_message_is_not_emitted_when_l7_is_rejected(self):
+        code, out, err = self.run_main('--lane', 'L7')
+        self.assertEqual(code, 1)
+        self.assertEqual('', out)
+        self.assertIn('cannot open a handoff', err)
 
     def test_success_message_with_frontier_reports_the_frontier_tier_model_and_effort(self):
         code, out, _ = self.run_main('--frontier')
@@ -282,14 +319,14 @@ class LaunchClaudeTests(unittest.TestCase):
 
     def test_a_launch_error_from_launch_tab_is_reported_and_exits_nonzero(self):
         self.agent_cli.launch_tab.side_effect = self.agent_cli.LaunchError('no terminal detected')
-        code, out, err = self.run_main()
+        code, out, err = self.run_main('--model', 'explicit-model')
         self.assertEqual(code, 1)
         self.assertIn('no terminal detected', err)
         self.assertNotIn('Launched', out)
 
     def test_a_launch_error_from_resolving_claude_is_reported_and_exits_nonzero(self):
         self.agent_cli.resolve_claude_executable.side_effect = self.agent_cli.LaunchError('no native claude found')
-        code, out, err = self.run_main()
+        code, out, err = self.run_main('--model', 'explicit-model')
         self.assertEqual(code, 1)
         self.assertIn('no native claude found', err)
         self.assertEqual(out, '')
@@ -301,7 +338,7 @@ class LaunchClaudeTests(unittest.TestCase):
         self.agent_cli.launch_tab.side_effect = self.agent_cli.LaunchTimeout(
             'Windows Terminal did not answer within 30 seconds; it may still have taken effect.'
         )
-        code, out, err = self.run_main()
+        code, out, err = self.run_main('--model', 'explicit-model')
         self.assertEqual(code, 3)
         self.assertIn('did not answer within 30 seconds', err)
         self.assertIn('may already have opened', err)
@@ -317,7 +354,7 @@ class LaunchClaudeTests(unittest.TestCase):
             self.skipTest('this filesystem or account does not allow creating a symlink')
         self.addCleanup(link.unlink)
         out, err = io.StringIO(), io.StringIO()
-        argv = ['--working-directory', str(link), '--prompt-path', str(self.prompt_path)]
+        argv = ['--working-directory', str(link), '--prompt-path', str(self.prompt_path), '--lane', 'L3']
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = LAUNCH_CLAUDE.main(argv)
         self.assertEqual(code, 0, err.getvalue())
