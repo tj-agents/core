@@ -9,11 +9,17 @@ $ErrorActionPreference = 'Stop'
 
 $repository = Split-Path -Parent $PSScriptRoot
 $pluginRoot = Join-Path $repository 'plugins\machine'
-$pluginSkills = Join-Path $pluginRoot 'skills'
-# A host adapter's generated SKILL.md is only a redirect to this canonical copy -- its own body carries no
-# `<skill-directory>` references and no forbidden-path strings to find, so scanning the adapter alone would
-# silently pass regardless of what the canonical body actually says. Both copies are scanned below.
+# A host adapter's generated SKILL.md is only a redirect to the canonical copy below -- its own body
+# carries no `<skill-directory>` references and no forbidden-path strings to find. The canonical body is
+# what actually says `<skill-directory>`, and that placeholder means the adapter folder a host loaded it
+# from (one of these two), never the canonical folder itself: a host never resolves it against
+# `.agents/machine/utility/`. So the canonical body is read once per skill, and its references are
+# checked against each adapter folder in turn.
 $canonicalSkills = Join-Path $pluginRoot '.agents\machine\utility'
+$adapterRoots = @(
+    (Join-Path $pluginRoot 'skills')
+    (Join-Path $pluginRoot 'codex-skills')
+)
 
 $script:RequiredSkillScripts = @{
     'bootstrap-capabilities' = 'scripts\bootstrap_capabilities.py'
@@ -36,15 +42,15 @@ function Get-MissingRequiredFiles {
     }
     return @()
 }
-function Get-UnpackagedSkillDirectoryReferences {
-    param([Parameter(Mandatory)][string] $SkillDir)
 
-    $skillMd = Join-Path $SkillDir 'SKILL.md'
-    if (-not (Test-Path -LiteralPath $skillMd -PathType Leaf)) { throw "No SKILL.md at $SkillDir." }
-    $body = [System.IO.File]::ReadAllText($skillMd)
+function Get-UnpackagedSkillDirectoryReferences {
+    param(
+        [Parameter(Mandatory)][string] $Body,
+        [Parameter(Mandatory)][string] $SkillDir
+    )
 
     $missing = @()
-    foreach ($match in [regex]::Matches($body, "<skill-directory>[\\/]([^'`"\s]+)")) {
+    foreach ($match in [regex]::Matches($Body, "<skill-directory>[\\/]([^'`"\s]+)")) {
         $relative = $match.Groups[1].Value -replace '/', '\'
         $target = Join-Path $SkillDir $relative
         if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
@@ -63,32 +69,43 @@ $forbiddenPatterns = @('routing/route.py', '.claude\routing', '$env:USERPROFILE'
 $targets = @($script:RequiredSkillScripts.Keys | Sort-Object)
 
 foreach ($name in $targets) {
-    foreach ($dir in @((Join-Path $pluginSkills $name), (Join-Path $canonicalSkills $name))) {
-        if (-not (Test-Path -LiteralPath $dir)) { throw "Generated package is missing $name at $dir. Run pwsh .agents/sync-generated.ps1." }
+    $canonicalDir = Join-Path $canonicalSkills $name
+    if (-not (Test-Path -LiteralPath $canonicalDir)) {
+        throw "Generated package is missing the canonical definition of $name at $canonicalDir. Run pwsh .agents/sync-generated.ps1."
+    }
+    $canonicalBody = [System.IO.File]::ReadAllText((Join-Path $canonicalDir 'SKILL.md'))
 
-        $missing = @(Get-UnpackagedSkillDirectoryReferences -SkillDir $dir) + @(Get-MissingRequiredFiles -SkillDir $dir -Name $name)
-        if ($missing.Count -gt 0) {
-            throw "$name ($dir) references packaged dependencies the generated plugin does not contain: $($missing -join ', ')"
+    foreach ($forbidden in $forbiddenPatterns) {
+        if ($canonicalBody.Contains($forbidden)) {
+            throw "$name's canonical SKILL.md ($canonicalDir) references '$forbidden', a path this repo does not package."
+        }
+    }
+
+    foreach ($adapterRoot in $adapterRoots) {
+        $adapterDir = Join-Path $adapterRoot $name
+        if (-not (Test-Path -LiteralPath $adapterDir)) {
+            throw "Generated package is missing $name under $adapterRoot. Run pwsh .agents/sync-generated.ps1."
         }
 
-        $body = [System.IO.File]::ReadAllText((Join-Path $dir 'SKILL.md'))
-        foreach ($forbidden in $forbiddenPatterns) {
-            if ($body.Contains($forbidden)) {
-                throw "$name/SKILL.md ($dir) references '$forbidden', a path this repo does not package."
-            }
+        $missing = @(Get-UnpackagedSkillDirectoryReferences -Body $canonicalBody -SkillDir $adapterDir) +
+                   @(Get-MissingRequiredFiles -SkillDir $adapterDir -Name $name)
+        if ($missing.Count -gt 0) {
+            throw "$name's canonical <skill-directory> references or required script do not resolve under ${adapterDir}: $($missing -join ', ')"
         }
     }
 }
 
-# Prove the packaged-dependency check has teeth: strip a shipped script from a scratch copy of the
-# generated package and confirm detection actually fails it, rather than trivially passing everything.
+# Prove the packaged-dependency check has teeth: strip a shipped script from a scratch copy of an adapter
+# folder and confirm detection actually fails it, rather than trivially passing everything.
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) "base-agents-packaging-$([guid]::NewGuid().ToString('N'))"
 try {
-    $source = Join-Path $pluginSkills 'handoff-claude'
+    $source = Join-Path $pluginRoot 'skills\handoff-claude'
     Copy-Item -LiteralPath $source -Destination $scratch -Recurse
     Remove-Item -LiteralPath (Join-Path $scratch 'scripts\launch_claude.py') -Force
 
-    $missing = @(Get-UnpackagedSkillDirectoryReferences -SkillDir $scratch) + @(Get-MissingRequiredFiles -SkillDir $scratch -Name 'handoff-claude')
+    $canonicalBody = [System.IO.File]::ReadAllText((Join-Path $canonicalSkills 'handoff-claude\SKILL.md'))
+    $missing = @(Get-UnpackagedSkillDirectoryReferences -Body $canonicalBody -SkillDir $scratch) +
+               @(Get-MissingRequiredFiles -SkillDir $scratch -Name 'handoff-claude')
     if ($missing.Count -eq 0) {
         throw 'Validation did not detect a packaged dependency removed from a generated skill copy.'
     }

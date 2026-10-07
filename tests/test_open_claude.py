@@ -174,6 +174,21 @@ class OpenClaudeTests(unittest.TestCase):
             self.run_main()
         hardened.assert_called_once()
 
+    def test_stdio_is_hardened_before_open_claude_tab_is_called(self):
+        # H27: hardening stdout/stderr against an unencodable title or path must happen before the tab can
+        # open, not after -- otherwise the success print for a launch that already happened is exactly
+        # what could crash unguarded.
+        parent = mock.Mock()
+        with mock.patch.object(self.agent_cli, 'make_stdio_encoding_lossy') as hardened, \
+                mock.patch.object(self.agent_cli, 'open_claude_tab', wraps=self.agent_cli.open_claude_tab) as tab:
+            parent.attach_mock(hardened, 'make_stdio_encoding_lossy')
+            parent.attach_mock(tab, 'open_claude_tab')
+            self.run_main()
+        self.assertEqual(
+            [call[0] for call in parent.mock_calls],
+            ['make_stdio_encoding_lossy', 'open_claude_tab'],
+        )
+
     # --- success / failure ---
 
     def test_success_prints_the_launched_message(self):

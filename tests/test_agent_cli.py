@@ -317,18 +317,26 @@ class StandardsSyncTests(unittest.TestCase):
         (self.config / 'plugins' / 'installed_plugins.json').write_text('{not json')
         self.assertEqual(CLI.standards_sync_script(), CLI.HERE / 'claude_standards_sync.py')
 
-    def test_a_hung_check_reports_a_standards_line_and_never_raises(self):
+    def test_no_outer_timeout_is_imposed_on_a_running_check(self):
+        # H21: claude_standards_sync.py already bounds its own steps (180s marketplace update, 120s per
+        # plugin); an outer timeout here would kill a normally running check and orphan its `claude
+        # plugin` grandchild instead, which an outer timeout cannot even wait out on Windows, where that
+        # grandchild holds the stdout pipe.
         install = self.base / 'install'
         script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
         script.parent.mkdir(parents=True)
-        script.write_text('print("unreachable")\n')
+        script.write_text('print("installed")\n')
         self.register(install)
-        lines = []
-        with mock.patch.object(CLI.subprocess, 'run', side_effect=subprocess.TimeoutExpired(cmd=['x'], timeout=120)):
-            CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
-        self.assertEqual(len(lines), 1)
-        self.assertIn('standards:', lines[0])
-        self.assertIn('did not finish', lines[0])
+        captured = {}
+        real_run = CLI.subprocess.run
+
+        def spy(*args, **kwargs):
+            captured.update(kwargs)
+            return real_run(*args, **kwargs)
+
+        with mock.patch.object(CLI.subprocess, 'run', side_effect=spy):
+            CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lambda line: None)
+        self.assertNotIn('timeout', captured)
 
     def test_a_failure_to_start_the_check_reports_a_standards_line_and_never_raises(self):
         install = self.base / 'install'
@@ -643,9 +651,9 @@ class LaunchTabTests(unittest.TestCase):
         self.assertNotIn('sendText', [cmd[3] for cmd in calls])
 
     def test_a_timed_out_konsole_title_call_still_closes_the_empty_tab(self):
-        # H12: no inner command was ever typed into this session, so once abandon() has (tried to) close
-        # it, the uncertainty a LaunchTimeout names no longer applies -- this is a plain, definite
-        # LaunchError, not a LaunchTimeout.
+        # H12/H23: no inner command was ever typed into this session, so once abandon() has closed it,
+        # the uncertainty a LaunchTimeout names no longer applies -- this is a plain, definite LaunchError,
+        # never "may still have taken effect", and it reports that closing the tab itself succeeded.
         environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
         calls = []
 
@@ -659,8 +667,32 @@ class LaunchTabTests(unittest.TestCase):
             with self.assertRaises(CLI.LaunchError) as caught:
                 CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
         self.assertNotIsInstance(caught.exception, CLI.LaunchTimeout)
+        message = str(caught.exception)
+        self.assertNotIn('may still have taken effect', message)
+        self.assertIn('the launch failed', message)
+        self.assertNotIn('also failed', message)
         self.assertEqual(calls[-1], ['/usr/bin/qdbus6', 'org.kde.konsole-123', '/Sessions/7', 'sendText', 'exit\n'])
         self.assertNotIn('runCommand', [cmd[3] for cmd in calls])
+
+    def test_a_timed_out_konsole_title_call_when_closing_also_fails_says_so(self):
+        environ = {'KONSOLE_DBUS_WINDOW': '/Windows/1', 'KONSOLE_DBUS_SERVICE': 'org.kde.konsole-123'}
+        calls = []
+
+        def run(cmd, **kwargs):
+            calls.append(cmd)
+            if cmd[3] == 'setTabTitleFormat':
+                raise subprocess.TimeoutExpired(cmd, 30)
+            if cmd[3] == 'sendText':
+                return subprocess.CompletedProcess(cmd, 1, stdout='', stderr='no such session')
+            return subprocess.CompletedProcess(cmd, 0, stdout='7', stderr='')
+
+        with mock.patch.object(CLI.shutil, 'which', side_effect=lambda name: '/usr/bin/qdbus6' if name == 'qdbus6' else None):
+            with self.assertRaises(CLI.LaunchError) as caught:
+                CLI.launch_tab(self.directory, '/bin/exe', 'A Tab', environ=environ, run=run, popen=mock.Mock())
+        self.assertNotIsInstance(caught.exception, CLI.LaunchTimeout)
+        message = str(caught.exception)
+        self.assertNotIn('may still have taken effect', message)
+        self.assertIn('also failed', message)
 
     def test_a_timed_out_konsole_new_session_call_is_a_plain_error_naming_a_possible_empty_tab(self):
         # H12: no session id came back, so there is nothing here to close by typing into it -- still a
@@ -798,8 +830,11 @@ class LaunchTabTests(unittest.TestCase):
 
 
 class OpenClaudeTabTests(unittest.TestCase):
-    """open_claude_tab: the H8 helper shared by open-claude and handoff-claude so the directory check,
-    executable discovery, pre-launch standards sync and the forced colour environment have one owner."""
+    """open_claude_tab: the H8 helper shared by open-claude and handoff-claude so executable discovery,
+    pre-launch standards sync and the forced colour environment have one owner. H26: it no longer
+    re-validates the working directory itself -- both launchers already call resolve_tab_directory before
+    calling this, and launch_tab (mocked below, with its own coverage in LaunchTabTests) remains the
+    single owner of that same check, so a launch validates the directory once, not twice."""
 
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='agent cli open tab ')
@@ -823,24 +858,26 @@ class OpenClaudeTabTests(unittest.TestCase):
         self.parent.attach_mock(self.sync_claude_standards, 'sync_claude_standards')
         self.parent.attach_mock(self.launch_tab, 'launch_tab')
 
-    def test_a_missing_working_directory_is_rejected_before_anything_else(self):
-        with self.assertRaisesRegex(CLI.LaunchError, 'not a directory'):
-            CLI.open_claude_tab(os.path.join(self.directory, 'missing'), 'Tab', [])
-        self.resolve_claude_executable.assert_not_called()
-        self.sync_claude_standards.assert_not_called()
-        self.launch_tab.assert_not_called()
+    def test_the_directory_is_not_revalidated_here_launch_tab_remains_the_single_owner(self):
+        missing = os.path.join(self.directory, 'missing')
+        CLI.open_claude_tab(missing, 'Tab', [])
+        self.resolve_claude_executable.assert_called_once()
+        self.sync_claude_standards.assert_called_once()
+        self.launch_tab.assert_called_once_with(
+            missing, '/bin/claude', 'Tab', arguments=[], force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
+        )
 
     def test_resolves_syncs_and_launches_in_order_with_the_forced_colour_environment(self):
         result = CLI.open_claude_tab(self.directory, 'Tab', ['--flag'])
 
-        self.assertEqual(result, Path(os.path.abspath(self.directory)))
+        self.assertIsNone(result)
         self.assertEqual(
             [call[0] for call in self.parent.mock_calls],
             ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
         )
-        self.sync_claude_standards.assert_called_once_with(result, claude='/bin/claude', out=print)
+        self.sync_claude_standards.assert_called_once_with(self.directory, claude='/bin/claude', out=print)
         self.launch_tab.assert_called_once_with(
-            result, '/bin/claude', 'Tab', arguments=['--flag'],
+            self.directory, '/bin/claude', 'Tab', arguments=['--flag'],
             force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
         )
 
