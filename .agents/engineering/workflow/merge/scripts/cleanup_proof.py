@@ -8,10 +8,12 @@ the primary from the first `git worktree list --porcelain` entry, then applies t
 
 1. the target is a registered, non-primary, attached (non-detached) worktree on exactly the given
    branch and head;
-2. `git status --porcelain=v2 --untracked-files=all` in the target is empty;
-3. a fresh `gh pr view <pr>` reports `MERGED` with `headRefOid` equal to the given head;
-4. the merge commit is an ancestor of `origin/<default>` (fetched first);
-5. `gh pr list --state open --head <branch>` returns no PRs.
+2. a fresh `gh pr view <pr>` reports `MERGED` with `headRefOid` equal to the given head;
+3. the merge commit is an ancestor of `origin/<default>` (fetched first);
+4. `gh pr list --state open --head <branch>` returns no PRs;
+5. `git status --porcelain=v2 --untracked-files=all` in the target is empty, or (argument-less from
+   inside the target) remaining changes are archived under `<state>/merge-cleanup/set-aside/` and the
+   tree is re-checked clean.
 
 All gates pass: prints `removable` and the exact `worktree remove`/`branch -d`/`branch -D` commands,
 exit 0. Any gate fails: prints `preserve: <reason>`, exit 1. Either way, a JSON receipt is written
@@ -26,6 +28,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -80,6 +83,16 @@ def run_git(cwd, *args, timeout=GIT_TIMEOUT_SECONDS):
 
 def git_succeeds(cwd, *args, timeout=GIT_TIMEOUT_SECONDS):
     return run_git(cwd, *args, timeout=timeout).returncode == 0
+
+
+def run_git_binary(cwd, *args, timeout=GIT_TIMEOUT_SECONDS):
+    try:
+        return subprocess.run(
+            ["git", "-C", str(cwd), *args],
+            capture_output=True, timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise Preserve(f"git {' '.join(args)} failed: {error}") from error
 
 
 def derive_context(cwd):
@@ -209,6 +222,120 @@ def require_clean(target):
         raise Preserve(f"{target} has uncommitted or untracked changes")
 
 
+def status_entries(target):
+    result = run_git(target, "status", "--porcelain=v2", "-z", "--untracked-files=all")
+    if result.returncode != 0:
+        raise Preserve(f"git status failed: {result.stderr.strip()}")
+    tokens = result.stdout.split("\0")
+    if tokens and tokens[-1] == "":
+        tokens.pop()
+    records = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token.startswith("2 "):
+            orig = tokens[index + 1] if index + 1 < len(tokens) else ""
+            records.append(f"{token}\t{orig}")
+            index += 2
+            continue
+        if token.startswith("u "):
+            raise Preserve(f"{target} has unmerged paths")
+        records.append(token)
+        index += 1
+    return records
+
+
+def cwd_is_inside_target(cwd, target):
+    try:
+        Path(cwd).resolve().relative_to(target)
+    except ValueError:
+        return False
+    return True
+
+
+def set_aside_directory(target):
+    digest = hashlib.sha256(target.as_posix().encode("utf-8")).hexdigest()
+    return state_directory() / "merge-cleanup" / "set-aside" / f"{digest}-{int(time.time() * 1000)}"
+
+
+def set_aside(target, records, branch, head, pr):
+    archive = set_aside_directory(target)
+    try:
+        archive.mkdir(parents=True)
+    except OSError as error:
+        raise Preserve(f"cannot create set-aside archive {archive}: {error}") from error
+
+    patch_entry = None
+    diff_result = run_git_binary(target, "diff", "HEAD", "--binary")
+    if diff_result.returncode != 0:
+        raise Preserve(f"git diff HEAD --binary failed in {target}")
+    if diff_result.stdout:
+        patch_path = archive / "tracked.patch"
+        patch_path.write_bytes(diff_result.stdout)
+        if patch_path.read_bytes() != diff_result.stdout:
+            raise Preserve(f"set-aside patch verification failed for {patch_path}")
+        patch_entry = {
+            "file": "tracked.patch",
+            "sha256": hashlib.sha256(diff_result.stdout).hexdigest(),
+            "bytes": len(diff_result.stdout),
+            "note": "staged and unstaged tracked changes are flattened into one patch",
+        }
+
+    untracked_entries = []
+    for record in records:
+        if not record.startswith("? "):
+            continue
+        relative_path = record[2:]
+        source = target / relative_path
+        try:
+            source_bytes = source.read_bytes()
+        except OSError as error:
+            raise Preserve(f"cannot read untracked file {source}: {error}") from error
+        source_hash = hashlib.sha256(source_bytes).hexdigest()
+        destination = archive / "untracked" / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        try:
+            copy_bytes = destination.read_bytes()
+        except OSError as error:
+            raise Preserve(f"cannot verify set-aside copy {destination}: {error}") from error
+        if hashlib.sha256(copy_bytes).hexdigest() != source_hash:
+            raise Preserve(f"set-aside copy hash mismatch for {relative_path}")
+        untracked_entries.append({
+            "path": relative_path,
+            "sha256": source_hash,
+            "bytes": len(source_bytes),
+        })
+
+    manifest_path = archive / "manifest.json"
+    manifest_path.write_text(json.dumps({
+        "worktree": str(target),
+        "branch": branch,
+        "head": head,
+        "pr": pr,
+        "created_at": time.time(),
+        "status_records": records,
+        "patch": patch_entry,
+        "untracked": untracked_entries,
+    }, sort_keys=True), encoding="utf-8")
+    try:
+        json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise Preserve(f"set-aside manifest unreadable: {error}") from error
+
+    reset = run_git(target, "reset", "--hard", "HEAD")
+    if reset.returncode != 0:
+        raise Preserve(f"git reset --hard HEAD failed in {target}: {reset.stderr.strip()}")
+    for entry in untracked_entries:
+        path = target / entry["path"]
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as error:
+            raise Preserve(f"cannot remove set-aside source {path}: {error}") from error
+
+    return str(archive)
+
+
 def load_fixture():
     path = os.environ.get(FORGE_FIXTURE_ENV)
     if not path:
@@ -304,6 +431,7 @@ def run(args):
     reason = None
     merge_oid = None
     primary = None
+    set_aside_path = None
     commands = []
     try:
         if worktree_value is None or branch is None or head is None:
@@ -316,10 +444,16 @@ def run(args):
         if pr is None:
             pr = resolve_pr(branch, args.repo, fixture, obligation)
         primary, target = resolve_target(cwd, worktree_value, branch, head)
-        require_clean(target)
+        records = status_entries(target)
         merge_oid = require_merged(pr, head, args.repo, fixture)
         require_contained(primary, default, merge_oid)
         require_no_open_pr(branch, args.repo, fixture)
+        if records:
+            if cwd_is_inside_target(cwd, target):
+                set_aside_path = set_aside(target, records, branch, head, pr)
+            else:
+                raise Preserve(f"{target} has uncommitted or untracked changes")
+        require_clean(target)
         commands = [
             f'git -C "{primary}" worktree remove -- "{target}"',
             branch_deletion_command(primary, branch, default),
@@ -340,6 +474,7 @@ def run(args):
         "merge_oid": merge_oid,
         "default": default,
         "verdict": verdict,
+        "set_aside": set_aside_path,
         "recorded_at": time.time(),
     })
 

@@ -100,6 +100,12 @@ def write_string_obligation(state_dir, worktree, pr):
     path.write_text(json.dumps({"pr": str(pr)}), encoding="utf-8")
 
 
+def load_receipt(state_dir, worktree):
+    digest = hashlib.sha256(Path(worktree).resolve().as_posix().encode("utf-8")).hexdigest()
+    path = Path(state_dir) / "merge-cleanup" / "receipts" / f"{digest}.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 class CleanupProofTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -349,6 +355,139 @@ class CleanupProofTests(unittest.TestCase):
         self.assertTrue(result.stdout.startswith("preserve:"))
         self.assertIn("obligation", result.stdout)
         self.assertTrue(worktree.exists())
+
+    def test_argument_less_set_aside_archives_dirt_and_is_removable(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+
+        (worktree / "file0.txt").write_text("modified tracked\n", encoding="utf-8")
+        (worktree / "staged.txt").write_text("staged new\n", encoding="utf-8")
+        git(worktree, "add", "staged.txt")
+        (worktree / "untracked.txt").write_bytes(b"dirty\n")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(result.stdout.startswith("removable"))
+        self.assertEqual("", git(worktree, "status", "--porcelain"))
+
+        receipt = load_receipt(self.state.name, worktree)
+        self.assertEqual("removable", receipt["verdict"])
+        self.assertIsNotNone(receipt["set_aside"])
+        archive = Path(receipt["set_aside"])
+        self.assertTrue(archive.is_dir())
+        set_aside_root = Path(self.state.name) / "merge-cleanup" / "set-aside"
+        self.assertEqual([archive], list(set_aside_root.iterdir()))
+
+        patch_text = (archive / "tracked.patch").read_text(encoding="utf-8")
+        self.assertIn("file0.txt", patch_text)
+        self.assertIn("staged.txt", patch_text)
+
+        self.assertEqual(
+            b"dirty\n", (archive / "untracked" / "untracked.txt").read_bytes(),
+        )
+
+        manifest = json.loads((archive / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual({"untracked.txt"}, {entry["path"] for entry in manifest["untracked"]})
+        self.assertIsNotNone(manifest["patch"])
+
+        self.run_commands(result.stdout)
+        self.assertFalse(worktree.exists())
+        porcelain = git(primary, "worktree", "list", "--porcelain")
+        self.assertNotIn(str(worktree), porcelain)
+
+    def test_argument_less_unmerged_dirty_worktree_is_untouched(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_commit_merge(primary, "feature")
+
+        (worktree / "file0.txt").write_text("modified tracked\n", encoding="utf-8")
+        (worktree / "staged.txt").write_text("staged new\n", encoding="utf-8")
+        git(worktree, "add", "staged.txt")
+        (worktree / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "OPEN", "headRefOid": head, "mergeCommit": None},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(1, result.returncode)
+        self.assertTrue(result.stdout.startswith("preserve:"))
+        self.assertEqual("modified tracked\n", (worktree / "file0.txt").read_text(encoding="utf-8"))
+        self.assertEqual("staged new\n", (worktree / "staged.txt").read_text(encoding="utf-8"))
+        self.assertEqual("dirty\n", (worktree / "untracked.txt").read_text(encoding="utf-8"))
+        set_aside_root = Path(self.state.name) / "merge-cleanup" / "set-aside"
+        self.assertFalse(set_aside_root.exists())
+        self.assertTrue(worktree.exists())
+
+    def test_argument_less_archive_failure_preserves_everything(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+
+        (worktree / "file0.txt").write_text("modified tracked\n", encoding="utf-8")
+        (worktree / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+
+        set_aside_root = Path(self.state.name) / "merge-cleanup" / "set-aside"
+        set_aside_root.parent.mkdir(parents=True, exist_ok=True)
+        set_aside_root.write_text("not a directory", encoding="utf-8")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(1, result.returncode)
+        self.assertTrue(result.stdout.startswith("preserve:"))
+        self.assertEqual("modified tracked\n", (worktree / "file0.txt").read_text(encoding="utf-8"))
+        self.assertEqual("dirty\n", (worktree / "untracked.txt").read_text(encoding="utf-8"))
+        self.assertTrue(worktree.exists())
+
+    def test_argument_less_ignored_files_neither_block_nor_archive(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        (worktree / ".gitignore").write_text("*.log\n", encoding="utf-8")
+        git(worktree, "add", ".gitignore")
+        git(worktree, "commit", "-q", "-m", "ignore logs")
+        git(worktree, "push", "-q", "origin", "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+
+        (worktree / "x.log").write_text("log noise\n", encoding="utf-8")
+        (worktree / "note.txt").write_text("keep me\n", encoding="utf-8")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(result.stdout.startswith("removable"))
+
+        receipt = load_receipt(self.state.name, worktree)
+        archive = Path(receipt["set_aside"])
+        manifest = json.loads((archive / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual({"note.txt"}, {entry["path"] for entry in manifest["untracked"]})
+        self.assertFalse((archive / "untracked" / "x.log").exists())
+        self.assertTrue((worktree / "x.log").exists())
+
+        self.run_commands(result.stdout)
+        self.assertFalse(worktree.exists())
 
 
 if __name__ == "__main__":
