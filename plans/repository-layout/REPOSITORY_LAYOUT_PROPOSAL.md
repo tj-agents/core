@@ -279,6 +279,15 @@ Resolve paths from Git, independent of the caller's linked checkout:
 ```python
 common = Path(git(caller, 'rev-parse', '--path-format=absolute', '--git-common-dir')).resolve()
 repository = common.parent
+caller_root = Path(git(caller, 'rev-parse', '--show-toplevel')).resolve()
+caller_git = Path(git(caller, 'rev-parse', '--absolute-git-dir')).resolve()
+if caller_git == common:
+    if caller_root != repository or not (caller_root / '.git').is_dir():
+        raise Refusal('Separately relocated primary Git directories are unsupported')
+elif caller_git.parent != common / 'worktrees':
+    raise Refusal('The caller is not a conventional linked worktree')
+elif Path((caller_git / 'gitdir').read_text().strip()).resolve() != caller_root / '.git':
+    raise Refusal('Linked worktree registration does not match the caller')
 if common.name != '.git' or git(repository, 'rev-parse', '--is-bare-repository') != 'false':
     raise Refusal('An ordinary non-bare repository with its common .git directory is required')
 if Path(git(repository, 'rev-parse', '--path-format=absolute', '--git-common-dir')).resolve() != common:
@@ -289,6 +298,13 @@ if Path(git(repository, 'rev-parse', '--show-toplevel')).resolve() != repository
     raise Refusal('Separately relocated Git directories are unsupported')
 target = repository / '.worktrees' / branch.replace('/', '-')
 ```
+
+The caller identity check must precede probing the common directory's parent: Git can infer that
+parent as a worktree even when a relocated primary lives elsewhere. Require the caller's resolved
+top-level path and Git directory to agree with its worktree registration. For a linked caller, verify
+both directions of its `.git` pointer and administrative `gitdir` file. Git does not retain enough
+metadata to distinguish every separately relocated primary through a linked caller; that layout is
+outside this helper's supported contract, and these checks do not claim universal detection of it.
 
 Every Git subprocess receives an environment with inherited repository selectors removed: `GIT_DIR`,
 `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
@@ -340,7 +356,7 @@ verify its registration, branch, HEAD, common directory and clean status. On any
 partial Git/path evidence and report it; do not roll back by force-deleting a branch or directory.
 
 Expected slice: helper plus focused tests, packaging test and engineering harness declaration,
-approximately 500–800 substantive lines in four files. No launcher, audit, reaper, migration or
+approximately 500–800 substantive lines in five files. No launcher, audit, reaper, migration or
 marketplace changes belong in this PR. The parent owns design and the goal; one L4 worker owns these
 specified implementation paths. The helper's new invocation permissions are declared in the engineering
 harness using the existing `${PLUGIN_ROOT}` patterns, constrained to `python -B <helper> create`.
@@ -368,15 +384,18 @@ Existing Python unittest and package-resource patterns in `tests/test_source_lay
 
 ## Execution readiness
 
-Allocator verdict: full design review completed with three findings now addressed; delta review pending.
+Allocator verdict: full and delta design reviews completed; the caller-identity correction awaits its
+focused recheck. A real-Git fixture passes for primary and linked checkouts and refuses a relocated primary.
 The examples and refusal behavior above resolve
 the first producer slice; they do not declare the remaining fleet migration mechanism ready.
 Execution authorization: implementation and normal goal delivery, as recorded under Authorization.
 Transfer: not required for this bounded helper refinement. This session is already the full-goal
 successor; retain it and dispatch one specified L4 implementation worker after design review.
-Review owner: `reviews/Feature-RepositoryOwnedLayout.md`; native and independent read-only evidence
-covered the frozen design at `fe7ddc8`. Changes define output semantics, explicit refspec freshness and
-primary-root verification. Next action: review the corrected design delta, then dispatch the producer
+Native and independent read-only review covered the frozen design at `fe7ddc8`; native delta review
+covered `0df530e`. Retained corrections define output semantics, explicit refspec freshness and
+caller-root verification. The delta review's missing-adoption-checkpoint claim was rejected: the committed
+ledger already contains its self-contained Next Steps. Review work orders remain local; this goal records
+the durable outcome. Next action: recheck the caller-identity correction, then dispatch the producer
 implementation at L4. Broader acceptance remains unchanged.
 
 ## Next Steps
