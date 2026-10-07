@@ -18,13 +18,14 @@ import bootstrap_capabilities as bootstrap
 import harness_permissions
 
 
-SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$")
+PACKAGE_VERSION = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
 def git(checkout: Path, arguments: list[str], data: bytes | None = None) -> bytes:
     environment = os.environ.copy()
     environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    environment["GIT_NO_LAZY_FETCH"] = "1"
     result = subprocess.run(
         ["git", "-C", str(checkout), *arguments], input=data,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, check=False,
@@ -98,7 +99,10 @@ def read_snapshot(source: dict) -> dict[str, bytes]:
     offset = 0
     for path, oid in entries:
         end = output.index(b"\n", offset)
-        found, kind, length = output[offset:end].split()
+        header = output[offset:end].split()
+        if len(header) != 3:
+            raise bootstrap.BootstrapError("Snapshot requires locally available blob objects")
+        found, kind, length = header
         size = int(length)
         if found != oid or kind != b"blob":
             raise bootstrap.BootstrapError("Git batch returned an unexpected object")
@@ -195,8 +199,8 @@ def compose_catalog(document: dict, platform: str) -> dict:
             if any(manifest.get("name") != name for manifest in native.values()):
                 raise bootstrap.BootstrapError(f"Native package identity disagrees: {name}")
             version = native["codex"].get("version")
-            if not isinstance(version, str) or not SEMVER.fullmatch(version):
-                raise bootstrap.BootstrapError(f"Codex package version must be semantic: {name}")
+            if not isinstance(version, str) or not PACKAGE_VERSION.fullmatch(version):
+                raise bootstrap.BootstrapError(f"Codex package version must use catalog v1 N.N.N: {name}")
             if "version" in native["claude"] and native["claude"]["version"] != version:
                 raise bootstrap.BootstrapError(f"Native package versions disagree: {name}")
             for manifest in native.values():
@@ -208,6 +212,9 @@ def compose_catalog(document: dict, platform: str) -> dict:
                 raise bootstrap.BootstrapError(f"Harness identity disagrees: {plugin_id}")
             requires = harness.get("requires")
             harness_permissions.validate_requires(requires, plugin_id)
+            requires = copy.deepcopy(requires)
+            requires["plugins"] = qualified(requires["plugins"], market, plugin_id)
+            bootstrap.require_string_list(requires["plugins"], f"{plugin_id}.qualified harness plugins")
             if plugin_id not in requires["plugins"] or {"id": market, "repository": repository} not in requires["marketplaces"]:
                 raise bootstrap.BootstrapError(f"Harness must declare its own package and marketplace: {plugin_id}")
             for hook in requires["hooks"]:
