@@ -236,6 +236,18 @@ current host attachment before invoking either cleanup path below. When the targ
 or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
 and branch deletion in the current session.
 
+When the session remains attached to the primary checkout or another retained checkout, finish Step 6,
+any plan close-out and the report, then run exactly this argument-free command as the final action:
+
+```
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/close.ps1
+```
+
+It verifies this session's registered host and attachment, closes only its own CLI or uniquely identified
+tab, and records verified session exit while preserving checkout files and Git state. A retained checkout
+or deleted branch does not prove that the CLI exited. If verification fails, preserve the session and
+resolve its registry or attachment evidence before retrying.
+
 Only when the recorded target is a linked worktree, the host is attached to that target, and the target
 differs from the primary checkout, the session closes itself as the delivery's final action, after Step 6,
 any plan close-out and the report. Run gate 1 below, then from inside that worktree run exactly this, with
@@ -384,4 +396,5 @@ needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-run `finish.ps1` when the session is attached to the merged worktree, otherwise stop. No preamble.
+run `finish.ps1` when the session is attached to the removable merged worktree, or `close.ps1` when its
+checkout is retained. No preamble.
