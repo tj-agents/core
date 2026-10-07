@@ -1,4 +1,6 @@
 import copy
+from contextlib import redirect_stderr, redirect_stdout
+import io
 import json
 import os
 import shutil
@@ -221,6 +223,24 @@ class CatalogCompositionTests(unittest.TestCase):
         self.assertEqual(set(sources), {'base-agents'})
         self.assertEqual(identities, {f'{name}@base-agents': True for name in names})
         self.assertEqual((allow, rules), ([], []))
+
+    def test_git_without_no_lazy_fetch_support_fails_before_object_inspection(self):
+        request = self.checkout / 'sources.json'
+        request.write_text(json.dumps(self.document()), encoding='utf-8')
+        unsupported = subprocess.CompletedProcess([], 129, b'', b'unknown option: --no-lazy-fetch')
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(composer.subprocess, 'run', return_value=unsupported) as invoke:
+            with mock.patch.object(sys, 'argv', ['compose_catalog.py', '--input', str(request), '--platform', 'linux']):
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    status = composer.main()
+        self.assertEqual(status, 1)
+        self.assertEqual(stdout.getvalue(), '')
+        self.assertIn('Git snapshot inspection failed (remote)', stderr.getvalue())
+        invoke.assert_called_once()
+        command = invoke.call_args.args[0]
+        self.assertEqual(command[:2], ['git', '--no-lazy-fetch'])
+        self.assertEqual(command[4:], ['remote', 'get-url', 'origin'])
+        self.assertEqual(invoke.call_args.kwargs['env']['GIT_NO_LAZY_FETCH'], '1')
 
     def test_missing_promisor_blob_fails_without_fetch_or_object_writes(self):
         provider_temporary = tempfile.TemporaryDirectory()
