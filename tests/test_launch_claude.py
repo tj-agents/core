@@ -103,14 +103,39 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 2)
         self.agent_cli.launch_tab.assert_not_called()
 
-    def test_there_is_no_effort_flag(self):
-        # H11: an explicit effort could reach a model it was never priced for (e.g. --lane L1 --effort max
-        # reaching the frontier pair without --frontier) or a model that rejects it outright (L7's Haiku).
-        # Effort is only ever the one the resolved lane or frontier entry prices for its own model.
+    def test_an_invalid_effort_is_rejected_by_argparse(self):
         with self.assertRaises(SystemExit) as raised:
-            self.run_main('--effort', 'high')
+            self.run_main('--model', 'explicit-model', '--effort', 'ultra')
         self.assertEqual(raised.exception.code, 2)
         self.agent_cli.launch_tab.assert_not_called()
+
+    def test_effort_alone_is_rejected(self):
+        # H22: effort without an explicit model could reach a model it was never priced for (e.g. --lane
+        # L1 --effort max reaching the frontier pair without --frontier) or a model that rejects it
+        # outright (L7's Haiku); --effort is only accepted together with an explicit --model.
+        code, _, err = self.run_main('--effort', 'high')
+        self.assertEqual(code, 1)
+        self.assertIn('--effort is only accepted together with an explicit --model', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
+    def test_effort_with_a_lane_but_no_explicit_model_is_rejected(self):
+        code, _, err = self.run_main('--lane', 'L1', '--effort', 'high')
+        self.assertEqual(code, 1)
+        self.assertIn('--effort is only accepted together with an explicit --model', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
+    def test_effort_with_frontier_but_no_explicit_model_is_rejected(self):
+        code, _, err = self.run_main('--frontier', '--effort', 'high')
+        self.assertEqual(code, 1)
+        self.assertIn('--effort is only accepted together with an explicit --model', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
+    def test_effort_together_with_an_explicit_model_passes_both(self):
+        self.run_main('--model', 'explicit-model', '--effort', 'high')
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(arguments[arguments.index('--model') + 1], 'explicit-model')
+        self.assertEqual(arguments[arguments.index('--effort') + 1], 'high')
+        self.assertLess(arguments.index('--model'), arguments.index('--effort'))
 
     # --- argument assembly and order ---
 
@@ -208,6 +233,21 @@ class LaunchClaudeTests(unittest.TestCase):
         with mock.patch.object(self.agent_cli, 'make_stdio_encoding_lossy') as hardened:
             self.run_main()
         hardened.assert_called_once()
+
+    def test_stdio_is_hardened_before_open_claude_tab_is_called(self):
+        # H27: hardening stdout/stderr against an unencodable title or path must happen before the tab can
+        # open, not after -- otherwise the success print for a launch that already happened is exactly
+        # what could crash unguarded.
+        parent = mock.Mock()
+        with mock.patch.object(self.agent_cli, 'make_stdio_encoding_lossy') as hardened, \
+                mock.patch.object(self.agent_cli, 'open_claude_tab', wraps=self.agent_cli.open_claude_tab) as tab:
+            parent.attach_mock(hardened, 'make_stdio_encoding_lossy')
+            parent.attach_mock(tab, 'open_claude_tab')
+            self.run_main()
+        self.assertEqual(
+            [call[0] for call in parent.mock_calls],
+            ['make_stdio_encoding_lossy', 'open_claude_tab'],
+        )
 
     # --- success message ---
 
