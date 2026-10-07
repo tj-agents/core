@@ -1,7 +1,8 @@
 """Shared launch primitives for the native agent CLIs, on Windows and POSIX.
 
-Imported by handoff-claude, handoff-codex and open-claude so the environment scrub, executable discovery,
-standards sync, lane lookup and terminal argument escaping have one owner. Not runnable on its own.
+Imported by open-claude and handoff-claude so the environment scrub, executable discovery, standards
+sync, lane lookup and terminal argument escaping have one owner. handoff-codex still uses the PowerShell
+agent-cli.ps1 until its own Python port lands. Not runnable on its own.
 """
 
 import glob
@@ -224,8 +225,14 @@ def standards_sync_script():
 
 
 def sync_claude_standards(working_directory, claude=None, out=print):
-    """Refresh the registered standards before a Claude session opens. Never blocks the launch, and never
-    raises: a hung or failing check is reported as a `standards:` line, same as every other outcome here.
+    """Refresh the registered standards before a Claude session opens. Never blocks the launch when the
+    check cannot even start, and never raises: a failure to start it is reported as a `standards:` line,
+    same as every other outcome here.
+
+    No outer timeout bounds how long a normally running check takes: claude_standards_sync.py already
+    bounds its own steps (a 180s marketplace update, 120s per plugin), so an outer timeout here would kill
+    a check that was progressing normally and orphan its `claude plugin` grandchild -- on Windows, not even
+    killable from here, because that grandchild holds the stdout pipe this would be waiting on.
     """
     script = standards_sync_script()
     if script is None:
@@ -238,10 +245,7 @@ def sync_claude_standards(working_directory, claude=None, out=print):
         # errors='replace' rather than bare text=True: a byte sequence the check's own output cannot
         # decode as UTF-8 must not turn "never blocks the launch" into a crash here instead.
         result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 encoding='utf-8', errors='replace', timeout=120)
-    except subprocess.TimeoutExpired:
-        out('standards: the check did not finish within 120 seconds; this session loads the installed plugins')
-        return
+                                 encoding='utf-8', errors='replace')
     except OSError as exc:
         out(f'standards: the check could not be run ({exc}); this session loads the installed plugins')
         return
@@ -455,14 +459,16 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
     script_path = None
 
     def abandon():
+        """Try to end the empty tab by closing its shell; report whether that itself succeeded."""
         if script_path is not None:
             shutil.rmtree(script_path.parent, ignore_errors=True)
         # Konsole exposes no D-Bus call to close a session; ending its shell closes the tab this created.
         try:
-            run([qdbus, service, session_path, 'sendText', 'exit\n'],
-                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
+            result = run([qdbus, service, session_path, 'sendText', 'exit\n'],
+                          stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
+            return result.returncode == 0
         except (OSError, subprocess.SubprocessError):
-            pass
+            return False
 
     try:
         # setTitle alone is replaced by the tab-title format as soon as the foreground process changes, so
@@ -474,11 +480,16 @@ def _launch_konsole(directory, executable, title, arguments, cleared, forced, en
         # fish), so the inner command never travels as that text: it is written to a private sh script whose
         # first line deletes it and its directory, and the only thing typed is `exec sh '<path>'`.
         script_path = _write_posix_script(posix_inner_command(directory, cleared, forced, executable, arguments))
-    except LaunchTimeout as exc:
-        # abandon() ends the empty tab (or tries to) before this raises, so the uncertainty a LaunchTimeout
-        # names no longer applies: no inner command was ever typed into this session.
-        abandon()
-        raise LaunchError(str(exc)) from None
+    except LaunchTimeout:
+        # The session definitely exists (newSession already returned one) and no inner command was ever
+        # typed into it, so this is a definite failure, not an open question -- unlike the generic
+        # LaunchTimeout wording, never "may still have taken effect": closing the empty tab is attempted
+        # right here, and the only thing actually left uncertain is whether that closing itself worked.
+        closed = abandon()
+        message = 'Konsole did not confirm the tab title within 30 seconds, so the launch failed.'
+        if not closed:
+            message += ' Closing the empty tab also failed; an empty Konsole tab may have been left open.'
+        raise LaunchError(message) from None
     except BaseException:
         abandon()
         raise
@@ -613,16 +624,16 @@ def launch_tab(working_directory, executable, title, arguments=(), clear=(), for
 
 
 def open_claude_tab(working_directory, title, arguments, out=print):
-    """Resolve the native claude executable, sync standards and open the tab; returns the absolute directory.
+    """Resolve the native claude executable, sync standards and open the tab.
 
-    Shared by open-claude and handoff-claude so the directory check, executable discovery, pre-launch
-    standards sync and the forced colour environment have one owner. Each caller keeps only its own
-    argument parsing, model/argument assembly, printing and exit codes.
+    Shared by open-claude and handoff-claude so executable discovery, pre-launch standards sync and the
+    forced colour environment have one owner. `working_directory` must already be resolved: both
+    launchers call resolve_tab_directory themselves first, before any prompt or lane handling, and
+    launch_tab (below) validates it again as the single remaining owner of that same check -- so a launch
+    validates the directory exactly once, not twice.
     """
-    directory = resolve_tab_directory(working_directory)
-
     claude = resolve_claude_executable()
-    sync_claude_standards(directory, claude=claude, out=out)
+    sync_claude_standards(working_directory, claude=claude, out=out)
 
     # Forced, not merely un-cleared: an automation-spawned terminal tab is not the interactive shell a
     # human would have launched it from, so colour/terminal-capability auto-detection cannot be trusted to
@@ -630,6 +641,5 @@ def open_claude_tab(working_directory, title, arguments, out=print):
     # to force colour outright. TERM=xterm-256color is forced the same way, but only ever reaches the
     # session on Windows: launch_tab drops any forced TERM on POSIX, because the terminal that actually
     # starts the tab sets TERM for that session itself, and forcing or clearing it here would fight that.
-    launch_tab(directory, claude, title, arguments=list(arguments), force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
-
-    return directory
+    launch_tab(working_directory, claude, title, arguments=list(arguments),
+               force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
