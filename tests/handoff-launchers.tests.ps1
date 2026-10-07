@@ -45,6 +45,8 @@ $originalClaudeConfig = $env:CLAUDE_CONFIG_DIR
 $originalUserProfile = $env:USERPROFILE
 $originalLocalAppData = $env:LOCALAPPDATA
 $originalWtLog = $env:WT_STUB_LOG
+$originalPSModuleAnalysisCachePath = $env:PSModuleAnalysisCachePath
+$moduleAnalysisCachePath = Join-Path $scratch 'powershell cache\ModuleAnalysisCache'
 
 function New-Stub {
     param(
@@ -74,6 +76,8 @@ try {
     foreach ($dir in @($fakeProfile, $fakeLocalAppData, $binDir, $workDir, $promptDir)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $moduleAnalysisCachePath) | Out-Null
+    $env:PSModuleAnalysisCachePath = $moduleAnalysisCachePath
 
     # The confirmed defect's precondition: the old resolver is absent, and nothing here recreates it.
     $oldRouting = Join-Path $fakeProfile '.claude\routing\route.py'
@@ -143,6 +147,45 @@ class Stub {
     $env:USERPROFILE = $fakeProfile
     $env:LOCALAPPDATA = $fakeLocalAppData
     $env:WT_STUB_LOG = $wtLog
+
+    $cacheProbeCwd = Join-Path $scratch "cache probe $([guid]::NewGuid().ToString('N'))"
+    $cacheProbePath = Join-Path $scratch 'powershell cache\DiscoveryProbeCache'
+    New-Item -ItemType Directory -Path $cacheProbeCwd | Out-Null
+    $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $cacheProbeCommand = @'
+$ErrorActionPreference = 'Stop'
+if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+    throw 'The module cache regression requires Windows PowerShell 5.1.'
+}
+Get-Module -ListAvailable | Out-Null
+Get-Command * | Out-Null
+$deadline = [DateTime]::UtcNow.AddSeconds(20)
+while (-not (Test-Path -LiteralPath $env:PSModuleAnalysisCachePath -PathType Leaf) -and [DateTime]::UtcNow -lt $deadline) {
+    Start-Sleep -Milliseconds 100
+}
+if (-not (Test-Path -LiteralPath $env:PSModuleAnalysisCachePath -PathType Leaf)) {
+    throw 'Windows PowerShell module discovery did not create the explicit scratch cache.'
+}
+if ((Get-Item -LiteralPath $env:PSModuleAnalysisCachePath).Length -eq 0) {
+    throw 'Windows PowerShell module discovery created an empty cache.'
+}
+if (Test-Path -LiteralPath (Join-Path (Get-Location).Path 'Microsoft')) {
+    throw 'Windows PowerShell module discovery polluted its working directory.'
+}
+'@
+    $cacheProbeEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cacheProbeCommand))
+    $env:PSModuleAnalysisCachePath = $cacheProbePath
+    Push-Location $cacheProbeCwd
+    try {
+        & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $cacheProbeEncoded
+        if ($LASTEXITCODE -ne 0) { throw 'The Windows PowerShell module cache regression failed.' }
+    } finally {
+        Pop-Location
+        $env:PSModuleAnalysisCachePath = $moduleAnalysisCachePath
+    }
+    if (-not (Test-Path -LiteralPath $cacheProbePath -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $cacheProbeCwd 'Microsoft'))) {
+        throw 'Windows PowerShell module discovery escaped the explicit scratch cache.'
+    }
 
     # Every generated discovery layout must load the shipped shared library and reach the stub terminal.
     # The packaged canonical `.agents/machine/.../scripts` copy is one directory deeper than the host
@@ -397,6 +440,11 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
     $env:PATH = $originalPath
     $env:USERPROFILE = $originalUserProfile
     $env:LOCALAPPDATA = $originalLocalAppData
+    if ($null -eq $originalPSModuleAnalysisCachePath) {
+        Remove-Item Env:\PSModuleAnalysisCachePath -ErrorAction SilentlyContinue
+    } else {
+        $env:PSModuleAnalysisCachePath = $originalPSModuleAnalysisCachePath
+    }
     if ($null -ne $originalClaudeConfig) { $env:CLAUDE_CONFIG_DIR = $originalClaudeConfig }
     Remove-Item Env:\CLAUDE_STUB_LOG -ErrorAction SilentlyContinue
     if ($null -eq $originalWtLog) { Remove-Item Env:\WT_STUB_LOG -ErrorAction SilentlyContinue } else { $env:WT_STUB_LOG = $originalWtLog }
