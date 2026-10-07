@@ -23,6 +23,24 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: tj-agents/kit
+          ref: v1.2.0
+          path: .kit
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: tj-agents/react
+          path: .react
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: tj-agents/dotnet
+          path: .dotnet
+          persist-credentials: false
 
       - name: regenerate the workspace from authored sources
         shell: pwsh
@@ -48,6 +66,10 @@ jobs:
       - name: harness declarations cover authored sources
         shell: pwsh
         run: python -B scripts/sync_harness_manifests.py --check
+
+      - name: authored skill references resolve in the public corpus
+        shell: pwsh
+        run: python -B .kit/.agents/kit/utility/check/scripts/check_skill_references.py --root . --root .kit --root .react --root .dotnet --source-root .
 
       - name: CLI session recovery tests
         shell: powershell
