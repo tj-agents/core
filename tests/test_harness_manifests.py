@@ -19,7 +19,7 @@ PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scr
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
-INSTRUCTED_SCRIPTS = {"engineering": "cleanup_proof.py", "machine": "finish.ps1"}
+INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.ps1"), ("machine", "close.ps1"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
 
 
@@ -32,6 +32,28 @@ class HarnessManifestTests(unittest.TestCase):
         for release in catalog["releases"]:
             for plugin in release["plugins"]:
                 self.assertEqual(manifests[plugin["name"]]["requires"], plugin["harness"])
+
+    def test_additional_roots_require_canonical_owned_shipped_resources(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            shutil.copytree(ROOT / ".agents", root / ".agents")
+            path = root / ".agents/plugins/harness/machine.json"
+            original = json.loads(path.read_text(encoding="utf-8"))
+            HARNESS.synchronize(root, check=True)
+            for roots in (
+                [".agents/catalog/catalog.schema.json"],
+                [".agents/machine", ".agents/catalog/catalog.schema.json"],
+                [".agents/machine", ".agents/machine"],
+                [".agents/lanes", ".agents/machine", ".agents/workflows"],
+                [".agents/catalog/missing.json", ".agents/machine"],
+                [".agents/catalog/../catalog/catalog.schema.json", ".agents/machine"],
+                ["../outside", ".agents/machine"],
+            ):
+                with self.subTest(roots=roots):
+                    manifest = {**original, "source_roots": roots}
+                    path.write_text(json.dumps(manifest), encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        HARNESS.synchronize(root, check=True)
 
     def test_manifest_shape_carries_no_digest_fields(self):
         manifest = json.loads(
@@ -86,8 +108,8 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         return harness_permissions.render_permissions(manifest["requires"]["permissions"], self.PLUGIN_ROOT)
 
     def test_every_instructed_command_is_declared_for_both_hosts(self):
-        for plugin, script in INSTRUCTED_SCRIPTS.items():
-            with self.subTest(plugin=plugin):
+        for plugin, script in INSTRUCTED_SCRIPTS:
+            with self.subTest(plugin=plugin, script=script):
                 claude_allow, codex_rules = self.rendered(plugin)
                 matching = [entry for entry in claude_allow if script in entry]
                 self.assertTrue(
@@ -102,9 +124,9 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                 self.assertEqual(1, len(matching_rules), f"{plugin}: expected exactly one Codex rule for {script}")
 
     def test_host_entry_and_vendored_script_paths_are_both_declared(self):
-        for plugin, script in INSTRUCTED_SCRIPTS.items():
+        for plugin, script in INSTRUCTED_SCRIPTS:
             skill = HOST_ENTRY_SKILLS[plugin]
-            with self.subTest(plugin=plugin):
+            with self.subTest(plugin=plugin, script=script):
                 claude_allow, codex_rules = self.rendered(plugin)
                 matching = [entry.replace("\\", "/") for entry in claude_allow if script in entry]
                 self.assertTrue(
@@ -124,13 +146,31 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                     f"{plugin}: missing the host-entry codex-skills/ Codex path",
                 )
 
+    def test_close_permissions_are_exact_argument_free_commands(self):
+        claude_allow, codex_rules = self.rendered("machine")
+        entries = [entry for entry in claude_allow if "close.ps1" in entry]
+        self.assertEqual(8, len(entries))
+        for entry in entries:
+            self.assertTrue(entry.replace("\\", "/").endswith("/close.ps1)"), entry)
+            self.assertNotIn("*", entry)
+        rules = [rule for rule in codex_rules if "close.ps1" in json.dumps(rule)]
+        self.assertEqual(1, len(rules))
+        self.assertEqual(6, len(rules[0]["pattern"]))
+        root = self.PLUGIN_ROOT.replace("\\", "/")
+        paths = {path.replace("\\", "/") for path in rules[0]["pattern"][-1]}
+        self.assertEqual({
+            f"{root}/.agents/machine/utility/peer-cli/scripts/close.ps1",
+            f"{root}/skills/peer-cli/scripts/close.ps1",
+            f"{root}/codex-skills/peer-cli/scripts/close.ps1",
+        }, paths)
+
     def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
         codex = shutil.which("codex")
         if not codex:
             self.skipTest("codex CLI not on PATH")
         rules = []
         checks = []
-        for plugin in INSTRUCTED_SCRIPTS:
+        for plugin in dict.fromkeys(plugin for plugin, _ in INSTRUCTED_SCRIPTS):
             _, codex_rules = self.rendered(plugin)
             rules += codex_rules
             checks.extend((plugin, rule["match"][0]) for rule in codex_rules)
