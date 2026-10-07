@@ -56,6 +56,12 @@ available, and saying so; on macOS always plain text with the markdown kept inta
 has no HTML flavour at all. Either way, a bare "Copied ..." line means it truly landed at that
 moment — not that it survived since.
 
+**On Linux, default mode is HTML-only — nothing a plain-text target can read.** `wl-copy`/`xclip`
+can set only one clipboard flavour per copy, so the default (rich) copy holds `text/html` and nothing
+else; a terminal paste or a plain text field gets nothing useful from it, not a plain fallback. Default
+mode is for rich targets — Teams, email. For anything pasted into a terminal or a plain field, use
+`--plain-only`, same as for a command (below).
+
 ## A command Tommy has to run himself
 
 **Put it on the clipboard. Never print it for him to copy out of the terminal.** Terminal copy is

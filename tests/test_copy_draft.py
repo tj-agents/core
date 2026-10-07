@@ -169,6 +169,7 @@ class PosixClipboardToolTests(unittest.TestCase):
         self.assertEqual(tool.paste_argv, ['wl-paste', '--no-newline'])
         self.assertEqual(tool.html_copy_argv, ['wl-copy', '--type', 'text/html'])
         self.assertEqual(tool.html_paste_argv, ['wl-paste', '--type', 'text/html'])
+        self.assertIsNone(tool.no_html_reason)
 
     def test_wayland_session_without_wl_clipboard_and_no_display_is_an_error_naming_the_package(self):
         with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-clipboard'):
@@ -187,6 +188,12 @@ class PosixClipboardToolTests(unittest.TestCase):
         )
         self.assertEqual(tool.label, 'xsel')
 
+    def test_wayland_and_x11_session_with_nothing_available_recommends_wl_clipboard_first(self):
+        # Wayland is the session actually running, so it is named first even though DISPLAY (XWayland) is
+        # also set; xclip/xsel are named only as that fallback.
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, r'wl-clipboard.*xclip'):
+            COPY_DRAFT.posix_clipboard_tool({'WAYLAND_DISPLAY': 'wayland-0', 'DISPLAY': ':0'}, which_only())
+
     def test_x11_session_prefers_xclip_with_an_html_flavour(self):
         tool = COPY_DRAFT.posix_clipboard_tool({'DISPLAY': ':0'}, which_only('xclip', 'xsel'))
         self.assertEqual(tool.label, 'xclip')
@@ -202,6 +209,7 @@ class PosixClipboardToolTests(unittest.TestCase):
         self.assertEqual(tool.paste_argv, ['xsel', '--clipboard', '--output'])
         self.assertIsNone(tool.html_copy_argv)
         self.assertIsNone(tool.html_paste_argv)
+        self.assertEqual(tool.no_html_reason, 'xsel cannot set an HTML flavour')
 
     def test_x11_session_without_either_tool_is_an_error(self):
         with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'xclip or xsel'):
@@ -218,6 +226,7 @@ class PosixClipboardToolTests(unittest.TestCase):
         self.assertEqual(tool.copy_argv, ['pbcopy'])
         self.assertEqual(tool.paste_argv, ['pbpaste'])
         self.assertIsNone(tool.html_copy_argv)
+        self.assertEqual(tool.no_html_reason, 'pbcopy has no HTML flavour')
 
     def test_no_session_detected_is_an_error(self):
         real_platform = COPY_DRAFT.sys.platform
@@ -237,11 +246,18 @@ class FakeResult:
 
 
 def make_run(results):
+    """A fake `subprocess.run`: records every call, and -- like the real thing -- writes stderr into
+    whatever file-like object the call passed as `stderr=`, since copy_draft.py reads it back from
+    there rather than from a `.stderr` attribute (a real stderr=PIPE capture only appears there)."""
     calls = []
 
     def run(argv, **kwargs):
         calls.append((list(argv), kwargs))
-        return results[len(calls) - 1]
+        result = results[len(calls) - 1]
+        sink = kwargs.get('stderr')
+        if sink is not None and hasattr(sink, 'write'):
+            sink.write(result.stderr)
+        return result
 
     run.calls = calls
     return run
@@ -289,18 +305,35 @@ class CopyPosixTests(unittest.TestCase):
         self.assertEqual(paste_argv, ['xclip', '-selection', 'clipboard', '-t', 'text/html', '-o'])
         self.assertIn('2 code spans', message)
 
-    def test_a_code_span_count_mismatch_in_the_html_readback_is_an_error(self):
-        run = make_run([FakeResult(stdout='')] + [FakeResult(stdout='<html><body>no spans here</body></html>')] * 5)
-        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'expected 1 code spans, found 0'):
+    def test_an_html_readback_that_does_not_match_what_was_written_is_an_error(self):
+        # Verification compares the read-back against the exact document that was written, not merely a
+        # non-empty result with the right code-span count.
+        run = make_run(
+            [FakeResult(stdout='')] + [FakeResult(stdout='<html><body>something different</body></html>')] * 5
+        )
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'did not read back the HTML flavour'):
             COPY_DRAFT.copy_posix(
                 'run `az login` now', plain_only=False,
                 environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
             )
 
-    def test_the_html_readback_is_retried_before_reporting_a_mismatch(self):
+    def test_the_html_readback_is_retried_past_a_stale_selection_before_matching(self):
         run = make_run([
             FakeResult(stdout=''),
             FakeResult(stdout='<html><body></body></html>'),  # stale/empty selection, as wl-paste can see
+            FakeResult(stdout=COPY_DRAFT.build_full_html(COPY_DRAFT.build_html_fragment('`az login`'))),
+        ])
+        message = COPY_DRAFT.copy_posix(
+            '`az login`', plain_only=False,
+            environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
+        )
+        self.assertEqual(len(run.calls), 3)
+        self.assertIn('1 code spans', message)
+
+    def test_the_html_readback_retries_past_a_nonzero_exit_before_succeeding(self):
+        run = make_run([
+            FakeResult(stdout=''),
+            FakeResult(returncode=1, stderr='No suitable type'),  # e.g. xclip: "target not available"
             FakeResult(stdout=COPY_DRAFT.build_full_html(COPY_DRAFT.build_html_fragment('`az login`'))),
         ])
         message = COPY_DRAFT.copy_posix(
@@ -383,11 +416,24 @@ class CopyPosixTests(unittest.TestCase):
         )
         self.assertIn('Copied 11 chars', message)
 
-    def test_the_plain_readback_is_retried_before_reporting_a_mismatch(self):
+    def test_the_plain_readback_is_retried_past_a_stale_selection_before_matching(self):
         run = make_run([FakeResult(stdout=''), FakeResult(stdout=''), FakeResult(stdout='hello world')])
         message = COPY_DRAFT.copy_posix(
             'hello world', plain_only=True,
             environ={'DISPLAY': ':0'}, which=which_only('xclip'), run=run,
+        )
+        self.assertEqual(len(run.calls), 3)
+        self.assertIn('plain text only', message)
+
+    def test_the_plain_readback_retries_past_a_nonzero_exit_before_succeeding(self):
+        run = make_run([
+            FakeResult(stdout=''),
+            FakeResult(returncode=1, stderr='Nothing is copied'),  # wl-paste with no owner answering yet
+            FakeResult(stdout='hello world'),
+        ])
+        message = COPY_DRAFT.copy_posix(
+            'hello world', plain_only=True,
+            environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
         )
         self.assertEqual(len(run.calls), 3)
         self.assertIn('plain text only', message)
@@ -400,9 +446,17 @@ class CopyPosixTests(unittest.TestCase):
                 environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
             )
 
+    def test_a_readback_that_always_exits_nonzero_reports_the_last_stderr(self):
+        run = make_run([FakeResult(stdout='')] + [FakeResult(returncode=1, stderr='Nothing is copied')] * 5)
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'Nothing is copied'):
+            COPY_DRAFT.copy_posix(
+                'hello world', plain_only=True,
+                environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
+            )
+
     # --- the copy command's own stdio, and failures of it ---
 
-    def test_the_copy_command_discards_stdout_and_stderr_instead_of_capturing_them(self):
+    def test_the_copy_commands_stdout_is_devnull_and_stderr_is_a_tempfile_not_a_pipe(self):
         run = make_run([FakeResult(stdout=''), FakeResult(stdout='hello world')])
         COPY_DRAFT.copy_posix(
             'hello world', plain_only=True,
@@ -410,16 +464,22 @@ class CopyPosixTests(unittest.TestCase):
         )
         copy_kwargs = run.calls[0][1]
         self.assertEqual(copy_kwargs['stdout'], subprocess.DEVNULL)
-        self.assertEqual(copy_kwargs['stderr'], subprocess.DEVNULL)
+        self.assertNotIn(copy_kwargs['stderr'], (subprocess.DEVNULL, subprocess.PIPE))
+        self.assertTrue(hasattr(copy_kwargs['stderr'], 'write'))
         self.assertNotIn('stdin', copy_kwargs)
+        self.assertEqual(copy_kwargs['encoding'], 'utf-8')
+        self.assertEqual(copy_kwargs['errors'], 'replace')
+
         paste_kwargs = run.calls[1][1]
         self.assertEqual(paste_kwargs['stdout'], subprocess.PIPE)
-        self.assertEqual(paste_kwargs['stderr'], subprocess.PIPE)
+        self.assertTrue(hasattr(paste_kwargs['stderr'], 'write'))
         self.assertEqual(paste_kwargs['stdin'], subprocess.DEVNULL)
+        self.assertEqual(paste_kwargs['encoding'], 'utf-8')
+        self.assertEqual(paste_kwargs['errors'], 'replace')
 
-    def test_a_nonzero_exit_from_the_copy_tool_is_an_error(self):
+    def test_a_nonzero_exit_from_the_copy_tool_is_an_error_including_its_stderr(self):
         run = make_run([FakeResult(returncode=1, stderr='no selection owner')])
-        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-copy copy failed'):
+        with self.assertRaisesRegex(COPY_DRAFT.ClipboardError, 'wl-copy copy failed.*no selection owner'):
             COPY_DRAFT.copy_posix(
                 'hello world', plain_only=True,
                 environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
@@ -441,6 +501,44 @@ class CopyPosixTests(unittest.TestCase):
                 'hello world', plain_only=True,
                 environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only(), run=make_run([]),
             )
+
+
+class LinuxSingleFlavourTechDebtTests(unittest.TestCase):
+    """Pins the TECH_DEBT.md entry "clip offers one clipboard flavour per copy on Linux".
+
+    wl-copy/xclip each take one MIME type per invocation, so default mode's copy_posix call sets ONLY
+    text/html -- never also a plain flavour a terminal paste could read. If copy_posix ever grows a second
+    copy call (e.g. once a persistent data source can answer both MIME types from one call), this test
+    must change, and the TECH_DEBT.md entry should be deleted in the same change.
+    """
+
+    def test_default_mode_issues_exactly_one_copy_call_and_it_is_html_only(self):
+        run = make_run([
+            FakeResult(stdout=''),
+            FakeResult(stdout=COPY_DRAFT.build_full_html(COPY_DRAFT.build_html_fragment('`a`'))),
+        ])
+        with mock.patch.object(COPY_DRAFT.time, 'sleep', return_value=None):
+            COPY_DRAFT.copy_posix(
+                '`a`', plain_only=False,
+                environ={'WAYLAND_DISPLAY': 'wayland-0'}, which=which_only('wl-copy', 'wl-paste'), run=run,
+            )
+        copy_calls = [call for call in run.calls if call[0] and call[0][0] == 'wl-copy']
+        self.assertEqual(len(copy_calls), 1)
+        self.assertEqual(copy_calls[0][0], ['wl-copy', '--type', 'text/html'])
+
+
+class AcquireClipboardOwnerTests(unittest.TestCase):
+    """_acquire_clipboard_owner, exercised against a stub user32 -- no real Windows needed for this part."""
+
+    def test_returns_the_window_handle_on_success(self):
+        user32 = mock.Mock()
+        user32.CreateWindowExW.return_value = 12345
+        self.assertEqual(COPY_DRAFT._acquire_clipboard_owner(user32), 12345)
+
+    def test_returns_none_when_window_creation_fails_so_openclipboard_null_can_still_be_tried(self):
+        user32 = mock.Mock()
+        user32.CreateWindowExW.return_value = 0
+        self.assertIsNone(COPY_DRAFT._acquire_clipboard_owner(user32))
 
 
 @unittest.skipUnless(os.name == 'nt', 'Exercises the real Windows clipboard via ctypes; Windows only.')
