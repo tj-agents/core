@@ -68,3 +68,17 @@ quote and a trailing backslash confirms whether Windows Terminal parses its own 
 way as the tab's command arguments. If it does not, give option values their own escaping (likely just the
 existing `;` handling, with no `CommandLineToArgvW`-style quoting), with a test pinned to the confirmed
 behaviour.
+
+## The pre-launch standards sync has no overall deadline
+
+`agent_cli.sync_claude_standards` runs `claude_standards_sync.py` before every Claude launch and waits
+for it with no outer limit, as the PowerShell launcher did. The script bounds each of its own steps
+(180 seconds per marketplace update, 120 per plugin, 20 per `git ls-remote`), but those add up across
+plugins, and on Windows a `claude plugin` grandchild that keeps the output pipe open can hold the wait
+past its own step limit. A slow or wedged check therefore delays the tab, and the launch it was meant
+never to block. A plain outer `subprocess` timeout is not the fix: it kills a check that is still
+within its own budgets and leaves the grandchild running.
+
+Resolve when the sync runs under one overall deadline that stops its whole process tree on expiry on
+both Windows and POSIX, reports a `standards:` line and then launches, with a test that a hung
+grandchild cannot hold the launch past that deadline.
