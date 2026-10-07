@@ -132,7 +132,12 @@
       "codex_prefix_rules": [
         {
           "pattern": [
-            ["python", "python.exe", "python3", "py"],
+            [
+              "python",
+              "python.exe",
+              "python3",
+              "py"
+            ],
             "-B",
             [
               "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
@@ -140,13 +145,24 @@
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
             ]
           ],
-          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before any cleanup",
+          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
           "match": [
-            ["python", "-B", "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"],
-            ["python", "-B", "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"]
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+            ]
           ],
           "not_match": [
-            ["python", "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"]
+            [
+              "python",
+              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+            ]
           ]
         }
       ]
