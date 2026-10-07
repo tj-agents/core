@@ -628,6 +628,23 @@ class RepoConfigTests(unittest.TestCase):
             self.assertIn("/second-native/config.toml\n", content)
             self.assertEqual(2, content.count(repo_config.EXCLUDE_START))
 
+    def test_tracked_lexical_config_behind_in_root_junction_is_rejected_without_writes(self):
+        self.git("init", "--quiet")
+        self.local()
+        self.git("add", "--force", ".codex/config.toml")
+        codex = self.root / ".codex"
+        physical = self.root / "physical-codex"
+        codex.rename(physical)
+        self.directory_link(codex, physical)
+        self.overlay(["Bash(new-owned-grant)"])
+        before = self.snapshot_files()
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "tracked.*\\.codex/config\\.toml"):
+            self.local()
+        self.assertEqual(before, self.snapshot_files())
+        self.assertEqual(before["physical-codex/config.toml"], (physical / "config.toml").read_bytes())
+        settings = json.loads((self.root / ".claude/settings.local.json").read_text(encoding="utf-8"))
+        self.assertNotIn("Bash(new-owned-grant)", settings["permissions"]["allow"])
+
 
 if __name__ == "__main__":
     unittest.main()
