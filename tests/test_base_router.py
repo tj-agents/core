@@ -8,6 +8,8 @@ import tempfile
 import unittest
 import uuid
 
+from native_plugin_inventory import empty_native_inventory_environment
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,7 +27,10 @@ class BaseRouterTests(unittest.TestCase):
                 "routes": [{"path": "^src/", "skills": ["missing-marketplace:never-shipped"]}]
             }), encoding="utf-8")
             environment = dict(os.environ, PLUGIN_ROOT=str(plugin), CLAUDE_PLUGIN_ROOT=str(plugin),
-                               HOME=str(root / "home"), USERPROFILE=str(root / "home"))
+                               HOME=str(root / "home"), USERPROFILE=str(root / "home"),
+                               CODEX_HOME=str(root / "home/.codex"),
+                               CLAUDE_CONFIG_DIR=str(root / "home/.claude"))
+            environment = empty_native_inventory_environment(root, environment, ("codex", "claude"))
             for host, tool, tool_input in (
                 ("codex", "apply_patch", {"patch": "*** Begin Patch\n*** Add File: src/item.cpp\n+int x;\n*** End Patch"}),
                 ("claude", "Write", {"file_path": "src/item.cpp", "content": "int x;"}),
