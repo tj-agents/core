@@ -70,9 +70,9 @@ EXEMPT_PS1_SCRIPTS = (
 )
 
 NEUTRAL_SEGMENT_RE = re.compile(
-    r"\A(?:Select-String|Select-Object|Where-Object|ForEach-Object|Sort-Object|Measure-Object|Out-String"
+    r"\A(?:Select-String|Measure-Object|Out-String"
     r"|Out-Null|ConvertFrom-Json|ConvertTo-Json|Format-\w+|Write-Output|Write-Host|echo|head|tail|grep"
-    r"|jq|sort|wc|cat|popd|Pop-Location|Set-Location|Push-Location|cd|pushd)\b",
+    r"|jq|wc|cat|popd|Pop-Location|Set-Location|Push-Location|cd|pushd)\b",
     re.IGNORECASE,
 )
 GIT_SEGMENT_RE = re.compile(
@@ -148,7 +148,7 @@ def command_is_exempt(command):
     segments = shell_segments(command)
     meaningful = [segment for segment in segments if not segment_is_neutral(segment)]
     if not meaningful:
-        return not segments
+        return True
     return all(segment_is_exempt(segment) for segment in meaningful)
 
 
@@ -340,6 +340,7 @@ def record_obligation(command, data):
         "branch": branch,
         "head": head,
         "pr": pr_number(command),
+        "command": command,
         "repo": normalize_slug(origin_url) if origin_url else None,
         "recorded_at": time.time(),
         "confirmed_merged": False,
@@ -464,31 +465,21 @@ MONITOR_COMMAND_RE = re.compile(
 )
 
 
-def confirm_obligation_for_pr(pr):
-    for path in iter_obligation_paths():
-        obligation = load_obligation(path)
-        if obligation is not None and obligation.get("pr") == pr:
-            obligation["confirmed_merged"] = True
-            save_obligation(path, obligation)
-
-
 def merge_is_final_segment(command):
     segments = shell_segments(command)
-    return bool(segments) and re.match(r"gh\s+pr\s+merge\b", segments[-1], re.IGNORECASE) is not None
+    return bool(segments) and re.match(
+        r"(?:\w+=\S+\s+)*gh\s+pr\s+merge\b", segments[-1], re.IGNORECASE
+    ) is not None
 
 
-def confirm_obligation_for_target(command, data):
-    from merge_review_gate import canonical_merge_target_dir, merge_target_dir
-
-    target = canonical_merge_target_dir(command) or pushd_target(command) or merge_target_dir(command, data)
-    try:
-        path = obligation_path(Path(target).resolve())
-    except OSError:
-        return
-    obligation = load_obligation(path)
-    if obligation is not None:
-        obligation["confirmed_merged"] = True
-        save_obligation(path, obligation)
+def confirm_obligation_for_command(session, command):
+    for path in iter_obligation_paths():
+        obligation = load_obligation(path)
+        if obligation is None or obligation.get("session_id") != session:
+            continue
+        if obligation.get("command") == command:
+            obligation["confirmed_merged"] = True
+            save_obligation(path, obligation)
 
 
 def confirm_owning_session_obligations(session, pr):
@@ -515,7 +506,7 @@ def handle_posttooluse(data):
     if is_merge_enable(command):
         if "--auto" in command or QUEUED_OUTPUT_RE.search(text) or not merge_is_final_segment(command):
             return
-        confirm_obligation_for_target(command, data)
+        confirm_obligation_for_command(data.get("session_id") or data.get("sessionId"), command)
         return
 
     match = MONITOR_COMMAND_RE.search(command)
@@ -535,9 +526,8 @@ def handle_posttoolusefailure(data):
     command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
     if not command or not is_merge_enable(command):
         return
-    match = MERGED_OUTPUT_RE.search(response_text(data))
-    if match:
-        confirm_obligation_for_pr(match.group("pr"))
+    if MERGED_OUTPUT_RE.search(response_text(data)):
+        confirm_obligation_for_command(data.get("session_id") or data.get("sessionId"), command)
 
 
 def handle_stop(data):
