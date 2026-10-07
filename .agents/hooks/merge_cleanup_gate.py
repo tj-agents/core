@@ -66,7 +66,7 @@ EXEMPT_PY_SCRIPTS = (
 )
 EXEMPT_PS1_SCRIPTS = (
     "worktrees.ps1", "peer-cli.ps1", "close-tab.ps1", "launch-codex.ps1",
-    "launch-claude.ps1", "finish.ps1", "finish_reaper.ps1",
+    "launch-claude.ps1", "finish.ps1", "close.ps1", "finish_reaper.ps1",
 )
 
 NEUTRAL_SEGMENT_RE = re.compile(
@@ -155,17 +155,18 @@ def command_is_exempt(command):
 MESSAGE = (
     "MERGE CLEANUP GATE: `gh pr merge` for PR #{pr} ({branch}) ran from {worktree} at {time} "
     "and merge Step 5 cleanup has not completed.\n"
-    "- Not merged yet? Keep monitoring — `python .agents/workflows/workflow_ops.py ... "
+    "- Not merged yet? Keep monitoring â€” `python .agents/workflows/workflow_ops.py ... "
     "monitor --kind pr --id {pr} --head {head}`, `gh pr view/checks` and `gh run list/view/watch` "
     "are never blocked.\n"
-    "- Merged? Finish Step 6 and the report, then from inside {worktree} run `python -B {cleanup_proof}` "
+    "- Merged? Finish Step 6 and the report. For a removable linked checkout, from inside {worktree} run `python -B {cleanup_proof}` "
     "and `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>"
     "/scripts/finish.ps1`, exactly, with no arguments: it closes this CLI and removes the worktree. "
-    "Elsewhere, follow `engineering:merge` Step 5.\n"
+    "For a primary or retained checkout, run the argument-free sibling `close.ps1` after the report; "
+    "it verifies session exit and retains the checkout. Elsewhere, follow `engineering:merge` Step 5.\n"
     "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
-    "`python \"{hook_path}\" --clear \"{worktree}\"`.\n"
+    "`python \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
     "This repeats every 10 minutes until cleanup completes, a handoff launcher transfers it, "
-    "or it is cleared."
+    "or verified session exit clears it."
 )
 
 
@@ -344,6 +345,8 @@ def record_obligation(command, data):
         "repo": normalize_slug(origin_url) if origin_url else None,
         "recorded_at": time.time(),
         "confirmed_merged": False,
+        "checkout_retained": worktree == Path(primary) if primary else False,
+        "session_exit_required": True,
         "merge_mode": "queued" if "--auto" in command else "direct",
         "nagged_at": None,
         "transferred_at": None,
@@ -556,7 +559,7 @@ def reminder_line(obligation):
     return (
         f"merge-cleanup: PR #{obligation.get('pr') or '?'} ({obligation.get('branch') or '?'}) "
         f"at {obligation.get('worktree')} still needs merge Step 5 cleanup "
-        f"(`python \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to clear)."
+        f"(`python \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
     )
 
 
@@ -602,15 +605,24 @@ def branch_ref_missing(primary, branch):
 
 
 def should_reconcile(obligation, now):
+    primary = obligation.get("primary")
+    worktree = obligation.get("worktree")
+    retained = obligation.get("checkout_retained") or (
+        primary and worktree and normalize_path_text(primary) == normalize_path_text(worktree)
+    )
+    if retained:
+        return False
     worktree = obligation.get("worktree")
     if not isinstance(worktree, str) or not Path(worktree).is_dir():
         return True
+    if obligation.get("session_exit_required"):
+        return False
     recorded_at = obligation.get("recorded_at")
     if isinstance(recorded_at, (int, float)) and now - recorded_at > RECONCILE_MAX_AGE_SECONDS:
         return True
     primary, branch = obligation.get("primary"), obligation.get("branch")
     if primary and branch and branch != "HEAD" and branch_ref_missing(primary, branch):
-        return True
+        return False
     return False
 
 
@@ -638,14 +650,20 @@ def cli_clear(args):
         print(f"merge-cleanup-gate: cannot resolve {args[0]}", file=sys.stderr)
         return 1
     try:
-        obligation_path(target).unlink()
+        path = obligation_path(target)
+        obligation = load_obligation(path)
+        if obligation is None:
+            raise FileNotFoundError
+        obligation["checkout_retained"] = True
+        obligation["session_exit_required"] = True
+        save_obligation(path, obligation)
     except FileNotFoundError:
         print(f"merge-cleanup-gate: no obligation recorded for {target}")
         return 0
     except OSError as error:
         print(f"merge-cleanup-gate: cannot clear {target}: {error}", file=sys.stderr)
         return 1
-    print(f"merge-cleanup-gate: cleared the obligation for {target}")
+    print(f"merge-cleanup-gate: retained checkout {target}; verified session exit is still required")
     return 0
 
 

@@ -111,10 +111,15 @@ sequential work. The worktree-cleanup audit gate makes skipped isolated-checkout
 ### 7. Confirm no publish fired
 
 A meta-only diff touches no publishable source, so nothing republishes and no version-sync PR opens. Confirm
-it against the repo's own publish path filter rather than assuming, then stop.
+it against the repo's own publish path filter rather than assuming, then report and close the session.
 
 ## Report
 
 One short report: PR number and merge commit, that it bypassed the end-to-end gate because the diff was
 meta-only, and that the base is clean. If the diff turned out not to be meta-only, report that you stopped
 and routed to `engineering:merge`.
+
+After that report, apply `engineering:merge` Step 5's terminal session operation: run the argument-free
+`finish.ps1` for this session's removable linked checkout, or its sibling `close.ps1` for a primary or
+retained checkout. Preserve the checkout when using `close.ps1`; completion requires verified session
+exit independently of branch deletion.
