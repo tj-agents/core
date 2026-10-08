@@ -442,6 +442,40 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertEqual(0, completed.returncode, completed.stderr)
                     self.assertEqual([], list(bundle.rglob("*.pyc")))
 
+    def test_entry_points_suppress_bytecode_without_relying_on_the_parent_interpreter(self):
+        scripts = (
+            (WORKFLOWS / "workflow_ops.py", PLUGIN_WORKFLOWS / "workflow_ops.py"),
+            (WORKFLOWS / "continuation_runtime.py", PLUGIN_WORKFLOWS / "continuation_runtime.py"),
+        )
+        env = {key: value for key, value in os.environ.items()
+               if key not in {"PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX"}}
+        for canonical, packaged in scripts:
+            for script in (canonical, packaged):
+                with self.subTest(script=script):
+                    with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+                        root = Path(temp)
+                        bundle = root / "workflows"
+                        shutil.copytree(
+                            script.parent,
+                            bundle,
+                            ignore=shutil.ignore_patterns("__pycache__"),
+                        )
+                        before = {path.relative_to(bundle).as_posix(): path.read_bytes()
+                                  for path in bundle.rglob("*") if path.is_file()}
+                        completed = subprocess.run(
+                            [sys.executable, str(bundle / script.name), "--help"],
+                            cwd=str(bundle),
+                            capture_output=True,
+                            text=True,
+                            env=env,
+                        )
+                        self.assertEqual(0, completed.returncode, completed.stderr)
+                        self.assertEqual([], list(bundle.rglob("*.pyc")))
+                        self.assertEqual([], list(bundle.rglob("__pycache__")))
+                        after = {path.relative_to(bundle).as_posix(): path.read_bytes()
+                                 for path in bundle.rglob("*") if path.is_file()}
+                        self.assertEqual(before, after)
+
     def test_fixture_skill_inlines_the_gate_contract_without_becoming_discoverable(self):
         template = self.normalized(
             WORKFLOWS / "fixtures" / "workflow-contract-fixture.template.md"

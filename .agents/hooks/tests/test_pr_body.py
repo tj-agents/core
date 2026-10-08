@@ -11,13 +11,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "workflows"))
 import delivery_binding_gate as gate
 import workflow_ops as ops
-from pr_body import validate_pr_body
+from pr_body import unchecked_tasks, validate_pr_body
 
 
 BODY = "## What\nChange.\n## Why\nReason.\n"
 
 
 class BodyTests(unittest.TestCase):
+    def test_unchecked_tasks_ignores_hidden_examples(self):
+        body = "- [ ] live\n> - [ ] quote\n```md\n- [ ] fenced\n```\n<!-- - [ ] hidden -->\n    - [ ] indented"
+        self.assertEqual(["live"], unchecked_tasks(body))
+
+    def test_unchecked_tasks_includes_nested_list_tasks(self):
+        body = "- Acceptance\n\n    - [ ] nested task\nParagraph.\n    - [ ] standalone code"
+        self.assertEqual(["nested task"], unchecked_tasks(body))
+
     def test_supported_formats_and_order(self):
         for body in (BODY, "\ufeff" + BODY, "## WHY\nReason\n# wHaT\nChange",
                      "**What:** Change.\n\n**Why:** Reason.",
