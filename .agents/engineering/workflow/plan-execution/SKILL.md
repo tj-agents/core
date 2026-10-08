@@ -26,6 +26,21 @@ canonical goal, validate the checkpoint and authority, acknowledge the exact att
 next action immediately. Acknowledgement is not completion; keep the same goal through its remaining
 authorized slices and record the first action or genuine gate as progress evidence.
 
+After design approval or completion of a prerequisite, resolve the next authorized substantive action and
+execute or dispatch it at the selected lane. Use existing valid ownership, scope, review and validation
+evidence; refresh only evidence whose inputs changed, whose result is missing or contradictory, or whose
+governing gate requires a fresh check. If substantive work cannot start, identify the exact unmet
+dependency and continue authorized work that does not depend on it. Repeating satisfied preparation is
+not progress toward the next action.
+
+A CI query, transport or monitor error leaves the delivery result unknown. Diagnose and restore
+observation through the supported monitor, retaining its repository, PR, head and run binding and
+reconciling the failed monitor before replacing it. Preserve TLS verification, authorization and every
+required review and CI gate. Continue independent authorized work while observation recovers; when fresh
+evidence establishes that delivery is ready, perform the next authorized delivery action. If recovery
+requires an external change, record the failed action, resolver, unblock action and observable resume
+condition.
+
 ## Select the execution lane
 
 Before choosing either execution mode below or making a deliverable edit, load `engineering:lanes`
