@@ -182,7 +182,7 @@ function Get-EnvDouble {
     $value = [Environment]::GetEnvironmentVariable($Name)
     if (-not $value) { return $Default }
     $parsed = 0.0
-    if ([double]::TryParse($value, [ref] $parsed)) { return $parsed }
+    if ([double]::TryParse($value, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref] $parsed)) { return $parsed }
     return $Default
 }
 
@@ -221,8 +221,12 @@ function Save-ResultRecord {
     $attempts = 3
     for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         try {
-            if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }
-            Move-Item -LiteralPath $temp -Destination $Path
+            if (Test-Path -LiteralPath $Path) {
+                [IO.File]::Replace($temp, $Path, $null)
+            }
+            else {
+                Move-Item -LiteralPath $temp -Destination $Path
+            }
             return
         }
         catch {
@@ -408,12 +412,14 @@ try {
             return
         }
         Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'timeout'
-            error    = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds"
-            finished = (Now-Epoch)
+            started           = $startedEpoch
+            host_pid          = $HostPid
+            worktree          = $Worktree
+            reaper_pid        = $PID
+            reaper_started_at = $reaperStartedAt
+            status            = 'timeout'
+            error             = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds"
+            finished          = (Now-Epoch)
         }
         return
     }

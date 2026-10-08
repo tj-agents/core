@@ -46,6 +46,32 @@ function Read-JsonFile {
     try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
 }
 
+function Save-AtomicJson {
+    param([string] $Path, [hashtable] $Data)
+
+    $directory = Split-Path -Parent $Path
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    $json = $Data | ConvertTo-Json -Depth 6
+    $temp = Join-Path $directory ('.' + (Split-Path -Leaf $Path) + '.' + $PID + '.tmp')
+    [IO.File]::WriteAllText($temp, $json, (New-Object Text.UTF8Encoding $false))
+    $attempts = 3
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        try {
+            if (Test-Path -LiteralPath $Path) {
+                [IO.File]::Replace($temp, $Path, $null)
+            }
+            else {
+                Move-Item -LiteralPath $temp -Destination $Path
+            }
+            return
+        }
+        catch {
+            if ($attempt -eq $attempts) { throw }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
 function Test-UnderOrEqual {
     param([string] $Candidate, [string] $Root)
 
@@ -342,6 +368,6 @@ function Get-EnvDouble {
     $value = [Environment]::GetEnvironmentVariable($Name)
     if (-not $value) { return $Default }
     $parsed = 0.0
-    if ([double]::TryParse($value, [ref] $parsed)) { return $parsed }
+    if ([double]::TryParse($value, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref] $parsed)) { return $parsed }
     return $Default
 }
