@@ -10,6 +10,9 @@ $global:ContinuationTasks = @{}
 $global:ContinuationRegistrations = 0
 $global:ContinuationRemovals = 0
 $global:ContinuationFailRegistration = $false
+$global:ContinuationSchedulerCalls = 0
+$global:ContinuationCimProcesses = @{}
+$continuationHostProcess = $null
 function Assert([bool] $Condition, [string] $Message) { if (-not $Condition) { throw $Message } }
 function Write-Json([string] $Path, $Value, [int] $Depth) { [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth $Depth), [Text.UTF8Encoding]::new($false)) }
 function Expect-Failure([scriptblock] $Action, [string] $Pattern) {
@@ -20,7 +23,15 @@ function Expect-Failure([scriptblock] $Action, [string] $Pattern) {
 }
 function Get-ScheduledTask {
     [CmdletBinding()]param($TaskName, $TaskPath)
+    $global:ContinuationSchedulerCalls++
     $global:ContinuationTasks.Values | Where-Object { $_.TaskName -like $TaskName -and (-not $TaskPath -or $_.TaskPath -eq $TaskPath) }
+}
+function Get-CimInstance {
+    [CmdletBinding()]param([string] $ClassName, [string] $Filter)
+    if ($ClassName -ne 'Win32_Process' -or $Filter -notmatch '^ProcessId = (\d+)$') { throw 'Unexpected CIM query.' }
+    $processId = [int]$Matches[1]
+    if (-not $global:ContinuationCimProcesses.ContainsKey($processId)) { return }
+    Write-Output $global:ContinuationCimProcesses[$processId]
 }
 function New-ScheduledTaskAction { param($Execute, $Argument, $WorkingDirectory) [pscustomobject]@{ Execute=$Execute; Arguments=$Argument; WorkingDirectory=$WorkingDirectory } }
 function New-ScheduledTaskTrigger { param([switch]$Once, $At, $RepetitionInterval) [pscustomobject]@{ At=$At } }
@@ -45,6 +56,7 @@ try {
     $bin = Join-Path $scratch 'bin'
     New-Item -ItemType Directory -Path $root, $bin | Out-Null
     New-Item -ItemType File -Path (Join-Path $bin 'codex.exe') | Out-Null
+    New-Item -ItemType File -Path (Join-Path $bin 'claude.exe'), (Join-Path $bin 'alternate.exe') | Out-Null
     $env:PATH = $bin + [IO.Path]::PathSeparator + $originalPath
     & git init --quiet $root
     & git -C $root remote add origin https://github.com/example/isolated-test.git
@@ -65,15 +77,74 @@ try {
     $legacy.Actions[0].WorkingDirectory = $scratch
     & $adapter register -OwnerPath $ownerPath -WhatIf
     $global:ContinuationTasks.Remove($legacy.TaskName)
-    & $adapter register -OwnerPath $ownerPath -WhatIf
-    Assert ($global:ContinuationRegistrations -eq 0 -and -not (Test-Path $receiptPath)) 'WhatIf registered or wrote a receipt.'
-    Assert ((Get-Content $ownerPath -Raw) -ceq $before) 'WhatIf changed runtime state.'
+    $global:ContinuationSchedulerCalls = 0
+    $continuationHostProcess = Start-Process -FilePath $python -ArgumentList '-c "import time; time.sleep(60)"' -WindowStyle Hidden -PassThru
+    $hostProcessId = [int]$continuationHostProcess.Id
+    function Set-ContinuationCimChain([string] $HostName, [int] $HostParent = 0, [string] $ExecutablePath = (Join-Path $bin $HostName)) {
+        $global:ContinuationCimProcesses = @{
+            $PID = [pscustomobject]@{ ProcessId = $PID; ParentProcessId = $hostProcessId; Name = 'powershell.exe'; ExecutablePath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' }
+            $hostProcessId = [pscustomobject]@{ ProcessId = $hostProcessId; ParentProcessId = $HostParent; Name = $HostName; ExecutablePath = $ExecutablePath }
+        }
+    }
+    Set-ContinuationCimChain 'codex.exe.bak'
+    Expect-Failure { & $adapter claim -OwnerPath $ownerPath } 'No codex.exe or claude.exe'
+    $global:ContinuationCimProcesses = @{}
+    Expect-Failure { & $adapter claim -OwnerPath $ownerPath } "Foreground process $PID is unavailable"
+    $global:ContinuationCimProcesses = @{
+        $PID = [pscustomobject]@{ ProcessId = $PID; ParentProcessId = $hostProcessId; Name = 'powershell.exe'; ExecutablePath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' }
+        $hostProcessId = [pscustomobject]@{ ProcessId = $hostProcessId; ParentProcessId = $PID; Name = 'powershell.exe'; ExecutablePath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' }
+    }
+    Expect-Failure { & $adapter claim -OwnerPath $ownerPath } 'ancestry contains a cycle'
+    Set-ContinuationCimChain 'claude.exe' 42
+    $global:ContinuationCimProcesses[42] = [pscustomobject]@{ ProcessId = 42; ParentProcessId = 0; Name = 'codex.exe'; ExecutablePath = (Join-Path $bin 'codex.exe') }
+    Expect-Failure { & $adapter claim -OwnerPath $ownerPath } 'Nearest foreground host is claude.exe'
+    Set-ContinuationCimChain 'codex.exe'
+    $badHostBefore = Get-Content $ownerPath -Raw
+    $global:ContinuationCimProcesses[$hostProcessId].ExecutablePath = (Join-Path $bin 'codex.cmd')
+    Expect-Failure { & $adapter claim -OwnerPath $ownerPath } 'existing absolute codex.exe path'
+    Assert ((Get-Content $ownerPath -Raw) -ceq $badHostBefore) 'Rejected host executable changed the owner.'
+    Set-ContinuationCimChain 'codex.exe'
+    $whatIfBefore = Get-Content $ownerPath -Raw
+    & $adapter claim -OwnerPath $ownerPath -WhatIf
+    Assert ((Get-Content $ownerPath -Raw) -ceq $whatIfBefore -and $global:ContinuationSchedulerCalls -eq 0) 'Claim WhatIf changed the owner or required scheduler capability.'
+    $claimed = (& $adapter claim -OwnerPath $ownerPath | ConvertFrom-Json)
+    Assert ($claimed.foreground.pid -eq $hostProcessId -and $claimed.foreground.token -and $claimed.host_executable -eq (Join-Path $bin 'codex.exe')) 'Codex claim did not retain the live nested host lease.'
+    Expect-Failure { & $adapter claim -OwnerPath $ownerPath } 'Continuation runtime claim failed with exit code 2'
+    $claimedOwner = Get-Content $ownerPath -Raw
+    Assert (($claimedOwner | ConvertFrom-Json).foreground.token -eq $claimed.foreground.token) 'A failed claim changed the active foreground lease.'
+    & $python -B $helper yield --owner $ownerPath --token $claimed.foreground.token --reason 'Codex claim checked' --next-action 'Claim Claude fixture'
+    $claudeOwner = Get-Content $ownerPath -Raw | ConvertFrom-Json
+    $claudeOwner.harness = 'claude'
+    $claudeOwner.host_executable = $null
+    Write-Json $ownerPath $claudeOwner 30
+    Set-ContinuationCimChain 'claude.exe'
+    $claudeClaim = (& $adapter claim -OwnerPath $ownerPath | ConvertFrom-Json)
+    Assert ($claudeClaim.foreground.pid -eq $hostProcessId -and $claudeClaim.foreground.token -and $claudeClaim.host_executable -eq (Join-Path $bin 'claude.exe')) 'Claude claim did not retain the live nested host lease.'
+    & $python -B $helper yield --owner $ownerPath --token $claudeClaim.foreground.token --reason 'Claude claim checked' --next-action 'Claim Codex fixture'
+    $codexOwner = Get-Content $ownerPath -Raw | ConvertFrom-Json
+    $codexOwner.harness = 'codex'
+    $codexOwner.host_executable = Join-Path $bin 'alternate.exe'
+    Write-Json $ownerPath $codexOwner 30
+    Set-ContinuationCimChain 'codex.exe'
+    $claimed = (& $adapter claim -OwnerPath $ownerPath | ConvertFrom-Json)
+    Assert ($claimed.foreground.pid -eq $hostProcessId -and $claimed.host_executable -eq (Join-Path $bin 'alternate.exe')) 'Final Codex claim did not preserve the explicit host executable.'
+    Assert ($global:ContinuationSchedulerCalls -eq 0) 'Claim depended on scheduler commands.'
     $global:ContinuationFailRegistration = $true
     Expect-Failure { & $adapter register -OwnerPath $ownerPath } 'Injected scheduler registration failure'
     Assert ((Test-Path $pendingPath) -and -not (Test-Path $receiptPath) -and $global:ContinuationTasks.Count -eq 0) 'Failed registration orphaned a task or lost its recovery transaction.'
     & $adapter remove -OwnerPath $ownerPath
     $global:ContinuationFailRegistration = $false
     & $adapter register -OwnerPath $ownerPath
+    & $adapter wake -OwnerPath $ownerPath
+    $activeOwner = Get-Content $ownerPath -Raw | ConvertFrom-Json
+    Assert ($activeOwner.foreground.token -eq $claimed.foreground.token) 'Wake took a live foreground lease.'
+    & $python -B $helper yield --owner $ownerPath --token $claimed.foreground.token --reason 'Scheduler registered' --next-action 'Observe isolated continuation'
+    $safeWakeOwner = Get-Content $ownerPath -Raw | ConvertFrom-Json
+    $safeWakeOwner.next_action = ''
+    Write-Json $ownerPath $safeWakeOwner 30
+    & $adapter wake -OwnerPath $ownerPath
+    Assert (((Get-Content $ownerPath -Raw | ConvertFrom-Json).state) -eq 'waiting') 'Post-yield wake did not preserve a waiting owner.'
+    $before = Get-Content -LiteralPath $ownerPath -Raw
     $receipt = Get-Content $receiptPath -Raw | ConvertFrom-Json
     Assert ($receipt.helper -eq $helper) 'Authored runtime path resolution failed.'
     Assert ($receipt.execute -ieq (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -and $receipt.arguments -match ' wake -OwnerPath ') 'Scheduled task does not run deterministic wake under the inbox Windows PowerShell.'
@@ -163,6 +234,7 @@ try {
     Write-Output 'Scheduler adapter tests passed; no live scheduler was changed.'
 } finally {
     $env:PATH = $originalPath
+    if ($continuationHostProcess) { Stop-Process -Id $continuationHostProcess.Id -Force -ErrorAction SilentlyContinue }
     if (([IO.Path]::GetFullPath($scratch)).StartsWith([IO.Path]::GetTempPath(), [StringComparison]::OrdinalIgnoreCase)) { Remove-Item -LiteralPath $scratch -Recurse -Force }
-    Remove-Variable ContinuationTasks, ContinuationRegistrations, ContinuationRemovals, ContinuationFailRegistration -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable ContinuationTasks, ContinuationRegistrations, ContinuationRemovals, ContinuationFailRegistration, ContinuationSchedulerCalls, ContinuationCimProcesses -Scope Global -ErrorAction SilentlyContinue
 }
