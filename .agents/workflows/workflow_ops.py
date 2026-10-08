@@ -1111,6 +1111,17 @@ def pr_readiness_observation(root, pr, repo=None, poll_seconds=DEFAULT_POLL_SECO
     failures = failed_check_items(value.get("statusCheckRollup"))
     pending = parse_status_checks(value.get("statusCheckRollup"))[1]
     identity = {"pr": value.get("number"), "url": value.get("url"), "repository": repository}
+    state = str(value.get("state") or "open").lower()
+    if state != "open":
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "pr-readiness",
+            "state": state,
+            "terminal": True,
+            "message": f"PR is {state}, not ready for the next delivery gate.",
+            "identity": identity,
+            "exit_state": "passed" if state == "merged" else "failed",
+        }
     if failures:
         for failed in failures:
             check = {"name": failed.get("name") or failed.get("context") or "unknown", "url": check_url(failed)}
