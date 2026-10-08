@@ -60,6 +60,8 @@
               "--harness",
               "claude",
               "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py",
@@ -115,6 +117,7 @@
               "25",
               "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
             ]
@@ -137,6 +140,8 @@
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py",
               "--prompt-context",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
               "--harness",

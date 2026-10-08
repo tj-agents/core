@@ -166,6 +166,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/callout_repair_gate.py",
+      "destination": "hooks/callout_repair_gate.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/delivery_binding_gate.py",
       "destination": "hooks/delivery_binding_gate.py"
     },

@@ -19,6 +19,17 @@
           {
             "type": "command",
             "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/callout_repair_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/callout_repair_gate.py\""
+          }
+        ],
+        "matcher": "SendFeedback|.*send_feedback|.*SendFeedback|exec_command|unified_exec|local_shell|shell|exec|functions.exec"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\"",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
           }
@@ -76,8 +87,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/callout_repair_gate.py\" --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/callout_repair_gate.py\" --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
       }

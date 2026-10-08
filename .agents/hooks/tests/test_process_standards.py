@@ -117,7 +117,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "A defect in a consumed standards package or its source repository is the exception: "
             "a stale or broken standard",
             "and so is a standard that caused or failed to prevent a mistake",
-            "in the same turn, before the current task resumes, without asking",
+            "in the same turn, after answering the user's direct question and before the current task resumes, without asking",
             "announcing a later or separate fix instead of launching is a violation",
         ):
             with self.subTest(phrase=phrase):
@@ -131,6 +131,7 @@ class ProcessStandardsTests(unittest.TestCase):
 
         self.assertTrue(section.startswith("When the user calls out a mistake, before apologizing"))
         self.assertLess(section.index("before apologizing"), section.index("An apology"))
+        self.assertLess(section.index("Answer the user's direct question first"), section.index("If it did, launch"))
         for phrase in (
             "missing, ambiguous, contradictory, mispriced or unenforced",
             "every consumed `tj-agents` plugin on both hosts",

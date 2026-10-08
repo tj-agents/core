@@ -1,0 +1,2 @@
+cd C:\Users\TommySeery\source\repos\tj-agents\core.worktrees\Feature-PrReadinessMonitor
+Read C:\Users\TommySeery\source\repos\tj-agents\core.worktrees\Feature-PrReadinessMonitor\plans\pr-readiness-monitor\GOAL.md and execute its ## Next Steps.
