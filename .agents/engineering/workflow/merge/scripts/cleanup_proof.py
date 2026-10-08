@@ -450,7 +450,10 @@ def run(args):
         require_no_open_pr(branch, args.repo, fixture)
         if records:
             if cwd_is_inside_target(cwd, target):
-                set_aside_path = set_aside(target, records, branch, head, pr)
+                try:
+                    set_aside_path = set_aside(target, records, branch, head, pr)
+                except OSError as error:
+                    raise Preserve(f"set-aside failed for {target}: {error}") from error
             else:
                 raise Preserve(f"{target} has uncommitted or untracked changes")
         require_clean(target)
