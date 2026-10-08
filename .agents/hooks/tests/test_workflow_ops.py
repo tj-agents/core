@@ -93,6 +93,16 @@ class PrReadinessTests(RepositoryFixture):
         self.assertTrue(result["terminal"])
         self.assertIn("next delivery gate", result["message"])
 
+    def test_closed_pr_is_terminal_not_ready(self):
+        value = self.pr([])
+        value["state"] = "CLOSED"
+        with mock.patch.object(ops, "pull_request_state", return_value=value):
+            result = ops.pr_readiness_observation(self.root, 42, "example/private")
+
+        self.assertEqual("closed", result["state"])
+        self.assertTrue(result["terminal"])
+        self.assertIn("not ready", result["message"])
+
     def test_ordinary_failed_check_names_the_job_and_url(self):
         value = self.pr([{
             "name": "verify", "status": "COMPLETED", "conclusion": "FAILURE",
