@@ -294,6 +294,10 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertIn(os.path.abspath(self.directory), out)
         self.assertIn('on explicit-model', out)
         self.assertIn(f'with prompt {self.prompt_path.resolve()}', out)
+        receipt = json.loads(out.splitlines()[-1])
+        self.assertEqual('agent-handoff-submitted', receipt['event'])
+        self.assertEqual(os.path.abspath(self.directory), receipt['worktree'])
+        self.assertEqual(str(self.prompt_path.resolve()), receipt['prompt_path'])
 
     def test_success_message_with_a_lane_reports_the_lane_model_and_effort(self):
         code, out, _ = self.run_main('--lane', 'L3')
@@ -323,6 +327,7 @@ class LaunchClaudeTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('no terminal detected', err)
         self.assertNotIn('Launched', out)
+        self.assertNotIn('agent-handoff-submitted', out)
 
     def test_a_launch_error_from_resolving_claude_is_reported_and_exits_nonzero(self):
         self.agent_cli.resolve_claude_executable.side_effect = self.agent_cli.LaunchError('no native claude found')
