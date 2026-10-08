@@ -145,6 +145,10 @@ harness's `persistent-workflow` skill to give that binding a continuation.
 
 ### 7. Report and continue
 
+When the canonical goal has a fenced `completion` record, retain every unchecked PR task there with the
+PR's repository, number, full head SHA, task text, owner, and next action. Keep those entries until a fresh
+completion check observes the task resolved.
+
 Print the PR URL. Opening a draft is not a context boundary: continue implementing, reviewing, or observing
 the candidate when the current authorization and context still cover that work. If landing is genuinely next,
 `engineering:merge` owns it. Update a plan only if PR creation is part of a material ownership handoff or
