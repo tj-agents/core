@@ -76,6 +76,13 @@ when delivery is authorized. Bind remote monitoring to the exact repository, hea
 pending CI is owned without an active monitor. A failed test selects `engineering:failing-tests` and its
 diagnose, repair and focused verification loop. Do not weaken a check merely to produce a pass.
 
+A terminal goal closes its own session as its final action, after its workflow's remaining steps and
+the completion report: run `machine:peer-cli`'s
+`finish.ps1` when `cleanup_proof.py` printed `removable` for this merged linked worktree,
+`close.ps1` for any other checkout. Stay open while the final message asks the user something or is
+an answer that exists only in the transcript. A handoff predecessor follows `engineering:handoff`'s
+release instead.
+
 ## Maintain the right source owner
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
