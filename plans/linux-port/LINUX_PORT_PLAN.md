@@ -67,6 +67,7 @@ from `open_claude.py` on this machine. Step 3a (`handoff-claude`) on `Feature/Ha
 ported to `scripts/launch_claude.py`, `launch-claude.ps1` deleted, tests and SKILL.md updated.
 Step 6 (`clip`) in progress on `Feature/ClipPython`.
 Step 8 (Linux-only test failures) in progress on `Fix/LinuxOnlyTestFailures`.
+Merge cleanup gate fix (obligation never clears on Linux after native-Git removal) in progress on `Fix/MergeCleanupGateRemovedWorktree`.
 
 ## Next Steps
 
