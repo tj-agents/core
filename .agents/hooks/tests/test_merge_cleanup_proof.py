@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -6,9 +7,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "engineering/workflow/merge/scripts/cleanup_proof.py"
+SPEC = importlib.util.spec_from_file_location("cleanup_proof", SCRIPT)
+CLEANUP_PROOF = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(CLEANUP_PROOF)
 
 
 def git(cwd, *args, check=True):
@@ -486,6 +491,53 @@ class CleanupProofTests(unittest.TestCase):
         self.assertEqual("modified tracked\n", (worktree / "file0.txt").read_text(encoding="utf-8"))
         self.assertEqual("dirty\n", (worktree / "untracked.txt").read_text(encoding="utf-8"))
         self.assertTrue(worktree.exists())
+
+    def test_archive_failure_after_creation_records_its_directory(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        (worktree / "file0.txt").write_text("modified tracked\n", encoding="utf-8")
+        records = CLEANUP_PROOF.status_entries(worktree)
+
+        failure = subprocess.CompletedProcess([], 1, "", "reset failed")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}):
+            with mock.patch.object(CLEANUP_PROOF, "run_git", return_value=failure):
+                with self.assertRaises(CLEANUP_PROOF.Preserve) as raised:
+                    CLEANUP_PROOF.set_aside(worktree, records, "feature", "head", 7)
+
+        archive = Path(raised.exception.set_aside)
+        self.assertTrue(archive.is_dir())
+        self.assertTrue((archive / "manifest.json").is_file())
+
+    def test_final_clean_failure_records_existing_archive(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+        (worktree / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+
+        fixture = {"pr_view": {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}}, "open_prs": []}
+        args = CLEANUP_PROOF.argparse.Namespace(
+            worktree=str(worktree), branch="feature", head=head, pr=7, default="main", repo=None,
+        )
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(worktree)
+            with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}):
+                with mock.patch.object(CLEANUP_PROOF, "load_fixture", return_value=fixture):
+                    with mock.patch.object(
+                        CLEANUP_PROOF,
+                        "require_clean",
+                        side_effect=CLEANUP_PROOF.Preserve("final clean check failed"),
+                    ):
+                        self.assertEqual(1, CLEANUP_PROOF.run(args))
+        finally:
+            os.chdir(previous_cwd)
+
+        receipt = load_receipt(self.state.name, worktree)
+        archive = Path(receipt["set_aside"])
+        self.assertEqual("preserve", receipt["verdict"])
+        self.assertTrue(archive.is_dir())
+        self.assertTrue((archive / "manifest.json").is_file())
 
     def test_argument_less_ignored_files_neither_block_nor_archive(self):
         bare, primary = init_repo(self.root)
