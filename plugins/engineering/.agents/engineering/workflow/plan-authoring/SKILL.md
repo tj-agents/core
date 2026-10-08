@@ -4,7 +4,6 @@ description: Design or phase multi-step work and create or update its implementa
 
 kind: workflow
 domain: process
-lane: L1
 ---
 
 # Author a durable plan

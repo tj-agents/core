@@ -323,7 +323,8 @@
   "prerequisites": {
     "base": [],
     "engineering": [
-      "base"
+      "base",
+      "machine"
     ],
     "machine": [
       "base"
