@@ -644,6 +644,75 @@ Start-Sleep -Seconds 20
     Write-Output 'PASS finish.tests.ps1: reaper timeout path'
 
 
+    $cancelArmedRoot = Join-Path $scratch 'r-cancelled-wins-expiry'
+    New-Item -ItemType Directory -Path $cancelArmedRoot -Force | Out-Null
+    $cancelArmedState = Join-Path $cancelArmedRoot 'state'
+    $cancelArmedRepo = New-TestRepo -Root $cancelArmedRoot
+    $cancelArmedWorktree = Add-FeatureWorktree -Primary $cancelArmedRepo.Primary -Root $cancelArmedRoot -Branch 'feature'
+    $cancelArmedResolved = Get-ResolvedPath $cancelArmedWorktree
+    $cancelArmedHead = (Invoke-GitOrThrow -Cwd $cancelArmedWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $cancelArmedResult = Join-Path $cancelArmedRoot 'result.json'
+
+    $cancelArmedAliveHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'ping -n 60 127.0.0.1 > nul' -PassThru -WindowStyle Hidden
+    try {
+        $cancelArmedAliveStart = ([DateTimeOffset]($cancelArmedAliveHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+        $previousCancelArmedState = $env:AGENT_STATE_DIRECTORY
+        $previousCancelArmedReaperTimeout = $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS
+        $env:AGENT_STATE_DIRECTORY = $cancelArmedState
+        $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = '2'
+        $cancelArmedReaperProcess = $null
+        try {
+            $cancelArmedReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+                '-HostPid', $cancelArmedAliveHost.Id, '-HostStart', $cancelArmedAliveStart,
+                '-Head', $cancelArmedHead,
+                '-Primary', $cancelArmedRepo.Primary, '-Worktree', $cancelArmedResolved,
+                '-Branch', 'feature', '-Default', 'main', '-Result', $cancelArmedResult,
+                '-StateDirectory', $cancelArmedState, '-AcceptTimeoutSeconds', '30'
+            ) -PassThru -WindowStyle Hidden
+
+            Grant-ReaperAcceptance -ResultPath $cancelArmedResult -ExpectedPid $cancelArmedReaperProcess.Id
+
+            $cancelArmedArmed = Wait-ReaperArmed -ResultPath $cancelArmedResult -TimeoutSeconds 30
+            Assert-True -Actual $cancelArmedArmed -Message 'The cancelled-wins-expiry scenario did not reach an armed state before cancelling.'
+
+            $cancelArmedDirectory = Split-Path -Parent $cancelArmedResult
+            New-Item -ItemType Directory -Path $cancelArmedDirectory -Force | Out-Null
+            $cancelArmedCancelledData = @{ cancelled = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0); reason = 'test cancellation after arming' }
+            [IO.File]::WriteAllText("$cancelArmedResult.cancelled", ($cancelArmedCancelledData | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding $false))
+
+            $cancelArmedWrote = Wait-Condition -TimeoutSeconds 60 -Condition {
+                $record = Read-JsonFile -Path $cancelArmedResult
+                $null -ne $record -and $null -ne $record.status
+            }
+            if (-not $cancelArmedWrote -and (Get-Process -Id $cancelArmedReaperProcess.Id -ErrorAction SilentlyContinue)) {
+                Stop-TestProcessTree $cancelArmedReaperProcess.Id
+            }
+        }
+        finally {
+            $env:AGENT_STATE_DIRECTORY = $previousCancelArmedState
+            $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = $previousCancelArmedReaperTimeout
+        }
+
+        $cancelArmedRecord = Read-JsonFile -Path $cancelArmedResult
+        Assert-True -Actual ($null -ne $cancelArmedRecord) -Message 'The cancelled-wins-expiry scenario did not write a result record.'
+        Assert-Equal -Expected 'cancelled' -Actual $cancelArmedRecord.status -Message 'A cancellation during the host-wait expiry was recorded as timeout instead of cancelled.'
+        Assert-True -Actual (Test-Path -LiteralPath $cancelArmedWorktree) -Message 'The worktree was touched despite a cancellation winning the race.'
+        $cancelArmedBranchStillPresent = $(& git -C $cancelArmedRepo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
+        Assert-True -Actual $cancelArmedBranchStillPresent -Message 'The feature branch was removed despite a cancellation winning the race.'
+        Assert-True -Actual ($null -ne (Get-EntryProperty -Entry $cancelArmedRecord -Name 'reaper_pid')) -Message 'The cancelled-wins-expiry terminal record did not carry reaper_pid.'
+        Assert-True -Actual ($null -ne (Get-EntryProperty -Entry $cancelArmedRecord -Name 'reaper_started_at')) -Message 'The cancelled-wins-expiry terminal record did not carry reaper_started_at.'
+    }
+    finally {
+        if (Get-Process -Id $cancelArmedAliveHost.Id -ErrorAction SilentlyContinue) {
+            Stop-TestProcessTree $cancelArmedAliveHost.Id
+        }
+    }
+
+    Write-Output 'PASS finish.tests.ps1: cancelled wins host-wait expiry'
+
+
     $r1aRoot = Join-Path $scratch 'r1-preflight-moved-head'
     New-Item -ItemType Directory -Path $r1aRoot -Force | Out-Null
     $r1aState = Join-Path $r1aRoot 'state'
@@ -1261,6 +1330,27 @@ Move-Item -LiteralPath $temp -Destination $Path
     Write-Output 'PASS finish.tests.ps1: handshake unit - failed spawn cancels without closing'
 
 
+    $previousUnitAcceptTimeout = $env:AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS
+    $env:AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS = '1'
+    try {
+        $resultAcceptClamp = Join-Path $unitState ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
+        $script:unitCapturedCommandLine = $null
+        $spawnImplAcceptClamp = {
+            param($CommandLine)
+            $script:unitCapturedCommandLine = $CommandLine
+            return $false
+        }
+        Invoke-ReaperHandshakeUnit -ResultPath $resultAcceptClamp -SpawnImpl $spawnImplAcceptClamp | Out-Null
+        Assert-Contains -Actual $script:unitCapturedCommandLine -Expected '-AcceptTimeoutSeconds 60' `
+            -Message 'An explicit accept timeout below the floor was not clamped to 60 on the reaper command line.'
+    }
+    finally {
+        $env:AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS = $previousUnitAcceptTimeout
+    }
+
+    Write-Output 'PASS finish.tests.ps1: handshake unit - accept timeout below the floor clamps to 60 on the command line'
+
+
     $resultB = Join-Path $unitState ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
     $spawnImplB = {
         param($CommandLine)
@@ -1428,6 +1518,10 @@ Move-Item -LiteralPath $temp -Destination $Path
     Assert-True -Actual (Test-Path -LiteralPath $cancelWorktree) -Message 'The worktree was removed despite a cancellation.'
     $cancelBranchStillPresent = $(& git -C $cancelRepo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
     Assert-True -Actual $cancelBranchStillPresent -Message 'The feature branch was removed despite a cancellation.'
+    Assert-Equal -Expected $cancelReaperProcess.Id -Actual ([int] (Get-EntryProperty -Entry $cancelRecord -Name 'reaper_pid')) `
+        -Message 'The cancel-after-started terminal record reaper_pid did not match the spawned reaper process id.'
+    Assert-True -Actual (([double] (Get-EntryProperty -Entry $cancelRecord -Name 'reaper_started_at')) -gt 0) `
+        -Message 'The cancel-after-started terminal record reaper_started_at was not a positive number.'
 
     Write-Output 'PASS finish.tests.ps1: cancel landing after the started record wins the race'
 
@@ -1465,6 +1559,10 @@ Move-Item -LiteralPath $temp -Destination $Path
     Assert-True -Actual ($null -ne $noAcceptRecord) -Message 'The launcher-exit-before-accept scenario did not write a terminal record.'
     Assert-Equal -Expected 'not-accepted' -Actual $noAcceptRecord.status -Message 'A reaper with no acceptance did not report not-accepted.'
     Assert-True -Actual (Test-Path -LiteralPath $noAcceptWorktree) -Message 'The worktree was removed despite no acceptance ever arriving.'
+    Assert-Equal -Expected $noAcceptReaperProcess.Id -Actual ([int] (Get-EntryProperty -Entry $noAcceptRecord -Name 'reaper_pid')) `
+        -Message 'The launcher-exit-before-accept terminal record reaper_pid did not match the spawned reaper process id.'
+    Assert-True -Actual (([double] (Get-EntryProperty -Entry $noAcceptRecord -Name 'reaper_started_at')) -gt 0) `
+        -Message 'The launcher-exit-before-accept terminal record reaper_started_at was not a positive number.'
 
     Write-Output 'PASS finish.tests.ps1: reaper exits not-accepted when the launcher never accepts'
 
