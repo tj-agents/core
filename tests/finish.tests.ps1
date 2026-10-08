@@ -1,4 +1,4 @@
-param([switch] $CloseOnlyTests, [switch] $FinishOnlyTests, [string] $TestShell, [string] $TestMode, [string] $CloseScriptOverride, [switch] $KeepScratch)
+param([switch] $CloseOnlyTests, [switch] $FinishOnlyTests, [string] $TestShell, [string] $TestMode, [string] $CloseScriptOverride, [switch] $KeepScratch, [switch] $TransferredOnlyTests)
 $ErrorActionPreference = 'Stop'
 
 $repository = Split-Path -Parent $PSScriptRoot
@@ -353,7 +353,7 @@ try {
     $preflightState = Join-Path $scratch 'preflight-state'
     New-Item -ItemType Directory -Path $preflightState -Force | Out-Null
 
-    if (-not $CloseOnlyTests) {
+    if (-not $CloseOnlyTests -and -not $TransferredOnlyTests) {
     $noReceiptTarget = Join-Path $scratch 'no-receipt-target'
     New-Item -ItemType Directory -Path $noReceiptTarget -Force | Out-Null
     $noReceiptResult = Invoke-FinishProcess -Worktree $noReceiptTarget -Environment @{ AGENT_STATE_DIRECTORY = $preflightState }
@@ -1862,6 +1862,210 @@ ping -n 30 127.0.0.1 >nul
     }
 
     if (-not $FinishOnlyTests) {
+    $env:AGENT_CLI_HOST_NAMES = 'codex'
+    $transferRoot = Join-Path $scratch 'transferred'
+    $transferRepo = New-TestRepo -Root $transferRoot
+    $transferTarget = Add-FeatureWorktree -Primary $transferRepo.Primary -Root $transferRoot -Branch 'feature'
+    $transferResolved = Get-ResolvedPath $transferTarget
+    $transferSeed = Join-Path $transferRoot 'seed'
+    $transferGate = Join-Path $repository '.agents/hooks/merge_cleanup_gate.py'
+    $transferSetup = @'
+import importlib.util, os, sys
+from pathlib import Path
+hook, state, worktree = sys.argv[1:]
+sys.path.insert(0, str(Path(hook).parent))
+os.environ['AGENT_STATE_DIRECTORY'] = state
+spec = importlib.util.spec_from_file_location('transfer_fixture_gate', hook)
+gate = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gate)
+data = {'cwd': worktree, 'session_id': 'predecessor-good'}
+gate.record_obligation(f'git -C "{worktree}" status; gh pr merge 3 --squash', data)
+gate.stamp_transfer('pwsh -File launch-codex.ps1 -Prompt continue', data)
+'@
+    & python -B -c $transferSetup $transferGate $transferSeed $transferResolved
+    Assert-Equal 0 $LASTEXITCODE 'Could not record the canonical transfer fixture.'
+    $transferSeedPaths = @(Get-ChildItem -LiteralPath (Join-Path $transferSeed 'merge-cleanup/obligations') -Filter '*.json' -File)
+    Assert-Equal 1 $transferSeedPaths.Count 'Canonical transfer fixture was ambiguous.'
+    $transferPrototype = Read-JsonFile $transferSeedPaths[0].FullName
+    Assert-True ($null -ne $transferPrototype) 'Canonical transfer obligation was not recorded.'
+    $transferResolved = $transferPrototype.worktree
+    $transferRepo.Primary = $transferPrototype.primary
+    $transferRoot = Split-Path -Parent $transferResolved
+    Invoke-GitOrThrow $transferRepo.Primary @('worktree', 'remove', '--', $transferResolved) | Out-Null
+    $registeredTarget = Join-Path $transferRoot 'registered-target'
+    $registeredMoved = Join-Path $transferRoot 'registered-moved'
+    Invoke-GitOrThrow $transferRepo.Primary @('worktree', 'add', '-q', '-b', 'registered', $registeredTarget) | Out-Null
+    foreach ($fixturePath in @($registeredTarget, $registeredMoved)) {
+        Assert-True ([IO.Path]::GetFullPath($fixturePath).StartsWith([IO.Path]::GetFullPath($transferRoot) + [IO.Path]::DirectorySeparatorChar)) 'Fixture move escaped the scratch directory.'
+    }
+    [IO.Directory]::Move($registeredTarget, $registeredMoved)
+    $existingTarget = Join-Path $transferRoot 'existing-target'
+    New-Item -ItemType Directory -Path $existingTarget -Force | Out-Null
+    $foreignRepo = New-TestRepo -Root (Join-Path $transferRoot 'foreign')
+    $transferDead = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'ping -n 2 127.0.0.1 >nul' -PassThru -WindowStyle Hidden
+    $transferDeadStart = ([DateTimeOffset]($transferDead.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+    Assert-True ($transferDead.WaitForExit(5000)) 'Fixture host did not exit naturally.'
+    $transferRunner = Join-Path $transferRoot 'observer.ps1'
+    @'
+param([string] $Reaper, [string] $State, [string] $Checkout, [string] $FixtureTarget, [string] $Result, [int] $DeadPid, [double] $DeadStart, [string] $Failure)
+$ErrorActionPreference = 'Stop'
+if ($Failure -ne 'unc-control') {
+    Set-Location -LiteralPath $Checkout
+    [Environment]::CurrentDirectory = $Checkout
+}
+$fixtureStarted = ([DateTimeOffset]((Get-Process -Id $PID).StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+foreach ($session in @('alive', 'pid-replacement')) {
+    $path = Join-Path $State "cli-sessions/$session.json"
+    if (Test-Path -LiteralPath $path) {
+        $entry = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        $entry.pid = $PID
+        $entry.pid_started_at = $fixtureStarted
+        if ($session -eq 'pid-replacement') { $entry.pid_started_at -= 30 }
+        [IO.File]::WriteAllText($path, ($entry | ConvertTo-Json))
+    }
+}
+function Get-Process {
+    [CmdletBinding()] param([int] $Id)
+    if ($Id -eq 71001) { return [pscustomobject]@{ StartTime = $null } }
+    if ($Id -eq 71002) { throw [UnauthorizedAccessException]::new('Fixture process query refused.') }
+    if ($Id -eq 71003) { return }
+    Microsoft.PowerShell.Management\Get-Process @PSBoundParameters
+}
+if ($Failure -eq 'unc-control') {
+    function Get-Item {
+        [CmdletBinding()] param([string] $LiteralPath)
+        if ($LiteralPath.StartsWith('\\fixture.invalid\share\')) { return [pscustomobject]@{ FullName = $LiteralPath } }
+        Microsoft.PowerShell.Management\Get-Item @PSBoundParameters
+    }
+    function Test-Path {
+        [CmdletBinding()] param([string] $LiteralPath)
+        if ($LiteralPath.StartsWith('\\fixture.invalid\share\')) { return $false }
+        Microsoft.PowerShell.Management\Test-Path @PSBoundParameters
+    }
+    function git {
+        $global:LASTEXITCODE = 0
+        Write-Output "worktree $Checkout`nHEAD fixture`nbranch refs/heads/main"
+    }
+}
+if ($Failure -eq 'git-error') {
+    function git { $global:LASTEXITCODE = 128; Write-Output 'Fixture Git inventory failed.' }
+}
+if ($Failure -eq 'registry-read-error') {
+    function Get-Content {
+        [CmdletBinding()] param([string] $LiteralPath, [switch] $Raw, [string] $Encoding)
+        if ($LiteralPath -like '*cli-sessions*') { throw [UnauthorizedAccessException]::new('Fixture registry read refused.') }
+        Microsoft.PowerShell.Management\Get-Content @PSBoundParameters
+    }
+}
+if ($Failure -eq 'registry-list-error') {
+    function Get-ChildItem {
+        [CmdletBinding()] param([string] $LiteralPath, [string] $Filter, [switch] $File)
+        if ($LiteralPath -like '*cli-sessions') { throw [UnauthorizedAccessException]::new('Fixture registry enumeration refused.') }
+        Microsoft.PowerShell.Management\Get-ChildItem @PSBoundParameters
+    }
+}
+if ($Failure -eq 'target-query-error') {
+    function Test-Path {
+        [CmdletBinding()] param([string] $LiteralPath)
+        if ($LiteralPath -eq $FixtureTarget) { throw [UnauthorizedAccessException]::new('Fixture target query refused.') }
+        Microsoft.PowerShell.Management\Test-Path @PSBoundParameters
+    }
+}
+. $Reaper -CloseOnly -HostPid $DeadPid -HostStart $DeadStart -SessionId 'successor' -Worktree $Checkout -StateDirectory $State -Result $Result
+'@ | Set-Content -LiteralPath $transferRunner -Encoding UTF8
+    $transferShells = if ($TestShell) { @($TestShell) } else { @('pwsh', 'powershell.exe') }
+    $transferCases = @('predecessor-good', 'pid-replacement', 'alive', 'unreadable-process', 'process-api-error', 'empty-process-query',
+        'missing-registry', 'missing-pid', 'fractional-pid', 'missing-start', 'invalid-start', 'zero-start', 'missing-host', 'unknown-host', 'wrong-session',
+        'wrong-cwd', 'ambiguous-registry', 'no-transfer', 'wrong-transfer', 'invalid-transfer', 'retained', 'invalid-retention',
+        'existing-target', 'registered-target', 'cross-primary', 'primary-target', 'no-exit-required',
+        'root-relative-primary', 'drive-relative-primary', 'root-relative-target', 'drive-relative-target',
+        'root-relative-cwd', 'drive-relative-cwd', 'forward-slash-drive')
+    $transferRefs = Invoke-GitOrThrow $transferRepo.Primary @('show-ref')
+    $transferInventory = Invoke-GitOrThrow $transferRepo.Primary @('worktree', 'list', '--porcelain')
+    foreach ($transferShell in $transferShells) {
+        if (-not (Get-Command $transferShell -ErrorAction SilentlyContinue)) { continue }
+        foreach ($failure in @('none', 'git-error', 'registry-read-error', 'registry-list-error', 'registry-invalid-json', 'target-query-error', 'unc-control')) {
+            $transferState = Join-Path $transferRoot "$transferShell-$failure"
+            $transferOwn = Join-Path $transferState 'merge-cleanup/obligations/own.json'
+            $transferPeer = Join-Path $transferState 'merge-cleanup/obligations/peer.json'
+            Write-JsonFile $transferOwn @{ session_id = 'successor'; worktree = $transferRepo.Primary; session_exit_required = $true }
+            Write-JsonFile $transferPeer @{ session_id = 'unrelated'; worktree = $transferResolved; session_exit_required = $true }
+            $cases = if ($failure -eq 'none') { $transferCases } else { @('predecessor-good') }
+            $observerCheckout = $transferRepo.Primary
+            foreach ($case in $cases) {
+                $obligation = @{}
+                foreach ($property in $transferPrototype.PSObject.Properties) { $obligation[$property.Name] = $property.Value }
+                $obligation.session_id = $case
+                $obligation.transferred_by = $case
+                $entry = @{ session_id = $case; pid = $transferDead.Id; pid_started_at = $transferDeadStart; host = 'codex'; cwd = $transferResolved }
+                switch ($case) {
+                    'unreadable-process' { $entry.pid = 71001 }
+                    'process-api-error' { $entry.pid = 71002 }
+                    'empty-process-query' { $entry.pid = 71003 }
+                    'missing-pid' { $entry.Remove('pid') }
+                    'fractional-pid' { $entry.pid = 1.25 }
+                    'missing-start' { $entry.Remove('pid_started_at') }
+                    'invalid-start' { $entry.pid_started_at = 'NaN' }
+                    'zero-start' { $entry.pid_started_at = 0 }
+                    'missing-host' { $entry.Remove('host') }
+                    'unknown-host' { $entry.host = 'powershell' }
+                    'wrong-session' { $entry.session_id = 'another-session' }
+                    'wrong-cwd' { $entry.cwd = $transferRepo.Primary }
+                    'no-transfer' { $obligation.Remove('transferred_at') }
+                    'wrong-transfer' { $obligation.transferred_by = 'another-session' }
+                    'invalid-transfer' { $obligation.transferred_at = 'yesterday' }
+                    'retained' { $obligation.checkout_retained = $true }
+                    'invalid-retention' { $obligation.checkout_retained = 'false' }
+                    'existing-target' { $obligation.worktree = $existingTarget; $entry.cwd = $existingTarget }
+                    'registered-target' { $obligation.worktree = $registeredTarget; $entry.cwd = $registeredTarget }
+                    'cross-primary' { $obligation.primary = $foreignRepo.Primary }
+                    'primary-target' { $obligation.worktree = $transferRepo.Primary; $entry.cwd = $transferRepo.Primary }
+                    'no-exit-required' { $obligation.session_exit_required = $false }
+                    'root-relative-primary' { $obligation.primary = $transferRepo.Primary.Substring(2) }
+                    'drive-relative-primary' { $obligation.primary = $transferRepo.Primary.Substring(0, 2) + '.' }
+                    'root-relative-target' { $obligation.worktree = $transferResolved.Substring(2) }
+                    'drive-relative-target' { $obligation.worktree = $transferResolved.Substring(0, 2) + '..\feature-wt' }
+                    'root-relative-cwd' { $entry.cwd = $transferResolved.Substring(2) }
+                    'drive-relative-cwd' { $entry.cwd = $transferResolved.Substring(0, 2) + '..\feature-wt' }
+                    'forward-slash-drive' {
+                        $obligation.primary = $transferRepo.Primary.Replace('\', '/')
+                        $obligation.worktree = $transferResolved.Replace('\', '/')
+                        $entry.cwd = $transferResolved.Replace('\', '/') + '/subdirectory'
+                    }
+                }
+                if ($failure -eq 'unc-control') {
+                    $observerCheckout = '\\fixture.invalid\share\primary'
+                    $obligation.primary = $observerCheckout
+                    $obligation.worktree = '\\fixture.invalid\share\removed-linked'
+                    $entry.cwd = '\\fixture.invalid\share\removed-linked\subdirectory'
+                }
+                Write-JsonFile (Join-Path $transferState "merge-cleanup/obligations/$case.json") $obligation
+                if ($case -ne 'missing-registry') { Write-JsonFile (Join-Path $transferState "cli-sessions/$case.json") $entry }
+                if ($case -eq 'ambiguous-registry') { Write-JsonFile (Join-Path $transferState 'cli-sessions/duplicate.json') $entry }
+            }
+            if ($failure -eq 'registry-invalid-json') {
+                [IO.File]::WriteAllText((Join-Path $transferState 'cli-sessions/predecessor-good.json'), '{')
+            }
+            $transferResult = Join-Path $transferState 'merge-cleanup/results/close.json'
+            $transferOutput = & $transferShell -NoProfile -ExecutionPolicy Bypass -File $transferRunner -Reaper $reaperScript -State $transferState -Checkout $observerCheckout -FixtureTarget $transferResolved -Result $transferResult -DeadPid $transferDead.Id -DeadStart $transferDeadStart -Failure $failure 2>&1
+            Assert-Equal 0 $LASTEXITCODE "Transferred observer failed: $transferOutput"
+            $transferRecord = Read-JsonFile $transferResult
+            Assert-Equal 'session-closed' $transferRecord.status "Successor exit was not verified for $transferShell $failure`: $($transferRecord.error)"
+            Assert-False (Test-Path -LiteralPath $transferOwn) 'Successor obligation was not cleared.'
+            Assert-True (Test-Path -LiteralPath $transferPeer) 'An unrelated session obligation was cleared.'
+            foreach ($case in $cases) {
+                $shouldRemain = $failure -notin @('none', 'unc-control') -or $case -notin @('predecessor-good', 'pid-replacement', 'forward-slash-drive')
+                Assert-Equal $shouldRemain (Test-Path -LiteralPath (Join-Path $transferState "merge-cleanup/obligations/$case.json")) "Incorrect predecessor settlement for $transferShell $failure $case."
+            }
+            Assert-Equal $transferRefs (Invoke-GitOrThrow $transferRepo.Primary @('show-ref')) 'Observer changed Git refs.'
+            Assert-Equal $transferInventory (Invoke-GitOrThrow $transferRepo.Primary @('worktree', 'list', '--porcelain')) 'Observer changed worktree registrations.'
+            Assert-Equal '' (Invoke-GitOrThrow $transferRepo.Primary @('status', '--porcelain')) 'Observer changed primary files.'
+            Write-Output "PASS finish.tests.ps1: transferred close $transferShell $failure"
+        }
+    }
+    }
+
+    if (-not $FinishOnlyTests -and -not $TransferredOnlyTests) {
     & {
         . (Join-Path $scriptsDirectory 'session_close.ps1')
         function Get-RecordedSessionEntries { return $selectionEntries }
