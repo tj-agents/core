@@ -66,14 +66,17 @@ class RedRunGateTests(unittest.TestCase):
             timeout=20,
         )
 
-    def result(self, command, output, event="PostToolUseFailure"):
+    def result(self, command, output, event="PostToolUseFailure", exit_code=None):
         key = "tool_error" if event == "PostToolUseFailure" else "tool_response"
+        response = {"stdout": output, "stderr": "", "interrupted": False}
+        if exit_code is not None:
+            response["exit_code"] = exit_code
         return self.run_gate(
             {
                 "hook_event_name": event,
                 "tool_name": "Bash",
                 "tool_input": {"command": command},
-                key: {"stdout": output, "stderr": "", "interrupted": False},
+                key: response,
             }
         )
 
@@ -91,12 +94,70 @@ class RedRunGateTests(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual("", result.stderr)
 
-    def test_successful_ci_read_reporting_queue_failure_is_detected(self):
-        output = "X merge queue run\nTriggered via merge_group\nX e2e-ui in 2m (ID 42)\n"
-        result = self.result("gh run view 42", output, event="PostToolUse")
+    def test_ci_log_read_with_echoed_failure_script_and_passing_summary_is_silent(self):
+        command = 'gh run view 42 --log | grep -iE "##\\[error\\]|error:|failed|Error " | head -30'
+        output = (
+            'echo "::error file=example.cs::failed build step"\n'
+            'echo "Error: The following required dependencies are missing..."\n'
+            "Passed! - Failed: 0, Passed: 12, Skipped: 0, Total: 12\n"
+        )
+        result = self.result(command, output, event="PostToolUse")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stderr)
+        stop = self.run_gate({"hook_event_name": "Stop", "stop_hook_active": False})
+        self.assertEqual("", stop.stdout)
+
+    def test_quoted_test_runner_and_log_search_are_silent(self):
+        for command in (
+            'echo "dotnet test Example.IntegrationTests"',
+            "grep -i 'dotnet test' workflow.log",
+            'echo "example; dotnet test Example.IntegrationTests"',
+            "grep 'example | pytest' workflow.log",
+            'printf "example\npytest"',
+        ):
+            with self.subTest(command=command):
+                result = self.result(command, FAILED)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("", result.stderr)
+
+    def test_failing_suite_is_detected_after_a_passing_suite(self):
+        result = self.result("dotnet test Example.IntegrationTests", PASSED + FAILED)
         self.assertEqual(2, result.returncode, result.stderr)
-        self.assertIn("e2e-ui-debug", result.stderr)
-        self.assertIn("engineering:merging", result.stderr)
+
+    def test_e2e_runner_still_selects_its_tier(self):
+        for command in ("./scripts/e2e.ps1 ui",
+                        "pwsh -NoProfile -File scripts/e2e.ps1 ui",
+                        "& 'C:\\Project Space\\scripts\\e2e.ps1' ui"):
+            with self.subTest(command=command):
+                result = self.result(command, FAILED)
+                self.assertEqual(2, result.returncode, result.stderr)
+                self.assertIn("e2e-ui-debug", result.stderr)
+
+    def test_compound_command_exit_alone_is_not_a_test_verdict(self):
+        result = self.result("pytest | grep missing", "", exit_code=1)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stderr)
+
+    def test_stop_discards_legacy_ci_read_obligation(self):
+        sys.path.insert(0, str(HOOKS))
+        self.addCleanup(sys.path.remove, str(HOOKS))
+        import red_run_gate
+
+        red_run_gate.save_state(self.session, {
+            "command": "gh run view 42 --log", "skills": ["engineering:failing-tests"],
+            "answered": False,
+        })
+        self.addCleanup(red_run_gate.clear_state, self.session)
+        stop = self.run_gate({"hook_event_name": "Stop", "stop_hook_active": False})
+        self.assertEqual("", stop.stdout + stop.stderr)
+
+    def test_structured_failing_exit_requires_an_executed_test_runner(self):
+        failed = self.result("pytest", "", event="PostToolUse", exit_code=1)
+        self.assertEqual(2, failed.returncode, failed.stderr)
+        for output, exit_code in (("", 0), (PASSED, 1)):
+            with self.subTest(output=output, exit_code=exit_code):
+                result = self.result("pytest", output, event="PostToolUse", exit_code=exit_code)
+                self.assertEqual(0, result.returncode, result.stderr)
 
     def test_stop_blocks_once_while_the_owner_is_unproven(self):
         first = self.result("pytest", "1 failed in 0.1s")

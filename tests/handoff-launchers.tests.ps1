@@ -266,6 +266,10 @@ public static extern System.IntPtr CommandLineToArgvW([System.Runtime.InteropSer
         throw 'launch-codex.ps1 passed model/effort flags when none were given.'
     }
     if ($output -notmatch 'codex-cli 0\.160\.0') { throw 'launch-codex.ps1 did not report the discovered codex-cli version.' }
+    $receipt = ($output -split "`r?`n" | Where-Object { $_ -match '^\{"' } | Select-Object -Last 1) | ConvertFrom-Json
+    if ($receipt.event -ne 'agent-handoff-submitted' -or $receipt.worktree -ne $workDir -or $receipt.prompt_path -ne $promptPath) {
+        throw 'The Codex launch receipt did not bind the actual working directory and prompt.'
+    }
 
     # --- handoff-codex: explicit -Model/-ReasoningEffort pass straight through ---
     Remove-Item -LiteralPath $wtLog -Force
