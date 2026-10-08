@@ -192,7 +192,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:16d0dc0129eaf2593b85e88848c9917f9814b1699e6925d91aa5537a1428937e",
+          "digest": "sha256:4e8fbb168057e846265a4ba0d3d2f5500af900895c7ffafdd9c0de897ee79b7f",
           "harness": {
             "marketplaces": [
               {
@@ -208,6 +208,13 @@
             "hooks": [
               {
                 "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/callout_repair_gate.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -434,7 +441,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:a3dcd6dc656cce5c6f02a2bff29e63c878495c8a14048154cc9b8be9f9946199",
+          "digest": "sha256:3bf8cd8c9e1704cd1c2856ad42b03a69ebbec4a7fa6d12989f1dac907c718ea4",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
