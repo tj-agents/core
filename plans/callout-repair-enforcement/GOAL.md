@@ -75,6 +75,12 @@ continue. This session owns execution; its earlier bounded workers have released
 - Runtime slice: A/B, `Fix/CalloutRepairEnforcement`, base `origin/main` at `8fb3c34`, no PR yet.
   Target below 1,000 substantive lines; hook/parser tests, packaging and harness declarations, an
   independent committed-head review, and repository CI are its validation gates.
+- Integrated remote main at `ab321492`; affected regressions, 29 lane-table checks, 41 Claude launcher
+  checks (one skip), and harness validation passed. Native review could not read the candidate due
+  to sandbox startup failure; automatic approval review rejected transmitting the patch directly.
+  The fresh workflow role was unsupported on this account. The review contract's bounded parent
+  fallback found and repaired R1: automatic feedback denial must not itself create a standards
+  handoff obligation for an unrecognized complaint. Its 13 focused tests passed.
 - Guidance slice: C, a subsequent `Docs/*` branch from the updated remote default, with the minimal
   wording correction and its process-standard regression tests.
 - The partial A patch was reviewed and corrected for quoted-command parsing, deleted E2E constants,

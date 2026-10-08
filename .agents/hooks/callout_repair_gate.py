@@ -31,7 +31,8 @@ LAUNCH_SUCCESS = re.compile(r"Launched (?:codex-cli\s+\S+|codex handoff tab|clau
 TAIL_BYTES = 1 << 20
 MESSAGE = (
     "CALLOUT REPAIR: answer the user's direct question first. Check the governing standard and "
-    "launch engineering:handoff in bounded side-workstream mode for the responsible source owner "
+    "if it caused or failed to prevent the mistake, launch engineering:handoff in bounded "
+    "side-workstream mode for the responsible source owner "
     "in this same turn. An apology, automatic SendFeedback, or memory update does not replace "
     "repair. A skill load, a promised launch, or a failed launcher is not launch evidence. "
     "Respect explicit user limits."
@@ -279,7 +280,7 @@ def main():
         return 0
     if event == "PreToolUse":
         if feedback:
-            save_state(session, prompt, True)
+            save_state(session, prompt, bool(pending))
             emit(event, MESSAGE, deny=True)
         elif launcher_call(data.get("tool_input")) and not assistant_answer(records):
             emit(event, "Answer the user's direct question before launching the callout repair handoff.", deny=True)
