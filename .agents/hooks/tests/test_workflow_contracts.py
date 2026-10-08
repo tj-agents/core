@@ -1107,6 +1107,28 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertIn("reparse point", completed.stderr)
                     self.assertEqual([], list(outside.iterdir()))
 
+    def test_codex_installer_rejects_a_dangling_reparse_point_in_a_profile_ancestor(self):
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    gone = root / "gone"
+                    gone.mkdir()
+                    linked = root / "linked"
+                    self.link_directory(linked, gone)
+                    gone.rmdir()
+                    completed = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(linked / "profile"), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode)
+                    self.assertIn("reparse point", completed.stderr)
+                    self.assertFalse(gone.exists())
+
     def test_codex_installer_ignores_unrelated_source_agents(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)

@@ -61,9 +61,14 @@ function Assert-SafeDeliveryPath([string] $Path) {
         [System.IO.Path]::AltDirectorySeparatorChar
     ), [System.StringSplitOptions]::RemoveEmptyEntries))) {
         $current = Join-Path $current $segment
-        $item = Get-Item -Force -LiteralPath $current -ErrorAction SilentlyContinue
-        if ($null -eq $item) { break }
-        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        # GetAttributes reads the entry itself, so a link whose target is gone is still refused;
+        # only a path that does not exist at all ends the walk.
+        try {
+            $attributes = [System.IO.File]::GetAttributes($current)
+        } catch [System.IO.FileNotFoundException], [System.IO.DirectoryNotFoundException] {
+            break
+        }
+        if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
             throw "Codex agent delivery path contains a reparse point: $current"
         }
     }
