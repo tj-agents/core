@@ -35,7 +35,7 @@ STAGE_LANES = {
 # frontier tier must outrank every rung.
 FAMILY_ORDER = {
     "claude": ("claude-fable-5", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5"),
-    "codex": ("gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"),
+    "codex": ("gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-terra", "gpt-6-luna"),
 }
 
 
@@ -83,6 +83,25 @@ class LaneTableTests(unittest.TestCase):
                     rank = order.index(rung["model"])
                     self.assertGreaterEqual(rank, seen, "a lower rung names a more capable model")
                     seen = rank
+
+    def test_codex_l4_is_below_the_top_general_family(self):
+        lanes = table("codex")["lanes"]
+        self.assertEqual("gpt-5.6-terra", lanes["L4"]["model"])
+        self.assertEqual("high", lanes["L4"]["reasoning_effort"])
+        self.assertGreater(
+            FAMILY_ORDER["codex"].index(lanes["L4"]["model"]),
+            FAMILY_ORDER["codex"].index(lanes["L3"]["model"]),
+        )
+
+    def test_l4_is_high_effort_and_differs_from_l3_on_both_hosts(self):
+        for host in HOST_IDS:
+            data = table(host)
+            key = data["effort_key"]
+            with self.subTest(host=host):
+                self.assertEqual("high", data["lanes"]["L4"][key])
+                self.assertNotEqual(
+                    data["lanes"]["L3"]["model"], data["lanes"]["L4"]["model"]
+                )
 
     def test_effort_is_declared_under_each_host_own_key_and_from_the_known_vocabulary(self):
         for host in HOST_IDS:
@@ -257,9 +276,10 @@ class PluginDeliveryTests(unittest.TestCase):
                 )
 
     def test_the_machine_plugin_ships_the_same_tables_for_its_launchers(self):
-        # The handoff launchers resolve -Lane/-Frontier from resources/lanes, two hops up from the shared
-        # agent-cli.ps1 -- the same hop that finds .agents/lanes in the authored layout. A machine-only
-        # install must price a lane identically to an engineering one.
+        # The handoff launchers resolve their lane/frontier flags from resources/lanes, two hops up from
+        # either shared library beside it (agent-cli.ps1 for handoff-codex, agent_cli.py for handoff-claude)
+        # -- the same hop that finds .agents/lanes in the authored layout. A machine-only install must price
+        # a lane identically to an engineering one.
         for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md"):
             with self.subTest(name=name):
                 shipped = ROOT / "plugins" / "machine" / "resources" / "lanes" / name
@@ -368,6 +388,15 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(
             table("claude")["lanes"]["L4"]["model"], json.loads(done.stdout)["model"]
         )
+
+    def test_codex_l4_resolves_to_the_pinned_model_and_effort(self):
+        done = self.resolve("--host", "codex", "--lane", "L4")
+        self.assertEqual(0, done.returncode, done.stderr)
+        resolved = json.loads(done.stdout)
+        rung = table("codex")["lanes"]["L4"]
+        self.assertEqual(rung["model"], resolved["model"])
+        self.assertEqual(rung["reasoning_effort"], resolved["effort"])
+        self.assertEqual("reasoning_effort", resolved["effort_key"])
 
     def test_an_unknown_lane_or_host_fails_rather_than_falling_back(self):
         for args in (("--host", "claude", "--lane", "L99"), ("--host", "nope", "--lane", "L1")):

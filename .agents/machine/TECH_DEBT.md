@@ -47,3 +47,57 @@ started from Konsole opens its tab in that Konsole window, or fails if the windo
 Resolve when detection confirms the variable belongs to the terminal the caller is attached to, for
 example by matching the terminal's own record of its sessions against the caller's process ancestry,
 with a test for an inherited variable.
+
+## Windows Terminal option values may be escaped for a parse they never get
+
+`agent_cli._launch_windows_terminal` (and `agent-cli.ps1`'s `Invoke-AgentTerminalTab`) pass every
+`wt.exe` argument through `terminal_argument`, including `--title` and `--startingDirectory`, which are
+Windows Terminal's own option values rather than the launched command's arguments. The escaping
+`terminal_argument` applies models the second argv parse the tab's command arguments get after Windows
+Terminal's own `;`-split re-joins them (`CommandLineToArgvW` quote/backslash rules) — a parse option
+values may never receive at all, if Windows Terminal reads them off its own command line after only the
+`;` split. If so, a title or starting directory containing a quote or a trailing backslash would show its
+escapes literally in the tab (visible cosmetically, not a lost launch, since `;` is still escaped either
+way and nothing else in that value is Windows-Terminal-significant).
+
+Left unresolved rather than guessed: changing the escaping for option values without observing the real
+behaviour risks trading a cosmetic defect for a functional one.
+
+**Resolution condition.** A real `wt.exe` launch with a `--title` and a `--startingDirectory` containing a
+quote and a trailing backslash confirms whether Windows Terminal parses its own option values the same
+way as the tab's command arguments. If it does not, give option values their own escaping (likely just the
+existing `;` handling, with no `CommandLineToArgvW`-style quoting), with a test pinned to the confirmed
+behaviour.
+
+## The pre-launch standards sync has no overall deadline
+
+`agent_cli.sync_claude_standards` runs `claude_standards_sync.py` before every Claude launch and waits
+for it with no outer limit, as the PowerShell launcher did. The script bounds each of its own steps
+(180 seconds per marketplace update, 120 per plugin, 20 per `git ls-remote`), but those add up across
+plugins, and on Windows a `claude plugin` grandchild that keeps the output pipe open can hold the wait
+past its own step limit. A slow or wedged check therefore delays the tab, and the launch it was meant
+never to block. A plain outer `subprocess` timeout is not the fix: it kills a check that is still
+within its own budgets and leaves the grandchild running.
+
+Resolve when the sync runs under one overall deadline that stops its whole process tree on expiry on
+both Windows and POSIX, reports a `standards:` line and then launches, with a test that a hung
+grandchild cannot hold the launch past that deadline.
+
+## finish.ps1 trusts the starting directory for attachment
+
+Run without arguments, `finish.ps1` treats the worktree containing its starting directory as its own and
+refuses only when another live registered session sits there. A session can therefore `cd` into another
+merged worktree and finish it. The receipt gates (merged at exactly that head, clean tree, no open PR) mean
+nothing unmerged is lost, but an unregistered session still attached there would lose its directory.
+
+**Resolution condition.** Every live CLI is registered with its current directory (the host reports cwd
+changes, or the registry records them), so attachment can be proven from the registry alone.
+
+## A shared parent shell can keep the worktree locked after finish
+
+`finish.ps1` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started
+by hand from a long-lived shell whose current directory is inside the worktree, that shell survives, Windows
+keeps the directory locked, and the reaper records a failed removal; the cleanup reminder then surfaces it.
+
+**Resolution condition.** The reaper can read another process's current directory, or the host records it,
+so finish can tell a shell that pins the worktree from one that does not.

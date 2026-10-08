@@ -7,7 +7,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -19,6 +21,96 @@ SPEC.loader.exec_module(SNAPSHOT)
 
 
 class CodexHookSnapshotTests(unittest.TestCase):
+    def test_concurrent_delayed_reads_keep_digest_order_and_reject_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, content in [('a.txt', b'first\r\n'), ('b.bin', b'\xff\r\n'),
+                                  ('c.txt', b'last\r')]:
+                (root / name).write_bytes(content)
+            expected = SNAPSHOT.digest_tree(root, 'base')
+            read_bytes = Path.read_bytes
+            started = threading.Barrier(3)
+            last_finished = threading.Event()
+            lock = threading.Lock()
+            completions = []
+            active = peak = 0
+
+            def delayed_read(path):
+                nonlocal active, peak
+                with lock:
+                    active += 1
+                    peak = max(peak, active)
+                try:
+                    started.wait(timeout=10)
+                    content = read_bytes(path)
+                    if path.name != 'c.txt' and not last_finished.wait(timeout=10):
+                        raise TimeoutError('Concurrent final read did not complete')
+                    with lock:
+                        completions.append(path.name)
+                    if path.name == 'c.txt':
+                        last_finished.set()
+                    return content
+                finally:
+                    with lock:
+                        active -= 1
+
+            with patch.object(Path, 'read_bytes', delayed_read):
+                self.assertEqual(expected, SNAPSHOT.digest_tree(root, 'base'))
+                self.assertEqual(3, peak)
+                self.assertEqual('c.txt', completions[0])
+                (root / 'b.bin').write_bytes(b'tampered')
+                with self.assertRaises(SystemExit) as raised:
+                    SNAPSHOT.verified(root, expected, 'base')
+                self.assertEqual(2, raised.exception.code)
+
+    def test_nested_text_binary_and_exclusions_keep_known_integrity_digests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            files = {
+                'nested/deeper/readme': b'end\r',
+                'nested/a.txt': 'café\r\n'.encode('utf-8'),
+                'nested/Z.bin': b'\xff\x00\r\n',
+                'A.txt': b'first\r\nsecond\rthird\n',
+                'catalog/catalog.json': b'catalog\r\n',
+                'hooks/codex.json': b'excluded bytes',
+            }
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            (root / 'empty directory').mkdir()
+            self.assertEqual('sha256:4cae22b1da621db254dd6f8cae7c0e630f64de733ba21a92b739f5173f54cb5d',
+                             SNAPSHOT.digest_tree(root, 'base'))
+            self.assertEqual('sha256:31d98d8abb3e0ea352cb87114db6c920bea86ade05e9ac72c6be9b1177789254',
+                             SNAPSHOT.digest_tree(root, 'machine'))
+
+    def test_file_directory_and_excluded_symbolic_links_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            root = temporary / 'package'
+            root.mkdir()
+            target_file = temporary / 'target.txt'
+            target_file.write_text('target', encoding='utf-8')
+            target_directory = temporary / 'target directory'
+            target_directory.mkdir()
+            for relative, target in [('file-link', target_file),
+                                     ('directory-link', target_directory),
+                                     ('hooks/codex.json', target_file),
+                                     ('catalog/catalog.json', target_file)]:
+                with self.subTest(relative=relative):
+                    link = root / relative
+                    link.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        link.symlink_to(target, target_is_directory=target.is_dir())
+                    except OSError as error:
+                        self.skipTest(f'Symbolic links unavailable: {error}')
+                    try:
+                        with self.assertRaises(SystemExit) as raised:
+                            SNAPSHOT.digest_tree(root, 'machine')
+                        self.assertEqual(2, raised.exception.code)
+                    finally:
+                        link.unlink()
+
     def test_each_generated_command_binds_to_its_package_bytes(self):
         for plugin in ("base", "engineering", "machine"):
             with self.subTest(plugin=plugin):

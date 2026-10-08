@@ -111,6 +111,11 @@
     },
     {
       "plugin": "machine",
+      "source": ".agents/hooks/hook_dispatch.py",
+      "destination": "hooks/hook_dispatch.py"
+    },
+    {
+      "plugin": "machine",
       "source": ".agents/machine/scripts",
       "destination": "resources/machine/scripts"
     },
@@ -203,6 +208,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/merge_review_gate.py",
       "destination": "hooks/merge_review_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/merge_cleanup_gate.py",
+      "destination": "hooks/merge_cleanup_gate.py"
     },
     {
       "plugin": "engineering",

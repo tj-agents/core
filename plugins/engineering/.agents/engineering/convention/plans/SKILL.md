@@ -74,7 +74,8 @@ A plan, ledger, roadmap, or handoff may sequence delivery, but anonymous procedu
 push`, `do not open a PR`, or `do not merge` has no authority to suppress the standing plan-delivery contract.
 Location alone never makes a restriction stale: preserve an explicit current user limitation, recorded
 repository authorization, named PR/head security or validation hold, merge hold, or repository stop class as
-a typed delivery gate. When no such live authority is identified, continue to merged default-branch state.
+a typed delivery gate. When no such live authority is identified, continue to merged default-branch state
+(`engineering:merging` owns the goal-wide merge-authorization scope).
 
 ## Shape of a plan
 
@@ -84,8 +85,9 @@ ships a capability something else consumes — its **consumption contract**. Pha
 intermediate state builds and passes.
 
 For a project selecting the Concertable pre-launch profile, its always-on instructions outrank every plan. That profile's router pre-launch guard applies to every write in every
-task lifecycle, while `python .agents/hooks/plan_graph.py --root . --plan <repo-relative *_PLAN.md>` applies
-that same shared policy to the complete selected plan before it is implementation-ready or executable. This
+task lifecycle, enforced through Concertable's own adapter CLI, separately from
+`python -B .agents/hooks/plan_graph.py --root .`, which applies the shared structural ledger check to the
+complete selected plan before it is implementation-ready or executable. This
 catches instructions that existed before the write-time guard. A failure requires correcting the plan
 immediately to the direct replacement-and-deletion outcome; never execute around it.
 

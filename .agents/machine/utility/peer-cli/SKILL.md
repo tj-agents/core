@@ -32,8 +32,11 @@ drops scoping and shows every recorded session on the machine. Outside a git rep
 auto-scope and behaves like `-All`.
 
 `close` prompts unless `-Force`. A session records itself at SessionStart, so one started before that hook
-existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe` processes that own no entry, so
-a running CLI is never invisible just because it predates the registry.
+existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe`/`codex.exe` processes that own
+no entry, so a running CLI is never invisible just because it predates the registry.
+
+Liveness matches the recorded pid and its OS start time. An entry that cannot be matched is unknown, not
+dead, and `close` and `close-tab.ps1` refuse it without `-Force`.
 
 ## Closing the tab, not just the process
 
@@ -59,6 +62,15 @@ Its two refusals both exist because they were broken first:
 - **A live tab is refused.** Liveness is per tab, read from the session registry, so a stale tab is still
   closable in a window full of busy ones. A title with no registry entry predates the hook and counts as
   live, because unknown is not dead. `-Force` overrides.
+
+Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
+that through `finish.ps1`, beside these scripts.
+
+For a completed session whose checkout must remain, run exactly
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File <skill-directory>/scripts/close.ps1` with no
+arguments after the completion report. It requires this host's verified registry entry and attachment,
+closes only its own host or uniquely identified tab, and records session exit without changing files,
+branches or worktree registration. `finish.ps1` retains ownership of removable linked-worktree cleanup.
 
 ## Closing a peer
 
