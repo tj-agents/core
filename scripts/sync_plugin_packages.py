@@ -220,7 +220,6 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
     return "sha256:" + digest.hexdigest()
 
 
-# cmd.exe accepts 8191 characters; the rest is headroom for the host's ${PLUGIN_ROOT} expansion.
 # cmd.exe's command-line limit, measured with every ${PLUGIN_ROOT} expanded to a full-length Windows path.
 CODEX_WINDOWS_COMMAND_BUDGET = 8191
 WINDOWS_MAX_PATH = 260
