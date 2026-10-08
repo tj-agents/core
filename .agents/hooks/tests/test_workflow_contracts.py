@@ -1171,6 +1171,7 @@ $definition = $ast.Find({
     $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
         $node.Name -eq 'Test-SafeDeliveryEntry'
 }, $true)
+if (-not $definition) { throw 'Test-SafeDeliveryEntry was not found in the installer.' }
 . ([scriptblock]::Create($definition.Extent.Text))
 $results = [ordered]@{}
 $results.lenient = Test-SafeDeliveryEntry $Locked -AllowUninspectable
@@ -1178,7 +1179,10 @@ try { $null = Test-SafeDeliveryEntry $Locked; $results.strict = 'accepted' }
 catch { $results.strict = $_.Exception.Message }
 $results.missing = Test-SafeDeliveryEntry $Missing
 try { $null = Test-SafeDeliveryEntry "invalid`0path"; $results.invalid = 'accepted' }
-catch { $results.invalid = $_.Exception.InnerException.GetType().FullName + ': ' + $_.Exception.Message }
+catch {
+    $inner = if ($_.Exception.InnerException) { $_.Exception.InnerException } else { $_.Exception }
+    $results.invalid = $inner.GetType().FullName + ': ' + $_.Exception.Message
+}
 $results | ConvertTo-Json -Compress
 """
         for name, arguments in hosts:

@@ -221,7 +221,9 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
 
 
 # cmd.exe accepts 8191 characters; the rest is headroom for the host's ${PLUGIN_ROOT} expansion.
-CODEX_WINDOWS_COMMAND_BUDGET = 7000
+# cmd.exe's command-line limit, measured with every ${PLUGIN_ROOT} expanded to a full-length Windows path.
+CODEX_WINDOWS_COMMAND_BUDGET = 8191
+WINDOWS_MAX_PATH = 260
 
 
 def codex_snapshot_expression(loader: str) -> str:
@@ -258,10 +260,14 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
                             prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
                             f'"{plugin}" ' + command[len(prefix):]
                         )
-                        if field == "commandWindows" and len(hook[field]) > CODEX_WINDOWS_COMMAND_BUDGET:
+                        # Each ${PLUGIN_ROOT} expands at run time; count it at a full Windows path length.
+                        expanded = len(hook[field]) + hook[field].count("${PLUGIN_ROOT}") * (
+                            WINDOWS_MAX_PATH - len("${PLUGIN_ROOT}")
+                        )
+                        if field == "commandWindows" and expanded > CODEX_WINDOWS_COMMAND_BUDGET:
                             raise ValueError(
-                                f"Codex commandWindows for {plugin} is {len(hook[field])} characters, over "
-                                f"the {CODEX_WINDOWS_COMMAND_BUDGET}-character budget for cmd.exe"
+                                f"Codex commandWindows for {plugin} is {expanded} characters once ${{PLUGIN_ROOT}} "
+                                f"expands, over the {CODEX_WINDOWS_COMMAND_BUDGET}-character budget for cmd.exe"
                             )
         output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
 

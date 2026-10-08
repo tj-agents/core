@@ -354,7 +354,7 @@ class ExternalPluginSourceTests(StandardsSyncHarness):
         # Both shapes name the bare remote in a form git resolves on every platform.
         shapes = {
             'trailing slash': lambda remote: str(remote) + '/',
-            'no .git suffix': lambda remote: str(remote)[:-4],
+            'no .git suffix': lambda remote: str(remote).removesuffix('.git'),
         }
         for index, (label, shape) in enumerate(shapes.items()):
             with self.subTest(shape=label):
