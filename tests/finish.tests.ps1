@@ -108,6 +108,39 @@ function Wait-Condition {
     return (& $Condition)
 }
 
+function Grant-ReaperAcceptance {
+    param([string] $ResultPath, [int] $ExpectedPid, [int] $TimeoutSeconds = 30)
+    $wrote = Wait-Condition -TimeoutSeconds $TimeoutSeconds -Condition {
+        $record = Read-JsonFile -Path $ResultPath
+        $null -ne $record -and $null -ne (Get-EntryProperty -Entry $record -Name 'reaper_pid')
+    }
+    if (-not $wrote) { throw "The reaper at '$ResultPath' never wrote a started record carrying reaper_pid." }
+    $record = Read-JsonFile -Path $ResultPath
+    $actualPid = [int] (Get-EntryProperty -Entry $record -Name 'reaper_pid')
+    if ($actualPid -ne $ExpectedPid) {
+        throw "The reaper's started record pid ($actualPid) did not match the spawned process pid ($ExpectedPid)."
+    }
+    $reaperStartedAt = Get-EntryProperty -Entry $record -Name 'reaper_started_at'
+    $acceptedPath = "$ResultPath.accepted"
+    $directory = Split-Path -Parent $acceptedPath
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    $temp = Join-Path $directory ('.' + (Split-Path -Leaf $acceptedPath) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
+    $data = @{
+        accepted          = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+        reaper_pid        = $actualPid
+        reaper_started_at = $reaperStartedAt
+        host_pid          = 0
+    }
+    [IO.File]::WriteAllText($temp, ($data | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding $false))
+    if (Test-Path -LiteralPath $acceptedPath) { Remove-Item -LiteralPath $acceptedPath -Force }
+    Move-Item -LiteralPath $temp -Destination $acceptedPath
+}
+
+function Wait-ReaperArmed {
+    param([string] $ResultPath, [int] $TimeoutSeconds = 30)
+    return (Wait-Condition -TimeoutSeconds $TimeoutSeconds -Condition { Test-Path -LiteralPath "$ResultPath.armed" })
+}
+
 function Invoke-GitOrThrow {
     param([string] $Cwd, [string[]] $Arguments)
     $output = & git -C $Cwd @Arguments 2>&1
@@ -419,7 +452,8 @@ while (-not (Test-Path -LiteralPath $Ready)) { Start-Sleep -Milliseconds 50 }
 $commandLine = Format-CommandLine -Parts @(
     'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $Reaper,
     '-HostPid', $DeadPid, '-HostStart', $DeadStart, '-Head', ('a' * 40), '-Primary', $DummyPrimary, '-Worktree', $DummyWorktree,
-    '-Branch', 'dummy', '-Default', 'main', '-Result', $ResultPath, '-StateDirectory', $StateDirectory
+    '-Branch', 'dummy', '-Default', 'main', '-Result', $ResultPath, '-StateDirectory', $StateDirectory,
+    '-AcceptTimeoutSeconds', '3'
 )
 Start-DetachedReaper -CommandLine $commandLine | Out-Null
 Start-Sleep -Seconds 20
@@ -513,12 +547,16 @@ Start-Sleep -Seconds 20
         $fakeHostProcess = Start-Process -FilePath $env:ComSpec -ArgumentList @('/c', $hostCommand) `
             -WorkingDirectory $worktree -PassThru -WindowStyle Hidden
 
+        $e2eResultPath = $null
         $succeeded = Wait-Condition -TimeoutSeconds 60 -Condition {
             $resultsDirectory = Join-Path $e2eState 'merge-cleanup\results'
             if (-not (Test-Path -LiteralPath $resultsDirectory)) { return $false }
             foreach ($file in (Get-ChildItem -LiteralPath $resultsDirectory -Filter '*.json' -File)) {
                 $record = Read-JsonFile -Path $file.FullName
-                if ($record -and $record.worktree -eq $worktreeResolved -and $record.status -eq 'succeeded') { return $true }
+                if ($record -and $record.worktree -eq $worktreeResolved -and $record.status -eq 'succeeded') {
+                    $script:e2eResultPath = $file.FullName
+                    return $true
+                }
             }
             return $false
         }
@@ -541,8 +579,10 @@ Start-Sleep -Seconds 20
     Assert-False -Actual $branchStillPresent -Message 'The feature branch still exists after end-to-end cleanup.'
     $obligationCleared = Wait-Condition -TimeoutSeconds 10 -Condition { -not (Test-Path -LiteralPath $obligationPath) }
     Assert-True -Actual $obligationCleared -Message 'The merge-cleanup obligation was not cleared after a successful cleanup.'
+    Assert-True -Actual ($null -ne $e2eResultPath -and (Test-Path -LiteralPath "$e2eResultPath.accepted")) -Message 'The accepted handshake signal was not left behind after a successful cleanup.'
+    Assert-True -Actual ($null -ne $e2eResultPath -and (Test-Path -LiteralPath "$e2eResultPath.armed")) -Message 'The armed handshake signal was not left behind after a successful cleanup.'
 
-    Write-Output 'PASS finish.tests.ps1: end-to-end squash-merge cleanup'
+    Write-Output 'PASS finish.tests.ps1: end-to-end squash-merge cleanup; three-phase handshake leaves .accepted and .armed'
 
 
     $timeoutRoot = Join-Path $scratch 'timeout'
@@ -573,6 +613,8 @@ Start-Sleep -Seconds 20
                 '-StateDirectory', $timeoutState
             ) -PassThru -WindowStyle Hidden
 
+            Grant-ReaperAcceptance -ResultPath $timeoutResult -ExpectedPid $reaperProcess.Id
+
             $wroteTimeoutRecord = Wait-Condition -TimeoutSeconds 60 -Condition {
                 $record = Read-JsonFile -Path $timeoutResult
                 $null -ne $record -and $null -ne $record.status
@@ -600,6 +642,75 @@ Start-Sleep -Seconds 20
     }
 
     Write-Output 'PASS finish.tests.ps1: reaper timeout path'
+
+
+    $cancelArmedRoot = Join-Path $scratch 'r-cancelled-wins-expiry'
+    New-Item -ItemType Directory -Path $cancelArmedRoot -Force | Out-Null
+    $cancelArmedState = Join-Path $cancelArmedRoot 'state'
+    $cancelArmedRepo = New-TestRepo -Root $cancelArmedRoot
+    $cancelArmedWorktree = Add-FeatureWorktree -Primary $cancelArmedRepo.Primary -Root $cancelArmedRoot -Branch 'feature'
+    $cancelArmedResolved = Get-ResolvedPath $cancelArmedWorktree
+    $cancelArmedHead = (Invoke-GitOrThrow -Cwd $cancelArmedWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $cancelArmedResult = Join-Path $cancelArmedRoot 'result.json'
+
+    $cancelArmedAliveHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'ping -n 60 127.0.0.1 > nul' -PassThru -WindowStyle Hidden
+    try {
+        $cancelArmedAliveStart = ([DateTimeOffset]($cancelArmedAliveHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+        $previousCancelArmedState = $env:AGENT_STATE_DIRECTORY
+        $previousCancelArmedReaperTimeout = $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS
+        $env:AGENT_STATE_DIRECTORY = $cancelArmedState
+        $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = '10'
+        $cancelArmedReaperProcess = $null
+        try {
+            $cancelArmedReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+                '-HostPid', $cancelArmedAliveHost.Id, '-HostStart', $cancelArmedAliveStart,
+                '-Head', $cancelArmedHead,
+                '-Primary', $cancelArmedRepo.Primary, '-Worktree', $cancelArmedResolved,
+                '-Branch', 'feature', '-Default', 'main', '-Result', $cancelArmedResult,
+                '-StateDirectory', $cancelArmedState, '-AcceptTimeoutSeconds', '30'
+            ) -PassThru -WindowStyle Hidden
+
+            Grant-ReaperAcceptance -ResultPath $cancelArmedResult -ExpectedPid $cancelArmedReaperProcess.Id
+
+            $cancelArmedArmed = Wait-ReaperArmed -ResultPath $cancelArmedResult -TimeoutSeconds 30
+            Assert-True -Actual $cancelArmedArmed -Message 'The cancelled-wins-expiry scenario did not reach an armed state before cancelling.'
+
+            $cancelArmedDirectory = Split-Path -Parent $cancelArmedResult
+            New-Item -ItemType Directory -Path $cancelArmedDirectory -Force | Out-Null
+            $cancelArmedCancelledData = @{ cancelled = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0); reason = 'test cancellation after arming' }
+            [IO.File]::WriteAllText("$cancelArmedResult.cancelled", ($cancelArmedCancelledData | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding $false))
+
+            $cancelArmedWrote = Wait-Condition -TimeoutSeconds 60 -Condition {
+                $record = Read-JsonFile -Path $cancelArmedResult
+                $null -ne $record -and $null -ne $record.status
+            }
+            if (-not $cancelArmedWrote -and (Get-Process -Id $cancelArmedReaperProcess.Id -ErrorAction SilentlyContinue)) {
+                Stop-TestProcessTree $cancelArmedReaperProcess.Id
+            }
+        }
+        finally {
+            $env:AGENT_STATE_DIRECTORY = $previousCancelArmedState
+            $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = $previousCancelArmedReaperTimeout
+        }
+
+        $cancelArmedRecord = Read-JsonFile -Path $cancelArmedResult
+        Assert-True -Actual ($null -ne $cancelArmedRecord) -Message 'The cancelled-wins-expiry scenario did not write a result record.'
+        Assert-Equal -Expected 'cancelled' -Actual $cancelArmedRecord.status -Message 'A cancellation during the host-wait expiry was recorded as timeout instead of cancelled.'
+        Assert-True -Actual (Test-Path -LiteralPath $cancelArmedWorktree) -Message 'The worktree was touched despite a cancellation winning the race.'
+        $cancelArmedBranchStillPresent = $(& git -C $cancelArmedRepo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
+        Assert-True -Actual $cancelArmedBranchStillPresent -Message 'The feature branch was removed despite a cancellation winning the race.'
+        Assert-True -Actual ($null -ne (Get-EntryProperty -Entry $cancelArmedRecord -Name 'reaper_pid')) -Message 'The cancelled-wins-expiry terminal record did not carry reaper_pid.'
+        Assert-True -Actual ($null -ne (Get-EntryProperty -Entry $cancelArmedRecord -Name 'reaper_started_at')) -Message 'The cancelled-wins-expiry terminal record did not carry reaper_started_at.'
+    }
+    finally {
+        if (Get-Process -Id $cancelArmedAliveHost.Id -ErrorAction SilentlyContinue) {
+            Stop-TestProcessTree $cancelArmedAliveHost.Id
+        }
+    }
+
+    Write-Output 'PASS finish.tests.ps1: cancelled wins host-wait expiry'
 
 
     $r1aRoot = Join-Path $scratch 'r1-preflight-moved-head'
@@ -649,6 +760,8 @@ Start-Sleep -Seconds 20
         '-Branch', 'feature', '-Default', 'main', '-Result', $movedHeadResult,
         '-StateDirectory', $movedHeadState
     ) -PassThru -WindowStyle Hidden
+
+    Grant-ReaperAcceptance -ResultPath $movedHeadResult -ExpectedPid $movedHeadReaperProcess.Id
 
     $movedHeadWrote = Wait-Condition -TimeoutSeconds 30 -Condition {
         $record = Read-JsonFile -Path $movedHeadResult
@@ -761,6 +874,8 @@ Start-Sleep -Seconds 20
                 '-StateDirectory', $parentWaitState
             ) -PassThru -WindowStyle Hidden
 
+            Grant-ReaperAcceptance -ResultPath $parentWaitResult -ExpectedPid $parentWaitReaperProcess.Id
+
             $parentWaitWrote = Wait-Condition -TimeoutSeconds 30 -Condition {
                 $record = Read-JsonFile -Path $parentWaitResult
                 $null -ne $record -and $null -ne $record.status
@@ -843,6 +958,8 @@ Start-Sleep -Seconds 20
         '-Branch', 'feature', '-Default', 'main', '-Result', $siblingResult,
         '-StateDirectory', $siblingState
     ) -PassThru -WindowStyle Hidden
+
+    Grant-ReaperAcceptance -ResultPath $siblingResult -ExpectedPid $siblingReaperProcess.Id
 
     $siblingWrote = Wait-Condition -TimeoutSeconds 60 -Condition {
         $record = Read-JsonFile -Path $siblingResult
@@ -1110,6 +1227,8 @@ Start-Sleep -Seconds 20
         '-StateDirectory', $duplicateState
     ) -PassThru -WindowStyle Hidden
 
+    Grant-ReaperAcceptance -ResultPath $duplicateResult -ExpectedPid $duplicateReaperProcess.Id
+
     $duplicateWrote = Wait-Condition -TimeoutSeconds 60 -Condition {
         $record = Read-JsonFile -Path $duplicateResult
         $null -ne $record -and $null -ne $record.status
@@ -1127,6 +1246,619 @@ Start-Sleep -Seconds 20
     Assert-True -Actual $duplicateClearedB -Message 'The reaper left a duplicate matching obligation file (under another path spelling) in place.'
 
     Write-Output 'PASS finish.tests.ps1: reaper removes every matching obligation file'
+
+
+    $unitRoot = Join-Path $scratch 'unit-handshake'
+    New-Item -ItemType Directory -Path $unitRoot -Force | Out-Null
+    $unitState = Join-Path $unitRoot 'state'
+    $unitWorktree = Join-Path $unitRoot 'worktree'
+    New-Item -ItemType Directory -Path $unitWorktree -Force | Out-Null
+    Invoke-GitOrThrow -Cwd $unitWorktree -Arguments @('init', '-q', '-b', 'feature') | Out-Null
+    Invoke-GitOrThrow -Cwd $unitWorktree -Arguments @('config', 'user.email', 't@example.com') | Out-Null
+    Invoke-GitOrThrow -Cwd $unitWorktree -Arguments @('config', 'user.name', 't') | Out-Null
+    Set-Content -LiteralPath (Join-Path $unitWorktree 'file.txt') -Value 'content' -Encoding UTF8
+    Invoke-GitOrThrow -Cwd $unitWorktree -Arguments @('add', '.') | Out-Null
+    Invoke-GitOrThrow -Cwd $unitWorktree -Arguments @('commit', '-q', '-m', 'init') | Out-Null
+    $unitHead = (Invoke-GitOrThrow -Cwd $unitWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $unitResolved = Get-ResolvedPath $unitWorktree
+    $unitDummySource = Join-Path $unitRoot 'dummy-source'
+    New-Item -ItemType Directory -Path $unitDummySource -Force | Out-Null
+    $unitReceipt = [pscustomobject]@{ head = $unitHead; primary = $unitRoot; branch = 'feature'; default = 'main' }
+    $unitOwnHost = [pscustomobject]@{ Pid = 900001; Started = 1700002000.0 }
+    $unitAttachment = [pscustomobject]@{ Attached = $true; Title = $null }
+
+    $delayedWriterScript = Join-Path $unitRoot 'delayed-writer.ps1'
+    @'
+param([string] $Path, [string] $JsonBase64, [int] $DelayMs)
+Start-Sleep -Milliseconds $DelayMs
+$Json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($JsonBase64))
+$directory = Split-Path -Parent $Path
+New-Item -ItemType Directory -Path $directory -Force | Out-Null
+$temp = "$Path.$PID.tmp"
+[IO.File]::WriteAllText($temp, $Json, (New-Object Text.UTF8Encoding $false))
+if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }
+Move-Item -LiteralPath $temp -Destination $Path
+'@ | Set-Content -LiteralPath $delayedWriterScript -Encoding UTF8
+
+    function Start-DelayedWrite {
+        param([string] $Path, [hashtable] $Data, [int] $DelayMs)
+        $json = $Data | ConvertTo-Json -Depth 6 -Compress
+        $jsonBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+        Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $delayedWriterScript,
+            '-Path', $Path, '-JsonBase64', $jsonBase64, '-DelayMs', $DelayMs
+        ) -WindowStyle Hidden | Out-Null
+    }
+
+    function Invoke-ReaperHandshakeUnit {
+        param([string] $ResultPath, [scriptblock] $SpawnImpl)
+        $previousUnitState = $env:AGENT_STATE_DIRECTORY
+        $env:AGENT_STATE_DIRECTORY = $unitState
+        try {
+            & {
+                try { . $finishScript -Worktree $unitDummySource } catch { }
+                Set-Item -Path function:Start-DetachedReaper -Value $SpawnImpl
+                $script:unitCloseCalled = $false
+                function Invoke-SessionClose { param($CloseMode, $Attachment, $OwnHost, $ParentShell) $script:unitCloseCalled = $true }
+                $threw = $false
+                $message = $null
+                try {
+                    Invoke-ReaperHandshake -StateDirectory $unitState -ResolvedWorktree $unitResolved -Receipt $unitReceipt `
+                        -OwnHost $unitOwnHost -ParentShell $null -Attachment $unitAttachment -ResultPath $ResultPath
+                }
+                catch {
+                    $threw = $true
+                    $message = $_.Exception.Message
+                }
+                [pscustomobject]@{ Threw = $threw; Message = $message; CloseCalled = $script:unitCloseCalled }
+            }
+        }
+        finally {
+            $env:AGENT_STATE_DIRECTORY = $previousUnitState
+        }
+    }
+
+    $resultA = Join-Path $unitState ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
+    $spawnImplA = { param($CommandLine) return $false }
+    $outcomeA = Invoke-ReaperHandshakeUnit -ResultPath $resultA -SpawnImpl $spawnImplA
+    Assert-True -Actual $outcomeA.Threw -Message 'A failed spawn did not throw.'
+    Assert-Contains -Actual $outcomeA.Message -Expected 'nothing was closed' -Message 'A failed spawn did not report that nothing was closed.'
+    Assert-False -Actual $outcomeA.CloseCalled -Message 'A failed spawn still closed the session.'
+    Assert-True -Actual (Test-Path -LiteralPath "$resultA.cancelled") -Message 'A failed spawn did not write .cancelled.'
+    Assert-False -Actual (Test-Path -LiteralPath "$resultA.accepted") -Message 'A failed spawn wrote .accepted.'
+
+    Write-Output 'PASS finish.tests.ps1: handshake unit - failed spawn cancels without closing'
+
+
+    $previousUnitAcceptTimeout = $env:AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS
+    $env:AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS = '1'
+    try {
+        $resultAcceptClamp = Join-Path $unitState ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
+        $script:unitCapturedCommandLine = $null
+        $spawnImplAcceptClamp = {
+            param($CommandLine)
+            $script:unitCapturedCommandLine = $CommandLine
+            return $false
+        }
+        Invoke-ReaperHandshakeUnit -ResultPath $resultAcceptClamp -SpawnImpl $spawnImplAcceptClamp | Out-Null
+        Assert-True -Actual ($null -ne $script:unitCapturedCommandLine -and
+            $script:unitCapturedCommandLine.TrimEnd().EndsWith('-AcceptTimeoutSeconds 60')) `
+            -Message "An explicit accept timeout below the floor was not clamped to exactly 60 on the reaper command line: $($script:unitCapturedCommandLine)"
+    }
+    finally {
+        $env:AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS = $previousUnitAcceptTimeout
+    }
+
+    Write-Output 'PASS finish.tests.ps1: handshake unit - accept timeout below the floor clamps to 60 on the command line'
+
+
+    $resultB = Join-Path $unitState ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
+    $spawnImplB = {
+        param($CommandLine)
+        $startedData = @{
+            started           = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+            host_pid          = 900001
+            worktree          = $unitResolved
+            reaper_pid        = 555555
+            reaper_started_at = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+        }
+        Start-DelayedWrite -Path $resultB -Data $startedData -DelayMs 300
+        $armedData = @{ armed = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0); reaper_pid = 555555 }
+        Start-DelayedWrite -Path "$resultB.armed" -Data $armedData -DelayMs 700
+        return @{ ProcessId = 555555; Method = 'cim' }
+    }
+    $outcomeB = Invoke-ReaperHandshakeUnit -ResultPath $resultB -SpawnImpl $spawnImplB
+    Assert-False -Actual $outcomeB.Threw -Message "A valid handshake threw: $($outcomeB.Message)"
+    Assert-True -Actual $outcomeB.CloseCalled -Message 'A valid handshake did not close the session.'
+    $acceptedRecordB = Read-JsonFile -Path "$resultB.accepted"
+    Assert-Equal -Expected 555555 -Actual ([int] $acceptedRecordB.reaper_pid) -Message 'The accepted record did not echo the validated reaper pid.'
+
+    Write-Output 'PASS finish.tests.ps1: handshake unit - delayed started record is accepted and armed before close'
+
+
+    $invalidVariants = @(
+        @{ Name = 'wrong host_pid'; Overrides = @{ host_pid = 123456 } },
+        @{ Name = 'wrong worktree'; Overrides = @{ worktree = (Join-Path $unitRoot 'elsewhere') } },
+        @{ Name = 'stale started'; Overrides = @{ started = 1000000000.0 } },
+        @{ Name = 'missing reaper_pid'; Remove = @('reaper_pid') },
+        @{ Name = 'pid mismatch'; Overrides = @{ reaper_pid = 7 }; SpawnPid = 999 }
+    )
+    foreach ($variant in $invalidVariants) {
+        $resultC = Join-Path $unitState ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
+        $baseData = @{
+            started           = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+            host_pid          = 900001
+            worktree          = $unitResolved
+            reaper_pid        = 555555
+            reaper_started_at = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+        }
+        if ($variant.ContainsKey('Overrides')) {
+            foreach ($key in @($variant.Overrides.Keys)) { $baseData[$key] = $variant.Overrides[$key] }
+        }
+        foreach ($key in @($variant.Remove)) { $baseData.Remove($key) }
+        $spawnPid = if ($variant.ContainsKey('SpawnPid')) { $variant.SpawnPid } else { 555555 }
+        $json = $baseData | ConvertTo-Json -Depth 6
+        $spawnImplC = {
+            param($CommandLine)
+            $directory = Split-Path -Parent $resultC
+            New-Item -ItemType Directory -Path $directory -Force | Out-Null
+            [IO.File]::WriteAllText($resultC, $json, (New-Object Text.UTF8Encoding $false))
+            return @{ ProcessId = $spawnPid; Method = 'cim' }
+        }
+        $outcomeC = Invoke-ReaperHandshakeUnit -ResultPath $resultC -SpawnImpl $spawnImplC
+        Assert-True -Actual $outcomeC.Threw -Message "A complete-but-invalid record ($($variant.Name)) did not cancel."
+        Assert-False -Actual $outcomeC.CloseCalled -Message "A complete-but-invalid record ($($variant.Name)) still closed the session."
+        Assert-True -Actual (Test-Path -LiteralPath "$resultC.cancelled") -Message "A complete-but-invalid record ($($variant.Name)) did not write .cancelled."
+    }
+
+    Write-Output 'PASS finish.tests.ps1: handshake unit - complete-but-invalid started records cancel immediately'
+
+
+    $previousArmedTimeout = $env:AGENT_FINISH_ARMED_TIMEOUT_SECONDS
+    $env:AGENT_FINISH_ARMED_TIMEOUT_SECONDS = '1'
+    try {
+        $resultD = Join-Path $unitState ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
+        $startedDataD = @{
+            started           = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+            host_pid          = 900001
+            worktree          = $unitResolved
+            reaper_pid        = 555556
+            reaper_started_at = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+        }
+        $jsonD = $startedDataD | ConvertTo-Json -Depth 6
+        $spawnImplD = {
+            param($CommandLine)
+            $directory = Split-Path -Parent $resultD
+            New-Item -ItemType Directory -Path $directory -Force | Out-Null
+            [IO.File]::WriteAllText($resultD, $jsonD, (New-Object Text.UTF8Encoding $false))
+            return @{ ProcessId = 555556; Method = 'cim' }
+        }
+        $outcomeD = Invoke-ReaperHandshakeUnit -ResultPath $resultD -SpawnImpl $spawnImplD
+        Assert-True -Actual $outcomeD.Threw -Message 'A valid acceptance with no armed acknowledgement did not cancel.'
+        Assert-False -Actual $outcomeD.CloseCalled -Message 'A valid acceptance with no armed acknowledgement still closed the session.'
+        Assert-True -Actual (Test-Path -LiteralPath "$resultD.accepted") -Message 'A valid acceptance did not write .accepted before the armed-wait.'
+        Assert-True -Actual (Test-Path -LiteralPath "$resultD.cancelled") -Message 'A missing armed acknowledgement did not write .cancelled.'
+    }
+    finally {
+        $env:AGENT_FINISH_ARMED_TIMEOUT_SECONDS = $previousArmedTimeout
+    }
+
+    Write-Output 'PASS finish.tests.ps1: handshake unit - accepted but never armed cancels without closing'
+
+
+    $sweepRoot = Join-Path $scratch 'sweep-decoy'
+    New-Item -ItemType Directory -Path $sweepRoot -Force | Out-Null
+    $sweepGuid = [guid]::NewGuid().ToString('N')
+    $sweepDecoyGuid = [guid]::NewGuid().ToString('N')
+    $sweepResultPath = Join-Path $sweepRoot ($sweepGuid + '.json')
+    $sweepMatching = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # finish_reaper.ps1 $sweepGuid") -PassThru -WindowStyle Hidden
+    $sweepDecoy = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # finish_reaper.ps1 $sweepDecoyGuid") -PassThru -WindowStyle Hidden
+    $sweepBystander = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # $sweepGuid") -PassThru -WindowStyle Hidden
+    try {
+        Start-Sleep -Milliseconds 500
+        & {
+            try { . $finishScript -Worktree $unitDummySource } catch { }
+            Invoke-HandshakeKillSweep -ResultPath $sweepResultPath
+        }
+        $matchingKilled = Wait-Condition -TimeoutSeconds 10 -Condition { $null -eq (Get-Process -Id $sweepMatching.Id -ErrorAction SilentlyContinue) }
+        Assert-True -Actual $matchingKilled -Message 'The kill sweep did not stop the reaper-shaped process whose command line carried the matching invocation GUID.'
+        Start-Sleep -Milliseconds 500
+        $sweepDecoy.Refresh()
+        Assert-False -Actual $sweepDecoy.HasExited -Message 'The kill sweep stopped a decoy process carrying a different GUID.'
+        $sweepBystander.Refresh()
+        Assert-False -Actual $sweepBystander.HasExited -Message 'The kill sweep stopped a bystander that quoted the invocation GUID without being a reaper.'
+    }
+    finally {
+        foreach ($sweepProcess in @($sweepMatching, $sweepDecoy, $sweepBystander)) {
+            if ($sweepProcess -and (Get-Process -Id $sweepProcess.Id -ErrorAction SilentlyContinue)) { Stop-TestProcessTree $sweepProcess.Id }
+        }
+    }
+
+    Write-Output 'PASS finish.tests.ps1: kill sweep stops only reaper-shaped matches and spares decoys and GUID-quoting bystanders'
+
+
+    $closeShapeRoot = Join-Path $scratch 'r-closeonly-timeout-shape'
+    New-Item -ItemType Directory -Path $closeShapeRoot -Force | Out-Null
+    $closeShapeState = Join-Path $closeShapeRoot 'state'
+    $closeShapeWorktree = Join-Path $closeShapeRoot 'worktree'
+    New-Item -ItemType Directory -Path $closeShapeWorktree -Force | Out-Null
+    $closeShapeResult = Join-Path $closeShapeRoot 'result.json'
+
+    $closeShapeAliveHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'ping -n 60 127.0.0.1 > nul' -PassThru -WindowStyle Hidden
+    try {
+        $closeShapeAliveStart = ([DateTimeOffset]($closeShapeAliveHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+        $previousCloseShapeTimeout = $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS
+        $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = '2'
+        $closeShapeProcess = $null
+        try {
+            $closeShapeProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript, '-CloseOnly',
+                '-HostPid', $closeShapeAliveHost.Id, '-HostStart', $closeShapeAliveStart,
+                '-SessionId', 'close-shape-test', '-Worktree', $closeShapeWorktree,
+                '-Result', $closeShapeResult, '-StateDirectory', $closeShapeState
+            ) -PassThru -WindowStyle Hidden
+
+            $closeShapeWrote = Wait-Condition -TimeoutSeconds 30 -Condition {
+                $record = Read-JsonFile -Path $closeShapeResult
+                $null -ne $record -and $null -ne (Get-EntryProperty -Entry $record -Name 'status')
+            }
+            if (-not $closeShapeWrote -and (Get-Process -Id $closeShapeProcess.Id -ErrorAction SilentlyContinue)) {
+                Stop-TestProcessTree $closeShapeProcess.Id
+            }
+        }
+        finally {
+            $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = $previousCloseShapeTimeout
+        }
+        $closeShapeRecord = Read-JsonFile -Path $closeShapeResult
+        Assert-True -Actual ($null -ne $closeShapeRecord) -Message 'The CloseOnly timeout-shape scenario did not write a terminal record.'
+        Assert-Equal -Expected 'timeout' -Actual $closeShapeRecord.status -Message 'The CloseOnly observer with a live host did not record a timeout.'
+        Assert-Equal -Expected 'close-shape-test' -Actual (Get-EntryProperty -Entry $closeShapeRecord -Name 'session_id') -Message 'The CloseOnly timeout record did not carry its session identity.'
+        Assert-True -Actual ([double] (Get-EntryProperty -Entry $closeShapeRecord -Name 'host_started_at') -gt 0) -Message 'The CloseOnly timeout record did not carry the host start time.'
+        Assert-True -Actual ($null -eq (Get-EntryProperty -Entry $closeShapeRecord -Name 'reaper_pid')) -Message 'The CloseOnly timeout record carried cleanup-reaper identity fields.'
+    }
+    finally {
+        if (Get-Process -Id $closeShapeAliveHost.Id -ErrorAction SilentlyContinue) {
+            Stop-TestProcessTree $closeShapeAliveHost.Id
+        }
+    }
+
+    Write-Output 'PASS finish.tests.ps1: a CloseOnly observer expiring on a live host keeps the close record shape'
+
+
+    $cancelRoot = Join-Path $scratch 'r-cancel-after-started'
+    New-Item -ItemType Directory -Path $cancelRoot -Force | Out-Null
+    $cancelState = Join-Path $cancelRoot 'state'
+    $cancelRepo = New-TestRepo -Root $cancelRoot
+    $cancelWorktree = Add-FeatureWorktree -Primary $cancelRepo.Primary -Root $cancelRoot -Branch 'feature'
+    $cancelResolved = Get-ResolvedPath $cancelWorktree
+    $cancelHead = (Invoke-GitOrThrow -Cwd $cancelWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $cancelResult = Join-Path $cancelRoot 'result.json'
+
+    $cancelDeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $cancelDeadHost.WaitForExit(5000) | Out-Null
+    $cancelDeadStart = ([DateTimeOffset]($cancelDeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $cancelReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $cancelDeadHost.Id, '-HostStart', $cancelDeadStart,
+        '-Head', $cancelHead,
+        '-Primary', $cancelRepo.Primary, '-Worktree', $cancelResolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $cancelResult,
+        '-StateDirectory', $cancelState, '-AcceptTimeoutSeconds', '30'
+    ) -PassThru -WindowStyle Hidden
+
+    $cancelWroteStarted = Wait-Condition -TimeoutSeconds 30 -Condition {
+        $record = Read-JsonFile -Path $cancelResult
+        $null -ne $record -and $null -ne (Get-EntryProperty -Entry $record -Name 'reaper_pid')
+    }
+    Assert-True -Actual $cancelWroteStarted -Message 'The cancel-after-started scenario did not write a started record in time.'
+
+    $cancelDirectory = Split-Path -Parent $cancelResult
+    New-Item -ItemType Directory -Path $cancelDirectory -Force | Out-Null
+    $cancelledData = @{ cancelled = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0); reason = 'test cancellation' }
+    [IO.File]::WriteAllText("$cancelResult.cancelled", ($cancelledData | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding $false))
+
+    $cancelWrote = Wait-Condition -TimeoutSeconds 30 -Condition {
+        $record = Read-JsonFile -Path $cancelResult
+        $null -ne $record -and $null -ne $record.status
+    }
+    if (-not $cancelWrote -and (Get-Process -Id $cancelReaperProcess.Id -ErrorAction SilentlyContinue)) {
+        Stop-TestProcessTree $cancelReaperProcess.Id
+    }
+    $cancelRecord = Read-JsonFile -Path $cancelResult
+    Assert-True -Actual ($null -ne $cancelRecord) -Message 'The cancel-after-started scenario did not write a terminal result record.'
+    Assert-Equal -Expected 'cancelled' -Actual $cancelRecord.status -Message 'A cancellation written after the started record did not win the race.'
+    Assert-True -Actual (Test-Path -LiteralPath $cancelWorktree) -Message 'The worktree was removed despite a cancellation.'
+    $cancelBranchStillPresent = $(& git -C $cancelRepo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
+    Assert-True -Actual $cancelBranchStillPresent -Message 'The feature branch was removed despite a cancellation.'
+    Assert-Equal -Expected $cancelReaperProcess.Id -Actual ([int] (Get-EntryProperty -Entry $cancelRecord -Name 'reaper_pid')) `
+        -Message 'The cancel-after-started terminal record reaper_pid did not match the spawned reaper process id.'
+    Assert-True -Actual (([double] (Get-EntryProperty -Entry $cancelRecord -Name 'reaper_started_at')) -gt 0) `
+        -Message 'The cancel-after-started terminal record reaper_started_at was not a positive number.'
+
+    Write-Output 'PASS finish.tests.ps1: cancel landing after the started record wins the race'
+
+
+    $noAcceptRoot = Join-Path $scratch 'r-no-accept'
+    New-Item -ItemType Directory -Path $noAcceptRoot -Force | Out-Null
+    $noAcceptState = Join-Path $noAcceptRoot 'state'
+    $noAcceptRepo = New-TestRepo -Root $noAcceptRoot
+    $noAcceptWorktree = Add-FeatureWorktree -Primary $noAcceptRepo.Primary -Root $noAcceptRoot -Branch 'feature'
+    $noAcceptResolved = Get-ResolvedPath $noAcceptWorktree
+    $noAcceptHead = (Invoke-GitOrThrow -Cwd $noAcceptWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $noAcceptResult = Join-Path $noAcceptRoot 'result.json'
+
+    $noAcceptDeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $noAcceptDeadHost.WaitForExit(5000) | Out-Null
+    $noAcceptDeadStart = ([DateTimeOffset]($noAcceptDeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $noAcceptReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $noAcceptDeadHost.Id, '-HostStart', $noAcceptDeadStart,
+        '-Head', $noAcceptHead,
+        '-Primary', $noAcceptRepo.Primary, '-Worktree', $noAcceptResolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $noAcceptResult,
+        '-StateDirectory', $noAcceptState, '-AcceptTimeoutSeconds', '1'
+    ) -PassThru -WindowStyle Hidden
+
+    $noAcceptWrote = Wait-Condition -TimeoutSeconds 30 -Condition {
+        $record = Read-JsonFile -Path $noAcceptResult
+        $null -ne $record -and $null -ne $record.status
+    }
+    if (-not $noAcceptWrote -and (Get-Process -Id $noAcceptReaperProcess.Id -ErrorAction SilentlyContinue)) {
+        Stop-TestProcessTree $noAcceptReaperProcess.Id
+    }
+    $noAcceptRecord = Read-JsonFile -Path $noAcceptResult
+    Assert-True -Actual ($null -ne $noAcceptRecord) -Message 'The launcher-exit-before-accept scenario did not write a terminal record.'
+    Assert-Equal -Expected 'not-accepted' -Actual $noAcceptRecord.status -Message 'A reaper with no acceptance did not report not-accepted.'
+    Assert-True -Actual (Test-Path -LiteralPath $noAcceptWorktree) -Message 'The worktree was removed despite no acceptance ever arriving.'
+    Assert-Equal -Expected $noAcceptReaperProcess.Id -Actual ([int] (Get-EntryProperty -Entry $noAcceptRecord -Name 'reaper_pid')) `
+        -Message 'The launcher-exit-before-accept terminal record reaper_pid did not match the spawned reaper process id.'
+    Assert-True -Actual (([double] (Get-EntryProperty -Entry $noAcceptRecord -Name 'reaper_started_at')) -gt 0) `
+        -Message 'The launcher-exit-before-accept terminal record reaper_started_at was not a positive number.'
+
+    Write-Output 'PASS finish.tests.ps1: reaper exits not-accepted when the launcher never accepts'
+
+
+    $foreignRoot = Join-Path $scratch 'r-foreign-acceptance'
+    New-Item -ItemType Directory -Path $foreignRoot -Force | Out-Null
+    $foreignState = Join-Path $foreignRoot 'state'
+    $foreignRepo = New-TestRepo -Root $foreignRoot
+    $foreignWorktree = Add-FeatureWorktree -Primary $foreignRepo.Primary -Root $foreignRoot -Branch 'feature'
+    $foreignResolved = Get-ResolvedPath $foreignWorktree
+    $foreignHead = (Invoke-GitOrThrow -Cwd $foreignWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $foreignResult = Join-Path $foreignRoot 'result.json'
+
+    $foreignDeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $foreignDeadHost.WaitForExit(5000) | Out-Null
+    $foreignDeadStart = ([DateTimeOffset]($foreignDeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $foreignReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $foreignDeadHost.Id, '-HostStart', $foreignDeadStart,
+        '-Head', $foreignHead,
+        '-Primary', $foreignRepo.Primary, '-Worktree', $foreignResolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $foreignResult,
+        '-StateDirectory', $foreignState, '-AcceptTimeoutSeconds', '30'
+    ) -PassThru -WindowStyle Hidden
+
+    $foreignWroteStarted = Wait-Condition -TimeoutSeconds 30 -Condition {
+        $record = Read-JsonFile -Path $foreignResult
+        $null -ne $record -and $null -ne (Get-EntryProperty -Entry $record -Name 'reaper_pid')
+    }
+    Assert-True -Actual $foreignWroteStarted -Message 'The foreign-acceptance scenario did not write a started record in time.'
+    $foreignStartedRecord = Read-JsonFile -Path $foreignResult
+
+    $foreignAcceptedData = @{
+        accepted          = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+        reaper_pid        = ($foreignReaperProcess.Id + 1)
+        reaper_started_at = (Get-EntryProperty -Entry $foreignStartedRecord -Name 'reaper_started_at')
+        host_pid          = 0
+    }
+    $foreignDirectory = Split-Path -Parent $foreignResult
+    New-Item -ItemType Directory -Path $foreignDirectory -Force | Out-Null
+    [IO.File]::WriteAllText("$foreignResult.accepted", ($foreignAcceptedData | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding $false))
+
+    $foreignExited = Wait-Condition -TimeoutSeconds 30 -Condition { $null -eq (Get-Process -Id $foreignReaperProcess.Id -ErrorAction SilentlyContinue) }
+    Assert-True -Actual $foreignExited -Message 'The reaper did not exit after seeing a foreign acceptance.'
+    $foreignFinalRecord = Read-JsonFile -Path $foreignResult
+    Assert-True -Actual ($null -eq (Get-EntryProperty -Entry $foreignFinalRecord -Name 'status')) -Message 'A foreign acceptance let the reaper write a terminal result record.'
+    Assert-True -Actual (Test-Path -LiteralPath $foreignWorktree) -Message 'The worktree was removed despite a foreign acceptance.'
+    Assert-False -Actual (Test-Path -LiteralPath "$foreignResult.armed") -Message 'A foreign acceptance still produced an armed acknowledgement.'
+
+    Write-Output 'PASS finish.tests.ps1: reaper exits inert on a foreign acceptance, leaving only the started record'
+
+
+    $dupStartedRoot = Join-Path $scratch 'r-duplicate-started'
+    New-Item -ItemType Directory -Path $dupStartedRoot -Force | Out-Null
+    $dupStartedState = Join-Path $dupStartedRoot 'state'
+    $dupStartedRepo = New-TestRepo -Root $dupStartedRoot
+    $dupStartedWorktree = Add-FeatureWorktree -Primary $dupStartedRepo.Primary -Root $dupStartedRoot -Branch 'feature'
+    $dupStartedResolved = Get-ResolvedPath $dupStartedWorktree
+    $dupStartedHead = (Invoke-GitOrThrow -Cwd $dupStartedWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    $dupStartedResult = Join-Path $dupStartedRoot 'result.json'
+
+    $dupStartedPreplaced = @{
+        started           = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+        host_pid          = 424242
+        worktree          = $dupStartedResolved
+        reaper_pid        = 424243
+        reaper_started_at = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0)
+    }
+    Write-JsonFile -Path $dupStartedResult -Data $dupStartedPreplaced
+    $dupStartedOriginalBytes = [IO.File]::ReadAllBytes($dupStartedResult)
+
+    $dupStartedDeadHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'exit 0' -PassThru -WindowStyle Hidden
+    $dupStartedDeadHost.WaitForExit(5000) | Out-Null
+    $dupStartedDeadStart = ([DateTimeOffset]($dupStartedDeadHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+
+    $dupStartedReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript,
+        '-HostPid', $dupStartedDeadHost.Id, '-HostStart', $dupStartedDeadStart,
+        '-Head', $dupStartedHead,
+        '-Primary', $dupStartedRepo.Primary, '-Worktree', $dupStartedResolved,
+        '-Branch', 'feature', '-Default', 'main', '-Result', $dupStartedResult,
+        '-StateDirectory', $dupStartedState, '-AcceptTimeoutSeconds', '5'
+    ) -PassThru -WindowStyle Hidden
+
+    $dupStartedExited = Wait-Condition -TimeoutSeconds 20 -Condition { $null -eq (Get-Process -Id $dupStartedReaperProcess.Id -ErrorAction SilentlyContinue) }
+    if (-not $dupStartedExited -and (Get-Process -Id $dupStartedReaperProcess.Id -ErrorAction SilentlyContinue)) {
+        Stop-TestProcessTree $dupStartedReaperProcess.Id
+    }
+    Assert-True -Actual $dupStartedExited -Message 'A reaper that lost the exclusive-create race for an existing started record did not exit promptly.'
+    $dupStartedFinalBytes = [IO.File]::ReadAllBytes($dupStartedResult)
+    Assert-True -Actual ([Convert]::ToBase64String($dupStartedOriginalBytes) -eq [Convert]::ToBase64String($dupStartedFinalBytes)) `
+        -Message 'A losing reaper overwrote the pre-placed started record instead of leaving it byte-identical.'
+    Assert-True -Actual (Test-Path -LiteralPath $dupStartedWorktree) -Message 'The worktree was removed despite the reaper losing the exclusive-create race.'
+
+    Write-Output 'PASS finish.tests.ps1: a reaper that loses the exclusive-create race exits leaving the record untouched'
+
+
+    $refusalRoot = Join-Path $scratch 'r-shared-claims-refusal'
+    New-Item -ItemType Directory -Path $refusalRoot -Force | Out-Null
+    $refusalState = Join-Path $refusalRoot 'state'
+    New-Item -ItemType Directory -Path (Join-Path $refusalState 'cli-sessions') -Force | Out-Null
+    $refusalRepo = New-TestRepo -Root $refusalRoot
+    $refusalWorktree = Add-FeatureWorktree -Primary $refusalRepo.Primary -Root $refusalRoot -Branch 'feature'
+    $refusalResolved = Get-ResolvedPath $refusalWorktree
+    $refusalHead = (Invoke-GitOrThrow -Cwd $refusalWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    Write-JsonFile -Path (Get-ReceiptPath -StateDirectory $refusalState -ResolvedWorktree $refusalResolved) -Data @{
+        worktree = $refusalResolved; primary = $refusalRepo.Primary; branch = 'feature'; head = $refusalHead; pr = 1
+        merge_oid = ('b' * 40); default = 'main'; verdict = 'removable'
+        recorded_at = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+    }
+
+    $refusalOtherProcess = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'ping -n 60 127.0.0.1 > nul' -PassThru -WindowStyle Hidden
+    try {
+        $refusalOtherStart = ([DateTimeOffset]($refusalOtherProcess.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+        Write-JsonFile -Path (Join-Path $refusalState 'cli-sessions\other-live.json') -Data @{
+            session_id = 'refusal-other'; title = 'other'; cwd = $refusalResolved
+            pid = $refusalOtherProcess.Id; pid_started_at = $refusalOtherStart
+        }
+
+        $refusalFakeHostDirectory = Join-Path $refusalRoot 'fake-host'
+        New-Item -ItemType Directory -Path $refusalFakeHostDirectory -Force | Out-Null
+        $refusalFakeHost = Join-Path $refusalFakeHostDirectory 'agent-finish-test.exe'
+        Copy-Item -LiteralPath $env:ComSpec -Destination $refusalFakeHost
+        $refusalStdOut = Join-Path $refusalRoot 'refusal.stdout.log'
+        $refusalStdErr = Join-Path $refusalRoot 'refusal.stderr.log'
+
+        $previousRefusalState = $env:AGENT_STATE_DIRECTORY
+        $previousRefusalHostNames = $env:AGENT_CLI_HOST_NAMES
+        $env:AGENT_STATE_DIRECTORY = $refusalState
+        $env:AGENT_CLI_HOST_NAMES = 'agent-finish-test'
+        $refusalProcess = $null
+        try {
+            $refusalInnerCommand = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$finishScript`" -Worktree `"$refusalWorktree`""
+            $refusalProcess = Start-Process -FilePath $refusalFakeHost -ArgumentList @('/c', $refusalInnerCommand) `
+                -WorkingDirectory $refusalWorktree -RedirectStandardOutput $refusalStdOut -RedirectStandardError $refusalStdErr -PassThru -WindowStyle Hidden
+            if (-not $refusalProcess.WaitForExit(60000)) {
+                Stop-TestProcessTree $refusalProcess.Id
+                throw 'The shared-claims refusal e2e scenario did not exit in time.'
+            }
+        }
+        finally {
+            $env:AGENT_STATE_DIRECTORY = $previousRefusalState
+            $env:AGENT_CLI_HOST_NAMES = $previousRefusalHostNames
+        }
+        Assert-False -Actual ($refusalProcess.ExitCode -eq 0) -Message 'finish.ps1 did not refuse a worktree claimed by another live session.'
+        $refusalStdErrText = Get-Content -LiteralPath $refusalStdErr -Raw -ErrorAction SilentlyContinue
+        Assert-Contains -Actual $refusalStdErrText -Expected 'live registered session' -Message 'The shared-claims refusal did not name the claim check.'
+        $refusalResultsDirectory = Join-Path $refusalState 'merge-cleanup\results'
+        $refusalResultsEmpty = (-not (Test-Path -LiteralPath $refusalResultsDirectory)) -or
+            (@(Get-ChildItem -LiteralPath $refusalResultsDirectory -File -ErrorAction SilentlyContinue).Count -eq 0)
+        Assert-True -Actual $refusalResultsEmpty -Message 'A refused finish left files behind in the results directory.'
+        Assert-True -Actual (Test-Path -LiteralPath $refusalWorktree) -Message 'A refused finish removed the worktree anyway.'
+    }
+    finally {
+        if (Get-Process -Id $refusalOtherProcess.Id -ErrorAction SilentlyContinue) {
+            Stop-TestProcessTree $refusalOtherProcess.Id
+        }
+    }
+
+    Write-Output 'PASS finish.tests.ps1: shared-claims refusal leaves the results directory empty'
+
+
+    $incidentRoot = Join-Path $scratch 'r-incident-regression'
+    New-Item -ItemType Directory -Path $incidentRoot -Force | Out-Null
+    $incidentState = Join-Path $incidentRoot 'state'
+    $incidentRepo = New-TestRepo -Root $incidentRoot
+    $incidentWorktree = Add-FeatureWorktree -Primary $incidentRepo.Primary -Root $incidentRoot -Branch 'feature'
+    $incidentResolved = Get-ResolvedPath $incidentWorktree
+    $incidentHead = (Invoke-GitOrThrow -Cwd $incidentWorktree -Arguments @('rev-parse', 'HEAD')).Trim()
+    Write-JsonFile -Path (Get-ReceiptPath -StateDirectory $incidentState -ResolvedWorktree $incidentResolved) -Data @{
+        worktree = $incidentResolved; primary = $incidentRepo.Primary; branch = 'feature'; head = $incidentHead; pr = 1
+        merge_oid = ('b' * 40); default = 'main'; verdict = 'removable'
+        recorded_at = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+    }
+
+    $incidentFakeHostDirectory = Join-Path $incidentRoot 'fake-host'
+    New-Item -ItemType Directory -Path $incidentFakeHostDirectory -Force | Out-Null
+    $incidentFakeHost = Join-Path $incidentFakeHostDirectory 'agent-finish-test.exe'
+    Copy-Item -LiteralPath $env:ComSpec -Destination $incidentFakeHost
+
+    $incidentStdErr = Join-Path $incidentRoot 'finish.stderr.log'
+    $incidentExitFile = Join-Path $incidentRoot 'finish.exitcode'
+    $incidentWrapper = Join-Path $incidentRoot 'wrapper.bat'
+    @"
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "$finishScript" -Worktree "$incidentWorktree" 2> "$incidentStdErr"
+echo %ERRORLEVEL% > "$incidentExitFile"
+ping -n 30 127.0.0.1 >nul
+"@ | Set-Content -LiteralPath $incidentWrapper -Encoding ASCII
+
+    $previousIncidentState = $env:AGENT_STATE_DIRECTORY
+    $previousIncidentHostNames = $env:AGENT_CLI_HOST_NAMES
+    $previousIncidentSpawnTimeout = $env:AGENT_FINISH_SPAWN_TIMEOUT_SECONDS
+    $env:AGENT_STATE_DIRECTORY = $incidentState
+    $env:AGENT_CLI_HOST_NAMES = 'agent-finish-test'
+    $env:AGENT_FINISH_SPAWN_TIMEOUT_SECONDS = '0'
+    $incidentHostProcess = $null
+    try {
+        $incidentHostProcess = Start-Process -FilePath $incidentFakeHost -ArgumentList @('/c', "`"$incidentWrapper`"") `
+            -WorkingDirectory $incidentWorktree -PassThru -WindowStyle Hidden
+
+        $incidentFinishReturned = Wait-Condition -TimeoutSeconds 30 -Condition { Test-Path -LiteralPath $incidentExitFile }
+        Assert-True -Actual $incidentFinishReturned -Message 'finish.ps1 did not return inside the incident-regression wrapper.'
+        $incidentExitCode = (Get-Content -LiteralPath $incidentExitFile -Raw).Trim()
+        Assert-False -Actual ($incidentExitCode -eq '0') -Message 'finish.ps1 did not report failure with a zero spawn-confirm timeout.'
+        $incidentStdErrText = Get-Content -LiteralPath $incidentStdErr -Raw -ErrorAction SilentlyContinue
+        Assert-Contains -Actual $incidentStdErrText -Expected 'nothing was closed' -Message 'The incident-regression scenario did not report that nothing was closed.'
+
+        $incidentHostProcess.Refresh()
+        Assert-False -Actual $incidentHostProcess.HasExited -Message 'The fake host exited despite the cancellation; the regression could not be exercised.'
+    }
+    finally {
+        if ($incidentHostProcess -and (Get-Process -Id $incidentHostProcess.Id -ErrorAction SilentlyContinue)) {
+            Stop-TestProcessTree $incidentHostProcess.Id
+        }
+        $env:AGENT_STATE_DIRECTORY = $previousIncidentState
+        $env:AGENT_CLI_HOST_NAMES = $previousIncidentHostNames
+        $env:AGENT_FINISH_SPAWN_TIMEOUT_SECONDS = $previousIncidentSpawnTimeout
+    }
+
+    try {
+        $incidentNoReaperLeft = Wait-Condition -TimeoutSeconds 30 -Condition {
+            $stillRunning = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+                Where-Object { $_.CommandLine -and $_.CommandLine.Contains($incidentState) })
+            $stillRunning.Count -eq 0
+        }
+        Assert-True -Actual $incidentNoReaperLeft -Message 'A reaper process referencing the incident-regression state directory was still running.'
+
+        Assert-True -Actual (Test-Path -LiteralPath $incidentWorktree) -Message 'The worktree was removed despite the launcher cancelling before acceptance.'
+        $incidentBranchStillPresent = $(& git -C $incidentRepo.Primary show-ref --verify --quiet refs/heads/feature; $LASTEXITCODE -eq 0)
+        Assert-True -Actual $incidentBranchStillPresent -Message 'The feature branch was removed despite the launcher cancelling before acceptance.'
+        $incidentResultsDirectory = Join-Path $incidentState 'merge-cleanup\results'
+        $incidentNoAcceptedFile = (@(Get-ChildItem -LiteralPath $incidentResultsDirectory -Filter '*.accepted' -File -ErrorAction SilentlyContinue)).Count -eq 0
+        Assert-True -Actual $incidentNoAcceptedFile -Message 'An .accepted signal was written despite the spawn-confirm deadline already having passed.'
+    }
+    finally {
+        Get-CimInstance -ClassName Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -and $_.CommandLine.Contains($incidentState) } |
+            ForEach-Object { try { Stop-TestProcessTree ([int] $_.ProcessId) } catch { } }
+    }
+
+    Write-Output 'PASS finish.tests.ps1: incident regression - zero spawn-confirm timeout cancels and leaves the worktree, branch and host intact'
     }
 
     if (-not $FinishOnlyTests) {
