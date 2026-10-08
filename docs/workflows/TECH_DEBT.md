@@ -1,5 +1,16 @@
 # Workflow runtime debt
 
+## Slice retirement checks the broader goal's completion
+
+The runtime's `checkpoint --state complete` calls the canonical goal's full completion check, even
+when its bound slice PR is merged and a workflow handoff records a pending successor. This conflicts
+with the documented foreground slice transition: the owner cannot complete while the broader goal
+correctly retains unfinished acceptance. A foreground parent can retire the merged slice's scheduler
+and binding, preserve its blocked owner receipts, and initialize the next slice against the same goal.
+
+Resolve when slice retirement verifies its exact merged PR/head and handoff without declaring the
+broader goal complete, and tests preserve pending successor acceptance across the foreground transition.
+
 ## PR preflight misclassifies an incremental review base
 
 `delivery-preflight` passes its final incremental review descriptor to `review-reconcile` against `origin/main`. An incremental descriptor's base is the prior reviewed commit, so an unchanged `origin/main` can be reported as `base-changed-relevant-evidence` when the prior commit touched a path in the incremental pass. The core Windows hook PR reproduced this false blocker; preparing a cumulative base-to-head descriptor let preflight verify the already reviewed chain.
