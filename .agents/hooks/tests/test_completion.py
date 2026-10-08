@@ -110,6 +110,16 @@ class CompletionTests(unittest.TestCase):
         content = "- [ ] live task\n> - [ ] quoted\n```md\n- [ ] fenced\n```\n<!-- - [ ] hidden -->\n    - [ ] indented"
         self.assertEqual(["live task"], visible_tasks(content))
 
+    def test_unchecked_marker_whitespace_blocks_completion(self):
+        path = self.write_goal(goal())
+        for body in ("- [ ]\tVerify deployment", "- [ ]"):
+            with self.subTest(body=body):
+                result = completion_check(path, None, path.parent, lambda *_: {
+                    "number": 42, "headRefOid": HEAD, "state": "MERGED", "body": body,
+                })
+                self.assertFalse(result["ready"])
+                self.assertEqual(1, len(result["open_tasks"]))
+
     def test_visible_tasks_includes_nested_list_tasks(self):
         self.assertEqual(["nested task"], visible_tasks("- Acceptance\n\n    - [ ] nested task"))
 

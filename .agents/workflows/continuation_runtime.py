@@ -251,8 +251,7 @@ def apply_receipt(state, receipt):
         state["evidence"] = None
     binding = check_identity(state, allow_terminal_release=status in {"complete", "blocked"})
     if status == "complete":
-        released = receipt.get("released_binding")
-        bound = binding or released
+        bound = binding
         if bound is None and state.get("pr") is not None:
             bound = {"repository": state["repo"], "pr": state["pr"], "head": state["head"]}
         try:
