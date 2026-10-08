@@ -297,9 +297,11 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
 
 1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py`; from
    elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It refuses the
-   primary checkout, a detached or mismatched target, a dirty tree,
+   primary checkout, a detached or mismatched target,
    a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
-   squash/rebase-safe containment proof), and a still-open PR for the head; `preserve:` stops cleanup.
+   squash/rebase-safe containment proof), and a still-open PR for the head. Run from inside a proven
+   merged target, it sets uncommitted leftovers aside under `<state>/merge-cleanup/set-aside/` and cleans
+   the tree; from elsewhere a dirty tree still preserves. `preserve:` stops cleanup.
 2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
