@@ -1,6 +1,6 @@
 ---
 name: lane-l3
-description: Runs one delegated task at lane L3. Open-ended judgement that is not design, where the answer is not yet known.
+description: Runs one delegated task at lane L3. Open investigation or bounded uncertain design with unresolved alternatives.
 kind: lane
 model: claude-opus-5-5
 effort: high

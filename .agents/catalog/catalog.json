@@ -176,7 +176,8 @@
           ],
           "dependencies": {
             "required": [
-              "base-agents/base"
+              "base-agents/base",
+              "base-agents/machine"
             ],
             "optional": []
           },
@@ -191,7 +192,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:27d5e92c667f6d20c3fcd21d4b0a4412871688ac74fc939c1e3a34d53ae628c3",
+          "digest": "sha256:16d0dc0129eaf2593b85e88848c9917f9814b1699e6925d91aa5537a1428937e",
           "harness": {
             "marketplaces": [
               {
@@ -201,7 +202,8 @@
             ],
             "plugins": [
               "base-agents/base",
-              "base-agents/engineering"
+              "base-agents/engineering",
+              "base-agents/machine"
             ],
             "hooks": [
               {
@@ -432,7 +434,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:2837652d89a802ec89dd9e5987911e320e7a6788f8fb2a3d6ae408b51e2afc4c",
+          "digest": "sha256:3d1e7a02d4e554a97dc35d18a37283c692a4feb26d2dac57222328d9e0183c57",
           "digest_excludes": [
             "catalog/catalog.json"
           ],

@@ -30,7 +30,7 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(1, len(releases))
         self.assertEqual(3, len(plugins))
         self.assertEqual(
-            ["base-agents/base"],
+            ["base-agents/base", "base-agents/machine"],
             plugins["base-agents/engineering"]["dependencies"]["required"],
         )
         self.assertEqual({"base-agents/base", "base-agents/engineering", "base-agents/machine"}, set(plugins))
