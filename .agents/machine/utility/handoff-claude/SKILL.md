@@ -50,8 +50,8 @@ Configurable family aliases are rejected for handoffs; pass a full non-Haiku mod
 
 Pass `--lane L2`–`L6` and the launcher resolves the model from the canonical lane tables it ships under
 `resources/lanes` — the `engineering:lanes` ladder, and the repo's only model-name owner, so no caller has
-to know a model id and a retiering is one edit in one authored file. `--model` still wins for a model the
-user named outright. `--lane L1` redirects to Codex. Handoff never uses the CLI default: choose L2–L6, frontier, or an explicit
+to know a model id and a retiering is one edit in one authored file. For local lanes, `--model` wins for a model the
+user named outright. `--lane L1` always routes to Codex; omit that lane for an explicit Claude model. Handoff never uses the CLI default: choose L2–L6, frontier, or an explicit
 non-Haiku model.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
