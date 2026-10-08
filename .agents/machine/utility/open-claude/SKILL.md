@@ -38,8 +38,11 @@ alias stub rather than a real interpreter, and it fails rather than running the 
   it. Omitted, the CLI uses its own configured default.
 - `--dangerously-skip-permissions` only when the user asks for it in that request.
 
-It opens a new tab in the terminal you are running in (Windows Terminal, tmux, kitty or Konsole). Open
-one tab per request, and report the directory and any session id afterwards.
+It opens a tab in whichever terminal it detects it is already running inside (Windows Terminal, tmux,
+kitty or Konsole). With none detected, it opens a new window instead and prints a warning — except on
+Windows, where a `wt.exe` it can still find opens a tab in the most recently used Windows Terminal window
+rather than a new window. Open one tab per request, and report the directory and any session id
+afterwards.
 
 ## One tab, and never a second
 

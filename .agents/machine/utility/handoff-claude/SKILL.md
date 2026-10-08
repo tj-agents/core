@@ -21,8 +21,10 @@ through nested command strings or place its contents directly in the terminal in
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
-It opens a new tab in the terminal this process is running inside (Windows Terminal, tmux, kitty or
-Konsole).
+It opens a tab in whichever terminal it detects it is already running inside (Windows Terminal, tmux,
+kitty or Konsole). With none detected, it opens a new window instead and prints a warning — except on
+Windows, where a `wt.exe` it can still find opens a tab in the most recently used Windows Terminal window
+rather than a new window.
 
 ## One tab, and never a second
 
