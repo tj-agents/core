@@ -430,6 +430,37 @@ class CleanupProofTests(unittest.TestCase):
         self.assertFalse(set_aside_root.exists())
         self.assertTrue(worktree.exists())
 
+    def test_argument_less_conflicted_worktree_preserves_and_archives_nothing(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+
+        git(worktree, "checkout", "-q", "-b", "side", "HEAD~1")
+        (worktree / "file1.txt").write_text("side change\n", encoding="utf-8")
+        git(worktree, "add", "file1.txt")
+        git(worktree, "commit", "-qm", "side")
+        git(worktree, "checkout", "-q", "feature")
+        (worktree / "file1.txt").write_text("feature change\n", encoding="utf-8")
+        git(worktree, "commit", "-qam", "feature change")
+        git(worktree, "merge", "side", check=False)
+        self.assertIn("u ", git(worktree, "status", "--porcelain=v2"))
+        head = git(worktree, "rev-parse", "HEAD")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            pr_for_branch=7,
+        )
+        result = self.run_proof_bare(worktree, fixture=fixture)
+
+        self.assertEqual(1, result.returncode)
+        self.assertTrue(result.stdout.startswith("preserve:"))
+        self.assertIn("unmerged paths", result.stdout)
+        self.assertIn("<<<<<<<", (worktree / "file1.txt").read_text(encoding="utf-8"))
+        set_aside_root = Path(self.state.name) / "merge-cleanup" / "set-aside"
+        self.assertFalse(set_aside_root.exists())
+
     def test_argument_less_archive_failure_preserves_everything(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
