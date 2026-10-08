@@ -15,11 +15,61 @@ function Get-EntryProperty {
     return $property.Value
 }
 
+function ConvertTo-FiniteDouble {
+    param($Value)
+
+    if ($null -eq $Value) { return $null }
+    $text = [Convert]::ToString($Value, [Globalization.CultureInfo]::InvariantCulture)
+    $parsed = 0.0
+    if (-not [double]::TryParse($text, [Globalization.NumberStyles]::Float,
+            [Globalization.CultureInfo]::InvariantCulture, [ref] $parsed)) {
+        return $null
+    }
+    if ([double]::IsNaN($parsed) -or [double]::IsInfinity($parsed)) { return $null }
+    return $parsed
+}
+
+function ConvertTo-PositiveInt {
+    param($Value)
+
+    $numeric = ConvertTo-FiniteDouble -Value $Value
+    if ($null -eq $numeric -or $numeric -le 0 -or $numeric -ne [math]::Floor($numeric) -or $numeric -gt [int]::MaxValue) {
+        return $null
+    }
+    return [int] $numeric
+}
+
 function Read-JsonFile {
     param([string] $Path)
 
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
     try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
+}
+
+function Save-AtomicJson {
+    param([string] $Path, [hashtable] $Data)
+
+    $directory = Split-Path -Parent $Path
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    $json = $Data | ConvertTo-Json -Depth 6
+    $temp = Join-Path $directory ('.' + (Split-Path -Leaf $Path) + '.' + $PID + '.tmp')
+    [IO.File]::WriteAllText($temp, $json, (New-Object Text.UTF8Encoding $false))
+    $attempts = 3
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        try {
+            if (Test-Path -LiteralPath $Path) {
+                [IO.File]::Replace($temp, $Path, [NullString]::Value)
+            }
+            else {
+                Move-Item -LiteralPath $temp -Destination $Path
+            }
+            return
+        }
+        catch {
+            if ($attempt -eq $attempts) { throw }
+            Start-Sleep -Milliseconds 100
+        }
+    }
 }
 
 function Test-UnderOrEqual {
@@ -281,12 +331,20 @@ function Format-CommandLine {
 function Start-DetachedReaper {
     param([string] $CommandLine)
 
+    $cimResult = $null
+    $cimCreated = $false
     try {
-        $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
-            -Arguments @{ CommandLine = $CommandLine } -ErrorAction Stop
-        if ($result.ReturnValue -eq 0) { return $true }
+        $cimResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+            -Arguments @{ CommandLine = $CommandLine } -ErrorAction Stop -OperationTimeoutSec 30
+        if ($cimResult.ReturnValue -eq 0) { $cimCreated = $true }
     }
     catch {
+    }
+
+    if ($cimCreated) {
+        $processId = $null
+        try { $processId = [int] $cimResult.ProcessId } catch { $processId = $null }
+        return @{ ProcessId = $processId; Method = 'cim' }
     }
 
     $taskName = 'agent-finish-reaper-' + [guid]::NewGuid().ToString('N')
@@ -296,7 +354,8 @@ function Start-DetachedReaper {
         & schtasks.exe /run /tn $taskName 2>$null | Out-Null
         $ran = $LASTEXITCODE -eq 0
         & schtasks.exe /delete /tn $taskName /f 2>$null | Out-Null
-        return $ran
+        if (-not $ran) { return $false }
+        return @{ ProcessId = $null; Method = 'schtasks' }
     }
     catch {
         return $false
@@ -309,6 +368,6 @@ function Get-EnvDouble {
     $value = [Environment]::GetEnvironmentVariable($Name)
     if (-not $value) { return $Default }
     $parsed = 0.0
-    if ([double]::TryParse($value, [ref] $parsed)) { return $parsed }
+    if ([double]::TryParse($value, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref] $parsed)) { return $parsed }
     return $Default
 }
