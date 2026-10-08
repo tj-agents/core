@@ -138,7 +138,10 @@ dot-sourced tests can drive it deterministically. States:
    unchanged: `git worktree remove` without `--force`, branch-tip protection (`branch-preserved`),
    obligation clearing on full success.
 
-`-CloseOnly` skips the accept gate entirely; its startup record and downstream behavior are unchanged.
+`-CloseOnly` skips the accept gate entirely; its startup record and downstream flow are unchanged,
+except that its host-wait expiry and failure records now keep the close shape (`session_id`,
+`host_started_at`, no reaper identity) that the shared code would otherwise have replaced with the
+cleanup shape.
 
 ## Race coverage
 
@@ -214,9 +217,12 @@ RESULT.md.
 
 Fix/TransferredCleanupObligation (uncommitted, separate owner) edits `Find-ObligationPaths`,
 `Test-ProcessExited`, and CloseOnly obligation clearing in finish_reaper.ps1, plus appends
-`-TransferredOnlyTests` scenarios to the test file. This repair touches none of those functions and no
-CloseOnly behavior; its reaper edits are the started record, the accept-gate insertion between the
-startup record and the wait loop, the pre-removal cancel re-check, the param block
+`-TransferredOnlyTests` scenarios to the test file. This repair touches none of those functions, none
+of the obligation semantics, and no CloseOnly control flow; the one CloseOnly-visible change is
+record-shape repair — the host-wait expiry and failure records keep the close shape (`session_id`,
+`host_started_at`, no reaper identity) instead of inheriting the cleanup fields the shared paths
+gained. Its reaper edits are the started record, the accept-gate insertion between the startup record
+and the wait loop, the pre-removal cancel re-check, the terminal-record helper, the param block
 (`-AcceptTimeoutSeconds`), and the help block — the last two are the likely textual conflicts. One
 non-textual conflict to reconcile at that owner's PR: any cleanup-mode reaper its tests start directly
 will block in accept-wait and needs `Grant-ReaperAcceptance` (its CloseOnly observers are unaffected).

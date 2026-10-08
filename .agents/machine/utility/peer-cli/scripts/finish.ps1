@@ -177,6 +177,13 @@ function Invoke-HandshakeKillSweep {
         if ($candidatePid -eq $PID) { continue }
         $commandLine = [string] $candidate.CommandLine
         if (-not $commandLine -or $commandLine -notlike "*$guid*" -or $commandLine -notlike '*finish_reaper.ps1*') { continue }
+        if (-not $candidate.CreationDate) { continue }
+        $enumeratedStartedAt = ConvertTo-UnixTime -Value $candidate.CreationDate
+        $live = Get-Process -Id $candidatePid -ErrorAction SilentlyContinue
+        if (-not $live) { continue }
+        $liveStartTime = try { $live.StartTime } catch { $null }
+        if ($null -eq $liveStartTime) { continue }
+        if ([math]::Abs((ConvertTo-UnixTime -Value $liveStartTime) - $enumeratedStartedAt) -gt 2.0) { continue }
         Stop-Process -Id $candidatePid -Force -ErrorAction SilentlyContinue
     }
 }
