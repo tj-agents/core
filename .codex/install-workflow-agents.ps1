@@ -44,17 +44,27 @@ function Get-NormalizedTextSha256([string] $Path) {
     return Get-BytesSha256 ($utf8.GetBytes($normalized))
 }
 
-function Test-SafeDeliveryEntry([string] $Path) {
+function Test-SafeDeliveryEntry([string] $Path, [switch] $AllowUninspectable) {
     # GetAttributes reads the entry itself, so a link whose target is gone is still refused. Returns
-    # $false only for a path that does not exist; anything that prevents the check refuses the path.
+    # $false only for a path that does not exist. An access or I/O failure refuses the path unless
+    # -AllowUninspectable is set; any other failure is rethrown unchanged.
     try {
         $attributes = [System.IO.File]::GetAttributes($Path)
-    } catch [System.IO.FileNotFoundException], [System.IO.DirectoryNotFoundException] {
-        return $false
     } catch {
-        $reason = $_.Exception
-        if ($null -ne $reason.InnerException) { $reason = $reason.InnerException }
-        throw "Codex agent delivery path: cannot verify $Path is not a reparse point: $($reason.Message)"
+        $failure = $_.Exception
+        if ($failure -is [System.Management.Automation.MethodInvocationException] -and
+            $null -ne $failure.InnerException) {
+            $failure = $failure.InnerException
+        }
+        if ($failure -is [System.IO.FileNotFoundException] -or
+            $failure -is [System.IO.DirectoryNotFoundException]) {
+            return $false
+        }
+        if ($failure -is [System.UnauthorizedAccessException] -or $failure -is [System.IO.IOException]) {
+            if ($AllowUninspectable) { return $true }
+            throw "Codex agent delivery path: cannot verify $Path is not a reparse point: $($failure.Message)"
+        }
+        throw
     }
     if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw "Codex agent delivery path contains a reparse point: $Path"
@@ -66,7 +76,9 @@ function Assert-SafeDeliveryPath([string] $Path) {
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     $root = [System.IO.Path]::GetPathRoot($fullPath)
     $current = $root
-    if (-not (Test-SafeDeliveryEntry $root)) { return }
+    # A root that cannot be inspected (for example some UNC share roots) is not refused; every
+    # segment below it still fails closed.
+    $null = Test-SafeDeliveryEntry $root -AllowUninspectable
     $relative = $fullPath.Substring($root.Length)
     # [char[]] is required: PowerShell 7 binds a plain array to Split(string, options), joining the
     # separators into one string that never matches, so no ancestor would be checked.

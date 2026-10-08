@@ -1156,6 +1156,57 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertIn("is not a reparse point", completed.stderr)
                     self.assertEqual([], list((locked / "child").iterdir()))
 
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits make the entry uninspectable")
+    def test_safe_delivery_entry_maps_only_access_and_io_failures(self):
+        if os.geteuid() == 0:
+            self.skipTest("root bypasses directory permissions")
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        installer = ROOT / ".codex" / "install-workflow-agents.ps1"
+        probe_body = """param([string] $Installer, [string] $Locked, [string] $Missing)
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($Installer, [ref]$null, [ref]$null)
+$definition = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-SafeDeliveryEntry'
+}, $true)
+. ([scriptblock]::Create($definition.Extent.Text))
+$results = [ordered]@{}
+$results.lenient = Test-SafeDeliveryEntry $Locked -AllowUninspectable
+try { $null = Test-SafeDeliveryEntry $Locked; $results.strict = 'accepted' }
+catch { $results.strict = $_.Exception.Message }
+$results.missing = Test-SafeDeliveryEntry $Missing
+try { $null = Test-SafeDeliveryEntry "invalid`0path"; $results.invalid = 'accepted' }
+catch { $results.invalid = $_.Exception.InnerException.GetType().FullName + ': ' + $_.Exception.Message }
+$results | ConvertTo-Json -Compress
+"""
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp).resolve()
+                    probe = root / "probe.ps1"
+                    probe.write_text(probe_body, encoding="utf-8")
+                    locked = root / "locked"
+                    (locked / "child").mkdir(parents=True)
+                    locked.chmod(0)
+                    try:
+                        completed = subprocess.run(
+                            [*arguments, "-File", str(probe), str(installer),
+                             str(locked / "child"), str(root / "missing")],
+                            capture_output=True,
+                            text=True,
+                        )
+                    finally:
+                        locked.chmod(0o700)
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    results = json.loads(completed.stdout)
+                    # The root check's leniency: an uninspectable entry is accepted only on request.
+                    self.assertIs(True, results["lenient"])
+                    self.assertIn(f"cannot verify {locked / 'child'} is not a reparse point", results["strict"])
+                    self.assertIs(False, results["missing"])
+                    self.assertTrue(results["invalid"].startswith("System.ArgumentException: "), results)
+                    self.assertNotIn("cannot verify", results["invalid"])
+
     def test_codex_installer_ignores_unrelated_source_agents(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
