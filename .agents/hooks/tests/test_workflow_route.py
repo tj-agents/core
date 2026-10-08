@@ -504,6 +504,35 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
         )
         self.assertNotIn("permissionDecision", preparation)
 
+    def test_codex_launcher_requires_a_standalone_supported_invocation(self):
+        prompt = "Build a command-line utility with validation and tests."
+        launcher = "C:/plugins/.agents/machine/utility/handoff-codex/scripts/launch-codex.ps1"
+
+        def shell(command):
+            self.session = str(uuid.uuid4())
+            self.write_transcript(prompt)
+            return self.run_hook(
+                "PreToolUse", harness="claude", tool_name="Bash", tool_input={"command": command},
+            )
+
+        allowed = shell(
+            "& 'C:/plugins/.agents/machine/utility/handoff-codex/scripts/launch-codex.ps1' "
+            "-WorkingDirectory 'C:/repo with spaces' -PromptPath 'C:/repo with spaces/GOAL.md' "
+            "-Title 'Fix launcher guard' -Lane L4"
+        )
+        self.assertNotIn("permissionDecision", allowed)
+        for command in (
+            "echo handoff-codex/scripts/launch-codex.ps1; touch utility.py",
+            f"pwsh -File {launcher}; touch utility.py",
+            f"touch utility.py; pwsh -File {launcher}",
+            f"& '{launcher}' && touch utility.py",
+            f"pwsh -File $(Get-Item '{launcher}')",
+            f"pwsh -File {launcher} -Title $(touch utility.py)",
+        ):
+            with self.subTest(command=command):
+                denied = shell(command)
+                self.assertEqual("deny", denied["permissionDecision"])
+
     def test_goal_preparation_is_bound_to_the_receipt_canonical_path(self):
         (self.cwd / ".git").mkdir()
         owned = self.cwd / "plans" / "owned" / "GOAL.md"
