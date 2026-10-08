@@ -9,7 +9,8 @@ domain: process
 
 An unqualified request to hand off means performing the transfer. Preparing a pointer alone does not
 complete it. Respect an explicitly named target harness; otherwise select `machine:handoff-codex`.
-For Claude select `machine:handoff-claude`. The machine plugin and that launcher's documented platform
+For a Claude parent, use `machine:handoff-codex` for multi-phase work and delegated design, implementation,
+or review; use `machine:handoff-claude` only for an explicit user choice of non-frontier Claude work. The machine plugin and that launcher's documented platform
 and CLI prerequisites must be available. Resolve the skill using native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
 
