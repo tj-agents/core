@@ -44,15 +44,29 @@ function Get-NormalizedTextSha256([string] $Path) {
     return Get-BytesSha256 ($utf8.GetBytes($normalized))
 }
 
+function Test-SafeDeliveryEntry([string] $Path) {
+    # GetAttributes reads the entry itself, so a link whose target is gone is still refused. Returns
+    # $false only for a path that does not exist; anything that prevents the check refuses the path.
+    try {
+        $attributes = [System.IO.File]::GetAttributes($Path)
+    } catch [System.IO.FileNotFoundException], [System.IO.DirectoryNotFoundException] {
+        return $false
+    } catch {
+        $reason = $_.Exception
+        if ($null -ne $reason.InnerException) { $reason = $reason.InnerException }
+        throw "Codex agent delivery path: cannot verify $Path is not a reparse point: $($reason.Message)"
+    }
+    if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Codex agent delivery path contains a reparse point: $Path"
+    }
+    return $true
+}
+
 function Assert-SafeDeliveryPath([string] $Path) {
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     $root = [System.IO.Path]::GetPathRoot($fullPath)
     $current = $root
-    $rootItem = Get-Item -Force -LiteralPath $root -ErrorAction SilentlyContinue
-    if ($null -ne $rootItem -and
-        ($rootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-        throw "Codex agent delivery path contains a reparse point: $root"
-    }
+    if (-not (Test-SafeDeliveryEntry $root)) { return }
     $relative = $fullPath.Substring($root.Length)
     # [char[]] is required: PowerShell 7 binds a plain array to Split(string, options), joining the
     # separators into one string that never matches, so no ancestor would be checked.
@@ -61,16 +75,7 @@ function Assert-SafeDeliveryPath([string] $Path) {
         [System.IO.Path]::AltDirectorySeparatorChar
     ), [System.StringSplitOptions]::RemoveEmptyEntries))) {
         $current = Join-Path $current $segment
-        # GetAttributes reads the entry itself, so a link whose target is gone is still refused;
-        # only a path that does not exist at all ends the walk.
-        try {
-            $attributes = [System.IO.File]::GetAttributes($current)
-        } catch [System.IO.FileNotFoundException], [System.IO.DirectoryNotFoundException] {
-            break
-        }
-        if (($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-            throw "Codex agent delivery path contains a reparse point: $current"
-        }
+        if (-not (Test-SafeDeliveryEntry $current)) { break }
     }
 }
 

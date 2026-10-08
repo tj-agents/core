@@ -1129,6 +1129,33 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertIn("reparse point", completed.stderr)
                     self.assertFalse(gone.exists())
 
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits make the ancestor unreadable")
+    def test_codex_installer_refuses_an_ancestor_it_cannot_inspect(self):
+        if os.geteuid() == 0:
+            self.skipTest("root bypasses directory permissions")
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    locked = Path(temp) / "locked"
+                    (locked / "child").mkdir(parents=True)
+                    locked.chmod(0)
+                    try:
+                        completed = subprocess.run(
+                            [*arguments, "-File", str(script), "-CodexHome",
+                             str(locked / "child" / "profile"), "-Apply"],
+                            capture_output=True,
+                            text=True,
+                        )
+                    finally:
+                        locked.chmod(0o700)
+                    self.assertNotEqual(0, completed.returncode)
+                    self.assertIn("cannot verify", completed.stderr)
+                    self.assertIn("is not a reparse point", completed.stderr)
+                    self.assertEqual([], list((locked / "child").iterdir()))
+
     def test_codex_installer_ignores_unrelated_source_agents(self):
         hosts = powershell_hosts()
         self.assertNotEqual([], hosts)
