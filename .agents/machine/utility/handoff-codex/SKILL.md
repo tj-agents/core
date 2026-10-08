@@ -20,14 +20,18 @@ through nested command strings or place its contents directly in the terminal in
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
-It opens a new tab in the terminal this process is running inside (Windows Terminal, tmux, kitty or
-Konsole).
+It opens a tab in whichever terminal it detects it is already running inside (Windows Terminal, tmux,
+kitty or Konsole). With none detected, it opens a new window instead and prints a warning — except on
+Windows, where a `wt.exe` it can still find opens a tab in the most recently used Windows Terminal window
+rather than a new window.
 
 ## One tab, and never a second
 
 The launcher **exits non-zero** on failure and prints `Launched codex-cli <version> from <path> on
-<selection>` on success. `standards:` lines before it report the pre-launch plugin refresh and hook trust,
-which never block the launch.
+<selection>` on success. `standards:` lines before it report the pre-launch plugin refresh and hook trust
+— and unlike `handoff-claude`/`open-claude`'s own standards check, **a failed refresh or hook trust here
+refuses the launch** (exit 1) rather than continuing on the installed plugins, the same as the PowerShell
+launcher it replaced.
 
 Exit code **3 is distinct from every other failure**: it means the terminal control command timed out
 after the tab may already have opened, not that the launch definitely failed. Check the terminal for the
@@ -131,10 +135,9 @@ whatever the account was entitled to. That is why the launcher fails loudly belo
 (default `0.154.0`, the oldest build observed to carry the current roster) rather than quietly running an
 old one. If it refuses, run `npm install -g @openai/codex@latest` — do not lower the floor to get past it.
 
-It opens as a **new tab in the terminal this process is already running inside** (Windows Terminal, tmux,
-kitty or Konsole), never a new window — the same shared tab-opening behaviour `handoff-claude` and
-`open-claude` use. Handing off several related tasks against the same repository means several tabs in
-the same terminal, not several windows.
+It opens as that same tab described above, the same shared tab-opening behaviour `handoff-claude` and
+`open-claude` use. Handing off several related tasks against the same repository means several tabs, not
+several windows.
 
 ## The parent session's environment must not leak
 

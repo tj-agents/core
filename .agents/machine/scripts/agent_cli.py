@@ -144,6 +144,16 @@ def codex_candidate_paths(which=shutil.which, local_app_data=None):
     # without the node process in front. Windows npm puts the shim beside node_modules; POSIX npm symlinks
     # bin/codex to the package's own bin/codex.js, two levels below the package root.
     shim = which('codex')
+
+    # `codex` on PATH is not always that shim: a standalone install, or a PATH that puts the vendored
+    # binary ahead of the npm one, lands the native executable on PATH directly. On POSIX that is whatever
+    # is not a `#!` script; on Windows the npm entry point is a `.cmd`/`.ps1`, never a `.exe`, so any `.exe`
+    # found here is native. Its realpath is included too, in case the PATH entry is itself a symlink.
+    if shim and ((IS_WINDOWS and Path(shim).suffix.casefold() == '.exe')
+                 or (not IS_WINDOWS and not _is_script(os.path.realpath(shim)))):
+        candidates.append(shim)
+        candidates.append(os.path.realpath(shim))
+
     if shim:
         roots = [
             Path(shim).parent / 'node_modules' / '@openai' / 'codex',
