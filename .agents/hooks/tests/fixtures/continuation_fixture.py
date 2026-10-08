@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -36,6 +37,18 @@ if mode == "repair":
     subprocess.run(["git", "commit", "-m", "Fixture repair"], check=True, capture_output=True)
     binding["head"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     binding_path.write_text(json.dumps(binding))
+    goal_path = Path(json.loads((root / ".agents/continuation/owner.json").read_text())["goal"])
+    goal_body = goal_path.read_text(encoding="utf-8")
+    completion = re.search(r"```completion\s*\n(.*?)\n```", goal_body, re.DOTALL)
+    if completion:
+        document = json.loads(completion.group(1))
+        for delivery in document.get("deliveries", []):
+            if delivery.get("repository") == binding["repo"] and delivery.get("pr") == binding["pr"]:
+                delivery["head"] = binding["head"]
+        goal_path.write_text(
+            goal_body[:completion.start(1)] + json.dumps(document) + goal_body[completion.end(1):],
+            encoding="utf-8",
+        )
     receipt["rebind"] = {"old": old, "new": {key: binding[key] for key in old}}
     observation = json.loads((root / "observation.json").read_text())
     observation["headRefOid"] = binding["head"]

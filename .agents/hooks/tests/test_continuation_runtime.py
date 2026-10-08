@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 RUNTIME = ROOT / ".agents/workflows/continuation_runtime.py"
 WORKFLOWS = RUNTIME.parent
 FIXTURE = Path(__file__).parent / "fixtures/continuation_fixture.py"
+RUNTIME_FIXTURE = Path(__file__).parent / "fixtures/continuation_runtime_fixture.py"
 sys.path.insert(0, str(RUNTIME.parent))
 spec = importlib.util.spec_from_file_location("continuation_runtime", RUNTIME)
 runtime = importlib.util.module_from_spec(spec)
@@ -29,7 +30,7 @@ class ContinuationTests(unittest.TestCase):
                      ["config", "user.email", "fixture@example.invalid"],
                      ["remote", "add", "origin", "https://github.com/example/test.git"]):
             self.git(*args)
-        (self.root / "goal.md").write_text("Repair CI, then record the verified completion boundary")
+        self.write_completion_goal()
         self.git("add", "goal.md")
         self.git("commit", "-m", "Initial")
         self.owner = self.root / ".agents/continuation/owner.json"
@@ -58,8 +59,23 @@ class ContinuationTests(unittest.TestCase):
                         "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
                         "--harness", "codex", "--actions", "edit", "test", *extra)
 
+    def write_completion_goal(self, deliveries=None, evidence=None):
+        document = {
+            "outcome": "The fixture records a verified completion boundary.",
+            "acceptance": [{
+                "id": "fixture",
+                "criterion": "The focused continuation fixture completed.",
+                "evidence": [{"source": "fixture", "result": "passed"}] if evidence is None else evidence,
+                "owner": "fixture owner",
+                "next_action": "None.",
+            }],
+            "deliveries": deliveries or [],
+            "open_tasks": [],
+        }
+        (self.root / "goal.md").write_text("```completion\n" + json.dumps(document) + "\n```\n")
+
     def cli(self, *args, code=0, env=None):
-        result = subprocess.run([sys.executable, str(RUNTIME), *args], capture_output=True,
+        result = subprocess.run([sys.executable, str(RUNTIME_FIXTURE), *args], capture_output=True,
                                 text=True, timeout=30, env=env)
         self.assertEqual(result.returncode, code, result.stderr + result.stdout)
         return json.loads(result.stdout)
@@ -84,6 +100,7 @@ class ContinuationTests(unittest.TestCase):
                        pending_evidence=[], review={"work_order": "review", "work_order_order": ["review"], "reviewed_sha": None},
                        merge_authorization={"mode": "absent", "instruction": None}, completion_condition="Boundary recorded")
         (self.root / ".agents/persistent-workflow-binding.json").write_text(json.dumps(binding))
+        self.write_completion_goal([{"repository": state["repo"], "pr": 42, "head": state["head"]}])
         self.observation(status, conclusion)
 
     def observation(self, status, conclusion=None):
@@ -94,7 +111,7 @@ class ContinuationTests(unittest.TestCase):
         (self.root / "observation.json").write_text(json.dumps(value))
 
     def start(self, *args):
-        process = subprocess.Popen([sys.executable, str(RUNTIME), *args], stdout=subprocess.PIPE,
+        process = subprocess.Popen([sys.executable, str(RUNTIME_FIXTURE), *args], stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True)
         self.processes.append(process)
         return process
@@ -106,6 +123,41 @@ class ContinuationTests(unittest.TestCase):
                 return
             time.sleep(0.05)
         self.fail("fixture did not reach expected subprocess boundary")
+
+    def test_unverified_complete_receipt_preserves_active_owner(self):
+        state = self.state()
+        state.update(launch_nonce="fixture", state="working", reason="headless-launch", next_action="Verify outcome")
+        receipt = {"nonce": "fixture", "owner_id": state["owner_id"], "state": "complete", "reason": "Done"}
+        before = dict(state)
+        binding = {"repository": state["repo"], "pr": 42, "head": state["head"]}
+        with mock.patch.object(runtime, "identity", return_value={key: state[key] for key in ("repo", "worktree", "branch", "head")}), \
+             mock.patch.object(runtime, "check_identity", return_value=binding), \
+             mock.patch.object(runtime, "completion_check", return_value={"ready": False, "blockers": ["missing observation"]}):
+            with self.assertRaisesRegex(runtime.Gate, "completion-unverified"):
+                runtime.apply_receipt(state, receipt)
+        self.assertEqual(before, state)
+
+    def test_child_complete_receipt_keeps_owner_when_bound_delivery_is_omitted(self):
+        self.binding("COMPLETED", "SUCCESS")
+        self.write_completion_goal()
+        before = self.state()
+        self.cli(*self.wake_args())
+        after = self.state()
+        self.assertEqual(before["owner_id"], after["owner_id"])
+        self.assertEqual("blocked", after["state"])
+        self.assertIn("completion-unverified: bound delivery is absent", after["reason"])
+
+    def test_foreground_complete_checkpoint_preserves_claim_on_missing_evidence(self):
+        self.write_completion_goal(evidence=[])
+        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+        token = claimed["foreground"]["token"]
+        result = self.cli("checkpoint", "--owner", str(self.owner), "--token", token,
+                          "--state", "complete", "--reason", "Fixture completion", code=2)
+        after = self.state()
+        self.assertEqual("working", after["state"])
+        self.assertEqual(token, after["foreground"]["token"])
+        self.assertEqual(claimed["reason"], after["reason"])
+        self.assertIn("completion-unverified: acceptance fixture lacks evidence", result["reason"])
 
     def test_parent_exit_delayed_failure_repair_success_complete(self):
         self.binding()
@@ -299,6 +351,7 @@ class ContinuationTests(unittest.TestCase):
             initialized = self.init("--goal", str(goal))
             self.assertEqual(initialized["goal"], str(goal))
             self.binding()
+            goal.write_text((self.root / "goal.md").read_text())
             binding_path = self.root / ".agents/persistent-workflow-binding.json"
             binding = json.loads(binding_path.read_text())
             binding["merge_authorization"] = {"mode": "merge", "instruction": "Merge this PR when reviewed and green"}
