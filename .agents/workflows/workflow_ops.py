@@ -970,11 +970,24 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
     descriptor = load_descriptor(root, workflow_run_id, descriptor_path)
     current_head = git(root, "rev-parse", "HEAD")
     current_base = git(root, "rev-parse", base_ref)
+    upstream_base = descriptor["base"]
+    base_ancestor = run_process(
+        ["git", "merge-base", "--is-ancestor", upstream_base, current_base], root, check=False
+    )
+    if base_ancestor.returncode == 1:
+        trunk_base = (descriptor.get("security") or {}).get("trunk_base")
+        if trunk_base and all(
+            run_process(
+                ["git", "merge-base", "--is-ancestor", trunk_base, target], root, check=False
+            ).returncode == 0
+            for target in (descriptor["head"], current_base)
+        ):
+            upstream_base = trunk_base
     reasons = []
     if current_head != descriptor["head"]:
         reasons.append("candidate-head-changed")
-    if current_base != descriptor["base"]:
-        changed = git(root, "diff", "--name-only", descriptor["base"], current_base).splitlines()
+    if current_base != upstream_base:
+        changed = git(root, "diff", "--name-only", upstream_base, current_base).splitlines()
         sensitive = set(descriptor["paths"]) | {rule["path"] for rule in descriptor["rules"]}
         if sensitive.intersection(changed):
             reasons.append("base-changed-relevant-evidence")
@@ -986,7 +999,7 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
         "current_head": current_head,
         "review_required": bool(reasons),
         "reasons": reasons,
-        "base_moved": current_base != descriptor["base"],
+        "base_moved": current_base != upstream_base,
         "exact_head": current_head == descriptor["head"],
     }
     append_event(root, workflow_run_id, {"kind": "review", "operation": "reconcile", "review_required": result["review_required"]})
