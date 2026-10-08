@@ -1,6 +1,6 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: implementation checkpoint `fe34217`; final policy reconciliation and focused validation precede review.
+Status: implementation and review repairs committed; final incremental review and draft publication next.
 
 PR: not opened.
 
@@ -45,11 +45,13 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. Finish the bounded L4 worker's policy reconciliation, package validation and checkpoint commit.
-   L3 descriptions must allow bounded uncertain design; L4 must include small local design choices.
-   Scope the no-handoff-for-cost rule to Codex, and keep the redirect body under canonical `.agents/`.
-2. Freeze and independently review the candidate. Open its draft PR, own exact-head CI, repair any
-   findings, and merge after the repository gates pass. Review and delivery use their selected lower lanes.
+1. Publish the repaired candidate and freeze an incremental review from watermark
+   `a3c82ff6365936c9f838a38b00918afca28a8da3`. The canonical work order is
+   `reviews/Fix-CodexFirstLanes.md`. Native CLI review was auto-review rejected; the review specialist
+   is unavailable for this account. Use fresh read-only Codex L4 fallback lenses, as the first pass did.
+2. Own exact-head CI, resolve any new findings, and merge after the repository gates pass.
+   A standalone scope assessment is already recorded below; do not invent a ledger to resolve
+   preflight's `assess-scope` result. Pass the PR URL once created. Keep delivery at L7 or L6 for monitoring.
 3. Update the installed plugins on both hosts and verify from a fresh Claude session that a design
    request routes to a Codex handoff without spawning a Claude Fable agent.
 4. Close this session yourself when done (`finish.ps1` after a removable `cleanup_proof.py`).
@@ -104,11 +106,17 @@ Review lane: L4 (or the declared Codex review specialist). Delivery lane: L7 cle
 use L6 for a sustained monitor. The L1 parent owns only design and synthesis, with bounded workers
 applying implementation and review lanes.
 
-Current next action: finish the L4 worker's reconciliation and validation, then freeze for review.
-Implementation checkpoint `fe34217` passed 29 lane-table tests, 40 launcher tests (one skipped),
-and 9 harness-manifest tests (one skipped). Source generation and declared dependency checks passed.
-Shared CLI and source-layout checks are also required before the final review candidate is accepted.
-Generated distribution files remain excluded from commits.
+Current next action: publish and incrementally review the repaired candidate.
+Implementation: `fe34217`, reconciled at `a3c82ff`; review repairs: `f1c9077`.
+The first independent pass found a routed-lane plus model override gap and a stale bootstrap dependency
+assertion. Both are repaired; this commit clarifies the matching launcher wording.
+Main was integrated conflict-free at `ccf475b`, with base `73fb99c`; the measured branch delta was
+23 files, 254 added and 61 removed lines, below the recorded split triggers.
+After repair, lane tests (29), launcher tests (41, one skipped), shared CLI tests (77, eleven skipped),
+and bootstrap CatalogTests (6) passed. Package-layout tests (19), harness checks and source generation
+passed on the implementation. The initial full bootstrap capture was inconclusive; only the six
+CatalogTests are claimed locally, with full-suite coverage delegated to exact-head CI.
+Generated distribution files remain excluded from commits. No PR existed at this checkpoint.
 
 Continuation owner: `.agents/continuation/owner.json`, owner `40f69016a71a88938ffa279b`.
 Foreground Codex PID: `40480`. Initialization, foreground claim and 20-minute scheduler registration
