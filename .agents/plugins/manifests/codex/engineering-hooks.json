@@ -7,18 +7,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\""
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --hook \"${PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
       }
@@ -30,7 +20,7 @@
             "type": "command",
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/git_auth_scope_gate.py\""
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
@@ -41,7 +31,7 @@
             "type": "command",
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/forge_poll_gate.py\""
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
@@ -52,7 +42,29 @@
             "type": "command",
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\""
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/compact_output_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 60,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/delivery_binding_gate.py\" --validate-body",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 57 \"${PLUGIN_ROOT}/hooks/delivery_binding_gate.py\" --validate-body"
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ],
         "matcher": "exec_command|unified_exec|local_shell|shell"
@@ -64,8 +76,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\"",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/workflow_route.py\""
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py\" --prompt-context --hook \"${PLUGIN_ROOT}/hooks/workflow_route.py\" --hook \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
           }
         ]
       }

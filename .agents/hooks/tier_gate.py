@@ -47,6 +47,7 @@ import re
 import runpy
 import subprocess
 import sys
+from urllib.parse import urlsplit
 
 
 SCHEMA_VERSIONS = (1, 2, 3)
@@ -65,11 +66,13 @@ WALK_SKIP = frozenset({
 CONTENT_CANDIDATES = 20
 CONTENT_BYTES = 256 * 1024
 GIT_TIMEOUT = 10
+REMOTE_HOST_PATTERN = r"(?=.{1,253}\.?(?![\s\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?"
 
 
 class Declaration:
     def __init__(self, plugin, marketplace, data, payload_dir=None, orphaned=False, diagnostics=()):
         self.plugin = plugin
+        self.data = data
         self.schema_version = data.get("schema_version")
         self.marketplace = marketplace
         self.tier = _text(data.get("tier")) or plugin
@@ -83,6 +86,8 @@ class Declaration:
         self.orphaned = orphaned
         self.diagnostics = tuple(diagnostics)
         self.fact_definitions = data.get("fact_definitions", {})
+        self.employer = data.get("employer") if self.schema_version == 3 else None
+        self.session_context = _text(data.get("session_context")) if self.schema_version == 3 else ""
 
     @property
     def id(self):
@@ -128,9 +133,11 @@ def predicate_diagnostics(node, path="detect"):
         if not isinstance(value, dict) or set(value) != {"transitive", "where"} or not isinstance(value.get("transitive"), bool):
             return [diagnostic("malformed-predicate", path, "Project dependency requires boolean transitive and positive where")]
         return predicate_diagnostics(value["where"], path + ".project_dependency.where")
-    if operator in ("file", "glob", "remote", "fact"):
+    if operator in ("file", "glob", "remote", "remote_host", "fact"):
         if not isinstance(value, str) or not value:
             return [diagnostic("malformed-predicate", path, operator + " requires a non-empty string")]
+        if operator == "remote_host" and not re.fullmatch(REMOTE_HOST_PATTERN, value):
+            return [diagnostic("malformed-predicate", path, "Remote host requires an exact hostname")]
         if operator == "remote":
             try:
                 re.compile(value)
@@ -154,9 +161,36 @@ def predicate_diagnostics(node, path="detect"):
     return [diagnostic("unsupported-predicate", path, "Unsupported positive operator: " + str(operator))]
 
 
-def v3_declaration_diagnostics(data, path="tier.json"):
+def predicate_uses_fact(node, name):
+    if not isinstance(node, dict):
+        return False
+    if node.get("fact") == name:
+        return True
+    return any(predicate_uses_fact(child, name) for operator in ("all", "any")
+               for child in (node[operator] if isinstance(node.get(operator), list) else []))
+
+
+def employer_context_path(payload_dir, slug):
+    if payload_dir is None or not isinstance(slug, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", slug):
+        return None
+    try:
+        payload = Path(payload_dir).resolve()
+        skill = (payload / "skills" / slug / "SKILL.md").resolve()
+        skill.relative_to(payload)
+        text = skill.read_text(encoding="utf-8-sig")
+        block = front_matter(text)
+        name = re.search(r"^name:[ \t]*([^\r\n]+?)[ \t]*$", block, re.MULTILINE)
+        if name is None or name.group(1) != slug or FRONT_MATTER_KIND.search(block) is None:
+            return None
+        return skill
+    except (OSError, UnicodeError, ValueError, RuntimeError):
+        return None
+
+
+def v3_declaration_diagnostics(data, path="tier.json", payload_dir=None):
     problems = []
-    unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect", "fact_definitions"}
+    unknown = set(data) - {"schema_version", "tier", "applies", "stack", "owner_repository", "detect",
+                           "fact_definitions", "employer", "session_context"}
     if unknown:
         problems.append(diagnostic("malformed-declaration", path, "Unknown declaration fields: " + ", ".join(sorted(unknown))))
     if not isinstance(data.get("tier"), str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", data["tier"]):
@@ -175,6 +209,21 @@ def v3_declaration_diagnostics(data, path="tier.json"):
         problems.extend(predicate_diagnostics(data.get("detect"), path + ".detect"))
     if "fact_definitions" in data:
         problems.extend(fact_definition_diagnostics(data["fact_definitions"], data.get("detect"), path))
+    if "session_context" in data:
+        context = data["session_context"]
+        if not isinstance(context, str) or not context.strip() or any(char in context for char in "\r\n\u0085\u2028\u2029"):
+            problems.append(diagnostic("malformed-declaration", path + ".session_context", "Session context requires one non-empty line"))
+    if "employer" in data:
+        employer = data["employer"]
+        if not isinstance(employer, dict) or set(employer) != {"context_skill"} or not isinstance(
+                employer.get("context_skill"), str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", employer["context_skill"]):
+            problems.append(diagnostic("malformed-employer", path + ".employer", "Employer requires a local context_skill slug"))
+        elif payload_dir is not None and employer_context_path(payload_dir, employer["context_skill"]) is None:
+            problems.append(diagnostic("missing-employer-context", path + ".employer.context_skill", "Employer context skill must be readable and shipped within this payload"))
+        if data.get("applies") != "stack-present":
+            problems.append(diagnostic("malformed-employer", path + ".applies", "Employer declarations require stack-present"))
+        if predicate_uses_fact(data.get("detect"), "employer"):
+            problems.append(diagnostic("employer-self-dependency", path + ".detect", "Employer declarations cannot depend on the employer fact"))
     return problems
 
 
@@ -297,6 +346,10 @@ def evaluate_project(graph, identity, node, definitions=None, context=None, fact
 
 
 def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
+    return _evaluate_predicate(root, node, facts, contexts, path)
+
+
+def _evaluate_predicate(root, node, facts=None, contexts=None, path="detect", employer_result=None):
     problems = predicate_diagnostics(node, path)
     if problems:
         return PredicateResult(root, diagnostics=problems)
@@ -304,7 +357,7 @@ def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
     if operator in ("dependency", "project_dependency"):
         return PredicateResult(root, diagnostics=[diagnostic("project-scope-required", path, "Evaluate this predicate with a discovered project identity")])
     if operator in ("all", "any"):
-        children = [evaluate_predicate(root, child, facts, contexts, f"{path}.{operator}[{index}]")
+        children = [_evaluate_predicate(root, child, facts, contexts, f"{path}.{operator}[{index}]", employer_result)
                     for index, child in enumerate(value)]
         matches = [child.matched for child in children]
         return PredicateResult(root, all(matches) if operator == "all" else any(matches),
@@ -312,6 +365,11 @@ def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
                                [item for child in children for item in child.prerequisites],
                                [item for child in children for item in child.diagnostics])
     if operator == "fact":
+        if value == "employer":
+            if employer_result is None:
+                return PredicateResult(root, prerequisites=[value], diagnostics=[
+                    diagnostic("reserved-fact", path, "Employer evidence is derived from installed employer declarations")])
+            return PredicateResult(root, employer_result.matched, employer_result.evidence, [value])
         if facts is None or value not in facts:
             return PredicateResult(root, prerequisites=[value], diagnostics=[
                 diagnostic("unknown-fact", path, "Provide scoped evidence for fact: " + value)])
@@ -336,19 +394,24 @@ def evaluate_predicate(root, node, facts=None, contexts=None, path="detect"):
         if not valid:
             return PredicateResult(root, diagnostics=[diagnostic("invalid-context", path, "Context has incompatible value: " + key)])
         return PredicateResult(root, matched, ["context " + key] if matched else [], ["context:" + key])
+    if operator == "remote_host":
+        host = repository_host(root)
+        matched = host is not None and host == value.rstrip(".").lower()
+        return PredicateResult(root, matched, ["origin host " + host] if matched else [])
     legacy = {"file": "files", "glob": "globs", "remote": "remote", "content": "content"}
     matched, evidence = stack_present(root, {legacy[operator]: [value]})
     return PredicateResult(root, matched, [evidence] if evidence else [])
 
 
 class SelectionResult:
-    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=()):
+    def __init__(self, scope, ubiquitous=(), applicable=(), blocked=(), diagnostics=(), selections=(), employers=()):
         self.scope = str(scope)
         self.ubiquitous = list(ubiquitous)
         self.applicable = list(applicable)
         self.blocked = list(blocked)
         self.diagnostics = tuple(diagnostics)
         self.selections = tuple(selections)
+        self.employers = tuple(employers)
 
     def __iter__(self):
         return iter((self.ubiquitous, self.applicable, self.blocked))
@@ -477,7 +540,7 @@ def declarations(roots=None, project=None, diagnostics=None):
                 if data.get("schema_version") not in SCHEMA_VERSIONS:
                     problems.append(diagnostic("unsupported-version", str(path), "Supported tier schema versions: 1, 2, 3"))
                 elif data.get("schema_version") == 3:
-                    problems.extend(v3_declaration_diagnostics(data, str(path)))
+                    problems.extend(v3_declaration_diagnostics(data, str(path), version_directory))
                 elif not _text(data.get("tier")) or data.get("applies") not in ("always", "stack-present"):
                     problems.append(diagnostic("malformed-declaration", str(path), "Declare tier and applies"))
             orphaned = (version_directory / ORPHAN_MARKER).exists()
@@ -530,6 +593,34 @@ def _git(root, arguments):
     if completed.returncode != 0:
         return None
     return completed.stdout
+
+
+def repository_host(root):
+    output = _git(root, ["config", "--get", "remote.origin.url"])
+    if output is None:
+        return None
+    origin = output.removesuffix("\n").removesuffix("\r")
+    if not origin or re.search(r"[\s\x00-\x1f\x7f\\]", origin):
+        return None
+    if "://" in origin:
+        try:
+            url = urlsplit(origin)
+            if url.scheme not in ("https", "http", "ssh", "git") or not url.hostname or "?" in origin or "#" in origin or url.netloc.endswith(":"):
+                return None
+            if url.port is not None and not 1 <= url.port <= 65535:
+                return None
+            host, path = url.hostname, url.path.lstrip("/")
+        except ValueError:
+            return None
+    else:
+        match = re.fullmatch(r"[^@/:]+@([^/:]+):(.+)", origin)
+        if match is None:
+            return None
+        host, path = match.groups()
+        path = path.lstrip("/")
+    if not re.fullmatch(REMOTE_HOST_PATTERN, host) or not path or any(part in ("", ".", "..") for part in path.rstrip("/").split("/")):
+        return None
+    return host.rstrip(".").lower()
 
 
 def repository_identity(root):
@@ -643,20 +734,48 @@ def overridden():
     return {part.strip().lower() for part in raw.split(",") if part.strip()}
 
 
+def declaration_diagnostics(declaration):
+    if declaration.diagnostics:
+        return declaration.diagnostics
+    if declaration.schema_version not in SCHEMA_VERSIONS:
+        return (diagnostic("unsupported-version", declaration.id, "Supported tier schema versions: 1, 2, 3"),)
+    if declaration.schema_version != 3:
+        return ()
+    path = str(Path(declaration.payload_dir) / DECLARATION_NAME) if declaration.payload_dir else declaration.id
+    problems = v3_declaration_diagnostics(declaration.data, path, declaration.payload_dir)
+    if declaration.employer is not None:
+        if declaration.payload_dir is None:
+            problems.append(diagnostic("missing-employer-context", path, "Employer context requires an installed payload"))
+        if declaration.orphaned:
+            problems.append(diagnostic("orphaned-employer", path, "An orphaned employer payload cannot establish applicability"))
+    return tuple(problems)
+
+
 def assess(root, found=None, facts=None, contexts=None):
     diagnostics = []
     selections = []
-    found = declarations(project=root) if found is None else found
+    found = list(declarations(project=root) if found is None else found)
     if not found:
         return SelectionResult(root, diagnostics=diagnostics)
 
     forced = overridden()
     identity = None
     ubiquitous, applicable, blocked = [], [], []
+    problems_by_id = {declaration.id: declaration_diagnostics(declaration) for declaration in found}
+    employers = []
+    employer_predicates = {}
     for declaration in found:
-        problems = declaration.diagnostics
-        if not problems and declaration.schema_version not in SCHEMA_VERSIONS:
-            problems = (diagnostic("unsupported-version", declaration.id, "Supported tier schema versions: 1, 2, 3"),)
+        if declaration.employer is None or problems_by_id[declaration.id]:
+            continue
+        result = evaluate_predicate(root, declaration.detect, facts, contexts)
+        employer_predicates[declaration.id] = result
+        if result.matched:
+            employers.append((declaration, result))
+    employer_result = PredicateResult(root, bool(employers),
+                                     [declaration.id + ": " + item for declaration, result in employers
+                                      for item in result.evidence])
+    for declaration in found:
+        problems = problems_by_id[declaration.id]
         if problems:
             diagnostics.extend(problems)
             selections.append({"plugin_id": declaration.id, "scope": str(root),
@@ -668,7 +787,9 @@ def assess(root, found=None, facts=None, contexts=None):
             ubiquitous.append(declaration)
             continue
         if declaration.schema_version == 3:
-            result = evaluate_predicate(root, declaration.detect, facts, contexts)
+            result = employer_predicates.get(declaration.id)
+            if result is None:
+                result = _evaluate_predicate(root, declaration.detect, facts, contexts, employer_result=employer_result)
             selections.append({"plugin_id": declaration.id, "scope": result.scope,
                                "predicate": declaration.detect, "matched": result.matched,
                                "prerequisites": result.prerequisites, "evidence": result.evidence,
@@ -694,13 +815,14 @@ def assess(root, found=None, facts=None, contexts=None):
             applicable.append((declaration, declaration.stack + " detected" + found_at))
         else:
             blocked.append(declaration)
-    return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections)
+    return SelectionResult(root, ubiquitous, applicable, blocked, diagnostics, selections, employers)
 
 
 def statement(root, found=None):
     result = assess(root, found)
     ubiquitous, applicable, blocked = result
-    if not applicable and not blocked and not result.diagnostics:
+    if not applicable and not blocked and not result.diagnostics and not any(
+            declaration.session_context for declaration in ubiquitous):
         return ""
 
     lines = ["Tier gate - which standards apply in this project"]
@@ -711,6 +833,13 @@ def statement(root, found=None):
         lines.append("Ubiquitous, always applies: " + names + ".")
     for declaration, reason in applicable:
         lines.append("Applies here: `" + declaration.plugin + ":*` - " + reason + ".")
+    for declaration, _ in result.employers:
+        path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
+        lines.append("Employer context: `" + declaration.plugin + ":" + declaration.employer["context_skill"]
+                     + "` - " + str(path))
+    for declaration in [*ubiquitous, *(item for item, _ in applicable)]:
+        if declaration.session_context:
+            lines.append(declaration.session_context)
     if blocked:
         names = ", ".join(
             "`" + declaration.plugin + ":*` (no " + declaration.stack + " here)"

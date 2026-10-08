@@ -1,7 +1,8 @@
 """Run several hook scripts for one host event inside a single interpreter.
 
-Each argument is a script path, absolute or beside this one, optionally followed by
-``@<tool matcher>``. The host's sibling-hook merge is reproduced here, so one event costs one
+Legacy arguments are script paths, absolute or beside this one, optionally followed by
+``@<tool matcher>``. Repeated ``--hook <script> [arguments...]`` groups pass arguments to each script.
+The host's sibling-hook merge is reproduced here, so one event costs one
 interpreter launch instead of one per gate. Each gate still runs as its own ``__main__`` with its
 own stdin, stdout and stderr. A leading ``--deadline <seconds>`` stays under the host timeout: a gate
 still running then is reported, and every finished gate's verdict is kept.
@@ -42,13 +43,13 @@ def captured(stream: io.TextIOWrapper) -> str:
         return ""
 
 
-def run_gate(name: str, raw: bytes) -> tuple[int, str, str]:
+def run_gate(name: str, raw: bytes, arguments: list[str] | None = None) -> tuple[int, str, str]:
     script = HOOKS / name if not Path(name).is_absolute() else Path(name)
     stdin = io.TextIOWrapper(io.BytesIO(raw), encoding="utf-8")
     stdout = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", write_through=True)
     stderr = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", write_through=True)
     saved = sys.stdin, sys.stdout, sys.stderr, sys.argv, sys.path[:]
-    sys.stdin, sys.stdout, sys.stderr, sys.argv = stdin, stdout, stderr, [str(script)]
+    sys.stdin, sys.stdout, sys.stderr, sys.argv = stdin, stdout, stderr, [str(script), *(arguments or [])]
     sys.path.insert(0, str(script.parent))
     code, message = 0, ""
     try:
@@ -88,7 +89,10 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
     for name, code, stdout, stderr in results:
         data = parse(stdout)
         if stdout.strip() and data is None:
-            diagnostics.append(f"{name}: {stdout.strip()}")
+            if event == "SessionStart":
+                contexts.append(stdout.strip())
+            else:
+                diagnostics.append(f"{name}: {stdout.strip()}")
         if code == BLOCKING_EXIT:
             reason = stderr.strip() or f"{name} blocked this {event} event."
             if event == "PreToolUse":
@@ -97,6 +101,14 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
                 blocks.append(reason)
         elif stderr.strip():
             diagnostics.append(f"{name}: {stderr.strip()}")
+        elif code:
+            diagnostics.append(f"{name}: exited with status {code}")
+        if event == "SessionStart" and code not in (0, BLOCKING_EXIT):
+            notice = f"hook-dispatch: {name} failed with exit status {code}."
+            if stderr.strip():
+                notice += "\n" + stderr.strip()
+            messages.append(notice)
+            contexts.append(notice)
         if data is None:
             continue
 
@@ -192,7 +204,7 @@ def overrun_notice(event: str, merged: dict, deadline: float, unfinished: list[s
     merged = dict(merged)
     message = merged.get("systemMessage")
     merged["systemMessage"] = f"{message}\n{notice}" if message else notice
-    if event in ("PreToolUse", "PostToolUse", "PostToolUseFailure", "UserPromptSubmit"):
+    if event in ("SessionStart", "PreToolUse", "PostToolUse", "PostToolUseFailure", "UserPromptSubmit"):
         specific = dict(merged.get("hookSpecificOutput") or {"hookEventName": event})
         context = specific.get("additionalContext")
         specific["additionalContext"] = f"{context}\n\n{notice}" if context else notice
@@ -209,6 +221,9 @@ def main(argv: list[str]) -> int:
         except ValueError:
             deadline = None
         arguments = arguments[2:]
+    deny_on_timeout = arguments[:1] == ["--deny-on-timeout"]
+    if deny_on_timeout:
+        arguments = arguments[1:]
     if not arguments:
         print("hook-dispatch: name the gate scripts to run.", file=sys.stderr)
         return 1
@@ -223,13 +238,27 @@ def main(argv: list[str]) -> int:
     event = data.get("hook_event_name") or data.get("hookEventName") or ""
     tool = data.get("tool_name") if isinstance(data.get("tool_name"), str) else ""
 
-    names = [name for name in (selected(spec, tool) for spec in arguments) if name]
+    gates: list[tuple[str, list[str]]] = []
+    if arguments[0] == "--hook":
+        for argument in arguments:
+            if argument == "--hook":
+                gates.append(("", []))
+            elif not gates[-1][0]:
+                gates[-1] = (argument, [])
+            else:
+                gates[-1][1].append(argument)
+        if any(not name for name, _ in gates):
+            stderr.write("hook-dispatch: each --hook requires a script.\n")
+            return 1
+    else:
+        gates = [(name, []) for name in (selected(spec, tool) for spec in arguments) if name]
+    names = [name for name, _ in gates]
     results: list[tuple[str, int, str, str]] = []
     lock = threading.Lock()
 
     def run_all() -> None:
-        for name in names:
-            result = (name, *run_gate(name, raw))
+        for name, script_arguments in gates:
+            result = (name, *run_gate(name, raw, script_arguments))
             with lock:
                 results.append(result)
 
@@ -242,6 +271,16 @@ def main(argv: list[str]) -> int:
     merged, diagnostics = merge(event, finished)
     if overrun:
         merged = overrun_notice(event, merged, deadline, names[len(finished):])
+        if deny_on_timeout and event == "PreToolUse":
+            specific = merged["hookSpecificOutput"]
+            if specific.get("permissionDecision") != "deny":
+                unfinished = [Path(name).name for name in names[len(finished):]]
+                specific["permissionDecision"] = "deny"
+                specific["permissionDecisionReason"] = (
+                    f"hook-dispatch: {unfinished[0]} did not finish before the deadline; "
+                    + "these gates did not run: " + (", ".join(unfinished[1:]) or "none")
+                    + ". Retry when every required hook can finish."
+                )
     if diagnostics:
         stderr.write(diagnostics + "\n")
     if merged:

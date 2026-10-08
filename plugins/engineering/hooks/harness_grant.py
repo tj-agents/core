@@ -5,8 +5,10 @@ origin is a trusted GitHub owner (`harness-trust.json` beside this file):
 
 - `git -C "<checkout>" merge --no-edit origin/<default>` from a branch other than the default;
 - `git -C "<checkout>" worktree remove -- "<worktree>"` for a linked worktree whose head is
-  already on `origin/<default>`;
-- `git -C "<checkout>" branch -d <branch>` for a branch already on `origin/<default>`.
+  already on `origin/<default>`, or whose exact worktree/branch has a fresh `cleanup_proof.py`
+  receipt;
+- `git -C "<checkout>" branch -d <branch>` for a branch already on `origin/<default>`, or `branch
+  -D <branch>` when a fresh matching receipt covers it instead.
 
 Each must be the whole command. A PreToolUse allow covers the entire tool call, so a compound
 command, an unquoted or relative path, or a `--force` never matches. Anything that does not match
@@ -14,15 +16,20 @@ exits 0 with no output and is left to the normal permission flow. Codex is not g
 hook contract has no equivalent allow decision yet.
 """
 
+import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from hook_runtime import COMMAND_TIMEOUT_SECONDS, grant, is_trusted_checkout
 
 SHELL_TOOLS = {"bash", "powershell"}
+STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
+RECEIPT_FRESHNESS_SECONDS = 60 * 60
 
 _UNSAFE_PATH_CHARS = frozenset('$%!`&|;<>^\r\n')
 _PATH = r'"(?P<{}>[^"\r\n]+)"'
@@ -35,7 +42,7 @@ _REMOVE_RE = re.compile(
     r"\Agit -C " + _PATH.format("checkout") + r" worktree remove -- " + _PATH.format("worktree") + r"\Z"
 )
 _BRANCH_RE = re.compile(
-    r"\Agit -C " + _PATH.format("checkout") + r" branch -d " + _REF.format("branch") + r"\Z"
+    r"\Agit -C " + _PATH.format("checkout") + r" branch (?P<flag>-d|-D) " + _REF.format("branch") + r"\Z"
 )
 
 
@@ -83,7 +90,7 @@ def on_default(checkout, commit, default):
 
 
 def linked_worktrees(checkout):
-    """``{resolved path: head}`` for every linked worktree, excluding the main one."""
+    """``{resolved path: (head, branch)}`` for every linked worktree, excluding the main one."""
     try:
         porcelain = git(checkout, "worktree", "list", "--porcelain")
     except (OSError, subprocess.SubprocessError):
@@ -93,12 +100,67 @@ def linked_worktrees(checkout):
     for block in entries[1:]:
         fields = dict(line.split(" ", 1) for line in block.splitlines() if " " in line)
         path, head = fields.get("worktree"), fields.get("HEAD")
+        branch_ref = fields.get("branch")
+        branch = branch_ref[len("refs/heads/"):] if branch_ref and branch_ref.startswith("refs/heads/") else None
         if path and head:
             try:
-                linked[Path(path).resolve()] = head
+                linked[Path(path).resolve()] = (head, branch)
             except OSError:
                 continue
     return linked
+
+
+def state_directory():
+    configured = os.environ.get(STATE_DIRECTORY_ENV)
+    return Path(configured) if configured else Path.home() / ".agents-state"
+
+
+def receipt_for_worktree(worktree):
+    digest = hashlib.sha256(Path(worktree).resolve().as_posix().encode("utf-8")).hexdigest()
+    path = state_directory() / "merge-cleanup" / "receipts" / f"{digest}.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def is_fresh_removable(receipt):
+    if receipt is None or receipt.get("verdict") != "removable":
+        return False
+    recorded_at = receipt.get("recorded_at")
+    if not isinstance(recorded_at, (int, float)):
+        return False
+    age = time.time() - recorded_at
+    return 0 <= age <= RECEIPT_FRESHNESS_SECONDS
+
+
+def worktree_receipt_authorizes(worktree, branch, head):
+    receipt = receipt_for_worktree(worktree)
+    return (
+        is_fresh_removable(receipt)
+        and receipt.get("branch") == branch
+        and receipt.get("head") == head
+    )
+
+
+def branch_receipt_authorizes(checkout, branch):
+    if not git_succeeds(checkout, "show-ref", "--verify", "--quiet", "refs/heads/" + branch):
+        return False
+    head = git(checkout, "rev-parse", "refs/heads/" + branch)
+    try:
+        paths = list((state_directory() / "merge-cleanup" / "receipts").glob("*.json"))
+    except OSError:
+        return False
+    for path in paths:
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(receipt, dict) and is_fresh_removable(receipt) \
+                and receipt.get("branch") == branch and receipt.get("head") == head:
+            return True
+    return False
 
 
 def sync_is_safe(checkout, ref, default):
@@ -115,16 +177,23 @@ def remove_is_safe(checkout, raw_worktree, default):
     target = absolute_dir(raw_worktree)
     if target is None:
         return False
-    head = linked_worktrees(checkout).get(target)
-    return head is not None and on_default(checkout, head, default)
+    entry = linked_worktrees(checkout).get(target)
+    if entry is None:
+        return False
+    head, branch = entry
+    if on_default(checkout, head, default):
+        return True
+    return branch is not None and worktree_receipt_authorizes(target, branch, head)
 
 
-def branch_delete_is_safe(checkout, branch, default):
+def branch_delete_is_safe(checkout, branch, flag, default):
     if branch == default:
         return False
     if not git_succeeds(checkout, "show-ref", "--verify", "--quiet", "refs/heads/" + branch):
         return False
-    return on_default(checkout, "refs/heads/" + branch, default)
+    if flag == "-d" and on_default(checkout, "refs/heads/" + branch, default):
+        return True
+    return branch_receipt_authorizes(checkout, branch)
 
 
 def main():
@@ -158,10 +227,10 @@ def main():
         reason = "harness-grant: syncing a feature branch with origin/" + default
     elif pattern is _REMOVE_RE:
         safe = remove_is_safe(checkout, match.group("worktree"), default)
-        reason = "harness-grant: removing a worktree already merged into origin/" + default
+        reason = "harness-grant: removing a worktree merged into origin/" + default + " or covered by a cleanup receipt"
     else:
-        safe = branch_delete_is_safe(checkout, match.group("branch"), default)
-        reason = "harness-grant: deleting a branch already merged into origin/" + default
+        safe = branch_delete_is_safe(checkout, match.group("branch"), match.group("flag"), default)
+        reason = "harness-grant: deleting a branch merged into origin/" + default + " or covered by a cleanup receipt"
 
     if safe:
         grant(reason + " in a trusted repository.")

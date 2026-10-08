@@ -123,6 +123,24 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
 
+    def test_callout_checks_standards_before_an_apology(self):
+        instructions = authored_skill("session-guidance").read_text(encoding="utf-8")
+        section = " ".join(
+            instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
+        )
+
+        self.assertTrue(section.startswith("When the user calls out a mistake, before apologizing"))
+        self.assertLess(section.index("before apologizing"), section.index("An apology"))
+        for phrase in (
+            "missing, ambiguous, contradictory, mispriced or unenforced",
+            "every consumed `tj-agents` plugin on both hosts",
+            "`engineering:handoff` in bounded side-workstream mode in the same turn",
+            "SendFeedback draft or local memory does not substitute",
+            "Existing user limits and scope gates still apply",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
     def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
         body = authored_skill("plan-execution").read_text(
             encoding="utf-8"
@@ -195,6 +213,81 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn("foreground fallback", body)
         self.assertIn("exact run head", merging)
         self.assertIn("bound PR source head", merging)
+
+    def test_merge_authorization_is_goal_scoped_with_one_owner(self):
+        merging = authored_skill("merging").read_text(encoding="utf-8")
+        flat_merging = " ".join(merging.split())
+        corpus = " ".join(self.corpus().split())
+
+        self.assertIn("## What authorizes a merge", merging)
+        self.assertIn("Merge authorization is scoped to the goal, not the PR", flat_merging)
+        self.assertIn(
+            "merge authorization for every PR that goal itself creates", flat_merging
+        )
+        self.assertIn("no per-PR re-approval", flat_merging)
+        self.assertIn(
+            "no delivery standard adds a per-PR approval requirement", flat_merging
+        )
+        self.assertEqual(
+            1, corpus.count("Merge authorization is scoped to the goal, not the PR")
+        )
+
+        bodies = {
+            name: " ".join(authored_skill(name).read_text(encoding="utf-8").split())
+            for name in (
+                "persistent-delivery",
+                "merge",
+                "plan-execution",
+                "plans",
+                "feature",
+                "bugfix",
+            )
+        }
+        self.assertIn(
+            "an authorization naming no mode records `auto`",
+            bodies["persistent-delivery"],
+        )
+        for referrer, pointer in (
+            (
+                "persistent-delivery",
+                "the owning goal record (`engineering:merging` owns that goal-wide scope)",
+            ),
+            (
+                "merge",
+                "re-resolves merge authorization from the goal's recorded "
+                "authorization (`engineering:merging`)",
+            ),
+            (
+                "plan-execution",
+                "default-branch state (`engineering:merging` owns the goal-wide "
+                "merge-authorization scope)",
+            ),
+            (
+                "plans",
+                "default-branch state (`engineering:merging` owns the goal-wide "
+                "merge-authorization scope)",
+            ),
+            (
+                "feature",
+                "covers delivery (`engineering:merging` owns that goal-wide scope)",
+            ),
+            (
+                "bugfix",
+                "covers delivery (`engineering:merging` owns that goal-wide scope)",
+            ),
+        ):
+            with self.subTest(referrer=referrer):
+                self.assertIn(pointer, bodies[referrer])
+
+        for per_pr_reading in (
+            "implementation approval never invents merge authority",
+            "reaches merge only under explicit authorization",
+            "never silently authorizes the successor",
+            "merge authorization into the successor",
+            "adds no authority for installation, publication, merging",
+        ):
+            with self.subTest(per_pr_reading=per_pr_reading):
+                self.assertNotIn(per_pr_reading, corpus)
 
     def test_techdebt_uses_mode_specific_isolation_and_picks_fast(self):
         body = authored_skill("techdebt").read_text(encoding="utf-8")
@@ -367,21 +460,23 @@ class ProcessStandardsTests(unittest.TestCase):
             "Join-Path <primary-checkout> 'scripts/worktrees.ps1'",
             "Test-Path -LiteralPath $worktreeHelper -PathType Leaf",
             "If that exact primary-checkout helper path is absent, do not skip cleanup",
-            "status --porcelain=v2 --untracked-files=all",
-            "git merge-base --is-ancestor",
-            "gh pr list --repo <owner/repo> --state open --head <branch> --json number,url",
-            "fresh query returns exactly `[]`",
+            "cleanup_proof.py",
+            "a dirty tree",
+            "a merge commit absent from `origin/<default>`",
+            "a still-open PR for the head",
+            "`preserve:` stops cleanup",
             "worktree remove -- <target-worktree>",
             "branch -d <branch>",
+            "proof covers exactly this head, so delete it with",
+            "branch -D <branch>",
             "Step 5 is a blocking post-merge gate",
-            "Do not enter Step 6",
+            "Only the `finish.ps1` path may enter Step 6 first",
             "never remove that path",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
         self.assertNotIn("worktree remove --force", cleanup)
-        self.assertNotIn("branch -D", cleanup)
 
     def test_merge_retargets_the_host_before_active_worktree_removal(self):
         body = authored_skill("merge").read_text(encoding="utf-8")
@@ -396,8 +491,12 @@ class ProcessStandardsTests(unittest.TestCase):
             "When the target is the primary checkout, or the session is already attached to the primary checkout, do not retarget or hand off",
             "continue cleanup and branch deletion in the current session",
             "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
-            "apply `base:cd` and retarget the host **before** a helper or native Git unregisters or removes it",
-            "retarget the host **before** a helper or native Git unregisters or removes it",
+            "the session closes itself as the delivery's final action, after Step 6",
+            'no arguments and no leading `&`, because the harness allow rule matches only this string',
+            'powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1',
+            "detaches a reaper that removes the worktree and branch once this session exits",
+            "closes this session's CLI and tab",
+            "Only when `finish.ps1` is unavailable or its preflight fails",
             "shell `cd`, or `git -C` does not retarget Codex or Claude",
             "invoke `/cd <primary-checkout>` there",
             "invoke the unqualified `handoff` workflow once with the primary checkout",
@@ -408,9 +507,9 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        self.assertLess(cleanup.index("apply `base:cd`"), cleanup.index("$worktreeHelper"))
+        self.assertLess(cleanup.index("finish.ps1"), cleanup.index("$worktreeHelper"))
         self.assertLess(
-            cleanup.index("apply `base:cd`"),
+            cleanup.index("finish.ps1"),
             cleanup.index("worktree remove -- <target-worktree>"),
         )
 
@@ -426,7 +525,10 @@ class ProcessStandardsTests(unittest.TestCase):
             cd,
         )
         self.assertIn(
-            "the original stops repository-scoped work; it cannot end its own host session", cd
+            "the original stops repository-scoped work; a completed delivery closes its own session "
+            "through `engineering:merge` Step 5's `finish`; only when that is unavailable does the "
+            "`handoff` successor own the removal, closing the predecessor through `machine:peer-cli`",
+            cd,
         )
         self.assertIn(
             "put that exact operation and its final filesystem verification in the "

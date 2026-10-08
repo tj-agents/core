@@ -7,6 +7,57 @@ domain: process
 
 # Persistent delivery continuation
 
+## Completion record
+
+Before recording a `complete` receipt, maintain the canonical goal's fenced `completion` JSON with observed
+acceptance evidence, every delivered PR identity, and every unresolved PR task with its owner and next
+action. The runtime refreshes every recorded PR and rejects a complete receipt unless the bound delivery is
+recorded, merged at its full head, has no unchecked tasks, and the outcome evidence is present. A rejection
+keeps the current owner and leaves the returned actions open.
+
+Run the same read-only check before a foreground terminal report:
+
+```bash
+python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
+```
+
+Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
+`workflows/completion.py` in an installed engineering package.
+
+The record has this exact shape. Every string is nonempty, every head is a forty-character SHA, acceptance
+and delivery records are unique, and empty evidence keeps its acceptance item open with an owner and next
+action.
+
+```completion
+{
+  "outcome": "The requested user-visible outcome.",
+  "acceptance": [
+    {
+      "id": "criterion-id",
+      "criterion": "The observable acceptance criterion.",
+      "evidence": [
+        {"source": "artifact or observation", "result": "concrete observed result"}
+      ],
+      "owner": "current execution owner",
+      "next_action": "Resolve this criterion when evidence is absent."
+    }
+  ],
+  "deliveries": [
+    {"repository": "owner/repository", "pr": 123, "head": "0123456789abcdef0123456789abcdef01234567"}
+  ],
+  "open_tasks": [
+    {
+      "repository": "owner/repository",
+      "pr": 123,
+      "head": "0123456789abcdef0123456789abcdef01234567",
+      "text": "Unchecked visible PR task.",
+      "owner": "current execution owner",
+      "next_action": "Complete the task and refresh the PR."
+    }
+  ]
+}
+```
+
 Load `engineering:persistent-delivery` for binding, review, repair, authorization and terminal behavior.
 Use this workflow when a substantive authorized task has a future decision that may outlive the current
 session. Its owner can begin before a PR exists. Ordinary quick answers and short inline work stay in the

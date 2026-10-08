@@ -41,8 +41,12 @@ session continues its independent active task.
    For a critical plan selected by `plan-authoring`'s readiness decision, use the verified execution
    pickup procedure below. Otherwise write the prompt
    to a UTF-8 file and invoke the selected launcher's packaged script once, following its loaded
-   instructions. Preserve a user-selected model, effort or frontier request; otherwise choose the lane the
-   remaining work is worth per `engineering:lanes` and pass it, or inherit defaults when no lane is clear.
+   instructions. Preserve a user-selected model, effort or frontier request; otherwise choose and pass the
+   cheapest suitable lane for the remaining work per `engineering:lanes`. A merge, handoff, file count or
+   delivery operation does not raise it: use L5 for small already-decided file deletion or move, config or
+   docs cleanup, and L4 only for specified implementation that still needs code-level judgement.
+   L7 is in-session only and cannot open either handoff launcher. Claude handoff also requires an explicit
+   L1–L6 lane, frontier tier, or non-Haiku model; never leave that choice to the CLI default.
    Record the lane and a one-line reason beside the next action in the goal.
    Never launch a second successor because startup is slow or acknowledgement is delayed.
 4. Stop owned-path writes before invoking the launcher. Verify the launch result. A definite failure
@@ -148,14 +152,17 @@ distinct transfer, reconcile the completed attempt and its current owner before 
    side-workstream writer lease, retain the original task's writer lease, and continue the original task.
    On failure, retain both task records and continue only work independent of the unlaunched side task.
 
-For a transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted,
-put that exact operation and its final filesystem verification in the successor's `## Next Steps`. The
-predecessor must not perform the operation after launch: it ends repository-scoped activity. No tool lets it
-end its own host process or close its own window, so releasing the host session is a human action; the
-successor's `## Next Steps` must name that release as a gate (who closes or redirects the predecessor's
-window) before the operation. The successor waits until that gate clears, then performs the operation from
-the target checkout and treats a command error or residual path as incomplete rather than accepting partial
-Git cleanup.
+This transfer is the fallback when the owner cannot run `engineering:merge` Step 5's `finish` itself; for a
+transfer whose purpose is to release the current checkout before it is moved, renamed, or deleted, put that
+exact operation and its final filesystem verification in the successor's `## Next Steps`. The
+predecessor must not perform the operation after launch: it ends repository-scoped activity and emits a
+recorded release marker. Without `finish` it cannot end its own host process or close its own window, so the
+successor's `## Next Steps` must gate the operation on that marker, then close the predecessor itself with
+`machine:peer-cli`: resolve the registry entry whose `cwd` is the target checkout (and the recorded session
+id or tab title when the goal names one); `close` verifies the recorded host pid and start time against the
+live process, `close-tab.ps1` takes the tab, and an unverifiable entry stays open with the user named as
+resolver. The successor then performs the operation from the target checkout and treats a command error or
+residual path as incomplete rather than accepting partial Git cleanup.
 
 If discovery cannot resolve the launcher, report the missing capability and required selection. Continue
 independent authorized work where possible. Never claim transfer occurred or silently substitute a

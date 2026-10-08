@@ -41,14 +41,18 @@ class GoalContinuationTests(unittest.TestCase):
             hooks = json.loads((self.plugin / self.manifest(host)["hooks"]).read_text(encoding="utf-8"))
             startup = hooks["hooks"]["SessionStart"]
             helper = ".agents/base/policy/goal-continuation/scripts/session-context.py"
-            self.assertEqual(len(startup), 4)
-            handler = startup[3]["hooks"][0]
             if host == "claude":
+                self.assertEqual(len(startup), 4)
+                handler = startup[3]["hooks"][0]
                 self.assertEqual(handler["command"], "python")
                 self.assertEqual(handler["args"], ["-B", f"${{{variable}}}/{helper}"])
             else:
-                self.assertIn(f'"${{{variable}}}/{helper}"', handler["command"])
-                self.assertIn(f'"${{{variable}}}/{helper}"', handler["commandWindows"])
+                self.assertEqual(len(startup), 1)
+                self.assertEqual(len(startup[0]["hooks"]), 1)
+                handler = startup[0]["hooks"][0]
+                for variant in ("command", "commandWindows"):
+                    self.assertIn(f'"${{{variable}}}/hooks/hook_dispatch.py"', handler[variant])
+                    self.assertEqual(handler[variant].count(f'--hook "${{{variable}}}/{helper}"'), 1)
             self.assertTrue((self.plugin / helper).is_file())
 
     def test_context_has_its_own_identity_and_is_read_only_in_an_installed_path(self):

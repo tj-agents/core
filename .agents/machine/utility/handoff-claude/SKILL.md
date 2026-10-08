@@ -11,21 +11,28 @@ route: infer
 
 The sibling of `handoff-codex`, for handing work to a second Claude Code rather than to Codex. For
 opening a CLI the user drives themselves, with no prepared prompt, use `open-claude` instead. Either
-harness can run either launcher — both only spawn a Windows Terminal tab, so neither depends on the
+harness can run either launcher — both only spawn a terminal tab, so neither depends on the
 harness it is invoked from. What the prompt itself must contain is the `handoff` skill's subject, not
 this one's.
 
 Write the complete handoff prompt to a UTF-8 file before launching. Never relay a substantial prompt
-through nested command strings or place its contents directly in the Windows Terminal invocation.
+through nested command strings or place its contents directly in the terminal invocation.
 
 Resolve the exact repository or worktree directory the request concerns. Do not substitute another
 checkout.
 
+It opens a new tab in the terminal this process is running inside (Windows Terminal, tmux, kitty or
+Konsole).
+
 ## One tab, and never a second
 
-The launcher **throws** on failure and prints `Launched claude handoff tab '<title>' …` on success. Those
-are the only two outcomes. `standards:` lines before them report the pre-launch plugin refresh, which
-never blocks the launch.
+The launcher **exits non-zero** on failure and prints `Launched claude handoff tab '<title>' …` on success.
+`standards:` lines before them report the pre-launch plugin refresh, which never blocks the launch.
+
+Exit code **3 is distinct from every other failure**: it means the terminal control command timed out
+after the tab may already have opened, not that the launch definitely failed. Check the terminal for the
+tab before doing anything else; never relaunch automatically on exit 3. Any other non-zero exit means the
+launch did not happen.
 
 **Never verify a launch by listing processes, and never re-run the launcher because one looked absent.**
 A tab takes seconds to appear and a process listing is trivially misread — an unsorted `Select-Object
@@ -33,32 +40,35 @@ A tab takes seconds to appear and a process listing is trivially misread — an 
 repository, which is worse than no handoff at all: they collide on the same files with neither aware of
 the other.
 
-If the launcher printed its confirmation, the handoff happened. Report it and stop. If it threw, say so;
-do not retry blind.
+If the launcher printed its confirmation, the handoff happened. Report it and stop. If it exited
+non-zero, say so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a
+second tab for the same handoff.
 
 ## Model selection
 
-Pass `-Lane L1`–`L7` and the launcher resolves the model from the canonical lane tables it ships under
+Configurable family aliases are rejected for handoffs; pass a full non-Haiku model ID or a supported lane.
+
+Pass `--lane L1`–`L6` and the launcher resolves the model from the canonical lane tables it ships under
 `resources/lanes` — the `engineering:lanes` ladder, and the repo's only model-name owner, so no caller has
-to know a model id and a retiering is one edit in one authored file. `-Model` still wins for a model the
-user named outright. Supply neither and the CLI keeps its own configured default, exactly as an
-interactively launched session would.
+to know a model id and a retiering is one edit in one authored file. `--model` still wins for a model the
+user named outright. Handoff never uses the CLI default: choose L1–L6, frontier, or an explicit
+non-Haiku model.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
-lane from the prompt would quietly decide the cost of every handoff. Choose by design, stakes, ambiguity
-and verifiability, from the hardest judgement inside the delegated work — never by how
-hard the work feels, and never raised by a merge, push or publish at its end, which the delivery gates
-govern:
+lane from the prompt would quietly decide the cost of every handoff. Choose the cheapest suitable rung by
+design, stakes, ambiguity and verifiability, from the hardest judgement inside the delegated work — never
+by how hard the work feels, file count, a handoff, or a merge, push or publish at its end, which the
+delivery gates govern:
 
 | Lane | For |
 |---|---|
 | `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
 | `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
 | `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
-| `L4` | Ordinary specified work that a compiler or a test suite will catch, delivery included. |
-| `L5` | Mechanical work whose shape is already decided. |
+| `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
+| `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
-| `L7` | Clerical work with a small input and no judgement to make. |
+| `L7` | In-session clerical work only; this launcher refuses it. |
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
@@ -67,38 +77,56 @@ planning alone does not call for this launcher. After a massive plan that was a 
 `engineering:plans` normally transfers execution to one fresh harness from a durable phased plan, even in
 the same checkout. Apply its context criteria and judgment to cases between those sizes.
 
-`-Frontier` selects the tier above the ladder from the same table. **Pass it only when the user
+`--frontier` selects the tier above the ladder from the same table. **Pass it only when the user
 explicitly asked for that tier or its model by name.** No lane resolves to the tier — L1 prices the same
 family an effort step below, and frontier spend is the user's provenance to grant, never a reward for a
-hard-looking task — and it rejects `-Lane` or `-Model` beside it.
+hard-looking task — and it rejects `--lane` or `--model` beside it.
 
-A calling skill or workflow that ships its own resolved selection may still pass `-Model` directly;
-that wins over `-Lane`. What is no longer acceptable is inventing a model id at the call site.
+A lane's effort travels with its resolved model (`--lane L4`, for example, resolves both a model and an
+effort from the table) and reaches `claude --effort <level>` automatically — a lane always opens the
+exact session that rung's model and effort pair describes. An explicit `--model` beating the lane means
+no lane effort applies either, matching the model it would have paired with. Some rungs (Claude's `L7`)
+price no effort at all, and the launcher passes none rather than inventing one.
 
-Launch with `scripts/launch-claude.ps1`, beside this file:
+`--effort '<low|medium|high|xhigh|max>'` is accepted only together with an explicit `--model`, for a
+calling skill or workflow (or a user) that already knows the exact pace it wants for a model it named
+outright — passing `--effort` alone, or beside `--lane`/`--frontier`, is rejected, because a lane or the
+frontier tier already carries its own effort for whichever model it resolves, and an effort picked
+without reference to a specific model is exactly the caller's-guess defect this restriction exists to
+prevent. `engineering:handoff`'s obligation to preserve a user-selected model, effort or frontier request
+is why this flag exists at all, not a general invitation to invent one.
 
-```powershell
-& '<skill-directory>\scripts\launch-claude.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
+A calling skill or workflow that ships its own resolved selection may still pass `--model` directly;
+that wins over `--lane`. What is no longer acceptable is inventing a model id (or, per above, an
+unpaired effort) at the call site.
+
+The launcher requires `--lane L1`–`L6`, `--frontier`, or an explicit non-Haiku `--model`. It rejects L7
+and every Haiku family ID or alias before launch, and never trusts the hidden CLI default.
+
+Launch with `scripts/launch_claude.py`, beside this file:
+
+```sh
+python3 '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>' --lane '<L1..L6>'
 ```
 
-Add `-Lane '<L1..L7>'` (or `-Frontier`) to have the launcher resolve the model, or `-Model '<model-id>'`
-for one the user named. Omitting all three lets `claude.exe` fall back to its own configured default —
-the same behavior an interactively launched session gets.
+Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
-Add `-DangerouslySkipPermissions` **only when the user asks for it in that request**. It disables every
+Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve the model and, where the table
+prices one, its effort, or `--model '<model-id>'` for a model the user named outright, optionally paired
+with `--effort '<level>'` for that exact model (never with `--lane` or `--frontier`; see above).
+
+Add `--dangerously-skip-permissions` **only when the user asks for it in that request**. It disables every
 permission prompt in the new window, so it is never a default and never inferred from the repository
 being Tommy's own.
 
-The launcher starts the native `claude.exe` directly as the Windows Terminal tab process. Do not replace
-it with the npm/NVM `claude` shim, `claude.cmd`, `claude.ps1`, `node.exe`, or an intermediate PowerShell
+The launcher starts the native `claude` executable directly as the terminal tab process. Do not replace
+it with the npm/NVM `claude` shim, `claude.cmd`, `claude.ps1`, `node.exe`, or an intermediate shell
 command — the same launch paths that produced a degraded monochrome, non-interactive TUI for Codex.
 
-The terminal invocation and the parent-session environment scrub belong to `scripts/agent-cli.ps1` under
-`resources/machine/scripts`, shared with `handoff-codex`. `agent-cli.ps1`'s comments carry the
-reasoning for the `--window 0` tab targeting, the cleared session variables and the forced colour
-variables; change this launcher's behaviour there, not here, and read it before altering any of them.
-`open-claude` has already moved to the Python `agent_cli.py` beside it; keep the two consistent until
-this launcher moves too.
+The terminal invocation and the environment scrub belong to `scripts/agent_cli.py` under
+`resources/machine/scripts`, shared with `open-claude`. `handoff-codex` still uses the PowerShell
+`agent-cli.ps1` until its own Python port lands.
 
 This is an unmanaged handoff. Do not invoke Agent Workboard, pass Workboard tokens, bind the session to
 Workboard state, or imply that the new window will checkpoint workflow status.

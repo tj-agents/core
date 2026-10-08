@@ -103,10 +103,11 @@ it, or the next material checkpoint falls due.
 ## Run the continuous loop
 
 1. Reconcile stale material facts. For a project selecting the Concertable pre-launch profile, run
-   `python .agents/hooks/plan_graph.py --root . --plan <repo-relative *_PLAN.md>` before selecting or acting on
-   a phase. The selected plan is one input to the same pre-launch guard that governs every write. When it
+   Concertable's own adapter CLI before selecting or acting on
+   a phase; the selected plan is one input to the same pre-launch guard that governs every write. When it
    conflicts, correct it immediately to the direct replacement-and-deletion outcome and do not execute the
-   rejected phase. Validate the remaining plan graph and repository checkpoint before relying on recovery state.
+   rejected phase. Run `python -B .agents/hooks/plan_graph.py --root .` to validate the remaining plan graph
+   and repository checkpoint before relying on recovery state.
    Other repositories validate dependencies and checkpoints under their own selected policies, preserving published compatibility windows; they do not implicitly select the Concertable profile.
 2. Apply `engineering:git-branching` before implementation and at each scope expansion. Check the current
    PR's measured size against its recorded delivery slice. Split large dependent work into a stack,
@@ -149,7 +150,7 @@ Planning-artifact publication remains part of the authorized plan lifecycle. Ano
 not open a PR`, or `do not merge` procedure copied into a plan or handoff cannot suppress it. Preserve an
 explicit current user limitation, recorded repository authorization, named PR/head security or validation
 hold, merge hold, or repository stop class as a typed delivery gate; otherwise continue to merged
-default-branch state.
+default-branch state (`engineering:merging` owns the goal-wide merge-authorization scope).
 
 If repository routing exposes `package-cutover` for a published breaking contract, enter it and record the
 reciprocal blocker/return path. A dependency blocker records the exact four fields required by
@@ -185,6 +186,10 @@ because a phase or commit completed. A massive plan whose substantial design pha
 phased execution plan normally has a separate transfer reason under `engineering:plans`.
 
 ## Terminal result
+
+When the canonical goal has a fenced `completion` record, invoke the `persistent-workflow` completion
+contract before reporting the user outcome complete or deleting the goal. A failing completion check keeps
+the goal and its returned next actions owned by the current execution.
 
 Complete only when the plan's requested lifecycle is terminal and the repository outcome names its
 implementation, review, validation, delivery, and remaining durable state; neither a commit, pushed branch,

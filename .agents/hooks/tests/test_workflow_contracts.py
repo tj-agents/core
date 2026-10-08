@@ -93,7 +93,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(
             {
                 "strategic": "gpt-6.1-sol",
-                "implementation": "gpt-6.1-sol",
+                "implementation": "gpt-5.6-terra",
                 "mechanical": "gpt-6-luna",
                 "review": "gpt-5.3-codex-spark",
                 "critical": "gpt-6.1-sol",
@@ -115,7 +115,7 @@ class WorkflowContractTests(unittest.TestCase):
                 "strategic": [],
                 "implementation": [],
                 "mechanical": [],
-                "review": ["gpt-6.1-sol"],
+                "review": ["gpt-5.6-terra"],
                 "critical": [],
             },
             {
@@ -441,6 +441,40 @@ class WorkflowGenerationTests(unittest.TestCase):
                     )
                     self.assertEqual(0, completed.returncode, completed.stderr)
                     self.assertEqual([], list(bundle.rglob("*.pyc")))
+
+    def test_entry_points_suppress_bytecode_without_relying_on_the_parent_interpreter(self):
+        scripts = (
+            (WORKFLOWS / "workflow_ops.py", PLUGIN_WORKFLOWS / "workflow_ops.py"),
+            (WORKFLOWS / "continuation_runtime.py", PLUGIN_WORKFLOWS / "continuation_runtime.py"),
+        )
+        env = {key: value for key, value in os.environ.items()
+               if key not in {"PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX"}}
+        for canonical, packaged in scripts:
+            for script in (canonical, packaged):
+                with self.subTest(script=script):
+                    with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+                        root = Path(temp)
+                        bundle = root / "workflows"
+                        shutil.copytree(
+                            script.parent,
+                            bundle,
+                            ignore=shutil.ignore_patterns("__pycache__"),
+                        )
+                        before = {path.relative_to(bundle).as_posix(): path.read_bytes()
+                                  for path in bundle.rglob("*") if path.is_file()}
+                        completed = subprocess.run(
+                            [sys.executable, str(bundle / script.name), "--help"],
+                            cwd=str(bundle),
+                            capture_output=True,
+                            text=True,
+                            env=env,
+                        )
+                        self.assertEqual(0, completed.returncode, completed.stderr)
+                        self.assertEqual([], list(bundle.rglob("*.pyc")))
+                        self.assertEqual([], list(bundle.rglob("__pycache__")))
+                        after = {path.relative_to(bundle).as_posix(): path.read_bytes()
+                                 for path in bundle.rglob("*") if path.is_file()}
+                        self.assertEqual(before, after)
 
     def test_fixture_skill_inlines_the_gate_contract_without_becoming_discoverable(self):
         template = self.normalized(
@@ -1281,13 +1315,14 @@ class HostAdapterTests(unittest.TestCase):
             "codex",
             dispatch,
             probe=probe,
-            available_models={"gpt-6.1-sol"},
+            available_models={"gpt-5.6-terra"},
         )
 
         self.assertEqual("review", invocation["semantic_stage"])
         self.assertEqual("gpt-5.3-codex-spark", invocation["primary_model"])
-        self.assertEqual("gpt-6.1-sol", invocation["model"])
+        self.assertEqual("gpt-5.6-terra", invocation["model"])
         self.assertEqual("fallback", invocation["model_selection"])
+        self.assertEqual("medium", invocation["reasoning_effort"])
         self.assertEqual("default", invocation["agent_name"])
         self.assertEqual("review_lens", invocation["role_agent_name"])
         self.assertEqual("../roles/review-lens.md", invocation["role_body"])
@@ -1317,12 +1352,13 @@ class HostAdapterTests(unittest.TestCase):
         self.assertEqual("model-unavailable", fallback["reason_code"])
         self.assertEqual("fallback", fallback["parent_transition"])
         self.assertEqual("gpt-5.3-codex-spark", fallback["failed_model"])
-        self.assertEqual("gpt-6.1-sol", fallback["next_model"])
+        self.assertEqual("gpt-5.6-terra", fallback["next_model"])
 
         retry_dispatch = self.dispatch("review-lens", "dispatch-002")
         retry = registry.prepare("codex", retry_dispatch, probe=probe)
-        self.assertEqual("gpt-6.1-sol", retry["model"])
+        self.assertEqual("gpt-5.6-terra", retry["model"])
         self.assertEqual("fallback", retry["model_selection"])
+        self.assertEqual("medium", retry["reasoning_effort"])
         self.assertEqual("default", retry["agent_name"])
 
         exhausted = registry.report_model_unavailable(
@@ -1332,7 +1368,7 @@ class HostAdapterTests(unittest.TestCase):
             "Sol is unavailable.",
         )
         self.assertEqual("pause", exhausted["parent_transition"])
-        self.assertEqual("gpt-6.1-sol", exhausted["failed_model"])
+        self.assertEqual("gpt-5.6-terra", exhausted["failed_model"])
         self.assertIsNone(exhausted["next_model"])
 
     def test_claude_nondefault_stage_uses_general_purpose_without_a_fallback(self):
