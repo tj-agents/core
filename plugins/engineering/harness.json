@@ -124,12 +124,42 @@
     ],
     "permissions": {
       "claude_allow": [
+        "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
         "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
       ],
       "codex_prefix_rules": [
+        {
+          "pattern": [
+            [
+              "python",
+              "python.exe",
+              "python3",
+              "py"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ],
+          "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report the user outcome complete",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ]
+        },
         {
           "pattern": [
             [
