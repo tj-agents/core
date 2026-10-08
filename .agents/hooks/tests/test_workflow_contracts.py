@@ -1139,7 +1139,8 @@ class WorkflowGenerationTests(unittest.TestCase):
         for name, arguments in hosts:
             with self.subTest(host=name):
                 with tempfile.TemporaryDirectory() as temp:
-                    locked = Path(temp) / "locked"
+                    # Resolved, so a symlinked temporary root (macOS /var) is not refused first.
+                    locked = Path(temp).resolve() / "locked"
                     (locked / "child").mkdir(parents=True)
                     locked.chmod(0)
                     try:
