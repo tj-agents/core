@@ -317,7 +317,6 @@ def _lanes_module():
 # rename. frontier resolves the tier above the ladder, which no lane resolves to: its selection is the
 # user's explicit request, never task shape.
 def resolve_lane(harness, lane=None, frontier=False):
-    """The full lane selection, including any host-routing metadata."""
     if not lane and not frontier:
         raise LaunchError('resolve_lane needs a lane or frontier.')
     if lane and frontier:

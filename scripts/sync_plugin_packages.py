@@ -631,17 +631,14 @@ def emit_workflow_agents(root: Path, config: dict, emit):
             )
 
     lane_body = read(root / ".agents/lanes/agent-body.md").strip()
+    handoff_body = read(root / ".agents/lanes/handoff-agent-body.md").strip()
     for host in ("claude", "codex"):
         table = load(root / f".agents/lanes/{host}.json")
         for lane, rung in table["lanes"].items():
             body = lane_body
             if rung.get("handoff"):
                 target = rung["handoff"]
-                body = (
-                    "You are a routing proxy. Return a required `engineering:handoff` request to your "
-                    f"parent for {target['host'].title()} {target['lane']}. Do not inspect, execute, "
-                    "delegate, or otherwise advance the delegated task."
-                )
+                body = handoff_body.format(host=target["host"].title(), lane=target["lane"])
             role = {
                 "agent_name": f"lane-{lane.lower()}" if host == "claude" else f"lane_{lane.lower()}",
                 "description": f"Runs one delegated task at lane {lane}. {rung['summary']}",
