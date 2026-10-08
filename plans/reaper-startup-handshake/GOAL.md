@@ -76,11 +76,21 @@ You are not alone. Preserve/adapt around all existing changes. In particular:
   session_close.ps1 (Start-DetachedReaper only) and tests/finish.tests.ps1; parent owns validation,
   review and delivery. Next action: L4 implementation per PROTOCOL.md.
 
+- L4 implementation landed as 85743a7 (scripts + tests); FinishOnly suite green on powershell.exe and
+  pwsh, CloseOnly regression green on powershell.exe (worker runs); the pre-repair incident repro no
+  longer reproduces against the repaired scripts. Synchronized once with origin/main (a9988f5, clean;
+  only close-tab.ps1 changed near this surface via PR #135).
+- Canonical review pass complete at c95a43f (reviews/Fix-ReaperStartupHandshake.md): native code-review
+  (high) + api-contract + workflow lenses; no safety hole found; 3 MEDIUM + 6 LOW findings, all
+  remediated in the working tree (RSH-1..9); protocol reconciled. Pending: real FinishOnly re-run after
+  the fixes (blocked briefly on machine-wide memory pressure), remediation commit, incremental review,
+  PR, CI, merge.
+
 ## Next Steps
 
 Scope: this startup/cancellation source repair through authorized delivery; parent retains the whole goal.
-Current slice: focused L4 implementation of PROTOCOL.md, then regression/native proof, review, CI and
-normal merge.
+Current slice: re-run focused tests over the remediated tree, commit, incremental review, then PR, CI
+and normal merge; write RESULT.md with evidence and residual risks for the parent.
 Done when: a failed startup cannot later clean up, normal closeout remains verified, and the focused
 repair is merged with any unavailable native gate recorded truthfully for parent acceptance.
 

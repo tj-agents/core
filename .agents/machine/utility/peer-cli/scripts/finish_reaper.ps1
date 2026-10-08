@@ -250,18 +250,6 @@ function Save-RecordExclusive {
     }
 }
 
-function Save-ArmedRecord {
-    param([string] $Path)
-
-    $directory = Split-Path -Parent $Path
-    New-Item -ItemType Directory -Path $directory -Force | Out-Null
-    $json = @{ armed = (Now-Epoch); reaper_pid = $PID } | ConvertTo-Json -Depth 4
-    $temp = Join-Path $directory ('.' + (Split-Path -Leaf $Path) + '.' + $PID + '.tmp')
-    [IO.File]::WriteAllText($temp, $json, (New-Object Text.UTF8Encoding $false))
-    if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }
-    Move-Item -LiteralPath $temp -Destination $Path
-}
-
 function Wait-ForAcceptance {
     param(
         [string] $ResultPath,
@@ -281,8 +269,8 @@ function Wait-ForAcceptance {
             if ($null -ne $acceptedPid -and $acceptedPid -ne $OwnPid) { return 'foreign' }
             if ($null -ne $acceptedPid -and $acceptedPid -eq $OwnPid) {
                 $acceptedStartedAt = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $accepted -Name 'reaper_started_at')
-                if ($null -eq $acceptedStartedAt -or [math]::Abs($acceptedStartedAt - $OwnStartedAt) -le 2.0) {
-                    Save-ArmedRecord -Path "$ResultPath.armed"
+                if ($null -ne $acceptedStartedAt -and [math]::Abs($acceptedStartedAt - $OwnStartedAt) -le 2.0) {
+                    Save-ResultRecord -Path "$ResultPath.armed" -Data @{ armed = (Now-Epoch); reaper_pid = $PID }
                     return 'accepted'
                 }
             }
@@ -366,21 +354,25 @@ try {
         if ($acceptance -eq 'foreign') { return }
         if ($acceptance -eq 'cancelled') {
             Save-ResultRecord -Path $Result -Data @{
-                started  = $startedEpoch
-                host_pid = $HostPid
-                worktree = $Worktree
-                status   = 'cancelled'
-                finished = (Now-Epoch)
+                started           = $startedEpoch
+                host_pid          = $HostPid
+                worktree          = $Worktree
+                reaper_pid        = $PID
+                reaper_started_at = $reaperStartedAt
+                status            = 'cancelled'
+                finished          = (Now-Epoch)
             }
             return
         }
         if ($acceptance -eq 'timeout') {
             Save-ResultRecord -Path $Result -Data @{
-                started  = $startedEpoch
-                host_pid = $HostPid
-                worktree = $Worktree
-                status   = 'not-accepted'
-                finished = (Now-Epoch)
+                started           = $startedEpoch
+                host_pid          = $HostPid
+                worktree          = $Worktree
+                reaper_pid        = $PID
+                reaper_started_at = $reaperStartedAt
+                status            = 'not-accepted'
+                finished          = (Now-Epoch)
             }
             return
         }
@@ -403,6 +395,18 @@ try {
     }
 
     if (-not $exited) {
+        if (Test-Path -LiteralPath "$Result.cancelled") {
+            Save-ResultRecord -Path $Result -Data @{
+                started           = $startedEpoch
+                host_pid          = $HostPid
+                worktree          = $Worktree
+                reaper_pid        = $PID
+                reaper_started_at = $reaperStartedAt
+                status            = 'cancelled'
+                finished          = (Now-Epoch)
+            }
+            return
+        }
         Save-ResultRecord -Path $Result -Data @{
             started  = $startedEpoch
             host_pid = $HostPid
@@ -434,11 +438,13 @@ try {
 
     if (Test-Path -LiteralPath "$Result.cancelled") {
         Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'cancelled'
-            finished = (Now-Epoch)
+            started           = $startedEpoch
+            host_pid          = $HostPid
+            worktree          = $Worktree
+            reaper_pid        = $PID
+            reaper_started_at = $reaperStartedAt
+            status            = 'cancelled'
+            finished          = (Now-Epoch)
         }
         return
     }
