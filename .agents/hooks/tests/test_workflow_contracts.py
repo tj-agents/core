@@ -29,6 +29,23 @@ from host_runtime import HostAdapterRegistry, WriterLeaseRegistry
 from fixtures.lane_expectations import authored_skill
 
 
+def powershell_hosts():
+    """Every installed PowerShell host with its argument prefix.
+
+    Windows PowerShell and PowerShell 7 bind .NET overloads differently, so the installer and
+    generator are exercised under each host that is present.
+    """
+    hosts = []
+    for name in ("powershell.exe", "pwsh"):
+        shell = shutil.which(name)
+        if shell:
+            arguments = [shell, "-NoProfile"]
+            if name == "powershell.exe":
+                arguments += ["-ExecutionPolicy", "Bypass"]
+            hosts.append((name, arguments))
+    return hosts
+
+
 class WorkflowContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -625,478 +642,464 @@ class WorkflowGenerationTests(unittest.TestCase):
                 contract.validate("host", reconciliation)
 
     def test_codex_installer_manages_profile_roles_and_migrates_project_copies(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            codex_home = root / "codex-home"
-            target = codex_home / "agents"
-            target.mkdir(parents=True)
-            unrelated_profile = target / "unrelated.toml"
-            unrelated_profile.write_text('name = "unrelated-profile"\n', encoding="utf-8")
-            former_profile = target / "workflow-review-lens.toml"
-            former_profile.write_text('name = "personal-former-name"\n', encoding="utf-8")
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    codex_home = root / "codex-home"
+                    target = codex_home / "agents"
+                    target.mkdir(parents=True)
+                    unrelated_profile = target / "unrelated.toml"
+                    unrelated_profile.write_text('name = "unrelated-profile"\n', encoding="utf-8")
+                    former_profile = target / "workflow-review-lens.toml"
+                    former_profile.write_text('name = "personal-former-name"\n', encoding="utf-8")
 
-            project = root / "project"
-            (project / ".git").mkdir(parents=True)
-            project_target = project / ".codex" / "agents"
-            project_target.mkdir(parents=True)
-            unrelated_project = project_target / "unrelated.toml"
-            unrelated_project.write_text('name = "unrelated-project"\n', encoding="utf-8")
-            generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
-            shutil.copy2(generated[0], project_target / generated[0].name)
-            former = project_target / "workflow-review-lens.toml"
-            former.write_text('name = "former"\n', encoding="utf-8")
-            arguments = [shell, "-NoProfile"]
-            if Path(shell).name.lower() == "powershell.exe":
-                arguments += ["-ExecutionPolicy", "Bypass"]
-            preview = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-ProjectRoot",
-                    str(project),
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, preview.returncode, preview.stderr)
-            self.assertEqual(
-                f"PREVIEW ONLY: {len(generated) + 1} change(s)",
-                preview.stdout.splitlines()[-1].split(";")[0],
-            )
-            self.assertIn("-ProjectRoot is deprecated", preview.stdout)
-            preview_lines = preview.stdout.splitlines()
-            profile_action = next(
-                index
-                for index, line in enumerate(preview_lines)
-                if line.startswith("ADD ")
-                and line.casefold().endswith(generated[0].name.casefold())
-            )
-            project_action = next(
-                index
-                for index, line in enumerate(preview_lines)
-                if line.startswith("REMOVE ")
-                and line.casefold().endswith(generated[0].name.casefold())
-            )
-            self.assertLess(
-                profile_action,
-                project_action,
-                "profile changes must be reported before project cleanup",
-            )
-            applied = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-ProjectRoot",
-                    str(project),
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, applied.returncode, applied.stderr)
-            self.assertEqual(
-                sorted(
-                    [path.name for path in generated]
-                    + ["unrelated.toml", "workflow-review-lens.toml"]
-                ),
-                sorted(p.name for p in target.glob("*.toml")),
-            )
-            self.assertEqual(
-                'name = "unrelated-profile"\n', unrelated_profile.read_text(encoding="utf-8")
-            )
-            self.assertEqual(
-                'name = "unrelated-project"\n', unrelated_project.read_text(encoding="utf-8")
-            )
-            self.assertEqual('name = "personal-former-name"\n', former_profile.read_text(encoding="utf-8"))
-            self.assertEqual('name = "former"\n', former.read_text(encoding="utf-8"))
-            self.assertFalse((project_target / generated[0].name).exists())
-            ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
-            self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
+                    project = root / "project"
+                    (project / ".git").mkdir(parents=True)
+                    project_target = project / ".codex" / "agents"
+                    project_target.mkdir(parents=True)
+                    unrelated_project = project_target / "unrelated.toml"
+                    unrelated_project.write_text('name = "unrelated-project"\n', encoding="utf-8")
+                    generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
+                    shutil.copy2(generated[0], project_target / generated[0].name)
+                    former = project_target / "workflow-review-lens.toml"
+                    former.write_text('name = "former"\n', encoding="utf-8")
+                    preview = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-ProjectRoot",
+                            str(project),
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, preview.returncode, preview.stderr)
+                    self.assertEqual(
+                        f"PREVIEW ONLY: {len(generated) + 1} change(s)",
+                        preview.stdout.splitlines()[-1].split(";")[0],
+                    )
+                    self.assertIn("-ProjectRoot is deprecated", preview.stdout)
+                    preview_lines = preview.stdout.splitlines()
+                    profile_action = next(
+                        index
+                        for index, line in enumerate(preview_lines)
+                        if line.startswith("ADD ")
+                        and line.casefold().endswith(generated[0].name.casefold())
+                    )
+                    project_action = next(
+                        index
+                        for index, line in enumerate(preview_lines)
+                        if line.startswith("REMOVE ")
+                        and line.casefold().endswith(generated[0].name.casefold())
+                    )
+                    self.assertLess(
+                        profile_action,
+                        project_action,
+                        "profile changes must be reported before project cleanup",
+                    )
+                    applied = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-ProjectRoot",
+                            str(project),
+                            "-Apply",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, applied.returncode, applied.stderr)
+                    self.assertEqual(
+                        sorted(
+                            [path.name for path in generated]
+                            + ["unrelated.toml", "workflow-review-lens.toml"]
+                        ),
+                        sorted(p.name for p in target.glob("*.toml")),
+                    )
+                    self.assertEqual(
+                        'name = "unrelated-profile"\n', unrelated_profile.read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(
+                        'name = "unrelated-project"\n', unrelated_project.read_text(encoding="utf-8")
+                    )
+                    self.assertEqual('name = "personal-former-name"\n', former_profile.read_text(encoding="utf-8"))
+                    self.assertEqual('name = "former"\n', former.read_text(encoding="utf-8"))
+                    self.assertFalse((project_target / generated[0].name).exists())
+                    ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+                    self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
 
-            verified = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-MigrateProjectRoot",
-                    str(project),
-                    "-Verify",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, verified.returncode, verified.stderr)
-            self.assertIn(f"VERIFIED: {len(generated)} profile agent(s)", verified.stdout)
-            repeated = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-MigrateProjectRoot",
-                    str(project),
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, repeated.returncode, repeated.stderr)
-            self.assertIn("INSTALLED: 0 change(s)", repeated.stdout)
+                    verified = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-MigrateProjectRoot",
+                            str(project),
+                            "-Verify",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, verified.returncode, verified.stderr)
+                    self.assertIn(f"VERIFIED: {len(generated)} profile agent(s)", verified.stdout)
+                    repeated = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-MigrateProjectRoot",
+                            str(project),
+                            "-Apply",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, repeated.returncode, repeated.stderr)
+                    self.assertIn("INSTALLED: 0 change(s)", repeated.stdout)
 
-            drifted = target / generated[0].name
-            drifted.write_text('name = "drifted"\n', encoding="utf-8")
-            rejected = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Verify"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(0, rejected.returncode)
-            self.assertIn("Profile verification failed", rejected.stderr)
+                    drifted = target / generated[0].name
+                    drifted.write_text('name = "drifted"\n', encoding="utf-8")
+                    rejected = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Verify"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, rejected.returncode)
+                    self.assertIn("Profile verification failed", rejected.stderr)
 
-            repaired = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(0, repaired.returncode)
-            self.assertIn("unowned or modified profile agent", repaired.stderr)
-            self.assertEqual('name = "drifted"\n', drifted.read_text(encoding="utf-8"))
-            shutil.copy2(generated[0], drifted)
-            drifted.write_text('name = "modified-after-install"\n', encoding="utf-8")
-            refused_uninstall = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-Uninstall",
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(0, refused_uninstall.returncode)
-            self.assertIn("modified owned profile agent", refused_uninstall.stderr)
-            self.assertEqual('name = "modified-after-install"\n', drifted.read_text(encoding="utf-8"))
-            shutil.copy2(generated[0], drifted)
-            removed = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-Uninstall",
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, removed.returncode, removed.stderr)
-            self.assertEqual(
-                sorted([unrelated_profile, former_profile]), sorted(target.glob("*.toml"))
-            )
-            self.assertFalse((target / ".base-agents-delivery.json").exists())
+                    repaired = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, repaired.returncode)
+                    self.assertIn("unowned or modified profile agent", repaired.stderr)
+                    self.assertEqual('name = "drifted"\n', drifted.read_text(encoding="utf-8"))
+                    shutil.copy2(generated[0], drifted)
+                    drifted.write_text('name = "modified-after-install"\n', encoding="utf-8")
+                    refused_uninstall = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-Uninstall",
+                            "-Apply",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, refused_uninstall.returncode)
+                    self.assertIn("modified owned profile agent", refused_uninstall.stderr)
+                    self.assertEqual('name = "modified-after-install"\n', drifted.read_text(encoding="utf-8"))
+                    shutil.copy2(generated[0], drifted)
+                    removed = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-Uninstall",
+                            "-Apply",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, removed.returncode, removed.stderr)
+                    self.assertEqual(
+                        sorted([unrelated_profile, former_profile]), sorted(target.glob("*.toml"))
+                    )
+                    self.assertFalse((target / ".base-agents-delivery.json").exists())
 
-            environment = os.environ.copy()
-            environment["CODEX_HOME"] = str(codex_home)
-            environment_preview = subprocess.run(
-                [*arguments, "-File", str(script)],
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
-            self.assertEqual(0, environment_preview.returncode, environment_preview.stderr)
-            expected_suffix = str(Path(codex_home.name) / "agents" / generated[0].name)
-            self.assertTrue(
-                any(
-                    line.startswith("ADD ")
-                    and line.casefold().endswith(expected_suffix.casefold())
-                    for line in environment_preview.stdout.splitlines()
-                ),
-                environment_preview.stdout,
-            )
+                    environment = os.environ.copy()
+                    environment["CODEX_HOME"] = str(codex_home)
+                    environment_preview = subprocess.run(
+                        [*arguments, "-File", str(script)],
+                        capture_output=True,
+                        text=True,
+                        env=environment,
+                    )
+                    self.assertEqual(0, environment_preview.returncode, environment_preview.stderr)
+                    expected_suffix = str(Path(codex_home.name) / "agents" / generated[0].name)
+                    self.assertTrue(
+                        any(
+                            line.startswith("ADD ")
+                            and line.casefold().endswith(expected_suffix.casefold())
+                            for line in environment_preview.stdout.splitlines()
+                        ),
+                        environment_preview.stdout,
+                    )
 
     def test_codex_installer_preserves_colliding_unowned_profile_agents(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
-        generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
-        arguments = [shell, "-NoProfile"]
-        if Path(shell).name.lower() == "powershell.exe":
-            arguments += ["-ExecutionPolicy", "Bypass"]
-        with tempfile.TemporaryDirectory() as temp:
-            codex_home = Path(temp) / "codex-home"
-            target = codex_home / "agents"
-            target.mkdir(parents=True)
-            collision = target / generated[0].name
-            collision.write_text('name = "personal-collision"\n', encoding="utf-8")
-            rejected = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(0, rejected.returncode)
-            self.assertIn("unowned or modified profile agent", rejected.stderr)
-            self.assertEqual('name = "personal-collision"\n', collision.read_text(encoding="utf-8"))
-            self.assertEqual([collision], list(target.glob("*.toml")))
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+                generated = sorted((ROOT / "plugins" / "engineering" / "codex-agents").glob("*.toml"))
+                with tempfile.TemporaryDirectory() as temp:
+                    codex_home = Path(temp) / "codex-home"
+                    target = codex_home / "agents"
+                    target.mkdir(parents=True)
+                    collision = target / generated[0].name
+                    collision.write_text('name = "personal-collision"\n', encoding="utf-8")
+                    rejected = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, rejected.returncode)
+                    self.assertIn("unowned or modified profile agent", rejected.stderr)
+                    self.assertEqual('name = "personal-collision"\n', collision.read_text(encoding="utf-8"))
+                    self.assertEqual([collision], list(target.glob("*.toml")))
 
-            shutil.copy2(generated[0], collision)
-            applied = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, applied.returncode, applied.stderr)
-            ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
-            self.assertNotIn(generated[0].name, [item["name"] for item in ownership["files"]])
-            removed = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-Uninstall",
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, removed.returncode, removed.stderr)
-            self.assertEqual(generated[0].read_bytes(), collision.read_bytes())
+                    shutil.copy2(generated[0], collision)
+                    applied = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, applied.returncode, applied.stderr)
+                    ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+                    self.assertNotIn(generated[0].name, [item["name"] for item in ownership["files"]])
+                    removed = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-Uninstall",
+                            "-Apply",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, removed.returncode, removed.stderr)
+                    self.assertEqual(generated[0].read_bytes(), collision.read_bytes())
 
     def test_codex_installer_recovers_interrupted_apply_ownership(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        arguments = [shell, "-NoProfile"]
-        if Path(shell).name.lower() == "powershell.exe":
-            arguments += ["-ExecutionPolicy", "Bypass"]
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            bundle = root / "bundle" / ".codex"
-            source = bundle / "agents"
-            shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
-            script = bundle / "install-workflow-agents.ps1"
-            shutil.copy2(ROOT / ".codex" / script.name, script)
-            shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
-            generated = sorted(source.glob("*.toml"))
-            codex_home = root / "codex-home"
-            target = codex_home / "agents"
-            target.mkdir(parents=True)
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    bundle = root / "bundle" / ".codex"
+                    source = bundle / "agents"
+                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
+                    script = bundle / "install-workflow-agents.ps1"
+                    shutil.copy2(ROOT / ".codex" / script.name, script)
+                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+                    generated = sorted(source.glob("*.toml"))
+                    codex_home = root / "codex-home"
+                    target = codex_home / "agents"
+                    target.mkdir(parents=True)
 
-            # Simulate termination after the pending journal and first atomic copy, but before the final
-            # ownership manifest. The retry may adopt only files named with the journal's exact digest.
-            pending = {
-                "schema_version": 1,
-                "owner": "base-agents",
-                "files": [
-                    {
-                        "name": path.name,
-                        "sha256": hashlib.sha256(path.read_bytes()).hexdigest().upper(),
+                    # Simulate termination after the pending journal and first atomic copy, but before the final
+                    # ownership manifest. The retry may adopt only files named with the journal's exact digest.
+                    pending = {
+                        "schema_version": 1,
+                        "owner": "base-agents",
+                        "files": [
+                            {
+                                "name": path.name,
+                                "sha256": hashlib.sha256(path.read_bytes()).hexdigest().upper(),
+                            }
+                            for path in generated
+                        ],
                     }
-                    for path in generated
-                ],
-            }
-            (target / ".base-agents-delivery.pending.json").write_text(
-                json.dumps(pending), encoding="utf-8"
-            )
-            shutil.copy2(generated[0], target / generated[0].name)
+                    (target / ".base-agents-delivery.pending.json").write_text(
+                        json.dumps(pending), encoding="utf-8"
+                    )
+                    shutil.copy2(generated[0], target / generated[0].name)
 
-            verify_interrupted = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Verify"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(0, verify_interrupted.returncode)
-            self.assertIn("interrupted install journal", verify_interrupted.stderr)
+                    verify_interrupted = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Verify"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, verify_interrupted.returncode)
+                    self.assertIn("interrupted install journal", verify_interrupted.stderr)
 
-            recovered = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, recovered.returncode, recovered.stderr)
-            self.assertFalse((target / ".base-agents-delivery.pending.json").exists())
-            ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
-            self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
+                    recovered = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, recovered.returncode, recovered.stderr)
+                    self.assertFalse((target / ".base-agents-delivery.pending.json").exists())
+                    ownership = json.loads((target / ".base-agents-delivery.json").read_text(encoding="utf-8"))
+                    self.assertEqual([path.name for path in generated], sorted(item["name"] for item in ownership["files"]))
 
-            upgraded_content = generated[0].read_bytes() + b"\n# upgraded\n"
-            generated[0].write_bytes(upgraded_content)
-            upgraded = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, upgraded.returncode, upgraded.stderr)
-            self.assertEqual(upgraded_content, (target / generated[0].name).read_bytes())
+                    upgraded_content = generated[0].read_bytes() + b"\n# upgraded\n"
+                    generated[0].write_bytes(upgraded_content)
+                    upgraded = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, upgraded.returncode, upgraded.stderr)
+                    self.assertEqual(upgraded_content, (target / generated[0].name).read_bytes())
 
-            removed = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(codex_home),
-                    "-Uninstall",
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, removed.returncode, removed.stderr)
-            self.assertFalse(target.exists())
+                    removed = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(script),
+                            "-CodexHome",
+                            str(codex_home),
+                            "-Uninstall",
+                            "-Apply",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, removed.returncode, removed.stderr)
+                    self.assertFalse(target.exists())
 
     def test_codex_installer_migrates_only_digest_proven_former_project_agents(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        arguments = [shell, "-NoProfile"]
-        if Path(shell).name.lower() == "powershell.exe":
-            arguments += ["-ExecutionPolicy", "Bypass"]
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            bundle = root / "bundle" / ".codex"
-            source = bundle / "agents"
-            shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
-            script = bundle / "install-workflow-agents.ps1"
-            shutil.copy2(ROOT / ".codex" / script.name, script)
-            delivery = json.loads((ROOT / ".codex" / "agent-delivery.json").read_text(encoding="utf-8"))
-            known_content = b'name = "known-former"\n'
-            delivery["project_managed_agent_sha256"]["workflow-review-lens.toml"] = [
-                hashlib.sha256(known_content).hexdigest()
-            ]
-            (bundle / "agent-delivery.json").write_text(json.dumps(delivery), encoding="utf-8")
-            project = root / "project"
-            (project / ".git").mkdir(parents=True)
-            project_agents = project / ".codex" / "agents"
-            project_agents.mkdir(parents=True)
-            known = project_agents / "workflow-review-lens.toml"
-            known.write_bytes(known_content)
-            unknown = project_agents / "workflow-log-analyst.toml"
-            unknown.write_text('name = "personal-collision"\n', encoding="utf-8")
-            completed = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(script),
-                    "-CodexHome",
-                    str(root / "codex-home"),
-                    "-MigrateProjectRoot",
-                    str(project),
-                    "-Apply",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, completed.returncode, completed.stderr)
-            self.assertFalse(known.exists())
-            self.assertEqual('name = "personal-collision"\n', unknown.read_text(encoding="utf-8"))
-
-    def test_the_authored_installer_refuses_to_run_without_generated_roles(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        arguments = [shell, "-NoProfile"]
-        if Path(shell).name.lower() == "powershell.exe":
-            arguments += ["-ExecutionPolicy", "Bypass"]
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            bundle = root / "bundle" / "scripts"
-            bundle.mkdir(parents=True)
-            script = bundle / "install-codex-agents.ps1"
-            shutil.copy2(ROOT / ".codex" / "install-workflow-agents.ps1", script)
-            project = root / "project"
-            project.mkdir()
-            (project / ".git").mkdir()
-            attempted = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(project / "codex-home")],
-                capture_output=True,
-                text=True,
-            )
-        self.assertNotEqual(0, attempted.returncode)
-        self.assertIn("No generated role files beside this installer", attempted.stderr)
-
-
-
-    def test_codex_installer_rejects_a_profile_reparse_point_target(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            codex_home = root / "codex-home"
-            outside = root / "outside"
-            codex_home.mkdir()
-            outside.mkdir()
-            target = codex_home / "agents"
-            if os.name == "nt":
-                linked = subprocess.run(
-                    ["cmd.exe", "/D", "/C", "mklink", "/J", str(target), str(outside)],
-                    capture_output=True,
-                    text=True,
-                )
-                if linked.returncode:
-                    self.skipTest(linked.stderr or linked.stdout)
-            else:
-                target.symlink_to(outside, target_is_directory=True)
-            arguments = [shell, "-NoProfile"]
-            if Path(shell).name.lower() == "powershell.exe":
-                arguments += ["-ExecutionPolicy", "Bypass"]
-            completed = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(0, completed.returncode)
-            self.assertIn("reparse point", completed.stderr)
-            self.assertEqual([], list(outside.iterdir()))
-
-    def test_codex_installer_rejects_a_reparse_point_in_a_profile_ancestor(self):
-        # Every available host: Windows PowerShell and PowerShell 7 bind String.Split differently.
-        shells = [shell for shell in map(shutil.which, ("powershell.exe", "pwsh")) if shell]
-        self.assertNotEqual([], shells)
-        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            outside = root / "outside"
-            outside.mkdir()
-            linked = root / "linked"
-            if os.name == "nt":
-                created = subprocess.run(
-                    ["cmd.exe", "/D", "/C", "mklink", "/J", str(linked), str(outside)],
-                    capture_output=True,
-                    text=True,
-                )
-                if created.returncode:
-                    self.skipTest(created.stderr or created.stdout)
-            else:
-                linked.symlink_to(outside, target_is_directory=True)
-            for shell in shells:
-                with self.subTest(shell=Path(shell).name):
-                    arguments = [shell, "-NoProfile"]
-                    if Path(shell).name.lower() == "powershell.exe":
-                        arguments += ["-ExecutionPolicy", "Bypass"]
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    bundle = root / "bundle" / ".codex"
+                    source = bundle / "agents"
+                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
+                    script = bundle / "install-workflow-agents.ps1"
+                    shutil.copy2(ROOT / ".codex" / script.name, script)
+                    delivery = json.loads((ROOT / ".codex" / "agent-delivery.json").read_text(encoding="utf-8"))
+                    known_content = b'name = "known-former"\n'
+                    delivery["project_managed_agent_sha256"]["workflow-review-lens.toml"] = [
+                        hashlib.sha256(known_content).hexdigest()
+                    ]
+                    (bundle / "agent-delivery.json").write_text(json.dumps(delivery), encoding="utf-8")
+                    project = root / "project"
+                    (project / ".git").mkdir(parents=True)
+                    project_agents = project / ".codex" / "agents"
+                    project_agents.mkdir(parents=True)
+                    known = project_agents / "workflow-review-lens.toml"
+                    known.write_bytes(known_content)
+                    unknown = project_agents / "workflow-log-analyst.toml"
+                    unknown.write_text('name = "personal-collision"\n', encoding="utf-8")
                     completed = subprocess.run(
                         [
                             *arguments,
                             "-File",
                             str(script),
                             "-CodexHome",
-                            str(linked / "profile"),
+                            str(root / "codex-home"),
+                            "-MigrateProjectRoot",
+                            str(project),
                             "-Apply",
                         ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    self.assertFalse(known.exists())
+                    self.assertEqual('name = "personal-collision"\n', unknown.read_text(encoding="utf-8"))
+
+    def test_the_authored_installer_refuses_to_run_without_generated_roles(self):
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    bundle = root / "bundle" / "scripts"
+                    bundle.mkdir(parents=True)
+                    script = bundle / "install-codex-agents.ps1"
+                    shutil.copy2(ROOT / ".codex" / "install-workflow-agents.ps1", script)
+                    project = root / "project"
+                    project.mkdir()
+                    (project / ".git").mkdir()
+                    attempted = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(project / "codex-home")],
+                        capture_output=True,
+                        text=True,
+                    )
+                self.assertNotEqual(0, attempted.returncode)
+                self.assertIn("No generated role files beside this installer", attempted.stderr)
+
+
+
+    def test_codex_installer_rejects_a_profile_reparse_point_target(self):
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    codex_home = root / "codex-home"
+                    outside = root / "outside"
+                    codex_home.mkdir()
+                    outside.mkdir()
+                    target = codex_home / "agents"
+                    if os.name == "nt":
+                        linked = subprocess.run(
+                            ["cmd.exe", "/D", "/C", "mklink", "/J", str(target), str(outside)],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if linked.returncode:
+                            self.skipTest(linked.stderr or linked.stdout)
+                    else:
+                        target.symlink_to(outside, target_is_directory=True)
+                    completed = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertNotEqual(0, completed.returncode)
+                    self.assertIn("reparse point", completed.stderr)
+                    self.assertEqual([], list(outside.iterdir()))
+
+    def link_directory(self, link, target):
+        if os.name == "nt":
+            created = subprocess.run(
+                ["cmd.exe", "/D", "/C", "mklink", "/J", str(link), str(target)],
+                capture_output=True,
+                text=True,
+            )
+            if created.returncode:
+                self.skipTest(created.stderr or created.stdout)
+        else:
+            link.symlink_to(target, target_is_directory=True)
+
+    def test_codex_installer_rejects_a_reparse_point_in_a_profile_ancestor(self):
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        script = ROOT / "plugins" / "engineering" / "scripts" / "install-codex-agents.ps1"
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    outside = root / "outside"
+                    outside.mkdir()
+                    linked = root / "linked"
+                    self.link_directory(linked, outside)
+                    completed = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(linked / "profile"), "-Apply"],
                         capture_output=True,
                         text=True,
                     )
@@ -1105,78 +1108,76 @@ class WorkflowGenerationTests(unittest.TestCase):
                     self.assertEqual([], list(outside.iterdir()))
 
     def test_codex_installer_ignores_unrelated_source_agents(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            bundle = root / "bundle" / ".codex"
-            source = bundle / "agents"
-            shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
-            script = bundle / "install-workflow-agents.ps1"
-            shutil.copy2(ROOT / ".codex" / script.name, script)
-            shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
-            generated = len(list(source.glob("*.toml")))
-            (source / "unrelated.toml").write_text('name = "unrelated"\n', encoding="utf-8")
-            codex_home = root / "codex-home"
-            arguments = [shell, "-NoProfile"]
-            if Path(shell).name.lower() == "powershell.exe":
-                arguments += ["-ExecutionPolicy", "Bypass"]
-            completed = subprocess.run(
-                [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, completed.returncode, completed.stderr)
-            target = codex_home / "agents"
-            self.assertEqual(generated, len(list(target.glob("*.toml"))))
-            self.assertFalse((target / "unrelated.toml").exists())
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    bundle = root / "bundle" / ".codex"
+                    source = bundle / "agents"
+                    shutil.copytree(ROOT / "plugins" / "engineering" / "codex-agents", source)
+                    script = bundle / "install-workflow-agents.ps1"
+                    shutil.copy2(ROOT / ".codex" / script.name, script)
+                    shutil.copy2(ROOT / ".codex" / "agent-delivery.json", bundle / "agent-delivery.json")
+                    generated = len(list(source.glob("*.toml")))
+                    (source / "unrelated.toml").write_text('name = "unrelated"\n', encoding="utf-8")
+                    codex_home = root / "codex-home"
+                    completed = subprocess.run(
+                        [*arguments, "-File", str(script), "-CodexHome", str(codex_home), "-Apply"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    target = codex_home / "agents"
+                    self.assertEqual(generated, len(list(target.glob("*.toml"))))
+                    self.assertFalse((target / "unrelated.toml").exists())
 
     def test_generator_preserves_authored_host_files_and_prunes_plugin_orphans(self):
-        shell = shutil.which("powershell.exe") or shutil.which("pwsh")
-        self.assertIsNotNone(shell)
-        with tempfile.TemporaryDirectory() as temp:
-            repository = Path(temp) / "repository"
-            shutil.copytree(
-                ROOT,
-                repository,
-                ignore=shutil.ignore_patterns(".git", "__pycache__"),
-            )
-            source_markers = (
-                repository / ".claude" / "user-owned.txt",
-                repository / ".codex" / "user-owned.txt",
-            )
-            for marker in source_markers:
-                marker.write_text("preserve\n", encoding="utf-8")
-            orphan = repository / "plugins/engineering/codex-agents/unrelated.toml"
-            orphan.write_text("generated orphan\n", encoding="utf-8")
-            arguments = [shell, "-NoProfile"]
-            if Path(shell).name.lower() == "powershell.exe":
-                arguments += ["-ExecutionPolicy", "Bypass"]
-            checked = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(repository / ".agents" / "sync-generated.ps1"),
-                    "-Check",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(1, checked.returncode)
-            self.assertIn("orphans: 1", checked.stderr)
-            completed = subprocess.run(
-                [
-                    *arguments,
-                    "-File",
-                    str(repository / ".agents" / "sync-generated.ps1"),
-                ],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, completed.returncode, completed.stderr)
-            self.assertFalse(orphan.exists())
-            for marker in source_markers:
-                self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
+        hosts = powershell_hosts()
+        self.assertNotEqual([], hosts)
+        for name, arguments in hosts:
+            with self.subTest(host=name):
+                with tempfile.TemporaryDirectory() as temp:
+                    repository = Path(temp) / "repository"
+                    shutil.copytree(
+                        ROOT,
+                        repository,
+                        ignore=shutil.ignore_patterns(".git", "__pycache__"),
+                    )
+                    source_markers = (
+                        repository / ".claude" / "user-owned.txt",
+                        repository / ".codex" / "user-owned.txt",
+                    )
+                    for marker in source_markers:
+                        marker.write_text("preserve\n", encoding="utf-8")
+                    orphan = repository / "plugins/engineering/codex-agents/unrelated.toml"
+                    orphan.write_text("generated orphan\n", encoding="utf-8")
+                    checked = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(repository / ".agents" / "sync-generated.ps1"),
+                            "-Check",
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(1, checked.returncode)
+                    self.assertIn("orphans: 1", checked.stderr)
+                    completed = subprocess.run(
+                        [
+                            *arguments,
+                            "-File",
+                            str(repository / ".agents" / "sync-generated.ps1"),
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    self.assertFalse(orphan.exists())
+                    for marker in source_markers:
+                        self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
 
 
 
