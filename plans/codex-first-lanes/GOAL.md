@@ -1,6 +1,6 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: PR #148 merged, generated packages installed, and post-merge CI passed. The fresh Sonnet routing acceptance failed by implementing locally. The old PR owner is archived blocked; successor runtime `Fix/CodexFirstLanesRuntime` is active for the L3-diagnosed L4 repair. The goal remains open.
+Status: PR #148 merged, generated packages installed, and post-merge CI passed. Fresh Sonnet routing acceptance failed by implementing locally. Successor `Fix/CodexFirstLanesRuntime` is local and unpublished; its L4 review repair passed all 38 router tests. Further live Claude tests are blocked pending explicit approval and available usage. The goal remains open.
 
 PR: https://github.com/tj-agents/core/pull/148
 
@@ -45,7 +45,7 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. The Claude-only enforcement repair is implemented on `Fix/CodexFirstLanesRuntime`; all 37 router tests pass and candidate packages are generated. Automatic approval review rejected the final live Claude probe because candidate-plugin/workspace data may be sent externally without explicit payload/destination authorization. The exact user approval question is pending. Do not retry that launch until approval arrives. Meanwhile checkpoint and review the concrete local candidate; after approval run the unchanged capped Sonnet task, requiring actual Codex launch and child results before publication.
+1. Checkpoint the local L4 repair of review finding R1 (a launcher-path mention could exempt an entire shell command) and review the frozen candidate using in-session Codex workers. The repaired guard accepts standalone launcher calls and rejects mentions, command chains and substitutions; all 38 router tests and the scoped diff check pass, and generated candidates are refreshed. No further Claude model calls are authorized by the latest response: Tommy raised scarce subscription usage and billing concerns rather than approving the pending probe. Automatic approval review also rejected sending the candidate plugins and synthetic workspace to Anthropic without explicit payload/destination authorization. Keep that test blocked and stop its continuation after independent local work is complete. Resume only after later explicit approval and available Claude usage; then require actual Codex launch and child results before publication.
 2. Causally linked post-merge CI run `37795175405` passed, including regeneration job `113372642356` and verify job `113372641549`. The generated commit is a direct child of landing commit `fa9f7400d939ba9cbf57048d2f94787aeaca864e`; primary checkout fast-forwarded with pre-existing files preserved.
 3. Record actual acceptance evidence, pass the completion check, release the completed delivery and scheduler, then close this session (`finish.ps1` after a removable `cleanup_proof.py`).
 
@@ -99,7 +99,7 @@ Review lane: L4 (or the declared Codex review specialist). Delivery lane: L7 cle
 use L6 for a sustained monitor. The L1 parent owns only design and synthesis, with bounded workers
 applying implementation and review lanes.
 
-Current next action: complete the small reconciliation-correction review and exact-head CI, then merge PR #148.
+Historical PR #148 delivery evidence follows; the current next action is in Next Steps above.
 Implementation: `fe34217`, reconciled at `a3c82ff`; review repairs: `f1c9077`.
 The first independent pass found a routed-lane plus model override gap and a stale bootstrap dependency
 assertion. Both are repaired; this commit clarifies the matching launcher wording.
@@ -185,9 +185,16 @@ Preserve that observation; do not claim a route passed. One corrected run uses t
 explicit `claude-sonnet-5`, low effort, a $0.75 cap and a bounded runtime. No further prompt reshaping.
 
 The valid corrected probe used Python argv transport, confirmed `claude-sonnet-5` at init and preserved
-the entire ordinary multiphase prompt. It completed in 29.029 API seconds for $0.2316332, writing
+the entire ordinary multiphase prompt. It completed in 29.029 API seconds with a CLI estimated cost of $0.2316332, writing
 `task_summary.py` and `test_task_summary.py` locally and running seven passing tests. No handoff,
 subagent, Codex lane receipt, or Codex child result occurred. This is an observed acceptance failure;
 the requested outcome is not complete. Evidence directory:
 `C:/Users/TommySeery/AppData/Local/Temp/pr148-claude-codex-first-corrected-python-10ea7aa3de974db282eeeb6134878fea`.
 Preserve `argv.json`, `init-metadata.json`, `probe-summary.json` and `claude-stream.jsonl`.
+
+Billing clarification, 2026-10-08: the read-only native `claude auth status` reports `claude.ai`
+authentication and a Team subscription; the current process has no `ANTHROPIC_API_KEY`,
+`ANTHROPIC_AUTH_TOKEN`, or `CLAUDE_CODE_OAUTH_TOKEN` override. No extra usage or API billing was enabled
+by this work. CLI dollar figures are estimated token costs, not evidence of an invoice. The earlier
+probes consumed Claude usage; the organisation's existing extra-usage setting was not verified.
+No further Claude model call was made for this check.

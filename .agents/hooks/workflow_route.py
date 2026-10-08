@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import sys
 import tempfile
 import time
@@ -49,6 +50,11 @@ READ_ONLY_SHELL_COMMAND = re.compile(
     r"(?:cat|type|get-content)\s+[-A-Za-z0-9_./\\]+",
     re.IGNORECASE,
 )
+CODEX_LAUNCHER_PATH = re.compile(
+    r"(?:^|[/\\])handoff-codex[/\\]scripts[/\\]launch-codex\.ps1$",
+    re.IGNORECASE,
+)
+POWERSHELL_EXECUTABLES = {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}
 
 PLANNING_DIRECTIVE = re.compile(
     r"(?:^|[.!?;:,\n]|\b(?:and|but|then)\b)\s*"
@@ -462,8 +468,36 @@ def command(data: dict) -> str:
 
 
 def codex_launcher(command_text: str) -> bool:
-    normalized = command_text.replace("\\", "/").lower()
-    return "handoff-codex/scripts/launch-codex.ps1" in normalized
+    if not isinstance(command_text, str) or any(
+        token in command_text for token in ("|", ";", ">", "<", "`", "$", "\n", "\r", "(", ")")
+    ):
+        return False
+    try:
+        tokens = shlex.split(command_text, posix=False)
+    except ValueError:
+        return False
+    if len(tokens) >= 2 and tokens[0] == "&":
+        return (
+            command_text.count("&") == 1
+            and CODEX_LAUNCHER_PATH.search(tokens[1].strip("'\"")) is not None
+        )
+    if "&" in command_text:
+        return False
+    if not tokens or tokens[0].casefold() not in POWERSHELL_EXECUTABLES:
+        return False
+    index = 1
+    while index < len(tokens):
+        option = tokens[index].casefold()
+        if option in {"-noprofile", "-nologo", "-noninteractive"}:
+            index += 1
+            continue
+        if option == "-executionpolicy" and index + 1 < len(tokens):
+            index += 2
+            continue
+        if option in {"-file", "-f"} and index + 1 < len(tokens):
+            return CODEX_LAUNCHER_PATH.search(tokens[index + 1].strip("'\"")) is not None
+        return False
+    return False
 
 
 def handoff_preparation(data: dict, receipt: dict) -> bool:
