@@ -29,6 +29,7 @@ QUESTION = re.compile(
 )
 EXPLICIT_CLAUDE = re.compile(
     r"\b(?:use|keep|stay|run|do)\s+(?:this\s+)?(?:on\s+)?claude\b|"
+    r"\bi\s+want\s+claude\s+to\s+(?:do|handle|implement|build|run)\b|"
     r"\bclaude\s+(?:should|must|can)\s+(?:do|handle|implement|build|run)\b",
     re.IGNORECASE,
 )
@@ -105,7 +106,9 @@ HANDOFF_ACTION = re.compile(
 DIRECT_HANDOFF = re.compile(
     r"(?:^|[.!?;\n]\s*)(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|"
     r"go\s+ahead\s+and\s+)?(?:hand\s+(?:off\b|(?:this|it|that)\s+off\b)|"
-    r"do\s+(?:a\s+)?handoff\b|handoff\b)",
+    r"do\s+(?:a\s+)?handoff\b|handoff\b)|"
+    r"\b(?:delegate|dispatch)\s+(?:an?\s+)?(?:(?:architectural|design)\s+)?"
+    r"(?:design|review)\b",
     re.IGNORECASE,
 )
 COMPLETE_STATUS = re.compile(
@@ -156,6 +159,10 @@ def selects_plan_execution(prompt: str, cwd: Path) -> bool:
 
 def selects_handoff(prompt: str, cwd: Path) -> bool:
     if not prompt.strip():
+        return False
+    if QUESTION.search(prompt) or re.search(
+        r"\b(?:do\s+not|don't|never)\s+(?:hand\s*off|delegate|dispatch)\b", prompt, re.IGNORECASE
+    ):
         return False
     if DIRECT_HANDOFF.search(prompt):
         return True
@@ -281,13 +288,17 @@ def prompt_mode(prompt: str, cwd: Path, harness: str | None, previous: dict | No
     previous = previous or {}
     if intent or QUESTION.search(evidence):
         return "conversation"
-    if explicit_claude(evidence):
+    if explicit_claude(unquoted(evidence)):
         return "explicit-claude"
     if previous.get("mode") == "codex":
         return "codex"
     if tiny_inline(evidence, cwd, previous):
         return "tiny-inline"
-    return "codex" if IMPLEMENTATION.search(evidence) else "conversation"
+    return "codex" if (
+        IMPLEMENTATION.search(evidence)
+        or selects_plan_execution(evidence, cwd)
+        or selects_handoff(evidence, cwd)
+    ) else "conversation"
 
 
 def route(prompt: str, cwd: Path, harness: str | None = None,
