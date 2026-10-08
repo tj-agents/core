@@ -218,10 +218,9 @@ RESULT.md.
 Fix/TransferredCleanupObligation (uncommitted, separate owner) edits `Find-ObligationPaths`,
 `Test-ProcessExited`, and CloseOnly obligation clearing in finish_reaper.ps1, plus appends
 `-TransferredOnlyTests` scenarios to the test file. This repair touches none of those functions, none
-of the obligation semantics, and no CloseOnly control flow; the one CloseOnly-visible change is
-record-shape repair — the host-wait expiry and failure records keep the close shape (`session_id`,
-`host_started_at`, no reaper identity) instead of inheriting the cleanup fields the shared paths
-gained. Its reaper edits are the started record, the accept-gate insertion between the startup record
+of the obligation semantics, and no CloseOnly control flow; the one CloseOnly-visible change is the
+record-shape repair stated in the `-CloseOnly` paragraph above. Its reaper edits are the started
+record, the accept-gate insertion between the startup record
 and the wait loop, the pre-removal cancel re-check, the terminal-record helper, the param block
 (`-AcceptTimeoutSeconds`), and the help block — the last two are the likely textual conflicts. One
 non-textual conflict to reconcile at that owner's PR: any cleanup-mode reaper its tests start directly
