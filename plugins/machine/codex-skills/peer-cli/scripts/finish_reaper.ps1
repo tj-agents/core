@@ -335,9 +335,10 @@ function Save-CloseStartupRecord {
 function Invoke-Git {
     param([string] $Cwd, [string[]] $Arguments)
 
-    $allArgs = @('-C', $Cwd) + $Arguments
+    $ErrorActionPreference = 'Continue'
+    $allArgs = @('-c', 'core.longpaths=true', '-C', $Cwd) + $Arguments
     $output = & git @allArgs 2>&1
-    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($output -join "`n") }
+    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = (@($output | ForEach-Object { "$_" }) -join "`n") }
 }
 
 function Now-Epoch {
@@ -446,8 +447,13 @@ try {
 
     $removeResult = Invoke-Git -Cwd $Primary -Arguments @('worktree', 'remove', '--', $Worktree)
     if ($removeResult.ExitCode -ne 0) {
-        Save-CleanupTerminalRecord -Status 'failed' -Extra @{ error = "git worktree remove failed: $($removeResult.Output)" }
-        return
+        $porcelainAfterFailure = (Invoke-Git -Cwd $Primary -Arguments @('worktree', 'list', '--porcelain')).Output
+        $alreadyGone = (-not (Test-Path -LiteralPath $Worktree)) -and
+            (-not (Test-WorktreeStillRegistered -PorcelainOutput $porcelainAfterFailure -ResolvedWorktree $Worktree))
+        if (-not $alreadyGone) {
+            Save-CleanupTerminalRecord -Status 'failed' -Extra @{ error = "git worktree remove failed: $($removeResult.Output)" }
+            return
+        }
     }
 
     $branchPreserved = $false
