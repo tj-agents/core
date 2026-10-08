@@ -26,18 +26,18 @@
       "why": "top general family at the setting above `high`. Judgement with a lot riding on it that designs nothing: a diagnosis of a production failure, a security or migration review. Delivering a change never selects it; merge, push and publish are governed by the delivery gates."
     },
     "L3": {
-      "summary": "Open-ended judgement that is not design, where the answer is not yet known.",
+      "summary": "Open investigation or bounded uncertain design with unresolved alternatives.",
       "model": "claude-opus-5-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "top general family at its default setting. Open-ended judgement that designs nothing: a diagnosis with no known answer, an investigation, weighing evidence a test cannot settle."
+      "why": "top general family at its default setting. Open investigation or bounded uncertain design with unresolved alternatives, including a diagnosis with no known answer or evidence a test cannot settle."
     },
     "L4": {
-      "summary": "Specified implementation that still needs code-level judgement.",
+      "summary": "Specified implementation, ordinary review, and small local testable choices.",
       "model": "claude-sonnet-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "the workhorse. Specified implementation that still needs code-level judgement: features, bugfixes and review lenses whose mistakes a compiler or a test suite will catch. Delivery never selects this rung."
+      "why": "the workhorse. Specified implementation and ordinary review, including a small local mechanism choice inside a testable fix. Features, bugfixes and review lenses whose mistakes a compiler or a test suite will catch. Delivery never selects this rung."
     },
     "L5": {
       "summary": "Mechanical work whose shape is already decided.",

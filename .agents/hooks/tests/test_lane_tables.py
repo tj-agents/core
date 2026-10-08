@@ -263,6 +263,8 @@ class GeneratedLaneAgentTests(unittest.TestCase):
         manifest = json.loads((HOSTS / "claude.json").read_text(encoding="utf-8-sig"))
         for stage in manifest["semantic_stages"].values():
             self.assertNotEqual(forbidden, stage["model"])
+        for role in manifest["roles"].values():
+            self.assertNotEqual(forbidden, role["model"])
 
     def test_codex_agents_carry_the_resolved_rung_including_effort(self):
         for lane, rung in table("codex")["lanes"].items():
@@ -290,7 +292,7 @@ class PluginDeliveryTests(unittest.TestCase):
     PLUGIN = ROOT / "plugins" / "engineering"
 
     def test_the_plugin_ships_the_tables_and_the_resolver(self):
-        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md"):
+        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md", "handoff-agent-body.md"):
             with self.subTest(name=name):
                 shipped = self.PLUGIN / ".agents" / "lanes" / name
                 self.assertTrue(shipped.is_file(), f"plugins/engineering/.agents/lanes/{name} is not shipped")
@@ -304,7 +306,7 @@ class PluginDeliveryTests(unittest.TestCase):
         # either shared library beside it (agent-cli.ps1 for handoff-codex, agent_cli.py for handoff-claude)
         # -- the same hop that finds .agents/lanes in the authored layout. A machine-only install must price
         # a lane identically to an engineering one.
-        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md"):
+        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md", "handoff-agent-body.md"):
             with self.subTest(name=name):
                 shipped = ROOT / "plugins" / "machine" / "resources" / "lanes" / name
                 self.assertTrue(shipped.is_file(), f"plugins/machine/resources/lanes/{name} is not shipped")
