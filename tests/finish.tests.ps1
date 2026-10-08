@@ -1341,7 +1341,8 @@ Move-Item -LiteralPath $temp -Destination $Path
             return $false
         }
         Invoke-ReaperHandshakeUnit -ResultPath $resultAcceptClamp -SpawnImpl $spawnImplAcceptClamp | Out-Null
-        Assert-True -Actual ($script:unitCapturedCommandLine.TrimEnd().EndsWith('-AcceptTimeoutSeconds 60')) `
+        Assert-True -Actual ($null -ne $script:unitCapturedCommandLine -and
+            $script:unitCapturedCommandLine.TrimEnd().EndsWith('-AcceptTimeoutSeconds 60')) `
             -Message "An explicit accept timeout below the floor was not clamped to exactly 60 on the reaper command line: $($script:unitCapturedCommandLine)"
     }
     finally {
