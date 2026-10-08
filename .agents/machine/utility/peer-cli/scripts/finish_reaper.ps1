@@ -400,15 +400,7 @@ try {
 
     if (-not $exited) {
         if (Test-Path -LiteralPath "$Result.cancelled") {
-            Save-ResultRecord -Path $Result -Data @{
-                started           = $startedEpoch
-                host_pid          = $HostPid
-                worktree          = $Worktree
-                reaper_pid        = $PID
-                reaper_started_at = $reaperStartedAt
-                status            = 'cancelled'
-                finished          = (Now-Epoch)
-            }
+            Save-CleanupTerminalRecord -Status 'cancelled'
             return
         }
         Save-CleanupTerminalRecord -Status 'timeout' -Extra @{ error = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds" }
@@ -489,12 +481,13 @@ try {
 catch {
     if ($CloseOnly) {
         Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'failed'
-            error    = $_.Exception.Message
-            finished = (Now-Epoch)
+            started    = $startedEpoch
+            host_pid   = $HostPid
+            worktree   = $Worktree
+            session_id = $SessionId
+            status     = 'failed'
+            error      = $_.Exception.Message
+            finished   = (Now-Epoch)
         }
     }
     else {
