@@ -15,6 +15,48 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 HOST_COMMAND = "commandWindows" if os.name == "nt" else "command"
+
+
+def windows_split(line):
+    """Split a command line by the Windows C runtime (CommandLineToArgvW) rules."""
+    arguments, current, started, quoted, index = [], [], False, False, 0
+    while index < len(line):
+        character = line[index]
+        if character == "\\":
+            count = 0
+            while index < len(line) and line[index] == "\\":
+                count += 1
+                index += 1
+            if index < len(line) and line[index] == '"':
+                current.append("\\" * (count // 2))
+                if count % 2:
+                    current.append('"')
+                    index += 1
+            else:
+                current.append("\\" * count)
+            started = True
+        elif character == '"':
+            if quoted and line[index + 1:index + 2] == '"':
+                current.append('"')
+                index += 1
+            else:
+                quoted = not quoted
+            started = True
+            index += 1
+        elif character in " \t" and not quoted:
+            if started:
+                arguments.append("".join(current))
+                current, started = [], False
+            index += 1
+        else:
+            current.append(character)
+            started = True
+            index += 1
+    if started:
+        arguments.append("".join(current))
+    return arguments
+
+
 SPEC = importlib.util.spec_from_file_location(
     "codex_hook_snapshot", ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py"
 )
@@ -128,22 +170,26 @@ class CodexHookSnapshotTests(unittest.TestCase):
                                     re.search(r"sha256:[0-9a-f]{64}", command).group(), expected
                                 )
 
-    def test_posix_shell_parsing_of_each_command_executes_the_exact_loader(self):
+    def test_each_host_parsing_of_each_command_executes_the_exact_loader(self):
         loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+        # Only base64 and fixed ASCII: nothing sh, PowerShell or cmd.exe expands inside double quotes.
+        portable = re.compile(r"exec\(__import__\('base64'\)\.b64decode\('[A-Za-z0-9+/=]+'\)\.decode\(\)\)")
         for plugin in ("base", "engineering", "machine"):
-            with self.subTest(plugin=plugin):
-                manifest = json.loads(
-                    (ROOT / "plugins" / plugin / "hooks" / "codex.json").read_text(encoding="utf-8")
-                )
-                for groups in manifest["hooks"].values():
-                    for group in groups:
-                        for hook in group["hooks"]:
-                            arguments = shlex.split(hook["command"])
-                            code = arguments[arguments.index("-c") + 1]
-                            self.assertNotIn("\0", code)
-                            executed = []
-                            exec(code, {"exec": executed.append})
-                            self.assertEqual([loader], executed)
+            manifest = json.loads(
+                (ROOT / "plugins" / plugin / "hooks" / "codex.json").read_text(encoding="utf-8")
+            )
+            for groups in manifest["hooks"].values():
+                for group in groups:
+                    for hook in group["hooks"]:
+                        for field, split in (("command", shlex.split), ("commandWindows", windows_split)):
+                            with self.subTest(plugin=plugin, field=field):
+                                arguments = split(hook[field])
+                                code = arguments[arguments.index("-c") + 1]
+                                self.assertRegex(code, portable)
+                                self.assertIn(f'-c "{code}" ', hook[field])
+                                executed = []
+                                exec(code, {"exec": executed.append})
+                                self.assertEqual([loader], executed)
 
     def test_hook_survives_deleted_cache_path_and_rejects_modified_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
