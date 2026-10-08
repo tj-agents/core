@@ -24,6 +24,13 @@
         ]
       },
       {
+        "path": "hooks/callout_repair_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": "hooks/compact_output_gate.py",
         "hosts": [
           "claude",
