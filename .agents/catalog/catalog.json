@@ -408,8 +408,12 @@
             "handoff-codex",
             "last-conversation",
             "open-claude",
+            "open-codex",
             "peer-cli",
-            "search"
+            "recover-agents",
+            "search",
+            "search-claude",
+            "search-codex"
           ],
           "dependencies": {
             "required": [

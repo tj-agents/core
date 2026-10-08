@@ -103,11 +103,13 @@ class OpenClaudeTests(unittest.TestCase):
 
     # --- argument assembly ---
 
-    def test_resume_reaches_launch_tab_as_resume_flag_and_id(self):
-        self.run_main('--resume', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875')
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
-        self.assertIn('--resume', arguments)
-        self.assertIn('a2bcd5c4-bf6d-4087-95e3-d7ba7f711875', arguments)
+    def test_resume_routes_through_the_shared_guard(self):
+        recovery = mock.Mock()
+        with mock.patch.object(OPEN_CLAUDE, '_load_recovery', return_value=recovery):
+            self.run_main('--resume', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875')
+        recovery.open_session.assert_called_once()
+        self.assertEqual(recovery.open_session.call_args.args[:2], ('claude', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875'))
+        self.agent_cli.launch_tab.assert_not_called()
 
     def test_continue_reaches_launch_tab(self):
         self.run_main('--continue')
