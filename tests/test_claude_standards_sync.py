@@ -351,20 +351,27 @@ class ExternalPluginSourceTests(StandardsSyncHarness):
         self.assertIn(f'at {pushed[:12]}: ext {pushed[:12]}', output)
 
     def test_plugin_source_shaped_differently_but_same_repository_is_tracked_as_native(self):
-        # A trailing slash changes the URL's shape while git still resolves the bare repository on
-        # every platform; the suffix-less form with a slash only resolves via a Windows drive prefix.
-        differently_shaped = str(self.remote) + '/'
-        self.declare_sources({'base': differently_shaped, 'ext': str(self.plugin_remote)})
-        self.enable({'base@core': True, 'ext@core': True})
-        self.install('base@core')
-        pushed = self.publish('second')
-        code, output = self.sync()
-        self.assertEqual(code, 0, output)
-        self.assertEqual(
-            [entry['argv'] for entry in self.invocations()],
-            [['plugin', 'marketplace', 'update', 'core'], ['plugin', 'update', 'base@core', '--scope', 'user', '--json']],
-        )
-        self.assertEqual(self.records('base@core')[0]['version'], pushed[:12])
+        # Both shapes name the bare remote in a form git resolves on every platform.
+        shapes = {
+            'trailing slash': lambda remote: str(remote) + '/',
+            'no .git suffix': lambda remote: str(remote)[:-4],
+        }
+        for index, (label, shape) in enumerate(shapes.items()):
+            with self.subTest(shape=label):
+                if index:
+                    self.setUp()  # a fresh profile and remotes; cleanups from each setUp still run
+                self.declare_sources({'base': shape(self.remote), 'ext': str(self.plugin_remote)})
+                self.enable({'base@core': True, 'ext@core': True})
+                self.install('base@core')
+                pushed = self.publish('second')
+                code, output = self.sync()
+                self.assertEqual(code, 0, output)
+                self.assertEqual(
+                    [entry['argv'] for entry in self.invocations()],
+                    [['plugin', 'marketplace', 'update', 'core'],
+                     ['plugin', 'update', 'base@core', '--scope', 'user', '--json']],
+                )
+                self.assertEqual(self.records('base@core')[0]['version'], pushed[:12])
 
     def test_unchanged_plugin_source_outside_the_marketplace_is_silent(self):
         self.install('ext@core', version=self.plugin_head[:12])
