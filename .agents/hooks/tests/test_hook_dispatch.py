@@ -178,6 +178,22 @@ class HookDispatchTests(unittest.TestCase):
         self.assertEqual('["--session-context", "--project", "path with spaces"]\n\n[]',
                          output['hookSpecificOutput']['additionalContext'])
 
+    def test_hook_groups_apply_tool_matchers_without_losing_sibling_arguments(self):
+        gates = [
+            "--hook", "deny.py@Bash|PowerShell",
+            "--hook", "arguments.py@Bash|PowerShell", "--shell-argument",
+            "--hook", "arguments.py", "--all-tool-argument",
+        ]
+        output, _ = self.dispatch(gates, event="SessionStart", tool="Read")
+        self.assertNotIn("decision", output)
+        self.assertEqual('["--all-tool-argument"]',
+                         output['hookSpecificOutput']['additionalContext'])
+
+        output, _ = self.dispatch(gates, event="SessionStart", tool="PowerShell")
+        self.assertEqual("block", output["decision"])
+        self.assertEqual('["--shell-argument"]\n\n["--all-tool-argument"]',
+                         output['hookSpecificOutput']['additionalContext'])
+
     def test_session_start_failure_missing_script_and_block_keep_sibling_context(self):
         for failed, evidence in [('crash.py', 'gate exploded'),
                                  ('missing.py', 'FileNotFoundError'),

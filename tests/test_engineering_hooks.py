@@ -192,11 +192,13 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 routed = self.run_user_prompt_submit(host, "Continue and complete the active goal.")
                 self.assertEqual(0, routed.returncode, routed.stderr)
                 routed_context = json.loads(routed.stdout)["hookSpecificOutput"]["additionalContext"]
+                workflow = "handoff" if host == "claude" else "plan-execution"
+                selection = f"engineering:{workflow} automatically selected"
                 self.assertIn("When the user calls out a mistake", routed_context)
-                self.assertIn("engineering:plan-execution automatically selected", routed_context)
+                self.assertIn(selection, routed_context)
                 self.assertLess(
                     routed_context.index("When the user calls out a mistake"),
-                    routed_context.index("engineering:plan-execution automatically selected"),
+                    routed_context.index(selection),
                 )
                 (self.cwd / "GOAL.md").unlink()
 

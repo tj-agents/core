@@ -160,7 +160,7 @@ class HookBudgetUnderLoad(unittest.TestCase):
         self.assertEqual(1, len(runs))
         self.assert_bounded(runs)
         hook, result, _, events = runs[0]
-        self.assertIn("engineering:plan-execution automatically selected", result.stdout)
+        self.assertIn("engineering:handoff automatically selected", result.stdout)
         self.assertEqual([], [event for event in events if event[0] == "subprocess.Popen"])
         watched = (str(self.home).lower(), str(self.cwd).lower())
         self.assertEqual([], [path for _, path in events if path.lower().startswith(watched)])
