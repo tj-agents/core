@@ -19,6 +19,8 @@ Tommy requested this handoff on 2026-10-08. Implementation, tests, commit, push,
 
 First locate existing core monitoring and persistent-delivery utilities. Extend the single appropriate source owner rather than duplicating a polling implementation. Add focused tests for pending, green, ordinary failure, and the billing/spending-limit failure signature.
 
+Delivery slice: one draft PR from `Feature/PrReadinessMonitor` against `origin/main`, containing the workflow command, its focused tests, and this goal. The 334-line, four-file candidate has no dependency or separate slice to stack.
+
 ## Next Steps
 
 1. Run the remaining repository-required validation and review for the PR-readiness change.
