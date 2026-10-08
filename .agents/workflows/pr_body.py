@@ -43,8 +43,9 @@ def unchecked_tasks(body):
             if indent < 4 or nested:
                 list_indents = [value for value in list_indents if value < indent] + [indent]
                 text = item.group(2)
-                if text.startswith("[ ] "):
-                    tasks.append(text[4:])
+                task = re.match(r"^\[ \](?:\s+|$)(.*)", text)
+                if task:
+                    tasks.append(task.group(1))
             continue
         if not line.startswith((" ", "\t")):
             list_indents = []

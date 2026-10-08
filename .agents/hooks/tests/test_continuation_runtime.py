@@ -137,6 +137,19 @@ class ContinuationTests(unittest.TestCase):
                 runtime.apply_receipt(state, receipt)
         self.assertEqual(before, state)
 
+    def test_released_receipt_cannot_substitute_another_delivery(self):
+        state = self.state()
+        state.update(pr=42, launch_nonce="fixture")
+        delivery = {"repository": state["repo"], "pr": 43, "head": state["head"]}
+        self.write_completion_goal([delivery])
+        receipt = {"owner_id": state["owner_id"], "nonce": "fixture", "state": "complete",
+                   "reason": "Done", "released_binding": delivery}
+        with mock.patch.object(runtime, "identity", return_value={key: state[key] for key in ("repo", "worktree", "branch", "head")}), \
+             mock.patch.object(runtime, "check_identity", return_value=None), \
+             mock.patch("completion.forge_state", return_value={"number": 43, "headRefOid": state["head"], "state": "MERGED", "body": ""}):
+            with self.assertRaisesRegex(runtime.Gate, "bound delivery is absent"):
+                runtime.apply_receipt(state, receipt)
+
     def test_child_complete_receipt_keeps_owner_when_bound_delivery_is_omitted(self):
         self.binding("COMPLETED", "SUCCESS")
         self.write_completion_goal()
