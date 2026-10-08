@@ -187,6 +187,10 @@ phased execution plan normally has a separate transfer reason under `engineering
 
 ## Terminal result
 
+When the canonical goal has a fenced `completion` record, invoke the `persistent-workflow` completion
+contract before reporting the user outcome complete or deleting the goal. A failing completion check keeps
+the goal and its returned next actions owned by the current execution.
+
 Complete only when the plan's requested lifecycle is terminal and the repository outcome names its
 implementation, review, validation, delivery, and remaining durable state; neither a commit, pushed branch,
 nor open PR is terminal while authorized delivery remains, including a planning-only slice. Otherwise return

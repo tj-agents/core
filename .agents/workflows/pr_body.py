@@ -8,6 +8,47 @@ FOOTER = re.compile(
     r"^(?:generated (?:with|by)\b|co-authored-by:|🤖\s*generated\b|authored (?:with|by)\b)",
     re.IGNORECASE,
 )
+LIST_ITEM = re.compile(r"^(\s*)(?:[-+*]|\d+[.)])\s+(.+?)\s*$")
+
+
+def unchecked_tasks(body):
+    if not isinstance(body, str):
+        return []
+    tasks = []
+    fence = None
+    list_indents = []
+    visible = re.sub(r"<!--[\s\S]*?(?:-->|$)", "", body.lstrip("\ufeff"))
+    for line in visible.splitlines():
+        marker = FENCE.match(line)
+        if marker:
+            if not line.startswith((" ", "\t")):
+                list_indents = []
+            token = marker.group(1)
+            if fence is None:
+                fence = token
+            elif token[0] == fence[0] and len(token) >= len(fence) and not line[marker.end():].strip():
+                fence = None
+            continue
+        if fence is not None:
+            continue
+        if line.lstrip().startswith(">"):
+            list_indents = []
+            continue
+        if not line.strip():
+            continue
+        item = LIST_ITEM.match(line)
+        if item:
+            indent = len(item.group(1).expandtabs(4))
+            nested = any(value < indent for value in list_indents)
+            if indent < 4 or nested:
+                list_indents = [value for value in list_indents if value < indent] + [indent]
+                text = item.group(2)
+                if text.startswith("[ ] "):
+                    tasks.append(text[4:])
+            continue
+        if not line.startswith((" ", "\t")):
+            list_indents = []
+    return tasks
 
 
 def validate_pr_body(body):
