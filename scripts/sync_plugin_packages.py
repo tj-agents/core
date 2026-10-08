@@ -634,6 +634,14 @@ def emit_workflow_agents(root: Path, config: dict, emit):
     for host in ("claude", "codex"):
         table = load(root / f".agents/lanes/{host}.json")
         for lane, rung in table["lanes"].items():
+            body = lane_body
+            if rung.get("handoff"):
+                target = rung["handoff"]
+                body = (
+                    "You are a routing proxy. Return a required `engineering:handoff` request to your "
+                    f"parent for {target['host'].title()} {target['lane']}. Do not inspect, execute, "
+                    "delegate, or otherwise advance the delegated task."
+                )
             role = {
                 "agent_name": f"lane-{lane.lower()}" if host == "claude" else f"lane_{lane.lower()}",
                 "description": f"Runs one delegated task at lane {lane}. {rung['summary']}",
@@ -646,7 +654,7 @@ def emit_workflow_agents(root: Path, config: dict, emit):
             directory = "agents" if host == "claude" else "codex-agents"
             emit(
                 f"plugins/{plugin}/{directory}/lane-{lane.lower()}.{extension}",
-                agent_payload(role, lane_body, host),
+                agent_payload(role, body, host),
             )
 
     fixtures = source / "fixtures"
