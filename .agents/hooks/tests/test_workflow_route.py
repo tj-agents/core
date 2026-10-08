@@ -245,6 +245,8 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
     def test_claude_questions_negation_and_planning_keep_local_authority(self):
         for prompt in (
             "Should we build a command-line utility?",
+            "Could you explain how to implement this utility?",
+            "Can you tell me how to build this utility?",
             "Do not implement the utility yet.",
             "Planning only: design the command-line utility.",
         ):
