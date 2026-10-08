@@ -25,8 +25,8 @@ ordering even when a harness's available families differ.
 |---|---|---|
 | **L1** | a critical design decision, or a big complex plan with substantial interacting decisions; never implementation, review or delivery | the highest appropriate design capability |
 | **L2** | high-stakes judgement that designs nothing — a diagnosis of a production failure, a security or migration review | top general family, the setting above its default |
-| **L3** | open-ended judgement that designs nothing — a diagnosis with no known answer, an investigation | top general family, default setting |
-| **L4** | specified implementation that still needs code-level judgement — features, bugfixes and review lenses whose mistakes a compiler or suite will catch | the workhorse family, high setting |
+| **L3** | open investigation or bounded uncertain design with unresolved alternatives | top general family, default setting |
+| **L4** | specified implementation, ordinary review, and small local choices inside a testable fix | the workhorse family, high setting |
 | **L5** | mechanical work whose shape is already decided — including small file deletions or moves, config or docs cleanup, and removing or migrating `CLAUDE.local.md` once its destination or rule is decided | a cheaper family or reduced workhorse setting |
 | **L6** | bulk clerical work whose input outgrows the cheapest rung — a monitor loop, a long transcript, a big diff | the cheapest model that still holds the input |
 | **L7** | clerical work with a small input — commit, push, pull, sync, one poll | the cheapest usable model |
@@ -91,8 +91,8 @@ Lane selection does not itself transfer task ownership. A Claude parent hands mu
 delegated design, implementation, or review phase to Codex before delegating, unless the user explicitly
 chooses Claude for non-frontier work. It keeps conversation and tiny inline follow-ups. If Codex cannot
 launch, report the capability gate and preserve the checkpoint; never silently use Claude for that phase.
-For Codex and small Claude inline work, the parent normally continues in the same checkout and may give a
-bounded implementation or review task to a lane agent.
+For Codex, the parent normally continues in the same checkout and may give a bounded implementation or
+review task to a lane agent. Claude keeps only conversation and tiny inline follow-ups.
 Give that agent explicit path and responsibility ownership, avoid overlapping writers, and reconcile its
 result in the parent. A small follow-up can stay with the parent. If delegation is unavailable, use the
 current owner's supported fallback; do not open an independent session solely to change model or cost.

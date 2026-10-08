@@ -1,6 +1,6 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: active in the authorized Codex owner; design settled, implementation next.
+Status: implementation checkpoint `fe34217`; final policy reconciliation and focused validation precede review.
 
 PR: not opened.
 
@@ -45,16 +45,11 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. Read AGENTS.md, README.md, SOURCE_LAYOUT.md, PACKAGING.md, `.agents/engineering/policy/lanes/SKILL.md`,
-   `.agents/lanes/claude.json` and `codex.json`, `resolve.py`, the `engineering:lane-l*` agent
-   definitions (`.claude/` and `.codex/`), `.agents/workflows/hosts/*.json`, `engineering:handoff`, and
-   `engineering:session-guidance`.
-2. Tommy's decision: Astra (this session) redefines all the lane definitions. For each rung, decide what
-   it is for, when design genuinely needs L1 versus a lower rung, and when a Claude session hands off to
-   Codex. Calibrate so neither Fable nor Astra is spent on primitive work. Record the design here. Then
-   route implementation, review and delivery to the cheapest rung your new definitions select. Implement
-   it, test it, open a PR, review it, pass exact-head
-   CI, and merge.
+1. Finish the bounded L4 worker's policy reconciliation, package validation and checkpoint commit.
+   L3 descriptions must allow bounded uncertain design; L4 must include small local design choices.
+   Scope the no-handoff-for-cost rule to Codex, and keep the redirect body under canonical `.agents/`.
+2. Freeze and independently review the candidate. Open its draft PR, own exact-head CI, repair any
+   findings, and merge after the repository gates pass. Review and delivery use their selected lower lanes.
 3. Update the installed plugins on both hosts and verify from a fresh Claude session that a design
    request routes to a Codex handoff without spawning a Claude Fable agent.
 4. Close this session yourself when done (`finish.ps1` after a removable `cleanup_proof.py`).
@@ -109,9 +104,11 @@ Review lane: L4 (or the declared Codex review specialist). Delivery lane: L7 cle
 use L6 for a sustained monitor. The L1 parent owns only design and synthesis, with bounded workers
 applying implementation and review lanes.
 
-Current next action: dispatch one Codex L4 worker to implement the selected design and focused tests.
-Then commit the verified candidate, obtain independent review, publish the PR, own exact-head CI,
-merge, refresh both installed hosts, verify fresh Claude routing, and close this exact session.
+Current next action: finish the L4 worker's reconciliation and validation, then freeze for review.
+Implementation checkpoint `fe34217` passed 29 lane-table tests, 40 launcher tests (one skipped),
+and 9 harness-manifest tests (one skipped). Source generation and declared dependency checks passed.
+Shared CLI and source-layout checks are also required before the final review candidate is accepted.
+Generated distribution files remain excluded from commits.
 
 Continuation owner: `.agents/continuation/owner.json`, owner `40f69016a71a88938ffa279b`.
 Foreground Codex PID: `40480`. Initialization, foreground claim and 20-minute scheduler registration
