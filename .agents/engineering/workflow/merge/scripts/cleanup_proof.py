@@ -75,7 +75,7 @@ def run_git(cwd, *args, timeout=GIT_TIMEOUT_SECONDS):
     try:
         return subprocess.run(
             ["git", "-C", str(cwd), *args],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError) as error:
         raise Preserve(f"git {' '.join(args)} failed: {error}") from error
