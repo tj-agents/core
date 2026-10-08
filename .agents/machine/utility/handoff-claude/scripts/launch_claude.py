@@ -98,6 +98,12 @@ def resolve_model(args, agent_cli):
         model, effort = agent_cli.resolve_lane_model('claude', frontier=True)
         tier = 'frontier -> '
     elif not model and args.lane:
+        route = agent_cli.resolve_lane('claude', lane=args.lane).get('handoff')
+        if route:
+            raise agent_cli.LaunchError(
+                f"--lane {args.lane} routes to Codex {route['lane']}; use engineering:handoff "
+                "with machine:handoff-codex instead of opening a Claude handoff."
+            )
         model, effort = agent_cli.resolve_lane_model('claude', lane=args.lane)
         tier = f'lane {args.lane} -> '
 

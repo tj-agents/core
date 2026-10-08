@@ -316,10 +316,10 @@ def _lanes_module():
 # configured default, because guessing a lane from a prompt is how an expensive model ends up serving a
 # rename. frontier resolves the tier above the ladder, which no lane resolves to: its selection is the
 # user's explicit request, never task shape.
-def resolve_lane_model(harness, lane=None, frontier=False):
-    """(model, effort) for a lane or the frontier tier; effort is None when the table prices none."""
+def resolve_lane(harness, lane=None, frontier=False):
+    """The full lane selection, including any host-routing metadata."""
     if not lane and not frontier:
-        raise LaunchError('resolve_lane_model needs a lane or frontier.')
+        raise LaunchError('resolve_lane needs a lane or frontier.')
     if lane and frontier:
         raise LaunchError('A lane and the frontier tier are mutually exclusive.')
     lanes = _lanes_module()
@@ -327,6 +327,12 @@ def resolve_lane_model(harness, lane=None, frontier=False):
         entry = lanes.frontier(harness) if frontier else lanes.resolve(harness, lane)
     except SystemExit as exc:
         raise LaunchError(str(exc)) from None
+    return entry
+
+
+def resolve_lane_model(harness, lane=None, frontier=False):
+    """(model, effort) for a lane or the frontier tier; effort is None when the table prices none."""
+    entry = resolve_lane(harness, lane=lane, frontier=frontier)
     return entry['model'], entry.get('effort')
 
 
