@@ -17,44 +17,22 @@ ROOT = Path(__file__).resolve().parent.parent
 HOST_COMMAND = "commandWindows" if os.name == "nt" else "command"
 
 
-def windows_split(line):
-    """Split a command line by the Windows C runtime (CommandLineToArgvW) rules."""
-    arguments, current, started, quoted, index = [], [], False, False, 0
-    while index < len(line):
-        character = line[index]
-        if character == "\\":
-            count = 0
-            while index < len(line) and line[index] == "\\":
-                count += 1
-                index += 1
-            if index < len(line) and line[index] == '"':
-                current.append("\\" * (count // 2))
-                if count % 2:
-                    current.append('"')
-                    index += 1
-            else:
-                current.append("\\" * count)
-            started = True
-        elif character == '"':
-            if quoted and line[index + 1:index + 2] == '"':
-                current.append('"')
-                index += 1
-            else:
-                quoted = not quoted
-            started = True
-            index += 1
-        elif character in " \t" and not quoted:
-            if started:
-                arguments.append("".join(current))
-                current, started = [], False
-            index += 1
-        else:
-            current.append(character)
-            started = True
-            index += 1
-    if started:
-        arguments.append("".join(current))
-    return arguments
+def posix_code_argument(command):
+    """Return the -c argument of a POSIX command line, split by POSIX shell rules."""
+    arguments = shlex.split(command)
+    return arguments[arguments.index("-c") + 1]
+
+
+def windows_code_argument(command):
+    """Return the -c argument of a commandWindows line as CommandLineToArgvW yields it.
+
+    The generator emits it as one double-quoted token holding no double quote or backslash, and for
+    such a token the Windows rules yield exactly the text between the quotes; anything else fails.
+    """
+    match = re.match(r'python -B -c "([^"\\]*)" ', command)
+    if match is None:
+        raise AssertionError(f"Unexpected commandWindows shape: {command[:80]}")
+    return match.group(1)
 
 
 SPEC = importlib.util.spec_from_file_location(
@@ -173,7 +151,10 @@ class CodexHookSnapshotTests(unittest.TestCase):
     def test_each_host_parsing_of_each_command_executes_the_exact_loader(self):
         loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
         # Only base64 and fixed ASCII: nothing sh, PowerShell or cmd.exe expands inside double quotes.
-        portable = re.compile(r"exec\(__import__\('base64'\)\.b64decode\('[A-Za-z0-9+/=]+'\)\.decode\(\)\)")
+        portable = re.compile(
+            r"exec\(__import__\('zlib'\)\.decompress\(__import__\('base64'\)"
+            r"\.b64decode\('[A-Za-z0-9+/=]+'\)\)\.decode\(\)\)"
+        )
         for plugin in ("base", "engineering", "machine"):
             manifest = json.loads(
                 (ROOT / "plugins" / plugin / "hooks" / "codex.json").read_text(encoding="utf-8")
@@ -181,11 +162,11 @@ class CodexHookSnapshotTests(unittest.TestCase):
             for groups in manifest["hooks"].values():
                 for group in groups:
                     for hook in group["hooks"]:
-                        for field, split in (("command", shlex.split), ("commandWindows", windows_split)):
+                        for field, extract in (("command", posix_code_argument),
+                                               ("commandWindows", windows_code_argument)):
                             with self.subTest(plugin=plugin, field=field):
-                                arguments = split(hook[field])
-                                code = arguments[arguments.index("-c") + 1]
-                                self.assertRegex(code, portable)
+                                code = extract(hook[field])
+                                self.assertIsNotNone(portable.fullmatch(code), code[:80])
                                 self.assertIn(f'-c "{code}" ', hook[field])
                                 executed = []
                                 exec(code, {"exec": executed.append})
