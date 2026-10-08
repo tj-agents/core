@@ -44,3 +44,4 @@ Lane: L4 (specified implementation with code-level judgement). The trust boundar
 - 2026-10-08: goal written and Codex launched by the cris-preaward-app review session.
 - 2026-10-08: implemented marketplace-source trust discovery for Claude and Codex. Installed packages from every GitHub marketplace owned by `tj-agents` now contribute harness grants; foreign marketplaces and unregistered Codex cache entries do not.
 - 2026-10-08: added cross-marketplace application, foreign-marketplace rejection, and grant-withdrawal coverage for both hosts. Focused suite (19 tests), full Python suite, shared-runtime suite, generation, catalog and manifest checks, and local PowerShell CI suites passed. The CLI recovery vault suite passed on a fresh isolated retry after one non-reproducing timing-bound failure.
+- 2026-10-08: native review found no issues. Opened PR #153; merge remains Tommy's decision.
