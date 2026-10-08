@@ -1,6 +1,8 @@
+import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -63,6 +65,8 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.state = tempfile.TemporaryDirectory()
         self.addCleanup(self.state.cleanup)
         self.env = dict(os.environ, AGENT_STATE_DIRECTORY=self.state.name, PYTHONIOENCODING="utf-8")
+        for variable in gate.SESSION_DIRECTORY_ENVS:
+            self.env.pop(variable, None)
 
     def obligations_dir(self):
         return Path(self.state.name) / "merge-cleanup" / "obligations"
@@ -391,6 +395,157 @@ class MergeCleanupGateTests(unittest.TestCase):
 
         self.run_hook({"hook_event_name": "SessionStart", "cwd": str(primary)})
         self.assertTrue(path.exists())
+
+
+    def stop(self, session="s1", cwd=None, env=None):
+        data = {"hook_event_name": "Stop", "session_id": session}
+        if cwd is not None:
+            data["cwd"] = cwd
+        result = self.run_hook(data, env=env)
+        self.assertEqual(0, result.returncode, result.stderr)
+        return json.loads(result.stdout) if result.stdout.strip() else None
+
+    def remove_natively(self, primary, worktree, branch="feature"):
+        git(primary, "worktree", "remove", "--", str(worktree))
+        git(primary, "branch", "-d", branch)
+
+    def test_coordinator_pushd_merge_requires_worktree_cleanup_not_session_exit(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --merge'
+        self.run_hook(self.payload(merge_command, codex=False, session="coord", cwd=str(primary)))
+        path, obligation = self.sole_obligation()
+        self.assertFalse(obligation["session_exit_required"])
+        self.assertEqual([str(primary)], obligation["session_cwd"])
+        self.edit_obligation(path, confirmed_merged=True)
+
+        blocked = self.stop(session="coord", cwd=str(primary))
+        self.assertEqual("block", blocked["decision"])
+        self.assertNotIn("finish.ps1", blocked["reason"])
+        self.assertNotIn("powershell.exe", blocked["reason"])
+        self.assertIn("cleanup_proof", blocked["reason"])
+        self.assertIn("git worktree remove", blocked["reason"])
+
+        self.remove_natively(primary, worktree)
+        self.assertIsNone(self.stop(session="coord", cwd=str(primary)))
+        self.assertFalse(path.exists())
+
+    def test_session_inside_worktree_still_requires_session_exit(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --merge'
+        project_env = dict(self.env, CLAUDE_PROJECT_DIR=str(worktree))
+        for label, cwd, env in (
+            ("cwd", str(worktree / "sub"), self.env),
+            ("project-dir", str(primary), project_env),
+        ):
+            with self.subTest(source=label):
+                for stale in self.obligation_files():
+                    stale.unlink()
+                self.run_hook(self.payload(merge_command, codex=False, cwd=cwd), env=env)
+                _, obligation = self.sole_obligation()
+                self.assertTrue(obligation["session_exit_required"])
+
+        path, _ = self.sole_obligation()
+        self.edit_obligation(path, confirmed_merged=True)
+        self.remove_natively(primary, worktree)
+
+        self.assertEqual("block", self.stop(cwd=str(worktree))["decision"])
+        self.assertEqual("block", self.stop(cwd=str(primary), env=project_env)["decision"])
+        other = self.run_hook({"hook_event_name": "SessionStart", "session_id": "s2", "cwd": str(primary)})
+        self.assertEqual(0, other.returncode, other.stderr)
+        self.assertTrue(path.exists())
+
+    def test_native_git_removal_releases_a_legacy_obligation_outside_the_worktree(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --merge'
+        self.run_hook(self.payload(merge_command, codex=False))
+        path, obligation = self.sole_obligation()
+        self.assertTrue(obligation["session_exit_required"])
+        del obligation["session_cwd"]
+        obligation["confirmed_merged"] = True
+        path.write_text(json.dumps(obligation), encoding="utf-8")
+
+        self.assertEqual("block", self.stop(cwd=str(primary))["decision"])
+        self.remove_natively(primary, worktree)
+
+        other = self.run_hook({"hook_event_name": "SessionStart", "session_id": "s2", "cwd": str(primary)})
+        self.assertEqual(0, other.returncode, other.stderr)
+        self.assertTrue(path.exists())
+        self.assertEqual("block", self.stop()["decision"])
+        self.assertIsNone(self.stop(cwd=str(primary)))
+        self.assertFalse(path.exists())
+
+    def test_deleted_but_still_registered_worktree_keeps_blocking_until_pruned(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --merge'
+        self.run_hook(self.payload(merge_command, codex=False, cwd=str(primary)))
+        path, _ = self.sole_obligation()
+        self.edit_obligation(path, confirmed_merged=True, session_exit_required=True)
+
+        shutil.rmtree(worktree)
+        self.assertEqual("block", self.stop(cwd=str(primary))["decision"])
+        self.assertTrue(path.exists())
+
+        git(primary, "worktree", "prune")
+        self.assertIsNone(self.stop(cwd=str(primary)))
+        self.assertFalse(path.exists())
+
+    def test_codex_release_after_native_removal_needs_merge_evidence(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --merge'
+        self.run_hook(self.payload(merge_command, session="s1"))
+        path, obligation = self.sole_obligation()
+        self.assertTrue(obligation["session_exit_required"])
+        self.edit_obligation(path, recorded_at=time.time() - gate.DIRECT_GRACE_SECONDS - 1)
+        self.remove_natively(primary, worktree)
+
+        write = 'Set-Content -Path x.txt -Value 1'
+        denied = self.run_hook(self.payload(write, session="s1", cwd=str(primary)))
+        self.assertEqual(2, denied.returncode, denied.stderr)
+        self.assertTrue(path.exists())
+
+        digest = hashlib.sha256(Path(obligation["worktree"]).as_posix().encode("utf-8")).hexdigest()
+        receipt = Path(self.state.name) / "merge-cleanup" / "receipts" / f"{digest}.json"
+        receipt.parent.mkdir(parents=True, exist_ok=True)
+        receipt.write_text(json.dumps({"verdict": "removable", "head": "0" * 40}), encoding="utf-8")
+        self.edit_obligation(path, nagged_at=None)
+        mismatched = self.run_hook(self.payload(write, session="s1", cwd=str(primary)))
+        self.assertEqual(2, mismatched.returncode, mismatched.stderr)
+
+        receipt.write_text(json.dumps({"verdict": "removable", "head": obligation["head"]}), encoding="utf-8")
+        self.edit_obligation(path, nagged_at=None)
+        released = self.run_hook(self.payload(write, session="s1", cwd=str(primary)))
+        self.assertEqual(0, released.returncode, released.stderr)
+        self.assertFalse(path.exists())
+
+    def test_posix_message_never_instructs_powershell(self):
+        obligation = {
+            "pr": "3", "branch": "feature", "head": "a" * 40, "worktree": "/repo/.worktrees/feature",
+            "primary": "/repo", "recorded_at": time.time(),
+        }
+        for required in (True, False):
+            with self.subTest(required=required):
+                obligation["session_exit_required"] = required
+                with mock.patch.object(gate, "is_windows", return_value=False):
+                    for codex in (True, False):
+                        message = gate.deny_message(obligation, codex)
+                        self.assertNotIn("powershell.exe", message)
+                        self.assertNotIn("finish.ps1", message)
+                        self.assertNotIn("close.ps1", message)
+                        self.assertIn("cleanup_proof", message)
+                        self.assertIn("from the primary checkout /repo", message)
+                        self.assertIn("--worktree \"/repo/.worktrees/feature\"", message)
+                with mock.patch.object(gate, "is_windows", return_value=True):
+                    message = gate.deny_message(obligation, False)
+                    if required:
+                        self.assertIn("powershell.exe", message)
+                        self.assertIn("finish.ps1", message)
+                    else:
+                        self.assertNotIn("finish.ps1", message)
 
 
     def test_claude_posttooluse_confirms_and_stop_blocks_while_unconfirmed_and_active_pass(self):
@@ -746,7 +901,11 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(head, obligation["head"])
         self.assertIn(f"--head {head}", denied.stderr)
         self.assertNotIn("<head>", denied.stderr)
-        self.assertIn("finish.ps1", denied.stderr)
+        if os.name == "nt":
+            self.assertIn("finish.ps1", denied.stderr)
+        else:
+            self.assertNotIn("powershell.exe", denied.stderr)
+            self.assertIn("cleanup_proof.py", denied.stderr)
 
         self.run_hook(self.payload(merge_command, codex=False, session="claude-session"))
         claude_path, _ = self.sole_obligation() if len(self.obligation_files()) == 1 else (None, None)
