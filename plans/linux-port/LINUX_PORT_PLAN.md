@@ -55,6 +55,9 @@ what still needs checking on Windows.
   assuming `wt.exe` is the parent.
 - [ ] 6. `clip` -> Python, using the platform clipboard.
 - [ ] 7. `persistent-workflow`'s `delivery-continuation.ps1` -> Python, verified on Linux.
+- [ ] 8. Tests that failed only on Linux pass: POSIX shell collapsed the Codex snapshot loader's escaped
+  backslashes into NULs; a test plugin URL only git on Windows resolves; pwsh 7 `Split` binding skipped
+  the installer's ancestor reparse-point check.
 
 ## Current progress
 
@@ -63,6 +66,7 @@ Step 2 merged (#108): `open-claude` ported, reviewed, review findings fixed; a r
 from `open_claude.py` on this machine. Step 3a (`handoff-claude`) on `Feature/HandoffClaudePython`:
 ported to `scripts/launch_claude.py`, `launch-claude.ps1` deleted, tests and SKILL.md updated.
 Step 6 (`clip`) in progress on `Feature/ClipPython`.
+Step 8 (Linux-only test failures) in progress on `Fix/LinuxOnlyTestFailures`.
 
 ## Next Steps
 
