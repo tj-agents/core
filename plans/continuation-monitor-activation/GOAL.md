@@ -21,8 +21,8 @@ Repair the shared continuation activation path and each host adapter as needed s
 ## Next Steps
 
 Scope: whole goal through repair, review, dedicated PR and terminal delivery.
-Current slice: explicit host process claim and Windows ancestry adapter for both hosts.
-Remaining scope: independent review and downstream delivery monitoring.
+Current slice: host process claim, native launch path and required public-operation permissions for both hosts.
+Remaining scope: incremental review, exact-head CI and downstream delivery monitoring.
 Done when: the repair is merged and its post-merge regeneration has finished successfully.
 
 1. Require an explicit host PID in the shared runtime claim interface so it cannot silently lease a transient tool shell.
@@ -42,6 +42,8 @@ Lane: L4 implementation complete; independent review and delivery next.
 - Live executable resolution exposed a second activation dependency: `shutil.which('codex')` and `shutil.which('claude')` both select `.CMD` wrappers. Extend this same atomic slice to pin the discovered native ancestor executable during claim; a foreground-owned wake alone is not proof that a headless launch will succeed.
 
 - Focused Python runtime tests (38), PowerShell 7 and Windows PowerShell 5.1 adapter suites, harness manifest tests, and generated-source/catalog checks passed. The implementation is ready for a committed, frozen independent review.
+
+- Independent native review found that operation permission prefixes failed the shipped consumer validator. R1 adds exact public `operation:*` prefixes and a narrow validator correction, with direct consumer coverage. Focused harness and bootstrap checks validate this remediation; incremental review follows.
 
 ## Delivery identity
 

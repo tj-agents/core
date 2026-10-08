@@ -123,6 +123,23 @@ class HarnessManifestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
 
+    def test_scoped_claude_script_operations_validate_and_unscoped_operations_fail(self):
+        requires = json.loads(
+            (ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
+        )["requires"]
+        harness_permissions.validate_requires(requires, "engineering")
+        allowed = "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py claim:*)"
+        for scope in ("claim", ":*"):
+            with self.subTest(scope=scope):
+                candidate = deepcopy(requires)
+                commands = candidate["permissions"]["claude_allow"]
+                commands[commands.index(allowed)] = allowed.replace("claim:*", scope)
+                with self.assertRaisesRegex(
+                    harness_permissions.bootstrap.BootstrapError,
+                    "script arguments require :\\*",
+                ):
+                    harness_permissions.validate_requires(candidate, "engineering")
+
 
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required for Test-Json")
 class HarnessManifestSchemaTests(unittest.TestCase):
@@ -243,24 +260,24 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         normalized_allow = [entry.replace("\\", "/") for entry in claude_allow]
         for operation in CONTINUATION_RUNTIME_OPERATIONS:
             with self.subTest(host="claude", script="runtime", operation=operation):
-                self.assertIn(f"Bash(python -B {runtime} {operation})", normalized_allow)
-                self.assertIn(f"PowerShell(python -B {runtime} {operation})", normalized_allow)
+                self.assertIn(f"Bash(python -B {runtime} {operation}:*)", normalized_allow)
+                self.assertIn(f"PowerShell(python -B {runtime} {operation}:*)", normalized_allow)
         for operation in CONTINUATION_ADAPTER_OPERATIONS:
             with self.subTest(host="claude", script="adapter", operation=operation):
                 self.assertIn(
-                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation})",
+                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation}:*)",
                     normalized_allow,
                 )
                 self.assertIn(
-                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation})",
+                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation}:*)",
                     normalized_allow,
                 )
                 self.assertIn(
-                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation})",
+                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation}:*)",
                     normalized_allow,
                 )
                 self.assertIn(
-                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation})",
+                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation}:*)",
                     normalized_allow,
                 )
         runtime_rules = [rule for rule in codex_rules if runtime in json.dumps(rule).replace("\\\\", "/")]

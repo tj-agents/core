@@ -37,7 +37,16 @@ def _has_unbounded_script_arguments(command: str) -> bool:
     if not command.startswith("Bash(") or not command.endswith(")"):
         return False
     tokens = command[len("Bash("):-1].split()
-    return any(token.lower().endswith(SCRIPT_SUFFIXES) for token in tokens[:-1])
+    for index, token in enumerate(tokens):
+        if not token.lower().endswith(SCRIPT_SUFFIXES):
+            continue
+        arguments = tokens[index + 1:]
+        if not arguments:
+            continue
+        if len(arguments) == 1 and arguments[0] != ":*" and arguments[0].endswith(":*"):
+            continue
+        return True
+    return False
 
 
 def validate_requires(requires: dict, label: str) -> None:
