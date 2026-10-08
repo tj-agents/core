@@ -18,6 +18,7 @@ files, and the opt-out `BASE_AGENTS_HARNESS_PERMISSIONS=off`.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -210,7 +211,7 @@ def codex_plugin_roots(environ: dict, warnings: list[str]) -> tuple[set[Path], b
     return roots, True
 
 
-def load_requires(root: Path, warnings: list[str]) -> dict | None:
+def load_requires(root: Path, warnings: list[str]) -> tuple[dict, dict] | None:
     harness = read_json(root / "harness.json")
     if not isinstance(harness, dict):
         return None
@@ -220,25 +221,240 @@ def load_requires(root: Path, warnings: list[str]) -> dict | None:
     except Exception as error:  # noqa: BLE001
         warnings.append(f"{root}: ignoring invalid harness declaration ({error})")
         return None
-    return requires
+    return harness, requires
 
 
-def rendered_requirements(roots: set[Path], warnings: list[str]) -> list[dict]:
+def auto_merge_enabled(project: Path | None) -> bool:
+    if project is None:
+        return False
+    policy = read_json(project / ".agents" / "delivery-authorization.json")
+    validator = policy_validator()
+    if validator is None:
+        return False
+    try:
+        validator.validate(policy)
+    except validator.PolicyViolation:
+        return False
+    return policy.get("auto_merge") is True
+
+
+def own_payload_root() -> Path | None:
+    ancestors = Path(__file__).resolve().parents
+    for ancestor in ancestors:
+        if (ancestor / "harness.json").is_file():
+            return ancestor
+    for ancestor in ancestors:
+        if ancestor.name == ".agents" and (ancestor / "machine").is_dir():
+            return ancestor
+    return None
+
+
+def own_machine_resources(name: str):
+    root = own_payload_root()
+    if root is None:
+        return
+    if root.name == ".agents":
+        yield root / "machine" / "scripts" / name
+    else:
+        yield root / "resources" / "machine" / "scripts" / name
+
+
+def policy_validator():
+    root = own_payload_root()
+    candidates = [] if root is None or root.name != ".agents" else [root / "workflows" / "delivery_policy.py"]
+    candidates.extend(own_machine_resources("delivery_policy.py"))
+    for path in candidates:
+        if not path.is_file():
+            continue
+        spec = importlib.util.spec_from_file_location("base_agents_delivery_policy", path)
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    return None
+
+
+def safe_project_root(project: Path | None) -> bool:
+    if project is None:
+        return False
+    return not any(character in str(project) for character in '"\'`$*?[]\r\n')
+
+
+def machine_module(name: str):
+    for path in own_machine_resources(name):
+        if not path.is_file():
+            continue
+        spec = importlib.util.spec_from_file_location(f"base_agents_{path.stem}", path)
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+    return None
+
+
+def verified_engineering_package(root: Path, plugin: dict, trust, project: Path, published: dict) -> bool:
+    marketplace = plugin.get("marketplaceSource")
+    repository = trust.github_repository(marketplace.get("source")) if isinstance(marketplace, dict) else None
+    if repository != ("tj-agents", "core") or root.is_symlink():
+        return False
+    try:
+        source = trust.source_package(plugin, project, published)
+        return source is not None and trust.package_files(root) == source
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def claude_auto_merge_roots(environ: dict, project: Path, trust, published: dict) -> set[Path]:
+    sync = machine_module("claude_standards_sync.py")
+    if sync is None:
+        return set()
+    config = claude_config_root(environ)
+    plugins = config / "plugins"
+    registry = read_json(plugins / "installed_plugins.json")
+    known = read_json(plugins / "known_marketplaces.json")
+    records = registry.get("plugins") if isinstance(registry, dict) else None
+    market = known.get(MARKETPLACE) if isinstance(known, dict) else None
+    if not isinstance(records, dict) or not isinstance(market, dict):
+        return set()
+    source = market.get("source")
+    checkout_text = market.get("installLocation")
+    if not isinstance(source, dict) or not isinstance(checkout_text, str) or not checkout_text:
+        return set()
+    repository = trust.github_repository(sync.source_url(source))
+    checkout = Path(checkout_text)
+    if repository != ("tj-agents", "core") or not checkout.is_dir():
+        return set()
+    entries = sync.read_json(checkout / ".claude-plugin" / "marketplace.json").get("plugins")
+    source_entry = next((entry.get("source") for entry in entries if isinstance(entry, dict) and entry.get("name") == "engineering"), None) if isinstance(entries, list) else None
+    if not isinstance(source_entry, str) or not source_entry:
+        return set()
+    package_source = (checkout / source_entry).resolve()
+    try:
+        package_source.relative_to(checkout.resolve())
+    except ValueError:
+        return set()
+    enabled = sync.enabled_plugins(config, project)
+    installs = sync.installs(plugins, project, enabled)
+    roots: set[Path] = set()
+    for install in installs:
+        if install.identity != "engineering@base-agents":
+            continue
+        for entry in records.get(install.identity, []):
+            if not isinstance(entry, dict) or entry.get("scope") != install.scope or str(entry.get("version") or "unknown") != install.version:
+                continue
+            if install.project is not None and entry.get("projectPath") != str(install.project):
+                continue
+            path = entry.get("installPath")
+            if not isinstance(path, str) or not path:
+                continue
+            root = Path(path)
+            plugin = {
+                "pluginId": install.identity,
+                "marketplaceSource": {"sourceType": "git", "source": sync.source_url(source)},
+                "source": {"source": "local", "path": str(package_source)},
+            }
+            if verified_engineering_package(root, plugin, trust, project, published):
+                roots.add(root)
+    return roots
+
+
+def codex_executable(environ: dict):
+    configured = environ.get("CODEX_EXECUTABLE")
+    if configured:
+        return configured
+    cli = machine_module("agent_cli.py")
+    if cli is None:
+        return None
+    try:
+        return cli.resolve_codex_executable()[0]
+    except Exception:
+        return None
+
+
+def codex_auto_merge_roots(environ: dict, project: Path, trust, published: dict) -> set[Path]:
+    executable = codex_executable(environ)
+    if not executable:
+        return set()
+    try:
+        with trust.AppServer(executable, project) as server:
+            inventory = server.request("plugin/list", {"cwds": [str(project)]})
+    except (OSError, RuntimeError, ValueError):
+        return set()
+    marketplaces = inventory.get("marketplaces") if isinstance(inventory, dict) else None
+    if not isinstance(marketplaces, list):
+        return set()
+    roots: set[Path] = set()
+    for market in marketplaces:
+        if not isinstance(market, dict) or market.get("name") != MARKETPLACE:
+            continue
+        plugins = market.get("plugins")
+        if not isinstance(plugins, list):
+            continue
+        for record in plugins:
+            if not isinstance(record, dict) or record.get("id") != "engineering@base-agents":
+                continue
+            if record.get("installed") is not True or record.get("enabled") is not True:
+                continue
+            version = record.get("localVersion")
+            source = record.get("source")
+            if not isinstance(version, str) or not version or not isinstance(source, dict) or source.get("type") != "local":
+                continue
+            source_path = source.get("path")
+            if not isinstance(source_path, str) or not source_path:
+                continue
+            root = codex_home(environ) / "plugins" / "cache" / MARKETPLACE / "engineering" / version
+            plugin = {
+                "pluginId": record["id"],
+                "marketplaceSource": {"sourceType": "git", "source": "https://github.com/tj-agents/core.git"},
+                "source": {"source": "local", "path": source_path},
+            }
+            if verified_engineering_package(root, plugin, trust, project, published):
+                roots.add(root)
+    return roots
+
+
+def auto_merge_roots(environ: dict, project: Path | None, warnings: list[str]) -> tuple[set[Path], set[Path]]:
+    if not auto_merge_enabled(project) or not safe_project_root(project):
+        return set(), set()
+    trust = machine_module("codex_hook_trust.py")
+    if trust is None:
+        return set(), set()
+    trust.TIMEOUT = min(trust.TIMEOUT, 7)
+    published: dict = {}
+    try:
+        return (
+            claude_auto_merge_roots(environ, project, trust, published),
+            codex_auto_merge_roots(environ, project, trust, published),
+        )
+    except Exception as error:
+        warnings.append(f"auto-merge permissions are unavailable ({error})")
+        return set(), set()
+
+
+def rendered_requirements(roots: set[Path], warnings: list[str], project: Path | None, enabled_roots: set[Path]) -> list[dict]:
     requirements = []
     for root in sorted(roots):
-        requires = load_requires(root, warnings)
-        if requires is None:
+        loaded = load_requires(root, warnings)
+        if loaded is None:
             continue
-        claude_allow, codex_rules = harness_permissions.render_permissions(requires["permissions"], root)
+        _, requires = loaded
+        conditional = root in enabled_roots
+        claude_allow, codex_rules = harness_permissions.render_permissions(
+            requires["permissions"], root, project, conditional
+        )
         requirements.append({"permissions": {"claude_allow": claude_allow, "codex_prefix_rules": codex_rules}})
     return requirements
 
 
-def desired_permissions(environ: dict, warnings: list[str]) -> tuple[list[str], list[dict], bool, bool]:
+def desired_permissions(environ: dict, warnings: list[str], project: Path | None = None) -> tuple[list[str], list[dict], bool, bool]:
     claude_roots, claude_ok = claude_plugin_roots(environ, warnings)
     codex_roots, codex_ok = codex_plugin_roots(environ, warnings)
-    claude_requirements = rendered_requirements(claude_roots, warnings)
-    codex_requirements = rendered_requirements(codex_roots, warnings)
+    enabled_claude, enabled_codex = auto_merge_roots(environ, project, warnings)
+    claude_requirements = rendered_requirements(claude_roots, warnings, project, enabled_claude)
+    codex_requirements = rendered_requirements(codex_roots, warnings, project, enabled_codex)
     claude_allow, _ = harness_permissions.fold_permissions(claude_requirements)
     _, codex_rules = harness_permissions.fold_permissions(codex_requirements)
     return claude_allow, codex_rules, claude_ok, codex_ok
@@ -308,11 +524,11 @@ def current_text(path: Path) -> str | None:
         return None
 
 
-def synchronize(environ: dict, mode: str) -> tuple[list[str], list[str]]:
+def synchronize(environ: dict, mode: str, project: Path | None = None) -> tuple[list[str], list[str]]:
     if environ.get(OPT_OUT_ENV, "").strip().lower() == "off":
         return [], []
     warnings: list[str] = []
-    claude_allow, codex_rules, claude_ok, codex_ok = desired_permissions(environ, warnings)
+    claude_allow, codex_rules, claude_ok, codex_ok = desired_permissions(environ, warnings, project)
     sidecar = load_sidecar(environ, warnings)
     claude_path = claude_config_root(environ) / "settings.json"
     claude_expected = claude_target_text(claude_path, claude_allow, sidecar, warnings) if claude_ok else None
@@ -351,9 +567,10 @@ def print_invocations(environ: dict, script_name: str) -> tuple[list[str], list[
     roots = sorted(claude_roots | codex_roots)
     lines: list[str] = []
     for root in roots:
-        requires = load_requires(root, warnings)
-        if requires is None:
+        loaded = load_requires(root, warnings)
+        if loaded is None:
             continue
+        _, requires = loaded
         for template in requires["permissions"]["claude_allow"]:
             if not (template.startswith("Bash(") and template.endswith(")")):
                 continue
@@ -373,6 +590,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--apply", action="store_true")
     group.add_argument("--check", action="store_true")
     group.add_argument("--print", dest="print_script", metavar="SCRIPT")
+    parser.add_argument("--project", type=Path, default=Path.cwd())
     args = parser.parse_args(argv)
     environ = os.environ
     try:
@@ -384,7 +602,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"harness-permissions-sync: {warning}", file=sys.stderr)
             return 0
         mode = "apply" if args.apply else "check"
-        drifted, warnings = synchronize(environ, mode)
+        drifted, warnings = synchronize(environ, mode, args.project.resolve())
         for warning in warnings:
             print(f"harness-permissions-sync: {warning}", file=sys.stderr)
         if drifted:

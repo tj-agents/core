@@ -1821,7 +1821,7 @@ def goal_preflight(root, workflow_run_id):
 
 
 def pull_request_state(root, pr, repo=None):
-    fields = "number,url,body,headRefOid,headRefName,state,isDraft,labels,files,changedFiles,statusCheckRollup"
+    fields = "number,url,body,headRefOid,headRefName,state,isDraft,mergeStateStatus,labels,files,changedFiles,statusCheckRollup"
     arguments = ["gh", "pr", "view"]
     if pr is not None:
         arguments.append(str(pr))
@@ -2041,6 +2041,7 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
         "pending_evidence": pending_evidence(value.get("statusCheckRollup"), head),
         "review": review_binding(root, branch, head),
         "merge_authorization": resolution["merge_authorization"],
+        "auto_merge": resolution["auto_merge"],
         "completion_condition": completion_condition,
     }
     if handoff is not None:
