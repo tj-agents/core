@@ -89,8 +89,9 @@ in the rung its cleanup needed is how a bad design gets built efficiently.
 
 Lane selection does not itself transfer task ownership. A Claude parent hands multi-phase work and every
 delegated design, implementation, or review phase to Codex before delegating, unless the user explicitly
-chooses Claude for non-frontier work. It keeps conversation and tiny inline follow-ups. If Codex cannot
-launch, report the capability gate and preserve the checkpoint; never silently use Claude for that phase.
+chooses Claude for non-frontier work. A fresh implementation goal hands off; Claude keeps conversation and
+tiny inline follow-ups. If Codex cannot launch, direct fallback is available only to an eligible owner;
+otherwise report the capability gate and preserve the checkpoint.
 For Codex, the parent normally continues in the same checkout and may give a bounded implementation or
 review task to a lane agent. Claude keeps only conversation and tiny inline follow-ups.
 Give that agent explicit path and responsibility ownership, avoid overlapping writers, and reconcile its
