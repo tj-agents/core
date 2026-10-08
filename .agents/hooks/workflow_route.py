@@ -27,10 +27,11 @@ QUESTION = re.compile(
     r"^\s*(?:why|what|when|where|who|how|should|could|would)\b|\?\s*$",
     re.IGNORECASE,
 )
+ACTION_REQUEST = re.compile(r"^\s*(?:can|could|would)\s+you\s+", re.IGNORECASE)
 EXPLICIT_CLAUDE = re.compile(
     r"\b(?:use|keep|stay|run|do)\s+(?:this\s+)?(?:on\s+)?claude\b|"
-    r"\bi\s+want\s+claude\s+to\s+(?:do|handle|implement|build|run)\b|"
-    r"\bclaude\s+(?:should|must|can)\s+(?:do|handle|implement|build|run)\b",
+    r"\bi\s+want\s+claude\s+to\s+(?:do|handle|implement|build|run|delegate|dispatch|review|design)\b|"
+    r"\bclaude\s+(?:should|must|can)\s+(?:do|handle|implement|build|run|delegate|dispatch|review|design)\b",
     re.IGNORECASE,
 )
 TINY_INLINE = re.compile(
@@ -111,6 +112,10 @@ DIRECT_HANDOFF = re.compile(
     r"(?:design|review)\b",
     re.IGNORECASE,
 )
+DELEGATED_PHASE = re.compile(
+    r"\b(?:delegate|dispatch)\b[^.!?\n]{0,80}\b(?:design|implement(?:ation|ing)?|review)\b",
+    re.IGNORECASE,
+)
 COMPLETE_STATUS = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?status\s*:?\s*(?:complete|completed|done|closed)\b"
 )
@@ -164,7 +169,7 @@ def selects_handoff(prompt: str, cwd: Path) -> bool:
         r"\b(?:do\s+not|don't|never)\s+(?:hand\s*off|delegate|dispatch)\b", prompt, re.IGNORECASE
     ):
         return False
-    if DIRECT_HANDOFF.search(prompt):
+    if DIRECT_HANDOFF.search(prompt) or DELEGATED_PHASE.search(prompt):
         return True
     return (
         SIDE_WORKSTREAM.search(prompt) is not None
@@ -285,10 +290,11 @@ def prompt_mode(prompt: str, cwd: Path, harness: str | None, previous: dict | No
     if harness != "claude":
         return "conversation"
     intent, evidence = planning_intent(prompt)
+    evidence = unquoted(evidence)
     previous = previous or {}
-    if intent or QUESTION.search(evidence):
+    if intent or (QUESTION.search(evidence) and not ACTION_REQUEST.search(evidence)):
         return "conversation"
-    if explicit_claude(unquoted(evidence)):
+    if explicit_claude(evidence):
         return "explicit-claude"
     if previous.get("mode") == "codex":
         return "codex"
@@ -310,6 +316,7 @@ def route(prompt: str, cwd: Path, harness: str | None = None,
         )
     if intent == "blocked":
         return None
+    evidence = unquoted(evidence)
     if harness == "claude" and mode == "codex":
         return load_context(Path(__file__), "engineering/workflow/handoff/SKILL.md", "handoff")
     if selects_handoff(evidence, cwd):
