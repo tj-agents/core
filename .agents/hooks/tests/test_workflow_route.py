@@ -1,17 +1,22 @@
 from datetime import datetime, timezone
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import uuid
 
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / ".agents/hooks/workflow_route.py"
+SPEC = importlib.util.spec_from_file_location("workflow_route", SCRIPT)
+workflow_route = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(workflow_route)
 PLANNING_INTENT_CASES = (
     ("Implement phase 2 of the plan only, not phase 3", "plan-execution", "plan-execution"),
     ("Don't only plan it, implement it", None, "plan-execution"),
@@ -60,11 +65,19 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_hook(self, prompt, event="UserPromptSubmit"):
+    def run_hook(self, prompt, event="UserPromptSubmit", *, harness=None, session=None,
+                 tool_name=None, tool_input=None):
+        command = [sys.executable, "-B", str(SCRIPT)]
+        if harness:
+            command.extend(("--harness", harness))
+        payload = {"hook_event_name": event, "cwd": str(self.cwd), "prompt": prompt,
+                   "session_id": session or str(uuid.uuid4())}
+        if tool_name:
+            payload["tool_name"] = tool_name
+        if tool_input is not None:
+            payload["tool_input"] = tool_input
         return subprocess.run(
-            [sys.executable, "-B", str(SCRIPT)],
-            input=json.dumps({"hook_event_name": event, "cwd": str(self.cwd), "prompt": prompt,
-                              "session_id": str(uuid.uuid4())}),
+            command, input=json.dumps(payload),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -195,6 +208,45 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
 
+    def test_fresh_claude_implementation_routes_to_the_codex_handoff(self):
+        result = self.run_hook(
+            "Build a small command-line utility, implement its validation, and add focused tests.",
+            harness="claude",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_claude_questions_negation_and_planning_keep_local_authority(self):
+        for prompt in (
+            "Should we build a command-line utility?",
+            "Do not implement the utility yet.",
+            "Planning only: design the command-line utility.",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt, harness="claude")
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertNotIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_explicit_human_claude_choice_allows_local_write(self):
+        session = str(uuid.uuid4())
+        prompt = "Use Claude to implement this small utility."
+        result = self.run_hook(prompt, harness="claude", session=session)
+        self.assertEqual(0, result.returncode, result.stderr)
+        attempted = self.run_hook(
+            prompt, event="PreToolUse", harness="claude", session=session,
+            tool_name="Write", tool_input={"file_path": str(self.cwd / "utility.py"), "content": ""},
+        )
+        self.assertEqual(0, attempted.returncode, attempted.stderr)
+        self.assertEqual("", attempted.stdout)
+
+    def test_codex_harness_keeps_existing_route_behavior(self):
+        result = self.run_hook(
+            "Build a small command-line utility, implement its validation, and add focused tests.",
+            harness="codex",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+
     def test_explicit_multi_phase_execution_routes_without_a_goal(self):
         result = self.run_hook("Implement this multi-phase migration through completion.")
         self.assertEqual(0, result.returncode, result.stderr)
@@ -271,11 +323,27 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
             "".join(json.dumps(entry) + "\n" for entry in entries), encoding="utf-8"
         )
 
-    def run_hook(self, event, **payload):
+    def write_receipt(self, prompt, mode, goal_path=None):
+        directory = self.scratch / "agents-workflow-route"
+        directory.mkdir(exist_ok=True)
+        digest = hashlib.sha256(self.session.encode("utf-8")).hexdigest()
+        receipt = {
+            "routed_at": time.time(), "mode": mode,
+            "prompt_digest": workflow_route.prompt_digest(prompt),
+            "substantive": workflow_route.substantive(prompt),
+        }
+        if goal_path is not None:
+            receipt["goal_path"] = str(goal_path)
+        (directory / f"{digest}.json").write_text(json.dumps(receipt), encoding="utf-8")
+
+    def run_hook(self, event, *, harness=None, **payload):
         data = {"hook_event_name": event, "cwd": str(self.cwd), "session_id": self.session,
                 "transcript_path": str(self.transcript), **payload}
+        command = [sys.executable, "-B", str(SCRIPT)]
+        if harness:
+            command.extend(("--harness", harness))
         result = subprocess.run(
-            [sys.executable, "-B", str(SCRIPT)], input=json.dumps(data), capture_output=True,
+            command, input=json.dumps(data), capture_output=True,
             text=True, encoding="utf-8", env=self.environment, timeout=20,
         )
         self.assertEqual(0, result.returncode, result.stderr)
@@ -371,6 +439,144 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
     def test_recovery_reads_only_a_bounded_transcript_tail(self):
         self.write_transcript(self.PROMPT, filler=2000)
         self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
+
+    def test_missing_or_stale_claude_receipt_recovers_the_latest_human_implementation_prompt(self):
+        prompt = "Create a command-line utility with validation and tests."
+        self.write_transcript(prompt)
+        recovered = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Write",
+            tool_input={"file_path": str(self.cwd / "utility.py"), "content": ""},
+        )
+        self.assertEqual("deny", recovered["permissionDecision"])
+        self.assertIn("engineering:handoff automatically selected", recovered["additionalContext"])
+        digest = hashlib.sha256(self.session.encode("utf-8")).hexdigest()
+        receipt = json.loads((self.scratch / "agents-workflow-route" / f"{digest}.json").read_text(
+            encoding="utf-8"
+        ))
+        self.assertEqual("codex", receipt["mode"])
+        self.assertEqual(workflow_route.prompt_digest(prompt), receipt["prompt_digest"])
+
+    def test_codex_requirement_denies_writes_dispatch_and_shell_except_the_launcher(self):
+        prompt = "Build a command-line utility with validation and tests."
+        self.write_transcript(prompt)
+        for tool_name, tool_input in (
+            ("Write", {"file_path": str(self.cwd / "utility.py"), "content": ""}),
+            ("Task", {"description": "implement it"}),
+            ("Bash", {"command": "python utility.py"}),
+        ):
+            with self.subTest(tool_name=tool_name):
+                self.session = str(uuid.uuid4())
+                recovered = self.run_hook(
+                    "PreToolUse", harness="claude", tool_name=tool_name, tool_input=tool_input,
+                )
+                self.assertEqual("deny", recovered["permissionDecision"])
+        self.session = str(uuid.uuid4())
+        allowed = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Bash",
+            tool_input={"command": "pwsh -File C:/plugins/.agents/machine/utility/handoff-codex/scripts/launch-codex.ps1"},
+        )
+        self.assertIn("engineering:handoff automatically selected", allowed["additionalContext"])
+        self.assertNotIn("permissionDecision", allowed)
+        self.session = str(uuid.uuid4())
+        read_only = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Bash",
+            tool_input={"command": "pwd && ls -la"},
+        )
+        self.assertIn("engineering:handoff automatically selected", read_only["additionalContext"])
+        self.assertNotIn("permissionDecision", read_only)
+        self.session = str(uuid.uuid4())
+        powershell_read = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="PowerShell",
+            tool_input={"command": "Get-Location; Get-ChildItem; Get-Content README.md"},
+        )
+        self.assertNotIn("permissionDecision", powershell_read)
+        self.session = str(uuid.uuid4())
+        mixed = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Bash",
+            tool_input={"command": "pwd && touch utility.py"},
+        )
+        self.assertEqual("deny", mixed["permissionDecision"])
+        self.session = str(uuid.uuid4())
+        preparation = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Write",
+            tool_input={"file_path": str(self.cwd / "GOAL.md"),
+                        "content": "# Goal\n\n## Next Steps\n\nLaunch Codex.\n"},
+        )
+        self.assertNotIn("permissionDecision", preparation)
+
+    def test_goal_preparation_is_bound_to_the_receipt_canonical_path(self):
+        (self.cwd / ".git").mkdir()
+        owned = self.cwd / "plans" / "owned" / "GOAL.md"
+        other = self.cwd / "plans" / "other" / "GOAL.md"
+        for path in (owned, other):
+            path.parent.mkdir(parents=True)
+            path.write_text("# Goal\n\n## Next Steps\n", encoding="utf-8")
+        prompt = "Build the utility and prepare plans/owned/GOAL.md for a Codex handoff."
+        routed = self.run_hook("UserPromptSubmit", harness="claude", prompt=prompt)
+        self.assertIn("engineering:handoff automatically selected", routed["additionalContext"])
+        receipt_file = self.scratch / "agents-workflow-route" / (
+            f"{hashlib.sha256(self.session.encode('utf-8')).hexdigest()}.json"
+        )
+        receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+        self.assertEqual(owned.resolve(), Path(receipt["goal_path"]).resolve())
+        allowed = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Write",
+            tool_input={"file_path": str(owned), "content": "# Goal\n\n## Next Steps\n\nLaunch Codex.\n"},
+        )
+        self.assertIsNone(allowed)
+        rejected_other = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Write",
+            tool_input={"file_path": str(other), "content": "# Goal\n\n## Next Steps\n"},
+        )
+        self.assertEqual("deny", rejected_other["permissionDecision"])
+        rejected_markdown = self.run_hook(
+            "PreToolUse", harness="claude", tool_name="Write",
+            tool_input={"file_path": str(self.cwd / "handoff.md"), "content": "# Goal\n\n## Next Steps\n"},
+        )
+        self.assertEqual("deny", rejected_markdown["permissionDecision"])
+
+        self.session = str(uuid.uuid4())
+        self.assertEqual((self.cwd / "GOAL.md").resolve(), workflow_route.canonical_goal(
+            "Build the utility without a goal reference.", self.cwd,
+        ).resolve())
+        self.assertEqual((self.cwd / "GOAL.md").resolve(), workflow_route.canonical_goal(
+            'Build the utility while discussing "plans/other/GOAL.md".', self.cwd,
+        ).resolve())
+
+    def test_tiny_followup_requires_a_prior_substantive_human_context_and_never_overrides_codex(self):
+        (self.cwd / "README.md").write_text("before\n", encoding="utf-8")
+        prompt = "Just update README.md."
+        self.write_transcript(prompt)
+        first = self.run_hook("PreToolUse", harness="claude", tool_name="Edit")
+        self.assertEqual("deny", first["permissionDecision"])
+
+        self.session = str(uuid.uuid4())
+        self.write_transcript(prompt)
+        self.write_receipt(
+            "Explain the current architecture and its deployment boundaries in detail.", "conversation",
+        )
+        allowed = self.run_hook("PreToolUse", harness="claude", tool_name="Edit")
+        self.assertIsNone(allowed)
+
+        self.write_transcript(prompt)
+        self.write_receipt("Build a command-line utility with validation and tests.", "codex")
+        denied = self.run_hook("PreToolUse", harness="claude", tool_name="Edit")
+        self.assertEqual("deny", denied["permissionDecision"])
+
+    def test_hook_dispatch_preserves_the_router_denial_in_its_merged_json(self):
+        prompt = "Build a command-line utility with validation and tests."
+        self.write_transcript(prompt)
+        dispatch = ROOT / ".agents/hooks/hook_dispatch.py"
+        result = subprocess.run(
+            [sys.executable, "-B", str(dispatch), "--hook", str(SCRIPT), "--harness", "claude"],
+            input=json.dumps({"hook_event_name": "PreToolUse", "cwd": str(self.cwd),
+                              "session_id": self.session, "transcript_path": str(self.transcript),
+                              "tool_name": "Write", "tool_input": {"file_path": "utility.py", "content": ""}}),
+            capture_output=True, text=True, encoding="utf-8", env=self.environment, timeout=20,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        output = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual("deny", output["permissionDecision"])
 
 
 if __name__ == "__main__":
