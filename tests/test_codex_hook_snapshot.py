@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import importlib.util
 import json
@@ -40,6 +41,11 @@ SPEC = importlib.util.spec_from_file_location(
 )
 SNAPSHOT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SNAPSHOT)
+GENERATOR_SPEC = importlib.util.spec_from_file_location(
+    "sync_plugin_packages_for_snapshot", ROOT / "scripts" / "sync_plugin_packages.py"
+)
+GENERATOR = importlib.util.module_from_spec(GENERATOR_SPEC)
+GENERATOR_SPEC.loader.exec_module(GENERATOR)
 
 
 class CodexHookSnapshotTests(unittest.TestCase):
@@ -148,13 +154,43 @@ class CodexHookSnapshotTests(unittest.TestCase):
                                     re.search(r"sha256:[0-9a-f]{64}", command).group(), expected
                                 )
 
+    def test_snapshot_expression_is_uncompressed_base64_of_the_loader_text(self):
+        loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+        for text in (loader, 'print("café")\n', ""):
+            with self.subTest(length=len(text)):
+                expression = GENERATOR.codex_snapshot_expression(text)
+                encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
+                self.assertEqual(f"exec(__import__('base64').b64decode('{encoded}').decode())", expression)
+                self.assertEqual(expression, GENERATOR.codex_snapshot_expression(text))
+                literal = expression.split("'")[3]
+                self.assertEqual(text.encode("utf-8"), base64.b64decode(literal, validate=True))
+
+    def test_generation_refuses_a_windows_command_over_budget(self):
+        hook = {"command": 'python3 -B "${PLUGIN_ROOT}/hooks/probe.py"',
+                "commandWindows": 'python -B "${PLUGIN_ROOT}/hooks/probe.py"'}
+        manifest = json.dumps({"hooks": {"SessionStart": [{"hooks": [hook]}]}}).encode("utf-8")
+        budget = GENERATOR.CODEX_WINDOWS_COMMAND_BUDGET
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            loader = root / ".agents" / "hooks" / "codex_hook_snapshot.py"
+            loader.parent.mkdir(parents=True)
+            for size, fits in ((budget // 2, True), (budget, False)):
+                with self.subTest(size=size):
+                    loader.write_text("#" * size, encoding="utf-8")
+                    output = {"plugins/probe/hooks/codex.json": manifest}
+                    if fits:
+                        GENERATOR.bind_codex_hook_snapshots(root, output, {"probe"})
+                        bound = json.loads(output["plugins/probe/hooks/codex.json"])
+                        command = bound["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
+                        self.assertLessEqual(len(command), budget)
+                    else:
+                        with self.assertRaisesRegex(ValueError, f"over the {budget}-character budget"):
+                            GENERATOR.bind_codex_hook_snapshots(root, output, {"probe"})
+
     def test_each_host_parsing_of_each_command_executes_the_exact_loader(self):
         loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
         # Only base64 and fixed ASCII: nothing sh, PowerShell or cmd.exe expands inside double quotes.
-        portable = re.compile(
-            r"exec\(__import__\('zlib'\)\.decompress\(__import__\('base64'\)"
-            r"\.b64decode\('[A-Za-z0-9+/=]+'\)\)\.decode\(\)\)"
-        )
+        portable = re.compile(r"exec\(__import__\('base64'\)\.b64decode\('[A-Za-z0-9+/=]+'\)\.decode\(\)\)")
         for plugin in ("base", "engineering", "machine"):
             manifest = json.loads(
                 (ROOT / "plugins" / plugin / "hooks" / "codex.json").read_text(encoding="utf-8")

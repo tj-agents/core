@@ -9,7 +9,6 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import sys
-import zlib
 
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
@@ -221,15 +220,25 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
     return "sha256:" + digest.hexdigest()
 
 
+# cmd.exe accepts 8191 characters; the rest is headroom for the host's ${PLUGIN_ROOT} expansion.
+CODEX_WINDOWS_COMMAND_BUDGET = 7000
+
+
+def codex_snapshot_expression(loader: str) -> str:
+    """Return the Python expression that runs the loader, as a pure function of its text.
+
+    Base64 ([A-Za-z0-9+/=]) in single-quoted literals contains nothing that sh, PowerShell or cmd.exe
+    interpret inside the surrounding double quotes, so one expression serves every host. No
+    compression: zlib output differs between implementations (zlib-ng on Windows CPython), which
+    would make the generated packages and their digests platform-dependent.
+    """
+    encoded = base64.b64encode(loader.encode("utf-8")).decode("ascii")
+    return f"exec(__import__('base64').b64decode('{encoded}').decode())"
+
+
 def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
     loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
-    # One expression for every host: base64 ([A-Za-z0-9+/=]) in single-quoted literals contains nothing
-    # that sh, PowerShell or cmd.exe interpret inside the surrounding double quotes. zlib keeps the
-    # command well inside cmd.exe's 8191-character line limit.
-    encoded = base64.b64encode(zlib.compress(loader.encode("utf-8"), 9)).decode("ascii")
-    expression = (
-        f"exec(__import__('zlib').decompress(__import__('base64').b64decode('{encoded}')).decode())"
-    )
+    expression = codex_snapshot_expression(loader)
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         excluded = ["hooks/codex.json"]
@@ -249,6 +258,11 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
                             prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
                             f'"{plugin}" ' + command[len(prefix):]
                         )
+                        if field == "commandWindows" and len(hook[field]) > CODEX_WINDOWS_COMMAND_BUDGET:
+                            raise ValueError(
+                                f"Codex commandWindows for {plugin} is {len(hook[field])} characters, over "
+                                f"the {CODEX_WINDOWS_COMMAND_BUDGET}-character budget for cmd.exe"
+                            )
         output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
 
 
