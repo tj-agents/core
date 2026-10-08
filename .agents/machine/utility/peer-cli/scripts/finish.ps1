@@ -167,30 +167,6 @@ function Get-EpochSeconds {
     return [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0
 }
 
-function ConvertTo-FiniteDouble {
-    param($Value)
-
-    if ($null -eq $Value) { return $null }
-    $text = [Convert]::ToString($Value, [Globalization.CultureInfo]::InvariantCulture)
-    $parsed = 0.0
-    if (-not [double]::TryParse($text, [Globalization.NumberStyles]::Float,
-            [Globalization.CultureInfo]::InvariantCulture, [ref] $parsed)) {
-        return $null
-    }
-    if ([double]::IsNaN($parsed) -or [double]::IsInfinity($parsed)) { return $null }
-    return $parsed
-}
-
-function ConvertTo-PositiveInt {
-    param($Value)
-
-    $numeric = ConvertTo-FiniteDouble -Value $Value
-    if ($null -eq $numeric -or $numeric -le 0 -or $numeric -ne [math]::Floor($numeric) -or $numeric -gt [int]::MaxValue) {
-        return $null
-    }
-    return [int] $numeric
-}
-
 function Save-AtomicJson {
     param([string] $Path, [hashtable] $Data)
 
@@ -199,8 +175,18 @@ function Save-AtomicJson {
     $json = $Data | ConvertTo-Json -Depth 6
     $temp = Join-Path $directory ('.' + (Split-Path -Leaf $Path) + '.' + $PID + '.tmp')
     [IO.File]::WriteAllText($temp, $json, (New-Object Text.UTF8Encoding $false))
-    if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }
-    Move-Item -LiteralPath $temp -Destination $Path
+    $attempts = 3
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        try {
+            if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }
+            Move-Item -LiteralPath $temp -Destination $Path
+            return
+        }
+        catch {
+            if ($attempt -eq $attempts) { throw }
+            Start-Sleep -Milliseconds 100
+        }
+    }
 }
 
 function Invoke-HandshakeKillSweep {
@@ -230,13 +216,15 @@ function Invoke-HandshakeCancel {
     param([string] $ResultPath, [string] $Reason)
 
     Save-AtomicJson -Path "$ResultPath.cancelled" -Data @{ cancelled = (Get-EpochSeconds); reason = $Reason }
-    Invoke-HandshakeKillSweep -ResultPath $ResultPath
-    $evidenceDeadline = [DateTime]::UtcNow.AddSeconds(2.0)
-    while ([DateTime]::UtcNow -lt $evidenceDeadline) {
-        $record = Read-JsonFile -Path $ResultPath
-        if ($record -and (Get-EntryProperty -Entry $record -Name 'status')) { break }
-        Start-Sleep -Milliseconds 100
+    if (Read-JsonFile -Path $ResultPath) {
+        $evidenceDeadline = [DateTime]::UtcNow.AddSeconds(1.0)
+        while ([DateTime]::UtcNow -lt $evidenceDeadline) {
+            $record = Read-JsonFile -Path $ResultPath
+            if ($record -and (Get-EntryProperty -Entry $record -Name 'status')) { break }
+            Start-Sleep -Milliseconds 100
+        }
     }
+    Invoke-HandshakeKillSweep -ResultPath $ResultPath
     throw "finish: $Reason; nothing was closed."
 }
 
@@ -253,7 +241,11 @@ function Invoke-ReaperHandshake {
 
     $spawnEpoch = Get-EpochSeconds
     $reaperScript = Join-Path $PSScriptRoot 'finish_reaper.ps1'
+    $spawnTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_SPAWN_TIMEOUT_SECONDS' -Default 15.0
     $acceptTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS' -Default 60.0
+    $acceptTimeoutFloor = [math]::Max(60.0, $spawnTimeoutSeconds + 30.0)
+    if ($acceptTimeoutSeconds -lt $acceptTimeoutFloor) { $acceptTimeoutSeconds = $acceptTimeoutFloor }
+    $acceptTimeoutText = $acceptTimeoutSeconds.ToString([Globalization.CultureInfo]::InvariantCulture)
     $commandParts = @(
         'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $reaperScript,
         '-HostPid', $OwnHost.Pid, '-HostStart', $OwnHost.Started,
@@ -264,7 +256,7 @@ function Invoke-ReaperHandshake {
         '-Default', (Get-EntryProperty -Entry $Receipt -Name 'default'),
         '-Result', $ResultPath,
         '-StateDirectory', $StateDirectory,
-        '-AcceptTimeoutSeconds', $acceptTimeoutSeconds
+        '-AcceptTimeoutSeconds', $acceptTimeoutText
     )
     if ($ParentShell) {
         $commandParts += @('-ParentPid', $ParentShell.Pid, '-ParentStart', $ParentShell.Started)
@@ -279,23 +271,28 @@ function Invoke-ReaperHandshake {
     }
     $spawnPid = ConvertTo-PositiveInt -Value $spawnResult.ProcessId
 
-    $spawnTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_SPAWN_TIMEOUT_SECONDS' -Default 15.0
     $confirmDeadline = [DateTime]::UtcNow.AddSeconds($spawnTimeoutSeconds)
     $validatedRecord = $null
     while ($true) {
         $record = Read-JsonFile -Path $ResultPath
         if ($null -ne $record) {
-            $recordStarted = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $record -Name 'started')
-            $recordHostPid = ConvertTo-PositiveInt -Value (Get-EntryProperty -Entry $record -Name 'host_pid')
-            $recordWorktree = Get-EntryProperty -Entry $record -Name 'worktree'
-            $recordReaperPid = ConvertTo-PositiveInt -Value (Get-EntryProperty -Entry $record -Name 'reaper_pid')
-            $recordReaperStartedAt = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $record -Name 'reaper_started_at')
+            $valid = $false
+            try {
+                $recordStarted = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $record -Name 'started')
+                $recordHostPid = ConvertTo-PositiveInt -Value (Get-EntryProperty -Entry $record -Name 'host_pid')
+                $recordWorktree = Get-EntryProperty -Entry $record -Name 'worktree'
+                $recordReaperPid = ConvertTo-PositiveInt -Value (Get-EntryProperty -Entry $record -Name 'reaper_pid')
+                $recordReaperStartedAt = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $record -Name 'reaper_started_at')
 
-            $valid = ($null -ne $recordStarted) -and ($recordStarted -ge ($spawnEpoch - 2.0)) -and
-                ($null -ne $recordHostPid) -and ($recordHostPid -eq $OwnHost.Pid) -and
-                ($recordWorktree) -and ((Get-NormalizedPathForm $recordWorktree) -eq (Get-NormalizedPathForm $ResolvedWorktree)) -and
-                ($null -ne $recordReaperPid) -and ((-not $spawnPid) -or ($recordReaperPid -eq $spawnPid)) -and
-                ($null -ne $recordReaperStartedAt) -and ($recordReaperStartedAt -gt 0)
+                $valid = ($null -ne $recordStarted) -and ($recordStarted -ge ($spawnEpoch - 2.0)) -and
+                    ($null -ne $recordHostPid) -and ($recordHostPid -eq $OwnHost.Pid) -and
+                    ($recordWorktree) -and ((Get-NormalizedPathForm $recordWorktree) -eq (Get-NormalizedPathForm $ResolvedWorktree)) -and
+                    ($null -ne $recordReaperPid) -and ((-not $spawnPid) -or ($recordReaperPid -eq $spawnPid)) -and
+                    ($null -ne $recordReaperStartedAt) -and ($recordReaperStartedAt -gt 0)
+            }
+            catch {
+                $valid = $false
+            }
 
             if ($valid) {
                 $validatedRecord = [pscustomobject]@{ ReaperPid = $recordReaperPid; ReaperStartedAt = $recordReaperStartedAt }

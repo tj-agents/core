@@ -66,9 +66,10 @@ returning `$null` on failure), never `-is [int]`/`-is [double]` type tests or `.
 ## Launcher state machine (finish.ps1, cleanup mode)
 
 The spawn-confirm-accept-armed-cancel flow lives in a named function (`Invoke-ReaperHandshake`) defined
-before the top-level script flow, taking the spawn/close operations' collaborators as overridable
-functions (`Start-DetachedReaper`, `Invoke-SessionClose` resolved dynamically), so dot-sourced tests can
-drive it deterministically. States:
+before the top-level script flow, receiving the state directory, resolved worktree, receipt, own host,
+parent shell, attachment, and result path, and taking the spawn/close operations' collaborators as
+overridable functions (`Start-DetachedReaper`, `Invoke-SessionClose` resolved dynamically), so
+dot-sourced tests can drive it deterministically. States:
 
 1. **preflight** — existing fresh receipt, head/branch match, host identity, attachment and
    shared-session checks, unchanged and still before any spawn.
@@ -99,13 +100,15 @@ drive it deterministically. States:
    exited `not-accepted`, died after starting, or never saw the acceptance — in every case the host must
    not close → **cancel**. Present and matching → `Invoke-SessionClose` wrapped in try/catch: an
    exception after arming writes `.cancelled` (the reaper re-checks it before removal) and rethrows.
-6. **cancel** — atomically write `.cancelled` with the reason; best-effort kill sweep: query
-   `Win32_Process` with WQL `Name = 'powershell.exe' AND CommandLine LIKE '%<guid>%'` (the 'N'-format
-   GUID is hex-only, so no LIKE wildcards), exclude `$PID`, stop each match with
-   `-ErrorAction SilentlyContinue` after re-verifying identity (command line, and start time against
-   `reaper_started_at` when a started record exists); poll ≤ 2 s for a terminal reaper record as
-   evidence; throw naming the reason, keeping the literal `nothing was closed` phrasing the merge skill's
-   guidance keys on. Host, worktree and branch are untouched in every cancel path.
+6. **cancel** — atomically write `.cancelled` with the reason; when a started record exists, poll
+   briefly (~1 s) for the reaper's own terminal record first, so the self-recorded `cancelled` evidence
+   survives; then the best-effort kill sweep: query `Win32_Process` with WQL
+   `Name = 'powershell.exe' AND CommandLine LIKE '%<guid>%'` (the 'N'-format GUID is hex-only, so no
+   LIKE wildcards), exclude `$PID`, stop each match with `-ErrorAction SilentlyContinue` after
+   re-verifying identity (command line, and start time against `reaper_started_at` when a started record
+   exists); throw naming the reason, keeping the literal `nothing was closed` phrasing the merge skill's
+   guidance keys on. With no started record, skip the evidence poll — nothing can ever appear. Host,
+   worktree and branch are untouched in every cancel path.
 
 ## Reaper state machine (finish_reaper.ps1, cleanup mode only)
 
@@ -117,8 +120,9 @@ drive it deterministically. States:
    the parameter is authoritative because CIM children inherit no environment):
    - `.cancelled` exists → terminal `status = 'cancelled'`, exit. Checked before `.accepted` each
      iteration, so a cancellation always beats a racing acceptance.
-   - `.accepted` parses with positive `reaper_pid` equal to own `$PID` (and `reaper_started_at` within
-     2 s of own start when present) → write `.armed`, proceed.
+   - `.accepted` parses with positive `reaper_pid` equal to own `$PID` and a `reaper_started_at` that
+     parses and matches own start within 2 s → write `.armed`, proceed. An absent or unparsable
+     `reaper_started_at` never arms — the launcher always echoes the value it validated.
    - `.accepted` parses with a positive pid that is **not** own `$PID` → exit without writing the result
      file (the accepted reaper owns the channel).
    - `.accepted` present but unparsable or incomplete → keep polling (mid-write).
@@ -143,7 +147,7 @@ drive it deterministically. States:
 | launcher exits/dies between spawn and decision | no acceptance ever appears; reaper exits `not-accepted` at its command-line bound |
 | launcher writes `.accepted` after the reaper's accept deadline (slow CIM return, machine sleep) | no `.armed` appears; launcher cancels at armed-wait; host stays open |
 | reaper dies between started and acceptance | no `.armed`; launcher cancels at armed-wait; host stays open |
-| launcher dies/throws after `.accepted` (close failure) | catch writes `.cancelled` and rethrows; reaper's pre-removal re-check aborts cleanup; if the launcher died uncatchably, the armed reaper waits on a host that is still running — a live host holds its cwd, and `AGENT_FINISH_REAPER_TIMEOUT_SECONDS` bounds the wait (`timeout`, worktree intact). Residual: a user closing that host inside the window lets the armed reaper clean up a receipt-proven worktree without `--force`, with dirty-work and branch-tip protections still active |
+| launcher dies/throws after `.accepted` (close failure) | catch writes `.cancelled` and rethrows; reaper's pre-removal re-check aborts cleanup, and a host-wait expiry with a cancellation on disk records `cancelled`, not `timeout`; if the launcher died uncatchably, the armed reaper waits on a host that is still running — a live host holds its cwd, and `AGENT_FINISH_REAPER_TIMEOUT_SECONDS` bounds the wait (worktree intact). Residual: a user closing that host inside the window lets the armed reaper clean up a receipt-proven worktree without `--force`, with dirty-work and branch-tip protections still active |
 | CIM created a process but reported failure, schtasks also spawned | the started exclusive create picks one owner; the sibling exits instantly; the launcher accepts exactly the pid it validated; a sibling that somehow reads a foreign-pid acceptance exits inert; the accepted reaper's terminal evidence can no longer be overwritten |
 | stale/foreign record at the result path | fresh GUID path makes reuse impossible; validation additionally requires the host pid/worktree echo, recent `started`, positive `reaper_started_at`, and the spawn pid when known |
 | pid reuse between acceptance and arming | acceptance echoes `reaper_pid` + `reaper_started_at`; a reused pid fails the start-time match (and an impostor would also have to be a duplicate reaper with identical arguments — harmless by construction) |
@@ -227,7 +231,10 @@ Tests for this repair live inside the FinishOnly block.
 - `AGENT_FINISH_SPAWN_TIMEOUT_SECONDS` default moves 5 → 15 s (matching close.ps1), reducing spurious
   cancellations; correctness comes from the handshake alone.
 - The accept bound travels as the `-AcceptTimeoutSeconds` command-line parameter (launcher-side env
-  override `AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS`, default 60 s); CIM children inherit no environment.
+  override `AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS`, default 60 s, clamped to at least the spawn bound plus
+  30 s and at least 60 s, formatted culture-invariantly); CIM children inherit no environment. The
+  accept-gate terminal records carry `reaper_pid`/`reaper_started_at` so sweeps and post-mortems keep
+  the reaper's identity after the started record is replaced.
 - No new scripts, no change to the documented argument-free invocation, no harness-permission changes
   (verified: `.agents/plugins/harness/machine.json` pins the exact existing command).
 - Residual risks accepted (for RESULT.md): armed reaper dying before cleanup leaves the obligation to

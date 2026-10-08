@@ -15,6 +15,30 @@ function Get-EntryProperty {
     return $property.Value
 }
 
+function ConvertTo-FiniteDouble {
+    param($Value)
+
+    if ($null -eq $Value) { return $null }
+    $text = [Convert]::ToString($Value, [Globalization.CultureInfo]::InvariantCulture)
+    $parsed = 0.0
+    if (-not [double]::TryParse($text, [Globalization.NumberStyles]::Float,
+            [Globalization.CultureInfo]::InvariantCulture, [ref] $parsed)) {
+        return $null
+    }
+    if ([double]::IsNaN($parsed) -or [double]::IsInfinity($parsed)) { return $null }
+    return $parsed
+}
+
+function ConvertTo-PositiveInt {
+    param($Value)
+
+    $numeric = ConvertTo-FiniteDouble -Value $Value
+    if ($null -eq $numeric -or $numeric -le 0 -or $numeric -ne [math]::Floor($numeric) -or $numeric -gt [int]::MaxValue) {
+        return $null
+    }
+    return [int] $numeric
+}
+
 function Read-JsonFile {
     param([string] $Path)
 
