@@ -191,7 +191,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:b58149c46316ba86d68d25cebaf011a21224e5f86dfa7fef7a14ec043bdf0ca5",
+          "digest": "sha256:da3db5dad8575dc841f3fd020943b15674a0ee6d5577e021f71845f005ec596f",
           "harness": {
             "marketplaces": [
               {
@@ -312,12 +312,42 @@
             ],
             "permissions": {
               "claude_allow": [
+                "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
               ],
               "codex_prefix_rules": [
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python.exe",
+                      "python3",
+                      "py"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/workflows/completion.py"
+                    ]
+                  ],
+                  "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report the user outcome complete",
+                  "match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/workflows/completion.py"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "${PLUGIN_ROOT}/workflows/completion.py"
+                    ]
+                  ]
+                },
                 {
                   "pattern": [
                     [
