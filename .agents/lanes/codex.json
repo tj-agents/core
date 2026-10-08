@@ -9,11 +9,11 @@
 
   "lanes": {
     "L1": {
-      "summary": "Plans and design decisions of any size, where the work decides how something should be built.",
+      "summary": "Critical design decisions or large complex plans with interacting decisions.",
       "model": "gpt-6-astra",
       "reasoning_effort": "xhigh",
       "context_ceiling": null,
-      "why": "frontier family at the setting above `high`. Planning and design: authoring a plan, large or small, that takes a design position; architecture; a data model or contract; a mechanism choice. The agent picks it on its own judgement. Never implementation, review or delivery; a merge, push or publish at the end of a job never raises its lane."
+      "why": "The highest lane for a critical design decision or a big, complex plan with substantial interacting decisions. Record a concrete criticality or scale reason before selecting it. A plan label, architecture, data model, contract, or mechanism choice alone does not select it. Never implementation, review or delivery."
     },
     "L2": {
       "summary": "High-stakes judgement that is not design, where a wrong call is costly or hard to undo.",

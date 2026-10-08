@@ -39,6 +39,8 @@ current host's supported controls or a bounded lane worker. Select again as the 
 dispatch falls back. Design approval does not select an implementation lane. The canonical lane contract
 owns direct execution, tiny inline follow-ups, capability limits, and when substantial design needs a
 fresh execution owner; apply it even when the engineering runtime is unavailable.
+On Claude, hand multi-phase work and any delegated design, implementation, or review phase to Codex before
+delegating. An explicit user choice of Claude may keep non-frontier work local; otherwise do not fall back.
 
 ## A link to another skill is a stage pointer, not a read
 

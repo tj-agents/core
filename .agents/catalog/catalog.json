@@ -176,7 +176,8 @@
           ],
           "dependencies": {
             "required": [
-              "base-agents/base"
+              "base-agents/base",
+              "base-agents/machine"
             ],
             "optional": []
           },
@@ -201,7 +202,8 @@
             ],
             "plugins": [
               "base-agents/base",
-              "base-agents/engineering"
+              "base-agents/engineering",
+              "base-agents/machine"
             ],
             "hooks": [
               {
