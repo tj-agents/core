@@ -1,6 +1,6 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: PR #148 is reviewed through `7527935d5b429a97d3b85a92f0bba9866f19b3b4`; the false incremental-review gate is repaired and focused regressions passed; the final correction is ready to publish.
+Status: PR #148 merged, generated packages installed, and post-merge CI passed. The fresh Sonnet routing acceptance failed by implementing locally. The old PR owner is archived blocked; successor runtime `Fix/CodexFirstLanesRuntime` is active for the L3-diagnosed L4 repair. The goal remains open.
 
 PR: https://github.com/tj-agents/core/pull/148
 
@@ -13,7 +13,7 @@ standards-defect authorization. Implement, test, PR, merge, and update the insta
 hosts.
 
 Checkout: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-CodexFirstLanes`, branch
-`Fix/CodexFirstLanes` from origin/main e831904. Do not touch `.worktrees/Fix-CloseEveryFinishedSession`
+`Fix/CodexFirstLanesRuntime` from origin/main `6e2e2db3d1ad48e095ca5c2a9889f1cdfb92c8f5`. Do not touch `.worktrees/Fix-CloseEveryFinishedSession`
 (owned by the Codex tab "Core: close finished sessions"; its step 5 is superseded by this goal) or
 `.worktrees/Fix-OutcomeVerifiedCompletion`.
 
@@ -45,17 +45,9 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. Publish the verified `review_reconcile` correction, then incrementally review its small delta
-   from `7527935d5b429a97d3b85a92f0bba9866f19b3b4` and own the new exact-head CI. The canonical work order is
-   `reviews/Fix-CodexFirstLanes.md`.
-   Native CLI review was auto-review rejected; the review specialist
-   is unavailable for this account. Use fresh read-only Codex L4 fallback lenses, as the first pass did.
-2. Own exact-head CI, resolve any new findings, and merge after the repository gates pass.
-   A standalone scope assessment is already recorded below; do not invent a ledger to resolve
-   preflight's `assess-scope` result. Pass the PR URL once created. Keep delivery at L7 or L6 for monitoring.
-3. Update the installed plugins on both hosts and verify from a fresh Claude session that a design
-   request routes to a Codex handoff without spawning a Claude Fable agent.
-4. Close this session yourself when done (`finish.ps1` after a removable `cleanup_proof.py`).
+1. The Claude-only enforcement repair is implemented on `Fix/CodexFirstLanesRuntime`; all 37 router tests pass and candidate packages are generated. Automatic approval review rejected the final live Claude probe because candidate-plugin/workspace data may be sent externally without explicit payload/destination authorization. The exact user approval question is pending. Do not retry that launch until approval arrives. Meanwhile checkpoint and review the concrete local candidate; after approval run the unchanged capped Sonnet task, requiring actual Codex launch and child results before publication.
+2. Causally linked post-merge CI run `37795175405` passed, including regeneration job `113372642356` and verify job `113372641549`. The generated commit is a direct child of landing commit `fa9f7400d939ba9cbf57048d2f94787aeaca864e`; primary checkout fast-forwarded with pre-existing files preserved.
+3. Record actual acceptance evidence, pass the completion check, release the completed delivery and scheduler, then close this session (`finish.ps1` after a removable `cleanup_proof.py`).
 
 ## Selected design and execution checkpoint
 
@@ -107,7 +99,7 @@ Review lane: L4 (or the declared Codex review specialist). Delivery lane: L7 cle
 use L6 for a sustained monitor. The L1 parent owns only design and synthesis, with bounded workers
 applying implementation and review lanes.
 
-Current next action: publish the verified reconciliation correction, review it, and own its exact-head CI.
+Current next action: complete the small reconciliation-correction review and exact-head CI, then merge PR #148.
 Implementation: `fe34217`, reconciled at `a3c82ff`; review repairs: `f1c9077`.
 The first independent pass found a routed-lane plus model override gap and a stale bootstrap dependency
 assertion. Both are repaired; this commit clarifies the matching launcher wording.
@@ -176,3 +168,26 @@ with the frozen descriptor head. Regressions cover incorporated base changes and
 changes; existing disjoint-base and head-mismatch checks remain. Captured runs
 `pr148-review-reconcile-base` and `pr148-review-reconcile-head` both exited 0; diff checks passed.
 Baseline CI run `37786854612` completed successfully at `7527935d` (guard and verify passed).
+
+Final correction `eaf28ed2` is published and verified against both remote branch and PR head.
+Review scope is three paths from `7527935d`; CI run `37791368941`, verify check `113359329709`.
+
+Installed verification: only user base/engineering/machine updated on both hosts. All six package trees
+have exact generated-file membership and match after normalizing text line endings; raw digest differences
+are Windows CRLF checkout conversion, not missing, extra, or stale content. Generated Git exports match
+the catalog's raw digests. Installed Codex agent preview/apply/verify completed with 12 profiles verified.
+Digest evidence: `C:/Users/TOMMYS~1/AppData/Local/Temp/pr148-package-digest-6ulb1uq8/result.json`.
+
+Fresh acceptance is not yet established. The first alpha/ALPHA probe was too small to distinguish the
+tiny-inline allowance. The ordinary multiphase probe then ran locally, but its launcher omitted `--model`
+and inherited user `model=opus` (actual `claude-opus-5-5`), invalidating the intended cheap-host test.
+Preserve that observation; do not claim a route passed. One corrected run uses the identical task,
+explicit `claude-sonnet-5`, low effort, a $0.75 cap and a bounded runtime. No further prompt reshaping.
+
+The valid corrected probe used Python argv transport, confirmed `claude-sonnet-5` at init and preserved
+the entire ordinary multiphase prompt. It completed in 29.029 API seconds for $0.2316332, writing
+`task_summary.py` and `test_task_summary.py` locally and running seven passing tests. No handoff,
+subagent, Codex lane receipt, or Codex child result occurred. This is an observed acceptance failure;
+the requested outcome is not complete. Evidence directory:
+`C:/Users/TommySeery/AppData/Local/Temp/pr148-claude-codex-first-corrected-python-10ea7aa3de974db282eeeb6134878fea`.
+Preserve `argv.json`, `init-metadata.json`, `probe-summary.json` and `claude-stream.jsonl`.
