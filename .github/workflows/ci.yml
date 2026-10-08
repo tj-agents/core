@@ -125,7 +125,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.12'
 
       - name: regenerate the workspace from authored sources
         shell: pwsh
@@ -140,6 +140,9 @@ jobs:
         shell: pwsh
         run: ./.agents/sync-generated.ps1 -Check
 
+      - name: tier payloads conform to the shipped shape
+        run: python -B .agents/hooks/check_tier_payload.py --root .
+
       - name: local capability catalog digests are current
         run: python -B scripts/update_catalog_digests.py --check
 
@@ -150,6 +153,12 @@ jobs:
         shell: pwsh
         run: ./tests/skill-packaging.tests.ps1
 
+      - name: Codex terminal profile tests
+        shell: pwsh
+        run: ./tests/codex-terminal-profile.tests.ps1
+
+      # Hook subprocesses in some tests read stdin as their payload; a closed stdin stands in for the host,
+      # which always closes it, so an inherited runner stdin can never leave a hook waiting.
       - name: source layout and package tests
         run: python -B -m unittest discover -s tests -p 'test_*.py' -v < /dev/null
 
