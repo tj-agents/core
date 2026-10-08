@@ -51,6 +51,16 @@
       ]
     },
     "detect": {},
+    "fact_definitions": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "\\S"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/predicate"
+      }
+    },
     "employer": {
       "type": "object",
       "additionalProperties": false,
@@ -296,6 +306,80 @@
               ]
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dependency"
+          ],
+          "properties": {
+            "dependency": {
+              "$ref": "#/$defs/dependency"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project_dependency"
+          ],
+          "properties": {
+            "project_dependency": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "transitive",
+                "where"
+              ],
+              "properties": {
+                "transitive": {
+                  "type": "boolean"
+                },
+                "where": {
+                  "$ref": "#/$defs/predicate"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "nuget",
+            "npm",
+            "sdk",
+            "framework"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prefix": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "id"
+          ]
+        },
+        {
+          "required": [
+            "prefix"
+          ]
         }
       ]
     },
@@ -353,7 +437,8 @@
             "$ref": "#/$defs/legacyDetect"
           },
           "employer": false,
-          "session_context": false
+          "session_context": false,
+          "fact_definitions": false
         }
       }
     },
