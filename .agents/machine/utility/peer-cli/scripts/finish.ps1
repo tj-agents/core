@@ -221,10 +221,14 @@ function Invoke-ReaperHandshake {
     $reaperScript = Join-Path $PSScriptRoot 'finish_reaper.ps1'
     $spawnTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_SPAWN_TIMEOUT_SECONDS' -Default 15.0
     $acceptTimeoutEnvValue = [Environment]::GetEnvironmentVariable('AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS')
-    $acceptTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS' -Default 60.0
+    $acceptTimeoutParsed = ConvertTo-FiniteDouble -Value $acceptTimeoutEnvValue
+    $acceptTimeoutSeconds = if ($null -ne $acceptTimeoutParsed) { $acceptTimeoutParsed } else { 60.0 }
     $acceptTimeoutFloor = [math]::Max(60.0, $spawnTimeoutSeconds + 30.0)
+    if ($acceptTimeoutEnvValue -and $null -eq $acceptTimeoutParsed) {
+        Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue is not a number; using the default."
+    }
     if ($acceptTimeoutSeconds -lt $acceptTimeoutFloor) {
-        if ($acceptTimeoutEnvValue) {
+        if ($null -ne $acceptTimeoutParsed) {
             $acceptTimeoutFloorText = $acceptTimeoutFloor.ToString([Globalization.CultureInfo]::InvariantCulture)
             Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue was below the minimum; raised to $acceptTimeoutFloorText seconds."
         }
@@ -283,7 +287,7 @@ function Invoke-ReaperHandshake {
                 $validatedRecord = [pscustomobject]@{ ReaperPid = $recordReaperPid; ReaperStartedAt = $recordReaperStartedAt }
                 break
             }
-            Invoke-HandshakeCancel -ResultPath $ResultPath -Reason 'the reaper startup record did not match this invocation'
+            Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -Reason 'the reaper startup record did not match this invocation'
             return
         }
         if ([DateTime]::UtcNow -ge $confirmDeadline) {

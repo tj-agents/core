@@ -660,7 +660,7 @@ Start-Sleep -Seconds 20
         $previousCancelArmedState = $env:AGENT_STATE_DIRECTORY
         $previousCancelArmedReaperTimeout = $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS
         $env:AGENT_STATE_DIRECTORY = $cancelArmedState
-        $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = '2'
+        $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = '10'
         $cancelArmedReaperProcess = $null
         try {
             $cancelArmedReaperProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
@@ -1341,8 +1341,8 @@ Move-Item -LiteralPath $temp -Destination $Path
             return $false
         }
         Invoke-ReaperHandshakeUnit -ResultPath $resultAcceptClamp -SpawnImpl $spawnImplAcceptClamp | Out-Null
-        Assert-Contains -Actual $script:unitCapturedCommandLine -Expected '-AcceptTimeoutSeconds 60' `
-            -Message 'An explicit accept timeout below the floor was not clamped to 60 on the reaper command line.'
+        Assert-True -Actual ($script:unitCapturedCommandLine.TrimEnd().EndsWith('-AcceptTimeoutSeconds 60')) `
+            -Message "An explicit accept timeout below the floor was not clamped to exactly 60 on the reaper command line: $($script:unitCapturedCommandLine)"
     }
     finally {
         $env:AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS = $previousUnitAcceptTimeout

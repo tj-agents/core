@@ -458,12 +458,14 @@ try {
     $removeResult = Invoke-Git -Cwd $Primary -Arguments @('worktree', 'remove', '--', $Worktree)
     if ($removeResult.ExitCode -ne 0) {
         Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'failed'
-            error    = "git worktree remove failed: $($removeResult.Output)"
-            finished = (Now-Epoch)
+            started           = $startedEpoch
+            host_pid          = $HostPid
+            worktree          = $Worktree
+            reaper_pid        = $PID
+            reaper_started_at = $reaperStartedAt
+            status            = 'failed'
+            error             = "git worktree remove failed: $($removeResult.Output)"
+            finished          = (Now-Epoch)
         }
         return
     }
@@ -486,12 +488,14 @@ try {
         $branchResult = Invoke-Git -Cwd $Primary -Arguments @('branch', $deleteFlag, $Branch)
         if ($branchResult.ExitCode -ne 0) {
             Save-ResultRecord -Path $Result -Data @{
-                started  = $startedEpoch
-                host_pid = $HostPid
-                worktree = $Worktree
-                status   = 'failed'
-                error    = "git branch $deleteFlag $Branch failed: $($branchResult.Output)"
-                finished = (Now-Epoch)
+                started           = $startedEpoch
+                host_pid          = $HostPid
+                worktree          = $Worktree
+                reaper_pid        = $PID
+                reaper_started_at = $reaperStartedAt
+                status            = 'failed'
+                error             = "git branch $deleteFlag $Branch failed: $($branchResult.Output)"
+                finished          = (Now-Epoch)
             }
             return
         }
@@ -503,33 +507,39 @@ try {
 
     if (-not ($pathAbsent -and $unregistered)) {
         Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'failed'
-            error    = 'worktree path or its registration is still present after cleanup'
-            finished = (Now-Epoch)
+            started           = $startedEpoch
+            host_pid          = $HostPid
+            worktree          = $Worktree
+            reaper_pid        = $PID
+            reaper_started_at = $reaperStartedAt
+            status            = 'failed'
+            error             = 'worktree path or its registration is still present after cleanup'
+            finished          = (Now-Epoch)
         }
         return
     }
 
     if ($branchPreserved) {
         Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'branch-preserved'
-            reason   = $branchPreservedReason
-            finished = (Now-Epoch)
+            started           = $startedEpoch
+            host_pid          = $HostPid
+            worktree          = $Worktree
+            reaper_pid        = $PID
+            reaper_started_at = $reaperStartedAt
+            status            = 'branch-preserved'
+            reason            = $branchPreservedReason
+            finished          = (Now-Epoch)
         }
     }
     else {
         Save-ResultRecord -Path $Result -Data @{
-            started  = $startedEpoch
-            host_pid = $HostPid
-            worktree = $Worktree
-            status   = 'succeeded'
-            finished = (Now-Epoch)
+            started           = $startedEpoch
+            host_pid          = $HostPid
+            worktree          = $Worktree
+            reaper_pid        = $PID
+            reaper_started_at = $reaperStartedAt
+            status            = 'succeeded'
+            finished          = (Now-Epoch)
         }
     }
 
@@ -539,11 +549,13 @@ try {
 }
 catch {
     Save-ResultRecord -Path $Result -Data @{
-        started  = $startedEpoch
-        host_pid = $HostPid
-        worktree = $Worktree
-        status   = 'failed'
-        error    = $_.Exception.Message
-        finished = (Now-Epoch)
+        started           = $startedEpoch
+        host_pid          = $HostPid
+        worktree          = $Worktree
+        reaper_pid        = $PID
+        reaper_started_at = $reaperStartedAt
+        status            = 'failed'
+        error             = $_.Exception.Message
+        finished          = (Now-Epoch)
     }
 }
