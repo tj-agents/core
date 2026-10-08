@@ -1,5 +1,30 @@
 # Plugin host integration debt
 
+## Arbitrary terminal prose is outside the completion runtime
+
+The completion runtime validates supported workflow receipts and the terminal reports those workflows
+produce. Codex and Claude provide no package hook that intercepts arbitrary final prose, so a session can
+still type an unsupported completion claim outside that path.
+
+Resolve when both hosts expose a trusted terminal-response interception point that can require the canonical
+completion check before a user-visible success claim. Until then, do not claim installed-host adoption from
+source tests alone.
+
+## Callout enforcement has bounded host signals
+
+The callout-repair gate blocks automatic feedback substitution and checks paired launcher results
+against the prepared standards-repair goal. Claude's Stop hook also holds recognized callouts.
+Callout detection covers explicit mistake wording that names standards or workflow mechanisms;
+it cannot establish the meaning of every complaint,
+whether a standard caused it, or whether assistant text substantively answers a question. Codex has no
+registered result or Stop hook, and specialized host tools can bypass normal plugin hooks. Source
+regressions and packaging checks do not establish live activation or interception of SendFeedback.
+
+Resolve when both hosts expose trusted semantic callout and answer signals, successful source-owner
+handoff evidence, and complete feedback/terminal interception; verify those paths in fresh sessions
+with the released hooks trusted. Until then, report the supported boundaries without claiming complete
+enforcement of arbitrary prose.
+
 ## Generated base tier README points to an absent schema path
 
 The source `.agents/tiers/README.md` links to `../schemas/tier.schema.json`, which exists in the source tree. Packaging moves the schema to `plugins/base/tiers/tier.schema.json` but copies the README without adjusting its link. The generated README therefore fails `docs_reachability.py` on the current main branch.

@@ -8,6 +8,7 @@ not relied on.
 
 import argparse
 import importlib.util
+import json
 import re
 import sys
 from pathlib import Path
@@ -83,17 +84,16 @@ def parse_args(argv, agent_cli):
 
 
 def resolve_model(args, agent_cli):
-    """(model, effort, tier text for the success message) per this launcher's selection precedence.
-
-    An explicit --model wins; its --effort (valid only alongside it, enforced in parse_args) travels with
-    it unchanged. A --lane or --frontier that actually resolves the model supplies whatever effort the
-    table prices for it, or none, same as that rung would get interactively; an explicit --model beating
-    the lane means no lane effort applies either. The lane is never guessed here: a transport that
-    inferred one from the prompt would quietly decide the cost of every handoff.
-    """
     model = args.model
     effort = args.effort
     tier = ''
+    if args.lane:
+        route = agent_cli.resolve_lane('claude', lane=args.lane).get('handoff')
+        if route:
+            raise agent_cli.LaunchError(
+                f"--lane {args.lane} routes to Codex {route['lane']}; use engineering:handoff "
+                "with machine:handoff-codex, or omit --lane for an explicit user-named model."
+            )
     if args.frontier:
         model, effort = agent_cli.resolve_lane_model('claude', frontier=True)
         tier = 'frontier -> '
@@ -145,6 +145,7 @@ def main(argv=None):
         if effort:
             selection += f' at {effort}'
         print(f"Launched claude handoff tab '{args.title}' in {working_directory} on {selection} with prompt {prompt_path}")
+        print(json.dumps({"event": "agent-handoff-submitted", "worktree": str(working_directory), "prompt_path": str(prompt_path)}))
         return 0
     except agent_cli.LaunchError as exc:
         return agent_cli.report_launch_failure(exc)

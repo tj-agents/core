@@ -4,7 +4,6 @@ description: Design or phase multi-step work and create or update its implementa
 
 kind: workflow
 domain: process
-lane: L1
 ---
 
 # Author a durable plan
@@ -85,7 +84,7 @@ For a request to choose the next roadmap item, let the
 4. For plan-managed work, resolve the Workflow v2 repository provider once and validate the plan, ledger,
    worktree, branch, and next action through it. When Kandev hosts the task, leave its task and session
    identifiers in Kandev.
-5. Run `python .agents/hooks/plan_graph.py --root . --plan <repo-relative *_PLAN.md>` for plan and ledger
+5. Run `python -B .agents/hooks/plan_graph.py --root .` for plan and ledger
    changes and the relevant documentation checks. Enter `docs-review`, including the `plans`
    implementation-design review gate, and resolve its findings before declaring the artifact
    implementation-ready. Correct structural, ownership, and pre-launch policy errors immediately.

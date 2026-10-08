@@ -26,6 +26,21 @@ canonical goal, validate the checkpoint and authority, acknowledge the exact att
 next action immediately. Acknowledgement is not completion; keep the same goal through its remaining
 authorized slices and record the first action or genuine gate as progress evidence.
 
+After design approval or completion of a prerequisite, resolve the next authorized substantive action and
+execute or dispatch it at the selected lane. Use existing valid ownership, scope, review and validation
+evidence; refresh only evidence whose inputs changed, whose result is missing or contradictory, or whose
+governing gate requires a fresh check. If substantive work cannot start, identify the exact unmet
+dependency and continue authorized work that does not depend on it. Repeating satisfied preparation is
+not progress toward the next action.
+
+A CI query, transport or monitor error leaves the delivery result unknown. Diagnose and restore
+observation through the supported monitor, retaining its repository, PR, head and run binding and
+reconciling the failed monitor before replacing it. Preserve TLS verification, authorization and every
+required review and CI gate. Continue independent authorized work while observation recovers; when fresh
+evidence establishes that delivery is ready, perform the next authorized delivery action. If recovery
+requires an external change, record the failed action, resolver, unblock action and observable resume
+condition.
+
 ## Select the execution lane
 
 Before choosing either execution mode below or making a deliverable edit, load `engineering:lanes`
@@ -103,10 +118,11 @@ it, or the next material checkpoint falls due.
 ## Run the continuous loop
 
 1. Reconcile stale material facts. For a project selecting the Concertable pre-launch profile, run
-   `python .agents/hooks/plan_graph.py --root . --plan <repo-relative *_PLAN.md>` before selecting or acting on
-   a phase. The selected plan is one input to the same pre-launch guard that governs every write. When it
+   Concertable's own adapter CLI before selecting or acting on
+   a phase; the selected plan is one input to the same pre-launch guard that governs every write. When it
    conflicts, correct it immediately to the direct replacement-and-deletion outcome and do not execute the
-   rejected phase. Validate the remaining plan graph and repository checkpoint before relying on recovery state.
+   rejected phase. Run `python -B .agents/hooks/plan_graph.py --root .` to validate the remaining plan graph
+   and repository checkpoint before relying on recovery state.
    Other repositories validate dependencies and checkpoints under their own selected policies, preserving published compatibility windows; they do not implicitly select the Concertable profile.
 2. Apply `engineering:git-branching` before implementation and at each scope expansion. Check the current
    PR's measured size against its recorded delivery slice. Split large dependent work into a stack,
@@ -185,6 +201,10 @@ because a phase or commit completed. A massive plan whose substantial design pha
 phased execution plan normally has a separate transfer reason under `engineering:plans`.
 
 ## Terminal result
+
+When the canonical goal has a fenced `completion` record, invoke the `persistent-workflow` completion
+contract before reporting the user outcome complete or deleting the goal. A failing completion check keeps
+the goal and its returned next actions owned by the current execution.
 
 Complete only when the plan's requested lifecycle is terminal and the repository outcome names its
 implementation, review, validation, delivery, and remaining durable state; neither a commit, pushed branch,
