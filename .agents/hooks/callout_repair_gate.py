@@ -15,6 +15,7 @@ CALLOUT = re.compile(
     r"(?:mistake|wrong|incorrect)\b",
     re.I,
 )
+STANDARDS_CONTEXT = re.compile(r"\b(?:standard|skill|hook|rule|plugin|handoff|workflow|lane|model)s?\b", re.I)
 EXPLICIT_FEEDBACK = re.compile(
     r"(?:^|[.!?;\n])\s*(?:please\s+|can you\s+|could you\s+|i want you to\s+)?"
     r"(?:send|draft|submit|write|give|file)\s+(?:a\s+|the\s+|some\s+)?feedback\b",
@@ -63,10 +64,10 @@ def load_state(session):
     return value if isinstance(value, dict) else {}
 
 
-def save_state(session, prompt, pending):
+def save_state(session, prompt, pending, resolved=False):
     if not session:
         return
-    state_path(session).write_text(json.dumps({"prompt": prompt, "pending": pending}), encoding="utf-8")
+    state_path(session).write_text(json.dumps({"prompt": prompt, "pending": pending, "resolved": resolved}), encoding="utf-8")
 
 
 def transcript_records(path):
@@ -253,7 +254,7 @@ def main():
             return 0
         if isinstance(origin, dict) and origin.get("kind") not in (None, "human"):
             return 0
-        pending = bool(CALLOUT.search(prompt)) and not REPAIR_LIMIT.search(prompt)
+        pending = bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) and not REPAIR_LIMIT.search(prompt)
         save_state(session, prompt, pending)
         if pending:
             emit(event, MESSAGE)
@@ -266,13 +267,15 @@ def main():
         prompt = state.get("prompt", "")
     if REPAIR_LIMIT.search(prompt) or EXPLICIT_FEEDBACK.search(prompt):
         return 0
+    if state.get("resolved") and state.get("prompt") == prompt:
+        return 0
     tool = str(data.get("tool_name", "")).lower().replace("_", "")
     feedback = tool.endswith("sendfeedback")
-    pending = bool(CALLOUT.search(prompt)) or (state.get("pending") and state.get("prompt") == prompt)
+    pending = bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) or (state.get("pending") and state.get("prompt") == prompt)
     if not pending and not feedback:
         return 0
     if launch_succeeded(records):
-        save_state(session, prompt, False)
+        save_state(session, prompt, False, resolved=True)
         return 0
     if event == "PreToolUse":
         if feedback:

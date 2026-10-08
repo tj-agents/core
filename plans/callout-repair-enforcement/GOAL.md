@@ -88,11 +88,15 @@ continue. This session owns execution; its earlier bounded workers have released
   the actual working directory and prompt path. That prevents variable-based commands from losing
   launch evidence and lets the gate inspect the prepared source-owner authorization.
 - Focused validation is green: red-run regressions (12), callout regressions (13), Claude launcher
-  tests (39, one platform skip), harness manifests (13), and source-layout tests (19). The full shared
-  runtime suite and PowerShell launcher suite remain in progress. Generated distribution and catalog
+  tests (39, one platform skip), harness manifests (13), source-layout tests (19), and PowerShell
+  launcher tests. The pre-integration shared runtime suite passed 964 tests with nine skips; it
+  finished before the attempted cancellation and no process was stopped. Generated distribution and catalog
   changes are local test output and will not be staged.
 - The remote base moved after the initial fetch. Commit the focused-green authored candidate, then
   synchronize once before freezing its independent review; rerun affected checks after integration.
+- D is delivered by PR #148, merged at `fa9f7400d939ba9cbf57048d2f94787aeaca864e`.
+  The runtime refinement keeps ordinary arithmetic corrections outside the Stop trigger and caches
+  a verified launch for the current prompt. Its 13 focused callout tests passed again.
 - Lifecycle recording by `workflow_ops.py skills --lifecycle plan-execution` fails on the former
   `.agents/skills` layout. This is already owned by `docs/workflows/TECH_DEBT.md`; canonical execution
   and lane contracts were read directly. This goal remains the sole progress owner.

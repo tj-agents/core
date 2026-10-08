@@ -90,6 +90,8 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.assertEqual({}, self.pretool("Read", {"file_path": "README.md"}))
         self.submit("Why will the PR not merge?")
         self.assertEqual({}, self.run_hook("Stop"))
+        self.submit("You made a mistake in that sum.")
+        self.assertEqual({}, self.run_hook("Stop"))
 
     def test_launcher_requires_a_visible_answer_before_launch(self):
         self.submit()
@@ -117,6 +119,10 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.write_transcript(self.claude_launch())
         self.assertEqual({}, self.pretool())
         self.assertEqual({}, self.run_hook("Stop", transcript_path=str(self.transcript)))
+        self.transcript.unlink()
+        self.assertEqual({}, self.pretool())
+        self.submit()
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
 
     def test_unrelated_launch_and_old_turn_launch_do_not_release_repair(self):
         self.submit()
