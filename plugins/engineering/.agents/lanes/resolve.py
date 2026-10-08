@@ -49,6 +49,8 @@ def resolve(host, lane):
         out["effort_key"] = effort_key
     if rung.get("context_ceiling") is not None:
         out["context_ceiling"] = rung["context_ceiling"]
+    if rung.get("handoff") is not None:
+        out["handoff"] = rung["handoff"]
     return out
 
 
