@@ -141,6 +141,20 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, section)
 
+    def test_status_reports_answer_the_requested_scope_first(self):
+        instructions = authored_skill("session-guidance").read_text(encoding="utf-8")
+        section = " ".join(
+            instructions.split("## Report the requested scope precisely", 1)[1].split("## ", 1)[0].split()
+        )
+
+        self.assertIn("answer that scope first from observed evidence", section)
+        self.assertIn(
+            "implementation or code-delivery status distinct from separate live acceptance, installation, "
+            "monitoring, cleanup, or operational follow-up",
+            section,
+        )
+        self.assertIn("unrelated post-merge chores", section)
+
     def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
         body = authored_skill("plan-execution").read_text(
             encoding="utf-8"
