@@ -58,7 +58,8 @@ diagnoses the cause, and chooses the repair.
 8. Checkpoint only material recovery state and commit any remaining coherent change. After each result,
    review, validation, checkpoint, and commit, re-resolve the next safe reversible action and continue while
    the defect remains unresolved.
-9. When the original authorization covers delivery, enter `engineering:merge`, reaching it through
+9. When the original authorization covers delivery (`engineering:merging` owns that goal-wide scope),
+   enter `engineering:merge`, reaching it through
    `engineering:open-pr` when no PR exists. Waiting on a queue, CI run, publish, or the version-sync
    PR a merge generates is a poll, not a gate; own each to terminal, that generated PR included.
 

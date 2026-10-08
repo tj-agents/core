@@ -30,6 +30,37 @@ before generation. Other project settings remain in place. Release commits are s
 the lock, while host settings pin the corresponding GitHub marketplace revision and plugin
 selection.
 
+For per-clone adoption, pass an explicit root and local scope. Local settings generation
+requires Python 3.11 or newer. Preview lists every changed output without writing:
+
+```powershell
+python -B '<skill-directory>\scripts\repo_config.py' `
+  --root C:\path\to\checkout --scope local `
+  --lock C:\path\to\checkout\.agents\capabilities.lock.json --mode preview
+```
+
+Use the same arguments with `--mode write` to apply or `--mode check` to detect drift.
+Local mode writes `.claude/settings.local.json`, `.codex/config.toml`, optional
+`.codex/rules/agent-harness.rules`, and `.agents/repo-capabilities.local.json` ownership
+state. It preserves unrelated native selections, settings and existing approvals, removes
+stale grants it added, and restores prior Claude values when owned selections become stale.
+Changed owned settings and collisions with unmanaged Codex tables fail before writing.
+Keep the ownership state with the clone; deleting it prevents safely updating existing
+managed Codex configuration or rules.
+
+All output paths, including Git exclusions, are checked against each other and the lock,
+catalog and repository overlay by canonical path and file identity before mutation. Multiply
+linked output files are rejected. Local mode rejects tracked targets and links that escape
+the explicit root, including links above missing output files. A failed write restores the
+attempted outputs to their prior bytes so approvals and ownership remain paired on retry.
+For a Git checkout, it maintains exact file exclusions through
+`git rev-parse --git-path info/exclude`; linked worktrees use their actual shared exclusion
+file with separate blocks owned by each checkout. Explicit non-Git workspace roots are supported
+without exclusions. Locks and catalogs remain read inputs; this command does not compose them
+or change their tracking. A later adoption caller can use `plan(..., prospective_paths=[...])`
+or `preflight_paths(...)` to validate its own prospective lock, catalog and receipt paths.
+The default `--scope project` retains the existing project settings contract.
+
 After each repository has adopted its generated project settings, audit the machine before removing
 old user-profile behavior:
 
@@ -83,8 +114,14 @@ path, a NUL, its byte length, a NUL, and its bytes. Symlinks are rejected. A plu
 `digest_excludes`; the machine package excludes only `catalog/catalog.json`, whose own digest field would
 otherwise be self-referential. Schemas and every other bootstrap resource remain covered.
 
-A lock records full 40-character source commits. Catalog revisions are immutable release tags. `apply` resolves
-the tag and refuses it unless it equals the lock's commit; version strings alone never select content.
+A lock records full lowercase 40-character source commits. Catalog revisions accept semantic
+`vN.N.N` release tags or exact lowercase 40-character commit SHAs. A SHA revision must equal
+the lock and managed-state commit before preview or mutation. `apply` fetches tags through their
+tag refs and SHAs directly, then verifies the revision identifies the locked commit object.
+Branches, abbreviated or uppercase SHAs, object expressions, and tag-object SHAs are rejected.
+Offline verification uses the same identity checks; version strings alone never select content.
+Existing tag recovery retains its recorded prior/target checks. Matching legacy release and
+commit records may acquire the catalog SHA; ambiguous legacy identity remains an error.
 
 Do not use this utility to refresh a normal profile opportunistically. Use an isolated profile for projects that
 select incompatible releases, and keep authentication/trust decisions separate from package installation.

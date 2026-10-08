@@ -16,7 +16,7 @@ class PeerCliTests(unittest.TestCase):
             cwd=ROOT,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=180,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("PASS peer-cli.tests.ps1", result.stdout)

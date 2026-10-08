@@ -22,7 +22,7 @@ checkout.
 
 ## Model selection
 
-Pass `-Lane L1`–`L7` and the launcher resolves the model *and its reasoning effort* from the canonical
+Pass `-Lane L1`–`L6` and the launcher resolves the model *and its reasoning effort* from the canonical
 lane tables it ships under `resources/lanes` — the `engineering:lanes` ladder, and the repo's only
 model-name owner, so no caller has to know a model id and a retiering is one edit in one authored file.
 The pair matters here: a Codex model is priced and paced by both. An explicit `-Model` or
@@ -30,20 +30,20 @@ The pair matters here: a Codex model is priced and paced by both. An explicit `-
 its own configured default, exactly as an interactively launched session would.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
-lane from the prompt would quietly decide the cost of every handoff. Choose by design, stakes, ambiguity
-and verifiability, from the hardest judgement inside the delegated work — never by how
-hard the work feels, and never raised by a merge, push or publish at its end, which the delivery gates
-govern:
+lane from the prompt would quietly decide the cost of every handoff. Choose the cheapest suitable rung by
+design, stakes, ambiguity and verifiability, from the hardest judgement inside the delegated work — never
+by how hard the work feels, file count, a handoff, or a merge, push or publish at its end, which the
+delivery gates govern:
 
 | Lane | For |
 |---|---|
 | `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
 | `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
 | `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
-| `L4` | Ordinary specified work that a compiler or a test suite will catch, delivery included. |
-| `L5` | Mechanical work whose shape is already decided. |
+| `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
+| `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
-| `L7` | Clerical work with a small input and no judgement to make. |
+| `L7` | In-session clerical work only; this launcher refuses it. |
 
 Choose the launch lane for the work assigned to this independent session. If the successor later reaches
 a different phase, it can route bounded work to an appropriate lane agent while retaining ownership.
@@ -67,7 +67,7 @@ Launch with `scripts/launch-codex.ps1`, beside this file:
 & '<skill-directory>\scripts\launch-codex.ps1' -WorkingDirectory '<absolute-checkout-path>' -PromptPath '<absolute-prompt-path>' -Title '<short-title>'
 ```
 
-Add `-Lane '<L1..L7>'` (or `-Frontier`) to have the launcher resolve model and effort, or `-Model
+Add `-Lane '<L1..L6>'` (or `-Frontier`) to have the launcher resolve model and effort, or `-Model
 '<model-id>'` and `-ReasoningEffort '<level>'` for values the user named. Omitting them all lets
 `codex.exe` fall back to its own configured default — the same behavior an interactively launched
 session gets.
@@ -117,12 +117,19 @@ Everything is **cleared**; nothing is forced. `NO_COLOR`, `TERM`, the session-bi
 `CLAUDE_CODE_CHILD_SESSION`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_PID`, the
 `CLAUDE_CODE_MESSAGING_*` pair, and the `WORKBOARD_*` pair.
 
-**`TERM` is cleared here and forced in `handoff-claude`, and that difference is deliberate.** Claude Code
-exports `TERM=xterm-256color`, which suits a Node CLI reading `supports-color`. Codex is a Rust/crossterm
-binary, and on native Windows an unset `TERM` is what selects the console's truecolor path — handing it a
-POSIX terminfo name instead caps the palette at 256 colours and visibly wrecks the theme. `COLORTERM` is
-not set on this machine either, so there is nothing for the leaked `TERM` to be overridden by. Do not
-"align" the two launchers; the runtimes differ, so the correct handling differs.
+**`TERM` is cleared here and forced in `handoff-claude` on Windows, and that difference is deliberate.**
+Claude Code exports `TERM=xterm-256color`, which suits a Node CLI reading `supports-color`. Codex is a
+Rust/crossterm binary, and on native Windows an unset `TERM` is what selects the console's truecolor path
+— handing it a POSIX terminfo name instead caps the palette at 256 colours and visibly wrecks the theme.
+`COLORTERM` is not set on this machine either, so there is nothing for the leaked `TERM` to be overridden
+by. Do not "align" the two launchers; the runtimes differ, so the correct handling differs.
+
+That Windows reasoning is specific to this launcher's current (Windows-only) `agent-cli.ps1` path, not a
+general POSIX rule. `agent_cli.py` -- the shared library behind `open-claude` and `handoff-claude` -- never
+forces or clears `TERM` on POSIX at all, for an unrelated reason: the terminal that actually starts the
+tab sets `TERM` for that session itself, and forcing or clearing it there would fight that. `handoff-codex`
+has not moved to that shared library yet; when it does, its own clearing stops being unconditional in the
+same way.
 
 Only variables observed in a real parent session are listed. Codex's own exported session state has not
 been read from one, so nothing is cleared on a guess.

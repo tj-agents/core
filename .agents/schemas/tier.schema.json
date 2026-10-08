@@ -60,6 +60,25 @@
       "additionalProperties": {
         "$ref": "#/$defs/predicate"
       }
+    },
+    "employer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_skill"
+      ],
+      "properties": {
+        "context_skill": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*(?![\\s\\S])"
+        }
+      },
+      "description": "A v3 gated employer declaration supplies a local shipped skills/<context_skill>/SKILL.md. Only a genuine detection match establishes the reserved employer fact."
+    },
+    "session_context": {
+      "type": "string",
+      "pattern": "^[^\\r\\n\\u0085\\u2028\\u2029]*\\S[^\\r\\n\\u0085\\u2028\\u2029]*(?![\\s\\S])",
+      "description": "One non-empty line emitted only when this v3 tier applies."
     }
   },
   "$defs": {
@@ -189,6 +208,20 @@
             "remote": {
               "type": "string",
               "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "remote_host"
+          ],
+          "properties": {
+            "remote_host": {
+              "type": "string",
+              "pattern": "^(?=.{1,253}\\.?(?![\\s\\S]))[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\\.?(?![\\s\\S])",
+              "description": "Exact case-insensitive origin hostname. Supports HTTP(S), SSH and Git URLs and user@host:path SCP origins. Local, file and malformed origins do not match."
             }
           }
         },
@@ -349,6 +382,37 @@
           ]
         }
       ]
+    },
+    "nonEmployerPredicate": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/predicate"
+        },
+        {
+          "not": {
+            "required": [
+              "fact"
+            ],
+            "properties": {
+              "fact": {
+                "const": "employer"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "all": {
+          "items": {
+            "$ref": "#/$defs/nonEmployerPredicate"
+          }
+        },
+        "any": {
+          "items": {
+            "$ref": "#/$defs/nonEmployerPredicate"
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -371,12 +435,10 @@
         "properties": {
           "detect": {
             "$ref": "#/$defs/legacyDetect"
-          }
-        },
-        "not": {
-          "required": [
-            "fact_definitions"
-          ]
+          },
+          "employer": false,
+          "session_context": false,
+          "fact_definitions": false
         }
       }
     },
@@ -389,6 +451,29 @@
         }
       },
       "then": {
+        "required": [
+          "detect"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "employer"
+        ]
+      },
+      "then": {
+        "properties": {
+          "schema_version": {
+            "const": 3
+          },
+          "applies": {
+            "const": "stack-present"
+          },
+          "detect": {
+            "$ref": "#/$defs/nonEmployerPredicate"
+          }
+        },
         "required": [
           "detect"
         ]
