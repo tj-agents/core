@@ -254,6 +254,22 @@ function Save-RecordExclusive {
     }
 }
 
+function Save-CleanupTerminalRecord {
+    param([string] $Status, [hashtable] $Extra = @{})
+
+    $data = @{
+        started           = $startedEpoch
+        host_pid          = $HostPid
+        worktree          = $Worktree
+        reaper_pid        = $PID
+        reaper_started_at = $reaperStartedAt
+        status            = $Status
+        finished          = (Now-Epoch)
+    }
+    foreach ($key in $Extra.Keys) { $data[$key] = $Extra[$key] }
+    Save-ResultRecord -Path $Result -Data $data
+}
+
 function Wait-ForAcceptance {
     param(
         [string] $ResultPath,
@@ -357,27 +373,11 @@ try {
         $acceptance = Wait-ForAcceptance -ResultPath $Result -OwnPid $PID -OwnStartedAt $reaperStartedAt -TimeoutSeconds $AcceptTimeoutSeconds
         if ($acceptance -eq 'foreign') { return }
         if ($acceptance -eq 'cancelled') {
-            Save-ResultRecord -Path $Result -Data @{
-                started           = $startedEpoch
-                host_pid          = $HostPid
-                worktree          = $Worktree
-                reaper_pid        = $PID
-                reaper_started_at = $reaperStartedAt
-                status            = 'cancelled'
-                finished          = (Now-Epoch)
-            }
+            Save-CleanupTerminalRecord -Status 'cancelled'
             return
         }
         if ($acceptance -eq 'timeout') {
-            Save-ResultRecord -Path $Result -Data @{
-                started           = $startedEpoch
-                host_pid          = $HostPid
-                worktree          = $Worktree
-                reaper_pid        = $PID
-                reaper_started_at = $reaperStartedAt
-                status            = 'not-accepted'
-                finished          = (Now-Epoch)
-            }
+            Save-CleanupTerminalRecord -Status 'not-accepted'
             return
         }
     }
@@ -411,16 +411,7 @@ try {
             }
             return
         }
-        Save-ResultRecord -Path $Result -Data @{
-            started           = $startedEpoch
-            host_pid          = $HostPid
-            worktree          = $Worktree
-            reaper_pid        = $PID
-            reaper_started_at = $reaperStartedAt
-            status            = 'timeout'
-            error             = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds"
-            finished          = (Now-Epoch)
-        }
+        Save-CleanupTerminalRecord -Status 'timeout' -Extra @{ error = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds" }
         return
     }
 
@@ -443,30 +434,13 @@ try {
     }
 
     if (Test-Path -LiteralPath "$Result.cancelled") {
-        Save-ResultRecord -Path $Result -Data @{
-            started           = $startedEpoch
-            host_pid          = $HostPid
-            worktree          = $Worktree
-            reaper_pid        = $PID
-            reaper_started_at = $reaperStartedAt
-            status            = 'cancelled'
-            finished          = (Now-Epoch)
-        }
+        Save-CleanupTerminalRecord -Status 'cancelled'
         return
     }
 
     $removeResult = Invoke-Git -Cwd $Primary -Arguments @('worktree', 'remove', '--', $Worktree)
     if ($removeResult.ExitCode -ne 0) {
-        Save-ResultRecord -Path $Result -Data @{
-            started           = $startedEpoch
-            host_pid          = $HostPid
-            worktree          = $Worktree
-            reaper_pid        = $PID
-            reaper_started_at = $reaperStartedAt
-            status            = 'failed'
-            error             = "git worktree remove failed: $($removeResult.Output)"
-            finished          = (Now-Epoch)
-        }
+        Save-CleanupTerminalRecord -Status 'failed' -Extra @{ error = "git worktree remove failed: $($removeResult.Output)" }
         return
     }
 
@@ -487,16 +461,7 @@ try {
         $deleteFlag = if ($ancestorCheck.ExitCode -eq 0) { '-d' } else { '-D' }
         $branchResult = Invoke-Git -Cwd $Primary -Arguments @('branch', $deleteFlag, $Branch)
         if ($branchResult.ExitCode -ne 0) {
-            Save-ResultRecord -Path $Result -Data @{
-                started           = $startedEpoch
-                host_pid          = $HostPid
-                worktree          = $Worktree
-                reaper_pid        = $PID
-                reaper_started_at = $reaperStartedAt
-                status            = 'failed'
-                error             = "git branch $deleteFlag $Branch failed: $($branchResult.Output)"
-                finished          = (Now-Epoch)
-            }
+            Save-CleanupTerminalRecord -Status 'failed' -Extra @{ error = "git branch $deleteFlag $Branch failed: $($branchResult.Output)" }
             return
         }
     }
@@ -506,41 +471,15 @@ try {
     $unregistered = -not (Test-WorktreeStillRegistered -PorcelainOutput $porcelain -ResolvedWorktree $Worktree)
 
     if (-not ($pathAbsent -and $unregistered)) {
-        Save-ResultRecord -Path $Result -Data @{
-            started           = $startedEpoch
-            host_pid          = $HostPid
-            worktree          = $Worktree
-            reaper_pid        = $PID
-            reaper_started_at = $reaperStartedAt
-            status            = 'failed'
-            error             = 'worktree path or its registration is still present after cleanup'
-            finished          = (Now-Epoch)
-        }
+        Save-CleanupTerminalRecord -Status 'failed' -Extra @{ error = 'worktree path or its registration is still present after cleanup' }
         return
     }
 
     if ($branchPreserved) {
-        Save-ResultRecord -Path $Result -Data @{
-            started           = $startedEpoch
-            host_pid          = $HostPid
-            worktree          = $Worktree
-            reaper_pid        = $PID
-            reaper_started_at = $reaperStartedAt
-            status            = 'branch-preserved'
-            reason            = $branchPreservedReason
-            finished          = (Now-Epoch)
-        }
+        Save-CleanupTerminalRecord -Status 'branch-preserved' -Extra @{ reason = $branchPreservedReason }
     }
     else {
-        Save-ResultRecord -Path $Result -Data @{
-            started           = $startedEpoch
-            host_pid          = $HostPid
-            worktree          = $Worktree
-            reaper_pid        = $PID
-            reaper_started_at = $reaperStartedAt
-            status            = 'succeeded'
-            finished          = (Now-Epoch)
-        }
+        Save-CleanupTerminalRecord -Status 'succeeded'
     }
 
     foreach ($obligationPath in @(Find-ObligationPaths -StateDirectory $resolvedState -ResolvedWorktree $Worktree)) {
@@ -548,14 +487,17 @@ try {
     }
 }
 catch {
-    Save-ResultRecord -Path $Result -Data @{
-        started           = $startedEpoch
-        host_pid          = $HostPid
-        worktree          = $Worktree
-        reaper_pid        = $PID
-        reaper_started_at = $reaperStartedAt
-        status            = 'failed'
-        error             = $_.Exception.Message
-        finished          = (Now-Epoch)
+    if ($CloseOnly) {
+        Save-ResultRecord -Path $Result -Data @{
+            started  = $startedEpoch
+            host_pid = $HostPid
+            worktree = $Worktree
+            status   = 'failed'
+            error    = $_.Exception.Message
+            finished = (Now-Epoch)
+        }
+    }
+    else {
+        Save-CleanupTerminalRecord -Status 'failed' -Extra @{ error = $_.Exception.Message }
     }
 }

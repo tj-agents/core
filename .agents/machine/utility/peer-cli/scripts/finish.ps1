@@ -168,7 +168,7 @@ function Get-EpochSeconds {
 }
 
 function Invoke-HandshakeKillSweep {
-    param([string] $ResultPath)
+    param([string] $ResultPath, [int] $SpawnPid = 0)
 
     $guid = [IO.Path]::GetFileNameWithoutExtension($ResultPath)
     $startedRecord = Read-JsonFile -Path $ResultPath
@@ -182,7 +182,7 @@ function Invoke-HandshakeKillSweep {
         if ($candidatePid -eq $PID) { continue }
         $commandLine = [string] $candidate.CommandLine
         if (-not $commandLine -or $commandLine -notlike "*$guid*") { continue }
-        if ($null -ne $expectedStartedAt -and $candidate.CreationDate) {
+        if ($candidatePid -ne $SpawnPid -and $null -ne $expectedStartedAt -and $candidate.CreationDate) {
             $candidateStartedAt = ConvertTo-UnixTime -Value $candidate.CreationDate
             if ([math]::Abs($candidateStartedAt - $expectedStartedAt) -gt 2.0) { continue }
         }
@@ -191,7 +191,7 @@ function Invoke-HandshakeKillSweep {
 }
 
 function Invoke-HandshakeCancel {
-    param([string] $ResultPath, [string] $Reason, [switch] $ExpectEvidence)
+    param([string] $ResultPath, [string] $Reason, [switch] $ExpectEvidence, [int] $SpawnPid = 0)
 
     Save-AtomicJson -Path "$ResultPath.cancelled" -Data @{ cancelled = (Get-EpochSeconds); reason = $Reason }
     if ($ExpectEvidence -and (Read-JsonFile -Path $ResultPath)) {
@@ -202,7 +202,7 @@ function Invoke-HandshakeCancel {
             Start-Sleep -Milliseconds 100
         }
     }
-    Invoke-HandshakeKillSweep -ResultPath $ResultPath
+    Invoke-HandshakeKillSweep -ResultPath $ResultPath -SpawnPid $SpawnPid
     throw "finish: $Reason; nothing was closed."
 }
 
@@ -224,17 +224,14 @@ function Invoke-ReaperHandshake {
     $acceptTimeoutParsed = ConvertTo-FiniteDouble -Value $acceptTimeoutEnvValue
     $acceptTimeoutSeconds = if ($null -ne $acceptTimeoutParsed) { $acceptTimeoutParsed } else { 60.0 }
     $acceptTimeoutFloor = [math]::Max(60.0, $spawnTimeoutSeconds + 30.0)
-    if ($acceptTimeoutEnvValue -and $null -eq $acceptTimeoutParsed) {
-        Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue is not a number; using the default."
-    }
-    if ($acceptTimeoutSeconds -lt $acceptTimeoutFloor) {
-        if ($null -ne $acceptTimeoutParsed) {
-            $acceptTimeoutFloorText = $acceptTimeoutFloor.ToString([Globalization.CultureInfo]::InvariantCulture)
-            Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue was below the minimum; raised to $acceptTimeoutFloorText seconds."
-        }
-        $acceptTimeoutSeconds = $acceptTimeoutFloor
-    }
+    if ($acceptTimeoutSeconds -lt $acceptTimeoutFloor) { $acceptTimeoutSeconds = $acceptTimeoutFloor }
     $acceptTimeoutText = $acceptTimeoutSeconds.ToString([Globalization.CultureInfo]::InvariantCulture)
+    if ($acceptTimeoutEnvValue -and $null -eq $acceptTimeoutParsed) {
+        Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue is not a number; using $acceptTimeoutText seconds."
+    }
+    elseif ($null -ne $acceptTimeoutParsed -and $acceptTimeoutParsed -lt $acceptTimeoutSeconds) {
+        Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue was below the minimum; raised to $acceptTimeoutText seconds."
+    }
     $commandParts = @(
         'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $reaperScript,
         '-HostPid', $OwnHost.Pid, '-HostStart', $OwnHost.Started,
@@ -259,6 +256,7 @@ function Invoke-ReaperHandshake {
         return
     }
     $spawnPid = ConvertTo-PositiveInt -Value $spawnResult.ProcessId
+    $spawnPidForSweep = if ($null -ne $spawnPid) { $spawnPid } else { 0 }
 
     $confirmDeadline = [DateTime]::UtcNow.AddSeconds($spawnTimeoutSeconds)
     $validatedRecord = $null
@@ -274,6 +272,7 @@ function Invoke-ReaperHandshake {
                 $recordReaperStartedAt = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $record -Name 'reaper_started_at')
 
                 $valid = ($null -ne $recordStarted) -and ($recordStarted -ge ($spawnEpoch - 2.0)) -and
+                    ($null -eq (Get-EntryProperty -Entry $record -Name 'status')) -and
                     ($null -ne $recordHostPid) -and ($recordHostPid -eq $OwnHost.Pid) -and
                     ($recordWorktree) -and ((Get-NormalizedPathForm $recordWorktree) -eq (Get-NormalizedPathForm $ResolvedWorktree)) -and
                     ($null -ne $recordReaperPid) -and ((-not $spawnPid) -or ($recordReaperPid -eq $spawnPid)) -and
@@ -287,11 +286,11 @@ function Invoke-ReaperHandshake {
                 $validatedRecord = [pscustomobject]@{ ReaperPid = $recordReaperPid; ReaperStartedAt = $recordReaperStartedAt }
                 break
             }
-            Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -Reason 'the reaper startup record did not match this invocation'
+            Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -SpawnPid $spawnPidForSweep -Reason 'the reaper startup record did not match this invocation'
             return
         }
         if ([DateTime]::UtcNow -ge $confirmDeadline) {
-            Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence `
+            Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -SpawnPid $spawnPidForSweep `
                 -Reason "the reaper did not confirm it started within $spawnTimeoutSeconds seconds"
             return
         }
@@ -299,12 +298,12 @@ function Invoke-ReaperHandshake {
     }
 
     if (-not (Test-WorktreeMatchesReceipt -ResolvedWorktree $ResolvedWorktree -Receipt $Receipt)) {
-        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence `
+        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -SpawnPid $spawnPidForSweep `
             -Reason "'$ResolvedWorktree' HEAD/branch no longer match the receipt cleanup_proof.py recorded"
         return
     }
     if (Test-OtherLiveSessionClaimsWorktree -ResolvedWorktree $ResolvedWorktree -OwnHost $OwnHost) {
-        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence `
+        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -SpawnPid $spawnPidForSweep `
             -Reason "another live registered session's cwd is under '$ResolvedWorktree'"
         return
     }
@@ -328,7 +327,7 @@ function Invoke-ReaperHandshake {
         Start-Sleep -Milliseconds 100
     }
     if (-not $armed) {
-        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -Reason 'the reaper did not acknowledge acceptance in time'
+        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -SpawnPid $spawnPidForSweep -Reason 'the reaper did not acknowledge acceptance in time'
         return
     }
 
