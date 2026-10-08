@@ -9,6 +9,7 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import sys
+import zlib
 
 
 FRONTMATTER = re.compile(r"\A---\n(?P<header>.*?)\n---\n(?P<body>.*)\Z", re.DOTALL)
@@ -223,9 +224,12 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
 def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
     loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
     # One expression for every host: base64 ([A-Za-z0-9+/=]) in single-quoted literals contains nothing
-    # that sh, PowerShell or cmd.exe interpret inside the surrounding double quotes.
-    encoded = base64.b64encode(loader.encode("utf-8")).decode("ascii")
-    expression = f"exec(__import__('base64').b64decode('{encoded}').decode())"
+    # that sh, PowerShell or cmd.exe interpret inside the surrounding double quotes. zlib keeps the
+    # command well inside cmd.exe's 8191-character line limit.
+    encoded = base64.b64encode(zlib.compress(loader.encode("utf-8"), 9)).decode("ascii")
+    expression = (
+        f"exec(__import__('zlib').decompress(__import__('base64').b64decode('{encoded}')).decode())"
+    )
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         excluded = ["hooks/codex.json"]
