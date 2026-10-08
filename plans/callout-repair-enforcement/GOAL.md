@@ -61,18 +61,22 @@ merged once gates pass. Report the PR URL and merge state back in this file.
 Lane: L4. The user changed this same session to Sol and confirmed on 2026-10-08 that it should
 continue. This session owns execution; its earlier bounded workers have released writing.
 
-1. Read the canonical sources for `red_run_gate`, `hook_dispatch`, the Stop and PostToolUse
-   registrations, and `engineering/policy/session-guidance`. Reproduce defect A with a fixture built
-   from the incident output above.
-2. Finish A and B with focused regression tests, then review and deliver the runtime slice. Deliver C
-   as a separate guidance slice under the same goal. D is already owned by
+1. Observe exact-head CI for [PR #152](https://github.com/tj-agents/core/pull/152), head
+   `1685a2f6b3538b0ad4882681d8e11340941fd270`, run `37801891775`. Its one failure is the expected
+   Windows PreToolUse hook inventory missing the new gate. Update that inventory, preserve budget
+   assertions, run its focused tests, commit/review the delta and refresh the exact-head binding.
+   Once replacement CI is green, mark ready and merge with the existing authority.
+2. Deliver C as a separate guidance slice from the updated remote base under the same goal. Correct
+   both session-guidance ordering sites, update process regressions, and align failing-tests' stale
+   description of CI-log hook triggering. D is already owned by
    [PR #148](https://github.com/tj-agents/core/pull/148), which reserves L1 for critical or large
    designs and keeps bounded testable choices at L4; reconcile its delivery instead of duplicating it.
 3. Validate, open the PR, merge when gates pass, and record the result here.
 
 ## Current evidence and delivery slices
 
-- Runtime slice: A/B, `Fix/CalloutRepairEnforcement`, base `origin/main` at `8fb3c34`, no PR yet.
+- Runtime slice: A/B, `Fix/CalloutRepairEnforcement`, [PR #152](https://github.com/tj-agents/core/pull/152),
+  reviewed and pushed head `1685a2f6b3538b0ad4882681d8e11340941fd270`.
   Target below 1,000 substantive lines; hook/parser tests, packaging and harness declarations, an
   independent committed-head review, and repository CI are its validation gates.
 - Integrated remote main at `ab321492`; affected regressions, 29 lane-table checks, 41 Claude launcher
@@ -98,11 +102,18 @@ continue. This session owns execution; its earlier bounded workers have released
   launcher tests. The pre-integration shared runtime suite passed 964 tests with nine skips; it
   finished before the attempted cancellation and no process was stopped. Generated distribution and catalog
   changes are local test output and will not be staged.
-- The remote base moved after the initial fetch. Commit the focused-green authored candidate, then
-  synchronize once before freezing its independent review; rerun affected checks after integration.
+- Remote base movement after the final-review synchronization is disjoint according to
+  `review-reconcile`; preserve the exact reviewed head. The runtime monitor is bound to PR #152 and
+  its head. Its continuation owner and Windows scheduler are registered, with a verified supported
+  wake respecting this session's foreground lease. No headless writer has launched.
 - D is delivered by PR #148, merged at `fa9f7400d939ba9cbf57048d2f94787aeaca864e`.
   The runtime refinement keeps ordinary arithmetic corrections outside the Stop trigger and caches
   a verified launch for the current prompt. Its 13 focused callout tests passed again.
 - Lifecycle recording by `workflow_ops.py skills --lifecycle plan-execution` fails on the former
   `.agents/skills` layout. This is already owned by `docs/workflows/TECH_DEBT.md`; canonical execution
   and lane contracts were read directly. This goal remains the sole progress owner.
+- CI run `37801891775` passed packaging, manifests, launcher and Windows compatibility checks.
+  The source/package suite ran 697 tests with 12 skips and one failure: the expected Windows hook
+  inventory did not include `callout_repair_gate.py`. Shared runtime CI was skipped because that
+  earlier step failed. A fresh bounded mechanical worker owns only that inventory correction;
+  no retry or merge bypass is authorized as a substitute for repairing the failure.
