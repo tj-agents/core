@@ -11,11 +11,13 @@ import subprocess
 import sys
 import threading
 import math
+from contextlib import contextmanager
 
 HERE = Path(__file__).resolve().parent
 SESSION_ID = re.compile(r"(?!-)[A-Za-z0-9_-]+\Z")
 LOCKS = {}
 LOCKS_GUARD = threading.Lock()
+MODULES = {}
 
 
 def _load(name):
@@ -24,9 +26,13 @@ def _load(name):
                      for layout in ("skills", "codex-skills")) if len(HERE.parents) > 2 else ()
     for path in (HERE / f"{name}.py", HERE / "resources/machine/scripts" / f"{name}.py", peer, *packaged):
         if path.is_file():
-            spec = importlib.util.spec_from_file_location(f"agent_recovery_{name}", path)
+            identity = str(path.resolve())
+            if identity in MODULES:
+                return MODULES[identity]
+            spec = importlib.util.spec_from_file_location(f"agent_recovery_{name}_{len(MODULES)}", path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
+            MODULES[identity] = module
             return module
     raise RuntimeError(f"The shared {name}.py helper was not found relative to {HERE}.")
 
@@ -76,14 +82,16 @@ def liveness(item, process_lookup=None):
 
 
 def _profile(host, root):
-    return str(Path(root).parent)
+    return os.path.normcase(str(Path(root).parent.resolve()))
 
 
 def _normalise(item, root):
+    preview = item.get("preview") or next((re.sub(r"\s+", " ", text)[:160] for _, role, text in item.get("messages", ())
+                                             if role == "user" and not text.lstrip().startswith("<")), "(no user preview)")
     return {
         "id": item["session"], "host": item["host"], "cwd": item.get("cwd"),
         "branch": item.get("branch"), "activity": item.get("last_activity"),
-        "preview": item.get("preview"), "profile": _profile(item["host"], root),
+        "preview": preview, "profile": _profile(item["host"], root),
         "status": liveness(item), "matched_by": item.get("matched_by"),
     }
 
@@ -113,7 +121,7 @@ def _title_index(root):
             if not isinstance(entry, dict):
                 continue
             session_id = entry.get("id") or entry.get("session_id") or entry.get("sessionId")
-            title = entry.get("title")
+            title = entry.get("thread_name") or entry.get("title")
             if isinstance(session_id, str) and isinstance(title, str):
                 titles[session_id] = title
     try:
@@ -126,7 +134,7 @@ def _title_index(root):
         except (OSError, ValueError):
             continue
         if isinstance(entry, dict) and isinstance(entry.get("session_id"), str) and isinstance(entry.get("title"), str):
-            titles[entry["session_id"]] = entry["title"]
+            titles[entry["session_id"]] = " | ".join(dict.fromkeys(filter(None, (titles.get(entry["session_id"]), entry["title"]))))
     return titles
 
 
@@ -214,29 +222,52 @@ def _receipt(host, session_id, profile):
     return path
 
 
+@contextmanager
+def _claim_lock(path):
+    lock_path = path.with_suffix(".lock")
+    with lock_path.open("a+b") as handle:
+        if os.name == "nt":
+            import msvcrt
+            handle.seek(0)
+            handle.write(b"0")
+            handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def _claim(host, session_id, profile):
     path = _receipt(host, session_id, profile)
-    if path.exists():
-        try:
-            previous = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            previous = {}
-        before = previous.get("registry_fingerprint")
-        current = _registry(session_id)
-        current_fingerprint = _fingerprint(current)
-        registered = current_fingerprint and current_fingerprint != before and current.get("started_at", 0) >= previous.get("created_at", float("inf"))
-        if registered and liveness({"host": host, "session": session_id}) == "closed":
+    with _claim_lock(path):
+        if path.exists():
             try:
+                previous = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                previous = {}
+            before = previous.get("registry_fingerprint")
+            current = _registry(session_id)
+            current_fingerprint = _fingerprint(current)
+            registered = current_fingerprint and current_fingerprint != before and current.get("started_at", 0) >= previous.get("created_at", float("inf"))
+            if registered and liveness({"host": host, "session": session_id}) == "closed":
                 path.unlink()
-            except OSError:
-                pass
-    try:
-        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        raise ValueError("A prior launch for that exact host session is pending or ambiguous; check its terminal before retrying.") from None
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        json.dump({"host": host, "session": session_id, "profile": profile, "state": "pending",
-                   "created_at": time.time(), "registry_fingerprint": _fingerprint(_registry(session_id))}, handle)
+        try:
+            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            raise ValueError("A prior launch for that exact host session is pending or ambiguous; check its terminal before retrying.") from None
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump({"host": host, "session": session_id, "profile": profile, "state": "pending",
+                       "created_at": time.time(), "registry_fingerprint": _fingerprint(_registry(session_id))}, handle)
     return path
 
 
@@ -259,7 +290,7 @@ def _receipt_state(path, host, session_id, profile, state):
 
 
 def open_session(host, session_id, prompt="Continue the requested work.", title=None, roots=None, confirm_closed=False,
-                 prompt_path=None, model=None, dangerously_skip_permissions=False):
+                 prompt_path=None, model=None, dangerously_skip_permissions=False, cli=None):
     item = find(host, session_id, roots)
     if item["status"] == "live":
         raise ValueError("That exact session is verified live; refusing to create a duplicate writer.")
@@ -269,6 +300,7 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
         raise ValueError("Pass either a short prompt or a prompt file, not both.")
     if not prompt_path and (not prompt or len(prompt) > 500):
         raise ValueError("The continue instruction must be a non-empty short prompt (500 characters or fewer).")
+    cli = cli or _load("agent_cli")
     lock = _session_lock(host, session_id)
     if not lock.acquire(blocking=False):
         raise ValueError("A launch request for that exact session is already in progress.")
@@ -276,7 +308,6 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
     launched = False
     try:
         receipt = _claim(host, session_id, item["profile"])
-        cli = _load("agent_cli")
         directory = cli.resolve_tab_directory(item["cwd"])
         label = title or f"{host.title()} {session_id[:8]}"
         instruction = cli.prompt_file_argument(prompt_path)[0] if prompt_path else prompt
@@ -299,19 +330,34 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
         else:
             executable, _ = cli.resolve_codex_executable()
             _verify_codex_resume(executable)
-            _sync_codex(executable, directory)
+            old_profile = os.environ.get("CODEX_HOME")
+            os.environ["CODEX_HOME"] = item["profile"]
+            try:
+                _sync_codex(executable, directory)
+            finally:
+                if old_profile is None:
+                    os.environ.pop("CODEX_HOME", None)
+                else:
+                    os.environ["CODEX_HOME"] = old_profile
             arguments = ["resume", session_id]
             if model:
                 arguments += ["-m", model]
             arguments.append(instruction)
             cli.launch_tab(directory, executable, label, arguments, clear=("TERM",), force={"CODEX_HOME": item["profile"]})
         launched = True
-        _receipt_state(receipt, host, session_id, item["profile"], "launched")
+        try:
+            _receipt_state(receipt, host, session_id, item["profile"], "launched")
+        except OSError:
+            pass
         return item
     except Exception as exc:
         if receipt is not None:
-            if isinstance(exc, getattr(cli, "LaunchTimeout", ())):
-                _receipt_state(receipt, host, session_id, item["profile"], "ambiguous")
+            timeout_type = getattr(cli, "LaunchTimeout", None)
+            if isinstance(timeout_type, type) and isinstance(exc, timeout_type):
+                try:
+                    _receipt_state(receipt, host, session_id, item["profile"], "ambiguous")
+                except OSError:
+                    pass
             elif not launched:
                 try:
                     receipt.unlink()
@@ -359,20 +405,38 @@ def main(argv=None):
             print(json.dumps(search(hosts, args.topic, args.checkout, args.count, roots), indent=2))
             return 0
         if args.operation == "recover":
-            candidates = search(hosts, args.topic, args.checkout, args.count, roots)
+            candidates = []
+            unavailable = []
+            for host in hosts:
+                try:
+                    candidates.extend(search((host,), args.topic, args.checkout, args.count, roots))
+                except ValueError as exc:
+                    unavailable.append({"host": host, "unavailable": str(exc)})
             if not args.select:
-                print(json.dumps(candidates, indent=2))
+                print(json.dumps({"sessions": candidates, "unavailable": unavailable}, indent=2))
                 return 0
             selected = []
             available = {(item["host"], item["id"]) for item in candidates}
+            seen = set()
             for value in args.select:
                 host, separator, session_id = value.partition(":")
                 if not separator or (host, session_id) not in available:
                     raise ValueError("Each --select must be an exact host:id returned by this recovery inventory.")
-                selected.append(open_session(host, session_id, args.prompt if args.prompt_path else args.prompt or "Continue the requested work.",
-                                             roots=roots, confirm_closed=args.confirm_closed,
-                                             prompt_path=args.prompt_path, model=args.model))
-            print(json.dumps(selected, indent=2))
+                if (host, session_id) in seen:
+                    raise ValueError("Each --select host:id may appear only once.")
+                seen.add((host, session_id))
+                selected.append((host, session_id))
+            opened = []
+            for host, session_id in selected:
+                try:
+                    opened.append(open_session(host, session_id, args.prompt if args.prompt_path else args.prompt or "Continue the requested work.",
+                                               roots=roots, confirm_closed=args.confirm_closed,
+                                               prompt_path=args.prompt_path, model=args.model))
+                except Exception:
+                    if opened:
+                        print(f"Already opened: {', '.join(item['host'] + ':' + item['id'] for item in opened)}", file=sys.stderr)
+                    raise
+            print(json.dumps(opened, indent=2))
             return 0
         if len(hosts) != 1 or not args.id:
             raise ValueError("open requires one --host and an exact --id.")
@@ -391,6 +455,8 @@ def main(argv=None):
         if isinstance(exc, cli.LaunchTimeout):
             print(str(exc), file=sys.stderr)
             return 3
+        if isinstance(exc, cli.LaunchError):
+            return cli.report_launch_failure(exc)
         raise
 
 

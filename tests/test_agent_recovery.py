@@ -1,6 +1,10 @@
 import importlib.util
+import contextlib
+import io
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -57,9 +61,15 @@ class RecoveryTests(unittest.TestCase):
         source = archive / "archive" / "archived_id.jsonl"
         source.parent.mkdir(parents=True, exist_ok=True)
         source.write_text((original_root / "sessions/archive/archived_id.jsonl").read_text(encoding="utf-8"), encoding="utf-8")
-        (self.root / "session_index.jsonl").write_text(json.dumps({"id": "archived_id", "title": "Lost title"}), encoding="utf-8")
+        (original_root / "sessions/archive/archived_id.jsonl").unlink()
+        (self.root / "session_index.jsonl").write_text(json.dumps({"id": "archived_id", "thread_name": "Lost title"}), encoding="utf-8")
         self.assertEqual(RECOVERY.search(("codex",), topic="title", roots={"codex": sessions})[0]["id"], "archived_id")
         self.assertEqual(RECOVERY.search(("codex",), topic="archived_id", roots={"codex": sessions})[0]["title"], "Lost title")
+        registry = RECOVERY._registry_root()
+        registry.mkdir(parents=True)
+        (registry / "archived_id.json").write_text(json.dumps({"session_id": "archived_id", "title": "Saved tab title"}), encoding="utf-8")
+        self.assertEqual(RECOVERY.search(("codex",), topic="Lost title", roots={"codex": sessions})[0]["id"], "archived_id")
+        self.assertEqual(RECOVERY.search(("codex",), topic="Saved tab title", roots={"codex": sessions})[0]["id"], "archived_id")
         with self.assertRaises(ValueError):
             RECOVERY.search(("codex",), roots={"codex": self.root / "missing"})
         with self.assertRaises(ValueError):
@@ -98,6 +108,20 @@ class RecoveryTests(unittest.TestCase):
         with mock.patch.object(RECOVERY, "liveness", return_value="closed"):
             self.assertTrue(RECOVERY._claim("codex", "exact_id", "profile").is_file())
 
+    def test_two_processes_retire_one_completed_receipt_once(self):
+        registry = RECOVERY._registry_root() / "race_id.json"
+        registry.parent.mkdir(parents=True)
+        registry.write_text(json.dumps({"pid": 7, "pid_started_at": 1, "host": "codex", "started_at": 1}), encoding="utf-8")
+        receipt = RECOVERY._claim("codex", "race_id", "profile")
+        created = json.loads(receipt.read_text(encoding="utf-8"))["created_at"]
+        registry.write_text(json.dumps({"pid": 999999, "pid_started_at": 2, "host": "codex", "started_at": created + 1}), encoding="utf-8")
+        code = "import importlib.util,sys; p=sys.argv[1]; s=importlib.util.spec_from_file_location('r',p); m=importlib.util.module_from_spec(s); s.loader.exec_module(m);\ntry: m._claim('codex','race_id','profile'); print('ok')\nexcept ValueError: print('blocked')"
+        env = dict(os.environ)
+        commands = [[sys.executable, "-c", code, str(ROOT / ".agents/machine/scripts/agent_recovery.py")] for _ in range(2)]
+        results = [subprocess.Popen(command, stdout=subprocess.PIPE, text=True, env=env) for command in commands]
+        output = [process.communicate(timeout=20)[0].strip() for process in results]
+        self.assertEqual(sorted(output), ["blocked", "ok"])
+
     def test_open_uses_exact_resume_cwd_and_refuses_unknown_without_confirmation(self):
         self.write_codex()
         cli = mock.Mock()
@@ -112,7 +136,7 @@ class RecoveryTests(unittest.TestCase):
             RECOVERY.open_session("codex", "exact_id", roots={"codex": self.root / "sessions"}, confirm_closed=True)
         cli.launch_tab.assert_called_once_with(self.cwd, "native-codex", mock.ANY,
                                                 ["resume", "exact_id", "Continue the requested work."], clear=("TERM",),
-                                                force={"CODEX_HOME": str(self.root)})
+                                                force={"CODEX_HOME": RECOVERY._profile("codex", self.root / "sessions")})
 
     def test_explicit_claude_profile_overrides_conflicting_environment_for_resume(self):
         profile = self.root / "alternate profile"
@@ -126,7 +150,7 @@ class RecoveryTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"CLAUDE_CONFIG_DIR": "wrong profile"}, clear=False), \
              mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)):
             RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True)
-        self.assertEqual(seen, [str(profile)])
+        self.assertEqual(seen, [RECOVERY._profile("claude", projects)])
 
     def test_packaged_resource_loads_peer_process_helper(self):
         path = ROOT / "plugins/machine/resources/machine/scripts/agent_recovery.py"
@@ -136,6 +160,39 @@ class RecoveryTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         self.assertTrue(callable(module._load("register_session").build_process_lookup))
+
+    def test_loader_caches_native_exception_identity(self):
+        self.assertIs(RECOVERY._load("agent_cli").LaunchTimeout, RECOVERY._load("agent_cli").LaunchTimeout)
+
+    def test_main_reports_native_launch_failure(self):
+        cli = RECOVERY._load("agent_cli")
+        with mock.patch.object(RECOVERY, "open_session", side_effect=cli.LaunchError("terminal unavailable")), \
+             contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(RECOVERY.main(["open", "--host", "codex", "--id", "exact_id"]), 1)
+
+    def test_main_reports_native_launch_timeout_as_three(self):
+        cli = RECOVERY._load("agent_cli")
+        with mock.patch.object(RECOVERY, "open_session", side_effect=cli.LaunchTimeout("unknown launch")), \
+             contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(RECOVERY.main(["open", "--host", "codex", "--id", "exact_id"]), 3)
+
+    def test_recover_reports_partial_launch_without_losing_timeout_exit(self):
+        cli = RECOVERY._load("agent_cli")
+        items = [{"host": "codex", "id": "first_id"}, {"host": "codex", "id": "second_id"}]
+        output = io.StringIO()
+        with mock.patch.object(RECOVERY, "search", return_value=items), \
+             mock.patch.object(RECOVERY, "open_session", side_effect=[items[0], cli.LaunchTimeout("unknown second launch")]), \
+             contextlib.redirect_stderr(output):
+            self.assertEqual(RECOVERY.main(["recover", "--host", "codex", "--select", "codex:first_id", "--select", "codex:second_id"]), 3)
+        self.assertIn("Already opened: codex:first_id", output.getvalue())
+
+    def test_recover_rejects_duplicate_selection_before_launch(self):
+        item = {"host": "codex", "id": "exact_id"}
+        with mock.patch.object(RECOVERY, "search", return_value=[item]), \
+             mock.patch.object(RECOVERY, "open_session") as opened, \
+             contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(RECOVERY.main(["recover", "--host", "codex", "--select", "codex:exact_id", "--select", "codex:exact_id"]), 1)
+        opened.assert_not_called()
 
 
 if __name__ == "__main__":

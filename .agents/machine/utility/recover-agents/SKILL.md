@@ -8,6 +8,10 @@ route: infer
 
 # Recover agent work
 
+Use `search-codex` and `search-claude` for the requested topic or checkout, then use `open-codex` and
+`open-claude` for the relevant exact sessions with a concise instruction to continue. The user's recovery
+request authorizes those resumes; clarify only when the relevant session or live identity is ambiguous.
+
 Inventory both native histories first. The result groups the host, original checkout, title and exact native id.
 Use the current goal or PR state to identify relevant work, then select only its returned `host:id` values. Do not
 reopen every old session or infer unfinished work from a final transcript message.
