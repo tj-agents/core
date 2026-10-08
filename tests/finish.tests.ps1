@@ -1451,8 +1451,9 @@ Move-Item -LiteralPath $temp -Destination $Path
     $sweepGuid = [guid]::NewGuid().ToString('N')
     $sweepDecoyGuid = [guid]::NewGuid().ToString('N')
     $sweepResultPath = Join-Path $sweepRoot ($sweepGuid + '.json')
-    $sweepMatching = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # $sweepGuid") -PassThru -WindowStyle Hidden
-    $sweepDecoy = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # $sweepDecoyGuid") -PassThru -WindowStyle Hidden
+    $sweepMatching = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # finish_reaper.ps1 $sweepGuid") -PassThru -WindowStyle Hidden
+    $sweepDecoy = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # finish_reaper.ps1 $sweepDecoyGuid") -PassThru -WindowStyle Hidden
+    $sweepBystander = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', "Start-Sleep -Seconds 60 # $sweepGuid") -PassThru -WindowStyle Hidden
     try {
         Start-Sleep -Milliseconds 500
         & {
@@ -1460,17 +1461,66 @@ Move-Item -LiteralPath $temp -Destination $Path
             Invoke-HandshakeKillSweep -ResultPath $sweepResultPath
         }
         $matchingKilled = Wait-Condition -TimeoutSeconds 10 -Condition { $null -eq (Get-Process -Id $sweepMatching.Id -ErrorAction SilentlyContinue) }
-        Assert-True -Actual $matchingKilled -Message 'The kill sweep did not stop the process whose command line carried the matching invocation GUID.'
+        Assert-True -Actual $matchingKilled -Message 'The kill sweep did not stop the reaper-shaped process whose command line carried the matching invocation GUID.'
         $sweepDecoy.Refresh()
         Assert-False -Actual $sweepDecoy.HasExited -Message 'The kill sweep stopped a decoy process carrying a different GUID.'
+        $sweepBystander.Refresh()
+        Assert-False -Actual $sweepBystander.HasExited -Message 'The kill sweep stopped a bystander that quoted the invocation GUID without being a reaper.'
     }
     finally {
-        foreach ($sweepProcess in @($sweepMatching, $sweepDecoy)) {
+        foreach ($sweepProcess in @($sweepMatching, $sweepDecoy, $sweepBystander)) {
             if ($sweepProcess -and (Get-Process -Id $sweepProcess.Id -ErrorAction SilentlyContinue)) { Stop-TestProcessTree $sweepProcess.Id }
         }
     }
 
-    Write-Output 'PASS finish.tests.ps1: kill sweep stops the matching invocation and leaves a decoy GUID alone'
+    Write-Output 'PASS finish.tests.ps1: kill sweep stops only reaper-shaped matches and spares decoys and GUID-quoting bystanders'
+
+
+    $closeShapeRoot = Join-Path $scratch 'r-closeonly-timeout-shape'
+    New-Item -ItemType Directory -Path $closeShapeRoot -Force | Out-Null
+    $closeShapeState = Join-Path $closeShapeRoot 'state'
+    $closeShapeWorktree = Join-Path $closeShapeRoot 'worktree'
+    New-Item -ItemType Directory -Path $closeShapeWorktree -Force | Out-Null
+    $closeShapeResult = Join-Path $closeShapeRoot 'result.json'
+
+    $closeShapeAliveHost = Start-Process -FilePath $env:ComSpec -ArgumentList '/c', 'ping -n 60 127.0.0.1 > nul' -PassThru -WindowStyle Hidden
+    try {
+        $closeShapeAliveStart = ([DateTimeOffset]($closeShapeAliveHost.StartTime.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
+        $previousCloseShapeTimeout = $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS
+        $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = '2'
+        $closeShapeProcess = $null
+        try {
+            $closeShapeProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $reaperScript, '-CloseOnly',
+                '-HostPid', $closeShapeAliveHost.Id, '-HostStart', $closeShapeAliveStart,
+                '-SessionId', 'close-shape-test', '-Worktree', $closeShapeWorktree,
+                '-Result', $closeShapeResult, '-StateDirectory', $closeShapeState
+            ) -PassThru -WindowStyle Hidden
+
+            $closeShapeWrote = Wait-Condition -TimeoutSeconds 30 -Condition {
+                $record = Read-JsonFile -Path $closeShapeResult
+                $null -ne $record -and $null -ne (Get-EntryProperty -Entry $record -Name 'status')
+            }
+            if (-not $closeShapeWrote -and (Get-Process -Id $closeShapeProcess.Id -ErrorAction SilentlyContinue)) {
+                Stop-TestProcessTree $closeShapeProcess.Id
+            }
+        }
+        finally {
+            $env:AGENT_FINISH_REAPER_TIMEOUT_SECONDS = $previousCloseShapeTimeout
+        }
+        $closeShapeRecord = Read-JsonFile -Path $closeShapeResult
+        Assert-True -Actual ($null -ne $closeShapeRecord) -Message 'The CloseOnly timeout-shape scenario did not write a terminal record.'
+        Assert-Equal -Expected 'timeout' -Actual $closeShapeRecord.status -Message 'The CloseOnly observer with a live host did not record a timeout.'
+        Assert-Equal -Expected 'close-shape-test' -Actual (Get-EntryProperty -Entry $closeShapeRecord -Name 'session_id') -Message 'The CloseOnly timeout record did not carry its session identity.'
+        Assert-True -Actual ($null -eq (Get-EntryProperty -Entry $closeShapeRecord -Name 'reaper_pid')) -Message 'The CloseOnly timeout record carried cleanup-reaper identity fields.'
+    }
+    finally {
+        if (Get-Process -Id $closeShapeAliveHost.Id -ErrorAction SilentlyContinue) {
+            Stop-TestProcessTree $closeShapeAliveHost.Id
+        }
+    }
+
+    Write-Output 'PASS finish.tests.ps1: a CloseOnly observer expiring on a live host keeps the close record shape'
 
 
     $cancelRoot = Join-Path $scratch 'r-cancel-after-started'

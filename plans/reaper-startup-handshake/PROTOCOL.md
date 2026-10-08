@@ -104,10 +104,12 @@ dot-sourced tests can drive it deterministically. States:
    briefly (~1 s) for the reaper's own terminal record first, so the self-recorded `cancelled` evidence
    survives; then the best-effort kill sweep: query `Win32_Process` with WQL
    `Name = 'powershell.exe' AND CommandLine LIKE '%<guid>%'` (the 'N'-format GUID is hex-only, so no
-   LIKE wildcards), exclude `$PID`, re-check the command line, and stop each match with
-   `-ErrorAction SilentlyContinue` — the per-invocation GUID is strict identity on its own, and a
-   record-supplied start-time filter could only ever spare this invocation's own reaper; throw naming
-   the reason, keeping the literal `nothing was closed` phrasing the merge skill's guidance keys on. With no started record, skip the evidence poll — nothing can ever appear. Host,
+   LIKE wildcards), exclude `$PID`, and stop each match with `-ErrorAction SilentlyContinue` only when
+   its command line carries both the invocation GUID and the `finish_reaper.ps1` token — the GUID alone
+   also matches a human-launched process quoting it (an operator tailing the result file), and a
+   record-supplied start-time filter would trust the very record whose mismatch caused the cancel;
+   throw naming the reason, keeping the literal `nothing was closed` phrasing the merge skill's
+   guidance keys on. With no started record, skip the evidence poll — nothing can ever appear. Host,
    worktree and branch are untouched in every cancel path.
 
 ## Reaper state machine (finish_reaper.ps1, cleanup mode only)

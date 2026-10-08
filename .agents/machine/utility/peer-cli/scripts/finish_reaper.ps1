@@ -399,11 +399,25 @@ try {
     }
 
     if (-not $exited) {
+        $timeoutError = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds"
+        if ($CloseOnly) {
+            Save-ResultRecord -Path $Result -Data @{
+                started         = $startedEpoch
+                host_pid        = $HostPid
+                host_started_at = $HostStart
+                session_id      = $SessionId
+                worktree        = $Worktree
+                status          = 'timeout'
+                error           = $timeoutError
+                finished        = (Now-Epoch)
+            }
+            return
+        }
         if (Test-Path -LiteralPath "$Result.cancelled") {
             Save-CleanupTerminalRecord -Status 'cancelled'
             return
         }
-        Save-CleanupTerminalRecord -Status 'timeout' -Extra @{ error = "host pid $HostPid (or its parent shell) did not exit within $timeoutSeconds seconds" }
+        Save-CleanupTerminalRecord -Status 'timeout' -Extra @{ error = $timeoutError }
         return
     }
 
@@ -481,13 +495,14 @@ try {
 catch {
     if ($CloseOnly) {
         Save-ResultRecord -Path $Result -Data @{
-            started    = $startedEpoch
-            host_pid   = $HostPid
-            worktree   = $Worktree
-            session_id = $SessionId
-            status     = 'failed'
-            error      = $_.Exception.Message
-            finished   = (Now-Epoch)
+            started         = $startedEpoch
+            host_pid        = $HostPid
+            host_started_at = $HostStart
+            session_id      = $SessionId
+            worktree        = $Worktree
+            status          = 'failed'
+            error           = $_.Exception.Message
+            finished        = (Now-Epoch)
         }
     }
     else {

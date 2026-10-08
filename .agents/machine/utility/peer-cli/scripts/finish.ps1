@@ -176,7 +176,7 @@ function Invoke-HandshakeKillSweep {
         $candidatePid = [int] $candidate.ProcessId
         if ($candidatePid -eq $PID) { continue }
         $commandLine = [string] $candidate.CommandLine
-        if (-not $commandLine -or $commandLine -notlike "*$guid*") { continue }
+        if (-not $commandLine -or $commandLine -notlike "*$guid*" -or $commandLine -notlike '*finish_reaper.ps1*') { continue }
         Stop-Process -Id $candidatePid -Force -ErrorAction SilentlyContinue
     }
 }
