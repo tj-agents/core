@@ -34,6 +34,7 @@ import harness_permissions
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
 OPT_OUT_ENV = "BASE_AGENTS_HARNESS_PERMISSIONS"
 TRUSTED_OWNER = "tj-agents"
+ENGINEERING_MARKETPLACE = "base-agents"
 GITHUB_SOURCE = re.compile(
     r"(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)?"
     r"(?P<owner>[A-Za-z0-9-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?/?$",
@@ -316,7 +317,7 @@ def claude_auto_merge_roots(environ: dict, project: Path, trust, published: dict
     registry = read_json(plugins / "installed_plugins.json")
     known = read_json(plugins / "known_marketplaces.json")
     records = registry.get("plugins") if isinstance(registry, dict) else None
-    market = known.get(MARKETPLACE) if isinstance(known, dict) else None
+    market = known.get(ENGINEERING_MARKETPLACE) if isinstance(known, dict) else None
     if not isinstance(records, dict) or not isinstance(market, dict):
         return set()
     source = market.get("source")
@@ -388,7 +389,7 @@ def codex_auto_merge_roots(environ: dict, project: Path, trust, published: dict)
         return set()
     roots: set[Path] = set()
     for market in marketplaces:
-        if not isinstance(market, dict) or market.get("name") != MARKETPLACE:
+        if not isinstance(market, dict) or market.get("name") != ENGINEERING_MARKETPLACE:
             continue
         plugins = market.get("plugins")
         if not isinstance(plugins, list):
@@ -405,7 +406,7 @@ def codex_auto_merge_roots(environ: dict, project: Path, trust, published: dict)
             source_path = source.get("path")
             if not isinstance(source_path, str) or not source_path:
                 continue
-            root = codex_home(environ) / "plugins" / "cache" / MARKETPLACE / "engineering" / version
+            root = codex_home(environ) / "plugins" / "cache" / ENGINEERING_MARKETPLACE / "engineering" / version
             plugin = {
                 "pluginId": record["id"],
                 "marketplaceSource": {"sourceType": "git", "source": "https://github.com/tj-agents/core.git"},
