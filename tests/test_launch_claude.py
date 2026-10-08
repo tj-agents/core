@@ -170,6 +170,20 @@ class LaunchClaudeTests(unittest.TestCase):
                 self.assertIn('handoff', err)
                 self.agent_cli.launch_tab.assert_not_called()
 
+    def test_claude_l1_redirects_to_codex_before_launch(self):
+        code, _, err = self.run_main('--lane', 'L1')
+        self.assertEqual(code, 1)
+        self.assertIn('routes to Codex L1', err)
+        self.assertIn('machine:handoff-codex', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
+    def test_claude_l1_with_an_explicit_model_redirects_to_codex_before_launch(self):
+        code, _, err = self.run_main('--lane', 'L1', '--model', 'explicit-model')
+        self.assertEqual(code, 1)
+        self.assertIn('routes to Codex L1', err)
+        self.assertIn('omit --lane', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
     def test_a_repointed_non_l7_lane_cannot_resolve_to_haiku(self):
         with mock.patch.object(
             self.agent_cli,
