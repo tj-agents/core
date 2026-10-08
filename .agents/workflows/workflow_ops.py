@@ -973,8 +973,10 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
     reasons = []
     if current_head != descriptor["head"]:
         reasons.append("candidate-head-changed")
-    if current_base != descriptor["base"]:
-        changed = git(root, "diff", "--name-only", descriptor["base"], current_base).splitlines()
+    comparison_base = git(root, "merge-base", descriptor["head"], current_base)
+    base_moved = current_base != comparison_base
+    if base_moved:
+        changed = git(root, "diff", "--name-only", comparison_base, current_base).splitlines()
         sensitive = set(descriptor["paths"]) | {rule["path"] for rule in descriptor["rules"]}
         if sensitive.intersection(changed):
             reasons.append("base-changed-relevant-evidence")
@@ -986,7 +988,7 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
         "current_head": current_head,
         "review_required": bool(reasons),
         "reasons": reasons,
-        "base_moved": current_base != descriptor["base"],
+        "base_moved": base_moved,
         "exact_head": current_head == descriptor["head"],
     }
     append_event(root, workflow_run_id, {"kind": "review", "operation": "reconcile", "review_required": result["review_required"]})

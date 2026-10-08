@@ -48,10 +48,10 @@ second tab for the same handoff.
 
 Configurable family aliases are rejected for handoffs; pass a full non-Haiku model ID or a supported lane.
 
-Pass `--lane L1`–`L6` and the launcher resolves the model from the canonical lane tables it ships under
+Pass `--lane L2`–`L6` and the launcher resolves the model from the canonical lane tables it ships under
 `resources/lanes` — the `engineering:lanes` ladder, and the repo's only model-name owner, so no caller has
-to know a model id and a retiering is one edit in one authored file. `--model` still wins for a model the
-user named outright. Handoff never uses the CLI default: choose L1–L6, frontier, or an explicit
+to know a model id and a retiering is one edit in one authored file. For local lanes, `--model` wins for a model the
+user named outright. `--lane L1` always routes to Codex; omit that lane for an explicit Claude model. Handoff never uses the CLI default: choose L2–L6, frontier, or an explicit
 non-Haiku model.
 
 **The lane is the caller's judgement, and the launcher never guesses it** — a transport that inferred a
@@ -62,10 +62,10 @@ delivery gates govern:
 
 | Lane | For |
 |---|---|
-| `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
+| `L1` | Redirects critical design decisions or large complex plans to Codex L1. |
 | `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
-| `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
-| `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
+| `L3` | Open investigation or bounded uncertain design with unresolved alternatives. |
+| `L4` | Specified implementation, ordinary review, or a small local choice inside a testable fix. |
 | `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
 | `L7` | In-session clerical work only; this launcher refuses it. |
@@ -78,15 +78,14 @@ planning alone does not call for this launcher. After a massive plan that was a 
 the same checkout. Apply its context criteria and judgment to cases between those sizes.
 
 `--frontier` selects the tier above the ladder from the same table. **Pass it only when the user
-explicitly asked for that tier or its model by name.** No lane resolves to the tier — L1 prices the same
-family an effort step below, and frontier spend is the user's provenance to grant, never a reward for a
+explicitly asked for that tier or its model by name.** No lane resolves to the tier, and frontier spend is
+the user's provenance to grant, never a reward for a
 hard-looking task — and it rejects `--lane` or `--model` beside it.
 
-A lane's effort travels with its resolved model (`--lane L4`, for example, resolves both a model and an
-effort from the table) and reaches `claude --effort <level>` automatically — a lane always opens the
-exact session that rung's model and effort pair describes. An explicit `--model` beating the lane means
-no lane effort applies either, matching the model it would have paired with. Some rungs (Claude's `L7`)
-price no effort at all, and the launcher passes none rather than inventing one.
+For local lanes `L2`–`L6`, effort travels with the resolved model (`--lane L4`, for example,
+resolves both from the table) and reaches `claude --effort <level>` automatically. An explicit
+`--model` beats one of these local lanes, so no lane effort applies; the explicit model's effort
+applies only when supplied. `L1` routes to Codex and does not launch Claude.
 
 `--effort '<low|medium|high|xhigh|max>'` is accepted only together with an explicit `--model`, for a
 calling skill or workflow (or a user) that already knows the exact pace it wants for a model it named
@@ -97,10 +96,11 @@ prevent. `engineering:handoff`'s obligation to preserve a user-selected model, e
 is why this flag exists at all, not a general invitation to invent one.
 
 A calling skill or workflow that ships its own resolved selection may still pass `--model` directly;
-that wins over `--lane`. What is no longer acceptable is inventing a model id (or, per above, an
-unpaired effort) at the call site.
+that wins over a local lane `L2`–`L6`. What is no longer acceptable is inventing a model id (or, per
+above, an unpaired effort) at the call site.
 
-The launcher requires `--lane L1`–`L6`, `--frontier`, or an explicit non-Haiku `--model`. It rejects L7
+The launcher requires `--lane L1`–`L6`, `--frontier`, or an explicit non-Haiku `--model`. L1 redirects to
+Codex; it rejects L7
 and every Haiku family ID or alias before launch, and never trusts the hidden CLI default.
 
 Launch with `scripts/launch_claude.py`, beside this file:
