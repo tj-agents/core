@@ -1,4 +1,4 @@
-# Goal â€” activate durable delivery continuation on both hosts
+# Goal — activate durable delivery continuation on both hosts
 
 ## Defect
 
@@ -28,10 +28,10 @@ Done when: the repair is merged and its post-merge regeneration has finished suc
 1. Require an explicit host PID in the shared runtime claim interface so it cannot silently lease a transient tool shell.
 2. Add a Windows adapter claim operation that walks process ancestry to the nearest exact `codex.exe` or `claude.exe`, passes that PID to the shared runtime, and rejects missing, cyclic, or wrong-host ancestry.
    Record that ancestor's native executable path for later headless launches, preserving an explicitly initialized host pin. The live PATH resolves both names to `.cmd` wrappers, which the runtime correctly rejects; PID discovery must also make the native launch path recoverable.
-3. Document and test the init â†’ adapter claim â†’ register â†’ yield â†’ wake sequence for both hosts, including mocked ancestry cases.
+3. Document and test the init → adapter claim → register → yield → wake sequence for both hosts, including mocked ancestry cases.
 4. Run focused continuation and host-adapter checks, review, commit, push, and open a dedicated PR. Monitor it through its own terminal delivery path.
 
-Lane: L3 â€” bounded cross-host investigation with unresolved runtime ownership alternatives.
+Lane: L4 implementation complete; independent review and delivery next.
 
 ## Progress
 
