@@ -255,6 +255,45 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(final["next_action"], "Ask for product approval")
         self.assertEqual(self.wake()["launches"], 1)
 
+    def test_claim_requires_an_explicit_positive_pid(self):
+        result = subprocess.run([sys.executable, str(RUNTIME_FIXTURE), "claim", "--owner", str(self.owner)],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(2, result.returncode)
+        self.assertIn("--pid", result.stderr)
+        before = self.state()
+        for pid in (0, -1, None):
+            with self.subTest(pid=pid), mock.patch.object(runtime, "process_identity") as process_identity:
+                args = SimpleNamespace(operation="claim", pid=pid)
+                with self.assertRaisesRegex(runtime.Gate, "foreground-pid-required"):
+                    runtime.operate(self.owner, dict(before), args)
+                process_identity.assert_not_called()
+        self.assertEqual(before, self.state())
+
+    def test_claim_pins_a_valid_host_executable_after_foreground_validation(self):
+        executable = self.root / "codex.exe"
+        executable.touch()
+        state = self.state()
+        args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(executable))
+        runtime.operate(self.owner, state, args)
+        self.assertEqual(str(executable), state["host_executable"])
+        self.assertEqual(os.getpid(), state["foreground"]["pid"])
+
+    def test_claim_rejects_invalid_host_executable_without_mutating_owner(self):
+        state = self.state()
+        before = dict(state)
+        args = SimpleNamespace(operation="claim", pid=os.getpid(), host_executable=str(self.root / "codex.cmd"))
+        with self.assertRaisesRegex(runtime.Gate, "foreground-host-executable-invalid"):
+            runtime.operate(self.owner, state, args)
+        self.assertEqual(before, state)
+        self.assertEqual(before, self.state())
+
+    def test_pinned_native_host_overrides_a_path_wrapper(self):
+        state = self.state()
+        state["host_executable"] = str(self.root / "codex.exe")
+        with mock.patch.object(runtime.shutil, "which", return_value=str(self.root / "codex.cmd")):
+            command = runtime.lane_command(state, "resume")
+        self.assertEqual(str(self.root / "codex.exe"), command[0])
+
     def test_unexplained_exit_is_bounded(self):
         self.fixture("missing")
         for attempt in range(3):

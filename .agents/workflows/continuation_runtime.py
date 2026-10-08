@@ -536,12 +536,24 @@ def operate(path, state, args):
             raise Gate("foreground-already-owned")
         if any(record and alive(record) for record in writer_records(state)):
             raise Gate("headless-writer-already-owned")
-        pid = args.pid or os.getppid()
+        pid = getattr(args, "pid", None)
+        if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+            raise Gate("foreground-pid-required")
         creation = process_identity(pid)
         if creation is None or creation == "unknown":
             raise Gate("foreground-process-identity-unavailable")
+        host_executable = getattr(args, "host_executable", None)
+        if not state.get("host_executable") and host_executable:
+            if not isinstance(host_executable, str):
+                raise Gate("foreground-host-executable-invalid")
+            candidate = Path(host_executable)
+            if (not candidate.is_absolute() or not candidate.is_file()
+                    or candidate.name.casefold() != f"{state['harness']}.exe"):
+                raise Gate("foreground-host-executable-invalid")
         state["foreground"] = {"pid": pid, "identity": creation, "activity": time.time(),
                                "token": uuid.uuid4().hex}
+        if not state.get("host_executable") and host_executable:
+            state["host_executable"] = str(candidate)
         transition(state, "working", "foreground-owned", state["next_action"])
     else:
         lease = state.get("foreground")
@@ -581,7 +593,8 @@ def parser():
                                        ("lease-seconds", 300, float)):
                 p.add_argument(f"--{flag}", type=kind, default=default)
         if name == "claim":
-            p.add_argument("--pid", type=int)
+            p.add_argument("--pid", type=int, required=True)
+            p.add_argument("--host-executable")
         if name in {"heartbeat", "yield", "checkpoint"}:
             p.add_argument("--token", required=True)
             p.add_argument("--reason", default="")
