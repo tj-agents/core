@@ -53,21 +53,21 @@ what still needs checking on Windows.
   both `python3` and `python`); `agent-cli.ps1` deleted.
 - [ ] 5. `peer-cli` -> Python, listing and closing tabs in the detected terminal; `reap_orphans.py` stops
   assuming `wt.exe` is the parent.
-- [ ] 6. `clip` -> Python, using the platform clipboard.
+- [x] 6. `clip` -> Python, using the platform clipboard (#125).
 - [ ] 7. `persistent-workflow`'s `delivery-continuation.ps1` -> Python, verified on Linux.
-- [ ] 8. Tests that failed only on Linux pass: POSIX shell collapsed the Codex snapshot loader's escaped
-  backslashes into NULs; a test plugin URL only git on Windows resolves; pwsh 7 `Split` binding skipped
-  the installer's ancestor reparse-point check.
+- [x] 8. Tests that failed only on Linux pass: POSIX shell collapsed the Codex snapshot loader's escaped
+  backslashes into NULs (now embedded as base64); a test plugin URL only git on Windows resolves; pwsh 7
+  `Split` binding skipped the installer's ancestor reparse-point check (#160).
+- [ ] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
+  (`verify-linux`); it blocks a PR once the repository ruleset lists it as a required check.
 
 ## Current progress
 
-Shared library merged (#106, after the interim path fix #105). Kitty configured. Step 1 merged (#107).
-Step 2 merged (#108): `open-claude` ported, reviewed, review findings fixed; a real kitty tab was opened
-from `open_claude.py` on this machine. Step 3a (`handoff-claude`) on `Feature/HandoffClaudePython`:
-ported to `scripts/launch_claude.py`, `launch-claude.ps1` deleted, tests and SKILL.md updated.
-Step 6 (`clip`) in progress on `Feature/ClipPython`.
-Step 8 (Linux-only test failures) in progress on `Fix/LinuxOnlyTestFailures`.
+Shared library merged (#106, after the interim path fix #105). Kitty configured. Steps merged: 1 (#107),
+2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
+(#125), 8 Linux-only test failures (#160). Step 3b `handoff-codex` in review as #137. Step 9 (Linux CI)
+on `Feature/LinuxCiJob`.
 
 ## Next Steps
 
-Land step 3a, then 3b (`handoff-codex` -> Python, with `codex_marketplace_sync.ps1`).
+Land 3b and 9; then 5 (`peer-cli`) and 4 (terminal start hooks, deleting `agent-cli.ps1`); then 7.
