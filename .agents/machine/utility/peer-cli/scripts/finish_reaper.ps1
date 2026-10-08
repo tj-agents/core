@@ -222,7 +222,7 @@ function Save-ResultRecord {
     for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         try {
             if (Test-Path -LiteralPath $Path) {
-                [IO.File]::Replace($temp, $Path, $null)
+                [IO.File]::Replace($temp, $Path, [NullString]::Value)
             }
             else {
                 Move-Item -LiteralPath $temp -Destination $Path
