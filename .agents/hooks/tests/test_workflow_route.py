@@ -216,6 +216,26 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("engineering:handoff automatically selected", result.stdout)
 
+    def test_claude_routes_active_execution_and_delegated_review_to_codex(self):
+        self.write_goal()
+        for prompt in (
+            "Complete the three phases of the active goal.",
+            "Work through all remaining phases of the migration.",
+            "Delegate an architectural review of this change.",
+        ):
+            with self.subTest(prompt=prompt):
+                session = str(uuid.uuid4())
+                routed = self.run_hook(prompt, harness="claude", session=session)
+                self.assertEqual(0, routed.returncode, routed.stderr)
+                self.assertIn("engineering:handoff automatically selected", routed.stdout)
+                attempted = self.run_hook(
+                    prompt, event="PreToolUse", harness="claude", session=session,
+                    tool_name="Write", tool_input={"file_path": str(self.cwd / "utility.py"), "content": ""},
+                )
+                self.assertEqual(0, attempted.returncode, attempted.stderr)
+                output = json.loads(attempted.stdout)["hookSpecificOutput"]
+                self.assertEqual("deny", output["permissionDecision"])
+
     def test_claude_questions_negation_and_planning_keep_local_authority(self):
         for prompt in (
             "Should we build a command-line utility?",
@@ -228,16 +248,32 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
                 self.assertNotIn("engineering:handoff automatically selected", result.stdout)
 
     def test_explicit_human_claude_choice_allows_local_write(self):
-        session = str(uuid.uuid4())
-        prompt = "Use Claude to implement this small utility."
-        result = self.run_hook(prompt, harness="claude", session=session)
-        self.assertEqual(0, result.returncode, result.stderr)
-        attempted = self.run_hook(
-            prompt, event="PreToolUse", harness="claude", session=session,
-            tool_name="Write", tool_input={"file_path": str(self.cwd / "utility.py"), "content": ""},
-        )
-        self.assertEqual(0, attempted.returncode, attempted.stderr)
-        self.assertEqual("", attempted.stdout)
+        for prompt in (
+            "Use Claude to implement this small utility.",
+            "I want Claude to build this utility.",
+        ):
+            with self.subTest(prompt=prompt):
+                session = str(uuid.uuid4())
+                result = self.run_hook(prompt, harness="claude", session=session)
+                self.assertEqual(0, result.returncode, result.stderr)
+                attempted = self.run_hook(
+                    prompt, event="PreToolUse", harness="claude", session=session,
+                    tool_name="Write", tool_input={"file_path": str(self.cwd / "utility.py"), "content": ""},
+                )
+                self.assertEqual(0, attempted.returncode, attempted.stderr)
+                self.assertEqual("", attempted.stdout)
+
+    def test_quoted_or_non_authorizing_claude_handoff_language_does_not_change_routes(self):
+        for prompt in (
+            'We discussed "I want Claude to build this utility."',
+            "Should I delegate an architectural review of this change?",
+            "Do not delegate an architectural review of this change.",
+            "Planning only: delegate an architectural review of this change.",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt, harness="claude")
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertNotIn("engineering:handoff automatically selected", result.stdout)
 
     def test_codex_harness_keeps_existing_route_behavior(self):
         result = self.run_hook(
