@@ -43,9 +43,10 @@ FORGE_TIMEOUT_SECONDS = 20
 
 
 class Preserve(Exception):
-    def __init__(self, reason):
+    def __init__(self, reason, set_aside=None):
         super().__init__(reason)
         self.reason = reason
+        self.set_aside = set_aside
 
 
 def state_directory():
@@ -265,75 +266,84 @@ def set_aside(target, records, branch, head, pr):
     except OSError as error:
         raise Preserve(f"cannot create set-aside archive {archive}: {error}") from error
 
-    patch_entry = None
-    diff_result = run_git_binary(target, "diff", "HEAD", "--binary")
-    if diff_result.returncode != 0:
-        raise Preserve(f"git diff HEAD --binary failed in {target}")
-    if diff_result.stdout:
-        patch_path = archive / "tracked.patch"
-        patch_path.write_bytes(diff_result.stdout)
-        if patch_path.read_bytes() != diff_result.stdout:
-            raise Preserve(f"set-aside patch verification failed for {patch_path}")
-        patch_entry = {
-            "file": "tracked.patch",
-            "sha256": hashlib.sha256(diff_result.stdout).hexdigest(),
-            "bytes": len(diff_result.stdout),
-            "note": "staged and unstaged tracked changes are flattened into one patch",
-        }
-
-    untracked_entries = []
-    for record in records:
-        if not record.startswith("? "):
-            continue
-        relative_path = record[2:]
-        source = target / relative_path
-        try:
-            source_bytes = source.read_bytes()
-        except OSError as error:
-            raise Preserve(f"cannot read untracked file {source}: {error}") from error
-        source_hash = hashlib.sha256(source_bytes).hexdigest()
-        destination = archive / "untracked" / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
-        try:
-            copy_bytes = destination.read_bytes()
-        except OSError as error:
-            raise Preserve(f"cannot verify set-aside copy {destination}: {error}") from error
-        if hashlib.sha256(copy_bytes).hexdigest() != source_hash:
-            raise Preserve(f"set-aside copy hash mismatch for {relative_path}")
-        untracked_entries.append({
-            "path": relative_path,
-            "sha256": source_hash,
-            "bytes": len(source_bytes),
-        })
-
-    manifest_path = archive / "manifest.json"
-    manifest_path.write_text(json.dumps({
-        "worktree": str(target),
-        "branch": branch,
-        "head": head,
-        "pr": pr,
-        "created_at": time.time(),
-        "status_records": records,
-        "patch": patch_entry,
-        "untracked": untracked_entries,
-    }, sort_keys=True), encoding="utf-8")
     try:
-        json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise Preserve(f"set-aside manifest unreadable: {error}") from error
+        patch_entry = None
+        diff_result = run_git_binary(target, "diff", "HEAD", "--binary")
+        if diff_result.returncode != 0:
+            raise Preserve(f"git diff HEAD --binary failed in {target}")
+        if diff_result.stdout:
+            patch_path = archive / "tracked.patch"
+            patch_path.write_bytes(diff_result.stdout)
+            if patch_path.read_bytes() != diff_result.stdout:
+                raise Preserve(f"set-aside patch verification failed for {patch_path}")
+            patch_entry = {
+                "file": "tracked.patch",
+                "sha256": hashlib.sha256(diff_result.stdout).hexdigest(),
+                "bytes": len(diff_result.stdout),
+                "note": "staged and unstaged tracked changes are flattened into one patch",
+            }
 
-    reset = run_git(target, "reset", "--hard", "HEAD")
-    if reset.returncode != 0:
-        raise Preserve(f"git reset --hard HEAD failed in {target}: {reset.stderr.strip()}")
-    for entry in untracked_entries:
-        path = target / entry["path"]
+        untracked_entries = []
+        for record in records:
+            if not record.startswith("? "):
+                continue
+            relative_path = record[2:]
+            source = target / relative_path
+            try:
+                source_bytes = source.read_bytes()
+            except OSError as error:
+                raise Preserve(f"cannot read untracked file {source}: {error}") from error
+            source_hash = hashlib.sha256(source_bytes).hexdigest()
+            destination = archive / "untracked" / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            try:
+                copy_bytes = destination.read_bytes()
+            except OSError as error:
+                raise Preserve(f"cannot verify set-aside copy {destination}: {error}") from error
+            if hashlib.sha256(copy_bytes).hexdigest() != source_hash:
+                raise Preserve(f"set-aside copy hash mismatch for {relative_path}")
+            untracked_entries.append({
+                "path": relative_path,
+                "sha256": source_hash,
+                "bytes": len(source_bytes),
+            })
+
+        manifest_path = archive / "manifest.json"
+        manifest_path.write_text(json.dumps({
+            "worktree": str(target),
+            "branch": branch,
+            "head": head,
+            "pr": pr,
+            "created_at": time.time(),
+            "status_records": records,
+            "patch": patch_entry,
+            "untracked": untracked_entries,
+        }, sort_keys=True), encoding="utf-8")
         try:
-            path.unlink(missing_ok=True)
+            json.loads(manifest_path.read_text(encoding="utf-8"))
         except OSError as error:
-            raise Preserve(f"cannot remove set-aside source {path}: {error}") from error
+            raise Preserve(f"set-aside manifest unreadable: {error}") from error
+        except ValueError as error:
+            raise Preserve(f"set-aside manifest unreadable: {error}") from error
 
-    return str(archive)
+        reset = run_git(target, "reset", "--hard", "HEAD")
+        if reset.returncode != 0:
+            raise Preserve(f"git reset --hard HEAD failed in {target}: {reset.stderr.strip()}")
+        for entry in untracked_entries:
+            path = target / entry["path"]
+            try:
+                path.unlink(missing_ok=True)
+            except OSError as error:
+                raise Preserve(f"cannot remove set-aside source {path}: {error}") from error
+
+        return str(archive)
+    except Preserve as error:
+        if error.set_aside is None:
+            error.set_aside = str(archive)
+        raise
+    except OSError as error:
+        raise Preserve(f"set-aside failed for {target}: {error}", str(archive)) from error
 
 
 def load_fixture():
@@ -464,6 +474,7 @@ def run(args):
     except Preserve as error:
         verdict = "preserve"
         reason = error.reason
+        set_aside_path = error.set_aside or set_aside_path
         if worktree_value is None:
             worktree_value = str(cwd)
 
