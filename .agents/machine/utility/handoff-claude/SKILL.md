@@ -82,11 +82,10 @@ explicitly asked for that tier or its model by name.** No lane resolves to the t
 the user's provenance to grant, never a reward for a
 hard-looking task — and it rejects `--lane` or `--model` beside it.
 
-A lane's effort travels with its resolved model (`--lane L4`, for example, resolves both a model and an
-effort from the table) and reaches `claude --effort <level>` automatically — a lane always opens the
-exact session that rung's model and effort pair describes. An explicit `--model` beating the lane means
-no lane effort applies either, matching the model it would have paired with. Some rungs (Claude's `L7`)
-price no effort at all, and the launcher passes none rather than inventing one.
+For local lanes `L2`–`L6`, effort travels with the resolved model (`--lane L4`, for example,
+resolves both from the table) and reaches `claude --effort <level>` automatically. An explicit
+`--model` beats one of these local lanes, so no lane effort applies; the explicit model's effort
+applies only when supplied. `L1` routes to Codex and does not launch Claude.
 
 `--effort '<low|medium|high|xhigh|max>'` is accepted only together with an explicit `--model`, for a
 calling skill or workflow (or a user) that already knows the exact pace it wants for a model it named
@@ -97,8 +96,8 @@ prevent. `engineering:handoff`'s obligation to preserve a user-selected model, e
 is why this flag exists at all, not a general invitation to invent one.
 
 A calling skill or workflow that ships its own resolved selection may still pass `--model` directly;
-that wins over `--lane`. What is no longer acceptable is inventing a model id (or, per above, an
-unpaired effort) at the call site.
+that wins over a local lane `L2`–`L6`. What is no longer acceptable is inventing a model id (or, per
+above, an unpaired effort) at the call site.
 
 The launcher requires `--lane L1`–`L6`, `--frontier`, or an explicit non-Haiku `--model`. L1 redirects to
 Codex; it rejects L7

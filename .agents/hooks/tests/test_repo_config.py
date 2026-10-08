@@ -187,7 +187,7 @@ class RepoConfigTests(unittest.TestCase):
             repo_config.run(self.lock, CATALOG, "write")
 
     def test_requires_core_selection(self):
-        self.selections.pop()
+        self.selections = [selection for selection in self.selections if selection["id"] != "base-agents/engineering"]
         self.save_lock()
         with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "omits core plugins"):
             repo_config.run(self.lock, CATALOG, "write")
