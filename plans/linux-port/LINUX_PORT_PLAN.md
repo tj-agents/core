@@ -58,8 +58,8 @@ what still needs checking on Windows.
 - [x] 8. Tests that failed only on Linux pass: POSIX shell collapsed the Codex snapshot loader's escaped
   backslashes into NULs (now embedded as base64); a test plugin URL only git on Windows resolves; pwsh 7
   `Split` binding skipped the installer's ancestor reparse-point check (#160).
-- [ ] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows, so a
-  Linux-only regression fails a PR.
+- [ ] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
+  (`verify-linux`); it blocks a PR once the repository ruleset lists it as a required check.
 
 ## Current progress
 
