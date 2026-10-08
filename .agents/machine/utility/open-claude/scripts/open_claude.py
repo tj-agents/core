@@ -115,17 +115,19 @@ def main(argv=None):
             recovery = _load_recovery()
             prompt = args.prompt if args.prompt_path else args.prompt or 'Continue the requested work.'
             roots = {'claude': agent_cli.claude_config_dir() / 'projects'}
-            recovery.open_session('claude', args.resume, prompt, args.title, roots,
-                                  confirm_closed=args.confirm_closed,
-                                  prompt_path=args.prompt_path, model=args.model,
-                                  dangerously_skip_permissions=args.dangerously_skip_permissions)
+            resumed = recovery.open_session('claude', args.resume, prompt, args.title, roots,
+                                            confirm_closed=args.confirm_closed,
+                                            prompt_path=args.prompt_path, model=args.model,
+                                            dangerously_skip_permissions=args.dangerously_skip_permissions,
+                                            cli=agent_cli)
         else:
             arguments = build_arguments(args, agent_cli)
             agent_cli.open_claude_tab(working_directory, args.title, arguments)
 
-        print(f"Launched claude tab '{args.title}' in {working_directory}")
+        actual_directory = resumed['cwd'] if args.resume else working_directory
+        print(f"Launched claude tab '{args.title}' in {actual_directory}")
         return 0
-    except agent_cli.LaunchError as exc:
+    except (agent_cli.LaunchError, ValueError, RuntimeError) as exc:
         return agent_cli.report_launch_failure(exc)
 
 

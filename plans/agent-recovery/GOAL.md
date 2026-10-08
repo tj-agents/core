@@ -39,3 +39,13 @@ First candidate is not yet acceptable. It passed five narrow helper tests, but p
 
 The missing shared recovery capability was identified by Tommy's lost-session callout. Selected engineering session-guidance supplies standing source-owner repair authority through tested/reviewed PR and merge in this repository. The requested usable machine recovery skills authorize supported local installation; no consuming repository selections or credentials are changed.
 
+
+## Fixed candidate checkpoint
+
+The shared helper and all five canonical skills now have both host entries. Protected exact Claude resumes reuse the shared guard; normal fresh/continue launch behavior remains covered. The parent confirmed and repaired five review findings, including native thread_name and tab-title matching, stable native exception identities, cross-process receipt retirement, selected-profile startup sync, and selection validation before side effects. Partial recovery keeps already-opened identities visible and preserves timeout exit3.
+
+Local validation: focused recovery/open-claude/history/agent-cli run exercised136 tests with12 platform skips; the final boundary regression exercised60 tests with1 skip. Generated package checks, installed resource loading, packaging and harness inventory passed. Read-only native search found this current top-level Codex session at its original cwd/profile with status live. No real historical agent was reopened, and the Sol-owned previous handoff was preserved.
+
+Review limitation: native Spark is unsupported by this account; native fallback could not execute local reads. Automatic approval review rejected an artifact-fed external native review for source transmission. The permitted parent fallback and a fresh internal behavior lens supplied the review; five concrete findings were recorded in reviews/Feature-AgentRecovery.md and are undergoing final incremental verification. No external native source payload was sent by the rejected action.
+
+Next action: commit the stable repair, freeze the delta, complete fresh incremental review, publish the focused PR and bind exact-head CI. Current source/test size remains one coherent search/resume capability below1000 substantive implementation/test lines; both host guards and their regression coverage remain atomic.
