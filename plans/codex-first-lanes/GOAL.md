@@ -1,8 +1,8 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: implementation and review repairs committed; final incremental review and draft publication next.
+Status: PR #148 is published at `40647fff42d48a97105efb52181e7d641b0ca90e`; wording and CI assertion repairs are verified; the stable repair candidate is ready to commit and push.
 
-PR: not opened.
+PR: https://github.com/tj-agents/core/pull/148
 
 ## Authority
 
@@ -45,9 +45,10 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. Publish the repaired candidate and freeze an incremental review from watermark
-   `a3c82ff6365936c9f838a38b00918afca28a8da3`. The canonical work order is
-   `reviews/Fix-CodexFirstLanes.md`. Native CLI review was auto-review rejected; the review specialist
+1. Verify the mechanical wording repairs R3/R4 and two stale CI assertions, commit once, then review the delta from watermark
+   `40647fff42d48a97105efb52181e7d641b0ca90e`. The canonical work order is
+   `reviews/Fix-CodexFirstLanes.md`.
+   Native CLI review was auto-review rejected; the review specialist
    is unavailable for this account. Use fresh read-only Codex L4 fallback lenses, as the first pass did.
 2. Own exact-head CI, resolve any new findings, and merge after the repository gates pass.
    A standalone scope assessment is already recorded below; do not invent a ledger to resolve
@@ -106,7 +107,8 @@ Review lane: L4 (or the declared Codex review specialist). Delivery lane: L7 cle
 use L6 for a sustained monitor. The L1 parent owns only design and synthesis, with bounded workers
 applying implementation and review lanes.
 
-Current next action: publish and incrementally review the repaired candidate.
+Current next action: commit and push the verified repair candidate at L7,
+review that small delta, then exact-head CI and merge.
 Implementation: `fe34217`, reconciled at `a3c82ff`; review repairs: `f1c9077`.
 The first independent pass found a routed-lane plus model override gap and a stale bootstrap dependency
 assertion. Both are repaired; this commit clarifies the matching launcher wording.
@@ -116,8 +118,31 @@ After repair, lane tests (29), launcher tests (41, one skipped), shared CLI test
 and bootstrap CatalogTests (6) passed. Package-layout tests (19), harness checks and source generation
 passed on the implementation. The initial full bootstrap capture was inconclusive; only the six
 CatalogTests are claimed locally, with full-suite coverage delegated to exact-head CI.
-Generated distribution files remain excluded from commits. No PR existed at this checkpoint.
+Generated distribution files remain excluded from commits. PR #148 is body-validated and bound to
+the published head with goal-scoped merge authorization. Initial CI run: `37768193063`.
+Both incremental lenses completed through `40647ff`; two wording inaccuracies were repaired: later
+model-precedence prose must exclude routed L1, and the Claude frontier rationale must not call Codex
+the same model family. No further runtime finding. After the monitor's GitHub TLS query error, one
+authoritative read established that CI run `37768193063` failed in shared runtime tests. L3 diagnosis
+found two stale assertions: planning prose still expected the old wording, and the core-selection test
+removed machine, now triggering engineering's dependency guard before its intended core guard. Repair
+the prose assertion and explicitly omit engineering from that fixture, preserving its original error
+assertion. No production change or suite retry is needed; run both affected test files before the push.
 
 Continuation owner: `.agents/continuation/owner.json`, owner `40f69016a71a88938ffa279b`.
-Foreground Codex PID: `40480`. Initialization, foreground claim and 20-minute scheduler registration
-succeeded. Bounded implementation worker: `implement_lanes`, Codex L4. The parent retains this goal.
+Current foreground Codex PID: `5400` (resumed session). The original PID `40480` no longer owns the goal.
+The continuation had blocked on its stale initial head; its checked receipt/rebind and claim functions
+reconciled it to `40647fff` and the existing PR binding. The 20-minute scheduler remains registered.
+Bounded current worker: `finish_test_repair_l4`, in-session Codex L4, owns only the two affected test files.
+The parent retains the goal and does no substantive implementation. No independent handoff was launched.
+Tommy clarified that lanes should execute cheaper work inside this session; the parent model label stays
+unchanged and its coordination still uses that model. The L4 role explicitly selects its cheaper model.
+The first repaired planning assertion exposed another old phrase, `parent may delegate bounded work`;
+review all assertions in that one test against the canonical policy before rerunning both test files.
+After the next commit/push, refresh the delivery binding and checkpoint the same continuation owner with
+its exact old/new head rebind before claiming foreground ownership again; do not leave its saved head stale.
+
+Focused repair verification: the L4 worker completed both full affected test files with exit 0 through
+workflow runs `pr148-process-standards-repair` and `pr148-repo-config-repair`; diff checks passed.
+The planning test now checks the canonical parent-ownership sentence, and the core-selection fixture
+keeps its original guard assertion while explicitly removing engineering.

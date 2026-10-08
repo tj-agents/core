@@ -66,6 +66,6 @@
     "summary": "Frontier deliberation above the ladder, priced by provenance rather than by task shape.",
     "model": "claude-fable-5",
     "effort": "max",
-    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select this spend. The Codex L1 destination prices the same family one effort step below, and a test asserts no rung prices this exact model-and-effort pair, so lane inflation can never reach it."
+    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select this spend. No Claude lane selects the frontier model; tests enforce that model invariant regardless of effort."
   }
 }
