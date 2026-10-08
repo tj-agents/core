@@ -1,6 +1,6 @@
 # Codex-first lanes: stop burning Claude usage
 
-Status: PR #148 is published at `40647fff42d48a97105efb52181e7d641b0ca90e`; wording and CI assertion repairs are verified; the stable repair candidate is ready to commit and push.
+Status: PR #148 is reviewed through `7527935d5b429a97d3b85a92f0bba9866f19b3b4`; the false incremental-review gate is repaired and focused regressions passed; the final correction is ready to publish.
 
 PR: https://github.com/tj-agents/core/pull/148
 
@@ -45,8 +45,8 @@ One Claude session on 2026-10-07/08 spent about 20% of Tommy's Claude usage on a
 
 ## Next Steps
 
-1. Verify the mechanical wording repairs R3/R4 and two stale CI assertions, commit once, then review the delta from watermark
-   `40647fff42d48a97105efb52181e7d641b0ca90e`. The canonical work order is
+1. Publish the verified `review_reconcile` correction, then incrementally review its small delta
+   from `7527935d5b429a97d3b85a92f0bba9866f19b3b4` and own the new exact-head CI. The canonical work order is
    `reviews/Fix-CodexFirstLanes.md`.
    Native CLI review was auto-review rejected; the review specialist
    is unavailable for this account. Use fresh read-only Codex L4 fallback lenses, as the first pass did.
@@ -107,8 +107,7 @@ Review lane: L4 (or the declared Codex review specialist). Delivery lane: L7 cle
 use L6 for a sustained monitor. The L1 parent owns only design and synthesis, with bounded workers
 applying implementation and review lanes.
 
-Current next action: commit and push the verified repair candidate at L7,
-review that small delta, then exact-head CI and merge.
+Current next action: publish the verified reconciliation correction, review it, and own its exact-head CI.
 Implementation: `fe34217`, reconciled at `a3c82ff`; review repairs: `f1c9077`.
 The first independent pass found a routed-lane plus model override gap and a stale bootstrap dependency
 assertion. Both are repaired; this commit clarifies the matching launcher wording.
@@ -146,3 +145,34 @@ Focused repair verification: the L4 worker completed both full affected test fil
 workflow runs `pr148-process-standards-repair` and `pr148-repo-config-repair`; diff checks passed.
 The planning test now checks the canonical parent-ownership sentence, and the core-selection fixture
 keeps its original guard assertion while explicitly removing engineering.
+
+Verified repair candidate `2e6596e3` is committed and published; remote branch and PR head match.
+Final incremental review covers six paths from `40647fff`. CI run: `37784159382`. The same continuation
+owner was checkpointed with the exact old/new head rebind and reclaimed by PID `5400`.
+
+Base reconciliation at reviewed head `2e6596e3` found relevant catalog/harness changes in main
+`8fb3c340` (six commits after `73fb99c`), so the merge gate requires integration. The L4 worker
+`finish_test_repair_l4` owns that integration and focused validation. The earlier six-path repair
+review is approved with no actionable source findings. No independent session was launched.
+
+Integration commit `7527935d` merged exact main `8fb3c340` without conflicts. Catalog generation
+and five focused test files passed; local generated output was restored to merge HEAD. The remote
+branch and PR match the published head. CI run `37786854612` owns its full verification.
+
+Both independent integration lenses completed with no actionable findings; the canonical review
+watermark is `7527935d`. The L6 monitor is `0a506cc61bac81c4caa9f22ae77566130197e1694db192f97acaf4817fb7526d`,
+with CI verify still pending and no observed failures at its seventh query.
+
+Reconciliation defect diagnosed: latest main remains `8fb3c340` and is already an ancestor of
+reviewed head `7527935d` (Git ancestry exit 0). `workflow_ops.review_reconcile` compares current base
+with the incremental descriptor starting watermark `2e6596e3`, falsely calling already-incorporated
+changes new relevant movement. No additional base integration is needed. This blocks the current
+delivery, so the existing L4 worker owns a minimal helper/regression repair here. Compare only base
+changes absent from the frozen reviewed head; preserve genuinely new relevant/disjoint movement and
+head-mismatch checks. No independent session or broader workflow redesign is authorized by this repair.
+
+Gate repair verification: `review_reconcile` now compares current base against its common ancestor
+with the frozen descriptor head. Regressions cover incorporated base changes and later relevant
+changes; existing disjoint-base and head-mismatch checks remain. Captured runs
+`pr148-review-reconcile-base` and `pr148-review-reconcile-head` both exited 0; diff checks passed.
+Baseline CI run `37786854612` completed successfully at `7527935d` (guard and verify passed).
