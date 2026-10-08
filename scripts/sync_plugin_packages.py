@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -219,11 +220,26 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
     return "sha256:" + digest.hexdigest()
 
 
+# cmd.exe's command-line limit, measured with every ${PLUGIN_ROOT} expanded to a full-length Windows path.
+CODEX_WINDOWS_COMMAND_BUDGET = 8191
+WINDOWS_MAX_PATH = 260
+
+
+def codex_snapshot_expression(loader: str) -> str:
+    """Return the Python expression that runs the loader, as a pure function of its text.
+
+    Base64 ([A-Za-z0-9+/=]) in single-quoted literals contains nothing that sh, PowerShell or cmd.exe
+    interpret inside the surrounding double quotes, so one expression serves every host. No
+    compression: zlib output differs between implementations (zlib-ng on Windows CPython), which
+    would make the generated packages and their digests platform-dependent.
+    """
+    encoded = base64.b64encode(loader.encode("utf-8")).decode("ascii")
+    return f"exec(__import__('base64').b64decode('{encoded}').decode())"
+
+
 def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
     loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
-    if "'" in loader:
-        raise ValueError("Codex hook snapshot loader must use only double-quoted strings")
-    expression = "exec(" + repr(loader).replace('"', r'\x22') + ")"
+    expression = codex_snapshot_expression(loader)
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         excluded = ["hooks/codex.json"]
@@ -243,6 +259,15 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
                             prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
                             f'"{plugin}" ' + command[len(prefix):]
                         )
+                        # Each ${PLUGIN_ROOT} expands at run time; count it at a full Windows path length.
+                        expanded = len(hook[field]) + hook[field].count("${PLUGIN_ROOT}") * (
+                            WINDOWS_MAX_PATH - len("${PLUGIN_ROOT}")
+                        )
+                        if field == "commandWindows" and expanded > CODEX_WINDOWS_COMMAND_BUDGET:
+                            raise ValueError(
+                                f"Codex commandWindows for {plugin} is {expanded} characters once ${{PLUGIN_ROOT}} "
+                                f"expands, over the {CODEX_WINDOWS_COMMAND_BUDGET}-character budget for cmd.exe"
+                            )
         output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
 
 
