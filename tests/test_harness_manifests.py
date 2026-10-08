@@ -1,5 +1,6 @@
 """Package harness declarations stay consistent with the catalog and hook wiring."""
 
+from copy import deepcopy
 import importlib.util
 import json
 from pathlib import Path
@@ -21,6 +22,27 @@ import harness_permissions  # noqa: E402
 
 INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.ps1"), ("machine", "close.ps1"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
+
+
+def validate_harness_schema(documents):
+    schema = str(ROOT / ".agents/plugins/harness.schema.json").replace("'", "''")
+    script = f"""
+$documents = [Console]::In.ReadToEnd() | ConvertFrom-Json -AsHashtable -Depth 100
+foreach ($document in $documents) {{
+    $valid = $document | ConvertTo-Json -Depth 100 -Compress |
+        Test-Json -SchemaFile '{schema}' -ErrorAction SilentlyContinue
+    [Console]::Out.WriteLine($valid.ToString().ToLowerInvariant())
+}}
+"""
+    result = subprocess.run(
+        ["pwsh", "-NoProfile", "-Command", script],
+        input=json.dumps(documents),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise AssertionError(result.stderr)
+    return [line == "true" for line in result.stdout.splitlines()]
 
 
 class HarnessManifestTests(unittest.TestCase):
@@ -98,6 +120,51 @@ class HarnessManifestTests(unittest.TestCase):
         requires["marketplaces"][0]["repository"] = "another-org/core"
         with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+
+
+@unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required for Test-Json")
+class HarnessManifestSchemaTests(unittest.TestCase):
+    def rule(self):
+        manifest = json.loads(
+            (ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
+        )
+        return manifest, manifest["requires"]["permissions"]["codex_prefix_rules"][0]
+
+    def test_shipped_manifests_validate_against_schema(self):
+        manifests = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in sorted((ROOT / ".agents/plugins/harness").glob("*.json"))
+        ]
+        self.assertEqual([True] * len(manifests), validate_harness_schema(manifests))
+
+    def test_codex_prefix_rule_accepts_legacy_string_tokens(self):
+        manifest, rule = self.rule()
+        rule["pattern"] = ["python", "-B", "script.py"]
+        rule["match"] = ["python"]
+        rule["not_match"] = ["pwsh"]
+        self.assertEqual([True], validate_harness_schema([manifest]))
+
+    def test_codex_prefix_rule_rejects_invalid_tokens_and_unknown_fields(self):
+        manifest, rule = self.rule()
+        invalid_rules = []
+        for field, value in (
+            ("pattern", []),
+            ("pattern", [""]),
+            ("pattern", [123]),
+            ("pattern", [[]]),
+            ("pattern", [["python", ["-B"]]]),
+            ("match", [[]]),
+            ("match", [[["python"]]]),
+            ("not_match", [123]),
+            ("not_match", [["python", ""]]),
+        ):
+            invalid = deepcopy(manifest)
+            invalid["requires"]["permissions"]["codex_prefix_rules"][0][field] = value
+            invalid_rules.append(invalid)
+        invalid = deepcopy(manifest)
+        invalid["requires"]["permissions"]["codex_prefix_rules"][0]["unexpected"] = True
+        invalid_rules.append(invalid)
+        self.assertEqual([False] * len(invalid_rules), validate_harness_schema(invalid_rules))
 
 
 class HarnessPermissionCoverageTests(unittest.TestCase):
