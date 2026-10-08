@@ -2,6 +2,11 @@ r"""Enforce merge Step 5 cleanup after a `gh pr merge`: record an obligation, na
 with a cooldown after grace, hard-block Claude's Stop once GitHub confirms the merge,
 and surface a reminder to any session whose checkout still owns it. `--clear <worktree>`
 is the deliberate-retention escape.
+
+Only a session whose own cwd or project directory is inside the merged checkout owes its own exit; a
+coordinator merging another checkout through the pushd envelope owes that worktree's removal. Removing a
+merged worktree by merge Step 5's native-Git path (directory gone and unregistered) satisfies the
+obligation unless the owning session is still inside the removed path.
 """
 
 import os
@@ -46,6 +51,7 @@ NAG_COOLDOWN_SECONDS = 600
 TRANSFER_REARM_SECONDS = 3600
 RECONCILE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 GIT_TIMEOUT_SECONDS = 5
+SESSION_DIRECTORY_ENVS = ("CLAUDE_PROJECT_DIR", "CODEX_PROJECT_DIR")
 
 CLEANUP_PROOF_RELATIVE = "engineering/workflow/merge/scripts/cleanup_proof.py"
 
@@ -158,15 +164,41 @@ MESSAGE = (
     "- Not merged yet? Keep monitoring — `python .agents/workflows/workflow_ops.py ... "
     "monitor --kind pr --id {pr} --head {head}`, `gh pr view/checks` and `gh run list/view/watch` "
     "are never blocked.\n"
+    "{merged_guidance}"
+    "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
+    "`python \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
+    "{closing}"
+)
+
+SELF_CLOSE_GUIDANCE = (
     "- Merged? Finish Step 6 and the report. For a removable linked checkout, from inside {worktree} run `python -B {cleanup_proof}` "
     "and `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>"
     "/scripts/finish.ps1`, exactly, with no arguments: it closes this CLI and removes the worktree. "
     "For a primary or retained checkout, run the argument-free sibling `close.ps1` after the report; "
     "it verifies session exit and retains the checkout. Elsewhere, follow `engineering:merge` Step 5.\n"
-    "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
-    "`python \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
+)
+
+NATIVE_GIT_GUIDANCE = (
+    "- Merged? Finish Step 6 and the report, then retire the worktree by `engineering:merge` Step 5's "
+    "native-Git path, run from the primary checkout {primary}: `python -B {cleanup_proof} --worktree "
+    "\"{worktree}\" --branch {branch} --head {head} --pr {pr}`, and on `removable` run the "
+    "`git worktree remove` and `git branch -d` commands it prints.\n"
+)
+
+ATTACHED_SESSION_GUIDANCE = (
+    "- This session is attached to {worktree}. peer-cli's self-close is not available on this platform "
+    "yet: retarget to the primary checkout or hand off per Step 5; the obligation clears once the "
+    "worktree is removed and its owning session is no longer inside it.\n"
+)
+
+SELF_CLOSE_CLOSING = (
     "This repeats every 10 minutes until cleanup completes, a handoff launcher transfers it, "
     "or verified session exit clears it."
+)
+
+REMOVAL_CLOSING = (
+    "This repeats every 10 minutes until the worktree is removed (by any session) "
+    "or a handoff launcher transfers it."
 )
 
 
@@ -227,6 +259,80 @@ def worktree_still_exists(obligation):
     return isinstance(worktree, str) and Path(worktree).is_dir()
 
 
+def worktree_registered(obligation):
+    """True/False from the primary's `git worktree list`; None when Git cannot answer."""
+    worktree, primary = obligation.get("worktree"), obligation.get("primary")
+    if not isinstance(worktree, str):
+        return False
+    if not isinstance(primary, str) or not Path(primary).is_dir():
+        return False
+    listing = git(primary, "worktree", "list", "--porcelain")
+    if listing is None:
+        return None
+    target = path_forms(worktree)
+    return any(
+        line.startswith("worktree ") and path_forms(line[len("worktree "):]) & target
+        for line in listing.splitlines()
+    )
+
+
+def worktree_removed(obligation):
+    """The checkout is gone the documented way: no directory and no registration in its primary."""
+    if worktree_still_exists(obligation):
+        return False
+    return worktree_registered(obligation) is False
+
+
+def merge_evidenced(obligation):
+    """GitHub confirmed the merge in this session, or `cleanup_proof.py` proved it removable at this head."""
+    if obligation.get("confirmed_merged"):
+        return True
+    worktree = obligation.get("worktree")
+    if not isinstance(worktree, str):
+        return False
+    digest = hashlib.sha256(Path(worktree).as_posix().encode("utf-8")).hexdigest()
+    receipt = load_obligation(state_directory() / "merge-cleanup" / "receipts" / f"{digest}.json")
+    if receipt is None or receipt.get("verdict") != "removable":
+        return False
+    head = obligation.get("head")
+    return not head or receipt.get("head") == head
+
+
+def session_locations(data):
+    """The session's own working directory and project directory, never a per-command pushd target."""
+    locations = []
+    cwd = data.get("cwd")
+    if isinstance(cwd, str) and cwd:
+        locations.append(cwd)
+    for variable in SESSION_DIRECTORY_ENVS:
+        value = os.environ.get(variable)
+        if value and value not in locations:
+            locations.append(value)
+    return locations
+
+
+def location_inside(location, worktree):
+    return any(
+        under_or_equal(form, root) for form in path_forms(location) for root in path_forms(worktree)
+    )
+
+
+def session_still_inside(obligation, data):
+    """Whether the owning session may still be attached to the obligation's worktree."""
+    worktree = obligation.get("worktree")
+    if not isinstance(worktree, str):
+        return False
+    session = data.get("session_id") or data.get("sessionId")
+    if session and session == obligation.get("session_id"):
+        current = session_locations(data)
+        if current:
+            return any(location_inside(location, worktree) for location in current)
+    recorded = obligation.get("session_cwd")
+    if isinstance(recorded, list) and recorded:
+        return any(isinstance(item, str) and location_inside(item, worktree) for item in recorded)
+    return bool(obligation.get("session_exit_required"))
+
+
 def grace_seconds(obligation):
     override = os.environ.get(GRACE_ENV)
     if override:
@@ -249,6 +355,15 @@ def nag_cooldown_seconds():
 
 def normalize_path_text(value):
     return str(value).replace("\\", "/").rstrip("/").casefold()
+
+
+def path_forms(value):
+    forms = {normalize_path_text(value)}
+    try:
+        forms.add(normalize_path_text(Path(value).resolve()))
+    except (OSError, RuntimeError, ValueError):
+        pass
+    return forms
 
 
 def under_or_equal(candidate, root):
@@ -288,15 +403,32 @@ def deny_message(obligation, codex):
         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(recorded_at))
         if isinstance(recorded_at, (int, float)) else "an earlier time"
     )
+    fields = {
+        "pr": obligation.get("pr") or "?",
+        "branch": obligation.get("branch") or "?",
+        "head": obligation.get("head") or "<head>",
+        "worktree": obligation.get("worktree"),
+        "primary": obligation.get("primary") or "<primary-checkout>",
+        "time": stamp,
+        "cleanup_proof": cleanup_proof,
+        "hook_path": str(Path(__file__).resolve()),
+    }
+    # peer-cli's finish.ps1/close.ps1 run only under Windows PowerShell until the Linux port's
+    # step 5 lands, and they close the calling session, so a coordinator that merged another
+    # checkout through the pushd envelope is never sent there.
+    if not obligation.get("session_exit_required"):
+        guidance, closing = NATIVE_GIT_GUIDANCE, REMOVAL_CLOSING
+    elif is_windows():
+        guidance, closing = SELF_CLOSE_GUIDANCE, SELF_CLOSE_CLOSING
+    else:
+        guidance, closing = NATIVE_GIT_GUIDANCE + ATTACHED_SESSION_GUIDANCE, REMOVAL_CLOSING
     return MESSAGE.format(
-        pr=obligation.get("pr") or "?",
-        branch=obligation.get("branch") or "?",
-        head=obligation.get("head") or "<head>",
-        worktree=obligation.get("worktree"),
-        time=stamp,
-        cleanup_proof=cleanup_proof,
-        hook_path=str(Path(__file__).resolve()),
+        merged_guidance=guidance.format(**fields), closing=closing, **fields,
     )
+
+
+def is_windows():
+    return os.name == "nt"
 
 
 def pushd_target(command):
@@ -333,6 +465,10 @@ def record_obligation(command, data):
             primary = str(common_path.parent) if common_path.name == ".git" else str(common_path)
     origin_url = git(worktree, "remote", "get-url", "origin")
     session = data.get("session_id") or data.get("sessionId")
+    # A session that lives outside the merged checkout (a coordinator using the pushd envelope)
+    # owes the worktree's removal, not its own exit; an unknown location stays conservative.
+    locations = session_locations(data)
+    session_inside = any(location_inside(location, worktree) for location in locations)
     save_obligation(obligation_path(worktree), {
         "session_id": session,
         "worktree": str(worktree),
@@ -346,7 +482,8 @@ def record_obligation(command, data):
         "recorded_at": time.time(),
         "confirmed_merged": False,
         "checkout_retained": worktree == Path(primary) if primary else False,
-        "session_exit_required": True,
+        "session_cwd": locations,
+        "session_exit_required": session_inside or not locations,
         "merge_mode": "queued" if "--auto" in command else "direct",
         "nagged_at": None,
         "transferred_at": None,
@@ -371,7 +508,7 @@ def stamp_transfer(command, data):
 
 
 def evaluate_codex_obligation(obligation, session, cwd, now):
-    if not obligation.get("session_exit_required") and not worktree_still_exists(obligation):
+    if not obligation.get("session_exit_required") and worktree_removed(obligation):
         return None
     transferred_at = obligation.get("transferred_at")
     if transferred_at is None:
@@ -548,7 +685,7 @@ def handle_stop(data):
             obligation is not None
             and obligation.get("session_id") == session
             and obligation.get("confirmed_merged")
-            and (obligation.get("session_exit_required") or worktree_still_exists(obligation))
+            and (obligation.get("session_exit_required") or not worktree_removed(obligation))
         ):
             json.dump({"decision": "block", "reason": deny_message(obligation, codex)}, sys.stdout)
             sys.stdout.write("\n")
@@ -556,10 +693,14 @@ def handle_stop(data):
 
 
 def reminder_line(obligation):
+    owed = (
+        "self-close is still required" if obligation.get("session_exit_required")
+        else "any session may remove the worktree"
+    )
     return (
         f"merge-cleanup: PR #{obligation.get('pr') or '?'} ({obligation.get('branch') or '?'}) "
         f"at {obligation.get('worktree')} still needs merge Step 5 cleanup "
-        f"(`python \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
+        f"(`python \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; {owed})."
     )
 
 
@@ -573,7 +714,7 @@ def handle_reminder(event, data):
     obligations = [
         obligation for obligation in (load_obligation(path) for path in iter_obligation_paths())
         if obligation is not None
-        and (obligation.get("session_exit_required") or worktree_still_exists(obligation))
+        and (obligation.get("session_exit_required") or not worktree_removed(obligation))
     ]
     if not obligations:
         return
@@ -605,9 +746,7 @@ def branch_ref_missing(primary, branch):
     return result.returncode == 1
 
 
-def should_reconcile(obligation, now):
-    if obligation.get("session_exit_required"):
-        return False
+def should_reconcile(obligation, now, data=None):
     primary = obligation.get("primary")
     worktree = obligation.get("worktree")
     retained = obligation.get("checkout_retained") or (
@@ -616,7 +755,16 @@ def should_reconcile(obligation, now):
     if retained:
         return False
     worktree = obligation.get("worktree")
-    if not isinstance(worktree, str) or not Path(worktree).is_dir():
+    if obligation.get("session_exit_required"):
+        # Removing a merged worktree by merge Step 5's native-Git path is the cleanup; only an
+        # owning session still attached to the removed path continues to owe its own exit.
+        return (
+            isinstance(worktree, str)
+            and worktree_removed(obligation)
+            and merge_evidenced(obligation)
+            and not session_still_inside(obligation, data or {})
+        )
+    if not isinstance(worktree, str) or worktree_removed(obligation):
         return True
     recorded_at = obligation.get("recorded_at")
     if isinstance(recorded_at, (int, float)) and now - recorded_at > RECONCILE_MAX_AGE_SECONDS:
@@ -627,14 +775,14 @@ def should_reconcile(obligation, now):
     return False
 
 
-def reconcile():
+def reconcile(data=None):
     paths = iter_obligation_paths()
     if not paths:
         return
     now = time.time()
     for path in paths:
         obligation = load_obligation(path)
-        if obligation is None or should_reconcile(obligation, now):
+        if obligation is None or should_reconcile(obligation, now, data):
             try:
                 path.unlink()
             except OSError:
@@ -679,7 +827,7 @@ def dispatch(argv):
     if not isinstance(data, dict):
         data = {}
     event = data.get("hook_event_name") or data.get("hookEventName") or ""
-    reconcile()
+    reconcile(data)
     if event == "PreToolUse":
         return handle_pretooluse(data)
     if event == "PostToolUse":
