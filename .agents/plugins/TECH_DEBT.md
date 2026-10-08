@@ -14,7 +14,8 @@ source tests alone.
 
 The callout-repair gate blocks automatic feedback substitution and checks paired launcher results
 against the prepared standards-repair goal. Claude's Stop hook also holds recognized callouts.
-Callout detection covers explicit mistake wording; it cannot establish the meaning of every complaint,
+Callout detection covers explicit mistake wording that names standards or workflow mechanisms;
+it cannot establish the meaning of every complaint,
 whether a standard caused it, or whether assistant text substantively answers a question. Codex has no
 registered result or Stop hook, and specialized host tools can bypass normal plugin hooks. Source
 regressions and packaging checks do not establish live activation or interception of SendFeedback.
