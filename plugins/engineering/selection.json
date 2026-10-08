@@ -4,7 +4,8 @@
     "process"
   ],
   "prerequisites": [
-    "base"
+    "base",
+    "machine"
   ],
   "skills": [
     "address-review",

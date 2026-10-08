@@ -83,17 +83,16 @@ def parse_args(argv, agent_cli):
 
 
 def resolve_model(args, agent_cli):
-    """(model, effort, tier text for the success message) per this launcher's selection precedence.
-
-    An explicit --model wins; its --effort (valid only alongside it, enforced in parse_args) travels with
-    it unchanged. A --lane or --frontier that actually resolves the model supplies whatever effort the
-    table prices for it, or none, same as that rung would get interactively; an explicit --model beating
-    the lane means no lane effort applies either. The lane is never guessed here: a transport that
-    inferred one from the prompt would quietly decide the cost of every handoff.
-    """
     model = args.model
     effort = args.effort
     tier = ''
+    if args.lane:
+        route = agent_cli.resolve_lane('claude', lane=args.lane).get('handoff')
+        if route:
+            raise agent_cli.LaunchError(
+                f"--lane {args.lane} routes to Codex {route['lane']}; use engineering:handoff "
+                "with machine:handoff-codex, or omit --lane for an explicit user-named model."
+            )
     if args.frontier:
         model, effort = agent_cli.resolve_lane_model('claude', frontier=True)
         tier = 'frontier -> '
