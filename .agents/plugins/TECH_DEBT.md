@@ -1,5 +1,15 @@
 # Plugin host integration debt
 
+## Arbitrary terminal prose is outside the completion runtime
+
+The completion runtime validates supported workflow receipts and the terminal reports those workflows
+produce. Codex and Claude provide no package hook that intercepts arbitrary final prose, so a session can
+still type an unsupported completion claim outside that path.
+
+Resolve when both hosts expose a trusted terminal-response interception point that can require the canonical
+completion check before a user-visible success claim. Until then, do not claim installed-host adoption from
+source tests alone.
+
 ## Generated base tier README points to an absent schema path
 
 The source `.agents/tiers/README.md` links to `../schemas/tier.schema.json`, which exists in the source tree. Packaging moves the schema to `plugins/base/tiers/tier.schema.json` but copies the README without adjusting its link. The generated README therefore fails `docs_reachability.py` on the current main branch.
