@@ -184,7 +184,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             environment = dict(os.environ, PLUGIN_DATA=str(data))
 
             first = subprocess.run(
-                command, shell=True, cwd=ROOT, env=environment,
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(first.returncode, 0, first.stderr)
@@ -195,7 +195,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
 
             shutil.rmtree(payload)
             recovered = subprocess.run(
-                command, shell=True, cwd=ROOT, env=environment,
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(recovered.returncode, 0, recovered.stderr)
@@ -218,7 +218,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
 
             (snapshot / "hooks" / "hook_runtime.py").write_text("changed", encoding="utf-8")
             rejected = subprocess.run(
-                command, shell=True, cwd=ROOT, env=environment,
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(rejected.returncode, 2, rejected.stderr)
@@ -243,7 +243,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 command = template.replace(original, expected)
                 commands.append(command)
                 result = subprocess.run(
-                    command, shell=True, cwd=ROOT, env=environment,
+                    command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                     capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -257,7 +257,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             shutil.rmtree(payload)
             for command in commands:
                 recovered = subprocess.run(
-                    command, shell=True, cwd=ROOT, env=environment,
+                    command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                     capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual(recovered.returncode, 0, recovered.stderr)
