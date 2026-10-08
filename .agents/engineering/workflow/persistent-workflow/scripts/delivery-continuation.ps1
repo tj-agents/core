@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [Parameter(Position = 0)][ValidateSet('register', 'remove', 'list', 'wake')][string] $Command = 'list',
+    [Parameter(Position = 0)][ValidateSet('claim', 'register', 'remove', 'list', 'wake')][string] $Command = 'list',
     [string] $Worktree,
     [string] $OwnerPath,
     [ValidateRange(5, 720)][int] $IntervalMinutes = 20,
@@ -13,6 +13,11 @@ if ($env:OS -ne 'Windows_NT') {
     throw 'Continuation scheduling requires Windows. No scheduler adapter is provided for this platform.'
 }
 function Test-FullyQualifiedPath([string] $Path) { return $Path -match '^(?:[A-Za-z]:[\\/]|[\\/]{2})' }
+function Assert-HostExecutable([string] $Path) {
+    if (-not (Test-FullyQualifiedPath $Path) -or -not (Test-Path -LiteralPath $Path -PathType Leaf) -or [IO.Path]::GetExtension($Path) -ine '.exe') {
+        throw 'The pinned host executable must be an existing absolute native .exe path.'
+    }
+}
 function Find-Executable([string] $Name) {
     $found = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $found) { throw "Required executable '$Name' is missing from PATH." }
@@ -89,9 +94,6 @@ function Resolve-PendingRegistration($CurrentReceipt) {
     }
     return $resolved
 }
-foreach ($name in @('Get-ScheduledTask', 'Register-ScheduledTask', 'Unregister-ScheduledTask', 'New-ScheduledTaskAction', 'New-ScheduledTaskTrigger', 'New-ScheduledTaskSettingsSet')) {
-    if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw "Windows ScheduledTasks capability is unavailable: $name." }
-}
 if ($Command -eq 'list') {
     Get-ScheduledTask -TaskName "$taskPrefix*" -ErrorAction SilentlyContinue | Select-Object TaskName, TaskPath, State, Description
     return
@@ -122,8 +124,14 @@ try {
     if (-not $acquired) { throw 'Another scheduler lifecycle operation holds this owner; retry after it finishes.' }
 $receiptPath = Join-Path (Split-Path -Parent $ownerFile) 'scheduler.json'
 $pendingPath = Join-Path (Split-Path -Parent $ownerFile) 'scheduler.pending.json'
-$receipt = if (Test-Path -LiteralPath $receiptPath -PathType Leaf) { Read-Json $receiptPath } else { $null }
-$receipt = Resolve-PendingRegistration $receipt
+$receipt = $null
+if ($Command -ne 'claim') {
+    foreach ($name in @('Get-ScheduledTask', 'Register-ScheduledTask', 'Unregister-ScheduledTask', 'New-ScheduledTaskAction', 'New-ScheduledTaskTrigger', 'New-ScheduledTaskSettingsSet')) {
+        if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw "Windows ScheduledTasks capability is unavailable: $name." }
+    }
+    $receipt = if (Test-Path -LiteralPath $receiptPath -PathType Leaf) { Read-Json $receiptPath } else { $null }
+    $receipt = Resolve-PendingRegistration $receipt
+}
 function Remove-OwnedTask {
     if (-not $receipt) { Write-Output "No scheduler receipt exists for owner $($owner.owner_id)."; return }
     $task = Get-OwnedTask $receipt
@@ -134,6 +142,47 @@ function Remove-OwnedTask {
     }
 }
 switch ($Command) {
+    'claim' {
+        if (-not $PSCmdlet.ShouldProcess($owner.owner_id, 'Claim foreground continuation owner')) { return }
+        $helper = Resolve-Helper
+        $python = Find-Executable 'python'
+        $hostExecutable = $null
+        if ($owner.PSObject.Properties['host_executable'] -and $owner.host_executable) { Assert-HostExecutable $owner.host_executable }
+        $foregroundProcessId = [int]$PID
+        $seen = @{}
+        $hostProcessId = $null
+        while ($foregroundProcessId -gt 0) {
+            if ($seen.ContainsKey($foregroundProcessId)) { throw 'Foreground process ancestry contains a cycle.' }
+            $seen[$foregroundProcessId] = $true
+            $processRecords = @(Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = {0}" -f $foregroundProcessId) -ErrorAction SilentlyContinue)
+            if ($processRecords.Count -ne 1) { throw "Foreground process $foregroundProcessId is unavailable." }
+            $process = $processRecords[0]
+            if (-not $process.PSObject.Properties['Name']) { throw "Foreground process $foregroundProcessId has no executable name." }
+            $name = [IO.Path]::GetFileName([string]$process.Name)
+            if ($name -ieq 'codex.exe' -or $name -ieq 'claude.exe') {
+                if ($name -ine ($owner.harness + '.exe')) { throw "Nearest foreground host is $name, but owner requires $($owner.harness).exe." }
+                $hostProcessId = [int]$process.ProcessId
+                if (-not $owner.host_executable) {
+                    if (-not $process.PSObject.Properties['ExecutablePath']) { throw "Foreground host $name has no executable path." }
+                    $hostExecutable = [string]$process.ExecutablePath
+                    if (-not (Test-FullyQualifiedPath $hostExecutable) -or -not (Test-Path -LiteralPath $hostExecutable -PathType Leaf) -or [IO.Path]::GetFileName($hostExecutable) -ine ($owner.harness + '.exe')) {
+                        throw "Foreground host executable must be an existing absolute $($owner.harness).exe path."
+                    }
+                }
+                break
+            }
+            $foregroundProcessId = [int]$process.ParentProcessId
+        }
+        if ($null -eq $hostProcessId) { throw "No codex.exe or claude.exe exists in the foreground process ancestry for $($owner.harness)." }
+        $claimArguments = @('-B', $helper, 'claim', '--owner', $ownerFile, '--pid', $hostProcessId)
+        if ($hostExecutable) { $claimArguments += @('--host-executable', $hostExecutable) }
+        $claimOutput = @(& $python @claimArguments)
+        if ($LASTEXITCODE -ne 0) { throw "Continuation runtime claim failed with exit code $LASTEXITCODE." }
+        try { $claim = (($claimOutput -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop) }
+        catch { throw "Continuation runtime claim returned invalid JSON: $($_.Exception.Message)" }
+        if (-not $claim.foreground -or -not $claim.foreground.token) { throw 'Continuation runtime claim returned no foreground lease token.' }
+        $claim | ConvertTo-Json -Depth 10 -Compress
+    }
     'register' {
         $legacyTasks = @(Get-ScheduledTask -TaskName 'AgentStandards-Delivery-*' -ErrorAction SilentlyContinue)
         foreach ($legacyTask in $legacyTasks) {
@@ -148,9 +197,7 @@ switch ($Command) {
         $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
         if (-not (Test-Path -LiteralPath $windowsPowerShell -PathType Leaf)) { throw "Windows PowerShell is missing: $windowsPowerShell." }
         if ($owner.PSObject.Properties['host_executable'] -and $owner.host_executable) {
-            if (-not (Test-FullyQualifiedPath $owner.host_executable) -or -not (Test-Path -LiteralPath $owner.host_executable -PathType Leaf) -or [IO.Path]::GetExtension($owner.host_executable) -ine '.exe') {
-                throw 'The pinned host executable must be an existing absolute native .exe path.'
-            }
+            Assert-HostExecutable $owner.host_executable
         } else { $null = Find-Executable $owner.harness }
         if (Test-Path -LiteralPath (Join-Path $root '.agents/persistent-workflow-binding.json')) { $null = Find-Executable 'gh' }
         $helper = Resolve-Helper

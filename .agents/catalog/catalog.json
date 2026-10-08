@@ -194,207 +194,335 @@
           },
           "digest": "sha256:4e8fbb168057e846265a4ba0d3d2f5500af900895c7ffafdd9c0de897ee79b7f",
           "harness": {
-            "marketplaces": [
-              {
-                "id": "base-agents",
-                "repository": "tj-agents/core"
-              }
-            ],
-            "plugins": [
-              "base-agents/base",
-              "base-agents/engineering",
-              "base-agents/machine"
-            ],
-            "hooks": [
-              {
-                "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/callout_repair_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/compact_output_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/delivery_binding_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/denial_prompt.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/forge_poll_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/git_auth_scope_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/harness_grant.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/hook_dispatch.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/merge_cleanup_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/merge_review_gate.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/persistent_workflow_merge_gate.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/plan_handoff_stop_launcher.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/pre_tool_use_adapter.py",
-                "hosts": [
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/red_run_gate.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/workflow_route.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/worktree_cleanup_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              }
-            ],
-            "permissions": {
-              "claude_allow": [
-                "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
-              ],
-              "codex_prefix_rules": [
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python.exe",
-                      "python3",
-                      "py"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/workflows/completion.py"
-                    ]
-                  ],
-                  "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
-                  "match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/workflows/completion.py"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "${PLUGIN_ROOT}/workflows/completion.py"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python.exe",
-                      "python3",
-                      "py"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
-                      "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
-                      "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                    ]
-                  ],
-                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
-                  "match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                    ]
-                  ]
-                }
-              ]
-            }
-          }
+                       "marketplaces": [
+                         {
+                           "id": "base-agents",
+                           "repository": "tj-agents/core"
+                         }
+                       ],
+                       "plugins": [
+                         "base-agents/base",
+                         "base-agents/engineering",
+                         "base-agents/machine"
+                       ],
+                       "hooks": [
+                         {
+                           "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/callout_repair_gate.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/compact_output_gate.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/delivery_binding_gate.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/denial_prompt.py",
+                           "hosts": [
+                             "claude"
+                           ]
+                         },
+                         {
+                           "path": "hooks/forge_poll_gate.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/git_auth_scope_gate.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/harness_grant.py",
+                           "hosts": [
+                             "claude"
+                           ]
+                         },
+                         {
+                           "path": "hooks/hook_dispatch.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/merge_cleanup_gate.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/merge_review_gate.py",
+                           "hosts": [
+                             "claude"
+                           ]
+                         },
+                         {
+                           "path": "hooks/persistent_workflow_merge_gate.py",
+                           "hosts": [
+                             "claude"
+                           ]
+                         },
+                         {
+                           "path": "hooks/plan_handoff_stop_launcher.py",
+                           "hosts": [
+                             "claude"
+                           ]
+                         },
+                         {
+                           "path": "hooks/pre_tool_use_adapter.py",
+                           "hosts": [
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/red_run_gate.py",
+                           "hosts": [
+                             "claude"
+                           ]
+                         },
+                         {
+                           "path": "hooks/workflow_route.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         },
+                         {
+                           "path": "hooks/worktree_cleanup_gate.py",
+                           "hosts": [
+                             "claude",
+                             "codex"
+                           ]
+                         }
+                       ],
+                       "permissions": {
+                         "claude_allow": [
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+                           "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+                           "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py init)",
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py claim)",
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py heartbeat)",
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py yield)",
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py checkpoint)",
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py status)",
+                           "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py wake)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py init)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py claim)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py heartbeat)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py yield)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py checkpoint)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py status)",
+                           "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py wake)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 claim)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 register)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 remove)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 list)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 wake)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 claim)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 register)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 remove)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 list)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1 wake)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 claim)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 register)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 remove)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 list)",
+                           "Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 wake)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 claim)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 register)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 remove)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 list)",
+                           "PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1 wake)"
+                         ],
+                         "codex_prefix_rules": [
+                           {
+                             "pattern": [
+                               [
+                                 "python",
+                                 "python.exe",
+                                 "python3",
+                                 "py"
+                               ],
+                               "-B",
+                               [
+                                 "${PLUGIN_ROOT}/workflows/completion.py"
+                               ]
+                             ],
+                             "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+                             "match": [
+                               [
+                                 "python",
+                                 "-B",
+                                 "${PLUGIN_ROOT}/workflows/completion.py"
+                               ]
+                             ],
+                             "not_match": [
+                               [
+                                 "python",
+                                 "${PLUGIN_ROOT}/workflows/completion.py"
+                               ]
+                             ]
+                           },
+                           {
+                             "pattern": [
+                               [
+                                 "python",
+                                 "python.exe",
+                                 "python3",
+                                 "py"
+                               ],
+                               "-B",
+                               [
+                                 "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+                                 "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
+                                 "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+                               ]
+                             ],
+                             "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
+                             "match": [
+                               [
+                                 "python",
+                                 "-B",
+                                 "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                               ],
+                               [
+                                 "python",
+                                 "-B",
+                                 "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+                               ]
+                             ],
+                             "not_match": [
+                               [
+                                 "python",
+                                 "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                               ]
+                             ]
+                           },
+                           {
+                             "pattern": [
+                               [
+                                 "python",
+                                 "python.exe",
+                                 "python3",
+                                 "py"
+                               ],
+                               "-B",
+                               "${PLUGIN_ROOT}/workflows/continuation_runtime.py",
+                               [
+                                 "init",
+                                 "claim",
+                                 "heartbeat",
+                                 "yield",
+                                 "checkpoint",
+                                 "status",
+                                 "wake"
+                               ]
+                             ],
+                             "justification": "persistent-workflow initializes, claims, heartbeats, yields and observes the one durable continuation owner; the explicit foreground lease PID prevents a transient tool shell from taking that owner",
+                             "match": [
+                               [
+                                 "python",
+                                 "-B",
+                                 "${PLUGIN_ROOT}/workflows/continuation_runtime.py",
+                                 "claim",
+                                 "--owner",
+                                 "C:\\continuation\\owner.json",
+                                 "--pid",
+                                 "1234"
+                               ]
+                             ],
+                             "not_match": [
+                               [
+                                 "python",
+                                 "-B",
+                                 "${PLUGIN_ROOT}/workflows/continuation_runtime.py",
+                                 "_child"
+                               ],
+                               [
+                                 "python",
+                                 "-B",
+                                 "${PLUGIN_ROOT}/workflows/continuation_runtime.py",
+                                 "unknown"
+                               ]
+                             ]
+                           },
+                           {
+                             "pattern": [
+                               "powershell.exe",
+                               "-NoProfile",
+                               "-NonInteractive",
+                               "-ExecutionPolicy",
+                               "Bypass",
+                               "-File",
+                               [
+                                 "${PLUGIN_ROOT}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1",
+                                 "${PLUGIN_ROOT}/skills/persistent-workflow/scripts/delivery-continuation.ps1",
+                                 "${PLUGIN_ROOT}/codex-skills/persistent-workflow/scripts/delivery-continuation.ps1"
+                               ],
+                               [
+                                 "claim",
+                                 "register",
+                                 "remove",
+                                 "list",
+                                 "wake"
+                               ]
+                             ],
+                             "justification": "persistent-workflow uses the Windows adapter to resolve the live host process, claim its foreground lease, and register or observe the exact owner scheduler receipt",
+                             "match": [
+                               [
+                                 "powershell.exe",
+                                 "-NoProfile",
+                                 "-NonInteractive",
+                                 "-ExecutionPolicy",
+                                 "Bypass",
+                                 "-File",
+                                 "${PLUGIN_ROOT}/codex-skills/persistent-workflow/scripts/delivery-continuation.ps1",
+                                 "claim",
+                                 "-OwnerPath",
+                                 "C:\\continuation\\owner.json"
+                               ]
+                             ],
+                             "not_match": [
+                               [
+                                 "powershell.exe",
+                                 "-NoProfile",
+                                 "-File",
+                                 "${PLUGIN_ROOT}/codex-skills/persistent-workflow/scripts/delivery-continuation.ps1",
+                                 "unexpected"
+                               ]
+                             ]
+                           }
+                         ]
+                       }
+                     }
         },
         {
           "id": "base-agents/machine",
