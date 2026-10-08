@@ -48,6 +48,17 @@ Resolve when detection confirms the variable belongs to the terminal the caller 
 example by matching the terminal's own record of its sessions against the caller's process ancestry,
 with a test for an inherited variable.
 
+## A locked Codex runtime executable can disable every sandboxed command
+
+Codex's sandbox setup opens ACLs on its bundled `node_repl.exe` before it starts a command. When Windows
+returns a sharing violation for that executable, setup refresh fails and even a read-only command cannot
+start. The launcher chooses among installed runtimes by version but has no command-runner health check, so
+it cannot select a healthy desktop runtime when the CLI runtime is locked.
+
+**Resolution condition.** Codex's sandbox setup tolerates a transient runtime-file lock or exposes a
+supported health probe and runtime selection mechanism; then the launcher detects the unhealthy runtime,
+uses a healthy supported runtime when available, and has regression coverage for the fallback.
+
 ## Windows Terminal option values may be escaped for a parse they never get
 
 `agent_cli._launch_windows_terminal` (and `agent-cli.ps1`'s `Invoke-AgentTerminalTab`) pass every
