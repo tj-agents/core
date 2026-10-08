@@ -44,13 +44,20 @@ def write_harness(root, name, claude_allow, codex_rules=None):
     (root / "harness.json").write_text(json.dumps(harness), encoding="utf-8")
 
 
-def install_claude_plugin(claude_config, name, version, claude_allow, codex_rules=None, scope="user", project_path=None):
-    root = claude_config / "plugins" / "cache" / "base-agents" / name / version
+def install_claude_plugin(
+    claude_config, name, version, claude_allow, codex_rules=None, scope="user", project_path=None,
+    marketplace="base-agents", repository="tj-agents/core",
+):
+    root = claude_config / "plugins" / "cache" / marketplace / name / version
     write_harness(root, name, claude_allow, codex_rules)
     installed_path = claude_config / "plugins" / "installed_plugins.json"
     installed_path.parent.mkdir(parents=True, exist_ok=True)
     data = json.loads(installed_path.read_text(encoding="utf-8")) if installed_path.is_file() else {"version": 2, "plugins": {}}
-    identity = f"{name}@base-agents"
+    known_path = claude_config / "plugins" / "known_marketplaces.json"
+    known = json.loads(known_path.read_text(encoding="utf-8")) if known_path.is_file() else {}
+    known[marketplace] = {"source": {"source": "github", "repo": repository}}
+    known_path.write_text(json.dumps(known), encoding="utf-8")
+    identity = f"{name}@{marketplace}"
     entry = {"scope": scope, "installPath": str(root), "version": version}
     if project_path is not None:
         entry["projectPath"] = str(project_path)
@@ -59,16 +66,26 @@ def install_claude_plugin(claude_config, name, version, claude_allow, codex_rule
     return root
 
 
-def clear_claude_plugin(claude_config, name):
+def clear_claude_plugin(claude_config, name, marketplace="base-agents"):
     installed_path = claude_config / "plugins" / "installed_plugins.json"
     data = json.loads(installed_path.read_text(encoding="utf-8"))
-    data["plugins"][f"{name}@base-agents"] = []
+    data["plugins"][f"{name}@{marketplace}"] = []
     installed_path.write_text(json.dumps(data), encoding="utf-8")
 
 
-def install_codex_plugin(codex_home, name, version, claude_allow=None, codex_rules=None):
-    root = codex_home / "plugins" / "cache" / "base-agents" / name / version
+def install_codex_plugin(
+    codex_home, name, version, claude_allow=None, codex_rules=None, marketplace="base-agents",
+    repository="tj-agents/core",
+):
+    root = codex_home / "plugins" / "cache" / marketplace / name / version
     write_harness(root, name, claude_allow or [], codex_rules)
+    config_path = codex_home / "config.toml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with config_path.open("a", encoding="utf-8") as config:
+        config.write(
+            f'\n[marketplaces.{marketplace}]\nsource_type = "git"\n'
+            f'source = "https://github.com/{repository}.git"\n'
+        )
     return root
 
 
@@ -118,6 +135,59 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
 
         after = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
         self.assertEqual([], after)
+
+    def test_tj_agents_non_base_marketplace_permissions_apply_on_both_hosts(self):
+        claude_root = install_claude_plugin(
+            self.claude_config, "work", "v1", ["Bash(work-review)"], marketplace="work-agents",
+            repository="tj-agents/work",
+        )
+        codex_root = install_codex_plugin(
+            self.codex_home, "work", "v1", codex_rules=[SAMPLE_RULE], marketplace="work-agents",
+            repository="tj-agents/work",
+        )
+
+        SYNC.synchronize(self.environ, "apply")
+
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertIn("Bash(work-review)", allow)
+        forward, _ = harness_permissions.path_spellings(codex_root)
+        self.assertIn(forward, self.rules_path().read_text(encoding="utf-8"))
+        self.assertTrue(claude_root.is_dir())
+
+    def test_foreign_marketplace_permissions_are_ignored_on_both_hosts(self):
+        install_claude_plugin(
+            self.claude_config, "foreign", "v1", ["Bash(foreign-review)"], marketplace="foreign-agents",
+            repository="foreign-org/standards",
+        )
+        install_codex_plugin(
+            self.codex_home, "foreign", "v1", codex_rules=[SAMPLE_RULE], marketplace="foreign-agents",
+            repository="foreign-org/standards",
+        )
+
+        SYNC.synchronize(self.environ, "apply")
+
+        self.assertFalse(self.settings_path().is_file())
+        self.assertFalse(self.rules_path().is_file())
+
+    def test_removed_non_base_marketplace_permissions_are_withdrawn_on_both_hosts(self):
+        install_claude_plugin(
+            self.claude_config, "work", "v1", ["Bash(work-review)"], marketplace="work-agents",
+            repository="tj-agents/work",
+        )
+        install_codex_plugin(
+            self.codex_home, "work", "v1", codex_rules=[SAMPLE_RULE], marketplace="work-agents",
+            repository="tj-agents/work",
+        )
+        SYNC.synchronize(self.environ, "apply")
+
+        clear_claude_plugin(self.claude_config, "work", marketplace="work-agents")
+        config_path = self.codex_home / "config.toml"
+        config_path.write_text("", encoding="utf-8")
+        SYNC.synchronize(self.environ, "apply")
+
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertEqual([], allow)
+        self.assertFalse(self.rules_path().is_file())
 
     def test_a_version_path_change_rerenders(self):
         install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
@@ -212,7 +282,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         SYNC.synchronize(self.environ, "apply")
         before = self.rules_path().read_bytes()
 
-        cache_base = self.codex_home / "plugins" / "cache" / "base-agents"
+        cache_base = self.codex_home / "plugins" / "cache"
         original_iterdir = Path.iterdir
 
         def fake_iterdir(self_path):
