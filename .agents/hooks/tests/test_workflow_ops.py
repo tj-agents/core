@@ -686,6 +686,33 @@ class ReviewTests(RepositoryFixture):
         self.assertTrue(result["exact_head"])
         self.assertFalse(result["review_required"])
 
+    def test_base_already_merged_into_frozen_head_does_not_restart_review(self):
+        self.git("switch", "-q", "main")
+        moved = self.commit("src/main.txt", "base advance\n", "base advance")
+        self.git("switch", "-q", "Feature/Workflow-ops")
+        self.git("merge", "-q", "--no-edit", moved)
+        descriptor = ops.review_prepare(self.root, "run-1", self.base, "HEAD", False)
+        self.git("update-ref", "refs/remotes/origin/main", moved)
+
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+
+        self.assertFalse(result["base_moved"])
+        self.assertTrue(result["exact_head"])
+        self.assertFalse(result["review_required"])
+
+    def test_relevant_base_movement_requires_incremental_review(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        self.git("switch", "-q", "main")
+        moved = self.commit("src/mapping.txt", "base change\n", "relevant base change")
+        self.git("switch", "-q", "Feature/Workflow-ops")
+        self.git("update-ref", "refs/remotes/origin/main", moved)
+
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+
+        self.assertTrue(result["base_moved"])
+        self.assertTrue(result["review_required"])
+        self.assertIn("base-changed-relevant-evidence", result["reasons"])
+
     def test_head_movement_requires_incremental_review(self):
         descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
         self.commit("src/second.txt", "later\n", "later candidate")
