@@ -7,7 +7,7 @@ implement, test, open the PR and merge once this repository's gates pass. Instal
 scope, publishing outside this repository, and destructive operations stay gated.
 
 - Checkout: `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-CalloutRepairEnforcement`
-- Branch: `Fix/CalloutRepairEnforcement` (from `origin/main` 8fb3c34)
+- Branch: `Docs/CalloutAnswerOrdering` (runtime PR #152 is merged; guidance starts from remote base `54bbb94`)
 - Originating session: cris-authz, answering "why won't PR #25 merge". It keeps its own goal; this
   workstream does not touch it.
 
@@ -61,14 +61,12 @@ merged once gates pass. Report the PR URL and merge state back in this file.
 Lane: L4. The user changed this same session to Sol and confirmed on 2026-10-08 that it should
 continue. This session owns execution; its earlier bounded workers have released writing.
 
-1. Observe exact-head CI for [PR #152](https://github.com/tj-agents/core/pull/152), head
-   `1685a2f6b3538b0ad4882681d8e11340941fd270`, run `37801891775`. Its one failure is the expected
-   Windows PreToolUse hook inventory missing the new gate. Update that inventory, preserve budget
-   assertions, run its focused tests, commit/review the delta and refresh the exact-head binding.
-   Once replacement CI is green, mark ready and merge with the existing authority.
-2. Deliver C as a separate guidance slice from the updated remote base under the same goal. Correct
-   both session-guidance ordering sites, update process regressions, and align failing-tests' stale
-   description of CI-log hook triggering. D is already owned by
+1. Validate and review C on `Docs/CalloutAnswerOrdering`: both ordering sites now put the answer before
+   handoff, the process regression checks that order, and failing-tests' hook description matches A.
+2. Open and merge the guidance slice with the same goal authority. PR #152's bound regeneration job
+   passed in run `37809283406`. Its scheduler and binding are retired and receipts preserved in
+   `%TEMP%/callout-repair-owner-pr152`; the same canonical goal now owns this guidance slice.
+   D is already owned by
    [PR #148](https://github.com/tj-agents/core/pull/148), which reserves L1 for critical or large
    designs and keeps bounded testable choices at L4; reconcile its delivery instead of duplicating it.
 3. Validate, open the PR, merge when gates pass, and record the result here.
@@ -76,7 +74,8 @@ continue. This session owns execution; its earlier bounded workers have released
 ## Current evidence and delivery slices
 
 - Runtime slice: A/B, `Fix/CalloutRepairEnforcement`, [PR #152](https://github.com/tj-agents/core/pull/152),
-  reviewed and pushed head `1685a2f6b3538b0ad4882681d8e11340941fd270`.
+  merged head `a0b7d8684a9c786e6e95da31e0276aa4aee0e0a0`, landing
+  `759e26935b0cb66a8bdaf5395d1d501ac12c171c`.
   Target below 1,000 substantive lines; hook/parser tests, packaging and harness declarations, an
   independent committed-head review, and repository CI are its validation gates.
 - Integrated remote main at `ab321492`; affected regressions, 29 lane-table checks, 41 Claude launcher
@@ -87,6 +86,11 @@ continue. This session owns execution; its earlier bounded workers have released
   handoff obligation for an unrecognized complaint. Its 13 focused tests passed.
 - Guidance slice: C, a subsequent `Docs/*` branch from the updated remote default, with the minimal
   wording correction and its process-standard regression tests.
+- C's 22 process-standard checks and 12 red-run regressions passed on 2026-10-08. The runtime's
+  documented slice-completion transition checks the broader goal and therefore cannot complete with
+  C correctly pending. That limitation is now owned by `docs/workflows/TECH_DEBT.md`; the foreground
+  parent preserved the blocked slice receipts, retired its scheduler and binding after merge, and
+  initialized the same canonical goal for the guidance slice.
 - The partial A patch was reviewed and corrected for quoted-command parsing, deleted E2E constants,
   mixed passing/failing suites, compound exit attribution, and old CI-read Stop state. Its 12 focused
   tests passed on 2026-10-08. Broader validation and review remain.
@@ -117,3 +121,19 @@ continue. This session owns execution; its earlier bounded workers have released
   inventory did not include `callout_repair_gate.py`. Shared runtime CI was skipped because that
   earlier step failed. A fresh bounded mechanical worker owns only that inventory correction;
   no retry or merge bypass is authorized as a substitute for repairing the failure.
+
+## Delivery acceptance
+
+```completion
+{
+  "outcome": "Repair bounded callout enforcement and false red-run detection, answer questions before handoff, and reconcile lane pricing",
+  "acceptance": [
+    {"id": "A", "criterion": "CI log reads and passing summaries do not create red-run obligations", "evidence": [{"source": ".agents/hooks/tests/test_red_run_gate.py", "result": "12 focused tests passed after main integration"}], "owner": "", "next_action": ""},
+    {"id": "B", "criterion": "Supported host events gate automatic feedback substitution and pair source-owner launcher proof", "evidence": [{"source": ".agents/hooks/tests/test_callout_repair_gate.py", "result": "13 focused tests passed; unsupported semantic and final-prose interception recorded in plugin debt"}], "owner": "", "next_action": ""},
+    {"id": "C", "criterion": "Minimal session guidance requires answering the direct question before same-turn handoff", "evidence": [], "owner": "This source-owner session", "next_action": "Deliver the separate guidance slice after PR152 lands"},
+    {"id": "D", "criterion": "Bounded testable choices do not select the critical-design lane", "evidence": [{"source": "https://github.com/tj-agents/core/pull/148", "result": "Merged at fa9f7400d939ba9cbf57048d2f94787aeaca864e"}], "owner": "", "next_action": ""}
+  ],
+  "deliveries": [{"repository": "tj-agents/core", "pr": 152, "head": "a0b7d8684a9c786e6e95da31e0276aa4aee0e0a0"}],
+  "open_tasks": []
+}
+```
