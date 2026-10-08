@@ -1462,6 +1462,7 @@ Move-Item -LiteralPath $temp -Destination $Path
         }
         $matchingKilled = Wait-Condition -TimeoutSeconds 10 -Condition { $null -eq (Get-Process -Id $sweepMatching.Id -ErrorAction SilentlyContinue) }
         Assert-True -Actual $matchingKilled -Message 'The kill sweep did not stop the reaper-shaped process whose command line carried the matching invocation GUID.'
+        Start-Sleep -Milliseconds 500
         $sweepDecoy.Refresh()
         Assert-False -Actual $sweepDecoy.HasExited -Message 'The kill sweep stopped a decoy process carrying a different GUID.'
         $sweepBystander.Refresh()
@@ -1512,6 +1513,7 @@ Move-Item -LiteralPath $temp -Destination $Path
         Assert-True -Actual ($null -ne $closeShapeRecord) -Message 'The CloseOnly timeout-shape scenario did not write a terminal record.'
         Assert-Equal -Expected 'timeout' -Actual $closeShapeRecord.status -Message 'The CloseOnly observer with a live host did not record a timeout.'
         Assert-Equal -Expected 'close-shape-test' -Actual (Get-EntryProperty -Entry $closeShapeRecord -Name 'session_id') -Message 'The CloseOnly timeout record did not carry its session identity.'
+        Assert-True -Actual ([double] (Get-EntryProperty -Entry $closeShapeRecord -Name 'host_started_at') -gt 0) -Message 'The CloseOnly timeout record did not carry the host start time.'
         Assert-True -Actual ($null -eq (Get-EntryProperty -Entry $closeShapeRecord -Name 'reaper_pid')) -Message 'The CloseOnly timeout record carried cleanup-reaper identity fields.'
     }
     finally {
