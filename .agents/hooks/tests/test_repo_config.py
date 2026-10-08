@@ -160,6 +160,21 @@ class RepoConfigTests(unittest.TestCase):
         repo_config.run(self.lock, CATALOG, "write")
         self.assertFalse(path.exists())
 
+    def test_claude_script_arguments_require_wildcard(self):
+        for allow in (
+            ["Bash(python -B .agents/workflows/workflow_ops.py)"],
+            ["Bash(python -B .agents/workflows/workflow_ops.py:*)"],
+        ):
+            with self.subTest(allow=allow):
+                overlay = self.overlay(allow)
+                requires = json.loads(overlay.read_text(encoding="utf-8"))["requires"]
+                repo_config.harness_permissions.validate_requires(requires, "fixture")
+
+        overlay = self.overlay(["Bash(python -B .agents/workflows/workflow_ops.py --check)"])
+        requires = json.loads(overlay.read_text(encoding="utf-8"))["requires"]
+        with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, r"script arguments require :\*"):
+            repo_config.harness_permissions.validate_requires(requires, "fixture")
+
     def test_hand_written_allow_rule_blocks_check_and_write_without_mutation(self):
         settings = self.root / ".claude" / "settings.json"
         settings.parent.mkdir()
