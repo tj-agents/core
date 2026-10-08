@@ -259,6 +259,16 @@ class CodexExecutableTests(unittest.TestCase):
         shim, binary = self.vendored(self.base / 'npm global', '0.160.0')
         self.assertEqual(CLI.codex_candidate_paths(which=lambda _: str(shim)), [str(binary)])
 
+    def test_a_native_executable_directly_on_path_is_a_candidate_with_no_npm_package(self):
+        native = executable(self.base / 'standalone' / 'codex', '\x7fELFnot a script\n')
+        self.assertEqual(CLI.codex_candidate_paths(which=lambda _: str(native)), [str(native)])
+
+    def test_an_npm_shim_on_path_is_not_itself_a_candidate(self):
+        shim, binary = self.vendored(self.base / 'npm global', '0.160.0')
+        candidates = CLI.codex_candidate_paths(which=lambda _: str(shim))
+        self.assertNotIn(str(shim), candidates)
+        self.assertEqual(candidates, [str(binary)])
+
     def test_skips_the_windows_desktop_cache_elsewhere(self):
         executable(self.base / 'appdata' / 'OpenAI' / 'Codex' / 'bin' / 'h' / 'codex.exe')
         self.assertEqual(CLI.codex_candidate_paths(which=lambda _: None, local_app_data=str(self.base / 'appdata')), [])
