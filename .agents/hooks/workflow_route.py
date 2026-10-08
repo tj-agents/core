@@ -27,7 +27,10 @@ QUESTION = re.compile(
     r"^\s*(?:why|what|when|where|who|how|should|could|would)\b|\?\s*$",
     re.IGNORECASE,
 )
-ACTION_REQUEST = re.compile(r"^\s*(?:can|could|would)\s+you\s+", re.IGNORECASE)
+ACTION_REQUEST = re.compile(
+    r"^\s*(?:can|could|would)\s+you\s+(?:build|create|implement|add|write|refactor|migrate|repair|fix|change|update)\b",
+    re.IGNORECASE,
+)
 EXPLICIT_CLAUDE = re.compile(
     r"\b(?:use|keep|stay|run|do)\s+(?:this\s+)?(?:on\s+)?claude\b|"
     r"\bi\s+want\s+claude\s+to\s+(?:do|handle|implement|build|run|delegate|dispatch|review|design)\b|"
