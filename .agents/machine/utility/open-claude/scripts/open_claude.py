@@ -31,6 +31,22 @@ def _load_agent_cli():
     raise SystemExit(f'The shared agent_cli.py library was not found relative to {HERE}.')
 
 
+def _load_recovery():
+    candidates = (
+        HERE / '../../../scripts/agent_recovery.py',
+        HERE / '../../../resources/machine/scripts/agent_recovery.py',
+        HERE / '../../../../../resources/machine/scripts/agent_recovery.py',
+    )
+    for candidate in candidates:
+        path = candidate.resolve()
+        if path.is_file():
+            spec = importlib.util.spec_from_file_location('agent_recovery', path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+    raise SystemExit(f'The shared agent_recovery.py library was not found relative to {HERE}.')
+
+
 def parse_args(argv, agent_cli):
     parser = argparse.ArgumentParser(description='Open a Claude Code CLI in a new terminal tab.')
     parser.add_argument('--working-directory', default='.')
@@ -40,6 +56,7 @@ def parse_args(argv, agent_cli):
     parser.add_argument('--prompt-path')
     parser.add_argument('--title', default='Claude')
     parser.add_argument('--model')
+    parser.add_argument('--confirm-closed', action='store_true')
     parser.add_argument('--dangerously-skip-permissions', action='store_true')
     args = parser.parse_args(argv)
 
@@ -94,9 +111,17 @@ def main(argv=None):
         # later check that only looked irrelevant.
         working_directory = agent_cli.resolve_tab_directory(args.working_directory)
 
-        arguments = build_arguments(args, agent_cli)
-
-        agent_cli.open_claude_tab(working_directory, args.title, arguments)
+        if args.resume:
+            recovery = _load_recovery()
+            prompt = args.prompt if args.prompt_path else args.prompt or 'Continue the requested work.'
+            roots = {'claude': agent_cli.claude_config_dir() / 'projects'}
+            recovery.open_session('claude', args.resume, prompt, args.title, roots,
+                                  confirm_closed=args.confirm_closed,
+                                  prompt_path=args.prompt_path, model=args.model,
+                                  dangerously_skip_permissions=args.dangerously_skip_permissions)
+        else:
+            arguments = build_arguments(args, agent_cli)
+            agent_cli.open_claude_tab(working_directory, args.title, arguments)
 
         print(f"Launched claude tab '{args.title}' in {working_directory}")
         return 0
