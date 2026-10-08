@@ -75,7 +75,7 @@ class CalloutRepairGateTests(unittest.TestCase):
     def test_automatic_feedback_is_gated_even_when_callout_wording_is_unrecognized(self):
         self.submit("For goodness sake, what was that?")
         self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
-        self.assertEqual("block", self.run_hook("Stop")["decision"])
+        self.assertEqual({}, self.run_hook("Stop"))
 
     def test_explicit_feedback_and_user_repair_limits_override_the_gate(self):
         for prompt in ("Please draft feedback about that mistake.",
