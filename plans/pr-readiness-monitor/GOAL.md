@@ -30,3 +30,4 @@ Lane: L4 — specified implementation with small code-level choices and test cov
 
 - 2026-10-08: isolated worktree created from `origin/main`; successor not yet launched.
 - 2026-10-08: added `workflow_ops.py pr-readiness` and focused coverage for waiting, ready, ordinary failure, and external billing blocks. The focused tests and syntax check pass.
+- 2026-10-08: review repair classifies closed and merged pull requests as terminal instead of ready; focused tests pass.
