@@ -198,3 +198,5 @@ Invoke-AgentTerminalTab `
 $selection = if ($Model) { "$tier$Model" } else { 'the CLI default model' }
 if ($ReasoningEffort) { $selection += " at $ReasoningEffort" }
 Write-Host "Launched codex-cli $($codex.Version.Text) from $($codex.Path) on $selection"
+@{ event = 'agent-handoff-submitted'; worktree = $resolvedWorkingDirectory; prompt_path = $resolvedPromptPath } |
+    ConvertTo-Json -Compress | Write-Output
