@@ -192,7 +192,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:6410240723adca3dd75851227426d94958c5bd9b760d2189656ce83482fffe8c",
+          "digest": "sha256:27d5e92c667f6d20c3fcd21d4b0a4412871688ac74fc939c1e3a34d53ae628c3",
           "harness": {
             "marketplaces": [
               {
@@ -335,7 +335,7 @@
                       "${PLUGIN_ROOT}/workflows/completion.py"
                     ]
                   ],
-                  "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report the user outcome complete",
+                  "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
                   "match": [
                     [
                       "python",
@@ -430,7 +430,7 @@
               "windows-terminal"
             ]
           },
-          "digest": "sha256:f9e7e780df04d820989f95917e10ad0ec81c7bea6bb0a77aa93ce92f30837af6",
+          "digest": "sha256:2837652d89a802ec89dd9e5987911e320e7a6788f8fb2a3d6ae408b51e2afc4c",
           "digest_excludes": [
             "catalog/catalog.json"
           ],

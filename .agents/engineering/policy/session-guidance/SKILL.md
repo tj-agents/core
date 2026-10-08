@@ -60,6 +60,10 @@ candidate before adding more scope; preserve atomic behavior and security when c
 
 ## Preserve one owner through completion
 
+When preparation or approved design has resolved the next action, enter that action through the owning
+lifecycle. A failed CI observation requires recovery under `engineering:plan-execution`; it does not end
+ownership or establish a CI result.
+
 Act on authorized reversible work and keep the canonical plan aligned with observed results. A phase,
 commit, open PR or context boundary does not narrow the original scope. Honor user limits and real
 external-action gates. Use `engineering:handoff` for an actual authorized context transfer; it checkpoints
