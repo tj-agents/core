@@ -288,6 +288,36 @@
       "plugin": "machine",
       "source": ".agents/tiers/machine.json",
       "destination": "tier.json"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/project_facts.py",
+      "destination": "hooks/project_facts.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/standards_context.py",
+      "destination": "hooks/standards_context.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/schemas/standards-context.schema.json",
+      "destination": "schemas/standards-context.schema.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/project_facts.py",
+      "destination": "hooks/project_facts.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/standards_context.py",
+      "destination": "hooks/standards_context.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/schemas/standards-context.schema.json",
+      "destination": "schemas/standards-context.schema.json"
     }
   ],
   "prerequisites": {
@@ -305,8 +335,18 @@
     "review"
   ],
   "host_only_terms": {
-    "claude": ["(?i)[`/]code-review(?![-\\w/])", "(?i)[`/]security-review(?![-\\w/])", "\\b`?Skill`?\\s+[Tt]ool\\b", "(?i)\\bAskUserQuestion\\b", "(?i)\\bToolSearch\\b", "\\bCLAUDE_PLUGIN_ROOT\\b"],
-    "codex": ["\\bcodex\\s+(?:review|exec)\\b", "\\bScheduled Task\\b"]
+    "claude": [
+      "(?i)[`/]code-review(?![-\\w/])",
+      "(?i)[`/]security-review(?![-\\w/])",
+      "\\b`?Skill`?\\s+[Tt]ool\\b",
+      "(?i)\\bAskUserQuestion\\b",
+      "(?i)\\bToolSearch\\b",
+      "\\bCLAUDE_PLUGIN_ROOT\\b"
+    ],
+    "codex": [
+      "\\bcodex\\s+(?:review|exec)\\b",
+      "\\bScheduled Task\\b"
+    ]
   },
   "workflow": {
     "source": ".agents/workflows",
