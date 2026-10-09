@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `a8291ff3faf97dd154172414616dd2b5101fd26b`  `(2026-10-09)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `bf4ccc05bcf06719e8f6cfb18e9d362e6b7b40cc`  `(2026-10-09)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — docs
 
@@ -236,4 +236,23 @@ documentation lenses in the parent. No security-sensitive path.
 Dropped: DEBT1's wording about a "locked reader" (frozen finding text; DEBT3's resolution names the owner
 lock as an option). Native layer: built-in `code-review` (medium); documentation lenses in the parent. No
 security-sensitive path.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `a8291ff3faf97dd154172414616dd2b5101fd26b`
+**Candidate head:** `bf4ccc05bcf06719e8f6cfb18e9d362e6b7b40cc`
+**Candidate branch:** `Docs/CrossPlatformConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:ee269d56a2ee571fac0d1f39af99327eb8a79ab8e100788ed5b9bdcc4b0457e4` `(2 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/8Tde4RqkHgZBTapy41R3Ac/usNv2Grxxtos2vjWhWto1o`
+**Candidate bundle identity:** `sha256:1ee5205d112bfcde3607cc12068b4240ef1ed71351e915253c07306cf169b03c`
+**Work-order path:** `reviews/Docs-CrossPlatformConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The debt entry names every reader and writer of `owner.json`, states an outcome rather
+than a mechanism, requires a deterministic Windows test, and covers `hook_control.py`. Native layer: built-in
+`code-review` (low); documentation lenses in the parent. No security-sensitive path.
 
