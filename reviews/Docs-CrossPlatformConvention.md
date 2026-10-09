@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `bf4f3d239f6f6919d931d4a2676559869a6bdbad`  `(2026-10-09)`
-**Judgment:** `approved`
+**Reviewed up to commit:** `a06db1be49d73f7a93ea1864b8b8c79fc891960c`  `(2026-10-09)`
+**Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
 
@@ -173,3 +173,39 @@ pass: the committed watermark never sat at `03af0ef`. Dropped: marking #166 "in 
 statement is true once this PR merges with it), the superseded spelling quoted in INST4's frozen resolution,
 and line width (no rule sets one). Native layer: built-in `code-review` (medium); documentation lenses in the
 parent. No security-sensitive path.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `65c1ae5098c5c339c97fd1709b55d43e77b64408`
+**Candidate head:** `a06db1be49d73f7a93ea1864b8b8c79fc891960c`
+**Candidate branch:** `Docs/CrossPlatformConvention`
+**Candidate scope:** `docs/workflows/TECH_DEBT.md AGENTS.md` (the rest of the 10-path range is `origin/main` brought in by the synchronizing merge)
+**Candidate path-set:** `sha256:fc63b216ab5cdfe2ae65d4231558675d3c1ff7a5d3a13e3c7bdd05bccae7959b` `(10 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/77gbm0KiUIkgzeM-dZGozN/uNle1b7KJectJdxUIQMm7k`
+**Candidate bundle identity:** `sha256:9c0ca845d25ca1065a2aaaca772249cfe3d6e4ad3358a038a1c8cb2778e57d15`
+**Work-order path:** `reviews/Docs-CrossPlatformConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [x] **DEBT1 — MEDIUM — accuracy** — `docs/workflows/TECH_DEBT.md:52`
+  The new entry blames only the test's read, but `workflow_ops.atomic_json`'s `os.replace` also fails on
+  Windows while a reader holds `owner.json`, so the supervisor's write is at risk too. It names one of the two
+  tests that share `recover_completed_child`, points at a "locked reader" the runtime does not have, and its
+  resolution condition is satisfiable by a test-only retry. Describe the writer/reader pair as the defect and
+  require one shared retrying helper used by the runtime and the tests.
+
+  Resolved: the entry now names the writer/reader pair, both tests and other live `state()` polls, and
+  resolves only through a shared helper with a concurrent reader-versus-writer test on Windows.
+
+- [x] **DEBT2 — LOW — dangling reference** — `docs/workflows/TECH_DEBT.md:57`
+  A CI run ID and "one in twenty recent runs" will rot. Drop them.
+
+  Resolved.
+
+Dropped: the AGENTS.md `tj-agents/docs` line (brought in from `origin/main` by the synchronizing merge, not
+this branch's change); filing location (`docs/workflows/TECH_DEBT.md` is the workflow-runtime debt owner for
+`.agents/workflows/`). Native layer: built-in `code-review` (medium) scoped to the branch's two touched paths;
+documentation lenses in the parent. No security-sensitive path.
+
