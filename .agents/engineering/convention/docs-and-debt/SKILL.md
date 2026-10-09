@@ -1,6 +1,6 @@
 ---
 name: docs-and-debt
-description: Keeping a repository's guidance corpus honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, tech debt recorded in the file owning the problem and deleted when fixed, and throwaway working markdown kept in the repo then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, finding the same rule in two places, logging tech debt, deciding to leave a problem unfixed, or creating a scratch analysis or handoff note.
+description: Keeping a repository's guidance corpus honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, tech debt recorded in the file owning the problem and deleted when fixed, and throwaway working markdown kept in the repo then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, deciding a refactor, migration or other change of direction, finding the same rule in two places, logging tech debt, deciding to leave a problem unfixed, or creating a scratch analysis or handoff note.
 
 kind: convention
 domain: process
@@ -109,6 +109,21 @@ row to respect, and getting it wrong is worse than having no skill at all.
 | Generic, consulted while doing the work | a shared load-on-demand skill |
 | Project-specific and expensive to miss silently | that repo's always-loaded instructions |
 | Cross-project and always applicable | your global agent instructions |
+
+### A change of direction is a standing rule from the moment it is decided
+
+**When a plan or task changes how a repository's code is written — a refactor, migration, new platform,
+new architecture or newly required pattern — write that rule into the repository's standing conventions
+when it is decided, before or with the first change that depends on it.** Standing conventions are the
+always-loaded `AGENTS.md`, or a convention doc it directs every affected change to read. A plan governs
+only its own work: a direction recorded there alone is invisible to every other session, which keeps
+writing the old way and builds new dependencies on it.
+
+The plan keeps the rollout — what moves and in what order. The convention states what all new code does,
+its scope, and how code that has not moved yet is treated, such as ported rather than extended. Replace
+the superseded rule in the same change, cite no plan from the convention, and record code that has not
+moved as tech debt. A change that decides or depends on a direction its repository's conventions do not
+state is incomplete; review reports it with the missing convention as its fix.
 
 ## Tech debt
 
