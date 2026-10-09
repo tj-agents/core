@@ -35,13 +35,14 @@ Planning-only work selects `engineering:plan-authoring` and does not authorize i
 A question or review request alone grants no implementation authority. A status question during already
 authorized execution should be answered before that execution continues.
 
-For every new task, work type, phase, review entry or fallback, load `engineering:lanes`, select the next
-phase's lane, and apply it through the current host's supported controls or a bounded lane worker. Make a
-fresh selection even when retaining the same lane; an earlier selection or inherited setting does not
-carry forward. Follow its Re-route per phase rule for the selection details. Design approval does not
-select an implementation lane. The canonical lane contract owns direct execution, tiny inline follow-ups,
-capability limits, and when substantial design needs a fresh execution owner; apply it even when the
-engineering runtime is unavailable.
+For every new task, work type, phase, review entry or fallback,
+load `engineering:lanes`, select the next phase's lane, and follow its canonical execution rules.
+When the current owner cannot honor that lane, use the current host's supported controls or a bounded lane
+worker. Make a fresh selection even when retaining the same lane; an earlier selection or inherited setting
+does not carry forward. Follow its Re-route per phase rule for the selection details. Design approval does
+not select an implementation lane. The canonical lane contract owns direct execution, tiny inline
+follow-ups, capability limits, and when substantial design needs a fresh execution owner; apply it even when
+the engineering runtime is unavailable.
 On Claude, hand multi-phase work and any delegated design, implementation, or review phase to Codex before
 delegating. An explicit user choice of Claude may keep non-frontier work local; otherwise do not fall back.
 
