@@ -85,3 +85,16 @@ committed digest change in an earlier release would pass. The catalog currently 
 
 Resolve when the guard keys each digest by release id and package id, with a test covering two releases
 that share a package id.
+
+## Codex hook commands need an inline loader authenticator
+
+`bind_codex_hook_snapshots` embeds a small readable Python bootstrap in each Codex hook command. It reads
+the packaged loader, or its retained snapshot when the cache has gone, normalizes newlines, verifies the
+loader SHA-256 embedded in the command, stages those bytes in a private temporary file, then calls it with
+`runpy`. The authenticated command is still necessary: invoking a packaged loader directly would execute a
+mutable file before any package or snapshot integrity check can run.
+
+This narrows the mutable-loader race to bytes checked and staged by the bootstrap; it does not protect
+against a same-user attacker who can replace Python, the temporary directory, or the process itself. The
+package loader continues to verify the complete selected snapshot before it dispatches a hook. Generation
+still enforces cmd.exe's 8191-character command limit, but command length no longer grows with loader size.
