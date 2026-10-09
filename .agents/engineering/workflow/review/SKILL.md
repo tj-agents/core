@@ -190,7 +190,7 @@ evidence, preserving stable IDs. Lenses do not supply final severity or approval
 severity, writes one judgment, and records findings in the canonical shape from `review-lifecycle`.
 
 Before completing an agent-surface pass, update the canonical work order's one moving coverage record for
-the frozen head, then run:
+the frozen head, then run with `python` on Windows or `python3` on Linux/macOS:
 
 ```bash
 python <engineering>/workflows/workflow_ops.py --root <repository-root> --workflow-run-id <id> review-host-check --descriptor <descriptor-path> --work-order <canonical-work-order>
