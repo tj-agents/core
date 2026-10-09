@@ -52,7 +52,8 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(73, len(skills))
+        self.assertEqual(74, len(skills))
+        self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
         })
@@ -99,6 +100,8 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/skills/bootstrap-capabilities/scripts/bootstrap_capabilities.py",
+            "plugins/machine/skills/hook-control/scripts/hook_control.py",
+            "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
             "plugins/machine/catalog/catalog.json",
             "plugins/machine/catalog/capabilities.lock.schema.json",
             "CAPABILITIES.md",

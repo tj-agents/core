@@ -41,7 +41,7 @@ Complete and verify the local change under repository rules. Report security pro
 
 ## Next Steps
 
-Freeze the focused-green authored candidate, review it, finish the broad validation and keep the active user profile disabled. Inspection confirmed 48 saved hook states, all disabled, and no branch lag against fetched origin/main. Bounded investigation used L3; specified implementation used L4 workers with disjoint ownership. Execute only regenerated launchers in disposable test profiles.
+Local implementation and validation are complete. Keep the active user profile disabled. No push, PR, installation into the active plugin cache, or live antivirus acceptance test was performed. Any delivery or live verification is a separate user-directed step. Bounded investigation used L3; specified implementation used L4 workers with disjoint ownership. Only regenerated launchers were executed in disposable test profiles.
 
 Tommy supplied the Bitdefender command-line alert directly and requested CODE_CONVENTIONS.md linked from AGENTS.md. He clarified that the general rule must be language-neutral, based on ordinary alternatives to dynamic source execution; Python-specific portability standards support the Windows/Linux transition. Native Codex trust hashes hook definitions, not referenced Python script bytes; the short readable authenticator protects the packaged verifier. Base64 and explicit exec are removed; authenticated bytes are staged before runpy, retaining snapshot integrity and recovery. Same-user temporary-file races, altered interpreters and modified trusted configuration remain outside the integrity guarantee.
 
@@ -51,10 +51,22 @@ Codex supports features.hooks=false globally and in trusted project config. This
 
 The canonical hook-control utility and both host adapters ship through the machine package. The thin codex-hooks terminal function offers status/off/on. Off saves the prior canonical gate and writes false; on restores only that prior gate. Hook states, trust metadata, legacy aliases and plugin enablement remain untouched. Unsupported TOML syntax fails before configuration or snapshot edits; native layer precedence and trusted-project requirements are documented.
 
-Focused checks passed: 19 control regressions, 10 snapshot tests (4 symbolic-link cases skipped because Windows link creation is unavailable), 3 Windows hook-command tests, packaging, PowerShell 7/Windows PowerShell profile tests, generation, catalog, harness and tier checks. Source and shared-runtime suites are still running. Generated plugins and catalog digests are test output and must not enter the authored commit.
+Focused checks passed: 22 control regressions, 10 snapshot tests (4 symbolic-link cases skipped because Windows link creation is unavailable), 3 Windows hook-command tests, packaging, PowerShell 7/Windows PowerShell profile tests, generation, catalog, harness and tier checks. Generated plugins and catalog digests are test output and did not enter the authored commits; the generated-path guard passes.
+
+Full runs exercised 790 source tests and 983 shared-runtime tests. They were initially red: the new Claude helper permissions used an unsupported argument wildcard, the source-layout inventory still expected 73 definitions, and two layout fixtures copied inconsistent metadata during the repair. The permissions now use the supported :* prefix, catalog metadata agrees, and source-layout coverage expects 74 definitions and asserts both packaged helper paths. After repair, all 38 repo-config tests, 32 harness tests and the 3 failed source-layout scenarios passed. No complete green rerun of both broad suites is claimed.
+
+The broad runs also saw a router subprocess timeout and an employer-scope assertion failure on unchanged code. The router scenario passed alone in 0.992 seconds against its unchanged 20-second limit; the entire employer-scope file passed on fresh isolated fixtures. No timeout was increased or scenario skipped. The last branch-base CI run 37859967381 actually executed both test steps successfully in Windows verify and verify-linux. Windows source/runtime durations were 7m21s/8m10s; the local concurrent runs took about 49m/42m. Local contention is consistent with the isolated results, but no underlying timing fix is claimed.
+
+Local commits: 9fbf9bf77f9cb5a69232ea37ac7a13a9d3c07a5c replaces the encoded launcher, adds reversible controls and documents conventions; 5fe9562110590edcf503ea9cf7c147772481169e rejects corrupted restoration metadata found during review. No push or PR was performed.
+
+7d8b52f5fe3a5fbefb9632b35aba829674d26b5f corrects the helper permission prefixes. The final source-layout checkpoint adds explicit shipped-helper coverage.
+
+The active user config now also contains features.hooks=false, set through the utility. Its 48 disabled states, entire hooks subtree and plugin settings were preserved. Native Codex features list reports hooks stable false without a command-line override. The restoration sidecar records the formerly absent broad gate; restoring it later would preserve the already-disabled individual entries. The original mitigation backup remains intact. Open hosts still require restart.
 
 Native Codex 0.157.0 accepted the feature gate in disposable profiles and returned no discovered hooks while off, including after a new plugin identity was added. A trusted marker positive control did not run from thread/start even when the gate was on; this proves configuration/discovery behavior only, not actual dispatch suppression. Source supports the pre-launch gate. No model turn, actual user hook, old encoded bootstrap or antivirus change was used. Live antivirus acceptance and open-host reload remain unverified. Only docker-desktop is available under WSL, so Linux execution is left to the existing CI tier.
 
 ## Reviews
 
-Pending: immutable authored candidate, general correctness and launcher/configuration security. Canonical work order: reviews/Fix-HookLauncherAndToggle.md.
+Local parent review covers the authored implementation and its restoration, permission and source-layout repairs. Its corrupted-snapshot finding was fixed and regression-tested; no unresolved findings remain. Canonical work order: reviews/Fix-HookLauncherAndToggle.md records the exact final reviewed commit.
+
+Automatic approval review rejected external native codex review because repository contents could be transmitted to an external model service without specific authorization. No retry or alternate export was used. Review continued through the safe in-session parent fallback; no independent native review result is claimed.
