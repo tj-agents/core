@@ -127,6 +127,8 @@ class ProcessStandardsTests(unittest.TestCase):
         for phrase in (
             "Every problem you notice is fixed, handed off or recorded before you move on, "
             "and the outcome reaches the default branch.",
+            "That PR is a meta-only slice with the same standing authorization planning artifacts "
+            "have, and it lands as `engineering:plans`' \"Planning artifacts always land\" defines",
             "A chat reply, a message, an issue, a scratch file or an entry on a branch that may "
             "never merge is not a record.",
         ):

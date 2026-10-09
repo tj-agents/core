@@ -144,10 +144,11 @@ reasoning and an objective resolution condition — a problem only one agent eve
 default branch.** Handing off means launching a side workstream through `engineering:handoff`, or giving the
 problem to the active owner of its fix who confirms it is in their goal; that goal, which ends in a merged
 fix, is then the record. Anything else left unfixed gets the entry above, merged to the default branch in
-the current PR when that PR will land, otherwise in its own docs-only PR opened straight away. That PR has
-standing authorization to run its docs review and land through `engineering:merge-docs`; a live user
-limitation or merge hold instead makes it a typed delivery gate, as for a planning artifact. A chat reply, a
-message, an issue, a scratch file or an entry on a branch that may never merge is not a record.
+the current PR when that PR will land, otherwise in its own docs-only PR opened straight away. That PR is a
+meta-only slice with the same standing authorization planning artifacts have, and it lands as
+`engineering:plans`' "Planning artifacts always land" defines, including its validation, docs review and
+typed delivery gates. A chat reply, a message, an issue, a scratch file or an entry on a branch that may
+never merge is not a record.
 
 ## Throwaway working markdown
 

@@ -54,8 +54,8 @@ say the rule must reach the repository's always-loaded conventions.
 - PR: https://github.com/tj-agents/core/pull/168. Both Python suites green locally before each push
   (802 + 985 tests at `bf43af5`); generated, tier, catalog, harness and reachability checks pass.
   Exact-head CI run 37949300554 passed `guard`, `verify` and `verify-linux` at `bf43af5`.
-- Docs review: five passes so far, recorded in `reviews/Docs-DirectionChangeConventions.md`; every
-  retained finding fixed with its commit noted. Later passes began contradicting earlier fixes; the parent
+- Docs review: full pass plus incremental passes, recorded in `reviews/Docs-DirectionChangeConventions.md`
+  (its watermark is the review state); every retained finding fixed with its commit noted. Later passes began contradicting earlier fixes; the parent
   dropped those with reasons recorded in the work order.
 - Tommy flagged that `docs-and-debt` bundles two jobs. With his explicit choice of Claude (Codex cannot
   launch on Linux), side session `splitdocsanddebt-24` runs at L3 in `.worktrees/SplitDocsAndDebt`, stacked
