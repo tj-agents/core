@@ -450,6 +450,11 @@ class SecurityPatternTests(unittest.TestCase):
     def test_credential_vocabulary_is_sensitive_without_any_repo_config(self):
         self.assertEqual("src/ApiKeyStore.cs", gate.touches_security(["src/ApiKeyStore.cs"]))
 
+    def test_permission_vocabulary_is_sensitive_without_any_repo_config(self):
+        self.assertEqual(
+            "tools/permission-audit.py", gate.touches_security(["tools/permission-audit.py"])
+        )
+
     def test_an_ordinary_path_is_not_sensitive(self):
         self.assertIsNone(gate.touches_security(["src/Widget.cs"]))
 
@@ -505,11 +510,11 @@ class JurisdictionTests(unittest.TestCase):
         target.mkdir(parents=True, exist_ok=True)
         (target / "merge-gate.json").write_text(json.dumps({"security_paths": []}), encoding="utf-8")
 
-    def run_hook(self, command, cwd=None, codex=False):
+    def run_hook(self, command, cwd=None, codex=False, native=False):
         payload_data = {
-            "tool_name": "Bash",
+            "tool_name": "exec_command" if native else "Bash",
             "cwd": str(cwd or self.root),
-            "tool_input": {"command": command},
+            "tool_input": {"cmd" if native else "command": command},
         }
         if codex:
             payload_data["turn_id"] = "codex-" + self._testMethodName
@@ -541,6 +546,16 @@ class JurisdictionTests(unittest.TestCase):
         command = 'pushd "' + str(self.root) + '" && ' + M + " 1 --squash"
 
         result = self.run_hook(command, codex=True)
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("cannot resolve PR #1", result.stderr)
+        self.assertNotIn("cannot prove this merge's checkout", result.stderr)
+
+    def test_native_codex_payload_reaches_the_target_repos_review_gate(self):
+        self.opt_in()
+        command = 'pushd "' + str(self.root) + '" && ' + M + " 1 --squash"
+
+        result = self.run_hook(command, codex=True, native=True)
 
         self.assertEqual(2, result.returncode)
         self.assertIn("cannot resolve PR #1", result.stderr)

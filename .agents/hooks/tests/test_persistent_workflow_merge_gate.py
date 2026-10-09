@@ -252,17 +252,19 @@ class EndToEndTests(unittest.TestCase):
             json.dumps(binding), encoding="utf-8"
         )
 
-    def run_hook(self, command=None):
+    def run_hook(self, command=None, native=False):
         env = dict(os.environ)
         env["PATH"] = str(self.bindir) + os.pathsep + env["PATH"]
         payload = {
             "session_id": uuid.uuid4().hex,
             "hook_event_name": "PreToolUse",
             "tool_use_id": uuid.uuid4().hex,
-            "tool_name": "Bash",
+            "tool_name": "unified_exec" if native else "Bash",
             "cwd": str(self.repo),
-            "tool_input": {"command": command or (M + " 42 --squash --auto")},
+            "tool_input": {"cmd" if native else "command": command or (M + " 42 --squash --auto")},
         }
+        if native:
+            payload["turn_id"] = "codex-" + self._testMethodName
         return subprocess.run(
             [sys.executable, str(HOOK)], input=json.dumps(payload),
             capture_output=True, text=True, cwd=str(self.repo), env=env,
@@ -272,6 +274,16 @@ class EndToEndTests(unittest.TestCase):
         if not self.has_gh_shim:
             self.skipTest("needs the POSIX gh shim")
         result = self.run_hook()
+        self.assertEqual(2, result.returncode)
+        self.assertIn("no persistent-workflow binding", result.stderr)
+
+    def test_native_codex_payload_with_no_binding_is_blocked(self):
+        if not self.has_gh_shim:
+            self.skipTest("needs the POSIX gh shim")
+        command = 'pushd "' + str(self.repo.resolve()) + '" && ' + M + " 42 --squash --auto"
+
+        result = self.run_hook(command, native=True)
+
         self.assertEqual(2, result.returncode)
         self.assertIn("no persistent-workflow binding", result.stderr)
 
@@ -307,6 +319,11 @@ class EndToEndTests(unittest.TestCase):
 
     def test_a_plain_merge_without_auto_is_not_gated(self):
         result = self.run_hook(M + " 42 --squash")
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_native_codex_payload_may_disable_auto_merge(self):
+        result = self.run_hook(M + " 42 --disable-auto", native=True)
+
         self.assertEqual(0, result.returncode, result.stderr)
 
     def test_a_repo_that_did_not_opt_in_is_not_gated(self):

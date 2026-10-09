@@ -27,11 +27,20 @@ class CodexWindowsHookCommands(unittest.TestCase):
                     budget = float(re.search(r"--timeout (\d+)", command)[1])
                     script = command.rsplit("/", 1)[-1].split('"', 1)[0]
                     names.append(script)
-                    self.assertEqual(budget, {"tier_gate.py": 7, "delivery_binding_gate.py": 57}.get(script, 12))
+                    self.assertEqual(
+                        budget,
+                        {
+                            "tier_gate.py": 7,
+                            "delivery_binding_gate.py": 57,
+                            "merge_review_gate.py": 57,
+                            "persistent_workflow_merge_gate.py": 57,
+                        }.get(script, 12),
+                    )
                     self.assertEqual(hook["timeout"] - budget, 3)
         self.assertCountEqual(names, [
             "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
             "forge_poll_gate.py", "compact_output_gate.py", "delivery_binding_gate.py",
+            "merge_review_gate.py", "persistent_workflow_merge_gate.py",
             "merge_cleanup_gate.py", "callout_repair_gate.py",
         ])
 

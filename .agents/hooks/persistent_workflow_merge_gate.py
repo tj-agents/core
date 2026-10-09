@@ -42,6 +42,7 @@ import sys
 from pathlib import Path
 
 from hook_runtime import NETWORK_COMMAND_TIMEOUT_SECONDS, claim_invocation, run_command
+from git_auth_scope_gate import extract_command
 from merge_review_gate import (
     canonical_merge_target_dir,
     invokes_pushd_before_merge,
@@ -66,7 +67,7 @@ HOOK_NAME = "persistent-workflow-merge-gate"
 # Lowercased, and the hook's whole vocabulary. Claude only, deliberately: this gate fails CLOSED, so
 # a matcher naming a shell the script cannot parse a command out of would block a real merge. Codex's
 # shell tool name is not established, exactly as for merge_review_gate.py.
-SHELL_TOOLS = {"bash", "powershell"}
+SHELL_TOOLS = {"bash", "powershell", "shell", "exec_command", "unified_exec", "local_shell"}
 
 _GIT_CWD = ["."]
 
@@ -243,8 +244,8 @@ def main():
     if str(data.get("tool_name", "")).lower() not in SHELL_TOOLS:
         sys.exit(0)
 
-    command = (data.get("tool_input") or {}).get("command", "")
-    if not isinstance(command, str) or not enables_auto(command):
+    command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
+    if command is None or not enables_auto(command):
         sys.exit(0)
 
     _GIT_CWD[0] = resolve_target_dir(command, data)

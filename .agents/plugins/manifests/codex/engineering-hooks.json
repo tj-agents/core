@@ -73,6 +73,28 @@
         "hooks": [
           {
             "type": "command",
+            "timeout": 60,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_review_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 57 \"${PLUGIN_ROOT}/hooks/merge_review_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 60,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 57 \"${PLUGIN_ROOT}/hooks/persistent_workflow_merge_gate.py\""
+          }
+        ],
+        "matcher": "exec_command|unified_exec|local_shell|shell"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "timeout": 15,
             "command": "python3 -B \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\"",
             "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/pre_tool_use_adapter.py\" --timeout 12 \"${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py\""
