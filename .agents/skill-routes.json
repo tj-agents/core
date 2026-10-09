@@ -1,9 +1,0 @@
-{
-  "routes": [
-    {
-      "path": "^(\\.agents/[^/]+/[^/]+|\\.codex/skills|\\.claude/skills)/[^/]+/SKILL\\.md$",
-      "skills": ["engineering:skill-authoring"],
-      "note": "An authored skill definition or host entry point."
-    }
-  ]
-}
