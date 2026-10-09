@@ -107,6 +107,50 @@ host registrations in place and records the failing step; rerunning `apply` resu
 Exit zero means the selected mode completed. Invalid locks, cycles, missing prerequisites, drift and partial
 application exit nonzero.
 
+## Compose immutable source catalogs
+
+Use `compose_catalog.py` before lock selection when combining source owners. Its input is an
+explicit JSON object with `schema_version: 1` and a non-empty `sources` list. Each source declares
+`repository` (`owner/repo`), an absolute local `checkout`, a full lowercase commit SHA,
+`plugins` (canonical package names), and `version_plugin` (one selected package):
+
+```json
+{
+  "schema_version": 1,
+  "sources": [{
+    "repository": "example/capabilities",
+    "checkout": "C:/sources/capabilities",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "plugins": ["base", "compiler"],
+    "version_plugin": "base"
+  }]
+}
+```
+
+```powershell
+python -B '<skill-directory>\scripts\compose_catalog.py' `
+  --input C:\path\to\sources.json --platform windows
+```
+
+The composed v1 catalog is printed to stdout; the composer writes no files.
+`--platform` defaults to the current platform. Source-owned catalog entries
+supply platforms, executable prerequisites, status and digest exclusions when present; otherwise
+the entry records only that consumption platform and no additional declared executable
+prerequisites. Those defaults describe the supplied catalog, without establishing owner support.
+
+The composer reads immutable Git blobs, so working-tree edits cannot change its output. It checks
+the GitHub origin, both native marketplace/package identities, actual `N.N.N` package versions
+supported by catalog v1, shipped skills, required harness declarations and their hook payloads. Top-level `selection.json`
+prerequisites/dependencies must agree with harness plugin requirements; local names qualify to
+the package's own marketplace in both dependency edges and emitted harness declarations.
+Skill-level library requirements do not become plugin edges.
+Unresolved dependencies, contradictory owners, cycles and linked payloads fail before output.
+Each package keeps its own native version. The selected anchor supplies only the release grouping
+version; the full commit and `sha256-tree-v1` payload digest identify the snapshot. Composition
+requires every inspected Git object to be locally available, disables Git lazy fetching, and
+performs no fetch, snapshot execution, lock selection, installation or profile changes. Git must
+support `--no-lazy-fetch`; unsupported versions fail before inspecting snapshot objects.
+
 ## Catalog and digest contract
 
 The bundled catalog uses `sha256-tree-v1`: sort package files by forward-slash relative path, then hash each
