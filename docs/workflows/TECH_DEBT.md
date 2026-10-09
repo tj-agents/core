@@ -49,13 +49,17 @@ result event, so after a failed or rejected merge it nags once every 10 minutes 
 **Resolution condition.** Codex publishes a tool-result or failure event that hooks can consume; wire the
 gate's failure handler to it and delete the obligation when the merge reports no success.
 
-## Continuation runtime tests race the supervisor's owner rewrite on Windows
+## Continuation owner state is not safe to replace while read on Windows
 
-`test_continuation_runtime.ContinuationTests.recover_completed_child` polls `self.state()`, which opens
-`.agents/continuation/owner.json` while the supervisor subprocess replaces it through `atomic_json`. On
-Windows that open can fail with `PermissionError` mid-replace, so
-`test_recover_completed_receipt_after_deadline` fails intermittently in `verify` (run 37946640952, on a
-docs-only PR; about one in twenty recent runs).
+`workflow_ops.atomic_json` replaces `owner.json` with `os.replace`, and `continuation_runtime.read` opens it
+with a plain read. On Windows a replace fails with `PermissionError` while another process has the file
+open, and an open fails while the replace is in progress. So a supervisor's state write can fail under a
+concurrent reader, and a reader can fail under a concurrent write. `test_continuation_runtime` shows it:
+`recover_completed_child` (behind `test_recover_completed_receipt_after_deadline` and
+`test_recover_final_launch_receipt_before_budget_gate`) polls `self.state()` while a supervisor subprocess
+saves, and fails intermittently in Windows `verify`. Any other `self.state()` call made while a supervisor
+is live has the same race.
 
-Resolve when the test's polling reads tolerate a concurrent atomic replace on Windows (or read through the
-runtime's own locked reader), and the test passes repeatedly under `verify` on Windows.
+Resolve when one shared helper retries the replace and the read on a Windows sharing violation, the runtime's
+writer and reader and the tests' `state()` all use it, and a test runs a concurrent reader against a
+supervisor writing on Windows without a failure on either side.
