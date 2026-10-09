@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `5ad2897b6d6d0f0a50c4eadb2e181174f6523c7d`  `(2026-10-09)`
+**Reviewed up to commit:** `bf43af58331a565aa586123aef74f3211e3c1722`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
@@ -204,10 +204,43 @@ and a shared test helper (the new tests follow the file's existing per-test flat
 - [x] **INST6 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:147`
   "Delivery gates as a planning artifact" did not say where those gates are defined. Name
   `engineering:plans`' "Planning artifacts always land".
+  Fixed in `bf43af5`.
 - [x] **INST7 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:121`
   "The convention" was ambiguous between `AGENTS.md` and the linked doc. Say the `AGENTS.md` statement
   itself carries what new code does, its scope and unmoved-code treatment.
+  Fixed in `bf43af5`.
 - [x] **ACC6 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:160`
   Pass-4 findings lacked fix evidence. Record it.
+  Fixed in `bf43af5`.
 - [x] **ACC7 — LOW — accuracy** — `plans/direction-change-conventions/GOAL.md:66`
   Next Steps still said to open the PR and progress named an old head. Bring both current.
+  Fixed in `bf43af5`.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `5ad2897b6d6d0f0a50c4eadb2e181174f6523c7d`
+**Candidate head:** `bf43af58331a565aa586123aef74f3211e3c1722`
+**Candidate branch:** `Docs/DirectionChangeConventions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:7df2b3cde84b38001a627aac06b3dfa413a4770a989f2a45fdf12b34c2992ae5` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/R_kNZhcrtred_qbGY77U3c/LHzjxCodfmbf-2SJS-AOjs`
+**Candidate bundle identity:** `sha256:1cd5ba327f7809dc98803a366dc6f194003f7558543b8499f915ab026350d32a`
+**Work-order path:** `reviews/Docs-DirectionChangeConventions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+Dropped after verification: the docs review a one-entry debt PR needs is now named in INST8's fix rather
+than a separate finding.
+
+- [x] **INST8 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:148`
+  The pointer into `plans` named authorization that section words differently. State the debt PR's
+  standing authorization, its docs review and the typed delivery gate directly.
+- [x] **ACC8 — LOW — accuracy** — `plans/direction-change-conventions/GOAL.md:64`
+  Steps still said `engineering:merge` and "pass 1", and progress claimed green heads without the latest
+  run. Bring both current.
+- [x] **TEST3 — LOW — test-coverage** — `.agents/hooks/tests/test_process_standards.py:118`
+  The `AGENTS.md` statement's required content was not pinned. Pin it.
+- [x] **ACC9 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:204`
+  Pass-5 findings lacked fix evidence. Record it.

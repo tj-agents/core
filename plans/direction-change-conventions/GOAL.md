@@ -44,15 +44,16 @@ say the rule must reach the repository's always-loaded conventions.
 - [x] Problem-recording rule in `docs-and-debt`; `review-lifecycle` and `address-review` point at it.
 - [x] Local gates: both Python suites, `sync-generated.ps1 -Check` after local regeneration, catalog,
   harness and reachability checks.
-- [ ] Docs review (pass 1 complete with findings; fixes need an incremental pass), PR, CI (`verify`,
-  `verify-linux`), merge through `engineering:merge`.
+- [ ] Docs review to a clean incremental pass, exact-head CI (`verify`, `verify-linux`), merge #168
+  through `engineering:merge-docs`.
 - [ ] After merge: retire this goal and the review work order in a docs-only closeout, and finish merge
   Step 5 for this worktree.
 
 ## Current progress
 
-- PR: https://github.com/tj-agents/core/pull/168. Both Python suites green on every pushed head
-  (802 + 985 tests at `5ad2897`); generated, tier, catalog, harness and reachability checks pass.
+- PR: https://github.com/tj-agents/core/pull/168. Both Python suites green locally before each push
+  (802 + 985 tests at `bf43af5`); generated, tier, catalog, harness and reachability checks pass.
+  Exact-head CI run 37949300554 passed `guard`, `verify` and `verify-linux` at `bf43af5`.
 - Docs review: five passes so far, recorded in `reviews/Docs-DirectionChangeConventions.md`; every
   retained finding fixed with its commit noted. Later passes began contradicting earlier fixes; the parent
   dropped those with reasons recorded in the work order.
