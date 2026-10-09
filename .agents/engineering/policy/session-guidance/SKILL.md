@@ -85,8 +85,9 @@ release instead.
 
 ## Maintain the right source owner
 
-Give shared behavior one source owner, preserve published compatibility commitments, and record material
-out-of-scope defects with an objective resolution condition in the existing project's debt or plan owner.
+Give shared behavior one source owner, preserve published compatibility commitments, and fix, hand off or
+record every defect you notice before moving on, so that its fix or debt entry reaches the default branch
+as `engineering:docs-and-debt` defines.
 A defect in a consumed standards package or its source repository is the exception: a stale or broken
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
 to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and launch

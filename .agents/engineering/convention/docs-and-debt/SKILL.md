@@ -139,6 +139,13 @@ provably the right call; "unrelated to what I was doing" is a perfectly good rea
 reason at all to leave it unwritten. Write it down as you make the decision, with the reasoning and an
 objective resolution condition — a problem only one agent ever saw is one nobody will fix.
 
+**Every problem you notice is fixed, handed off or recorded before you move on, and the outcome reaches the
+default branch.** Handing off means launching a side workstream through `engineering:handoff`, or giving the
+problem to the active owner of its fix who confirms it is in their goal; either goal ends in a merged fix.
+Recording means a `TECH_DEBT.md` entry merged to the default branch: in the current PR when that PR will
+land, otherwise in its own docs-only PR straight away. A chat reply, a message, a scratch file or an entry
+on a branch that may never merge is not a record.
+
 ## Throwaway working markdown
 
 Ad-hoc markdown — an investigation prompt, a scratch analysis, a handoff note for another tool or agent — goes
