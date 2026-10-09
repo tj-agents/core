@@ -5,7 +5,7 @@
 Bounded standards-defect side workstream under the standing authorization in
 `engineering:session-guidance`. Tommy called the bundling out ("docs and debt, why is it doing two things
 at once? ... that's probably a tech debt") and explicitly chose to launch this Claude session for it
-(Codex is not installed on this Linux machine; its launcher port is PR #137). Authorized: implement, test,
+(the Codex CLI is installed, but its handoff launcher is Windows-only until PR #137). Authorized: implement, test,
 open the PR and merge once this repository's gates pass. Installing into other scopes stays gated.
 
 Worktree: `/home/tommy/projects/tj-agents/core/.worktrees/SplitDocsAndDebt` (yours alone)
@@ -48,16 +48,19 @@ it, and a guidance rule added there looks like a tech-debt change.
 
 ## Decisions (step 2)
 
-- **Three owners, not two.** Throwaway working markdown is neither guidance nor debt and is summoned by
-  its own trigger (creating a scratch analysis or handoff note), so it is a third convention rather than a
-  section bolted onto either half. `base:plan-artifacts` was rejected as its home: it is an always-loaded
-  base policy about plans, and moving the rule there would grow base context and change package ownership.
-  - `engineering:guidance-ownership` (`.agents/engineering/convention/guidance-ownership/`): "Describe the
-    intended behavior", "One rule, one home" with its subsections, "Make it machine-checked", "Sort a rule
-    by the cost of missing it" including "A change of direction is a standing rule".
+- **Two owners: `docs` and `debt-records`.** First decided as three (`guidance-ownership`, `debt-records`,
+  `working-docs`); Tommy questioned separating the guidance and working-markdown halves, and they were
+  merged into `engineering:docs`. Both govern where a repository's markdown lives and when it goes away;
+  the working-markdown rule is two paragraphs, so a separate skill cost more in discovery than it saved,
+  and `docs` names the guidance half the old name hid. A scratch note is sometimes written without any
+  guidance work; loading the guidance rules then costs only context. `base:plan-artifacts` was rejected as
+  the working-markdown home: it is an always-loaded base policy about plans. Another installed plugin owns
+  `anthropic-skills:docs`, so this repository always writes the qualified `engineering:docs`.
+  - `engineering:docs` (`.agents/engineering/convention/docs/`): "Describe the intended behavior", "One
+    rule, one home" with its subsections, "Make it machine-checked", "Sort a rule by the cost of missing
+    it" including "A change of direction is a standing rule", and "Throwaway working markdown".
   - `engineering:debt-records` (`.agents/engineering/convention/debt-records/`): the "Tech debt" section.
     Not named `tech-debt`, which would sit one hyphen from the `techdebt` workflow.
-  - `engineering:working-docs` (`.agents/engineering/convention/working-docs/`): "Throwaway working markdown".
 - **The debt convention stays separate from the `techdebt` workflow.** Recording is consumed during any
   work that leaves a problem unfixed; `techdebt` is the resolution workflow loaded only when working debt
   down. `SKILL_KINDS.md` requires a separate owner for independently consumed responsibilities. `techdebt`
@@ -65,7 +68,7 @@ it, and a guidance rule added there looks like a tech-debt change.
 - **Compatibility.** Published releases through `v2.1.15` ship `engineering:docs-and-debt`, and the
   `skills` alias table in `.agents/plugins/compatibility.json` maps one old name to one new name, so it
   cannot express a split. `docs-and-debt` therefore stays as a thin `convention` compatibility entry whose
-  body only routes to the three owners (no rule text), with "remove after 2027-04-09" in its description,
+  body only routes to the two owners (no rule text), with "remove after 2027-04-09" in its description,
   following the `gpp:gpp-scaffold` precedent. The `base:docs-and-debt` alias keeps resolving to it. Its
   removal is recorded in `.agents/engineering/TECH_DEBT.md` (a skill-local debt file would ship in
   every generated package), resolved after that date once no `tj-agents` consumer still names the old skill.
@@ -97,12 +100,20 @@ it, and a guidance rule added there looks like a tech-debt change.
   so the waits are owned by the live session. #168's owner (`.worktrees/DirectionChange`) notifies this
   session when #168 changes or merges; each parent change is absorbed by rebasing and re-moving its text.
 
+## Side workstream
+
+- Tommy flagged that no standard governs how a skill is authored. Launched as a bounded side workstream:
+  `.worktrees/SkillAuthoringConvention`, branch `Docs/SkillAuthoringConvention`, goal
+  `plans/skill-authoring-convention/GOAL.md`, Claude at lane L3 (launcher submission confirmed; pickup is
+  recorded in that goal). This goal does not own it.
+
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: exact-head CI on #173, then wait for #168 to merge.
+Current slice: merge `guidance-ownership` and `working-docs` into `engineering:docs` on #173, validate,
+incremental review, push.
 Remaining scope: after #168 merges, rebase onto `main`, retarget #173 to `main`, re-validate, mark ready and
 merge through `engineering:merge`, then Step 5 cleanup of this worktree.
 Done when: the split is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 5: when #168 merges, rebase and retarget #173 to `main`.
+Continue at Completion expectation step 4 for the merged `docs` skill.

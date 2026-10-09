@@ -1,12 +1,12 @@
 ---
-name: guidance-ownership
-description: Keeping a repository's guidance corpus honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, a rule sorted by the cost of missing it, and a change of direction written into the standing conventions when it is decided. Use when writing or editing any guidance doc, adding a rule, deciding where a rule belongs, deciding a refactor, migration or other change of direction, or finding the same rule in two places.
+name: docs
+description: Keeping a repository's docs honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, a rule sorted by the cost of missing it, a change of direction written into the standing conventions when it is decided, and throwaway working markdown kept in the repository then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, deciding where a rule belongs, deciding a refactor, migration or other change of direction, finding the same rule in two places, or creating a scratch analysis, investigation prompt or handoff note.
 
 kind: convention
 domain: process
 ---
 
-# Guidance ownership
+# Docs
 
 ## Describe the intended behavior
 
@@ -125,3 +125,12 @@ code does, its scope, and how code that has not moved yet is treated, such as po
 Replace the superseded rule in the same change, cite no plan from it, and record code that has not moved as
 tech debt under `debt-records`. A change that decides or depends on a direction its repository's conventions
 do not state is incomplete; review reports it with the missing convention as its fix.
+
+## Throwaway working markdown
+
+Ad-hoc markdown — an investigation prompt, a scratch analysis, a handoff note for another tool or agent — goes
+**in the repository**, never in a temp or scratchpad directory. A scratchpad is invisible to the human and to
+other tools operating on the repo, so a doc written there is effectively lost.
+
+These are working docs, not an archive: **delete the file once it has served its purpose** — the handoff
+happened, the question was answered, the analysis landed in code. Don't let throwaway markdown accumulate.

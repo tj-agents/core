@@ -98,7 +98,7 @@ standing authorization: it covers implementing, testing, opening the PR and merg
 repository's gates pass. Installing into any other scope (the consuming repository included),
 publishing outside that repository, and destructive operations stay gated; explicit user limits still
 hold.
-When a plan or task changes how a repository's code is written, apply `engineering:guidance-ownership`'s
+When a plan or task changes how a repository's code is written, apply `engineering:docs`'
 direction-change rule before code depends on it.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt

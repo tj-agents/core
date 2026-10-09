@@ -2,7 +2,7 @@
 
 ## The `docs-and-debt` compatibility entry outlives its split
 
-`engineering:docs-and-debt` was split into `guidance-ownership`, `debt-records` and `working-docs`.
+`engineering:docs-and-debt` was split into `engineering:docs` and `engineering:debt-records`.
 Releases published before the split ship the old name as the rules owner, and every later release ships it
 as a routing-only compatibility entry until it is removed. The `skills` alias table in
 `.agents/plugins/compatibility.json` maps one name to one name, so it cannot redirect a split, and

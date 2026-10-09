@@ -8,10 +8,9 @@ domain: process
 
 # Docs and tech debt
 
-This public name remains for existing callers and owns no rule. Its three concerns each have one owner;
-load the one the task needs:
+This public name remains for existing callers and owns no rule. Its concerns each have one owner; load
+the one the task needs:
 
-- `engineering:guidance-ownership` — writing guidance, where a rule belongs, keeping rules reachable and
-  machine-checked, and a change of direction as a standing rule.
+- `engineering:docs` — writing guidance, where a rule belongs, keeping rules reachable and machine-checked,
+  a change of direction as a standing rule, and throwaway working markdown.
 - `engineering:debt-records` — recording tech debt and deleting the entry once it is addressed.
-- `engineering:working-docs` — throwaway working markdown.
