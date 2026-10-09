@@ -61,18 +61,19 @@ what still needs checking on Windows.
 - [x] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
   (`verify-linux`, #162); it blocks a PR once the repository ruleset lists it as a required check,
   which awaits the user's decision after a few green runs.
-- [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no SKILL.md under
-  `.agents/` tells an agent to run bare `python`, `powershell.exe`, `pwsh` or `wt.exe` without naming the
-  platform (including `merge` and `merge-docs` Step 5's session exit), every unported skill says it is
-  Windows-only, and each Windows-only PowerShell test suite retires with its port or gains a Linux
-  counterpart.
+- [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no shipped Markdown
+  under `.agents/`, `.claude/` or `.codex/` tells an agent to run bare `python`, `powershell.exe`, `pwsh`
+  or `wt.exe` without naming the platform (including the session exit in `merge` Step 5 and in
+  `merge-docs`' Report), every unported skill says it is Windows-only, and the PowerShell test suite of
+  each shipped script retires with that script's port or gains a Linux counterpart.
 
 ## Current progress
 
 Shared library merged (#106, after the interim path fix #105). Kitty configured. Steps merged: 1 (#107),
 2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
 (#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). The cross-platform direction is a written
-convention in `CODE_CONVENTIONS.md` (#166). Step 3b `handoff-codex` in review as #137.
+convention in `CODE_CONVENTIONS.md` (#166), which labels `peer-cli` Windows-only and adds step 10 for
+the rest of the shipped instructions. Step 3b `handoff-codex` in review as #137.
 
 ## Next Steps
 
