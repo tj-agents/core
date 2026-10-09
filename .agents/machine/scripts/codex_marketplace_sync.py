@@ -80,7 +80,9 @@ def invoke_codex_sync_command(codex_executable, arguments, cwd=None, run=subproc
     try:
         return json.loads(result.stdout)
     except ValueError:
-        raise SyncError(f"Codex plugin sync returned invalid JSON: {' '.join(arguments)}") from None
+        raise SyncError(
+            f"Codex plugin sync returned invalid JSON: {' '.join(arguments)}: {result.stdout.strip()!r}"
+        ) from None
 
 
 def invoke_codex_hook_trust(codex_executable, working_directory, helper_script, cwd=None, run=subprocess.run, out=print):

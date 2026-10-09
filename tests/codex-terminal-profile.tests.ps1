@@ -101,7 +101,10 @@ using System;
 using System.Diagnostics;
 class Stub {
     static int Main(string[] args) {
-        var start = new ProcessStartInfo("cmd.exe", "/c \"$batchPathEscaped\" " + string.Join(" ", args));
+        // /d skips any Command Processor \AutoRun registry value -- GitHub's windows-latest runner
+        // images have one, and without /d its banner text lands ahead of the batch file's own stdout
+        // and corrupts the JSON the Python caller parses.
+        var start = new ProcessStartInfo("cmd.exe", "/d /c \"$batchPathEscaped\" " + string.Join(" ", args));
         start.UseShellExecute = false;
         var process = Process.Start(start);
         process.WaitForExit();
