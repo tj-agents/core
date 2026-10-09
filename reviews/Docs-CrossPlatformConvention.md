@@ -4,7 +4,7 @@
 > findings directly and report what changed. Tick each `[x]` as you land it. Pause only for a genuinely
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
-**Review status:** `complete`
+**Review status:** `in-progress`
 **Reviewed up to commit:** `07532d92b3fcf3888d79d0c91ce40974214287f9`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
@@ -66,3 +66,51 @@ Native layer: Claude Code's built-in `code-review` (medium) over the frozen rang
 over the immutable bundle; `docs_reachability.py --root <bundle>/tree` reported 0 errors. Dropped: Linux CI
 coverage for `.codex/install-workflow-agents.ps1` (pre-existing CI scope, below the bar for this docs pass).
 No changed path matched the merge gate's security inventory, so no security marker is required.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `07532d92b3fcf3888d79d0c91ce40974214287f9`
+**Candidate head:** `03af0efce86ca9a18185621959e83a02000016f8`
+**Candidate branch:** `Docs/CrossPlatformConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:d2e3bed390dff6db348dfdece9810e5cfdc5ec06a8abf56039b5b06156deb732` `(5 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/qJctf4SOy93W8hHVTgl_eC/BA84EU0FQPg_PRmpw3ZPf9`
+**Candidate bundle identity:** `sha256:9490debe5995772ef8f31251bf7f8c56025da149f07fb811e083dee8f0c70316`
+**Work-order path:** `reviews/Docs-CrossPlatformConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [x] **INST3 — LOW — followability** — `.agents/machine/utility/peer-cli/SKILL.md:72`
+  The `powershell.exe ... close.ps1` instruction still names no platform at the point of use. Say "on
+  Windows" there.
+
+  Resolved: the instruction now reads "on Windows run exactly".
+
+- [x] **INST4 — LOW — followability** — `.agents/machine/utility/peer-cli/SKILL.md:3`
+  The Windows-only status is invisible in the `description` that hosts route on. Add it to the description
+  in the shared definition and both host entry points.
+
+  Resolved: all three descriptions end with "Windows only until its Python port lands."
+
+- [x] **INST5 — LOW — followability** — `plans/linux-port/LINUX_PORT_PLAN.md:64`
+  Step 10's pass condition checks only SKILL.md files under `.agents/`, names a `merge-docs` "Step 5" that
+  does not exist, and its test-suite clause reads as conflicting with the plan's out-of-scope repository
+  test tooling. Widen it to shipped Markdown under `.agents/`, `.claude/` and `.codex/`, name `merge-docs`'
+  Report, and scope the test clause to suites of shipped scripts.
+
+  Resolved as described.
+
+- [x] **INST6 — LOW — followability** — `plans/linux-port/LINUX_PORT_PLAN.md:74`
+  Current progress does not mention step 10 or the `peer-cli` label. Record both.
+
+  Resolved: Current progress records them.
+
+Dropped: `merge` Step 5 lacking a Linux path (pre-existing; plan step 5 is next and ports `close`/`finish`
+first); `persistent-workflow` (its SKILL.md already names its adapter as the Windows adapter beside a
+Python runtime); restoring the Python mandate to AGENTS.md (the line above already requires reading
+`CODE_CONVENTIONS.md` before runtime changes, and HOME1 removed that copy deliberately); the local bundle
+path (the work-order contract records it). Native layer: built-in `code-review` (medium); documentation
+lenses in the parent; `docs_reachability.py` 0 errors. No security-sensitive path.
+
