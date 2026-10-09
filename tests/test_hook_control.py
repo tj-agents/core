@@ -1,0 +1,245 @@
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / '.agents/machine/utility/hook-control/scripts/hook_control.py'
+SPEC = importlib.util.spec_from_file_location('hook_control', SCRIPT)
+CONTROL = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = CONTROL
+SPEC.loader.exec_module(CONTROL)
+
+
+class HookControlTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='hook-control-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+
+    def config(self, name='profile'):
+        path = self.root / name / 'config.toml'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def test_true_round_trip_preserves_comments_legacy_trust_and_plugins(self):
+        config = self.config()
+        original = (
+            '# top-level note\n'
+            '[features]\n'
+            'hooks = true # retain\n'
+            'codex_hooks = false\n\n'
+            '[plugins]\n'
+            'trusted_hash = "unchanged"\n'
+        )
+        config.write_text(original, encoding='utf-8')
+        result = CONTROL.disable('global', config)
+        self.assertTrue(result['changed'])
+        self.assertIn('hooks = false # retain', config.read_text(encoding='utf-8'))
+        snapshot = json.loads(CONTROL.sidecar_path(config).read_text(encoding='utf-8'))
+        self.assertIs(snapshot['original'], True)
+        result = CONTROL.restore('global', config)
+        self.assertTrue(result['changed'])
+        self.assertEqual(config.read_text(encoding='utf-8'), original)
+        self.assertFalse(CONTROL.sidecar_path(config).exists())
+
+    def test_false_is_saved_and_restored_without_enabling(self):
+        config = self.config()
+        original = '[features]\nhooks = false\n'
+        config.write_text(original, encoding='utf-8')
+        self.assertFalse(CONTROL.disable('global', config)['changed'])
+        self.assertFalse(CONTROL.restore('global', config)['changed'])
+        self.assertEqual(config.read_text(encoding='utf-8'), original)
+
+    def test_absent_value_and_introduced_table_are_removed(self):
+        config = self.config()
+        original = '[plugins]\ntrusted_hash = "kept"\n'
+        config.write_text(original, encoding='utf-8')
+        CONTROL.disable('global', config)
+        self.assertIn('[features]', config.read_text(encoding='utf-8'))
+        CONTROL.restore('global', config)
+        self.assertEqual(config.read_text(encoding='utf-8'), original)
+
+    def test_missing_config_is_removed_after_absent_restore(self):
+        config = self.config()
+        config.unlink(missing_ok=True)
+        CONTROL.disable('global', config)
+        self.assertTrue(config.exists())
+        CONTROL.restore('global', config)
+        self.assertFalse(config.exists())
+
+    def test_existing_empty_config_survives_absent_restore(self):
+        config = self.config()
+        config.write_text('', encoding='utf-8')
+        CONTROL.disable('global', config)
+        CONTROL.restore('global', config)
+        self.assertTrue(config.exists())
+        self.assertEqual(config.read_text(encoding='utf-8'), '')
+
+    def test_existing_empty_features_table_survives_absent_restore(self):
+        config = self.config()
+        original = '[features]\n'
+        config.write_text(original, encoding='utf-8')
+        CONTROL.disable('global', config)
+        CONTROL.restore('global', config)
+        self.assertEqual(config.read_text(encoding='utf-8'), original)
+
+    def test_no_final_newline_round_trips(self):
+        config = self.config()
+        original = '[features]\nhooks = true'
+        config.write_text(original, encoding='utf-8')
+        CONTROL.disable('global', config)
+        CONTROL.restore('global', config)
+        self.assertEqual(config.read_text(encoding='utf-8'), original)
+
+    def test_absent_hook_no_final_newline_round_trips_exactly(self):
+        config = self.config()
+        original = 'model = "x"'
+        config.write_text(original, encoding='utf-8')
+        CONTROL.disable('global', config)
+        CONTROL.restore('global', config)
+        self.assertEqual(config.read_bytes(), original.encode('utf-8'))
+
+    def test_crlf_round_trip_preserves_bytes(self):
+        config = self.config()
+        original = b'[features]\r\nhooks = true # keep\r\n[plugins]\r\nenabled = true\r\n'
+        config.write_bytes(original)
+        CONTROL.disable('global', config)
+        CONTROL.restore('global', config)
+        self.assertEqual(config.read_bytes(), original)
+
+    def test_project_and_global_snapshots_are_isolated(self):
+        global_config = self.root / 'home' / 'config.toml'
+        global_config.parent.mkdir(parents=True)
+        global_config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        project = self.root / 'project'
+        project_config = project / '.codex' / 'config.toml'
+        project_config.parent.mkdir(parents=True)
+        project_config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        CONTROL.disable('global', global_config)
+        CONTROL.disable('project', project_config)
+        CONTROL.restore('global', global_config)
+        self.assertIn('hooks = true', global_config.read_text(encoding='utf-8'))
+        self.assertIn('hooks = false', project_config.read_text(encoding='utf-8'))
+
+    def test_repeated_off_keeps_original_restoration_value(self):
+        config = self.config()
+        config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        CONTROL.disable('global', config)
+        CONTROL.disable('global', config)
+        snapshot = json.loads(CONTROL.sidecar_path(config).read_text(encoding='utf-8'))
+        self.assertIs(snapshot['original'], True)
+        CONTROL.restore('global', config)
+        self.assertIn('hooks = true', config.read_text(encoding='utf-8'))
+
+    def test_restore_rejects_user_change_and_retains_snapshot(self):
+        config = self.config()
+        config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        CONTROL.disable('global', config)
+        config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        with self.assertRaisesRegex(CONTROL.ControlError, 'changed while disabled'):
+            CONTROL.restore('global', config)
+        self.assertTrue(CONTROL.sidecar_path(config).exists())
+
+    def test_dotted_form_is_preserved(self):
+        config = self.config()
+        original = 'features.hooks = true # canonical\n[plugins]\ntrusted_hash = "kept"\n'
+        config.write_text(original, encoding='utf-8')
+        CONTROL.disable('global', config)
+        self.assertIn('features.hooks = false # canonical', config.read_text(encoding='utf-8'))
+        CONTROL.restore('global', config)
+        self.assertEqual(config.read_text(encoding='utf-8'), original)
+
+    def test_restore_preserves_hook_and_plugin_changes_made_while_off(self):
+        config = self.config()
+        config.write_text(
+            '[features]\n'
+            'hooks = true\n'
+            '[hooks]\n'
+            'async = false\n'
+            '[hooks.state.existing]\n'
+            'enabled = true\n'
+            'trusted_hash = "old"\n'
+            '[plugins.example]\n'
+            'enabled = true\n',
+            encoding='utf-8')
+        CONTROL.disable('global', config)
+        changed = config.read_text(encoding='utf-8').replace('trusted_hash = "old"', 'trusted_hash = "updated"').replace(
+            '[plugins.example]\nenabled = true', '[plugins.example]\nenabled = false')
+        changed += '[hooks.state.new_identity]\nenabled = true\ntrusted_hash = "new"\n'
+        config.write_text(changed, encoding='utf-8')
+        CONTROL.restore('global', config)
+        restored = config.read_text(encoding='utf-8')
+        self.assertIn('hooks = true', restored)
+        self.assertIn('async = false', restored)
+        self.assertIn('trusted_hash = "updated"', restored)
+        self.assertIn('[hooks.state.new_identity]', restored)
+        self.assertIn('trusted_hash = "new"', restored)
+        self.assertIn('[plugins.example]\nenabled = false', restored)
+
+    def test_status_counts_only_disabled_hook_states(self):
+        config = self.config()
+        config.write_text(
+            '[features]\nhooks = true\n[hooks]\nasync = false\n'
+            '[hooks.state.one]\nenabled = false\n'
+            '[hooks.state.two]\nenabled = true\n', encoding='utf-8')
+        result = CONTROL.status('global', config)
+        self.assertEqual(result['individually_disabled_entries'], 1)
+
+    def test_unfamiliar_value_is_rejected_before_edit(self):
+        config = self.config()
+        original = '[features]\nhooks = "false"\n'
+        config.write_text(original, encoding='utf-8')
+        with self.assertRaisesRegex(CONTROL.ControlError, 'true or false'):
+            CONTROL.disable('global', config)
+        self.assertEqual(config.read_text(encoding='utf-8'), original)
+        self.assertFalse(CONTROL.sidecar_path(config).exists())
+
+    def test_inline_table_is_rejected_before_snapshot(self):
+        config = self.config()
+        config.write_text('features = { hooks = true }\n', encoding='utf-8')
+        with self.assertRaisesRegex(CONTROL.ControlError, 'unfamiliar TOML syntax'):
+            CONTROL.disable('global', config)
+        self.assertFalse(CONTROL.sidecar_path(config).exists())
+
+    def test_concurrent_off_preserves_single_original_for_restore(self):
+        config = self.config()
+        config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        commands = [[sys.executable, '-B', str(SCRIPT), 'off', '--scope', 'global', '--codex-home', str(config.parent)]] * 2
+        processes = [subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for command in commands]
+        outputs = [process.communicate() for process in processes]
+        self.assertEqual([process.returncode for process in processes], [0, 0], outputs)
+        snapshot = json.loads(CONTROL.sidecar_path(config).read_text(encoding='utf-8'))
+        self.assertIs(snapshot['original'], True)
+        restored = subprocess.run(
+            [sys.executable, '-B', str(SCRIPT), 'on', '--scope', 'global', '--codex-home', str(config.parent)],
+            capture_output=True, text=True, check=False)
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        self.assertIn('hooks = true', config.read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(sys.platform == 'win32', 'PowerShell profile wrapper is Windows-only')
+    def test_codex_hooks_profile_wrapper_uses_source_utility(self):
+        home = self.root / 'wrapper-home'
+        script = self.root / 'invoke-hook-control.ps1'
+        profile = ROOT / '.agents/machine/scripts/codex-profile.ps1'
+        script.write_text(
+            f". '{profile}'\n"
+            "codex-hooks off --scope global --codex-home $args[0]\n"
+            "codex-hooks status --scope global --codex-home $args[0]\n"
+            "codex-hooks on --scope global --codex-home $args[0]\n",
+            encoding='utf-8')
+        completed = subprocess.run(
+            ['pwsh', '-NoProfile', '-File', str(script), str(home)],
+            capture_output=True, text=True, check=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn('"action": "off"', completed.stdout)
+        self.assertIn('"action": "on"', completed.stdout)
+        self.assertFalse((home / 'config.toml').exists())
+
+
+if __name__ == '__main__':
+    unittest.main()
