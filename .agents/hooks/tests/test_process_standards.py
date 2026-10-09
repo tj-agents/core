@@ -103,7 +103,7 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn(
             "Before committing or returning a terminal result, check the work against the "
             "standards that governed it and reconcile every problem encountered: it is fixed, "
-            "handed off, or already has the owning debt entry",
+            "handed off, or already has the owning debt entry, landed or landing with this change",
             flat,
         )
 

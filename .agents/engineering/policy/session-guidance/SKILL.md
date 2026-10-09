@@ -102,6 +102,6 @@ When a plan or task changes how a repository's code is written, apply `engineeri
 direction-change rule before code depends on it.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
-entry, on the default branch or in this change. `engineering:docs-and-debt` defines the selected
+entry, landed or landing with this change. `engineering:docs-and-debt` defines the selected
 repository convention. Do not create a second ledger for a standalone goal just to satisfy a
 repository-oriented procedure.
