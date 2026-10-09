@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `0b4624fcef7f403af362285ba21ac6523a7b2cac`  `(2026-10-09)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `ae55ca1f74d09c123d5fc24523311f961f1f5fd0`  `(2026-10-09)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — code
 
@@ -171,3 +171,19 @@ paragraph with "Resolve …", which the entry does).
   The guard let a plain bullet rule through, counted `#` inside code fences and could raise `IndexError`.
   Fix: require exactly three `engineering:` routing bullets, one heading, no bold lead or code fence, and
   assert the front matter exists.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `0b4624fcef7f403af362285ba21ac6523a7b2cac`
+**Candidate head:** `ae55ca1f74d09c123d5fc24523311f961f1f5fd0`
+**Candidate branch:** `Refactor/SplitDocsAndDebt`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Claude Code built-in `code-review` skill (low) over the pass-4 fix commit. No findings.
+
+### Findings
+
+None.

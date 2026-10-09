@@ -86,18 +86,15 @@ it, and a guidance rule added there looks like a tech-debt change.
   `address-review`, session-guidance, and two `test_process_standards.py` tests).
 - Step 4 passes on the rebased head over parent `bf43af5`: 802 + 985 tests, generation `-Check`, tier
   payload, catalog and harness `--check`, `docs_reachability.py`, packaging tests.
-- Step 5: `reviews/Refactor-SplitDocsAndDebt.md` pass 1 (6 findings), pass 2 over the rebased layer
-  (4 findings) and incremental pass 3 (8 findings) are fixed; the pass-3 fix commit needs its own
-  incremental pass before the PR.
+- Step 5: `reviews/Refactor-SplitDocsAndDebt.md` is approved after five passes (one full, one full over
+  the rebased layer, three incremental); every finding is fixed or carries a recorded disposition.
 
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: incremental review of the pass-3 fix commit, then open the stacked PR on
-`Docs/DirectionChangeConventions` (PR #168).
+Current slice: push and open the stacked PR on `Docs/DirectionChangeConventions` (PR #168).
 Remaining scope: rebase when #168 changes again; after #168 merges, retarget to `main`, re-validate, merge
 through `engineering:merge`, then Step 5 cleanup of this worktree.
 Done when: the split is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 5: incremental review of the latest fix commit, then push and open
-the stacked PR.
+Continue at Completion expectation step 5: push and open the stacked PR.
