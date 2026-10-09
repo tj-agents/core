@@ -15,5 +15,5 @@ consumer pinned to an earlier release keeps that release's copy and is unaffecte
 `.agents/engineering/convention/docs-and-debt/` and both host entry points, the `base:docs-and-debt` alias,
 its row in the authored `.agents/catalog/catalog.json` skill roster and
 `test_docs_and_debt_only_routes_to_its_replacements` in `.agents/hooks/tests/test_process_standards.py`,
-and lower the canonical skill count in `tests/test_source_layout.py` by one. Then confirm
+lower the canonical skill count in `tests/test_source_layout.py` by one, and delete this entry. Then confirm
 `git grep -nIi docs-and-debt -- . ':!plugins'` finds only historical plans and reviews.

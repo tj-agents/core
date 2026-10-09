@@ -69,7 +69,7 @@ it, and a guidance rule added there looks like a tech-debt change.
   following the `gpp:gpp-scaffold` precedent. The `base:docs-and-debt` alias keeps resolving to it. Its
   removal is recorded in `.agents/engineering/TECH_DEBT.md` (a skill-local debt file would ship in
   every generated package), resolved after that date once no `tj-agents` consumer still names the old skill.
-- **Rename allowlist** (`grep -rniE "docs-and-debt"` over authored sources, excluding `plugins/`):
+- **Rename allowlist** (`git grep -nIi docs-and-debt -- . ':!plugins'`):
   the compatibility entry's three files (`.agents/engineering/convention/docs-and-debt/SKILL.md`,
   `.codex/skills/docs-and-debt/SKILL.md`, `.claude/skills/docs-and-debt/SKILL.md`), the
   `base:docs-and-debt` alias in `.agents/plugins/compatibility.json`, its debt entry in

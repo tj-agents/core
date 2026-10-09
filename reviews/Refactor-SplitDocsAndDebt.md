@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `5ad4c42e1ec83d999e34baef65a0056352ed005d`  `(2026-10-09)`
+**Reviewed up to commit:** `0b4624fcef7f403af362285ba21ac6523a7b2cac`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — code
@@ -56,7 +56,7 @@ recorded compatibility decision, not a defect in this candidate; no route row in
 
 ## Review pass — 2026-10-09 — code (rebased candidate)
 
-The branch was rebased six times onto the moving parent, so pass 1's watermark `39588f6` is no longer an
+The branch was rebased four times onto the moving parent, so pass 1's watermark `39588f6` is no longer an
 ancestor; this pass covers the whole rebased layer rather than an incremental delta.
 
 **Candidate base:** `bf43af58331a565aa586123aef74f3211e3c1722`
@@ -133,3 +133,41 @@ Native layer: Claude Code built-in `code-review` skill (medium) over the pass-2 
 - [x] **REV1 — LOW — accuracy** — `reviews/Refactor-SplitDocsAndDebt.md`
   Rebase count disagreed with the goal. Fix: six in both.
 - [x] **GEN1 — LOW — accuracy** — (folded into DEBT5) the routing body shipped a link to a maintainer file.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `5ad4c42e1ec83d999e34baef65a0056352ed005d`
+**Candidate head:** `0b4624fcef7f403af362285ba21ac6523a7b2cac`
+**Candidate branch:** `Refactor/SplitDocsAndDebt`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill (medium) over the pass-3 fix commit. Pass 2's
+narrative said "four times"; the branch had been rebased six times by then. It is left as written.
+
+Dropped at synthesis: a `**Resolution condition.**` lead (this repository's debt files open the condition
+paragraph with "Resolve …", which the entry does).
+
+### Findings
+
+- [x] **PKG1 — MEDIUM — packaging** — `.agents/engineering/TECH_DEBT.md`
+  Generation packages any skill-local `TECH_DEBT.md` (`bootstrap-capabilities` ships three copies today);
+  moving one entry treats a symptom. Fix: out of this slice's scope; recorded in
+  `.agents/plugins/TECH_DEBT.md` with an objective resolution condition.
+- [wontfix] **DEBT8 — LOW — convention** — `.agents/engineering/TECH_DEBT.md`
+  `debt-records` prefers the owning area, `convention/docs-and-debt/`. Reason: a skill-local file ships in
+  every generated package until PKG1 is resolved, and the problem spans the engineering package's skill,
+  host entries and catalog row, so the engineering package's file is the lowest home that does not leak.
+  PKG1's entry names this placement.
+- [x] **REV2 — LOW — review-lifecycle** — `reviews/Refactor-SplitDocsAndDebt.md`
+  The fix edited completed pass 2's text. Fix: restore it and note the count here.
+- [x] **DEBT9 — LOW — correctness** — `.agents/engineering/TECH_DEBT.md`
+  The final grep would match the entry itself. Fix: delete the entry before the grep.
+- [x] **PLAN6 — LOW — accuracy** — `plans/split-docs-and-debt/GOAL.md`
+  The allowlist used `grep -rniE` while the entry uses `git grep`. Fix: one command.
+- [x] **TEST3 — LOW — test-impact** — `.agents/hooks/tests/test_process_standards.py`
+  The guard let a plain bullet rule through, counted `#` inside code fences and could raise `IndexError`.
+  Fix: require exactly three `engineering:` routing bullets, one heading, no bold lead or code fence, and
+  assert the front matter exists.
