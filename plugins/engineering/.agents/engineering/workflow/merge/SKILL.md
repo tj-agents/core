@@ -236,6 +236,18 @@ current host attachment before invoking either cleanup path below. When the targ
 or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
 and branch deletion in the current session.
 
+When the session remains attached to the primary checkout or another retained checkout, finish Step 6,
+any plan close-out and the report, then run exactly this argument-free command as the final action:
+
+```
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/close.ps1
+```
+
+It verifies this session's registered host and attachment, closes only its own CLI or uniquely identified
+tab, and records verified session exit while preserving checkout files and Git state. A retained checkout
+or deleted branch does not prove that the CLI exited. If verification fails, preserve the session and
+resolve its registry or attachment evidence before retrying.
+
 Only when the recorded target is a linked worktree, the host is attached to that target, and the target
 differs from the primary checkout, the session closes itself as the delivery's final action, after Step 6,
 any plan close-out and the report. Run gate 1 below, then from inside that worktree run exactly this, with
@@ -285,9 +297,11 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
 
 1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py`; from
    elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It refuses the
-   primary checkout, a detached or mismatched target, a dirty tree,
+   primary checkout, a detached or mismatched target,
    a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
-   squash/rebase-safe containment proof), and a still-open PR for the head; `preserve:` stops cleanup.
+   squash/rebase-safe containment proof), and a still-open PR for the head. Run from inside a proven
+   merged target, it sets uncommitted leftovers aside under `<state>/merge-cleanup/set-aside/` and cleans
+   the tree; from elsewhere a dirty tree still preserves. `preserve:` stops cleanup.
 2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
@@ -358,7 +372,9 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   build to discover the rest rather than starting a full local solution build. Record the red state once as a
   blocker, then commit fixes locally, run targeted builds, and make one stable push. GitHub retains replacement
   checks and merge evidence. Never push the source plan's recovery commits to either PR.
-- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Once
+- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Before
+  deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
+  plan and its owned actions in place. Once
   publication and sync are terminal, record the final transition, delete the plan and ledger, and tick
   the owning roadmap item in one docs-only
   closeout commit. Review it per `engineering:docs-review` — skipped for a pure close-out — and
@@ -374,6 +390,18 @@ each create a checkpoint. Never create a commit merely to make the ledger agree 
 
 ## Report
 
+Every goal completion and plan closeout requires exactly one fenced `completion` record. A missing or
+invalid record is incomplete. Run a fresh completion check before claiming the requested user outcome or
+deleting its goal:
+
+```bash
+python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree> --bound-repository <owner/repo> --bound-pr <n> --bound-head <forty-character-head>
+```
+
+Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
+`workflows/completion.py` in an installed engineering package. On a failing result, retain the goal and
+report its owned next actions as incomplete.
+
 One short report: the PR that merged (number plus merge commit); whether the full suite ran because a
 positive trigger was present or was skipped by label because none was; that the base is synced; and that the
 branch — and its worktree, if the work was done in one — is cleaned up. For plan-managed work, that the
@@ -384,4 +412,5 @@ needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-run `finish.ps1` when the session is attached to the merged worktree, otherwise stop. No preamble.
+run `finish.ps1` when the session is attached to the removable merged worktree, or `close.ps1` when its
+checkout is retained. No preamble.

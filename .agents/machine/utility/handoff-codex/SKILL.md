@@ -65,10 +65,10 @@ delivery gates govern:
 
 | Lane | For |
 |---|---|
-| `L1` | Plans and design decisions of any size, where the work decides how something should be built. |
+| `L1` | Critical design decisions or large complex plans with interacting decisions. |
 | `L2` | High-stakes judgement that is not design, where a wrong call is costly or hard to undo. |
-| `L3` | Open-ended judgement that is not design, where the answer is not yet known. |
-| `L4` | Specified implementation that still needs code-level judgement, such as a feature, bugfix or review lens. |
+| `L3` | Open investigation or bounded uncertain design with unresolved alternatives. |
+| `L4` | Specified implementation, ordinary review, or a small local choice inside a testable fix. |
 | `L5` | Already-decided mechanical work: small file deletions or moves, config or docs cleanup, including removing or migrating `CLAUDE.local.md` once its destination or rule is decided. |
 | `L6` | Bulk clerical work whose input is too large for the cheapest rung. |
 | `L7` | In-session clerical work only; this launcher refuses it. |

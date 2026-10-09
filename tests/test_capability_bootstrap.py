@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -29,7 +30,7 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(1, len(releases))
         self.assertEqual(3, len(plugins))
         self.assertEqual(
-            ["base-agents/base"],
+            ["base-agents/base", "base-agents/machine"],
             plugins["base-agents/engineering"]["dependencies"]["required"],
         )
         self.assertEqual({"base-agents/base", "base-agents/engineering", "base-agents/machine"}, set(plugins))
@@ -109,6 +110,100 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(first, excluded)
             self.assertEqual(excluded, BOOT.tree_digest(root, ["catalog.json"]))
             self.assertNotEqual(included, BOOT.tree_digest(root, []))
+
+
+class RevisionValidationTests(unittest.TestCase):
+    def test_catalog_revision_formats_and_lock_commit_equality(self):
+        original = json.loads((ROOT / ".agents/catalog/catalog.json").read_text(encoding="utf-8"))
+        for revision in ("v9.8.7", "a" * 40):
+            with self.subTest(revision=revision):
+                catalog = json.loads(json.dumps(original))
+                catalog["releases"][0]["revision"] = revision
+                releases, plugins = BOOT.catalog_index(catalog)
+                lock = {"schema_version": 1, "plugins": [{"id": name, "release": plugin["_release"]["id"], "commit": "a" * 40, "required_skills": [], "path_scopes": [], "exceptions": []} for name, plugin in plugins.items()]}
+                self.assertEqual(3, len(BOOT.validate_lock(lock, releases, plugins)))
+                if revision == "a" * 40:
+                    for selection in lock["plugins"]:
+                        selection["commit"] = "b" * 40
+                    with self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                        BOOT.validate_lock(lock, releases, plugins)
+        for revision in ("main", "a" * 39, "A" * 40, "a" * 40 + "^{commit}", "refs/tags/v1.0.0", "v1.2", "v1.2.3-beta"):
+            with self.subTest(revision=revision):
+                catalog = json.loads(json.dumps(original))
+                catalog["releases"][0]["revision"] = revision
+                with self.assertRaisesRegex(BOOT.BootstrapError, "immutable semantic tag or full lowercase"):
+                    BOOT.catalog_index(catalog)
+
+    def test_sha_mismatch_blocks_state_checkout_and_verification_before_git(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "checkout"
+            release = {"id": "fixture@1.0.0", "marketplace": "fixture", "source": "fixture", "revision": "a" * 40}
+            record = {"checkout": str(destination), "release": release["id"], "source": "fixture", "revision": "a" * 40, "commit": "b" * 40}
+            run = mock.Mock(side_effect=AssertionError("Git must not run"))
+            operations = [lambda: BOOT.release_state(release, "b" * 40, destination), lambda: BOOT.validate_state_record(record, destination, "fixture"), lambda: BOOT.checkout_release(run, release, "b" * 40, destination), lambda: BOOT.verify_checkout(run, Path(temporary), release, "b" * 40, [], {})]
+            for operation in operations:
+                with self.subTest(operation=operations.index(operation)), self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                    operation()
+            self.assertFalse(destination.exists())
+            run.assert_not_called()
+
+    def test_pending_complete_identity_and_flat_revision_cannot_conflict_with_commit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary)
+            prior = {"checkout": str(destination), "release": "fixture@1.0.0", "source": "fixture", "revision": "b" * 40, "commit": "b" * 40}
+            target = {**prior, "release": "fixture@1.0.1", "revision": "a" * 40, "commit": "a" * 40}
+            pending = {"from": prior, "to": target, "source": "fixture", "revision": "b" * 40}
+            with self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                BOOT.validate_pending_transition(pending, prior, target, {"marketplace": "fixture"})
+            pending["revision"] = target["revision"]
+            pending["to"] = {**target, "revision": "c" * 40}
+            run = mock.Mock(side_effect=AssertionError("Git must not run"))
+            with self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                BOOT.upgrade_pending_transition(run, pending, prior, target, destination, "fixture")
+            with self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                BOOT.validate_transition_checkout(run, pending, destination)
+            run.assert_not_called()
+
+    def test_matching_legacy_sha_identity_needs_no_tag_and_ambiguity_stays_closed(self):
+        record = {"release": "fixture@1.0.0", "commit": "a" * 40}
+        expected = {**record, "revision": "a" * 40}
+        with mock.patch.object(BOOT, "git", side_effect=AssertionError("Tag discovery must not run")):
+            self.assertEqual("a" * 40, BOOT.resolve_legacy_revision(None, record, Path("fixture"), expected))
+        expected["release"] = "fixture@1.0.1"
+        with mock.patch.object(BOOT, "git", return_value="v1.0.0\nv2.0.0"):
+            with self.assertRaisesRegex(BOOT.BootstrapError, "cannot determine an exact revision"):
+                BOOT.resolve_legacy_revision(None, record, Path("fixture"), expected)
+
+    def test_installed_sha_identity_is_checked_for_both_hosts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            plugin = {"version": "1.0.0", "digest": BOOT.tree_digest(root, []), "_release": {"revision": "a" * 40}}
+            for harness, version in (("codex", "1.0.0"), ("claude", "b" * 12)):
+                installed = {"example@fixture": {"enabled": True, "version": version, "path": str(root)}}
+                with self.subTest(harness=harness), self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                    BOOT.verify_installed_plugin(harness, "example@fixture", installed, plugin, "b" * 40)
+                self.assertFalse(BOOT.installed_plugin_is_exact(harness, "example@fixture", installed, plugin, "b" * 40))
+
+    def test_loaded_state_rejects_malformed_sha_pairs_in_every_record(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            profile = Path(temporary)
+            valid = {"commit": "a" * 40, "revision": "a" * 40}
+            malformed = {"commit": "b" * 40, "revision": "a" * 40}
+            states = [{"schema_version": 1, "marketplaces": {"fixture": malformed}, "transitions": {}}, {"schema_version": 1, "marketplaces": {"fixture": valid}, "transitions": {"fixture": {"from": malformed, "to": valid, "revision": "a" * 40}}}, {"schema_version": 1, "marketplaces": {"fixture": valid}, "transitions": {"fixture": {"from": valid, "to": valid, "revision": "b" * 40}}}]
+            for state in states:
+                with self.subTest(state=state):
+                    BOOT.write_json(BOOT.state_path(profile), state)
+                    before = BOOT.state_path(profile).read_bytes()
+                    with self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                        BOOT.load_state(profile)
+                    self.assertEqual(before, BOOT.state_path(profile).read_bytes())
+
+    def test_catalog_schema_requires_the_complete_immutable_revision(self):
+        schema = json.loads((ROOT / ".agents/catalog/catalog.schema.json").read_text(encoding="utf-8"))
+        pattern = schema["$defs"]["release"]["properties"]["revision"]["pattern"]
+        for revision, accepted in (("v1.2.3", True), ("a" * 40, True), ("main", False), ("A" * 40, False), ("a" * 40 + "\n", False), ("v1.2.3\n", False)):
+            with self.subTest(revision=revision):
+                self.assertEqual(accepted, re.search(pattern, revision) is not None)
 
 
 class BootstrapIntegrationTests(unittest.TestCase):
@@ -874,6 +969,133 @@ class BootstrapIntegrationTests(unittest.TestCase):
                 BOOT.execute(self.arguments("apply"), run=self.fake_run)
         self.assertEqual({}, self.plugins)
         self.assertFalse((self.profile / BOOT.STATE_DIRECTORY / "managed.json").exists())
+
+    def set_revision(self, revision):
+        catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        catalog["releases"][0]["revision"] = revision
+        self.catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+    def native_fixture(self):
+        return mock.patch.object(BOOT, "executable", side_effect=lambda name: f"{name}-fixture" if name in {"codex", "claude"} else shutil.which("git"))
+
+    def test_untagged_sha_apply_and_offline_verify_work_for_both_hosts(self):
+        self.git("tag", "-d", "v1.0.0", cwd=self.source)
+        self.set_revision(self.commit)
+        fetches = []
+        original_git = BOOT.git
+
+        def capture_git(run, arguments, cwd=None):
+            if arguments[0] == "fetch":
+                fetches.append(arguments)
+            return original_git(run, arguments, cwd)
+
+        with self.native_fixture(), mock.patch.object(BOOT, "git", side_effect=capture_git):
+            for harness in ("codex", "claude"):
+                with self.subTest(harness=harness):
+                    self.profile = self.root / f"{harness} isolated profile"
+                    self.marketplaces = set()
+                    self.plugins = {}
+                    self.assertEqual("planned", BOOT.execute(self.arguments("preview", harness), run=self.fake_run)["status"])
+                    self.assertFalse(self.profile.exists())
+                    self.assertEqual("applied", BOOT.execute(self.arguments("apply", harness), run=self.fake_run)["status"])
+                    before = self.host_mutations
+                    self.assertEqual("applied", BOOT.execute(self.arguments("apply", harness), run=self.fake_run)["status"])
+                    self.assertEqual(before, self.host_mutations)
+                    checkout = self.profile / BOOT.STATE_DIRECTORY / "checkouts/fixture"
+                    self.assertEqual("", self.git("tag", cwd=checkout))
+                    count = len(fetches)
+                    self.assertEqual("verified", BOOT.execute(self.arguments("verify", harness), run=self.fake_run)["status"])
+                    self.assertEqual(count, len(fetches))
+                    state = BOOT.load_state(self.profile)
+                    self.assertEqual(self.commit, state["marketplaces"]["fixture"]["revision"])
+        self.assertTrue(fetches)
+        self.assertTrue(all(arguments[-1] == self.commit and "refs/tags/" not in " ".join(arguments) for arguments in fetches))
+
+    def test_sha_lock_mismatch_fails_preview_before_profile_or_host_mutation(self):
+        self.set_revision(self.parent_commit)
+        for mode in ("preview", "apply", "verify"):
+            with self.subTest(mode=mode), self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                BOOT.execute(self.arguments(mode), run=self.fake_run)
+            self.assertFalse(self.profile.exists())
+            self.assertEqual(0, self.host_mutations)
+
+    def test_sha_resolver_rejects_tree_and_annotated_tag_object_ids(self):
+        self.git("tag", "-a", "object-tag", "-m", "Fixture annotated tag", cwd=self.source)
+        object_ids = [self.git("rev-parse", "HEAD^{tree}", cwd=self.source).strip(), self.git("rev-parse", "refs/tags/object-tag", cwd=self.source).strip()]
+        for object_id in object_ids:
+            with self.subTest(object_id=object_id), self.assertRaises(BOOT.BootstrapError):
+                BOOT.resolve_revision(subprocess.run, object_id, self.source, object_id)
+        self.assertEqual(self.commit, BOOT.resolve_revision(subprocess.run, self.commit, self.source, self.commit))
+        self.assertEqual(self.commit, BOOT.resolve_revision(subprocess.run, "v1.0.0", self.source, self.commit))
+
+    def test_untagged_sha_legacy_state_upgrade_is_exact_and_idempotent(self):
+        self.git("tag", "-d", "v1.0.0", cwd=self.source)
+        self.set_revision(self.commit)
+        with self.native_fixture():
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            state_path = BOOT.state_path(self.profile)
+            state = BOOT.load_state(self.profile)
+            state["marketplaces"]["fixture"].pop("source")
+            state["marketplaces"]["fixture"].pop("revision")
+            BOOT.write_json(state_path, state)
+            mutations = self.host_mutations
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            self.assertEqual(mutations, self.host_mutations)
+            self.assertEqual(self.commit, BOOT.load_state(self.profile)["marketplaces"]["fixture"]["revision"])
+            self.assertEqual("verified", BOOT.execute(self.arguments("verify"), run=self.fake_run)["status"])
+
+    def assert_revision_transition_recovers(self, prior_sha, target_sha, failure_command):
+        if prior_sha:
+            self.set_revision(self.commit)
+        with self.native_fixture():
+            BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            _, moved_commit = self.prepare_moved_release()
+            if target_sha:
+                self.set_revision(moved_commit)
+            original_git = BOOT.git
+            interrupted = False
+
+            def fail_after_operation(run, arguments, cwd=None):
+                nonlocal interrupted
+                result = original_git(run, arguments, cwd)
+                if arguments[0] == failure_command and not interrupted:
+                    interrupted = True
+                    raise BOOT.BootstrapError("injected revision transition interruption")
+                return result
+
+            with mock.patch.object(BOOT, "git", side_effect=fail_after_operation):
+                with self.assertRaisesRegex(BOOT.BootstrapError, "revision transition interruption"):
+                    BOOT.execute(self.arguments("apply"), run=self.fake_run)
+            pending = BOOT.load_state(self.profile)["transitions"]["fixture"]
+            self.assertEqual(self.commit, pending["from"]["commit"])
+            self.assertEqual(moved_commit, pending["to"]["commit"])
+            self.assertEqual("applied", BOOT.execute(self.arguments("apply"), run=self.fake_run)["status"])
+            state = BOOT.load_state(self.profile)
+            self.assertEqual({}, state["transitions"])
+            self.assertEqual(moved_commit if target_sha else "v1.0.1", state["marketplaces"]["fixture"]["revision"])
+            self.assertEqual("verified", BOOT.execute(self.arguments("verify"), run=self.fake_run)["status"])
+
+    def test_tag_to_sha_transition_resumes_after_fetch(self):
+        self.assert_revision_transition_recovers(False, True, "fetch")
+
+    def test_sha_to_tag_transition_resumes_after_checkout(self):
+        self.assert_revision_transition_recovers(True, False, "checkout")
+
+    def test_sha_to_sha_transition_resumes_after_fetch(self):
+        self.assert_revision_transition_recovers(True, True, "fetch")
+
+    def test_sha_to_sha_transition_resumes_after_checkout(self):
+        self.assert_revision_transition_recovers(True, True, "checkout")
+
+    def test_malformed_managed_sha_blocks_preview_and_apply_without_host_operations(self):
+        state = {"schema_version": 1, "marketplaces": {"fixture": {"commit": self.commit, "revision": self.parent_commit}}, "transitions": {}}
+        BOOT.write_json(BOOT.state_path(self.profile), state)
+        before = BOOT.state_path(self.profile).read_bytes()
+        for mode in ("preview", "apply", "verify"):
+            with self.subTest(mode=mode), self.assertRaisesRegex(BOOT.BootstrapError, "disagrees with lock/state commit"):
+                BOOT.execute(self.arguments(mode), run=self.fake_run)
+            self.assertEqual(before, BOOT.state_path(self.profile).read_bytes())
+            self.assertEqual([], self.host_commands)
 
 
 if __name__ == "__main__":

@@ -19,7 +19,8 @@ an authorized task has a future decision that may outlive the current session.
 When the user calls out a mistake, before apologizing or drafting feedback, check whether a governing
 standard caused or failed to prevent the mistake. This includes a missing, ambiguous, contradictory,
 mispriced or unenforced standard across every
-consumed `tj-agents` plugin on both hosts. If it did, launch `engineering:handoff` in bounded
+consumed `tj-agents` plugin on both hosts. Answer the user's direct question first. If it did,
+launch `engineering:handoff` in bounded
 side-workstream mode in the same turn under the standing authorization, before the original task resumes.
 An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Existing
 user limits and scope gates still apply. Questions ask for reasoning: explain and defend recommendations with
@@ -39,6 +40,8 @@ current host's supported controls or a bounded lane worker. Select again as the 
 dispatch falls back. Design approval does not select an implementation lane. The canonical lane contract
 owns direct execution, tiny inline follow-ups, capability limits, and when substantial design needs a
 fresh execution owner; apply it even when the engineering runtime is unavailable.
+On Claude, hand multi-phase work and any delegated design, implementation, or review phase to Codex before
+delegating. An explicit user choice of Claude may keep non-frontier work local; otherwise do not fall back.
 
 ## A link to another skill is a stage pointer, not a read
 
@@ -58,6 +61,10 @@ candidate before adding more scope; preserve atomic behavior and security when c
 
 ## Preserve one owner through completion
 
+When preparation or approved design has resolved the next action, enter that action through the owning
+lifecycle. A failed CI observation requires recovery under `engineering:plan-execution`; it does not end
+ownership or establish a CI result.
+
 Act on authorized reversible work and keep the canonical plan aligned with observed results. A phase,
 commit, open PR or context boundary does not narrow the original scope. Honor user limits and real
 external-action gates. Use `engineering:handoff` for an actual authorized context transfer; it checkpoints
@@ -69,6 +76,13 @@ when delivery is authorized. Bind remote monitoring to the exact repository, hea
 pending CI is owned without an active monitor. A failed test selects `engineering:failing-tests` and its
 diagnose, repair and focused verification loop. Do not weaken a check merely to produce a pass.
 
+A terminal goal closes its own session as its final action, after its workflow's remaining steps and
+the completion report: run `machine:peer-cli`'s
+`finish.ps1` when `cleanup_proof.py` printed `removable` for this merged linked worktree,
+`close.ps1` for any other checkout. Stay open while the final message asks the user something or is
+an answer that exists only in the transcript. A handoff predecessor follows `engineering:handoff`'s
+release instead.
+
 ## Maintain the right source owner
 
 Give shared behavior one source owner, preserve published compatibility commitments, and record material
@@ -77,7 +91,8 @@ A defect in a consumed standards package or its source repository is the excepti
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
 to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and launch
 `engineering:handoff` in bounded side-workstream mode (the side workstream's goal records the defect)
-in the same turn, before the current task resumes, without asking, regardless of that task's own
+in the same turn, after answering the user's direct question and before the current task resumes,
+without asking, regardless of that task's own
 authority; announcing a later or separate fix instead of launching is a violation. This rule is the
 standing authorization: it covers implementing, testing, opening the PR and merging once that
 repository's gates pass. Installing into any other scope (the consuming repository included),

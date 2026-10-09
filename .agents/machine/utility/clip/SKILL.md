@@ -1,6 +1,6 @@
 ---
 name: clip
-description: Put text on Tommy's Windows clipboard so he can paste it straight into Teams, an email or a terminal instead of drag-selecting it out of the transcript. Use when drafting a message for someone to paste, and whenever he says "copy that", "put that on my clipboard", "clip that". NOT for GitHub review comments — review drafts are previewed in the reply and posted from here, never pasted. Applies in every repo, personal and work.
+description: Put text on Tommy's clipboard (Windows, Linux or macOS) so he can paste it straight into Teams, an email or a terminal instead of drag-selecting it out of the transcript. Use when drafting a message for someone to paste, and whenever he says "copy that", "put that on my clipboard", "clip that". NOT for GitHub review comments — review drafts are previewed in the reply and posted from here, never pasted. Applies in every repo, personal and work.
 kind: utility
 domain: machine
 ---
@@ -14,15 +14,17 @@ goes on his clipboard.
 
 Write the exact text to a UTF-8 file in the scratchpad, then:
 
-```powershell
-& '<skill-directory>\scripts\copy-draft.ps1' -Path '<absolute-path-to-file>'
+```sh
+python3 '<skill-directory>/scripts/copy_draft.py' --path '<absolute-path-to-file>'
 ```
 
-`copy-draft.ps1` sits beside this file, the same way `handoff-claude` carries its launcher.
+On Windows, use `python` instead of `python3` if `python3` is not on PATH.
+
+`copy_draft.py` sits beside this file, the same way `handoff-claude` carries its launcher.
 
 The script reads UTF-8, trims trailing blank lines, copies, and reads the clipboard back to verify —
-it throws rather than reporting a success it did not achieve. It prints the character count; relay
-that, so a silent failure can't pass as done.
+it exits non-zero rather than reporting a success it did not achieve. It prints the character count;
+relay that, so a silent failure can't pass as done.
 
 **Never pipe the text through the command line.** Quoting mangles backticks, `$`, curly quotes and
 emoji, and a heredoc through PowerShell is worse. The file is the interface.
@@ -46,10 +48,19 @@ wrong thing.
 **The clipboard is volatile and nothing tells you it changed.** Any copy anywhere on the machine
 replaces it — a terminal drag-select most of all, which lands plain text with the terminal's own
 wrapping and indentation baked in and no HTML flavour. A message copied several turns ago is not
-still there. If he says the backticks did not render, do NOT assume you omitted them: read the live
-clipboard first (`HTML Format` present? how many `<code>`?) and re-copy. The script verifies both
-flavours off the live clipboard at write time and throws if the HTML is missing, so a bare
-"Copied ..." line means it truly landed at that moment — not that it survived since.
+still there. If he says the backticks did not render, do NOT assume you omitted them: re-copy. The
+script writes and verifies off the live clipboard at write time, and exits non-zero on a mismatch —
+on Windows both an HTML flavour and a plain flavour; on Linux an HTML flavour by default (via
+`wl-copy` or `xclip`), falling back to plain text with the markdown kept intact when only `xsel` is
+available, and saying so; on macOS always plain text with the markdown kept intact, because `pbcopy`
+has no HTML flavour at all. Either way, a bare "Copied ..." line means it truly landed at that
+moment — not that it survived since.
+
+**On Linux, default mode is HTML-only — nothing a plain-text target can read.** `wl-copy`/`xclip`
+can set only one clipboard flavour per copy, so the default (rich) copy holds `text/html` and nothing
+else; a terminal paste or a plain text field gets nothing useful from it, not a plain fallback. Default
+mode is for rich targets — Teams, email. For anything pasted into a terminal or a plain field, use
+`--plain-only`, same as for a command (below).
 
 ## A command Tommy has to run himself
 
@@ -57,7 +68,7 @@ flavours off the live clipboard at write time and throws if the HTML is missing,
 where wrapping and indentation get baked in, and it silently breaks a long command on paste. This is
 the same failure that put a line break into a Teams message mid-sentence.
 
-Use `-PlainOnly` for a command: no HTML flavour, and backticks stay literal because in a shell they
+Use `--plain-only` for a command: no HTML flavour, and backticks stay literal because in a shell they
 are syntax, not markup. Show the command in your reply too so he can read it, but the clipboard copy
 is the one he runs.
 

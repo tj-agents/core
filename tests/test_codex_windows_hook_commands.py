@@ -32,7 +32,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
         self.assertCountEqual(names, [
             "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
             "forge_poll_gate.py", "compact_output_gate.py", "delivery_binding_gate.py",
-            "merge_cleanup_gate.py",
+            "merge_cleanup_gate.py", "callout_repair_gate.py",
         ])
 
     def test_every_plugin_uses_host_expanded_plugin_root_and_pretool_adapter(self):

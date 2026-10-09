@@ -293,6 +293,14 @@ class LaunchCodexTests(unittest.TestCase):
         self.assertNotIn('lane', out)
         self.assertNotIn('frontier', out)
 
+    def test_success_prints_a_handoff_receipt_binding_the_working_directory_and_prompt(self):
+        code, out, _ = self.run_main('--model', 'explicit-model')
+        self.assertEqual(code, 0)
+        receipt = json.loads(out.splitlines()[-1])
+        self.assertEqual('agent-handoff-submitted', receipt['event'])
+        self.assertEqual(os.path.abspath(self.directory), receipt['worktree'])
+        self.assertEqual(str(self.prompt_path.resolve()), receipt['prompt_path'])
+
     def test_a_launch_error_from_launch_tab_is_reported_and_exits_nonzero(self):
         self.agent_cli.launch_tab.side_effect = self.agent_cli.LaunchError('no terminal detected')
         code, out, err = self.run_main()

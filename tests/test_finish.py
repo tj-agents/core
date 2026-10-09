@@ -11,16 +11,24 @@ ROOT = Path(__file__).resolve().parents[1]
 @unittest.skipUnless(os.name == "nt", "Windows is required")
 class FinishTests(unittest.TestCase):
     def test_finish_scenarios(self):
-        shell = "pwsh" if shutil.which("pwsh") else "powershell.exe"
-        result = subprocess.run(
-            [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ROOT / "tests" / "finish.tests.ps1")],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            timeout=480,
-        )
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("PASS finish.tests.ps1", result.stdout)
+        for shell in ("pwsh", "powershell.exe"):
+            if not shutil.which(shell):
+                continue
+            for scope in ("-FinishOnlyTests", "-CloseOnlyTests"):
+                with self.subTest(shell=shell, scope=scope):
+                    command = [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                               str(ROOT / "tests" / "finish.tests.ps1"), scope]
+                    if scope == "-CloseOnlyTests":
+                        command.extend(["-TestShell", shell])
+                    result = subprocess.run(
+                        command,
+                        cwd=ROOT,
+                        capture_output=True,
+                        text=True,
+                        timeout=480,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("PASS finish.tests.ps1", result.stdout)
 
 
 if __name__ == "__main__":

@@ -23,10 +23,10 @@ ordering even when a harness's available families differ.
 
 | Lane | For | Resolves to |
 |---|---|---|
-| **L1** | planning and design of any size — authoring a plan that takes a design position, architecture, a data model or contract, a mechanism choice; never implementation, review or delivery | the frontier family, on the ladder only for this shape of work |
+| **L1** | a critical design decision, or a big complex plan with substantial interacting decisions; never implementation, review or delivery | the highest appropriate design capability |
 | **L2** | high-stakes judgement that designs nothing — a diagnosis of a production failure, a security or migration review | top general family, the setting above its default |
-| **L3** | open-ended judgement that designs nothing — a diagnosis with no known answer, an investigation | top general family, default setting |
-| **L4** | specified implementation that still needs code-level judgement — features, bugfixes and review lenses whose mistakes a compiler or suite will catch | the workhorse family, high setting |
+| **L3** | open investigation or bounded uncertain design with unresolved alternatives | top general family, default setting |
+| **L4** | specified implementation, ordinary review, and small local choices inside a testable fix | the workhorse family, high setting |
 | **L5** | mechanical work whose shape is already decided — including small file deletions or moves, config or docs cleanup, and removing or migrating `CLAUDE.local.md` once its destination or rule is decided | a cheaper family or reduced workhorse setting |
 | **L6** | bulk clerical work whose input outgrows the cheapest rung — a monitor loop, a long transcript, a big diff | the cheapest model that still holds the input |
 | **L7** | clerical work with a small input — commit, push, pull, sync, one poll | the cheapest usable model |
@@ -42,8 +42,8 @@ standard. A lifecycle or orchestrating skill that spans phases of varying shape 
 `merge`) must not either: invoking one re-points the whole session, so it inherits the session's model and
 routes each bounded phase down the ladder instead. The generator refuses a lane on a routed standard for
 exactly this reason; the test for the rest is whether an agent *runs* one unvarying shape of work.
-`commit` takes a lane; `committing` and `feature` do not. `plan-authoring` keeps L1 because planning of
-any size is that one shape.
+`commit` takes a lane; `committing`, `feature`, and `plan-authoring` do not. Planning does not itself
+select a lane.
 
 **No declaration means inherit the session's model** — not a default rung. A lane is opt-in per skill, so
 adding one is a visible, reviewable decision and no skill silently changes model because a default moved.
@@ -52,9 +52,10 @@ implementation that still needs code-level judgement, and L5 for small already-d
 
 ## Choosing a rung — four questions, in this order
 
-1. **Design.** Does the work decide how something should be built — author a plan that takes a design
-   position, choose an architecture, a data model, a contract or a mechanism? Then it is L1, whatever its
-   size. The agent makes this call on its own judgement; a small plan that settles a design is still L1.
+1. **Critical design or scale.** Is this a critical design decision, or a big complex plan with substantial
+   interacting decisions? Record one concrete criticality or scale reason before selecting L1. A plan,
+   architecture, data model, contract, or mechanism label alone does not select it. Bounded uncertain
+   design is L3; small local choices inside a specified, testable fix are L4.
 2. **Stakes.** For work that designs nothing: how costly, and how hard to undo, is a wrong call? A
    diagnosis or review with a lot riding on it — production, security, stored data — is L2.
 3. **Ambiguity.** Is the answer known and this is typing, or is the problem open? Open is never below L3;
@@ -71,14 +72,13 @@ gates — review, CI, the merge queue, release checks — never by model tier. I
 delivery never select L1; a high-stakes review may select L2 under the stakes question.
 
 Nothing here says "how hard does this feel". A long mechanical edit is still L5; a one-paragraph plan that
-picks a mechanism is still L1. One extra axis applies at the floor alone: clerical work is L7 only while
+picks a mechanism is L3 or L4 according to its uncertainty and verification. One extra axis applies at the floor alone: clerical work is L7 only while
 its input fits the cheapest rung, and an input that outgrows it selects L6.
 
 **The frontier tier is above the ladder and is not a rung.** Each table carries a `frontier` entry the
 four questions can never select: it is priced by provenance — the user explicitly asking for that tier or
-its model by name — not by task shape. L1 prices the frontier family for planning and design, so the
-guard is the pair, not the model: a test asserts no rung resolves to the frontier's exact model *and*
-effort, which sits one step above L1's, so lane inflation cannot reach the tier. Consumers that expose it
+its model by name — not by task shape. A test asserts no rung resolves to the frontier's exact
+model-and-effort pair, so lane inflation cannot reach the tier. Consumers that expose it
 (the handoff launchers' `-Frontier`) make selecting it a distinct visible act rather than one lane value
 among others.
 
@@ -87,8 +87,12 @@ test-caught while it is built, then clerical to commit and push. Route each phas
 in the rung its hardest phase needed is the waste this ladder exists to stop, and running the design phase
 in the rung its cleanup needed is how a bad design gets built efficiently.
 
-Lane selection does not itself transfer task ownership. For small and medium plans, the parent normally
-continues in the same checkout and may give a bounded implementation or review task to a lane agent.
+Lane selection does not itself transfer task ownership. A Claude parent hands multi-phase work and every
+delegated design, implementation, or review phase to Codex before delegating, unless the user explicitly
+chooses Claude for non-frontier work. It keeps conversation and tiny inline follow-ups. If Codex cannot
+launch, report the capability gate and preserve the checkpoint; never silently use Claude for that phase.
+For Codex, the parent normally continues in the same checkout and may give a bounded implementation or
+review task to a lane agent. Claude keeps only conversation and tiny inline follow-ups.
 Give that agent explicit path and responsibility ownership, avoid overlapping writers, and reconcile its
 result in the parent. A small follow-up can stay with the parent. If delegation is unavailable, use the
 current owner's supported fallback; do not open an independent session solely to change model or cost.

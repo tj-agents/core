@@ -66,6 +66,12 @@ Its two refusals both exist because they were broken first:
 Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
 that through `finish.ps1`, beside these scripts.
 
+For a completed session whose checkout must remain, run exactly
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File <skill-directory>/scripts/close.ps1` with no
+arguments after the completion report. It requires this host's verified registry entry and attachment,
+closes only its own host or uniquely identified tab, and records session exit without changing files,
+branches or worktree registration. `finish.ps1` retains ownership of removable linked-worktree cleanup.
+
 ## Closing a peer
 
 Close one when it is **finished or duplicating**, and say which and why before you do:

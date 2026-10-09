@@ -1,5 +1,5 @@
 name = "lane_l1"
-description = "Runs one delegated task at lane L1. Plans and design decisions of any size, where the work decides how something should be built."
+description = "Runs one delegated task at lane L1. Critical design decisions or large complex plans with interacting decisions."
 model = "gpt-6-astra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
