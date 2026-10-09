@@ -148,7 +148,9 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(owner=owner):
                 self.assertIn(f"`engineering:{owner}`", body)
         self.assertIn("owns no rule", body)
-        self.assertNotIn("\n## ", body)
+        # A rule in the routing entry would be a second owner: no bold rule lead and no section below the title.
+        self.assertNotIn("**", body)
+        self.assertEqual(1, sum(line.startswith("#") for line in body.split("---", 2)[2].splitlines()))
 
     def test_a_standards_defect_hands_off_in_the_same_turn(self):
         instructions = authored_skill("session-guidance").read_text(

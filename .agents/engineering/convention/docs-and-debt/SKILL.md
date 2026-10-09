@@ -15,5 +15,3 @@ load the one the task needs:
   machine-checked, and a change of direction as a standing rule.
 - `engineering:debt-records` — recording tech debt and deleting the entry once it is addressed.
 - `engineering:working-docs` — throwaway working markdown.
-
-Its removal is tracked in [TECH_DEBT.md](TECH_DEBT.md).

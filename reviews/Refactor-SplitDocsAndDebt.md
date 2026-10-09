@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `847ec60150095556f6b642ca998e85db2119020b`  `(2026-10-09)`
+**Reviewed up to commit:** `5ad4c42e1ec83d999e34baef65a0056352ed005d`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — code
@@ -56,7 +56,7 @@ recorded compatibility decision, not a defect in this candidate; no route row in
 
 ## Review pass — 2026-10-09 — code (rebased candidate)
 
-The branch was rebased four times onto the moving parent, so pass 1's watermark `39588f6` is no longer an
+The branch was rebased six times onto the moving parent, so pass 1's watermark `39588f6` is no longer an
 ancestor; this pass covers the whole rebased layer rather than an incremental delta.
 
 **Candidate base:** `bf43af58331a565aa586123aef74f3211e3c1722`
@@ -98,3 +98,38 @@ DEBT3's resolution condition).
 - [x] **TEST1 — LOW — test-impact** — `.agents/hooks/tests/test_process_standards.py`
   Nothing pinned `working-docs`' deletion rule or kept rule text out of the compatibility entry. Fix: add
   both assertions.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `847ec60150095556f6b642ca998e85db2119020b`
+**Candidate head:** `5ad4c42e1ec83d999e34baef65a0056352ed005d`
+**Candidate branch:** `Refactor/SplitDocsAndDebt`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill (medium) over the pass-2 fix commit. All findings kept.
+
+### Findings
+
+- [x] **DEBT5 — MEDIUM — packaging** — `.agents/engineering/convention/docs-and-debt/TECH_DEBT.md`
+  A skill-local debt file is copied into three generated package paths, so the `techdebt` survey sees four
+  copies and consumers receive a maintainer record. Fix: move the entry to `.agents/engineering/TECH_DEBT.md`,
+  which generation does not package, and drop the link from the routing entry.
+- [x] **DEBT6 — MEDIUM — correctness** — same entry
+  "No pinned release still names it" can never become true, and the steps omit the compatibility test.
+  Fix: condition on default-branch route tables and instructions only, note pinned consumers keep their
+  release, and list the test among the deletions.
+- [x] **DEBT7 — LOW — accuracy** — same entry
+  The final grep did not say how to exclude only generated `plugins/`. Fix: give the exact `git grep`.
+- [x] **TEST2 — LOW — test-impact** — `.agents/hooks/tests/test_process_standards.py`
+  The routing-only guard rejected only `## ` headings. Fix: reject bold rule leads and any heading below
+  the title.
+- [x] **PLAN4 — LOW — accuracy** — `plans/split-docs-and-debt/GOAL.md`
+  The allowlist omitted the new test reference. Fix: list it.
+- [x] **PLAN5 — LOW — plan-checkpoint** — same file
+  Next Steps skipped the incremental review the fix commit needs. Fix: add it.
+- [x] **REV1 — LOW — accuracy** — `reviews/Refactor-SplitDocsAndDebt.md`
+  Rebase count disagreed with the goal. Fix: six in both.
+- [x] **GEN1 — LOW — accuracy** — (folded into DEBT5) the routing body shipped a link to a maintainer file.
