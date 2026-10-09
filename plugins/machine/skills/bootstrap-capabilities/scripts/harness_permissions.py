@@ -11,6 +11,7 @@ import bootstrap_capabilities as bootstrap
 
 
 PLUGIN_ROOT_TOKEN = "${PLUGIN_ROOT}"
+SCRIPT_SUFFIXES = (".py", ".ps1")
 
 
 def _require_tokens(value: Any, label: str) -> None:
@@ -32,6 +33,13 @@ def _require_rule_field(value: Any, label: str) -> None:
         _require_tokens(item, f"{label}[{index}]")
 
 
+def _has_unbounded_script_arguments(command: str) -> bool:
+    if not command.startswith("Bash(") or not command.endswith(")"):
+        return False
+    tokens = command[len("Bash("):-1].split()
+    return any(token.lower().endswith(SCRIPT_SUFFIXES) for token in tokens[:-1])
+
+
 def validate_requires(requires: dict, label: str) -> None:
     if not isinstance(requires, dict) or set(requires) != {"marketplaces", "plugins", "hooks", "permissions"}:
         raise bootstrap.BootstrapError(f"{label}: invalid harness requirements")
@@ -42,6 +50,9 @@ def validate_requires(requires: dict, label: str) -> None:
     if not isinstance(permissions, dict) or set(permissions) != {"claude_allow", "codex_prefix_rules"}:
         raise bootstrap.BootstrapError(f"{label}: invalid harness permissions")
     bootstrap.require_string_list(permissions["claude_allow"], f"{label}.claude_allow")
+    for command in permissions["claude_allow"]:
+        if _has_unbounded_script_arguments(command):
+            raise bootstrap.BootstrapError(f"{label}.claude_allow script arguments require :*: {command}")
     rules = permissions["codex_prefix_rules"]
     if not isinstance(rules, list):
         raise bootstrap.BootstrapError(f"{label}: invalid Codex prefix rules")

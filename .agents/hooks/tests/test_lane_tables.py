@@ -79,6 +79,14 @@ class LaneTableTests(unittest.TestCase):
             seen = -1
             for lane, rung in table(host)["lanes"].items():
                 with self.subTest(host=host, lane=lane):
+                    if rung.get("handoff"):
+                        target = rung["handoff"]
+                        self.assertEqual("claude", host)
+                        self.assertEqual(
+                            table(target["host"])["lanes"][target["lane"]]["model"],
+                            table("codex")["lanes"]["L1"]["model"],
+                        )
+                        continue
                     self.assertIn(rung["model"], order, "model is not in the declared capability order")
                     rank = order.index(rung["model"])
                     self.assertGreaterEqual(rank, seen, "a lower rung names a more capable model")
@@ -187,11 +195,10 @@ class LaneDeclarationTests(unittest.TestCase):
         # A lane in skill front matter re-points the whole session when the skill is invoked, and the
         # switch outlives the skill. A lifecycle or orchestrating skill spans phases of varying shape, so
         # it must inherit the session's model and route each bounded phase down the ladder instead. Only
-        # a leaf task that is one unvarying shape may pin: the clerical operations, and plan-authoring,
-        # whose shape — planning of any size — is the L1 rung by definition. Adding a lane is a deliberate
+        # a leaf task that is one unvarying shape may pin: the clerical operations. Planning may span
+        # multiple lanes, so plan-authoring inherits and routes its phases. Adding a lane is a deliberate
         # declaration that a skill is such a leaf; declare it here too.
         expected = {
-            "plan-authoring": "L1",
             "commit": "L7",
             "commit-all": "L7",
             "push": "L7",
@@ -240,6 +247,25 @@ class GeneratedLaneAgentTests(unittest.TestCase):
                 self.assertEqual(rung.get("effort"), fields.get("effort"))
                 self.assertEqual("Agent", fields["disallowedTools"])
 
+    def test_claude_l1_agent_only_returns_the_codex_handoff(self):
+        path = ROOT / "plugins" / "engineering" / "agents" / "lane-l1.md"
+        body = path.read_text(encoding="utf-8-sig")
+        self.assertIn("required `engineering:handoff` request", body)
+        self.assertIn("Codex L1", body)
+        self.assertIn("Do not inspect, execute, delegate", body)
+
+    def test_claude_lane_agents_and_workflow_pins_never_select_fable(self):
+        forbidden = table("claude")["frontier"]["model"]
+        for rung in table("claude")["lanes"].values():
+            self.assertNotEqual(forbidden, rung["model"])
+        for path in (ROOT / "plugins" / "engineering" / "agents").glob("lane-*.md"):
+            self.assertNotEqual(forbidden, front_matter(path).get("model"))
+        manifest = json.loads((HOSTS / "claude.json").read_text(encoding="utf-8-sig"))
+        for stage in manifest["semantic_stages"].values():
+            self.assertNotEqual(forbidden, stage["model"])
+        for role in manifest["roles"].values():
+            self.assertNotEqual(forbidden, role["model"])
+
     def test_codex_agents_carry_the_resolved_rung_including_effort(self):
         for lane, rung in table("codex")["lanes"].items():
             path = ROOT / "plugins" / "engineering" / "codex-agents" / f"lane-{lane.lower()}.toml"
@@ -266,7 +292,7 @@ class PluginDeliveryTests(unittest.TestCase):
     PLUGIN = ROOT / "plugins" / "engineering"
 
     def test_the_plugin_ships_the_tables_and_the_resolver(self):
-        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md"):
+        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md", "handoff-agent-body.md"):
             with self.subTest(name=name):
                 shipped = self.PLUGIN / ".agents" / "lanes" / name
                 self.assertTrue(shipped.is_file(), f"plugins/engineering/.agents/lanes/{name} is not shipped")
@@ -279,7 +305,7 @@ class PluginDeliveryTests(unittest.TestCase):
         # The handoff launchers resolve their lane/frontier flags from resources/lanes, two hops up from
         # the shared agent_cli.py beside each of them -- the same hop that finds .agents/lanes in the
         # authored layout. A machine-only install must price a lane identically to an engineering one.
-        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md"):
+        for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md", "handoff-agent-body.md"):
             with self.subTest(name=name):
                 shipped = ROOT / "plugins" / "machine" / "resources" / "lanes" / name
                 self.assertTrue(shipped.is_file(), f"plugins/machine/resources/lanes/{name} is not shipped")
@@ -387,6 +413,11 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(
             table("claude")["lanes"]["L4"]["model"], json.loads(done.stdout)["model"]
         )
+
+    def test_claude_l1_exposes_its_codex_handoff(self):
+        done = self.resolve("--host", "claude", "--lane", "L1")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual({"host": "codex", "lane": "L1"}, json.loads(done.stdout)["handoff"])
 
     def test_codex_l4_resolves_to_the_pinned_model_and_effort(self):
         done = self.resolve("--host", "codex", "--lane", "L4")

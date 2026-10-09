@@ -48,6 +48,17 @@ Resolve when detection confirms the variable belongs to the terminal the caller 
 example by matching the terminal's own record of its sessions against the caller's process ancestry,
 with a test for an inherited variable.
 
+## A locked Codex runtime executable can disable every sandboxed command
+
+Codex's sandbox setup opens ACLs on its bundled `node_repl.exe` before it starts a command. When Windows
+returns a sharing violation for that executable, setup refresh fails and even a read-only command cannot
+start. The launcher chooses among installed runtimes by version but has no command-runner health check, so
+it cannot select a healthy desktop runtime when the CLI runtime is locked.
+
+**Resolution condition.** Codex's sandbox setup tolerates a transient runtime-file lock or exposes a
+supported health probe and runtime selection mechanism; then the launcher detects the unhealthy runtime,
+uses a healthy supported runtime when available, and has regression coverage for the fallback.
+
 ## Windows Terminal option values may be escaped for a parse they never get
 
 `agent_cli._launch_windows_terminal` (and `agent-cli.ps1`'s `Invoke-AgentTerminalTab`) pass every
@@ -68,6 +79,25 @@ quote and a trailing backslash confirms whether Windows Terminal parses its own 
 way as the tab's command arguments. If it does not, give option values their own escaping (likely just the
 existing `;` handling, with no `CommandLineToArgvW`-style quoting), with a test pinned to the confirmed
 behaviour.
+
+## clip offers one clipboard flavour per copy on Linux
+
+`copy_draft.py`'s POSIX backend sets a clipboard flavour through `wl-copy`/`xclip`, and each of those
+tools accepts only one MIME type per invocation. Default mode therefore copies `text/html` only when
+the tool supports it — nothing a plain-text target (a terminal, a plain text field) can read from that
+same copy. The skill documents the split instead: default mode is for rich targets (Teams, email);
+`--plain-only` for everything else. Windows is unaffected — CF_HTML and CF_UNICODETEXT are set in the
+same clipboard transaction, so both flavours are always available together there.
+
+`tests/test_copy_draft.py`'s `LinuxSingleFlavourTechDebtTests` pins today's one-call, HTML-only default
+so a future change here is deliberate rather than accidental.
+
+**Resolution condition.** A single copy can offer both `text/html` and `text/plain` on Linux — for
+example, a small persistent Wayland (`wlr-data-control`) or X11 data source that goes on answering
+selection/data-control requests for either MIME type from the same in-memory text, rather than a
+one-shot `wl-copy`/`xclip` invocation that exits once the data is handed off. When one exists (or is
+written here), default mode copies both flavours from one call and this entry is deleted, with a test
+proving a `text/plain` read-back succeeds right after a default-mode copy.
 
 ## The pre-launch standards sync has no overall deadline
 

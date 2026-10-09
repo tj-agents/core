@@ -18,6 +18,7 @@ from typing import Any, Iterable
 LOCK_NAME = "capabilities.lock.json"
 STATE_DIRECTORY = "capability-bootstrap"
 HEX_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+SEMANTIC_TAG = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+$")
 SAFE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
@@ -84,6 +85,27 @@ def require_string_list(value: Any, label: str) -> list[str]:
     return value
 
 
+def revision_selector(revision: str, locked_commit: str | None = None) -> str:
+    require_string(revision, "Release revision")
+    if locked_commit is not None and (not isinstance(locked_commit, str) or not HEX_COMMIT.fullmatch(locked_commit)):
+        raise BootstrapError("Lock/state commit must be a full lowercase Git commit")
+    if SEMANTIC_TAG.fullmatch(revision):
+        return f"refs/tags/{revision}"
+    if HEX_COMMIT.fullmatch(revision):
+        if locked_commit is not None and revision != locked_commit:
+            raise BootstrapError(f"Revision SHA {revision} disagrees with lock/state commit {locked_commit}")
+        return revision
+    raise BootstrapError(f"Release revision must be an immutable semantic tag or full lowercase commit SHA: {revision}")
+
+
+def resolve_revision(run, revision: str, destination: Path, locked_commit: str | None = None) -> str:
+    selector = revision_selector(revision, locked_commit)
+    resolved = git(run, ["rev-parse", f"{selector}^{{commit}}"], destination)
+    if HEX_COMMIT.fullmatch(revision) and resolved != revision:
+        raise BootstrapError(f"Revision SHA {revision} is not a commit object: resolved to {resolved}")
+    return resolved
+
+
 def catalog_index(catalog: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     if catalog.get("schema_version") != 1 or catalog.get("digest_format") != "sha256-tree-v1":
         raise BootstrapError("Unsupported capability catalog schema or digest format")
@@ -107,8 +129,7 @@ def catalog_index(catalog: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], d
             raise BootstrapError(f"Unsafe marketplace name: {marketplace}")
         if release_id != f"{marketplace}@{version}":
             raise BootstrapError(f"Release id must match marketplace and version: {release_id}")
-        if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", revision):
-            raise BootstrapError(f"Release revision must be an immutable semantic tag: {release_id}")
+        revision_selector(revision)
         release_plugins = release.get("plugins")
         if not isinstance(release_plugins, list) or not release_plugins:
             raise BootstrapError(f"{release_id}.plugins must be a non-empty list")
@@ -246,6 +267,7 @@ def validate_lock(
             raise BootstrapError(f"Lock selects unknown plugin: {plugin_id}")
         if release_id not in releases or plugins[plugin_id]["_release"]["id"] != release_id:
             raise BootstrapError(f"{plugin_id} does not belong to catalog release {release_id}")
+        revision_selector(releases[release_id]["revision"], commit)
         prior = release_commits.setdefault(release_id, commit)
         if prior != commit:
             raise BootstrapError(f"Selections from {release_id} disagree on the exact commit")
@@ -423,6 +445,7 @@ def normalize_source(source: str) -> str:
 def release_state(release: dict[str, Any], commit: str, destination: Path) -> dict[str, str]:
     source = require_string(release.get("source"), f"{release['id']}.source")
     revision = require_string(release.get("revision"), f"{release['id']}.revision")
+    revision_selector(revision, commit)
     return {
         "checkout": str(destination),
         "release": release["id"],
@@ -452,10 +475,13 @@ def validate_state_record(
         or (require_identity and (expected_source is None or expected_revision is None))
     ):
         raise BootstrapError(f"{label} is invalid for checkout: {destination}")
+    if expected_revision is not None:
+        revision_selector(expected_revision, expected_commit)
 
 
 def state_revision(record: dict[str, Any]) -> str:
     if isinstance(record.get("revision"), str):
+        revision_selector(record["revision"], record["commit"])
         return record["revision"]
     return f"v{record['release'].rsplit('@', 1)[1]}"
 
@@ -468,7 +494,12 @@ def resolve_legacy_revision(
 ) -> str:
     recorded = record.get("revision")
     if isinstance(recorded, str):
+        revision_selector(recorded, record["commit"])
         return recorded
+    if expected is not None:
+        revision_selector(expected["revision"], expected["commit"])
+        if HEX_COMMIT.fullmatch(expected["revision"]) and record.get("release") == expected["release"] and record.get("commit") == expected["commit"]:
+            return expected["revision"]
     tags = [
         tag
         for tag in git(run, ["tag", "--points-at", record["commit"]], destination).splitlines()
@@ -501,16 +532,13 @@ def resolve_legacy_transition_revision(
         actual_commit = git(run, ["rev-parse", "HEAD"], destination)
         target_revision = target["revision"]
         if (
-            actual_commit not in {prior["commit"], target["commit"]}
+            HEX_COMMIT.fullmatch(target_revision)
+            or actual_commit not in {prior["commit"], target["commit"]}
             or target_revision != state_revision(prior)
         ):
             raise error
         try:
-            tag_commit = git(
-                run,
-                ["rev-parse", f"refs/tags/{target_revision}^{{commit}}"],
-                destination,
-            )
+            tag_commit = resolve_revision(run, target_revision, destination, target["commit"])
         except BootstrapError:
             raise error
         if tag_commit != target["commit"]:
@@ -539,9 +567,9 @@ def validate_checkout_at(
         raise BootstrapError(
             f"Managed checkout is {actual_commit}, {label} requires {expected_commit}: {destination}"
         )
-    tag_ref = f"refs/tags/{revision}"
-    tag_commit = git(run, ["rev-parse", f"{tag_ref}^{{commit}}"], destination)
-    accepted_tag_commits = allowed_tag_commits or {expected_commit}
+    tag_ref = revision_selector(revision, expected_commit)
+    tag_commit = resolve_revision(run, revision, destination, expected_commit)
+    accepted_tag_commits = {expected_commit} if HEX_COMMIT.fullmatch(revision) else allowed_tag_commits or {expected_commit}
     if tag_commit not in accepted_tag_commits:
         accepted = ", ".join(sorted(accepted_tag_commits))
         raise BootstrapError(
@@ -607,6 +635,7 @@ def upgrade_pending_transition(
     expected_base = {key: expected[key] for key in ("checkout", "release", "commit")}
     target_source = require_string(pending.get("source"), f"{marketplace}.transition.source")
     target_revision = require_string(pending.get("revision"), f"{marketplace}.transition.revision")
+    revision_selector(target_revision, expected["commit"])
     if (
         target_base != expected_base
         or normalize_source(target_source) != expected["source"]
@@ -648,6 +677,9 @@ def upgrade_pending_transition(
 def validate_pending_transition(
     pending: dict[str, Any], managed: dict[str, Any], expected: dict[str, str], release: dict[str, Any]
 ) -> None:
+    validate_state_record(managed, Path(managed["checkout"]), "pending transition source")
+    validate_state_record(expected, Path(expected["checkout"]), "pending transition target")
+    revision_selector(pending.get("revision"), expected["commit"])
     wanted = {
         "from": managed,
         "to": expected,
@@ -673,7 +705,7 @@ def validate_transition_checkout(
     allowed_sources = {prior["source"], target["source"]}
     if actual_commit == prior["commit"]:
         allowed_tag_commits = {prior["commit"]}
-        if prior["revision"] == target["revision"]:
+        if not HEX_COMMIT.fullmatch(prior["revision"]) and prior["revision"] == target["revision"]:
             allowed_tag_commits.add(target["commit"])
         validate_checkout_at(
             run,
@@ -710,6 +742,7 @@ def checkout_release(
 ) -> None:
     source = require_string(release.get("source"), f"{release['id']}.source")
     revision = require_string(release.get("revision"), f"{release['id']}.revision")
+    selector = revision_selector(revision, commit)
     if destination.exists():
         if not (destination / ".git").exists():
             raise BootstrapError(f"Managed checkout path is not a Git checkout: {destination}")
@@ -729,9 +762,11 @@ def checkout_release(
             raise BootstrapError(f"Managed checkout is missing: {destination}")
         destination.parent.mkdir(parents=True, exist_ok=True)
         git(run, ["clone", "--no-checkout", "-c", "core.autocrlf=false", source, str(destination)])
-    tag_ref = f"refs/tags/{revision}"
-    git(run, ["fetch", "--force", "origin", f"{tag_ref}:{tag_ref}"], destination)
-    resolved = git(run, ["rev-parse", f"{tag_ref}^{{commit}}"], destination)
+    if HEX_COMMIT.fullmatch(revision):
+        git(run, ["fetch", "--no-tags", "origin", selector], destination)
+    else:
+        git(run, ["fetch", "--force", "origin", f"{selector}:{selector}"], destination)
+    resolved = resolve_revision(run, revision, destination, commit)
     if resolved != commit:
         raise BootstrapError(f"{release['id']} tag {revision} resolves to {resolved}, lock requires {commit}")
     git(run, ["checkout", "--detach", "--force", commit], destination)
@@ -758,6 +793,17 @@ def load_state(profile: Path) -> dict[str, Any]:
         state["transitions"] = {}
     if not isinstance(state["transitions"], dict):
         raise BootstrapError(f"Unsupported managed-state transitions at {path}")
+    records = list(state["marketplaces"].values())
+    for pending in state["transitions"].values():
+        if not isinstance(pending, dict) or not isinstance(pending.get("from"), dict) or not isinstance(pending.get("to"), dict):
+            raise BootstrapError(f"Invalid pending marketplace identity at {path}")
+        records.extend((pending["from"], pending["to"]))
+        revision_selector(pending.get("revision"), require_string(pending["to"].get("commit"), "Pending target commit"))
+    for record in records:
+        if not isinstance(record, dict):
+            raise BootstrapError(f"Invalid managed marketplace identity at {path}")
+        if "revision" in record:
+            revision_selector(record["revision"], require_string(record.get("commit"), "Managed commit"))
     return state
 
 
@@ -796,13 +842,14 @@ def verify_checkout(
     run, profile: Path, release: dict[str, Any], commit: str, selected: list[dict[str, Any]], plugins: dict[str, dict[str, Any]]
 ) -> list[str]:
     marketplace = release["marketplace"]
+    revision_selector(release["revision"], commit)
     checkout = checkout_path(profile, marketplace)
     if not (checkout / ".git").exists():
         raise BootstrapError(f"Managed checkout is missing: {checkout}")
     actual_commit = git(run, ["rev-parse", "HEAD"], checkout)
     if actual_commit != commit:
         raise BootstrapError(f"{marketplace} checkout is {actual_commit}, expected {commit}")
-    tag_commit = git(run, ["rev-parse", f"refs/tags/{release['revision']}^{{commit}}"], checkout)
+    tag_commit = resolve_revision(run, release["revision"], checkout, commit)
     if tag_commit != commit:
         raise BootstrapError(
             f"{marketplace} local tag {release['revision']} is {tag_commit}, expected {commit}"
@@ -833,6 +880,8 @@ def verify_installed_plugin(
     plugin: dict[str, Any],
     commit: str,
 ) -> list[str]:
+    if "_release" in plugin:
+        revision_selector(plugin["_release"]["revision"], commit)
     record = installed.get(identity)
     if not record or not record.get("enabled"):
         raise BootstrapError(f"Plugin is not installed and enabled: {identity}")
@@ -874,6 +923,7 @@ def release_groups(selections: list[dict[str, Any]], plugins: dict[str, dict[str
     groups: dict[str, tuple[dict[str, Any], str, list[dict[str, Any]]]] = {}
     for selection in selections:
         release = plugins[selection["id"]]["_release"]
+        revision_selector(release["revision"], selection["commit"])
         group = groups.get(release["id"])
         if group is None:
             groups[release["id"]] = (release, selection["commit"], [selection])
@@ -917,12 +967,12 @@ def execute(arguments: argparse.Namespace, run=subprocess.run) -> dict[str, Any]
         },
         "errors": [],
     }
-    if arguments.mode == "preview":
-        return report
     try:
+        state = load_state(profile)
+        if arguments.mode == "preview":
+            return report
         host = NativeHost(arguments.harness, profile, run)
         groups = release_groups(selections, plugins)
-        state = load_state(profile)
         if arguments.mode == "apply":
             for release, commit, members in groups:
                 checkout = checkout_path(profile, release["marketplace"])

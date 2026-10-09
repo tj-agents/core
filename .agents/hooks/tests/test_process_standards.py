@@ -117,7 +117,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "A defect in a consumed standards package or its source repository is the exception: "
             "a stale or broken standard",
             "and so is a standard that caused or failed to prevent a mistake",
-            "in the same turn, before the current task resumes, without asking",
+            "in the same turn, after answering the user's direct question and before the current task resumes, without asking",
             "announcing a later or separate fix instead of launching is a violation",
         ):
             with self.subTest(phrase=phrase):
@@ -131,6 +131,7 @@ class ProcessStandardsTests(unittest.TestCase):
 
         self.assertTrue(section.startswith("When the user calls out a mistake, before apologizing"))
         self.assertLess(section.index("before apologizing"), section.index("An apology"))
+        self.assertLess(section.index("Answer the user's direct question first"), section.index("If it did, launch"))
         for phrase in (
             "missing, ambiguous, contradictory, mispriced or unenforced",
             "every consumed `tj-agents` plugin on both hosts",
@@ -341,12 +342,12 @@ class ProcessStandardsTests(unittest.TestCase):
             authored_skill("plan-execution").read_text(encoding="utf-8").split()
         )
         self.assertIn("Lane selection does not itself transfer task ownership", lanes)
-        self.assertIn("small and medium plans, the parent normally continues", lanes)
+        self.assertIn("For Codex, the parent normally continues in the same checkout", lanes)
         self.assertIn("explicit path and responsibility ownership", lanes)
         self.assertIn("A small follow-up can stay with the parent", lanes)
         self.assertIn("If delegation is unavailable", lanes)
         self.assertIn("Continue in the current context by default for small and medium plans", plans)
-        self.assertIn("parent may delegate bounded work", plans)
+        self.assertIn("The parent retains ownership", plans)
         self.assertIn("massive plan whose design was a substantial phase", plans)
         self.assertIn("normally hand execution to one fresh harness", plans)
         self.assertIn("even when the checkout stays the same", plans)

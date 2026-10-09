@@ -12,7 +12,8 @@ repo maintenance rather than shipped behaviour and already run under pwsh on Lin
 ## Authorization
 
 The user authorized the whole port, one PR per step, including review and merge of each step
-(2026-10-05/06). Each step ends merged before the next starts.
+(2026-10-05/06). Each step ends merged before the next starts. Independent steps may run in parallel
+on separate branches; each still lands as its own reviewed PR.
 
 ## Decisions and evidence
 
@@ -63,6 +64,7 @@ from `open_claude.py` on this machine. Step 3a (`handoff-claude`) on `Feature/Ha
 ported to `scripts/launch_claude.py`, `launch-claude.ps1` deleted, tests and SKILL.md updated.
 Step 3b (`handoff-codex` -> Python, with `codex_marketplace_sync.ps1`) in progress on
 `Feature/HandoffCodexPython`.
+Step 6 (`clip`) in progress on `Feature/ClipPython`.
 
 ## Next Steps
 
