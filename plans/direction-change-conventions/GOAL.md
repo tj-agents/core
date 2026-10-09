@@ -30,6 +30,10 @@ say the rule must reach the repository's always-loaded conventions.
   lands a missing convention), `review` Stage 4 and `docs-review` Rules (check it), and
   `session-guidance` (always-loaded trigger for task-level decisions outside a plan).
 - No machine check: detecting a direction change is semantic, so review is the enforcement.
+- Added at Tommy's request: every noticed problem is fixed, handed off to an owner whose goal ends in a
+  merged fix, or recorded in a `TECH_DEBT.md` entry merged to the default branch. Owner: `docs-and-debt`'s
+  Tech debt section; `session-guidance` now covers every defect, not only material ones. Folded into this
+  PR because it edits the same two files, which the handoff standard forbids offloading.
 - `base:plan-artifacts` stays unchanged: guidance-corpus ownership is an engineering convention, and a
   base copy would be a second home.
 
@@ -55,4 +59,5 @@ say the rule must reach the repository's always-loaded conventions.
 
 ## Next Steps
 
-Docs review of `origin/main..7900a30`, open the PR, CI, merge through `engineering:merge`.
+Docs review of `origin/main..HEAD`, open the PR, CI, merge through `engineering:merge`. After
+any further parent commit, message `splitdocsanddebt-24` so its stacked branch absorbs it.
