@@ -2,8 +2,8 @@
 
 Read `README.md` before changing repository structure.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
-Everything this repository ships runs on Windows and Linux. New shipped code is Python, not PowerShell;
-see [Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
+Shipped code must run on Windows and Linux; follow
+[Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
 
 `.agents/` is the only canonical home for host-neutral capability definitions, workflow contracts,
 shared hooks, schemas, tests and resources. Logical base, engineering and machine ownership lives below

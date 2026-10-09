@@ -9,6 +9,8 @@ route: infer
 
 # Peer CLI sessions
 
+Windows-only until its Python port lands: its scripts need Windows PowerShell and Windows Terminal.
+
 Two naming systems describe the same window. A session's own name is derived by the harness from its
 branch or directory (`refactor-postgresauthconsumer-ec`), while its tab is titled by whoever launched it
 ("Postgres sweep: Search"). Naming a peer by the first is naming something the user cannot see on screen.

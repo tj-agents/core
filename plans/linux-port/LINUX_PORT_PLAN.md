@@ -61,6 +61,11 @@ what still needs checking on Windows.
 - [x] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
   (`verify-linux`, #162); it blocks a PR once the repository ruleset lists it as a required check,
   which awaits the user's decision after a few green runs.
+- [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no SKILL.md under
+  `.agents/` tells an agent to run bare `python`, `powershell.exe`, `pwsh` or `wt.exe` without naming the
+  platform (including `merge` and `merge-docs` Step 5's session exit), every unported skill says it is
+  Windows-only, and each Windows-only PowerShell test suite retires with its port or gains a Linux
+  counterpart.
 
 ## Current progress
 
@@ -71,5 +76,6 @@ convention in `CODE_CONVENTIONS.md` (#166). Step 3b `handoff-codex` in review as
 
 ## Next Steps
 
-Land 3b; then 5 (`peer-cli`, `close` and `finish` first, so merge Step 5's session exit works on
-Linux) and 4 (terminal start hooks, deleting `agent-cli.ps1`); then 7.
+Land 3b; then 5 (`peer-cli`, `close` and `finish` first, so the `merge` skill's Step 5 session exit
+works on Linux) and 4 (terminal start hooks, deleting `agent-cli.ps1`); then 7 and 10. After `verify-linux`
+has had a few green runs, ask the user whether the repository ruleset should require it.
