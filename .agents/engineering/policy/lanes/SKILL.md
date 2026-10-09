@@ -84,12 +84,13 @@ among others.
 
 **Re-route per phase.** For every new task, work type, phase, review entry or fallback, make a fresh lane
 selection before substantive work, even when retaining the same lane. Record the phase, lane and reason in
-the existing task context, resolve model and effort from the canonical host table, and apply the selection
-through a supported control or bounded lane worker; inherited settings or an earlier phase's selection do
-not count. One task is usually open/judgement while it is being designed, then specified and test-caught
-while it is built, then clerical to commit and push. Running the whole task in the rung its hardest phase
-needed is the waste this ladder exists to stop, and running the design phase in the rung its cleanup needed
-is how a bad design gets built efficiently.
+the existing task context, and resolve model and effort from the canonical host table. Apply the selection
+under the canonical execution rules: continue directly when the current owner already honors the selected
+lane; otherwise use a supported control or bounded lane worker. Inherited settings or an earlier phase's
+selection do not count. One task is usually open/judgement while it is being designed, then specified and
+test-caught while it is built, then clerical to commit and push. Running the whole task in the rung its
+hardest phase needed is the waste this ladder exists to stop, and running the design phase in the rung its
+cleanup needed is how a bad design gets built efficiently.
 
 Lane selection does not itself transfer task ownership. A Claude parent hands multi-phase work and every
 delegated design, implementation, or review phase to Codex before delegating, unless the user explicitly
