@@ -19,6 +19,27 @@ Codex hook commands retain an integrity-checked copy of their trusted plugin pac
 An active session can keep running its original hook scripts when a marketplace refresh removes the old
 cache directory. A changed hook definition still requires Codex trust review before it runs.
 
+Codex hook commands use a short readable Python authenticator instead of encoded executable source.
+It checks the shipped snapshot verifier's SHA-256 before staging those authenticated bytes in a temporary
+directory and loading the Python file. Python isolated mode prevents the caller's directory from supplying
+bootstrap imports. The verified runtime then checks package identity, package bytes and snapshot bytes.
+Codex [trusts the hook definition](https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/hooks/src/engine/discovery.rs),
+so invoking a mutable verifier directly would allow it to skip its own checks. The inline authenticator
+retains that boundary without Base64 or explicit `exec`. These checks do not protect against an attacker
+who can modify the user's trusted configuration or race files inside the same user's temporary/snapshot
+directories, and source tests do not establish antivirus acceptance.
+
+Use `machine:hook-control` for reversible Codex hook controls. In a terminal with the machine launcher
+loaded, `codex-hooks status`, `codex-hooks off` and `codex-hooks on` operate on the active user profile.
+Add `--scope project --project <repository>` for a trusted repository's `.codex/config.toml`.
+The utility requires Python 3.11+. `off` writes the native
+[`features.hooks = false` gate](https://learn.chatgpt.com/docs/hooks#turn-hooks-off), which prevents ordinary
+lifecycle hooks from starting, including hooks introduced by later plugin updates. `on` restores the
+previous gate value or absence; it preserves individually disabled hooks and trust metadata. Plugins and
+skills remain enabled. A higher-priority project, profile, command-line or managed setting may override
+the selected layer; status describes saved settings, and reopening Codex is required to rely on the change.
+Internal host cleanup hooks and the separate legacy `notify` command are outside this gate.
+
 The split packages form the **2.1.16** release candidate. Existing 1.x consumers and fresh installations select all
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
