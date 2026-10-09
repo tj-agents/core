@@ -67,33 +67,33 @@ it, and a guidance rule added there looks like a tech-debt change.
   cannot express a split. `docs-and-debt` therefore stays as a thin `convention` compatibility entry whose
   body only routes to the three owners (no rule text), with "remove after 2027-04-09" in its description,
   following the `gpp:gpp-scaffold` precedent. The `base:docs-and-debt` alias keeps resolving to it. Its
-  removal is recorded in `.agents/plugins/TECH_DEBT.md` with that date as the resolution condition.
+  removal is recorded in `.agents/engineering/convention/docs-and-debt/TECH_DEBT.md` (the area that owns
+  it), resolved after that date once no `tj-agents` consumer still names the old skill.
 - **Rename allowlist** (`grep -rniE "docs-and-debt"` over authored sources, excluding `plugins/`):
   the compatibility entry's three files (`.agents/engineering/convention/docs-and-debt/SKILL.md`,
   `.codex/skills/docs-and-debt/SKILL.md`, `.claude/skills/docs-and-debt/SKILL.md`), the
   `base:docs-and-debt` alias in `.agents/plugins/compatibility.json`, its debt entry in
-  `.agents/plugins/TECH_DEBT.md`, the authored `.agents/catalog/catalog.json` skill roster, this goal, and historical
+  `.agents/engineering/convention/docs-and-debt/TECH_DEBT.md`, the authored `.agents/catalog/catalog.json` skill roster, this goal, and historical
   plans/reviews that record past work (`plans/direction-change-conventions/`, owned by the parent PR,
   `plans/outcome-verified-completion/`, `plans/pr-ownership/`, `reviews/`).
 
 ## Progress
 
-- Steps 1–3 done: the split, host entry points, catalog roster, references and compatibility entry landed
-  in "Split docs-and-debt into guidance, debt and working-doc conventions". The branch was rebased twice
-  onto the parent (`3f9ab37`, then `724e5b5`) and the parent's revised recording and direction-change text
-  re-moved into `debt-records` and `guidance-ownership`; its new `review-lifecycle` and `address-review`
-  pointers were retargeted at `debt-records`.
-- Step 4 passed at `39588f6` (both suites, generation `-Check`, tier payload, catalog and harness `--check`,
-  `docs_reachability.py`); re-run on the rebased candidate before the PR.
-- Step 5: first review pass over `3f9ab37..39588f6` is in `reviews/Refactor-SplitDocsAndDebt.md`
-  (6 findings, changes requested); fixes applied after the rebase.
+- Steps 1–3 done in "Split docs-and-debt into guidance, debt and working-doc conventions". The parent moved
+  five times during this work; each rebase re-moved its revised recording and direction-change text into
+  `debt-records` and `guidance-ownership`, and retargeted its new pointers (`review-lifecycle`,
+  `address-review`, session-guidance, and two `test_process_standards.py` tests).
+- Step 4 passes on the rebased head over parent `bf43af5`: 802 + 985 tests, generation `-Check`, tier
+  payload, catalog and harness `--check`, `docs_reachability.py`, packaging tests.
+- Step 5: `reviews/Refactor-SplitDocsAndDebt.md` pass 1 (6 findings) and pass 2 over the rebased layer
+  (4 findings) are fixed.
 
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: commit the review fixes, re-validate, incremental review of the rebased candidate.
-Remaining scope: stacked PR on `Docs/DirectionChangeConventions`, merge after the parent lands, Step 5
-cleanup of this worktree.
+Current slice: open the stacked PR on `Docs/DirectionChangeConventions` (PR #168).
+Remaining scope: rebase when #168 changes again; after #168 merges, retarget to `main`, re-validate, merge
+through `engineering:merge`, then Step 5 cleanup of this worktree.
 Done when: the split is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 4 on the rebased candidate.
+Continue at Completion expectation step 5: push and open the stacked PR.

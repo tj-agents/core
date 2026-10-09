@@ -135,6 +135,21 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
 
+    def test_working_markdown_is_deleted_once_it_has_served_its_purpose(self):
+        flat = " ".join(authored_skill("working-docs").read_text(encoding="utf-8").split())
+
+        self.assertIn("never in a temp or scratchpad directory", flat)
+        self.assertIn("delete the file once it has served its purpose", flat)
+
+    def test_docs_and_debt_only_routes_to_its_replacements(self):
+        body = authored_skill("docs-and-debt").read_text(encoding="utf-8")
+
+        for owner in ("guidance-ownership", "debt-records", "working-docs"):
+            with self.subTest(owner=owner):
+                self.assertIn(f"`engineering:{owner}`", body)
+        self.assertIn("owns no rule", body)
+        self.assertNotIn("\n## ", body)
+
     def test_a_standards_defect_hands_off_in_the_same_turn(self):
         instructions = authored_skill("session-guidance").read_text(
             encoding="utf-8"

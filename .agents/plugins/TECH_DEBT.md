@@ -98,15 +98,3 @@ This narrows the mutable-loader race to bytes checked and staged by the bootstra
 against a same-user attacker who can replace Python, the temporary directory, or the process itself. The
 package loader continues to verify the complete selected snapshot before it dispatches a hook. Generation
 still enforces cmd.exe's 8191-character command limit, but command length no longer grows with loader size.
-
-## The `docs-and-debt` compatibility entry outlives its split
-
-`engineering:docs-and-debt` was split into `guidance-ownership`, `debt-records` and `working-docs`.
-Releases published before the split ship the old name as the rules owner, and every later release ships it
-as a routing-only compatibility entry until it is removed. The `skills` alias table maps one name to one
-name, so it cannot redirect a split, and `base:docs-and-debt` stays aliased to the routing entry.
-
-Resolve after 2027-04-09: delete the compatibility entry's canonical and host files, its
-`base:docs-and-debt` alias, its row in the authored `.agents/catalog/catalog.json` skill roster, and lower
-the canonical skill count in `tests/test_source_layout.py` by one. Then confirm
-`grep -rniE "docs-and-debt"` over authored sources finds only historical plans and reviews.
