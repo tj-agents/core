@@ -3,34 +3,45 @@
 - Plan: `plans/standards-composition/STANDARDS_COMPOSITION_PLAN.md`
 - Roadmap: `plans/standards-composition/STANDARDS_COMPOSITION_ROADMAP.md`
 - Roadmap item: `standards-composition/scoped-selection`
-
-- Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Docs-StandardsCompositionPlan
-- Branch: Docs/StandardsCompositionPlan
+- Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Docs-StandardsCompositionDesign
+- Branch: Docs/StandardsCompositionDesign
 - PR: not opened
 
 ## Current state
 
-Requirements/discovery plan authored from inspected core, kit, dotnet, work configuration and unfinished source-owner worktrees. No refactor runtime or live hook changes made. The current slice publishes this plan; the authorized standards goal remains open across later implementation slices. Tommy provisionally prefers shared technical requirements with personal conventions explicitly selected, and requested inspection of the previous implementation before schema decisions.
+Successor acknowledged ownership on 2026-10-09 in the recorded checkout and branch. The current slice is the design proposal, documentation review and authorized personal planning publication. Source inspection is read-only outside these planning artifacts; runtime implementation, application changes and live hook adoption remain outside this slice.
+
+The requirements/discovery plan landed through [core PR167](https://github.com/tj-agents/core/pull/167), merge `71e76cce393254712447e267b71e4e43155d20f0`. Its final candidate `6a2705cb56f44df61f975f3f29629189d2d5eb28` passed native and parent full/incremental documentation review. The personal planning workflow used the sanctioned docs-only merge with Linux CI green and Windows CI still running; no full Windows CI success was claimed.
+
+The proposal is authored in the canonical plan: homogeneous contract skills, an additive package standards manifest, scoped context v2 adoption, explicit house choices, one immutable resolution and full-body delivery proof. It includes current/proposed boundaries, a kit necessity assessment, migration/rollback, owner PR slices and acceptance cases. Current source inventory covers core, kit, .NET, React and the employer package. No runtime, application or hook-setting change is included.
 
 ## Verification
 
-Initial plan graph and diff checks passed. Existing core selection-profile tests passed (11); existing .NET source-layout/profile pin tests passed (3). Documentation review at `500415f5027c37d55b61b27eb1e753f33f790109` passed without retained findings, including native Codex review and parent documentation checks. Frozen documentation reachability passed with zero errors/warnings. The ledger-format correction requires incremental review before publication.
+Current inventory verification: core finite-profile reader 11 tests; .NET source/profile 3; React core-profile 5; kit generator 42; employer 14, all passed. Three JSON examples and nine Python excerpts receive syntax checks in their stated expression/function contexts. These checks do not establish proposed API integration or host acceptance.
+
+Plan graph: zero errors, one pre-existing size warning in the unrelated repo-declared-config ledger. Workflow v2 repository provider resolves this branch, plan and next action. `git diff --check` passes. Frozen documentation reachability passed with zero errors/warnings. Final incremental documentation review remains the publication gate.
 
 ## Reviews
 
-Canonical work order: `reviews/Docs-StandardsCompositionPlan.md`. Documentation review approved `500415f5027c37d55b61b27eb1e753f33f790109`. The configured fresh lens was unavailable, so its bounded check returned to the parent. The plan is not yet implementation-ready for runtime changes; incremental review of the ledger-format correction is pending.
+Native Codex review and parent documentation review completed at `421bbae`. The configured fresh lens was unavailable (unsupported model); the documented parent fallback covered its bounded design/accuracy check. Four findings are corrected in this candidate: resource addressing, target-relevant choices, an unspecified concern API, and legacy-release compatibility. Canonical work order: `reviews/Docs-StandardsCompositionDesign.md`; final incremental review must qualify the repairs before publication.
 
 ## Decisions, discoveries, blockers, and deviations
 
-Personal plan publication is selected by Tommy; it supplies no work-repository publication authority. Current disabled hooks and other active writer worktrees are preserved. Merged .NET PR24/32 and core PR140 contain real tested separation and a finite-profile adapter; C++ PR37 remains draft. The current .NET routes bypass profile selection, and no production caller of the core adapter was found in inspected source. Existing mechanisms and owners must be reconciled before adding missing consumers. No new handoff is selected.
+Reuse merged .NET PR24/32/35, core PR140/116, kit inventories and the existing employer package. PR139 catalog composition and PR54 conditional routes remain drafts; the latter's trunk ledger is stale. Existing capability-lock skill/path fields remain installation coverage, not automatic opinion adoption. The plan records exact inspected revisions and retained owners.
+
+Preserve other writers, particularly `Feature/StandardsSourceOwnership`, `Feature/ConfigurableAutoMerge` and hook-repair work. No duplicate implementation or takeover is selected. The originating cris-authz session retains the local underscore/extension-syntax restoration; this successor must not edit, commit, push or merge that application work. Private work tooling and work-repo gates remain separate from personal planning publication.
+
+## Execution readiness
+
+Design lane L1 covered the interacting selection, authority and delivery decisions. Next is documentation review using the configured reviewer, followed by clerical publication. No implementation handoff is selected. Tommy must approve the direction and runtime scope after the proposal is reviewable and published; source-owner integration, new Dapper/raw content and host qualification retain their explicit gates in the plan.
 
 ## Next Steps
 
-Scope: whole plan through all remaining design, implementation, verification and delivery phases, within recorded owner and installation gates.
-Current slice: validate, review and merge the requirements/discovery plan to core's main branch.
-Remaining scope: resolve the detailed selection design, refactor selected owner contracts and consumers, qualify both hosts, repair personal planning delivery and reconcile the existing auto-merge owner.
-Done when: the plan is visible on main for this slice; the whole goal remains incomplete until its completion conditions pass.
+Scope: current slice only; full plan remains incomplete. The handoff explicitly limits this successor to design and reviewed personal planning publication.
+Current slice: validate and review the proposed composition design, correct findings, then publish the planning artifacts on main.
+Remaining scope: after the design decision, implement reviewed owner slices, qualify loading and review on both hosts, and reconcile the separately owned plan-publication/auto-merge work.
+Done when: the concrete proposed design and ledger are reviewed and published on main, and the consequential decisions are presented to Tommy. The wider refactor remains incomplete.
 
-1. Review the final ledger-format correction and confirm delivery preflight; the plan graph, diff and reference checks already pass.
-2. Publish the reviewed personal plan to main, preserving explicit owner and host gates.
-3. Resolve the Phase 1 owner/schema inventory using the existing separation in the same plan, then publish reviewed implementation-ready owner designs before code changes.
+1. Freeze the committed candidate against synchronized origin/main and run canonical docs review plus frozen reachability. Resolve findings through a reviewed incremental candidate.
+2. Publish through the authorized personal `merge-docs` workflow, verifying the actual PR and merge result. Preserve other owners, the current proposed-runtime decision and disabled hooks.
+3. Present the recommendation, consequential tradeoffs and review/publication evidence to Tommy, asking for the runtime decision only after the proposal is concrete. Do not implement or adopt live consumers in this slice.
