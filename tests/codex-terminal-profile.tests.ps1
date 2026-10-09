@@ -65,6 +65,7 @@ if ($isWindowsHost) {
     New-Item -ItemType Directory -Force -Path $desktopBin | Out-Null
     $batchPath = Join-Path $desktopBin 'codex.bat'
     $nativeDispatch = @"
+@echo off
 if "%1" == "--version" goto version
 echo %* >> "$callsPath"
 if "%*" == "plugin marketplace upgrade --json" goto upgrade
