@@ -114,8 +114,8 @@ row to respect, and getting it wrong is worse than having no skill at all.
 
 **When a plan or task changes how a repository's code is written — a refactor, migration, new platform,
 new architecture or newly required pattern — write that rule into the repository's standing conventions
-when it is decided, before or with the first change that depends on it.** Standing conventions are the
-always-loaded `AGENTS.md`, or a convention doc it directs every affected change to read. A plan governs
+when it is decided, before or with the first change that depends on it.** State it in the always-loaded
+`AGENTS.md`, linking a convention doc for any detail, so every session sees it whatever it changes. A plan governs
 only its own work: a direction recorded there alone is invisible to every other session, which keeps
 writing the old way and builds new dependencies on it.
 
@@ -141,10 +141,12 @@ objective resolution condition — a problem only one agent ever saw is one nobo
 
 **Every problem you notice is fixed, handed off or recorded before you move on, and the outcome reaches the
 default branch.** Handing off means launching a side workstream through `engineering:handoff`, or giving the
-problem to the active owner of its fix who confirms it is in their goal; either goal ends in a merged fix.
-Recording means a `TECH_DEBT.md` entry merged to the default branch: in the current PR when that PR will
-land, otherwise in its own docs-only PR straight away. A chat reply, a message, a scratch file or an entry
-on a branch that may never merge is not a record.
+problem to the active owner of its fix who confirms it is in their goal; that goal, which ends in a merged
+fix, is then the record. Anything else left unfixed gets the entry above, merged to the default branch in
+the current PR when that PR will land, otherwise in its own docs-only PR straight away. That PR has the
+same standing authorization as a planning artifact to land through `engineering:merge-docs`; an explicit
+user limit or merge hold still applies, and the report then names the unmerged entry. A chat reply, a
+message, an issue, a scratch file or an entry on a branch that may never merge is not a record.
 
 ## Throwaway working markdown
 
