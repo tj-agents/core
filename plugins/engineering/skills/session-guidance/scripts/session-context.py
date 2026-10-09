@@ -8,19 +8,28 @@ import re
 import sys
 
 
-PROMPT_CONTEXT_HEADING = "## When the user calls out a mistake"
+PROMPT_CONTEXT_HEADINGS = (
+    "## When the user calls out a mistake",
+    "## A task has an owning lifecycle — load it before the first edit",
+)
+
+
+def prompt_context_section(body, heading):
+    heading_match = re.search(rf"(?m)^{re.escape(heading)}[ \t]*$", body)
+    if heading_match is None:
+        raise ValueError(f"missing prompt context section {heading!r}")
+    next_heading = re.search(r"(?m)^## ", body[heading_match.end():])
+    end = heading_match.end() + (next_heading.start() if next_heading else len(body[heading_match.end():]))
+    section = body[heading_match.end():end].strip()
+    if not section:
+        raise ValueError(f"prompt context section {heading!r} is empty")
+    return section
 
 
 def prompt_context(body):
-    heading = re.search(rf"(?m)^{re.escape(PROMPT_CONTEXT_HEADING)}[ \t]*$", body)
-    if heading is None:
-        raise ValueError(f"missing prompt context section {PROMPT_CONTEXT_HEADING!r}")
-    next_heading = re.search(r"(?m)^## ", body[heading.end():])
-    end = heading.end() + (next_heading.start() if next_heading else len(body[heading.end():]))
-    section = body[heading.end():end].strip()
-    if not section:
-        raise ValueError(f"prompt context section {PROMPT_CONTEXT_HEADING!r} is empty")
-    return section
+    return "\n\n".join(
+        prompt_context_section(body, heading) for heading in PROMPT_CONTEXT_HEADINGS
+    )
 
 
 def main():
