@@ -63,6 +63,7 @@ EXEMPT_GH_VERBS = (
 )
 EXEMPT_PY_SCRIPTS = (
     "workflow_ops.py", "cleanup_proof.py", "agent_cli.py", "transfer.py", "merge_cleanup_gate.py",
+    "launch_codex.py", "launch_claude.py",
 )
 EXEMPT_PS1_SCRIPTS = (
     "worktrees.ps1", "peer-cli.ps1", "close-tab.ps1", "launch-codex.ps1",
