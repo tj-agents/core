@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `bf43af58331a565aa586123aef74f3211e3c1722`  `(2026-10-09)`
+**Reviewed up to commit:** `f21fedb193e3e99d6e2d92cff6fb056e6171a372`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
@@ -237,10 +237,44 @@ than a separate finding.
 - [x] **INST8 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:148`
   The pointer into `plans` named authorization that section words differently. State the debt PR's
   standing authorization, its docs review and the typed delivery gate directly.
+  Fixed in `f21fedb`.
 - [x] **ACC8 — LOW — accuracy** — `plans/direction-change-conventions/GOAL.md:64`
   Steps still said `engineering:merge` and "pass 1", and progress claimed green heads without the latest
   run. Bring both current.
+  Fixed in `f21fedb`.
 - [x] **TEST3 — LOW — test-coverage** — `.agents/hooks/tests/test_process_standards.py:118`
   The `AGENTS.md` statement's required content was not pinned. Pin it.
+  Fixed in `f21fedb`.
 - [x] **ACC9 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:204`
   Pass-5 findings lacked fix evidence. Record it.
+  Fixed in `f21fedb`.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `bf43af58331a565aa586123aef74f3211e3c1722`
+**Candidate head:** `f21fedb193e3e99d6e2d92cff6fb056e6171a372`
+**Candidate branch:** `Docs/DirectionChangeConventions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:587b20e7031a9ff673d0a0a2ee10556956a19e7f885a138989d3043f3ec1a3f8` `(4 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/Y_2UWrnJaXiZFw4N0ZNu0L/fs9xLywOzO5-H8GMMrVstR`
+**Candidate bundle identity:** `sha256:716434137f8cd7a538238184a9fb9e7a9972a29962bb288aecc5611036dc52af`
+**Work-order path:** `reviews/Docs-DirectionChangeConventions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [x] **CON12 — MEDIUM — contradiction** — `.agents/engineering/convention/docs-and-debt/SKILL.md:149`
+  Restating the gates named only two of the gate types `plans` preserves, dropped the pointer INST6 added
+  and omitted the required validation. Make the debt PR a meta-only slice that lands as `plans`' "Planning
+  artifacts always land" defines, keeping only the authorization this skill adds.
+  Fixed in the commit that adds this line.
+- [x] **ACC10 — LOW — accuracy** — `plans/direction-change-conventions/GOAL.md:57`
+  Progress counted passes and went stale on the next pass. Point at the work order's watermark instead.
+  Fixed in the commit that adds this line.
+- [x] **TEST4 — LOW — test-coverage** — `.agents/hooks/tests/test_process_standards.py:128`
+  The debt PR's authorization sentence was not pinned. Pin it.
+  Fixed in the commit that adds this line.
+- [x] **ACC11 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:237`
+  Pass-6 findings lacked fix evidence. Record it.
+  Fixed in the commit that adds this line.
