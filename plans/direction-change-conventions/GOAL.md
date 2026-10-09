@@ -61,6 +61,8 @@ say the rule must reach the repository's always-loaded conventions.
   and agent shells here lack `~/.npm-global/bin`. Routed to the #137 owner (`core-46`), which
   accepted it and the missing Windows-only note in `handoff-codex` as required fixes before #137 merges.
 
+- PR: https://github.com/tj-agents/core/pull/168 (opened at `6e494c9`).
+
 ## Next Steps
 
 Docs review of `origin/main..HEAD`, open the PR, CI, merge through `engineering:merge`. After
