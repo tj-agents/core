@@ -6,7 +6,7 @@
 
 **Review status:** `complete`
 **Reviewed up to commit:** `ae55ca1f74d09c123d5fc24523311f961f1f5fd0`  `(2026-10-09)`
-**Judgment:** `approved`
+**Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — code
 
@@ -187,3 +187,34 @@ Native layer: Claude Code built-in `code-review` skill (low) over the pass-4 fix
 ### Findings
 
 None.
+
+## Review pass — 2026-10-09 — incremental (merge into `engineering:docs`)
+
+**Candidate base:** `01736046ec0fb01af8e5b0171c92812f10dac0f3`
+**Candidate head:** `22c2685b9d672d0f06a4913729ce8fdff2d0fa65`
+**Candidate branch:** `Refactor/SplitDocsAndDebt`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill (medium). Tommy decided to merge `guidance-ownership`
+and `working-docs` into one `engineering:docs` skill; this pass covers that merge.
+
+Dropped at synthesis: a test comparing the catalog roster with the skill folders (`update_catalog_digests.py`
+already fails on roster drift, which is how CI would have caught CAT1); the `docs` name overlapping
+`anthropic-skills:docs` (Tommy chose the name; plugin-qualified listings and `engineering:docs` references keep
+them apart, and the skill-authoring side workstream owns naming rules); reading the `docs` skill in two tests
+(this file reads per test throughout).
+
+### Findings
+
+- [x] **CAT1 — HIGH — correctness** — `.agents/catalog/catalog.json`
+  The authored engineering roster still listed `guidance-ownership` and `working-docs` and lacked `docs`:
+  restoring the file after local validation discarded the roster edit along with the generated digest.
+  Fix: re-apply the roster change; validation now restores a saved copy instead of `HEAD`.
+- [x] **DEBT10 — LOW — correctness** — `.agents/engineering/TECH_DEBT.md`
+  Its removal steps assumed a correct roster. Fix: covered by CAT1.
+- [x] **PLAN7 — LOW — plan-checkpoint** — `plans/split-docs-and-debt/GOAL.md`
+  Progress claimed the review was approved before the merge was reviewed. Fix: say the merge is reviewed as
+  a further pass.

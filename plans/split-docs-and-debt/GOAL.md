@@ -89,8 +89,8 @@ it, and a guidance rule added there looks like a tech-debt change.
   `address-review`, session-guidance, and two `test_process_standards.py` tests).
 - Step 4 passes on the rebased head over parent `bf43af5`: 802 + 985 tests, generation `-Check`, tier
   payload, catalog and harness `--check`, `docs_reachability.py`, packaging tests.
-- Step 5: `reviews/Refactor-SplitDocsAndDebt.md` is approved after five passes (one full, one full over
-  the rebased layer, three incremental); every finding is fixed or carries a recorded disposition.
+- Step 5: `reviews/Refactor-SplitDocsAndDebt.md` was approved after five passes over the three-skill
+  split; the merge into `engineering:docs` (Tommy's decision) is reviewed as a further incremental pass.
 
 ## Delivery
 
