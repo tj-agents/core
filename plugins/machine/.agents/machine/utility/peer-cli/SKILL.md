@@ -1,6 +1,6 @@
 ---
 name: peer-cli
-description: List, inspect and close the other Claude CLI sessions and their Windows Terminal tabs, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session or a stale tab, or to check what another session is doing before continuing.
+description: List, inspect and close the other Claude CLI sessions and their Windows Terminal tabs, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session or a stale tab, or to check what another session is doing before continuing. Windows-only until its Python port lands.
 
 kind: utility
 domain: machine
@@ -8,6 +8,8 @@ route: infer
 ---
 
 # Peer CLI sessions
+
+Windows-only until its Python port lands: its scripts need Windows PowerShell and Windows Terminal.
 
 Two naming systems describe the same window. A session's own name is derived by the harness from its
 branch or directory (`refactor-postgresauthconsumer-ec`), while its tab is titled by whoever launched it
@@ -66,7 +68,7 @@ Its two refusals both exist because they were broken first:
 Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
 that through `finish.ps1`, beside these scripts.
 
-For a completed session whose checkout must remain, run exactly
+For a completed session whose checkout must remain, on Windows run exactly
 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <skill-directory>/scripts/close.ps1` with no
 arguments after the completion report. It requires this host's verified registry entry and attachment,
 closes only its own host or uniquely identified tab, and records session exit without changing files,

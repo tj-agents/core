@@ -1,6 +1,6 @@
 ---
 name: peer-cli
-description: List, inspect and close the other Claude CLI sessions and their Windows Terminal tabs, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session or a stale tab, or to check what another session is doing before continuing.
+description: List, inspect and close the other Claude CLI sessions and their Windows Terminal tabs, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session or a stale tab, or to check what another session is doing before continuing. Windows-only until its Python port lands.
 
 kind: utility
 domain: machine
