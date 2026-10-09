@@ -4,8 +4,8 @@
 > findings directly and report what changed. Tick each `[x]` as you land it. Pause only for a genuinely
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
-**Review status:** `in-progress`
-**Reviewed up to commit:** `07532d92b3fcf3888d79d0c91ce40974214287f9`  `(2026-10-09)`
+**Review status:** `complete`
+**Reviewed up to commit:** `fb65ab8881ec9908b0874d4d2db31ee4c37d60b3`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
@@ -113,4 +113,42 @@ Python runtime); restoring the Python mandate to AGENTS.md (the line above alrea
 `CODE_CONVENTIONS.md` before runtime changes, and HOME1 removed that copy deliberately); the local bundle
 path (the work-order contract records it). Native layer: built-in `code-review` (medium); documentation
 lenses in the parent; `docs_reachability.py` 0 errors. No security-sensitive path.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `03af0efce86ca9a18185621959e83a02000016f8`
+**Candidate head:** `fb65ab8881ec9908b0874d4d2db31ee4c37d60b3`
+**Candidate branch:** `Docs/CrossPlatformConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:24330ff8c7dc18bd21c09546a598559a429ca0798cb781abdb87859f106abade` `(5 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/xQ-D9YvpPpJccvLNw_XaDc/sR44spyCSQP191gd_q-WJR`
+**Candidate bundle identity:** `sha256:9e4b0868e72c06465041514d32263ee0f36c5afae68520e1c71a2033cf94b060`
+**Work-order path:** `reviews/Docs-CrossPlatformConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [x] **REV1 — LOW — workflow** — `reviews/Docs-CrossPlatformConvention.md:7`
+  The previous pass was committed with its judgment set but the top-level status still `in-progress` and the
+  watermark at `07532d9`. Finalize each pass's header in the same commit as its findings.
+
+  Resolved: the previous pass is finalized with the watermark at its head `03af0ef`, and this pass is
+  finalized at `fb65ab8`; its remediation goes to the next incremental pass.
+
+- [x] **INST7 — LOW — accuracy** — `plans/linux-port/LINUX_PORT_PLAN.md:75`
+  Current progress attributes the `peer-cli` label and step 10 to `CODE_CONVENTIONS.md`; the PR made them.
+  Attribute them to #166.
+
+  Resolved.
+
+- [x] **INST8 — LOW — consistency** — `.agents/machine/utility/peer-cli/SKILL.md:3`
+  The description spells "Windows only" while the body and the convention spell "Windows-only". Use
+  "Windows-only" in all three descriptions.
+
+  Resolved.
+
+Dropped: a post-port concern that `close-tab.ps1` stays Windows-only (step 5 rewrites the description when
+it ports the skill); step 10's "including" examples (the general clause already covers every bare `python`).
+Native layer: built-in `code-review` (medium); documentation lenses in the parent. No security-sensitive path.
 
