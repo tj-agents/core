@@ -69,6 +69,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
             manifest = json.loads((plugin / "hooks" / "codex.json").read_text(encoding="utf-8"))
             command = manifest["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
             expanded = command.replace("${PLUGIN_ROOT}", str(plugin))
+            self.assertTrue(expanded.startswith("python -I -B -c \""))
             payload = {
                 "cwd": str(repo),
                 "tool_name": "apply_patch",

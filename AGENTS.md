@@ -1,6 +1,7 @@
 # core
 
 Read `README.md` before changing repository structure.
+Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
 
 `.agents/` is the only canonical home for host-neutral capability definitions, workflow contracts,
 shared hooks, schemas, tests and resources. Logical base, engineering and machine ownership lives below

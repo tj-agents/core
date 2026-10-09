@@ -86,14 +86,15 @@ committed digest change in an earlier release would pass. The catalog currently 
 Resolve when the guard keys each digest by release id and package id, with a test covering two releases
 that share a package id.
 
-## The Codex hook snapshot loader is inlined into every hook command
+## Codex hook commands need an inline loader authenticator
 
-`bind_codex_hook_snapshots` embeds the loader, base64-encoded, in each Codex hook's `command` and
-`commandWindows`. Base64 keeps the command free of shell metacharacters, and it is uncompressed because
-zlib output differs between implementations (zlib-ng on Windows CPython, stock zlib on Linux), which would
-make generated packages differ by platform. Generation refuses a `commandWindows` over cmd.exe's 8191
-characters with every `${PLUGIN_ROOT}` counted at full Windows path length, so the loader has limited
-room to grow before the build fails.
+`bind_codex_hook_snapshots` embeds a small readable Python bootstrap in each Codex hook command. It reads
+the packaged loader, or its retained snapshot when the cache has gone, normalizes newlines, verifies the
+loader SHA-256 embedded in the command, stages those bytes in a private temporary file, then calls it with
+`runpy`. The authenticated command is still necessary: invoking a packaged loader directly would execute a
+mutable file before any package or snapshot integrity check can run.
 
-Resolve when the loader ships as a packaged file that each hook command runs by path, so a command's
-length no longer depends on the loader's size, with the snapshot and Windows hook-command tests passing.
+This narrows the mutable-loader race to bytes checked and staged by the bootstrap; it does not protect
+against a same-user attacker who can replace Python, the temporary directory, or the process itself. The
+package loader continues to verify the complete selected snapshot before it dispatches a hook. Generation
+still enforces cmd.exe's 8191-character command limit, but command length no longer grows with loader size.
