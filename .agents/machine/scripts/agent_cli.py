@@ -134,7 +134,19 @@ def compare_codex_version(left, right):
     return 0
 
 
-def codex_candidate_paths(which=shutil.which, local_app_data=None):
+def npm_global_prefix():
+    """The npm global install prefix, or None when npm is unavailable or reports nothing."""
+    try:
+        result = subprocess.run(['npm', 'config', 'get', 'prefix'], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    prefix = result.stdout.strip()
+    return prefix or None
+
+
+def codex_candidate_paths(which=shutil.which, local_app_data=None, npm_prefix=npm_global_prefix):
     name = 'codex.exe' if IS_WINDOWS else 'codex'
     candidates = []
 
@@ -144,6 +156,17 @@ def codex_candidate_paths(which=shutil.which, local_app_data=None):
     # without the node process in front. Windows npm puts the shim beside node_modules; POSIX npm symlinks
     # bin/codex to the package's own bin/codex.js, two levels below the package root.
     shim = which('codex')
+
+    # A session launched from a desktop entry (not a login shell) often has PATH built from the display
+    # manager rather than the shell rc files that add a user npm prefix's bin directory, so `which` finds
+    # nothing even though the global install is on disk. `npm config get prefix` resolves it directly,
+    # the same way the native install under home is checked for Claude, below any PATH lookup.
+    if not shim and not IS_WINDOWS:
+        prefix = npm_prefix()
+        if prefix:
+            direct = Path(prefix) / 'bin' / name
+            if direct.is_file():
+                shim = str(direct)
 
     # `codex` on PATH is not always that shim: a standalone install, or a PATH that puts the vendored
     # binary ahead of the npm one, lands the native executable on PATH directly. On POSIX that is whatever
