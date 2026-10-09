@@ -98,3 +98,20 @@ This narrows the mutable-loader race to bytes checked and staged by the bootstra
 against a same-user attacker who can replace Python, the temporary directory, or the process itself. The
 package loader continues to verify the complete selected snapshot before it dispatches a hook. Generation
 still enforces cmd.exe's 8191-character command limit, but command length no longer grows with loader size.
+
+## Delivery merge gates have unequal host wiring
+
+The engineering harness and host manifests wire `merge_review_gate.py` and
+`persistent_workflow_merge_gate.py` for Claude only. Codex has body-validation and cleanup wiring,
+but the manifest contains neither merge gate. This establishes a wiring difference, not a proven
+Codex API limitation or installed-host execution. Both hosts can run the shared workflow helpers;
+source review and delivery authorization still require their recorded evidence.
+
+Resolver: the existing configurable-auto-merge/delivery owner on `Feature/ConfigurableAutoMerge`,
+with the rollout retained by the originating Rust-discovery session. Keep that implementation separate
+from the both-host planning/review evidence repair.
+
+Resolve when the delivery owner records each host's supported review/enqueue interception path,
+wires and verifies equivalent gates where the host supports them, and documents any observed
+API/runtime constraint with the other host's supported outcome. Require fresh trusted-session
+Claude and Codex acceptance evidence before claiming installed enforcement parity.
