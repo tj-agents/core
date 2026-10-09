@@ -84,11 +84,12 @@ Mistakes this session made that such a convention should have prevented, as evid
   resources, compatibility entries, and tests. Kinds, lanes, layout and packaging are links.
 - **Sizing reconciles `SKILL_KINDS.md`.** Its "separate owner" sentence moves into the convention's sizing
   rule, which adds the discovery cost that sentence omitted; `SKILL_KINDS.md` links there.
-- **Discovery, three layers.** The description triggers on creating, splitting, merging, renaming,
-  retiring or reviewing a skill. Core's `AGENTS.md` names it, because the split decision is made while
-  planning, before any `SKILL.md` is written. Core opts into routing with a one-row
-  `.agents/skill-routes.json` for authored `SKILL.md` paths, so a write is blocked until the convention is
-  loaded and a review's `--skills-for` names it.
+- **Discovery, two layers.** The description triggers on creating, splitting, merging, renaming,
+  retiring or reviewing a skill. Core's `AGENTS.md` links it, because the split decision is made while
+  planning, before any `SKILL.md` is written. A core route table was implemented and then removed on
+  review (F1): carrying one opts the whole repository into write-time routing, whose router blocks every
+  write while any routed skill is unresolved or plugin discovery fails, and it puts every red test run in
+  core under the red-run gate. That cost is out of proportion to routing one file type.
 - **Machine checks.** Description parity across canonical and host entries is already enforced by
   `scripts/sync_plugin_packages.py` (`validate_adapters`). Add a generation check rejecting two public
   names equal once hyphens are removed (`tech-debt` beside `techdebt`). Generating the host adapters
@@ -103,10 +104,10 @@ Mistakes this session made that such a convention should have prevented, as evid
 
 - Picked up 2026-10-09 in `.worktrees/SkillAuthoringConvention` (Claude, L3). Steps 1–2 done.
 - Steps 3–4 done: convention, host entry points, catalog roster, `SKILL_KINDS.md` link, `AGENTS.md` line,
-  core route table, near-miss name check with tests, adapter-generation debt entry. 804 + 983 tests,
+  near-miss name check with a test, adapter-generation debt entry. 804 + 983 tests,
   generation `-Check`, tier payload, catalog and harness `--check`, `docs_reachability.py` and the packaging
-  tests pass. This Claude profile has `engineering` installed but not `base`, so the write-time router is
-  not active on this machine; the review-time `--skills-for` query routes `SKILL.md` paths as intended.
+  tests pass.
+- Step 5: first review pass `changes-requested` (F1 HIGH route table, F2–F3 LOW); all three fixed.
 
 ## Next Steps
 

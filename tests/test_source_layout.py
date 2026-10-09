@@ -2,7 +2,6 @@
 
 import importlib.util
 import json
-import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -335,23 +334,6 @@ class SourceLayoutTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "Duplicate public skill name"):
             SYNC.build(self.root)
-
-    def test_every_authored_skill_file_routes_to_skill_authoring(self):
-        config = SYNC.load(self.root / ".agents/plugins/sources.json")
-        skills = SYNC.discover(self.root, config)
-        authored = [shared["relative"] for shared in skills.values()] + [
-            f"{root}/{name}/SKILL.md"
-            for root in config["host_adapter_roots"].values()
-            for name in skills
-        ]
-        routes = json.loads((ROOT / ".agents/skill-routes.json").read_text(encoding="utf-8"))["routes"]
-        owners = [
-            route for route in routes if "engineering:skill-authoring" in route["skills"]
-        ]
-        self.assertEqual(1, len(owners))
-        pattern = re.compile(owners[0]["path"])
-        self.assertEqual([], [path for path in authored if not pattern.search(path)])
-        self.assertIsNone(pattern.search("plugins/engineering/skills/lanes/SKILL.md"))
 
     def test_public_names_equal_without_hyphens_fail_generation(self):
         source = self.root / ".agents/engineering/workflow/techdebt"

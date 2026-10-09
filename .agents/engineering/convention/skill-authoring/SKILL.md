@@ -45,10 +45,11 @@ and checklists with the skill they support.
 ## Name the subject the reader is thinking of
 
 A public name is a lowercase hyphenated word or phrase naming the subject an agent has in mind when it
-needs the skill, not the mechanism inside it. The generator enforces the syntax and rejects an exact
-duplicate within the repository, and rejects two names that are equal once their hyphens are removed.
+needs the skill, not the mechanism inside it. Generation enforces the syntax and rejects an exact
+duplicate within the repository. Core's generator also rejects two names equal once their hyphens are
+removed; `kit:check` applies its own folder-naming rules, which do not catch that case.
 
-The generator cannot see other plugins. Before choosing a name, check every installed plugin on both
+No generator sees other plugins. Before choosing a name, check every installed plugin on both
 hosts for the same bare name and for a near miss: a plural, a reordered phrase, or a name one hyphen
 away. Choose a different name for a near miss. When a bare name is shared with another publisher, write
 the qualified `plugin:name` in every reference to it, because a bare name may select the other plugin's
