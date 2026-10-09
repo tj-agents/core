@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `d110e09cd4e00b063a4850583808313de5ac7f69`  `(2026-10-09)`
+**Reviewed up to commit:** `6e494c955d432479a8f123fbc6c05380d6f916ab`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
@@ -122,16 +122,55 @@ not defects; and the bold lead's conflict with the hold exception is resolved by
 - [x] **CON7 — MEDIUM — contradiction** — `.agents/engineering/convention/docs-and-debt/SKILL.md:117`
   CON2's "lowest node" `AGENTS.md` is not always loaded, which defeats the rule. Require the root
   `AGENTS.md` and say the cost of missing it outranks the lowest-node default.
+  Fixed in `6e494c9`.
 - [x] **CON8 — MEDIUM — contradiction** — `.agents/engineering/convention/review-lifecycle/SKILL.md:119`
   `[wontfix]` now demanded a handoff or entry even for a rejected finding. Require it only for postponed
   work.
+  Fixed in `6e494c9`.
 - [x] **CON9 — LOW — contradiction** — `.agents/engineering/policy/session-guidance/SKILL.md:105`
   "In this change" accepted an entry on a branch that may never merge. Say "landed or landing with this
   change".
+  Fixed in `6e494c9`; superseded by CON11, which restores the plain pointer.
 - [x] **INST5 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:149`
   The merge-hold clause relied on a goal a standalone task may lack and on the report. Open the entry's PR,
   name it, and let it land when the hold lifts.
+  Fixed in `6e494c9`; superseded by CON10, which reuses the planning-artifact delivery gates.
 - [x] **TEST1 — LOW — test-coverage** — `.agents/hooks/tests/test_process_standards.py:106`
   The pinned terminal-check phrase did not cover the new qualifier. Extend the assertion.
+  Fixed in `6e494c9`.
 - [x] **ACC3 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:69`
   Ticked findings carried no fix evidence. Record the fixing commit on each.
+  Fixed in `6e494c9`.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `d110e09cd4e00b063a4850583808313de5ac7f69`
+**Candidate head:** `6e494c955d432479a8f123fbc6c05380d6f916ab`
+**Candidate branch:** `Docs/DirectionChangeConventions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:9f97040830445a13f1fb91117a6d2848eb3f2924e48e7bf277523a9d5c8f6af6` `(5 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/afnBN4akVzlVwWsr7gS10D/klHwSE0f9WdBjh3lqz22D3`
+**Candidate bundle identity:** `sha256:93c19ba3716d701e64ae41249b02946c9affead7c97b1df3482fc455ef0f0961`
+**Work-order path:** `reviews/Docs-DirectionChangeConventions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+Dropped after verification: the lowest-node rule in "One rule, one home" needs no exception, because the
+"Sort a rule by the cost of missing it" section already places rules by cost and the direction rule, which
+lives there, states its precedence.
+
+- [x] **CON10 — MEDIUM — contradiction** — `.agents/engineering/convention/docs-and-debt/SKILL.md:149`
+  The bespoke hold clause accepted an unmerged entry, dropped tracking and told the agent to open a PR
+  against a "no PRs" limit. Replace it with the planning-artifact standing authorization and delivery gates.
+- [x] **CON11 — MEDIUM — contradiction** — `.agents/engineering/policy/session-guidance/SKILL.md:105`
+  "Landed or landing with this change" rejected the separate docs-PR path. Restore the plain pointer;
+  `docs-and-debt` alone defines what counts as an entry.
+- [x] **ACC4 — MEDIUM — accuracy** — `.agents/engineering/convention/docs-and-debt/SKILL.md:118`
+  A one-line pointer in `AGENTS.md` leaves the costly parts (scope, unmoved code) on demand. State the rule
+  itself in the root `AGENTS.md`, linking only further detail.
+- [x] **ACC5 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:121`
+  Pass-3 findings lacked fix evidence. Record it.
+- [x] **TEST2 — LOW — test-coverage** — `.agents/hooks/tests/test_process_standards.py:110`
+  Neither new `docs-and-debt` rule was pinned. Pin the direction placement and the recording rule.
