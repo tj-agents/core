@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -225,21 +224,24 @@ CODEX_WINDOWS_COMMAND_BUDGET = 8191
 WINDOWS_MAX_PATH = 260
 
 
-def codex_snapshot_expression(loader: str) -> str:
-    """Return the Python expression that runs the loader, as a pure function of its text.
-
-    Base64 ([A-Za-z0-9+/=]) in single-quoted literals contains nothing that sh, PowerShell or cmd.exe
-    interpret inside the surrounding double quotes, so one expression serves every host. No
-    compression: zlib output differs between implementations (zlib-ng on Windows CPython), which
-    would make the generated packages and their digests platform-dependent.
-    """
-    encoded = base64.b64encode(loader.encode("utf-8")).decode("ascii")
-    return f"exec(__import__('base64').b64decode('{encoded}').decode())"
+def codex_snapshot_bootstrap(loader: str) -> str:
+    digest = hashlib.sha256(canonical_output_bytes(loader)).hexdigest()
+    return (
+        "import hashlib,os,runpy,sys,tempfile;from pathlib import Path;"
+        "r=Path(sys.argv[1]);e=sys.argv[2];"
+        "d=Path(os.environ.get('PLUGIN_DATA','')).resolve();"
+        "p=r/'hooks'/'codex_hook_snapshot.py';"
+        "p=p if p.is_file() else d/'hook-snapshots'/hashlib.sha256((str(r)+chr(0)+e).encode()).hexdigest()/'hooks'/'codex_hook_snapshot.py';"
+        "b=p.read_bytes() if p.is_file() else b'';n=chr(10).encode();"
+        "b=b.replace(chr(13).encode()+n,n).replace(chr(13).encode(),n);"
+        f"h=hashlib.sha256(b).hexdigest();h=='{digest}' or (sys.stderr.write('Codex hook snapshot loader integrity check failed'+chr(10)),sys.exit(2));"
+        "t=tempfile.TemporaryDirectory();q=Path(t.name)/'loader.py';q.write_bytes(b);runpy.run_path(str(q),run_name='__main__')"
+    )
 
 
 def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
     loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
-    expression = codex_snapshot_expression(loader)
+    bootstrap = codex_snapshot_bootstrap(loader)
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         excluded = ["hooks/codex.json"]
@@ -252,12 +254,13 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
                 for hook in group["hooks"]:
                     for field in ("command", "commandWindows"):
                         command = hook[field]
-                        prefix = "python3 -B " if field == "command" else "python -B "
-                        if not command.startswith(prefix + '"${PLUGIN_ROOT}/'):
+                        source_prefix = "python3 -B " if field == "command" else "python -B "
+                        launcher_prefix = "python3 -I -B " if field == "command" else "python -I -B "
+                        if not command.startswith(source_prefix + '"${PLUGIN_ROOT}/'):
                             raise ValueError(f"Unsupported Codex {field} for {plugin}: {command}")
                         hook[field] = (
-                            prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
-                            f'"{plugin}" ' + command[len(prefix):]
+                            launcher_prefix + f'-c "{bootstrap}" "${{PLUGIN_ROOT}}" "{expected}" '
+                            f'"{plugin}" ' + command[len(source_prefix):]
                         )
                         # Each ${PLUGIN_ROOT} expands at run time; count it at a full Windows path length.
                         expanded = len(hook[field]) + hook[field].count("${PLUGIN_ROOT}") * (
