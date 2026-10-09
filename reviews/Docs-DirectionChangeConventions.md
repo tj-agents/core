@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `6e494c955d432479a8f123fbc6c05380d6f916ab`  `(2026-10-09)`
+**Reviewed up to commit:** `5ad2897b6d6d0f0a50c4eadb2e181174f6523c7d`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
@@ -164,13 +164,50 @@ lives there, states its precedence.
 - [x] **CON10 — MEDIUM — contradiction** — `.agents/engineering/convention/docs-and-debt/SKILL.md:149`
   The bespoke hold clause accepted an unmerged entry, dropped tracking and told the agent to open a PR
   against a "no PRs" limit. Replace it with the planning-artifact standing authorization and delivery gates.
+  Fixed in `5ad2897`.
 - [x] **CON11 — MEDIUM — contradiction** — `.agents/engineering/policy/session-guidance/SKILL.md:105`
   "Landed or landing with this change" rejected the separate docs-PR path. Restore the plain pointer;
   `docs-and-debt` alone defines what counts as an entry.
+  Fixed in `5ad2897`.
 - [x] **ACC4 — MEDIUM — accuracy** — `.agents/engineering/convention/docs-and-debt/SKILL.md:118`
   A one-line pointer in `AGENTS.md` leaves the costly parts (scope, unmoved code) on demand. State the rule
   itself in the root `AGENTS.md`, linking only further detail.
+  Fixed in `5ad2897`.
 - [x] **ACC5 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:121`
   Pass-3 findings lacked fix evidence. Record it.
+  Fixed in `5ad2897`.
 - [x] **TEST2 — LOW — test-coverage** — `.agents/hooks/tests/test_process_standards.py:110`
   Neither new `docs-and-debt` rule was pinned. Pin the direction placement and the recording rule.
+  Fixed in `5ad2897`.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `6e494c955d432479a8f123fbc6c05380d6f916ab`
+**Candidate head:** `5ad2897b6d6d0f0a50c4eadb2e181174f6523c7d`
+**Candidate branch:** `Docs/DirectionChangeConventions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:3afcdd8769def7c9e6918b1a6da3225c1ccd588c30b495ad609ea559dfc5be57` `(5 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/StPal4RlAe2x1VkrfsrTw5/RAkuMl1vSk0mAFzYwGFfnm`
+**Candidate bundle identity:** `sha256:a307beb5f981649142f717cf465603ae0c85f62a86e552c305aba598d782cb7c`
+**Work-order path:** `reviews/Docs-DirectionChangeConventions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+Dropped after verification: re-qualifying the terminal check (each qualifier so far contradicted one of the
+owner's own record paths; the pointer names the owner); the bold lead's timing (it does not time the
+landing, and the delivery gate governs a held PR); the watermark trailing the head (the lifecycle's normal
+state between passes); pinning the merge-docs sentence (the two rules' load-bearing sentences are pinned);
+and a shared test helper (the new tests follow the file's existing per-test flattening).
+
+- [x] **INST6 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:147`
+  "Delivery gates as a planning artifact" did not say where those gates are defined. Name
+  `engineering:plans`' "Planning artifacts always land".
+- [x] **INST7 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:121`
+  "The convention" was ambiguous between `AGENTS.md` and the linked doc. Say the `AGENTS.md` statement
+  itself carries what new code does, its scope and unmoved-code treatment.
+- [x] **ACC6 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:160`
+  Pass-4 findings lacked fix evidence. Record it.
+- [x] **ACC7 — LOW — accuracy** — `plans/direction-change-conventions/GOAL.md:66`
+  Next Steps still said to open the PR and progress named an old head. Bring both current.

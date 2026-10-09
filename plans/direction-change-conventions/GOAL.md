@@ -51,19 +51,22 @@ say the rule must reach the repository's always-loaded conventions.
 
 ## Current progress
 
-- Commit `7900a30` pushed on `Docs/DirectionChangeConventions`. Both Python suites green on it
-  (802 + 983 tests); generated, tier, catalog, harness and reachability checks pass.
+- PR: https://github.com/tj-agents/core/pull/168. Both Python suites green on every pushed head
+  (802 + 985 tests at `5ad2897`); generated, tier, catalog, harness and reachability checks pass.
+- Docs review: five passes so far, recorded in `reviews/Docs-DirectionChangeConventions.md`; every
+  retained finding fixed with its commit noted. Later passes began contradicting earlier fixes; the parent
+  dropped those with reasons recorded in the work order.
 - Tommy flagged that `docs-and-debt` bundles two jobs. With his explicit choice of Claude (Codex cannot
-  launch on Linux), a bounded side session `splitdocsanddebt-24` was launched at L3 in
-  `.worktrees/SplitDocsAndDebt`, stacked on this branch; its goal is `plans/split-docs-and-debt/GOAL.md`
-  there. Launch confirmed; acknowledgement not yet observed.
+  launch on Linux), side session `splitdocsanddebt-24` runs at L3 in `.worktrees/SplitDocsAndDebt`, stacked
+  on this branch (goal `plans/split-docs-and-debt/GOAL.md` there). It has acknowledged and rebases after
+  each parent change; message it after every further parent commit.
 - Found while answering why Codex cannot launch: `agent_cli.py` finds Codex on POSIX only via PATH,
-  and agent shells here lack `~/.npm-global/bin`. Routed to the #137 owner (`core-46`), which
-  accepted it and the missing Windows-only note in `handoff-codex` as required fixes before #137 merges.
-
-- PR: https://github.com/tj-agents/core/pull/168 (opened at `6e494c9`).
+  and agent shells here lack `~/.npm-global/bin`. Routed to the #137 owner (`core-46`), which accepted it
+  and the missing Windows-only note in `handoff-codex` as required fixes before #137 merges.
 
 ## Next Steps
 
-Docs review of `origin/main..HEAD`, open the PR, CI, merge through `engineering:merge`. After
-any further parent commit, message `splitdocsanddebt-24` so its stacked branch absorbs it.
+Finish the current incremental docs-review pass over the latest head, then wait for #168's exact-head
+`verify` and `verify-linux`, merge through `engineering:merge-docs` (guidance and process tests only),
+tell `splitdocsanddebt-24` to retarget its stacked PR to `main`, retire this goal and the work order in a
+docs-only closeout, and finish merge Step 5 for this worktree.
