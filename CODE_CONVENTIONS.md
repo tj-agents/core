@@ -2,8 +2,8 @@
 
 Read these conventions before changing runtime scripts, hook wiring, or launchers.
 
-Use the language and runtime appropriate to the repository and host. No language is inherently a safe
-replacement for another; the execution mechanism, inputs and trust boundary determine the risk.
+Use the language and runtime appropriate to the repository and host. Assess the execution mechanism,
+inputs and trust boundary when choosing a safe implementation.
 
 Prefer ordinary function calls, imports, script files and structured APIs over executing source-code
 strings with `exec`, `eval` or `Invoke-Expression`. Use dynamic execution only when a documented requirement
