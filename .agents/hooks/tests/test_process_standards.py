@@ -115,6 +115,8 @@ class ProcessStandardsTests(unittest.TestCase):
             "before or with the first change that depends on it",
             "State the rule itself in the repository's root `AGENTS.md`, which every session loads",
             "A plan governs only its own work",
+            "The `AGENTS.md` statement itself says what all new code does, its scope, and how code "
+            "that has not moved yet is treated",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
