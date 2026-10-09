@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -270,6 +271,47 @@ class HookControlTests(unittest.TestCase):
             capture_output=True, text=True, check=False)
         self.assertEqual(restored.returncode, 0, restored.stderr)
         self.assertIn('hooks = true', config.read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows lock contention is Windows-only')
+    def test_windows_lock_retries_a_transient_open_permission_error(self):
+        lock = CONTROL.lock_path(self.config())
+        original_open = open
+        attempts = 0
+
+        def open_after_transient_permission_error(*args, **kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise PermissionError(13, 'Permission denied')
+            return original_open(*args, **kwargs)
+
+        with mock.patch('builtins.open', side_effect=open_after_transient_permission_error):
+            with CONTROL.ExclusiveLock(lock):
+                self.assertTrue(lock.exists())
+
+        self.assertEqual(attempts, 2)
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows lock contention is Windows-only')
+    def test_windows_lock_closes_and_reopens_after_a_transient_initialization_permission_error(self):
+        lock = CONTROL.lock_path(self.config())
+        original_open = open
+        failed_handle = mock.Mock()
+        failed_handle.read.side_effect = PermissionError(13, 'Permission denied')
+        attempts = 0
+
+        def open_after_transient_permission_error(*args, **kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                return failed_handle
+            return original_open(*args, **kwargs)
+
+        with mock.patch('builtins.open', side_effect=open_after_transient_permission_error):
+            with CONTROL.ExclusiveLock(lock):
+                self.assertTrue(lock.exists())
+
+        failed_handle.close.assert_called_once_with()
+        self.assertEqual(attempts, 2)
 
     @unittest.skipUnless(sys.platform == 'win32', 'PowerShell profile wrapper is Windows-only')
     def test_codex_hooks_profile_wrapper_uses_source_utility(self):
