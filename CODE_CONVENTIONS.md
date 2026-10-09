@@ -2,7 +2,8 @@
 
 Read these conventions before changing runtime scripts, hook wiring, or launchers.
 
-Use the language and runtime appropriate to the repository and host. Assess the execution mechanism,
+Use the language and runtime appropriate to the repository and host; for this repository's shipped code,
+that is set by [Supported platforms](#supported-platforms). Assess the execution mechanism,
 inputs and trust boundary when choosing a safe implementation.
 
 Prefer ordinary function calls, imports, script files and structured APIs over executing source-code
@@ -19,6 +20,36 @@ required integrity boundary depends on them; fail clearly when verification fail
 
 Use standard libraries and explicit prerequisites. Resolve repository-owned dependencies relative to the
 installed package. Do not rely on an unshipped machine-local helper.
+
+## Supported platforms
+
+Everything this repository ships runs on Windows and Linux: skill scripts, hooks, launchers, and the
+tests that cover them. macOS is best effort. A change that works on only one of Windows and Linux is
+incomplete.
+
+- New shipped runtime code is Python using the standard library. Do not add a PowerShell script for
+  shipped behaviour. The one exception is behaviour that exists only on Windows, such as Windows
+  Terminal UI Automation. Run it through Windows' built-in `powershell.exe`, called from a Python entry
+  point that has its own Linux path.
+- Existing shipped PowerShell scripts are being ported; see
+  [`plans/linux-port/LINUX_PORT_PLAN.md`](plans/linux-port/LINUX_PORT_PLAN.md). Do not add behaviour
+  to one. Port it, or add the behaviour to its Python replacement. Until a skill is ported, its SKILL.md
+  states that it is Windows-only, and its Windows commands are not presented as universal.
+- Skill and workflow instructions name the interpreter per platform: `python3` on Linux and macOS,
+  `python` on Windows, where `python3` is usually the Microsoft Store alias stub. Never tell an agent
+  to run `powershell.exe`, `pwsh` or `wt.exe` without saying which platform the instruction is for.
+- Open terminal tabs through `agent_cli.launch_tab` (Windows Terminal, tmux, kitty, Konsole), never by
+  calling a terminal program directly.
+- Find the home directory with `Path.home()`. Gate Windows-only locations such as `LOCALAPPDATA` behind
+  a platform check. POSIX executables have no `.exe`.
+- CI runs `verify` on Windows and `verify-linux` on Linux. A test that only one platform can run gives
+  a skip reason, and the behaviour it covers also has a test on the other platform. Tests whose
+  behaviour differs by platform pin the platform explicitly.
+
+Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
+(`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `shell/`, `install.ps1` and
+`cli-session-recovery/` are the Windows PowerShell profile and its tools, and are Windows-only by
+design.
 
 ## Python and portability
 

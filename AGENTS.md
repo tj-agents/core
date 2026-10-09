@@ -2,6 +2,8 @@
 
 Read `README.md` before changing repository structure.
 Read [`CODE_CONVENTIONS.md`](CODE_CONVENTIONS.md) before changing runtime scripts, hooks, or launchers.
+Shipped code must run on Windows and Linux; follow
+[Supported platforms](CODE_CONVENTIONS.md#supported-platforms).
 
 Global design and cross-repository plans belong in [`tj-agents/docs`](https://github.com/tj-agents/docs).
 Keep core implementation plans here and link to shared designs instead of copying them.

@@ -48,3 +48,20 @@ result event, so after a failed or rejected merge it nags once every 10 minutes 
 
 **Resolution condition.** Codex publishes a tool-result or failure event that hooks can consume; wire the
 gate's failure handler to it and delete the obligation when the merge reports no success.
+
+## Continuation owner state is not safe to replace while read on Windows
+
+`workflow_ops.atomic_json` replaces `owner.json` with `os.replace`, and every reader opens it without the
+owner lock: `continuation_runtime.read` (used by `status`, `main`'s pre-lock worktree resolution and the
+launched child) and the tests' `state()`. On Windows a replace fails with `PermissionError` while another
+process has the file open, and an open can fail while the replace is in progress, so a supervisor save can
+fail under a concurrent `status` or child read, and those reads can fail under a save.
+`test_continuation_runtime`'s `recover_completed_child` (behind `test_recover_completed_receipt_after_deadline`
+and `test_recover_final_launch_receipt_before_budget_gate`) polls `state()` during supervisor saves and
+fails intermittently in Windows `verify`. `hook_control.py` writes its snapshot with the same
+replace-then-read pattern.
+
+Resolve when every reader and writer of `owner.json`, in the runtime and the tests, tolerates the other on
+Windows, whether through the owner lock or a sharing-violation-safe read and replace, and a Windows test
+proves it deterministically: a save succeeds while a reader holds the file open, and a read succeeds across
+a save. Apply the same outcome to `hook_control.py`'s snapshot or record why it cannot race.
