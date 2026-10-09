@@ -9,9 +9,8 @@ the merged worktree, is `engineering:merge` Step 5's self-close path: the target
 session's own worktree. It requires a fresh `removable` verdict from `cleanup_proof.py` for exactly that
 worktree, whose recorded `head`/`branch` must still match the worktree's actual `HEAD` (a commit landed
 after `cleanup_proof.py` ran otherwise re-run it), resolves the claude/codex host this session is actually
-running under, spawns a detached reaper that waits for that host (and, if its parent process is a shell,
-that shell too) to exit and then runs the approved `git worktree remove`/`branch -d|-D` from the primary
-checkout, and only then closes this session's own tab or process.
+running under, then runs a three-phase started/accepted/armed handshake (`Invoke-ReaperHandshake`) with a
+detached reaper before closing this session's own tab or process.
 
 `-Worktree <target>` overrides the target explicitly; it exists for tests, not the documented invocation,
 since a Claude auto-mode allow rule for this script can only match an exact, argument-free command.
@@ -19,8 +18,16 @@ since a Claude auto-mode allow rule for this script can only match an exact, arg
 The reaper is spawned through `Invoke-CimMethod Win32_Process Create`, which parents it to the WMI
 provider host rather than this process or any job object it sits inside — the property that lets it
 outlive the very tab-close that follows it. A `schtasks /create /sc once` one-shot is the fallback when
-CIM is unavailable. Nothing is closed until the reaper proves it started by writing to its result file;
-any failure before that point aborts without closing or removing anything.
+CIM is unavailable. The reaper is inert until explicitly accepted: it writes a `started` record (its own
+pid and start time) and waits; this process validates that record's identity against the live invocation,
+re-checks the receipt and shared-claims preflight, then writes `.accepted` and waits for the reaper's
+`.armed` acknowledgement before closing anything. Any failure at any phase - a failed spawn, an
+unconfirmed, stale or foreign `started` record, a refreshed preflight check that now fails, or a missing
+`.armed` acknowledgement - writes `.cancelled`, best-effort kills a matching reaper by its invocation GUID,
+and aborts without closing or removing anything. Once armed, the reaper re-checks `.cancelled` again
+immediately before touching the worktree, so a late cancellation still wins. `-AcceptTimeoutSeconds` on the
+reaper's command line (from `AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS`) carries the accept bound, since a
+CIM-spawned child inherits no environment.
 
 `AGENT_CLI_HOST_NAMES` overrides the claude/codex executable-stem set for tests, mirroring
 `register_session.py`. `AGENT_FINISH_CLOSE_MODE=process` forces the Stop-Process close path even when a
@@ -36,29 +43,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $ReceiptMaxAgeSeconds = 3600.0
-$ShellProcessNames = @('pwsh', 'powershell', 'cmd', 'bash', 'sh', 'zsh', 'fish', 'nu')
-
-function Get-StateDirectory {
-    $override = $env:AGENT_STATE_DIRECTORY
-    if ($override) { return $override }
-    return (Join-Path $HOME '.agents-state')
-}
-
-function Get-EntryProperty {
-    param($Entry, [string] $Name)
-
-    if ($null -eq $Entry) { return $null }
-    $property = $Entry.PSObject.Properties[$Name]
-    if ($null -eq $property) { return $null }
-    return $property.Value
-}
-
-function Read-JsonFile {
-    param([string] $Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    try { return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
-}
+. (Join-Path $PSScriptRoot 'session_close.ps1')
 
 function Get-NormalizedPathForm {
     param([string] $Path)
@@ -128,15 +113,6 @@ function Get-ResolvedWorktree {
     return $item.FullName.TrimEnd('\')
 }
 
-function Test-UnderOrEqual {
-    param([string] $Candidate, [string] $Root)
-
-    if (-not $Candidate -or -not $Root) { return $false }
-    $c = ($Candidate.TrimEnd('\', '/') -replace '\\', '/').ToLowerInvariant()
-    $r = ($Root.TrimEnd('\', '/') -replace '\\', '/').ToLowerInvariant()
-    return ($c -eq $r) -or $c.StartsWith("$r/")
-}
-
 function Resolve-TargetWorktree {
     param([string] $Provided)
 
@@ -187,265 +163,173 @@ function Get-FreshRemovableReceipt {
     return $receipt
 }
 
-function Get-HostNames {
-    $override = $env:AGENT_CLI_HOST_NAMES
-    if (-not $override) { return @('claude', 'codex') }
-    $names = @($override -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
-    if ($names.Count -eq 0) { return @('claude', 'codex') }
-    return $names
+function Get-EpochSeconds {
+    return [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0
 }
 
-function ConvertTo-UnixTime {
-    param([DateTime] $Value)
+function Invoke-HandshakeKillSweep {
+    param([string] $ResultPath)
 
-    return ([DateTimeOffset]($Value.ToUniversalTime())).ToUnixTimeMilliseconds() / 1000.0
-}
-
-function Resolve-OwnHost {
-    param([int] $DepthCap = 10)
-
-    $hostNames = Get-HostNames
-    $current = $PID
-    $seen = @{}
-    for ($depth = 0; $depth -lt $DepthCap; $depth++) {
-        if ($null -eq $current -or $seen.ContainsKey($current)) { return $null }
-        $seen[$current] = $true
-        $process = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $current" -ErrorAction SilentlyContinue
-        if (-not $process) { return $null }
-        $stem = [IO.Path]::GetFileNameWithoutExtension($process.Name).ToLowerInvariant()
-        if ($hostNames -contains $stem) {
-            return [pscustomobject]@{
-                Pid     = [int] $process.ProcessId
-                Started = ConvertTo-UnixTime -Value $process.CreationDate
-            }
-        }
-        $current = [int] $process.ParentProcessId
-    }
-    return $null
-}
-
-function Test-OnlyHostAndConsoleChildren {
-    param([int] $ParentPid, [int] $HostPid)
-
-    $consoleStems = @('conhost', 'openconsole')
-    $children = @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $ParentPid" -ErrorAction SilentlyContinue)
-    foreach ($child in $children) {
-        if ([int] $child.ProcessId -eq $HostPid) { continue }
-        $childStem = [IO.Path]::GetFileNameWithoutExtension($child.Name).ToLowerInvariant()
-        if ($consoleStems -notcontains $childStem) { return $false }
-    }
-    return $true
-}
-
-function Get-ParentShellHost {
-    param([pscustomobject] $OwnHost)
-
-    $process = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $($OwnHost.Pid)" -ErrorAction SilentlyContinue
-    if (-not $process) { return $null }
-    $parent = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $($process.ParentProcessId)" -ErrorAction SilentlyContinue
-    if (-not $parent) { return $null }
-    $stem = [IO.Path]::GetFileNameWithoutExtension($parent.Name).ToLowerInvariant()
-    if ($ShellProcessNames -notcontains $stem) { return $null }
-    $parentStarted = ConvertTo-UnixTime -Value $parent.CreationDate
-    $delta = $OwnHost.Started - $parentStarted
-    if ($delta -lt 0 -or $delta -gt 10.0) { return $null }
-    if (-not (Test-OnlyHostAndConsoleChildren -ParentPid ([int] $parent.ProcessId) -HostPid $OwnHost.Pid)) { return $null }
-    return [pscustomobject]@{
-        Pid     = [int] $parent.ProcessId
-        Started = $parentStarted
+    $guid = [IO.Path]::GetFileNameWithoutExtension($ResultPath)
+    $candidates = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'powershell.exe' AND CommandLine LIKE '%$guid%'" -ErrorAction SilentlyContinue)
+    foreach ($candidate in $candidates) {
+        $candidatePid = [int] $candidate.ProcessId
+        if ($candidatePid -eq $PID) { continue }
+        $commandLine = [string] $candidate.CommandLine
+        if (-not $commandLine -or $commandLine -notlike "*$guid*" -or $commandLine -notlike '*finish_reaper.ps1*') { continue }
+        if (-not $candidate.CreationDate) { continue }
+        if (-not (Test-ProcessVerifiedLive -ProcessId $candidatePid -StartedAt (ConvertTo-UnixTime -Value $candidate.CreationDate))) { continue }
+        Stop-Process -Id $candidatePid -Force -ErrorAction SilentlyContinue
     }
 }
 
-function Stop-VerifiedProcess {
-    param([pscustomobject] $Target)
+function Invoke-HandshakeCancel {
+    param([string] $ResultPath, [string] $Reason, [switch] $ExpectEvidence)
 
-    $process = Get-Process -Id $Target.Pid -ErrorAction SilentlyContinue
-    if (-not $process) { return }
-    $startTime = try { $process.StartTime } catch { $null }
-    if ($null -eq $startTime) { return }
-    if ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - $Target.Started) -gt 2.0) { return }
-    Stop-Process -Id $Target.Pid -Force
-}
-
-function Stop-WrapperThenHost {
-    param([pscustomobject] $OwnHost, [pscustomobject] $ParentShell)
-
-    if ($ParentShell) { Stop-VerifiedProcess -Target $ParentShell }
-    Stop-VerifiedProcess -Target $OwnHost
-}
-
-function Test-ProcessVerifiedLive {
-    param($ProcessId, $StartedAt)
-
-    if ($null -eq $ProcessId -or $null -eq $StartedAt) { return $false }
-    $process = Get-Process -Id ([int] $ProcessId) -ErrorAction SilentlyContinue
-    if (-not $process) { return $false }
-    $startTime = try { $process.StartTime } catch { $null }
-    if ($null -eq $startTime) { return $false }
-    return ([math]::Abs((ConvertTo-UnixTime -Value $startTime) - [double] $StartedAt) -le 2.0)
-}
-
-function Get-RecordedSessionEntries {
-    $directory = Join-Path (Get-StateDirectory) 'cli-sessions'
-    if (-not (Test-Path -LiteralPath $directory)) { return @() }
-    return @(Get-ChildItem -LiteralPath $directory -Filter '*.json' -File | ForEach-Object {
-        try { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
-    } | Where-Object { $_ })
-}
-
-function Get-OwnRegistryEntry {
-    param([pscustomobject] $OwnHost)
-
-    foreach ($entry in (Get-RecordedSessionEntries)) {
-        $entryPid = Get-EntryProperty -Entry $entry -Name 'pid'
-        $entryStart = Get-EntryProperty -Entry $entry -Name 'pid_started_at'
-        if ($entryPid -eq $OwnHost.Pid -and $null -ne $entryStart -and
-            [math]::Abs([double] $entryStart - $OwnHost.Started) -le 2.0) {
-            return $entry
+    Save-AtomicJson -Path "$ResultPath.cancelled" -Data @{ cancelled = (Get-EpochSeconds); reason = $Reason }
+    if ($ExpectEvidence -and (Read-JsonFile -Path $ResultPath)) {
+        $evidenceDeadline = [DateTime]::UtcNow.AddSeconds(1.0)
+        while ([DateTime]::UtcNow -lt $evidenceDeadline) {
+            $record = Read-JsonFile -Path $ResultPath
+            if ($record -and (Get-EntryProperty -Entry $record -Name 'status')) { break }
+            Start-Sleep -Milliseconds 100
         }
     }
-    return $null
+    Invoke-HandshakeKillSweep -ResultPath $ResultPath
+    throw "finish: $Reason; nothing was closed."
 }
 
-function Get-TitleAndAttachment {
+function Invoke-ReaperHandshake {
     param(
+        [string] $StateDirectory,
         [string] $ResolvedWorktree,
-        [string] $StartingLocation,
-        [pscustomobject] $OwnHost
-    )
-
-    $selfEntry = Get-OwnRegistryEntry -OwnHost $OwnHost
-    $selfCwd = if ($selfEntry) { Get-EntryProperty -Entry $selfEntry -Name 'cwd' } else { $null }
-    $attached = (Test-UnderOrEqual -Candidate $StartingLocation -Root $ResolvedWorktree) -or
-        (Test-UnderOrEqual -Candidate $selfCwd -Root $ResolvedWorktree)
-    return [pscustomobject]@{
-        Attached = $attached
-        Title    = if ($selfEntry) { Get-EntryProperty -Entry $selfEntry -Name 'title' } else { $null }
-    }
-}
-
-function Test-OtherLiveSessionClaimsWorktree {
-    param([string] $ResolvedWorktree, [pscustomobject] $OwnHost)
-
-    foreach ($entry in (Get-RecordedSessionEntries)) {
-        $entryPid = Get-EntryProperty -Entry $entry -Name 'pid'
-        $entryStart = Get-EntryProperty -Entry $entry -Name 'pid_started_at'
-        if ($entryPid -eq $OwnHost.Pid -and $null -ne $entryStart -and
-            [math]::Abs([double] $entryStart - $OwnHost.Started) -le 2.0) { continue }
-        $entryCwd = Get-EntryProperty -Entry $entry -Name 'cwd'
-        if (-not (Test-UnderOrEqual -Candidate $entryCwd -Root $ResolvedWorktree)) { continue }
-        if (Test-ProcessVerifiedLive -ProcessId $entryPid -StartedAt $entryStart) { return $true }
-    }
-    return $false
-}
-
-function Test-SingleRegistryEntryWithTitle {
-    param([string] $Title)
-
-    $count = 0
-    foreach ($entry in (Get-RecordedSessionEntries)) {
-        if ((Get-EntryProperty -Entry $entry -Name 'title') -eq $Title) { $count++ }
-    }
-    return $count -eq 1
-}
-
-function ConvertFrom-TabListingJson {
-    param([string] $Text)
-
-    if (-not $Text -or -not $Text.Trim()) { return @() }
-    try { return @(ConvertFrom-Json -InputObject $Text | ForEach-Object { $_ }) } catch { return @() }
-}
-
-function Test-SingleLiveTabInListing {
-    param([object[]] $Tabs, [string] $Title)
-
-    $found = @($Tabs | Where-Object { $_.title -eq $Title })
-    return $found.Count -eq 1
-}
-
-function Get-LiveTerminalTabs {
-    $output = & (Join-Path $PSScriptRoot 'close-tab.ps1') -Json 2>$null
-    $text = (@($output) | ForEach-Object { [string] $_ }) -join "`n"
-    return (ConvertFrom-TabListingJson -Text $text)
-}
-
-function Test-SingleLiveTabWithTitle {
-    param([string] $Title)
-
-    return (Test-SingleLiveTabInListing -Tabs (Get-LiveTerminalTabs) -Title $Title)
-}
-
-function Invoke-SessionClose {
-    param(
-        [string] $CloseMode,
-        [pscustomobject] $Attachment,
+        [pscustomobject] $Receipt,
         [pscustomobject] $OwnHost,
-        [pscustomobject] $ParentShell
+        [pscustomobject] $ParentShell,
+        [pscustomobject] $Attachment,
+        [string] $ResultPath
     )
 
-    if ($CloseMode -eq 'process') {
-        Stop-WrapperThenHost -OwnHost $OwnHost -ParentShell $ParentShell
-        Write-Output "finish: closed host pid $($OwnHost.Pid) directly (AGENT_FINISH_CLOSE_MODE=process)."
+    $spawnEpoch = Get-EpochSeconds
+    $reaperScript = Join-Path $PSScriptRoot 'finish_reaper.ps1'
+    $spawnTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_SPAWN_TIMEOUT_SECONDS' -Default 15.0
+    $acceptTimeoutEnvValue = [Environment]::GetEnvironmentVariable('AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS')
+    $acceptTimeoutParsed = ConvertTo-FiniteDouble -Value $acceptTimeoutEnvValue
+    $acceptTimeoutSeconds = if ($null -ne $acceptTimeoutParsed) { $acceptTimeoutParsed } else { 60.0 }
+    $acceptTimeoutFloor = [math]::Max(60.0, $spawnTimeoutSeconds + 30.0)
+    if ($acceptTimeoutSeconds -lt $acceptTimeoutFloor) { $acceptTimeoutSeconds = $acceptTimeoutFloor }
+    $acceptTimeoutText = $acceptTimeoutSeconds.ToString([Globalization.CultureInfo]::InvariantCulture)
+    if ($acceptTimeoutEnvValue -and $null -eq $acceptTimeoutParsed) {
+        Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue is not a number; using $acceptTimeoutText seconds."
+    }
+    elseif ($null -ne $acceptTimeoutParsed -and $acceptTimeoutParsed -lt $acceptTimeoutSeconds) {
+        Write-Output "finish: AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS=$acceptTimeoutEnvValue was below the minimum; raised to $acceptTimeoutText seconds."
+    }
+    $commandParts = @(
+        'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $reaperScript,
+        '-HostPid', $OwnHost.Pid, '-HostStart', $OwnHost.Started,
+        '-Head', (Get-EntryProperty -Entry $Receipt -Name 'head'),
+        '-Primary', (Get-EntryProperty -Entry $Receipt -Name 'primary'),
+        '-Worktree', $ResolvedWorktree,
+        '-Branch', (Get-EntryProperty -Entry $Receipt -Name 'branch'),
+        '-Default', (Get-EntryProperty -Entry $Receipt -Name 'default'),
+        '-Result', $ResultPath,
+        '-StateDirectory', $StateDirectory,
+        '-AcceptTimeoutSeconds', $acceptTimeoutText
+    )
+    if ($ParentShell) {
+        $commandParts += @('-ParentPid', $ParentShell.Pid, '-ParentStart', $ParentShell.Started)
+    }
+    $commandLine = Format-CommandLine -Parts $commandParts
+
+    $spawnResult = Start-DetachedReaper -CommandLine $commandLine
+    if (-not ($spawnResult -is [hashtable])) {
+        Invoke-HandshakeCancel -ResultPath $ResultPath `
+            -Reason 'could not spawn the cleanup reaper; neither CIM process creation nor the schtasks fallback succeeded'
         return
     }
-    if ($Attachment.Title -and
-        (Test-SingleRegistryEntryWithTitle -Title $Attachment.Title) -and
-        (Test-SingleLiveTabWithTitle -Title $Attachment.Title)) {
-        & (Join-Path $PSScriptRoot 'close-tab.ps1') $Attachment.Title -Force
+    $spawnPid = ConvertTo-PositiveInt -Value $spawnResult.ProcessId
+
+    $confirmDeadline = [DateTime]::UtcNow.AddSeconds($spawnTimeoutSeconds)
+    $validatedRecord = $null
+    while ($true) {
+        $record = Read-JsonFile -Path $ResultPath
+        if ($null -ne $record) {
+            $valid = $false
+            try {
+                $recordStarted = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $record -Name 'started')
+                $recordHostPid = ConvertTo-PositiveInt -Value (Get-EntryProperty -Entry $record -Name 'host_pid')
+                $recordWorktree = Get-EntryProperty -Entry $record -Name 'worktree'
+                $recordReaperPid = ConvertTo-PositiveInt -Value (Get-EntryProperty -Entry $record -Name 'reaper_pid')
+                $recordReaperStartedAt = ConvertTo-FiniteDouble -Value (Get-EntryProperty -Entry $record -Name 'reaper_started_at')
+
+                $valid = ($null -ne $recordStarted) -and ($recordStarted -ge ($spawnEpoch - 2.0)) -and
+                    ($null -eq (Get-EntryProperty -Entry $record -Name 'status')) -and
+                    ($null -ne $recordHostPid) -and ($recordHostPid -eq $OwnHost.Pid) -and
+                    ($recordWorktree) -and ((Get-NormalizedPathForm $recordWorktree) -eq (Get-NormalizedPathForm $ResolvedWorktree)) -and
+                    ($null -ne $recordReaperPid) -and ((-not $spawnPid) -or ($recordReaperPid -eq $spawnPid)) -and
+                    ($null -ne $recordReaperStartedAt) -and ($recordReaperStartedAt -gt 0)
+            }
+            catch {
+                $valid = $false
+            }
+
+            if ($valid) {
+                $validatedRecord = [pscustomobject]@{ ReaperPid = $recordReaperPid; ReaperStartedAt = $recordReaperStartedAt }
+                break
+            }
+            Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -Reason 'the reaper startup record did not match this invocation'
+            return
+        }
+        if ([DateTime]::UtcNow -ge $confirmDeadline) {
+            Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence `
+                -Reason "the reaper did not confirm it started within $spawnTimeoutSeconds seconds"
+            return
+        }
+        Start-Sleep -Milliseconds 100
+    }
+
+    if (-not (Test-WorktreeMatchesReceipt -ResolvedWorktree $ResolvedWorktree -Receipt $Receipt)) {
+        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence `
+            -Reason "'$ResolvedWorktree' HEAD/branch no longer match the receipt cleanup_proof.py recorded"
         return
     }
-    Stop-WrapperThenHost -OwnHost $OwnHost -ParentShell $ParentShell
-    Write-Output "finish: closed host pid $($OwnHost.Pid) directly (no uniquely identified tab to close)."
-}
+    if (Test-OtherLiveSessionClaimsWorktree -ResolvedWorktree $ResolvedWorktree -OwnHost $OwnHost) {
+        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence `
+            -Reason "another live registered session's cwd is under '$ResolvedWorktree'"
+        return
+    }
 
-function Format-CommandLineArgument {
-    param([string] $Value)
+    Save-AtomicJson -Path "$ResultPath.accepted" -Data @{
+        accepted          = (Get-EpochSeconds)
+        reaper_pid        = $validatedRecord.ReaperPid
+        reaper_started_at = $validatedRecord.ReaperStartedAt
+        host_pid          = $OwnHost.Pid
+    }
 
-    $text = [string] $Value
-    if ($text -eq '') { return '""' }
-    if ($text -match '[\s"]') { return '"' + ($text -replace '"', '\"') + '"' }
-    return $text
-}
-
-function Format-CommandLine {
-    param([string[]] $Parts)
-
-    return ($Parts | ForEach-Object { Format-CommandLineArgument $_ }) -join ' '
-}
-
-function Start-DetachedReaper {
-    param([string] $CommandLine)
+    $armedTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_ARMED_TIMEOUT_SECONDS' -Default 10.0
+    $armedDeadline = [DateTime]::UtcNow.AddSeconds($armedTimeoutSeconds)
+    $armed = $false
+    while ([DateTime]::UtcNow -lt $armedDeadline) {
+        $armedRecord = Read-JsonFile -Path "$ResultPath.armed"
+        if ($armedRecord) {
+            $armedPid = ConvertTo-PositiveInt -Value (Get-EntryProperty -Entry $armedRecord -Name 'reaper_pid')
+            if ($null -ne $armedPid -and $armedPid -eq $validatedRecord.ReaperPid) { $armed = $true; break }
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not $armed) {
+        Invoke-HandshakeCancel -ResultPath $ResultPath -ExpectEvidence -Reason 'the reaper did not acknowledge acceptance in time'
+        return
+    }
 
     try {
-        $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
-            -Arguments @{ CommandLine = $CommandLine } -ErrorAction Stop
-        if ($result.ReturnValue -eq 0) { return $true }
+        Invoke-SessionClose -CloseMode $env:AGENT_FINISH_CLOSE_MODE -Attachment $Attachment -OwnHost $OwnHost -ParentShell $ParentShell
     }
     catch {
+        Save-AtomicJson -Path "$ResultPath.cancelled" -Data @{ cancelled = (Get-EpochSeconds); reason = 'session close failed' }
+        throw
     }
-
-    $taskName = 'agent-finish-reaper-' + [guid]::NewGuid().ToString('N')
-    try {
-        & schtasks.exe /create /tn $taskName /sc once /st 00:00 /rl highest /f /tr $CommandLine 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) { return $false }
-        & schtasks.exe /run /tn $taskName 2>$null | Out-Null
-        $ran = $LASTEXITCODE -eq 0
-        & schtasks.exe /delete /tn $taskName /f 2>$null | Out-Null
-        return $ran
-    }
-    catch {
-        return $false
-    }
-}
-
-function Get-EnvDouble {
-    param([string] $Name, [double] $Default)
-
-    $value = [Environment]::GetEnvironmentVariable($Name)
-    if (-not $value) { return $Default }
-    $parsed = 0.0
-    if ([double]::TryParse($value, [ref] $parsed)) { return $parsed }
-    return $Default
 }
 
 $startingLocation = (Get-Location).Path
@@ -453,6 +337,10 @@ $targetWorktree = Resolve-TargetWorktree -Provided $Worktree
 $resolvedWorktree = Get-ResolvedWorktree -Path $targetWorktree
 $stateDirectory = Get-StateDirectory
 $receipt = Get-FreshRemovableReceipt -StateDirectory $stateDirectory -ResolvedWorktree $resolvedWorktree
+if ((Get-NormalizedPathForm $resolvedWorktree) -eq
+    (Get-NormalizedPathForm (Get-EntryProperty -Entry $receipt -Name 'primary'))) {
+    throw 'finish: the primary checkout cannot be removed; use close.ps1 to retain it.'
+}
 
 $ownHost = Resolve-OwnHost
 if (-not $ownHost) {
@@ -483,37 +371,5 @@ if (-not $PSCmdlet.ShouldProcess($resolvedWorktree, 'Spawn the cleanup reaper an
 
 $resultPath = Join-Path $stateDirectory ('merge-cleanup/results/' + [guid]::NewGuid().ToString('N') + '.json')
 
-$reaperScript = Join-Path $PSScriptRoot 'finish_reaper.ps1'
-$commandParts = @(
-    'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $reaperScript,
-    '-HostPid', $ownHost.Pid, '-HostStart', $ownHost.Started,
-    '-Head', (Get-EntryProperty -Entry $receipt -Name 'head'),
-    '-Primary', (Get-EntryProperty -Entry $receipt -Name 'primary'),
-    '-Worktree', $resolvedWorktree,
-    '-Branch', (Get-EntryProperty -Entry $receipt -Name 'branch'),
-    '-Default', (Get-EntryProperty -Entry $receipt -Name 'default'),
-    '-Result', $resultPath,
-    '-StateDirectory', $stateDirectory
-)
-if ($parentShell) {
-    $commandParts += @('-ParentPid', $parentShell.Pid, '-ParentStart', $parentShell.Started)
-}
-$commandLine = Format-CommandLine -Parts $commandParts
-
-if (-not (Start-DetachedReaper -CommandLine $commandLine)) {
-    throw 'finish: could not spawn the cleanup reaper; neither CIM process creation nor the schtasks fallback succeeded.'
-}
-
-$spawnTimeoutSeconds = Get-EnvDouble -Name 'AGENT_FINISH_SPAWN_TIMEOUT_SECONDS' -Default 5.0
-$deadline = [DateTime]::UtcNow.AddSeconds($spawnTimeoutSeconds)
-$started = $false
-while ([DateTime]::UtcNow -lt $deadline) {
-    $record = Read-JsonFile -Path $resultPath
-    if ($record -and (Get-EntryProperty -Entry $record -Name 'started')) { $started = $true; break }
-    Start-Sleep -Milliseconds 100
-}
-if (-not $started) {
-    throw "finish: the reaper did not confirm it started within $spawnTimeoutSeconds seconds; nothing was closed."
-}
-
-Invoke-SessionClose -CloseMode $env:AGENT_FINISH_CLOSE_MODE -Attachment $attachment -OwnHost $ownHost -ParentShell $parentShell
+Invoke-ReaperHandshake -StateDirectory $stateDirectory -ResolvedWorktree $resolvedWorktree -Receipt $receipt `
+    -OwnHost $ownHost -ParentShell $parentShell -Attachment $attachment -ResultPath $resultPath

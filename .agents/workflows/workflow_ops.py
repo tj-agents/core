@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import delivery_runtime
 import workflow_runtime
@@ -27,6 +28,8 @@ DEFAULT_SUMMARY_LINES = 8
 DEFAULT_FAILURE_ITEMS = 20
 DEFAULT_SUMMARY_BYTES = 4096
 DEFAULT_POLL_SECONDS = 60
+MIN_PR_READINESS_POLL_SECONDS = 15
+MAX_PR_READINESS_POLL_SECONDS = 300
 DEFAULT_MONITOR_SECONDS = 21600
 DEFAULT_OFFLINE_GAP_SECONDS = 300
 REVIEW_BUNDLE_RETENTION_SECONDS = 7 * 24 * 60 * 60
@@ -35,6 +38,22 @@ FAILURE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 SECRET_PATTERN = re.compile(r"(?:token|secret|password|key|authorization)", re.IGNORECASE)
+EXTERNAL_BILLING_PATTERN = re.compile(
+    r"(?:failed payment|payment failed|spending limit|billing.{0,80}(?:payment|limit)|(?:payment|billing).{0,80}(?:failed|limit))",
+    re.IGNORECASE,
+)
+EXTERNAL_RUNNER_PATTERN = re.compile(
+    r"(?:no (?:self-hosted )?runners? (?:are )?(?:available|online)|runner.{0,80}(?:unavailable|offline|not available))",
+    re.IGNORECASE,
+)
+EXTERNAL_PROVIDER_PATTERN = re.compile(
+    r"(?:provider.{0,80}(?:unavailable|outage|incident)|external service.{0,80}(?:unavailable|outage|incident))",
+    re.IGNORECASE,
+)
+EXTERNAL_ACCOUNT_PATTERN = re.compile(
+    r"(?:account.{0,80}(?:disabled|suspended|restricted)|organization.{0,80}(?:disabled|suspended|restricted))",
+    re.IGNORECASE,
+)
 
 
 class WorkflowOperationError(RuntimeError):
@@ -972,8 +991,10 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
     reasons = []
     if current_head != descriptor["head"]:
         reasons.append("candidate-head-changed")
-    if current_base != descriptor["base"]:
-        changed = git(root, "diff", "--name-only", descriptor["base"], current_base).splitlines()
+    comparison_base = git(root, "merge-base", descriptor["head"], current_base)
+    base_moved = current_base != comparison_base
+    if base_moved:
+        changed = git(root, "diff", "--name-only", comparison_base, current_base).splitlines()
         sensitive = set(descriptor["paths"]) | {rule["path"] for rule in descriptor["rules"]}
         if sensitive.intersection(changed):
             reasons.append("base-changed-relevant-evidence")
@@ -985,7 +1006,7 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
         "current_head": current_head,
         "review_required": bool(reasons),
         "reasons": reasons,
-        "base_moved": current_base != descriptor["base"],
+        "base_moved": base_moved,
         "exact_head": current_head == descriptor["head"],
     }
     append_event(root, workflow_run_id, {"kind": "review", "operation": "reconcile", "review_required": result["review_required"]})
@@ -1009,6 +1030,159 @@ def parse_status_checks(checks):
         elif status not in {"completed", "success"} or not conclusion:
             pending.append(name)
     return failures, pending
+
+
+def failed_check_items(checks):
+    failures = []
+    for check in checks or []:
+        state = str(check.get("state") or "").lower()
+        conclusion = str(check.get("conclusion") or "").lower()
+        if state in {"error", "failure", "failed"} or (
+            conclusion and conclusion not in {"success", "neutral", "skipped"}
+        ):
+            failures.append(check)
+    return failures
+
+
+def check_url(check):
+    return check.get("detailsUrl") or check.get("targetUrl") or check.get("url") or check.get("permalink")
+
+
+def classify_external_check(value):
+    output = value.get("output") or {}
+    text = "\n".join(
+        str(item or "") for item in (value.get("name"), output.get("title"), output.get("summary"), output.get("text"))
+    )
+    if EXTERNAL_BILLING_PATTERN.search(text):
+        return {
+            "kind": "github-billing",
+            "resolver": "GitHub organization/account billing administrator",
+            "resume_condition": "The GitHub organization/account billing administrator restores billing or raises the spending limit, then rerun pr-readiness.",
+        }
+    if EXTERNAL_RUNNER_PATTERN.search(text):
+        return {
+            "kind": "runner",
+            "resolver": "repository or organization runner administrator",
+            "resume_condition": "A repository or organization runner administrator restores an eligible runner, then rerun pr-readiness.",
+        }
+    if EXTERNAL_ACCOUNT_PATTERN.search(text):
+        return {
+            "kind": "account",
+            "resolver": "GitHub organization/account administrator",
+            "resume_condition": "The GitHub organization/account administrator restores the account, then rerun pr-readiness.",
+        }
+    if EXTERNAL_PROVIDER_PATTERN.search(text):
+        return {
+            "kind": "provider",
+            "resolver": "external provider administrator",
+            "resume_condition": "The external provider administrator restores the service, then rerun pr-readiness.",
+        }
+    return None
+
+
+def external_check_block(root, repository, check, head):
+    check_id = check.get("databaseId") or check.get("id")
+    endpoint = (
+        f"repos/{repository}/check-runs/{check_id}"
+        if check_id is not None
+        else f"repos/{repository}/commits/{head}/check-runs"
+    )
+    completed = run_process(["gh", "api", endpoint], root, check=False)
+    if completed.returncode:
+        return None
+    try:
+        value = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return None
+    if check_id is not None:
+        return classify_external_check(value)
+    name = check.get("name") or check.get("context")
+    for item in value.get("check_runs") or []:
+        if item.get("name") == name:
+            block = classify_external_check(item)
+            if block:
+                return block
+    return None
+
+
+def pr_readiness_observation(root, pr, repo=None, poll_seconds=DEFAULT_POLL_SECONDS):
+    value = pull_request_state(root, pr, repo)
+    repository = repo or repository_slug(root)
+    failures = failed_check_items(value.get("statusCheckRollup"))
+    pending = parse_status_checks(value.get("statusCheckRollup"))[1]
+    identity = {"pr": value.get("number"), "url": value.get("url"), "repository": repository}
+    state = str(value.get("state") or "open").lower()
+    if state != "open":
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "pr-readiness",
+            "state": state,
+            "terminal": True,
+            "message": f"PR is {state}, not ready for the next delivery gate.",
+            "identity": identity,
+            "exit_state": "passed" if state == "merged" else "failed",
+        }
+    if failures:
+        for failed in failures:
+            check = {"name": failed.get("name") or failed.get("context") or "unknown", "url": check_url(failed)}
+            block = external_check_block(root, repository, failed, value.get("headRefOid"))
+            if block:
+                return {
+                    "schema_version": SCHEMA_VERSION,
+                    "operation": "pr-readiness",
+                    "state": "blocked",
+                    "terminal": True,
+                    "eta": "no ETA available",
+                    "failed_check": check,
+                    "external_block": block,
+                    "identity": identity,
+                    "exit_state": "failed",
+                }
+        failed = failures[0]
+        check = {"name": failed.get("name") or failed.get("context") or "unknown", "url": check_url(failed)}
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "pr-readiness",
+            "state": "failed",
+            "terminal": True,
+            "failed_check": check,
+            "identity": identity,
+            "exit_state": "failed",
+        }
+    if pending:
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "pr-readiness",
+            "state": "waiting",
+            "terminal": False,
+            "observed_pending_checks": pending,
+            "recheck_seconds": poll_seconds,
+            "identity": identity,
+            "exit_state": "waiting",
+        }
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "operation": "pr-readiness",
+        "state": "ready",
+        "terminal": True,
+        "message": "PR checks are green and ready for the next delivery gate.",
+        "identity": identity,
+        "exit_state": "passed",
+    }
+
+
+def pr_readiness(root, pr, repo=None, poll_seconds=DEFAULT_POLL_SECONDS, watch=False, on_wait=None):
+    if not MIN_PR_READINESS_POLL_SECONDS <= poll_seconds <= MAX_PR_READINESS_POLL_SECONDS:
+        raise WorkflowOperationError(
+            f"pr readiness poll seconds must be between {MIN_PR_READINESS_POLL_SECONDS} and {MAX_PR_READINESS_POLL_SECONDS}"
+        )
+    while True:
+        result = pr_readiness_observation(root, pr, repo, poll_seconds)
+        if result["terminal"] or not watch:
+            return result
+        if on_wait is not None:
+            on_wait(result)
+        time.sleep(poll_seconds)
 
 
 def forge_observation(root, identity):
@@ -1890,6 +2064,12 @@ def parser():
     body_check.add_argument("--pr", required=True)
     body_check.add_argument("--repo")
 
+    readiness = commands.add_parser("pr-readiness")
+    readiness.add_argument("--pr", required=True)
+    readiness.add_argument("--repo")
+    readiness.add_argument("--poll-seconds", type=float, default=DEFAULT_POLL_SECONDS)
+    readiness.add_argument("--watch", action="store_true")
+
     bind = commands.add_parser("delivery-bind")
     bind.add_argument("--pr", type=int)
     bind.add_argument("--approval-record")
@@ -1936,6 +2116,11 @@ def main(argv=None):
         result = goal_preflight(root, arguments.workflow_run_id)
     elif arguments.operation == "pr-body-check":
         result = pr_body_check(root, arguments.pr, arguments.repo)
+    elif arguments.operation == "pr-readiness":
+        result = pr_readiness(
+            root, arguments.pr, arguments.repo, arguments.poll_seconds, arguments.watch,
+            emit if arguments.watch else None,
+        )
     elif arguments.operation == "delivery-bind":
         declared = (arguments.workflow_id, arguments.state_artifact, arguments.next_stage)
         if any(declared) and not all(declared):

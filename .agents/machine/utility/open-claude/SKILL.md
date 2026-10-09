@@ -29,9 +29,11 @@ python3 '<skill-directory>/scripts/open_claude.py' --working-directory '<absolut
 Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
-- `--resume '<session-id>'` reopens a specific past session; `--continue` reopens the most recent one for
-  that directory. A session resumes only from the directory it was started in, so pass the session's own
-  `cwd` as `--working-directory`.
+- `--resume '<session-id>'` first resolves the exact saved session and its original directory, checks for a
+  live writer, and preserves the selected Claude profile. Reconcile an unknown live identity before resuming.
+  `--continue` reopens the most recent session for that directory.
+- `--confirm-closed` records the user's explicit reconciliation that an unknown saved session has no live writer;
+  it never overrides a verified live session.
 - `--prompt '<short instruction>'` seeds a first turn. For anything substantial write a file and pass
   `--prompt-path` instead; never relay a long prompt through a nested command string.
 - `--model '<model-id>'` only when the user named one or a checked-in selection policy already resolved

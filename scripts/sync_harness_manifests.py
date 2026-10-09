@@ -112,8 +112,16 @@ def synchronize(root: Path, check: bool) -> dict[str, dict]:
         if manifest["plugin"] != f"base-agents/{plugin}":
             raise ValueError(f"{path}: plugin identity mismatch")
         expected_roots = sorted(scope["root"] for scope in config["scopes"] if scope["plugin"] == plugin)
-        if manifest["source_roots"] != expected_roots:
-            raise ValueError(f"{path}: source roots must be {expected_roots}")
+        roots = manifest["source_roots"]
+        if not isinstance(roots, list) or not all(isinstance(value, str) for value in roots) or roots != sorted(set(roots)):
+            raise ValueError(f"{path}: source roots must be sorted unique paths")
+        if not set(expected_roots).issubset(roots):
+            raise ValueError(f"{path}: source roots must include {expected_roots}")
+        resources = [inside(root, resource["source"]) for resource in config.get("resources", []) if resource["plugin"] == plugin]
+        for relative in set(roots) - set(expected_roots):
+            source = inside(root, relative)
+            if source.relative_to(root.resolve()).as_posix() != relative or not source.exists() or not any(source == resource or resource.is_dir() and source.is_relative_to(resource) for resource in resources):
+                raise ValueError(f"{path}: source root is not a canonical shipped {plugin} resource: {relative}")
         validate_requires(root, config, catalog, plugin, manifest["requires"])
         result[plugin] = manifest
     return result

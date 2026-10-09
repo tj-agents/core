@@ -8,6 +8,7 @@ not relied on.
 
 import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -153,6 +154,7 @@ def main(argv=None):
         if effort:
             selection += f' at {effort}'
         print(f"Launched codex-cli {version['text']} from {codex} on {selection}")
+        print(json.dumps({"event": "agent-handoff-submitted", "worktree": str(working_directory), "prompt_path": str(prompt_path)}))
         return 0
     except agent_cli.LaunchError as exc:
         return agent_cli.report_launch_failure(exc)

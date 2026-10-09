@@ -85,8 +85,9 @@ ships a capability something else consumes — its **consumption contract**. Pha
 intermediate state builds and passes.
 
 For a project selecting the Concertable pre-launch profile, its always-on instructions outrank every plan. That profile's router pre-launch guard applies to every write in every
-task lifecycle, while `python .agents/hooks/plan_graph.py --root . --plan <repo-relative *_PLAN.md>` applies
-that same shared policy to the complete selected plan before it is implementation-ready or executable. This
+task lifecycle, enforced through Concertable's own adapter CLI, separately from
+`python -B .agents/hooks/plan_graph.py --root .`, which applies the shared structural ledger check to the
+complete selected plan before it is implementation-ready or executable. This
 catches instructions that existed before the write-time guard. A failure requires correcting the plan
 immediately to the direct replacement-and-deletion outcome; never execute around it.
 
@@ -361,8 +362,9 @@ boundary makes the conversation disposable; it does not require disposing of it.
 
 **Continue in the current context by default for small and medium plans** when the next action belongs to
 the same logical workstream, the loaded goals, constraints, decisions, and evidence remain relevant and
-coherent, and the user's existing authorization covers the next phase. The parent may delegate bounded work
-to an appropriate lane agent while retaining ownership. Move directly into that work after the durable
+coherent, and the user's existing authorization covers the next phase. A Claude parent hands delegated work
+to Codex unless the user explicitly chooses local non-frontier Claude work. The parent retains ownership.
+Move directly into that work after the durable
 checkpoint; do not stop for a handoff merely because planning or another phase completed.
 
 For a massive plan whose design was a substantial phase of its own, write a durable phased execution plan

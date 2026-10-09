@@ -135,7 +135,7 @@ but `engineering:merge` must verify that its base is eligible before acting. Aft
 reconcile the child and refresh this binding so the continuation does not rely on stale topology.
 
 ```bash
-python .agents/workflows/workflow_ops.py --workflow-run-id delivery-bind-pr-<n> delivery-bind --pr <n>
+python <workflow-ops> --root <delivery-checkout> --workflow-run-id delivery-bind-pr-<n> delivery-bind --pr <n>
 ```
 
 It resolves the repository's recorded standing merge authorization against this head and writes the binding
@@ -144,6 +144,10 @@ delivery-binding gate has already run it for you — then it is bound, not to be
 harness's `persistent-workflow` skill to give that binding a continuation.
 
 ### 7. Report and continue
+
+When the canonical goal has a fenced `completion` record, retain every unchecked PR task there with the
+PR's repository, number, full head SHA, task text, owner, and next action. Keep those entries until a fresh
+completion check observes the task resolved.
 
 Print the PR URL. Opening a draft is not a context boundary: continue implementing, reviewing, or observing
 the candidate when the current authorization and context still cover that work. If landing is genuinely next,
