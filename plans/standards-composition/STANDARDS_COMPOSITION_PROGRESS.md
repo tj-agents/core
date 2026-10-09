@@ -17,13 +17,13 @@ The proposal is authored in the canonical plan: homogeneous contract skills, an 
 
 ## Verification
 
-Current inventory verification: core finite-profile reader 11 tests; .NET source/profile 3; React core-profile 5; kit generator 42; employer 14, all passed. The two JSON examples parse and nine Python excerpts syntax-check in their stated expression/function contexts. These checks do not establish proposed API integration or host acceptance.
+Current inventory verification: core finite-profile reader 11 tests; .NET source/profile 3; React core-profile 5; kit generator 42; employer 14, all passed. Three JSON examples and nine Python excerpts receive syntax checks in their stated expression/function contexts. These checks do not establish proposed API integration or host acceptance.
 
-Plan graph: zero errors, one pre-existing size warning in the unrelated repo-declared-config ledger. Workflow v2 repository provider resolves this branch, plan and next action. `git diff --check` passes. Frozen reachability and documentation review remain the publication gate.
+Plan graph: zero errors, one pre-existing size warning in the unrelated repo-declared-config ledger. Workflow v2 repository provider resolves this branch, plan and next action. `git diff --check` passes. Frozen documentation reachability passed with zero errors/warnings. Final incremental documentation review remains the publication gate.
 
 ## Reviews
 
-The predecessor review does not qualify this proposal. Run a fresh frozen documentation review, including implementation-design followability and source accuracy, then correct findings and review the changed candidate. Canonical work order: `reviews/Docs-StandardsCompositionDesign.md`.
+Native Codex review and parent documentation review completed at `421bbae`. The configured fresh lens was unavailable (unsupported model); the documented parent fallback covered its bounded design/accuracy check. Four findings are corrected in this candidate: resource addressing, target-relevant choices, an unspecified concern API, and legacy-release compatibility. Canonical work order: `reviews/Docs-StandardsCompositionDesign.md`; final incremental review must qualify the repairs before publication.
 
 ## Decisions, discoveries, blockers, and deviations
 
