@@ -42,7 +42,7 @@ Employer and repository standards compose with selected shared standards. Resolv
 
 ### Phase 1: Resolve the taxonomy and publish the maintained design
 
-Inventory core, kit, dotnet and employer contracts against actual source, distinguishing universal scope, technical prerequisites and house decisions. Begin with the merged .NET family/profile tests and core finite-profile reader, and distinguish package selection from individual requirement selection. Read the existing composition, conditional-route, source-ownership and auto-merge owners. Resolve overlap and the exact selection schema, diagnostics and migration examples before declaring runtime work ready.
+Inventory core, kit, dotnet, react and employer contracts against actual source, distinguishing universal scope, technical prerequisites and house decisions. Begin with the merged .NET family/profile tests and core finite-profile reader, and distinguish package selection from individual requirement selection. Read the existing composition, conditional-route, source-ownership and auto-merge owners. Resolve overlap and the exact selection schema, diagnostics and migration examples before declaring runtime work ready.
 
 Consumption: each source owner receives one path-to-contract inventory and its own concrete implementation plan; the cross-repository plan records only dependencies and shared acceptance. Existing owned plans remain their single progress owners.
 
@@ -56,13 +56,17 @@ Consumption: both host adapters, routes and review preparation receive the same 
 
 Gate: core resolver/route/review tests prove matching selections, conflicting house decisions, absent profiles, unresolved dependencies, nested worktrees and missing load proof. Source tests alone do not qualify live host acceptance.
 
-### Phase 3: Separate .NET contracts by real applicability
+### Phase 3: Separate .NET and React contracts by real applicability
 
 Split universal/technical C# guidance from personal house conventions and explicitly adopted DDD/value behavior. Give EF Core, Dapper and raw-provider contracts separate technology identities and finer selected-abstraction prerequisites. Separate tenant mechanisms by implementation. Do not invent Dapper guidance from EF guidance. Keep one canonical owner per rule and explicitly migrate published names/profile membership.
 
 Consumption: generated selection inventory and routes express selected contracts and technology prerequisites, including DDD behavior under API paths. No EF library or personal style rule is selected solely by a filename or .NET presence.
 
 Gate: dotnet tests cover EF-only, Dapper-only, raw-Npgsql, mixed projects, employer underscore fields, selected DDD under API, and omitted personal logging conventions. Published producer identity is verified before adopting it in consumers.
+
+React is the second initial stack owner, alongside .NET. Inspect its existing family/profile metadata and source routes before proposing changes. Separate React/TypeScript correctness and explicitly adopted domain guidance from personal styling, library, state-management and testing preferences wherever the actual source mixes them. Include employer-selected and mixed-stack examples. Do not infer that installing React adopts every selected-stack preference.
+
+Kit owns producer/template mechanics. Propose template, schema or generator changes only when the .NET/React composition requirements expose a concrete gap in the current kit contract. If no kit change is needed, record the existing supported mechanism and evidence. Include regeneration/migration examples and producer tests for any required change; generated skill files are not the authored fix.
 
 ### Phase 4: Employer profiles and intentional personal adoption
 
@@ -84,6 +88,14 @@ Repair the common-to-engineering plan-publication transition for personal reposi
 Reconcile the existing configurable-auto-merge owner and finish its authorized delivery rather than duplicate its implementation. Enable/disable changes mechanism behavior only; they do not grant delivery authority or bypass exact-head review, checks or holds. Record actual PR/configuration/authority state when a goal cannot merge. The refactor's planning publication is separate from permission to merge another unfinished feature.
 
 Gate: focused tests distinguish personal planning, unfinished implementation, work-repository publication gates, explicit auto-merge true/false/omission and unavailable host capability. Complete the recorded existing feature through its legitimate publication/merge boundary before claiming the toggle shipped.
+
+## Current design deliverable
+
+The successor proposes one coherent standards-composition direction reusable across tj-agents, with .NET and React as the first concrete migrations. Keep unresolved decisions explicit. Preserve the recorded collaborator naming intent: the role suffix must remain correct, and a shorter subject is acceptable where the context makes it unambiguous. Compare reasonable alternatives, recommend one, and show current/proposed configuration and code at selection, precedence, generation, loading and review boundaries. Distinguish package installation, profile adoption, skill/rule selection and proof that the required body was read.
+
+The design must trace producer and consumer identities end to end, preserve employer/repository authority, identify the smallest kit changes actually needed, and split migration into independently reviewable owner PRs with compatibility/rollback and acceptance evidence. Retain this plan and its ledger as the canonical cross-owner artifacts. Existing owner plans remain authoritative for their separate unfinished work.
+
+Planning publication puts the proposed design on main; it does not adopt the proposal as runtime policy or authorize implementation. Return a concise proposal and the consequential decisions for Tommy before runtime changes.
 
 ## Completion
 
