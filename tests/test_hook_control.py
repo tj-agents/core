@@ -145,6 +145,56 @@ class HookControlTests(unittest.TestCase):
             CONTROL.restore('global', config)
         self.assertTrue(CONTROL.sidecar_path(config).exists())
 
+    def test_corrupted_original_values_do_not_edit_disabled_config(self):
+        for original in (0, 1, 'true'):
+            with self.subTest(original=original):
+                config = self.config(f'corrupt-original-{original}')
+                config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+                CONTROL.disable('global', config)
+                sidecar = CONTROL.sidecar_path(config)
+                snapshot = json.loads(sidecar.read_text(encoding='utf-8'))
+                snapshot['original'] = original
+                sidecar.write_text(json.dumps(snapshot), encoding='utf-8')
+                disabled = config.read_bytes()
+                corrupted = sidecar.read_bytes()
+                with self.assertRaisesRegex(CONTROL.ControlError, 'invalid original'):
+                    CONTROL.restore('global', config)
+                self.assertEqual(config.read_bytes(), disabled)
+                self.assertEqual(sidecar.read_bytes(), corrupted)
+
+    def test_corrupted_boolean_ownership_does_not_edit_disabled_config(self):
+        for field in ('config_existed', 'features_table_existed'):
+            for value in (0, 1, 'true'):
+                with self.subTest(field=field, value=value):
+                    config = self.config(f'corrupt-ownership-{field}-{value}')
+                    config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+                    CONTROL.disable('global', config)
+                    sidecar = CONTROL.sidecar_path(config)
+                    snapshot = json.loads(sidecar.read_text(encoding='utf-8'))
+                    snapshot[field] = value
+                    sidecar.write_text(json.dumps(snapshot), encoding='utf-8')
+                    disabled = config.read_bytes()
+                    corrupted = sidecar.read_bytes()
+                    with self.assertRaisesRegex(CONTROL.ControlError, f'invalid {field}'):
+                        CONTROL.restore('global', config)
+                    self.assertEqual(config.read_bytes(), disabled)
+                    self.assertEqual(sidecar.read_bytes(), corrupted)
+
+    def test_unknown_separator_does_not_edit_disabled_config(self):
+        config = self.config()
+        config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        CONTROL.disable('global', config)
+        sidecar = CONTROL.sidecar_path(config)
+        snapshot = json.loads(sidecar.read_text(encoding='utf-8'))
+        snapshot['owned_separator'] = '\x0b'
+        sidecar.write_text(json.dumps(snapshot), encoding='utf-8')
+        disabled = config.read_bytes()
+        corrupted = sidecar.read_bytes()
+        with self.assertRaisesRegex(CONTROL.ControlError, 'invalid owned_separator'):
+            CONTROL.restore('global', config)
+        self.assertEqual(config.read_bytes(), disabled)
+        self.assertEqual(sidecar.read_bytes(), corrupted)
+
     def test_dotted_form_is_preserved(self):
         config = self.config()
         original = 'features.hooks = true # canonical\n[plugins]\ntrusted_hash = "kept"\n'

@@ -143,10 +143,22 @@ def load_snapshot(path: Path) -> dict[str, Any] | None:
         snapshot = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ControlError(f"cannot read hook-control snapshot {path}: {error}") from error
-    if not isinstance(snapshot, dict) or snapshot.get("version") != 1:
+    if not isinstance(snapshot, dict) or type(snapshot.get("version")) is not int or snapshot["version"] != 1:
         raise ControlError(f"unrecognized hook-control snapshot: {path}")
-    if snapshot.get("original") not in ("absent", True, False):
+    original = snapshot.get("original")
+    if not ((type(original) is str and original == "absent") or type(original) is bool):
         raise ControlError(f"invalid original value in hook-control snapshot: {path}")
+    for field in ("config_existed", "features_table_existed"):
+        if type(snapshot.get(field)) is not bool:
+            raise ControlError(f"invalid {field} in hook-control snapshot: {path}")
+    original_sha256 = snapshot.get("original_sha256")
+    if not isinstance(original_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", original_sha256) is None:
+        raise ControlError(f"invalid original_sha256 in hook-control snapshot: {path}")
+    if snapshot.get("owned_separator") not in ("", "\n", "\r\n"):
+        raise ControlError(f"invalid owned_separator in hook-control snapshot: {path}")
+    disabled_sha256 = snapshot.get("disabled_sha256")
+    if disabled_sha256 is not None and (not isinstance(disabled_sha256, str) or re.fullmatch(r"[0-9a-f]{64}", disabled_sha256) is None):
+        raise ControlError(f"invalid disabled_sha256 in hook-control snapshot: {path}")
     return snapshot
 
 
@@ -296,7 +308,9 @@ def snapshot_for(scope: str, config: Path, raw: bytes, parsed: dict[str, Any]) -
 
 
 def validate_snapshot(snapshot: dict[str, Any], scope: str, config: Path) -> None:
-    if snapshot.get("scope") != scope or snapshot.get("config") != str(config.resolve(strict=False)):
+    if type(snapshot.get("scope")) is not str or type(snapshot.get("config")) is not str:
+        raise ControlError("invalid scope ownership in hook-control snapshot")
+    if snapshot["scope"] != scope or snapshot["config"] != str(config.resolve(strict=False)):
         raise ControlError("hook-control snapshot belongs to a different scope or config path")
 
 
