@@ -10,11 +10,11 @@ PR: pending
 
 ## Current state
 
-Requirements/discovery plan authored from inspected core, kit, dotnet, work configuration and unfinished source-owner worktrees. No refactor runtime or live hook changes made. The current slice publishes this plan; the authorized standards goal remains open across later implementation slices. Work-profile opt-in versus opt-out question is pending; the stated default is an assumption.
+Requirements/discovery plan authored from inspected core, kit, dotnet, work configuration and unfinished source-owner worktrees. No refactor runtime or live hook changes made. The current slice publishes this plan; the authorized standards goal remains open across later implementation slices. Tommy provisionally prefers shared technical requirements with personal conventions explicitly selected, and requested inspection of the previous implementation before schema decisions.
 
 ## Verification
 
-Plan graph, diff checks and documentation review pending.
+Initial plan graph and diff checks passed. Existing core selection-profile tests passed (11); existing .NET source-layout/profile pin tests passed (3). Documentation review and final exact-candidate checks are pending.
 
 ## Reviews
 
@@ -22,7 +22,7 @@ Documentation review pending; the plan is not yet implementation-ready for runti
 
 ## Decisions, discoveries, blockers, and deviations
 
-Personal plan publication is selected by Tommy; it supplies no work-repository publication authority. Current disabled hooks and other active writer worktrees are preserved. Existing partial mechanisms and owners are recorded in the plan and must be reconciled before implementing their replacements. No new handoff is selected.
+Personal plan publication is selected by Tommy; it supplies no work-repository publication authority. Current disabled hooks and other active writer worktrees are preserved. Merged .NET PR24/32 and core PR140 contain real tested separation and a finite-profile adapter; C++ PR37 remains draft. The current .NET routes bypass profile selection, and no production caller of the core adapter was found in inspected source. Existing mechanisms and owners must be reconciled before adding missing consumers. No new handoff is selected.
 
 ## Next Steps
 
@@ -33,4 +33,4 @@ Done when: the plan is visible on main for this slice; the whole goal remains in
 
 1. Run the plan graph and diff checks; review the exact frozen planning candidate and resolve documentation findings.
 2. Publish the reviewed personal plan to main, preserving explicit owner and host gates.
-3. Resolve profile preferences and the Phase 1 owner/schema inventory in the same plan, then publish reviewed implementation-ready owner designs before code changes.
+3. Resolve the Phase 1 owner/schema inventory using the existing separation in the same plan, then publish reviewed implementation-ready owner designs before code changes.

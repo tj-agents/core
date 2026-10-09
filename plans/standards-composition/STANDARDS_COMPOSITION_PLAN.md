@@ -14,6 +14,8 @@ Tommy requested work on the standards and their refactor on 2026-10-09, includin
 
 ## Evidence and existing ownership
 
+- [.NET PR24](https://github.com/tj-agents/dotnet/pull/24) and [PR32](https://github.com/tj-agents/dotnet/pull/32) merged capability scopes and family-profile separation. `.agents/tests/test_source_layout.py` pins stack-free core hubs and keeps prerequisite-bearing members outside core. This is implemented and tested separation, but stack-free does not mean free of personal conventions.
+- [Core PR140](https://github.com/tj-agents/core/pull/140) merged `.agents/machine/utility/bootstrap-capabilities/scripts/selection_profiles.py`: an optional read-only adapter for source-owned finite selection forms. It returns package IDs; discovery, installation and dependency closure are outside its contract. The inspected current source contains no production caller. [C++ PR37](https://github.com/tj-agents/cpp/pull/37) publishes one producer declaration and parity fixtures, but remains an open draft. Reuse this reader and producer work where their contracts fit; do not replace them under the claim that no separation existed.
 - Core PR116 merged project/dependency facts and standards context, explicitly deferring source ownership and host activation. The current `Feature/StandardsSourceOwnership` worktree contains uncommitted `source_facts.py`, tier/context changes and tests. Preserve that owner; inspect its state before integrating its contribution.
 - Dotnet PR35 merged the generator and registered cris-authz. Current C# routes select style/naming; the Domain row selects domain-design but not its DDD/value owners. Repository filename rules select EF-specific persistence without matching its prerequisite metadata.
 - Core's installed tier gate announces .NET applicability. Review lists tier conventions but does not prove semantic prerequisites were selected. `workflow_ops.route_findings` requires a checkout-local table, whereas the router can cross a nested worktree boundary to the main checkout's private table.
@@ -32,7 +34,7 @@ Tommy requested work on the standards and their refactor on 2026-10-09, includin
 | Architecture | Explicit project adoption, such as DDD, not inferred from a folder name | Architecture contract owner |
 | Technology implementation | Actual project/source prerequisites and adopted abstraction, such as EF Core, Dapper, raw Npgsql, or a selected data-access library | Technology contract owner |
 
-Work-profile default under discussion: shared technical requirements plus explicitly selected personal conventions, rather than wholesale personal adoption. Tommy's alternative include/exclude preference is being requested; this is an assumption, not a confirmed choice. A logging example is not an instruction to disable logging. DDD's adoption in authz does not make every personal C# style opinion adopted there.
+Tommy's provisional preference is shared technical requirements plus explicitly selected personal conventions. Before settling the detailed schema, trace and reuse the previously implemented separation; his latest request specifically prioritizes proving what already exists. The exact profile schema and migration remain unresolved. A logging example is not an instruction to disable logging. DDD's adoption in authz does not make every personal C# style opinion adopted there.
 
 Select facts per project/source. EF Core in one service must not impose EF-specific tenancy on a Dapper or raw-Npgsql sibling. Tenant-isolation requirements may be shared outcomes where an actual owner requires them; filters, interceptors, SQL predicates and tenant context mechanics remain implementation-specific. Unknown/conflicting prerequisites are explicit diagnostics requiring resolution, not inferred technology adoption.
 
@@ -42,7 +44,7 @@ Employer and repository standards compose with selected shared standards. Resolv
 
 ### Phase 1: Resolve the taxonomy and publish the maintained design
 
-Inventory core, kit, dotnet and employer contracts against actual source, distinguishing universal scope, technical prerequisites and house decisions. Read the existing composition, conditional-route, source-ownership and auto-merge owners. Resolve overlap and the exact selection schema, diagnostics and migration examples before declaring runtime work ready.
+Inventory core, kit, dotnet and employer contracts against actual source, distinguishing universal scope, technical prerequisites and house decisions. Begin with the merged .NET family/profile tests and core finite-profile reader, and distinguish package selection from individual requirement selection. Read the existing composition, conditional-route, source-ownership and auto-merge owners. Resolve overlap and the exact selection schema, diagnostics and migration examples before declaring runtime work ready.
 
 Consumption: each source owner receives one path-to-contract inventory and its own concrete implementation plan; the cross-repository plan records only dependencies and shared acceptance. Existing owned plans remain their single progress owners.
 
