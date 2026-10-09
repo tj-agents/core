@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:70d45bb4630cb5c8c02a28ab582647ed8aec8d7b8007b3d3894ac0221462b3ab",
+          "digest": "sha256:817a1c9e46fff10aa4ca0832a7d1bc31e7847320a608194bc47114b2267bf0ae",
           "harness": {
             "marketplaces": [
               {
@@ -192,7 +192,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:96e70f50c0451252627532117202291091c8aa243a06fe3ee9b21e3bc0f45144",
+          "digest": "sha256:6e76b3a6cb817dcb7d5951beff74832ef2d7c1f76292217cbefa93ef3fc5d5c5",
           "harness": {
             "marketplaces": [
               {
@@ -415,6 +415,7 @@
             "followup-codex",
             "handoff-claude",
             "handoff-codex",
+            "hook-control",
             "last-conversation",
             "open-claude",
             "open-codex",
@@ -438,10 +439,11 @@
               "exe:powershell",
               "exe:codex",
               "exe:claude",
-              "windows-terminal"
+              "windows-terminal",
+              "python>=3.11"
             ]
           },
-          "digest": "sha256:766be5842b9fa3dc1ea0d289c9f98da6e9dc4f628897c24997c76e9db471825c",
+          "digest": "sha256:0e17fd83bf3ae0577d32d5eedf0a63562825ead616332c6010e38ceda7369723",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -512,7 +514,11 @@
                 "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1)",
                 "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1)",
                 "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1)",
-                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1)"
+                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -604,6 +610,42 @@
                       "-NoProfile",
                       "-File",
                       "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py",
+                      "${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py",
+                      "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py"
+                    ],
+                    [
+                      "status",
+                      "off",
+                      "on"
+                    ]
+                  ],
+                  "justification": "machine:hook-control: inspect, suspend or restore the requested Codex configuration layer while preserving hook trust and plugin state",
+                  "match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py",
+                      "off"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/other.py",
+                      "off"
                     ]
                   ]
                 }
