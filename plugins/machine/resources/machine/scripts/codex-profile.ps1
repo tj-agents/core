@@ -15,3 +15,13 @@ function codex {
     }
     & $target @args
 }
+
+function codex-hooks {
+    $candidates = @(
+        (Join-Path $PSScriptRoot '..\utility\hook-control\scripts\hook_control.py'),
+        (Join-Path $PSScriptRoot '..\..\..\.agents\machine\utility\hook-control\scripts\hook_control.py')
+    )
+    $script = @($candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
+    if (-not $script) { throw 'Codex hook-control utility is not installed' }
+    & python -B $script @args
+}

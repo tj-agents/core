@@ -219,11 +219,29 @@ def output_tree_digest(output: dict[str, bytes], package_path: str, excluded: li
     return "sha256:" + digest.hexdigest()
 
 
+# cmd.exe's command-line limit, measured with every ${PLUGIN_ROOT} expanded to a full-length Windows path.
+CODEX_WINDOWS_COMMAND_BUDGET = 8191
+WINDOWS_MAX_PATH = 260
+
+
+def codex_snapshot_bootstrap(loader: str) -> str:
+    digest = hashlib.sha256(canonical_output_bytes(loader)).hexdigest()
+    return (
+        "import hashlib,os,runpy,sys,tempfile;from pathlib import Path;"
+        "r=Path(sys.argv[1]);e=sys.argv[2];"
+        "d=Path(os.environ.get('PLUGIN_DATA','')).resolve();"
+        "p=r/'hooks'/'codex_hook_snapshot.py';"
+        "p=p if p.is_file() else d/'hook-snapshots'/hashlib.sha256((str(r)+chr(0)+e).encode()).hexdigest()/'hooks'/'codex_hook_snapshot.py';"
+        "b=p.read_bytes() if p.is_file() else b'';n=chr(10).encode();"
+        "b=b.replace(chr(13).encode()+n,n).replace(chr(13).encode(),n);"
+        f"h=hashlib.sha256(b).hexdigest();h=='{digest}' or (sys.stderr.write('Codex hook snapshot loader integrity check failed'+chr(10)),sys.exit(2));"
+        "t=tempfile.TemporaryDirectory();q=Path(t.name)/'loader.py';q.write_bytes(b);runpy.run_path(str(q),run_name='__main__')"
+    )
+
+
 def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set[str]) -> None:
     loader = read(inside(root, ".agents/hooks/codex_hook_snapshot.py"))
-    if "'" in loader:
-        raise ValueError("Codex hook snapshot loader must use only double-quoted strings")
-    expression = "exec(" + repr(loader).replace('"', r'\x22') + ")"
+    bootstrap = codex_snapshot_bootstrap(loader)
     for plugin in sorted(plugins):
         hook_path = f"plugins/{plugin}/hooks/codex.json"
         excluded = ["hooks/codex.json"]
@@ -236,13 +254,23 @@ def bind_codex_hook_snapshots(root: Path, output: dict[str, bytes], plugins: set
                 for hook in group["hooks"]:
                     for field in ("command", "commandWindows"):
                         command = hook[field]
-                        prefix = "python3 -B " if field == "command" else "python -B "
-                        if not command.startswith(prefix + '"${PLUGIN_ROOT}/'):
+                        source_prefix = "python3 -B " if field == "command" else "python -B "
+                        launcher_prefix = "python3 -I -B " if field == "command" else "python -I -B "
+                        if not command.startswith(source_prefix + '"${PLUGIN_ROOT}/'):
                             raise ValueError(f"Unsupported Codex {field} for {plugin}: {command}")
                         hook[field] = (
-                            prefix + f'-c "{expression}" "${{PLUGIN_ROOT}}" "{expected}" '
-                            f'"{plugin}" ' + command[len(prefix):]
+                            launcher_prefix + f'-c "{bootstrap}" "${{PLUGIN_ROOT}}" "{expected}" '
+                            f'"{plugin}" ' + command[len(source_prefix):]
                         )
+                        # Each ${PLUGIN_ROOT} expands at run time; count it at a full Windows path length.
+                        expanded = len(hook[field]) + hook[field].count("${PLUGIN_ROOT}") * (
+                            WINDOWS_MAX_PATH - len("${PLUGIN_ROOT}")
+                        )
+                        if field == "commandWindows" and expanded > CODEX_WINDOWS_COMMAND_BUDGET:
+                            raise ValueError(
+                                f"Codex commandWindows for {plugin} is {expanded} characters once ${{PLUGIN_ROOT}} "
+                                f"expands, over the {CODEX_WINDOWS_COMMAND_BUDGET}-character budget for cmd.exe"
+                            )
         output[hook_path] = canonical_output_bytes(json.dumps(payload, indent=2) + "\n")
 
 
