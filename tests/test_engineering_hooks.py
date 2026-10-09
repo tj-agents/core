@@ -98,6 +98,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertRegex(context, r"load `engineering:lanes`.*?select the next phase")
                 self.assertIn(str(contract), context)
                 self.assertIn("source SHA-256", context)
+                body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1].strip()
+                self.assertEqual(body, context.split("\n\n", 1)[1])
                 bodies.append(context)
         self.assertEqual(1, len(set(bodies)))
         self.assertEqual([], list(self.cwd.iterdir()))
@@ -112,10 +114,18 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("cannot read contract", result.stderr)
         self.assertEqual("", result.stdout)
 
-    def test_user_prompt_context_is_bounded_to_the_callout_section(self):
+    def test_user_prompt_context_is_bounded_to_the_callout_and_lifecycle_sections(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
         contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
-        heading = "## When the user calls out a mistake"
+        headings = (
+            "## When the user calls out a mistake",
+            "## A task has an owning lifecycle — load it before the first edit",
+        )
+        body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
+        expected = "\n\n".join(
+            body.split(heading, 1)[1].split("\n## ", 1)[0].strip()
+            for heading in headings
+        )
 
         for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
             with self.subTest(host=host):
@@ -135,26 +145,36 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertEqual(1, len(prompt_context))
                 self.assertIn(chr(36) + "{" + variable + "}/" + script, prompt_context[0])
 
-                result = self.run_hook(script, {"hook_event_name": "UserPromptSubmit"}, ("--prompt-context",))
-                self.assertEqual(0, result.returncode, result.stderr)
-                output = json.loads(result.stdout)["hookSpecificOutput"]
-                self.assertEqual("UserPromptSubmit", output["hookEventName"])
-                context = output["additionalContext"]
-                body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
-                expected = body.split(heading, 1)[1].split("\n## ", 1)[0].strip()
-                self.assertIn(str(contract), context)
-                self.assertIn("source SHA-256", context)
-                self.assertNotIn(heading, context)
-                self.assertEqual(expected, context.split("\n\n", 1)[1])
-                self.assertIn("Questions ask for reasoning", context)
-                self.assertIn("only for new evidence or a stated user decision", context)
-                self.assertNotIn("## A task has an owning lifecycle", context)
-                self.assertLess(len(context), 1200)
+                for prompt in (
+                    "What should I work on?",
+                    "Move these global plans to a shared docs repo like Concertable docs.",
+                ):
+                    with self.subTest(prompt=prompt):
+                        result = self.run_user_prompt_submit(host, prompt)
+                        self.assertEqual(0, result.returncode, result.stderr)
+                        output = json.loads(result.stdout)["hookSpecificOutput"]
+                        self.assertEqual("UserPromptSubmit", output["hookEventName"])
+                        context = output["additionalContext"]
+                        source = context.split("\n\n", 1)[0].split("Source: ", 1)[1]
+                        self.assertTrue(source.endswith(str(
+                            Path(".agents") / "engineering" / "policy" / "session-guidance" / "SKILL.md"
+                        )))
+                        self.assertIn("source SHA-256", context)
+                        self.assertIn(expected, context)
+                        self.assertEqual(expected, context.split("\n\n", 1)[1])
+                        normalized_context = " ".join(context.split())
+                        self.assertIn("load `engineering:lanes`", normalized_context)
+                        self.assertIn("select the next phase's lane", normalized_context)
+                        self.assertIn("Re-route per phase", normalized_context)
+                        self.assertIn("canonical execution rules", normalized_context)
+                        self.assertNotIn("## A link to another skill is a stage pointer", context)
+                        self.assertNotIn("## Keep large changes reviewable", context)
+                        self.assertLess(len(context), 3000)
 
         before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         contract.write_text(contract.read_text(encoding="utf-8").replace(
-            "Existing\nuser limits and scope gates still apply.",
-            "Existing\nuser limits and scope gates still apply. Canonical source changed.",
+            "An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair.",
+            "An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Canonical source changed.",
         ), encoding="utf-8")
         after = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertNotEqual(before, after)
@@ -203,29 +223,34 @@ class PackagedEngineeringHooks(unittest.TestCase):
     def test_prompt_context_reports_missing_and_empty_sections(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
         contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
-        heading = "## When the user calls out a mistake"
+        headings = (
+            "## When the user calls out a mistake",
+            "## A task has an owning lifecycle — load it before the first edit",
+        )
         original = contract.read_text(encoding="utf-8")
 
-        contract.write_text(original.replace(heading, heading + " \t", 1), encoding="utf-8")
-        whitespace = self.run_hook(script, arguments=("--prompt-context",))
-        self.assertEqual(0, whitespace.returncode, whitespace.stderr)
+        for heading in headings:
+            with self.subTest(section=heading, defect="missing"):
+                contract.write_text(
+                    original.replace(heading, "## Replaced heading", 1), encoding="utf-8"
+                )
+                missing = self.run_hook(script, arguments=("--prompt-context",))
+                self.assertNotEqual(0, missing.returncode)
+                self.assertIn("missing prompt context section", missing.stderr)
+                self.assertIn(heading, missing.stderr)
+                self.assertEqual("", missing.stdout)
 
-        contract.write_text(original.replace(heading, "## Replaced heading"), encoding="utf-8")
-        missing = self.run_hook(script, arguments=("--prompt-context",))
-        self.assertNotEqual(0, missing.returncode)
-        self.assertIn("missing prompt context section", missing.stderr)
-        self.assertEqual("", missing.stdout)
-
-        before, remainder = original.split(heading, 1)
-        _, after = remainder.split("## A task has an owning lifecycle", 1)
-        contract.write_text(
-            before + heading + "\n\n## A task has an owning lifecycle" + after,
-            encoding="utf-8",
-        )
-        empty = self.run_hook(script, arguments=("--prompt-context",))
-        self.assertNotEqual(0, empty.returncode)
-        self.assertIn("is empty", empty.stderr)
-        self.assertEqual("", empty.stdout)
+            with self.subTest(section=heading, defect="empty"):
+                before, remainder = original.split(heading, 1)
+                _, after = remainder.split("\n## ", 1)
+                contract.write_text(
+                    before + heading + "\n\n## " + after, encoding="utf-8"
+                )
+                empty = self.run_hook(script, arguments=("--prompt-context",))
+                self.assertNotEqual(0, empty.returncode)
+                self.assertIn("is empty", empty.stderr)
+                self.assertIn(heading, empty.stderr)
+                self.assertEqual("", empty.stdout)
 
     def test_each_host_routes_an_active_goal_to_the_packaged_plan_execution_contract(self):
         (self.cwd / "GOAL.md").write_text(
