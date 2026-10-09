@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `3f9ab37d00f625004287b2e5728f80d154577cd5`  `(2026-10-09)`
+**Reviewed up to commit:** `724e5b5ef1d8e4cd54245267b2f8c0d0b49734f3`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
@@ -51,3 +51,37 @@ outside the route table (same precedent as `plans`; a semantic check has no path
 - [x] **ACC2 — LOW — accuracy** — `plans/direction-change-conventions/GOAL.md:42`
   Steps are unchecked though progress records them done, and no step retires the goal after merge. Tick
   completed steps and add the closeout.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `3f9ab37d00f625004287b2e5728f80d154577cd5`
+**Candidate head:** `724e5b5ef1d8e4cd54245267b2f8c0d0b49734f3`
+**Candidate branch:** `Docs/DirectionChangeConventions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:af52152b0bc9d21c9dc03404a417a87ef8b6e90aa5e78f27e7706e15d7ddf03d` `(7 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/BYXEghlf7eJq14F57CmzeA/rO2MVPhefuld80pFucGUSc`
+**Candidate bundle identity:** `sha256:b977a01d8f8b0fa06f6cdb56131577e0f2b3d3dbf08bef89bfea3ed10c190167`
+**Work-order path:** `reviews/Docs-DirectionChangeConventions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [x] **CON2 — MEDIUM — contradiction** — `.agents/engineering/convention/docs-and-debt/SKILL.md:118`
+  "The always-loaded `AGENTS.md`" read as the root, against "a doc lives at the lowest node". State it at
+  the lowest node containing every affected path.
+- [x] **CON3 — MEDIUM — contradiction** — `.agents/engineering/convention/docs-and-debt/SKILL.md:147`
+  Under a merge hold the entry stayed unmerged with only a report mention, which the same paragraph says is
+  not a record. Keep the problem open in the goal and report until the entry lands.
+- [x] **CON4 — MEDIUM — contradiction** — `.agents/engineering/convention/docs-and-debt/SKILL.md:136`
+  "Everything you decide not to fix earns an entry" still demanded an entry for handed-off work. Exempt
+  handoffs in that sentence.
+- [x] **INST3 — LOW — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:146`
+  The debt-PR authorization did not include the docs review `merge-docs` requires. Name it.
+- [x] **CON5 — LOW — contradiction** — `.agents/engineering/convention/review-lifecycle/SKILL.md:119`
+  `[wontfix]` still required "any required debt entry" only. Accept a handoff or debt entry.
+- [x] **INST4 — LOW — followability** — `.agents/engineering/workflow/address-review/SKILL.md:39`
+  Bare `docs-and-debt` in review-lifecycle and address-review; use the `engineering:` identity.
+- [x] **CON6 — LOW — contradiction** — `.agents/engineering/policy/session-guidance/SKILL.md:103`
+  The terminal check accepted a debt entry anywhere. Require it on the default branch or in this change,
+  keeping the pinned wording.

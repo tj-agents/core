@@ -112,12 +112,13 @@ row to respect, and getting it wrong is worse than having no skill at all.
 
 ### A change of direction is a standing rule from the moment it is decided
 
-**When a plan or task changes how a repository's code is written — a refactor, migration, new platform,
-new architecture or newly required pattern — write that rule into the repository's standing conventions
-when it is decided, before or with the first change that depends on it.** State it in the always-loaded
-`AGENTS.md`, linking a convention doc for any detail, so every session sees it whatever it changes. A plan governs
-only its own work: a direction recorded there alone is invisible to every other session, which keeps
-writing the old way and builds new dependencies on it.
+**When a plan or task changes how a repository's code is written — a refactor, migration, new platform, new
+architecture or newly required pattern — write that rule into the repository's standing conventions when it
+is decided, before or with the first change that depends on it.** State it in the always-loaded `AGENTS.md`
+at the lowest node containing every affected path, linking a convention doc for any detail, so every session
+working there sees it whatever it changes. A plan governs only its own work: a direction recorded there
+alone is invisible to every other session, which keeps writing the old way and builds new dependencies on
+it.
 
 The plan keeps the rollout — what moves and in what order. The convention states what all new code does,
 its scope, and how code that has not moved yet is treated, such as ported rather than extended. Replace
@@ -133,20 +134,21 @@ hitting the same underlying cause is two entries, not one in their shared parent
 separately and are usually blocked by different things. **Once the debt is addressed, delete the entire
 entry** — a resolved entry retained as an archive is just another stale doc.
 
-**Everything you decide not to fix earns an entry** — a shortcut taken, and equally a defect, risk or rule
-violation you noticed and deliberately left alone. A shortcut is acceptable only where it is genuinely,
-provably the right call; "unrelated to what I was doing" is a perfectly good reason to leave a problem and no
-reason at all to leave it unwritten. Write it down as you make the decision, with the reasoning and an
-objective resolution condition — a problem only one agent ever saw is one nobody will fix.
+**Everything you decide not to fix, and do not hand off, earns an entry** — a shortcut taken, and equally a
+defect, risk or rule violation you noticed and deliberately left alone. A shortcut is acceptable only where
+it is genuinely, provably the right call; "unrelated to what I was doing" is a perfectly good reason to
+leave a problem and no reason at all to leave it unwritten. Write it down as you make the decision, with the
+reasoning and an objective resolution condition — a problem only one agent ever saw is one nobody will fix.
 
 **Every problem you notice is fixed, handed off or recorded before you move on, and the outcome reaches the
 default branch.** Handing off means launching a side workstream through `engineering:handoff`, or giving the
 problem to the active owner of its fix who confirms it is in their goal; that goal, which ends in a merged
 fix, is then the record. Anything else left unfixed gets the entry above, merged to the default branch in
 the current PR when that PR will land, otherwise in its own docs-only PR straight away. That PR has the
-same standing authorization as a planning artifact to land through `engineering:merge-docs`; an explicit
-user limit or merge hold still applies, and the report then names the unmerged entry. A chat reply, a
-message, an issue, a scratch file or an entry on a branch that may never merge is not a record.
+same standing authorization as a planning artifact to run its docs review and land through
+`engineering:merge-docs`. An explicit user limit or merge hold still applies; the problem then stays open
+in the goal and the report until the entry lands. A chat reply, a message, an issue, a scratch file or an
+entry on a branch that may never merge is not a record.
 
 ## Throwaway working markdown
 

@@ -36,7 +36,7 @@ pass judgment are immutable. Remediation may only:
 - move a finding from `[ ]` to `[~]` to `[x]`;
 - append a concise disposition and fix evidence; or
 - mark `[wontfix]` with a final reason and, when work is postponed, hand it off or record it in the same
-  stroke, with an objective resolution condition, as `docs-and-debt` requires.
+  stroke, with an objective resolution condition, as `engineering:docs-and-debt` requires.
 
 Do not reassess a high-confidence review finding as subjective and silently defer it. When part is fixable,
 split the blocked remainder and land the fixable part now. A genuinely irreversible or product/architecture

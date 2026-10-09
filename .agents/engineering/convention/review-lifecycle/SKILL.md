@@ -116,10 +116,11 @@ Use one status vocabulary:
 - `[ ]` open;
 - `[~]` remediation or staged coverage in progress;
 - `[x]` resolved; and
-- `[wontfix]` a conscious final disposition whose reason and any required debt entry are recorded.
+- `[wontfix]` a conscious final disposition whose reason and handoff or debt entry are recorded.
 
 Do not introduce a second deferred status. Any postponed work is `[wontfix]` here and must be handed off or
-recorded in the same stroke, with an objective resolution condition, as `docs-and-debt` requires.
+recorded in the same stroke, with an objective resolution condition, as `engineering:docs-and-debt`
+requires.
 
 Use one severity vocabulary. `CRITICAL` is an immediately exploitable security, data-loss, or catastrophic
 availability defect; `HIGH` is a likely correctness, security, or boundary failure with material impact;
