@@ -98,7 +98,8 @@ DIRECT_SCRIPT_SEGMENT_RE = re.compile(
 
 PUSHD_RE = re.compile(r"""\bpushd\s+(?:"([^"]+)"|'([^']+)'|(\S+))""", re.IGNORECASE)
 LAUNCHER_RE = re.compile(
-    r"launch-codex\.ps1|launch-claude\.ps1|agent_cli\.py|transfer\.py", re.IGNORECASE
+    r"launch-codex\.ps1|launch-claude\.ps1|launch_codex\.py|launch_claude\.py|agent_cli\.py|transfer\.py",
+    re.IGNORECASE,
 )
 
 
