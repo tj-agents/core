@@ -58,16 +58,25 @@ what still needs checking on Windows.
 - [x] 8. Tests that failed only on Linux pass: POSIX shell collapsed the Codex snapshot loader's escaped
   backslashes into NULs (now embedded as base64); a test plugin URL only git on Windows resolves; pwsh 7
   `Split` binding skipped the installer's ancestor reparse-point check (#160).
-- [ ] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
-  (`verify-linux`); it blocks a PR once the repository ruleset lists it as a required check.
+- [x] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
+  (`verify-linux`, #162); it blocks a PR once the repository ruleset lists it as a required check,
+  which awaits the user's decision after a few green runs.
+- [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no shipped Markdown
+  under `.agents/`, `.claude/` or `.codex/` tells an agent to run bare `python`, `powershell.exe`, `pwsh`
+  or `wt.exe` without naming the platform (including the session exit in `merge` Step 5 and in
+  `merge-docs`' Report), every unported skill says it is Windows-only, and the PowerShell test suite of
+  each shipped script retires with that script's port or gains a Linux counterpart.
 
 ## Current progress
 
 Shared library merged (#106, after the interim path fix #105). Kitty configured. Steps merged: 1 (#107),
 2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
-(#125), 8 Linux-only test failures (#160). Step 3b `handoff-codex` in review as #137. Step 9 (Linux CI)
-on `Feature/LinuxCiJob`.
+(#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). #166 makes the cross-platform direction a written
+convention in `CODE_CONVENTIONS.md`, labels `peer-cli` Windows-only, and adds step 10 for the rest of the
+shipped instructions. Step 3b `handoff-codex` in review as #137.
 
 ## Next Steps
 
-Land 3b and 9; then 5 (`peer-cli`) and 4 (terminal start hooks, deleting `agent-cli.ps1`); then 7.
+Land 3b; then 5 (`peer-cli`, `close` and `finish` first, so the `merge` skill's Step 5 session exit
+works on Linux) and 4 (terminal start hooks, deleting `agent-cli.ps1`); then 7 and 10. After `verify-linux`
+has had a few green runs, ask the user whether the repository ruleset should require it.
