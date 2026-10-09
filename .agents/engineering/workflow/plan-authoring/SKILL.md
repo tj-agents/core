@@ -80,7 +80,9 @@ For a request to choose the next roadmap item, let the
    one PR or defer decomposition until the accumulated implementation is ready to merge.
 3. Write the owned artifact in the repository's current format. For a plan, create or update its compact
    ledger with its roadmap path and stable item key; the plan does not cite the roadmap. A standing reference
-   keeps the bare-stem shape defined by `plans` and creates no competing phase owner.
+   keeps the bare-stem shape defined by `plans` and creates no competing phase owner. When the design
+   changes the repository's direction, land its standing convention in the same change, as
+   `engineering:docs-and-debt` requires.
 4. For plan-managed work, resolve the Workflow v2 repository provider once and validate the plan, ledger,
    worktree, branch, and next action through it. When Kandev hosts the task, leave its task and session
    identifiers in Kandev.

@@ -136,7 +136,9 @@ it, or the next material checkpoint falls due.
    serialized writer lease. The parent retains architecture, phase, scope, diagnosis, security, migration,
    acceptance, review synthesis, and transition decisions and reconciles every writer result against Git.
 3. Implement the selected slice and run focused checks through the shared `run` operation so detailed output
-   remains an artifact and the model receives only bounded results. Enter
+   remains an artifact and the model receives only bounded results. When the slice depends on a direction
+   the plan decided and the repository's standing conventions do not state it yet, land that convention
+   in this slice under `engineering:docs-and-debt`. Enter
    `engineering:failing-tests` once a test run itself comes back red, diagnose the cause,
    repair it, and return to this same loop without asking the user to relay output or approve routine
    continuation.

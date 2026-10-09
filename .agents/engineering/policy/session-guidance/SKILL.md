@@ -98,6 +98,8 @@ standing authorization: it covers implementing, testing, opening the PR and merg
 repository's gates pass. Installing into any other scope (the consuming repository included),
 publishing outside that repository, and destructive operations stay gated; explicit user limits still
 hold.
+When a plan or task changes how a repository's code is written, record that direction in the repository's
+standing conventions before code depends on it, as `engineering:docs-and-debt` defines.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
 entry. `engineering:docs-and-debt` defines the selected repository convention. Do not create a second

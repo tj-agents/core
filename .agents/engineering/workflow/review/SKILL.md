@@ -130,7 +130,9 @@ from the exported frozen tree, never the live checkout. A route violation is evi
 Invoke additional standards only when the diff plainly touches their domain; a missing route is a
 route-table defect rather than a list to duplicate here. If the candidate contains plans or
 implementation-ready design references, load plans and apply its implementation-design review gate to
-those artifacts, including their implementation-path standards.
+those artifacts, including their implementation-path standards. If the candidate decides or depends on a
+change of repository direction, apply `docs-and-debt`'s direction-change rule against the frozen tree's
+standing conventions.
 
 Record the owning `review` lifecycle and the helper's routed technical rule identities with
 `<engineering>/workflows/workflow_ops.py skills`. Read only identities returned as `load`; an unchanged
