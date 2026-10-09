@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `cb2193b66f6772cc7d101ccf34d30aba5bed71f0`  `(2026-10-09)`
+**Reviewed up to commit:** `28fbce2d0874152b9ec0ffcc55f25465a7216bd5`  `(2026-10-09)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-07 — full
@@ -58,3 +58,13 @@ diff against current `main` instead — 27 paths, matching `git diff origin/main
 Native layer: Claude Code `code-review` (high) over the branch-vs-main diff, 1 finding, confirmed and fixed
 (recorded above, under "Additional required fixes"). No other correctness, reuse, simplification,
 efficiency, or convention issues cleared the confirm/plausible bar.
+
+### CI failure found and fixed after this pass
+
+- [x] PR #137's `verify` (Windows) job failed on first push after this review (run `37986734663`, job
+  `114010473718`, step "Codex terminal profile tests"): `codex_marketplace_sync.py` raised "Codex plugin
+  sync returned invalid JSON: plugin marketplace upgrade --json". Root cause: the test's C# relay stub
+  spawns `cmd.exe` without `/d`, so GitHub's windows-latest `\AutoRun` registry value runs first and its
+  output lands ahead of the batch dispatch's own JSON on stdout. Fixed in `28fbce2` (adds `/d`); also
+  widened the parse-failure message to quote the unparseable text for any future repeat. `verify-linux`
+  and `guard` passed on this same push; `verify` re-run pending.
