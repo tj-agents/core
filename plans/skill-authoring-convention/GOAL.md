@@ -55,7 +55,7 @@ Mistakes this session made that such a convention should have prevented, as evid
    restating them, and reconcile `SKILL_KINDS.md`'s separate-owner sentence with the new sizing rule in
    one place.
 3. Implement it, with discovery: make sure the sessions that add or change a skill actually load it (route
-   table, `AGENTS.md`, description trigger). Add a focused test where a rule is machine-checkable; consider
+   table, `AGENTS.md`, description trigger; see Decisions for what was kept). Add a focused test where a rule is machine-checkable; consider
    whether description parity between canonical and host entries can be checked or generated instead of
    copied.
 4. Validate: both Python suites with `< /dev/null`, local `python -B scripts/update_catalog_digests.py` and
@@ -90,6 +90,7 @@ Mistakes this session made that such a convention should have prevented, as evid
   review (F1): carrying one opts the whole repository into write-time routing, whose router blocks every
   write while any routed skill is unresolved or plugin discovery fails, and it puts every red test run in
   core under the red-run gate. That cost is out of proportion to routing one file type.
+  The lost review-time trigger is recorded in `docs/workflows/TECH_DEBT.md`.
 - **Machine checks.** Description parity across canonical and host entries is already enforced by
   `scripts/sync_plugin_packages.py` (`validate_adapters`). Add a generation check rejecting two public
   names equal once hyphens are removed (`tech-debt` beside `techdebt`). Generating the host adapters
@@ -107,7 +108,9 @@ Mistakes this session made that such a convention should have prevented, as evid
   near-miss name check with a test, adapter-generation debt entry. 804 + 983 tests,
   generation `-Check`, tier payload, catalog and harness `--check`, `docs_reachability.py` and the packaging
   tests pass.
-- Step 5: first review pass `changes-requested` (F1 HIGH route table, F2–F3 LOW); all three fixed.
+- Step 5: first review pass `changes-requested` (F1 HIGH route table, F2–F3 LOW); all three fixed in
+  `33898c4` and re-validated (803 + 983 tests and every generation check). Incremental pass over the fix:
+  F4–F8, fixed or recorded.
 
 ## Next Steps
 
@@ -116,4 +119,4 @@ Current slice: step 5, review.
 Remaining scope: PR, merge, cleanup, message #173's session.
 Done when: the convention is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 5 with `engineering:review` (the diff changes the generator and tests).
+Continue at Completion expectation step 5: incremental review of the F4–F8 fixes, then the PR.
