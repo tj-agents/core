@@ -110,10 +110,9 @@ it, and a guidance rule added there looks like a tech-debt change.
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: merge `guidance-ownership` and `working-docs` into `engineering:docs` on #173, validate,
-incremental review, push.
+Current slice: exact-head CI on #173 after the `engineering:docs` merge, then wait for #168 to merge.
 Remaining scope: after #168 merges, rebase onto `main`, retarget #173 to `main`, re-validate, mark ready and
 merge through `engineering:merge`, then Step 5 cleanup of this worktree.
 Done when: the split is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 4 for the merged `docs` skill.
+Continue at Completion expectation step 5: when #168 merges, rebase and retarget #173 to `main`.
