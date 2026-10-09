@@ -116,7 +116,8 @@ Use one status vocabulary:
 - `[ ]` open;
 - `[~]` remediation or staged coverage in progress;
 - `[x]` resolved; and
-- `[wontfix]` a conscious final disposition whose reason and handoff or debt entry are recorded.
+- `[wontfix]` a conscious final disposition whose reason, and the handoff or debt entry for any postponed
+  work, are recorded.
 
 Do not introduce a second deferred status. Any postponed work is `[wontfix]` here and must be handed off or
 recorded in the same stroke, with an objective resolution condition, as `engineering:docs-and-debt`
