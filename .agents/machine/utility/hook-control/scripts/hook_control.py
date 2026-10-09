@@ -65,26 +65,29 @@ class ExclusiveLock:
     def __enter__(self) -> "ExclusiveLock":
         self.path.parent.mkdir(parents=True, exist_ok=True)
         reject_symlink(self.path)
-        self.handle = open(self.path, "a+b")
-        self.handle.seek(0)
-        if not self.handle.read(1):
-            self.handle.seek(0)
-            self.handle.write(b"0")
-            self.handle.flush()
-        self.handle.seek(0)
         deadline = time.monotonic() + 10
         while True:
+            handle: Any = None
             try:
+                handle = open(self.path, "a+b")
+                handle.seek(0)
+                if not handle.read(1):
+                    handle.seek(0)
+                    handle.write(b"0")
+                    handle.flush()
+                handle.seek(0)
                 if os.name == "nt":
                     import msvcrt
-                    msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl
-                    fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.handle = handle
                 return self
             except OSError:
+                if handle is not None:
+                    handle.close()
                 if time.monotonic() >= deadline:
-                    self.handle.close()
                     raise ControlError(f"timed out waiting for hook-control lock: {self.path}")
                 time.sleep(0.05)
 
