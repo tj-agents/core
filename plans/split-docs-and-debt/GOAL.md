@@ -89,12 +89,20 @@ it, and a guidance rule added there looks like a tech-debt change.
 - Step 5: `reviews/Refactor-SplitDocsAndDebt.md` is approved after five passes (one full, one full over
   the rebased layer, three incremental); every finding is fixed or carries a recorded disposition.
 
+## Delivery
+
+- PR: https://github.com/tj-agents/core/pull/173 (draft, base `Docs/DirectionChangeConventions`, stacked on
+  #168). Body validated; delivery bound with no recorded standing merge authorization in the binding.
+- Continuation: this Linux machine has no cross-exit continuation adapter (the supported one is Windows-only),
+  so the waits are owned by the live session. #168's owner (`.worktrees/DirectionChange`) notifies this
+  session when #168 changes or merges; each parent change is absorbed by rebasing and re-moving its text.
+
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: push and open the stacked PR on `Docs/DirectionChangeConventions` (PR #168).
-Remaining scope: rebase when #168 changes again; after #168 merges, retarget to `main`, re-validate, merge
-through `engineering:merge`, then Step 5 cleanup of this worktree.
+Current slice: exact-head CI on #173, then wait for #168 to merge.
+Remaining scope: after #168 merges, rebase onto `main`, retarget #173 to `main`, re-validate, mark ready and
+merge through `engineering:merge`, then Step 5 cleanup of this worktree.
 Done when: the split is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 5: push and open the stacked PR.
+Continue at Completion expectation step 5: when #168 merges, rebase and retarget #173 to `main`.
