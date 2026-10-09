@@ -120,9 +120,9 @@ missing it outranks the lowest-node default. A plan governs only its own work: a
 alone is invisible to every other session, which keeps writing the old way and builds new dependencies on
 it.
 
-The plan keeps the rollout — what moves and in what order. The convention states what all new code does,
-its scope, and how code that has not moved yet is treated, such as ported rather than extended. Replace
-the superseded rule in the same change, cite no plan from the convention, and record code that has not
+The plan keeps the rollout — what moves and in what order. The `AGENTS.md` statement itself says what all
+new code does, its scope, and how code that has not moved yet is treated, such as ported rather than
+extended. Replace the superseded rule in the same change, cite no plan from it, and record code that has not
 moved as tech debt. A change that decides or depends on a direction its repository's conventions do not
 state is incomplete; review reports it with the missing convention as its fix.
 
@@ -145,9 +145,9 @@ default branch.** Handing off means launching a side workstream through `enginee
 problem to the active owner of its fix who confirms it is in their goal; that goal, which ends in a merged
 fix, is then the record. Anything else left unfixed gets the entry above, merged to the default branch in
 the current PR when that PR will land, otherwise in its own docs-only PR straight away. That PR lands
-through `engineering:merge-docs` under the same standing authorization and delivery gates as a planning
-artifact. A chat reply, a message, an issue, a scratch file or an entry on a branch that may never merge is
-not a record.
+through `engineering:merge-docs` under the standing authorization and delivery gates that
+`engineering:plans` gives planning artifacts in "Planning artifacts always land". A chat reply, a message,
+an issue, a scratch file or an entry on a branch that may never merge is not a record.
 
 ## Throwaway working markdown
 
