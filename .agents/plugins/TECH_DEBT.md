@@ -98,3 +98,16 @@ This narrows the mutable-loader race to bytes checked and staged by the bootstra
 against a same-user attacker who can replace Python, the temporary directory, or the process itself. The
 package loader continues to verify the complete selected snapshot before it dispatches a hook. Generation
 still enforces cmd.exe's 8191-character command limit, but command length no longer grows with loader size.
+
+## Host skill entry points are copied by hand
+
+Every skill has a canonical `SKILL.md` and two host entry points under `.codex/skills/` and
+`.claude/skills/`. The entry points repeat the canonical name, description, kind and domain and a fixed
+reference body. `validate_adapters` in `scripts/sync_plugin_packages.py` fails generation when a copy
+drifts, so the copies cannot silently disagree, but an author still writes each one by hand and every
+description change touches three files. kit-layout repositories already generate their host skill
+directories.
+
+Resolve when generation emits the plain host entry points from the canonical definitions, so only an
+entry with a genuine host difference (`extended_host_adapters`) is authored under `.codex/` or `.claude/`,
+and `engineering:skill-authoring` no longer tells authors to copy the description.

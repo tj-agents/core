@@ -67,11 +67,52 @@ Mistakes this session made that such a convention should have prevented, as evid
 6. Record the PR URL and outcome here, and message the originating session (`.worktrees/SplitDocsAndDebt`)
    if the new convention changes how #173's skills should be shaped.
 
+## Decisions (step 2)
+
+- **Owner: a core engineering convention, `engineering:skill-authoring`**
+  (`.agents/engineering/convention/skill-authoring/`). kit was rejected as the owner: it is not installed
+  in the sessions that author core's skills, and core is not a kit-layout repository, so a kit-owned rule
+  would load nowhere it is needed. `engineering` is selected wherever skills are written. The convention
+  states the generic rules and links each repository's layout owner (`SOURCE_LAYOUT.md` here, `kit:check`
+  in kit-layout repositories) instead of restating either.
+- **Name.** No installed plugin on either host ships `skill-authoring` (checked against every
+  `SKILL.md` under `~/.claude/plugins` and `~/.codex`); the near names are other publishers'
+  `skill-creator`, `skill-development` and `writing-skills`. It shares a first word with `skill-routes`;
+  kit's family-folder rule applies only to kit-layout repositories, and core's layout has no families.
+- **Scope**: create versus extend, sizing and splitting by subject and consumption, naming and collisions,
+  the description as the selection trigger, kinds, lanes, host entry points and generation, skill-local
+  resources, compatibility entries, and tests. Kinds, lanes, layout and packaging are links.
+- **Sizing reconciles `SKILL_KINDS.md`.** Its "separate owner" sentence moves into the convention's sizing
+  rule, which adds the discovery cost that sentence omitted; `SKILL_KINDS.md` links there.
+- **Discovery, three layers.** The description triggers on creating, splitting, merging, renaming,
+  retiring or reviewing a skill. Core's `AGENTS.md` names it, because the split decision is made while
+  planning, before any `SKILL.md` is written. Core opts into routing with a one-row
+  `.agents/skill-routes.json` for authored `SKILL.md` paths, so a write is blocked until the convention is
+  loaded and a review's `--skills-for` names it.
+- **Machine checks.** Description parity across canonical and host entries is already enforced by
+  `scripts/sync_plugin_packages.py` (`validate_adapters`). Add a generation check rejecting two public
+  names equal once hyphens are removed (`tech-debt` beside `techdebt`). Generating the host adapters
+  instead of hand-copying them is a layout change (kit already generates them); record it as debt in
+  `.agents/plugins/TECH_DEBT.md` rather than doing it here. Excluding skill-local `TECH_DEBT.md` from
+  generation is #173's recorded debt; not duplicated here.
+- **Lanes.** Writing the convention is the L3 design deliverable. The generator check is a tiny inline
+  follow-up kept in this session: the Codex launcher is Windows-only on this machine (#137), so no Codex
+  phase can launch.
+
+## Progress
+
+- Picked up 2026-10-09 in `.worktrees/SkillAuthoringConvention` (Claude, L3). Steps 1–2 done.
+- Steps 3–4 done: convention, host entry points, catalog roster, `SKILL_KINDS.md` link, `AGENTS.md` line,
+  core route table, near-miss name check with tests, adapter-generation debt entry. 804 + 983 tests,
+  generation `-Check`, tier payload, catalog and harness `--check`, `docs_reachability.py` and the packaging
+  tests pass. This Claude profile has `engineering` installed but not `base`, so the write-time router is
+  not active on this machine; the review-time `--skills-for` query routes `SKILL.md` paths as intended.
+
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: steps 1–2.
-Remaining scope: implementation, validation, review, PR, merge, cleanup.
+Current slice: step 5, review.
+Remaining scope: PR, merge, cleanup, message #173's session.
 Done when: the convention is merged to `main` and this worktree is cleaned up.
 
-Start at Completion expectation step 1.
+Continue at Completion expectation step 5 with `engineering:review` (the diff changes the generator and tests).
