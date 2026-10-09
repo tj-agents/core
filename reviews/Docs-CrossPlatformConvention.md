@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `a06db1be49d73f7a93ea1864b8b8c79fc891960c`  `(2026-10-09)`
+**Reviewed up to commit:** `a8291ff3faf97dd154172414616dd2b5101fd26b`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — docs
@@ -208,4 +208,32 @@ Dropped: the AGENTS.md `tj-agents/docs` line (brought in from `origin/main` by t
 this branch's change); filing location (`docs/workflows/TECH_DEBT.md` is the workflow-runtime debt owner for
 `.agents/workflows/`). Native layer: built-in `code-review` (medium) scoped to the branch's two touched paths;
 documentation lenses in the parent. No security-sensitive path.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `a06db1be49d73f7a93ea1864b8b8c79fc891960c`
+**Candidate head:** `a8291ff3faf97dd154172414616dd2b5101fd26b`
+**Candidate branch:** `Docs/CrossPlatformConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:ee269d56a2ee571fac0d1f39af99327eb8a79ab8e100788ed5b9bdcc4b0457e4` `(2 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/qiBbFtlQRQf2VeXbjSgNsO/TgfBfPUKxqKNWupeuMbWzB`
+**Candidate bundle identity:** `sha256:a8a1d0858ca3c6853b12a29aa9537558749b5eec684dce866b5c657651265744`
+**Work-order path:** `reviews/Docs-CrossPlatformConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+### Findings
+
+- [x] **DEBT3 — LOW — followability** — `docs/workflows/TECH_DEBT.md:52`
+  The entry omits the runtime's own unlocked readers (`status`, `main`'s pre-lock worktree resolution, the
+  launched child), its acceptance test depends on timing, it prescribes a retry helper over the existing
+  owner lock, and it is silent on `hook_control.py`'s identical replace-then-read snapshot. State the
+  outcome for every reader and writer, require a deterministic Windows test, allow either the lock or a
+  sharing-safe read/replace, and name `hook_control.py`.
+
+  Resolved as described.
+
+Dropped: DEBT1's wording about a "locked reader" (frozen finding text; DEBT3's resolution names the owner
+lock as an option). Native layer: built-in `code-review` (medium); documentation lenses in the parent. No
+security-sensitive path.
 
