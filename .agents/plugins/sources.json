@@ -61,6 +61,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
+      "destination": "resources/plan-artifacts/host_coverage.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
     },
@@ -143,6 +148,11 @@
       "plugin": "engineering",
       "source": ".agents/workflows",
       "destination": "workflows"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
+      "destination": "workflows/host_coverage.py"
     },
     {
       "plugin": "engineering",
