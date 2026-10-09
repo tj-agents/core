@@ -41,6 +41,18 @@ say the rule must reach the repository's always-loaded conventions.
   harness and reachability checks.
 - [ ] Docs review, PR, CI (`verify`, `verify-linux`), merge through `engineering:merge`.
 
+## Current progress
+
+- Commit `7900a30` pushed on `Docs/DirectionChangeConventions`. Both Python suites green on it
+  (802 + 983 tests); generated, tier, catalog, harness and reachability checks pass.
+- Tommy flagged that `docs-and-debt` bundles two jobs. With his explicit choice of Claude (Codex cannot
+  launch on Linux), a bounded side session `splitdocsanddebt-24` was launched at L3 in
+  `.worktrees/SplitDocsAndDebt`, stacked on this branch; its goal is `plans/split-docs-and-debt/GOAL.md`
+  there. Launch confirmed; acknowledgement not yet observed.
+- Found while answering why Codex cannot launch: `agent_cli.py` finds Codex on POSIX only via PATH,
+  and agent shells here lack `~/.npm-global/bin`. Routed to the #137 owner (`core-46`), which
+  accepted it and the missing Windows-only note in `handoff-codex` as required fixes before #137 merges.
+
 ## Next Steps
 
-Implement the edits above, then validate, review, open the PR and merge.
+Docs review of `origin/main..7900a30`, open the PR, CI, merge through `engineering:merge`.
