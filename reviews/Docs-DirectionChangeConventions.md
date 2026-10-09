@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `f21fedb193e3e99d6e2d92cff6fb056e6171a372`  `(2026-10-09)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `f20561fa422d623422d100b730307073f7caabfb`  `(2026-10-09)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — docs
 
@@ -268,13 +268,35 @@ than a separate finding.
   Restating the gates named only two of the gate types `plans` preserves, dropped the pointer INST6 added
   and omitted the required validation. Make the debt PR a meta-only slice that lands as `plans`' "Planning
   artifacts always land" defines, keeping only the authorization this skill adds.
-  Fixed in the commit that adds this line.
+  Fixed in `f20561f`.
 - [x] **ACC10 — LOW — accuracy** — `plans/direction-change-conventions/GOAL.md:57`
   Progress counted passes and went stale on the next pass. Point at the work order's watermark instead.
-  Fixed in the commit that adds this line.
+  Fixed in `f20561f`.
 - [x] **TEST4 — LOW — test-coverage** — `.agents/hooks/tests/test_process_standards.py:128`
   The debt PR's authorization sentence was not pinned. Pin it.
-  Fixed in the commit that adds this line.
+  Fixed in `f20561f`.
 - [x] **ACC11 — LOW — accuracy** — `reviews/Docs-DirectionChangeConventions.md:237`
   Pass-6 findings lacked fix evidence. Record it.
-  Fixed in the commit that adds this line.
+  Fixed in `f20561f`.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `f21fedb193e3e99d6e2d92cff6fb056e6171a372`
+**Candidate head:** `f20561fa422d623422d100b730307073f7caabfb`
+**Candidate branch:** `Docs/DirectionChangeConventions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:587b20e7031a9ff673d0a0a2ee10556956a19e7f885a138989d3043f3ec1a3f8` `(4 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/04Vdp_QZuVcJVqFyfe_B64/S26b50qFe57b_Q0MI4l9Qf`
+**Candidate bundle identity:** `sha256:4125497210800c0dd26167298ee6227b6ff41257c8b999d224ef15fb41a889ad`
+**Work-order path:** `reviews/Docs-DirectionChangeConventions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No retained findings. Dropped after verification: the borrowed authorization is stated in `plan-authoring`
+step 6 and this sentence extends it to a meta-only slice, which `plans`' section covers; `TECH_DEBT.md`
+entries are Markdown, so the `merge-docs` path list admits them; the goal's progress names its own head and
+the work order's trailing watermark is the lifecycle's normal state between passes; the `plans` gate list is
+pinned separately; generated output stays uncommitted by repository rule; and the goal file's line wrapping
+is a formatting preference in a file the post-merge closeout deletes.
