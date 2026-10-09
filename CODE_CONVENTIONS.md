@@ -2,7 +2,8 @@
 
 Read these conventions before changing runtime scripts, hook wiring, or launchers.
 
-Use the language and runtime appropriate to the repository and host. Assess the execution mechanism,
+Use the language and runtime appropriate to the repository and host; for this repository's shipped code,
+that is set by [Supported platforms](#supported-platforms). Assess the execution mechanism,
 inputs and trust boundary when choosing a safe implementation.
 
 Prefer ordinary function calls, imports, script files and structured APIs over executing source-code
@@ -45,7 +46,7 @@ incomplete.
   a skip reason, and the behaviour it covers also has a test on the other platform. Tests whose
   behaviour differs by platform pin the platform explicitly.
 
-Repository tooling (`sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
+Repository tooling (`.agents/sync-generated.ps1`, `.codex/install-workflow-agents.ps1`) may use PowerShell 7
 (`pwsh`), but it must run under `pwsh` on Linux as well as on Windows. `shell/`, `install.ps1` and
 `cli-session-recovery/` are the Windows PowerShell profile and its tools, and are Windows-only by
 design.
