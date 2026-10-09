@@ -102,10 +102,11 @@ still enforces cmd.exe's 8191-character command limit, but command length no lon
 ## The `docs-and-debt` compatibility entry outlives its split
 
 `engineering:docs-and-debt` was split into `guidance-ownership`, `debt-records` and `working-docs`.
-Releases through `v2.1.15` publish the old name, and the `skills` alias table maps one name to one
-name, so it cannot redirect a split. The old name therefore ships as a routing-only compatibility entry,
-with `base:docs-and-debt` still aliased to it.
+Releases published before the split ship the old name as the rules owner, and every later release ships it
+as a routing-only compatibility entry until it is removed. The `skills` alias table maps one name to one
+name, so it cannot redirect a split, and `base:docs-and-debt` stays aliased to the routing entry.
 
-Resolve after 2027-04-09: delete the compatibility entry's canonical and host files and its
-`base:docs-and-debt` alias, then confirm `grep -rniE "docs-and-debt"` over authored sources finds only
-historical plans and reviews.
+Resolve after 2027-04-09: delete the compatibility entry's canonical and host files, its
+`base:docs-and-debt` alias, its row in the authored `.agents/catalog/catalog.json` skill roster, and lower
+the canonical skill count in `tests/test_source_layout.py` by one. Then confirm
+`grep -rniE "docs-and-debt"` over authored sources finds only historical plans and reviews.

@@ -32,24 +32,24 @@ recorded compatibility decision, not a defect in this candidate; no route row in
 
 ### Findings
 
-- [ ] **DEBT1 — MEDIUM — correctness** — `.agents/plugins/TECH_DEBT.md`
+- [x] **DEBT1 — MEDIUM — correctness** — `.agents/plugins/TECH_DEBT.md`
   The removal steps omit the hand-maintained `docs-and-debt` row in `.agents/catalog/catalog.json` and the
   skill count in `tests/test_source_layout.py`, so following the entry fails the catalog roster check and
   its own grep condition. Fix: list both in the resolution steps.
-- [ ] **COMPAT1 — MEDIUM — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:3`
+- [x] **COMPAT1 — MEDIUM — followability** — `.agents/engineering/convention/docs-and-debt/SKILL.md:3`
   The compatibility entry's description repeats the three owners' trigger words, so description matching
   can pick the routing stub over the real owner. Fix: describe it only as a compatibility entry for
   existing callers that is never selected for new work; keep the routes in the body.
-- [ ] **XREF1 — LOW — followability** — `.agents/engineering/convention/guidance-ownership/SKILL.md`
+- [x] **XREF1 — LOW — followability** — `.agents/engineering/convention/guidance-ownership/SKILL.md`
   The direction-change rule says "record code that has not moved as tech debt" but no longer shares a
   body with the recording rule. Fix: point it at `debt-records`.
-- [ ] **DEBT2 — LOW — accuracy** — `.agents/plugins/TECH_DEBT.md`
+- [x] **DEBT2 — LOW — accuracy** — `.agents/plugins/TECH_DEBT.md`
   "Releases through `v2.1.15` publish the old name" understates it: every release until removal ships the
   compatibility entry. Fix: say published releases before the split ship it as the rules owner and every
   later release until removal ships the routing entry.
-- [ ] **PLAN1 — LOW — accuracy** — `plans/split-docs-and-debt/GOAL.md`
+- [x] **PLAN1 — LOW — accuracy** — `plans/split-docs-and-debt/GOAL.md`
   The allowlist calls the `catalog.json` skill list generated; it is authored. Fix: call it the authored
   catalog skill roster.
-- [ ] **PLAN2 — LOW — plan-checkpoint** — `plans/split-docs-and-debt/GOAL.md`
+- [x] **PLAN2 — LOW — plan-checkpoint** — `plans/split-docs-and-debt/GOAL.md`
   `## Next Steps` still says to start at step 1 after the move landed. Fix: checkpoint progress and the
   current slice.

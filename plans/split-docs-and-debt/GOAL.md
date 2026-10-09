@@ -72,15 +72,28 @@ it, and a guidance rule added there looks like a tech-debt change.
   the compatibility entry's three files (`.agents/engineering/convention/docs-and-debt/SKILL.md`,
   `.codex/skills/docs-and-debt/SKILL.md`, `.claude/skills/docs-and-debt/SKILL.md`), the
   `base:docs-and-debt` alias in `.agents/plugins/compatibility.json`, its debt entry in
-  `.agents/plugins/TECH_DEBT.md`, the generated `catalog.json` skill list, this goal, and historical
+  `.agents/plugins/TECH_DEBT.md`, the authored `.agents/catalog/catalog.json` skill roster, this goal, and historical
   plans/reviews that record past work (`plans/direction-change-conventions/`, owned by the parent PR,
   `plans/outcome-verified-completion/`, `plans/pr-ownership/`, `reviews/`).
+
+## Progress
+
+- Steps 1–3 done: the split, host entry points, catalog roster, references and compatibility entry landed
+  in "Split docs-and-debt into guidance, debt and working-doc conventions". The branch was rebased twice
+  onto the parent (`3f9ab37`, then `724e5b5`) and the parent's revised recording and direction-change text
+  re-moved into `debt-records` and `guidance-ownership`; its new `review-lifecycle` and `address-review`
+  pointers were retargeted at `debt-records`.
+- Step 4 passed at `39588f6` (both suites, generation `-Check`, tier payload, catalog and harness `--check`,
+  `docs_reachability.py`); re-run on the rebased candidate before the PR.
+- Step 5: first review pass over `3f9ab37..39588f6` is in `reviews/Refactor-SplitDocsAndDebt.md`
+  (6 findings, changes requested); fixes applied after the rebase.
 
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: steps 1–2, then the move.
-Remaining scope: validation, review, stacked PR, merge after the parent lands.
+Current slice: commit the review fixes, re-validate, incremental review of the rebased candidate.
+Remaining scope: stacked PR on `Docs/DirectionChangeConventions`, merge after the parent lands, Step 5
+cleanup of this worktree.
 Done when: the split is merged to `main` and this worktree is cleaned up.
 
-Start at Completion expectation step 1.
+Continue at Completion expectation step 4 on the rebased candidate.
