@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `fb65ab8881ec9908b0874d4d2db31ee4c37d60b3`  `(2026-10-09)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `bf4f3d239f6f6919d931d4a2676559869a6bdbad`  `(2026-10-09)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — docs
 
@@ -133,8 +133,8 @@ lenses in the parent; `docs_reachability.py` 0 errors. No security-sensitive pat
   The previous pass was committed with its judgment set but the top-level status still `in-progress` and the
   watermark at `07532d9`. Finalize each pass's header in the same commit as its findings.
 
-  Resolved: the previous pass is finalized with the watermark at its head `03af0ef`, and this pass is
-  finalized at `fb65ab8`; its remediation goes to the next incremental pass.
+  Resolved: the committed watermark moved from `07532d9` directly to this pass's head `fb65ab8`, covering
+  the previous pass's `03af0ef` as well; this pass's remediation went to the next incremental pass.
 
 - [x] **INST7 — LOW — accuracy** — `plans/linux-port/LINUX_PORT_PLAN.md:75`
   Current progress attributes the `peer-cli` label and step 10 to `CODE_CONVENTIONS.md`; the PR made them.
@@ -152,3 +152,24 @@ Dropped: a post-port concern that `close-tab.ps1` stays Windows-only (step 5 rew
 it ports the skill); step 10's "including" examples (the general clause already covers every bare `python`).
 Native layer: built-in `code-review` (medium); documentation lenses in the parent. No security-sensitive path.
 
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `fb65ab8881ec9908b0874d4d2db31ee4c37d60b3`
+**Candidate head:** `bf4f3d239f6f6919d931d4a2676559869a6bdbad`
+**Candidate branch:** `Docs/CrossPlatformConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:24330ff8c7dc18bd21c09546a598559a429ca0798cb781abdb87859f106abade` `(5 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/rVc76uykpvE-rMFBdoYhtf/eNiTz8dJHxfbvVgrSeWm0J`
+**Candidate bundle identity:** `sha256:8073d92624407fff9970428ab19d02a0c2deef90f2a1cff457862a608182696b`
+**Work-order path:** `reviews/Docs-CrossPlatformConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. The `peer-cli` descriptions agree across the shared definition and both host entry points,
+and the plan attributes the label and step 10 to #166. REV1's resolution was corrected while finalizing this
+pass: the committed watermark never sat at `03af0ef`. Dropped: marking #166 "in review" in the plan (the
+statement is true once this PR merges with it), the superseded spelling quoted in INST4's frozen resolution,
+and line width (no rule sets one). Native layer: built-in `code-review` (medium); documentation lenses in the
+parent. No security-sensitive path.
