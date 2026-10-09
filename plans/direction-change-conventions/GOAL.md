@@ -39,11 +39,15 @@ say the rule must reach the repository's always-loaded conventions.
 
 ## Steps
 
-- [ ] Owner text in `docs-and-debt` and description trigger.
-- [ ] Pointers in `plan-authoring`, `plan-execution`, `review`, `docs-review`, `session-guidance`.
-- [ ] Local gates: both Python suites, `sync-generated.ps1 -Check` after local regeneration, catalog,
+- [x] Owner text in `docs-and-debt` and description trigger.
+- [x] Pointers in `plan-authoring`, `plan-execution`, `review`, `docs-review`, `session-guidance`.
+- [x] Problem-recording rule in `docs-and-debt`; `review-lifecycle` and `address-review` point at it.
+- [x] Local gates: both Python suites, `sync-generated.ps1 -Check` after local regeneration, catalog,
   harness and reachability checks.
-- [ ] Docs review, PR, CI (`verify`, `verify-linux`), merge through `engineering:merge`.
+- [ ] Docs review (pass 1 complete with findings; fixes need an incremental pass), PR, CI (`verify`,
+  `verify-linux`), merge through `engineering:merge`.
+- [ ] After merge: retire this goal and the review work order in a docs-only closeout, and finish merge
+  Step 5 for this worktree.
 
 ## Current progress
 
