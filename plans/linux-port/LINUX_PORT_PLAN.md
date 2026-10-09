@@ -71,9 +71,9 @@ what still needs checking on Windows.
 
 Shared library merged (#106, after the interim path fix #105). Kitty configured. Steps merged: 1 (#107),
 2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
-(#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). The cross-platform direction is a written
-convention in `CODE_CONVENTIONS.md` (#166), which labels `peer-cli` Windows-only and adds step 10 for
-the rest of the shipped instructions. Step 3b `handoff-codex` in review as #137.
+(#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). #166 makes the cross-platform direction a written
+convention in `CODE_CONVENTIONS.md`, labels `peer-cli` Windows-only, and adds step 10 for the rest of the
+shipped instructions. Step 3b `handoff-codex` in review as #137.
 
 ## Next Steps
 
