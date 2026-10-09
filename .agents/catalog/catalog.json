@@ -127,6 +127,7 @@
             "commit-push",
             "committing",
             "continue-roadmap",
+            "debt-records",
             "docs-and-debt",
             "docs-review",
             "failing-tests",
@@ -134,6 +135,7 @@
             "feature",
             "git-auth",
             "git-branching",
+            "guidance-ownership",
             "guide",
             "guide-build",
             "handoff",
@@ -172,6 +174,7 @@
             "unmerged",
             "update-roadmap",
             "workboard",
+            "working-docs",
             "worktree"
           ],
           "dependencies": {

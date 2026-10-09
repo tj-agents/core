@@ -108,7 +108,7 @@ class ProcessStandardsTests(unittest.TestCase):
         )
 
     def test_a_change_of_direction_is_stated_where_every_session_loads_it(self):
-        flat = " ".join(authored_skill("docs-and-debt").read_text(encoding="utf-8").split())
+        flat = " ".join(authored_skill("guidance-ownership").read_text(encoding="utf-8").split())
 
         for phrase in (
             "write that rule into the repository's standing conventions when it is decided, "
@@ -122,7 +122,7 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(phrase, flat)
 
     def test_a_noticed_problem_is_recorded_on_the_default_branch(self):
-        flat = " ".join(authored_skill("docs-and-debt").read_text(encoding="utf-8").split())
+        flat = " ".join(authored_skill("debt-records").read_text(encoding="utf-8").split())
 
         for phrase in (
             "Every problem you notice is fixed, handed off or recorded before you move on, "
