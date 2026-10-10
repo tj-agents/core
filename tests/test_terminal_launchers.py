@@ -56,7 +56,7 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertEqual(["--", "--hooks"], json.loads(result.stdout)[-2:])
 
     def test_claude_exempts_non_sessions_and_makes_bare_name_in_python(self):
-        with mock.patch.object(CLAUDE, "native_target_for_batch", side_effect=lambda target: target), \
+        with mock.patch.object(CLAUDE, "native_target_for_shim", side_effect=lambda target: target), \
                 mock.patch.object(CLAUDE, "sync_claude_standards") as sync, \
                 mock.patch.object(CLAUDE, "run_target", return_value=17) as run, \
                 mock.patch.object(CLAUDE, "claude_label", return_value="repo/topic"):
@@ -72,13 +72,16 @@ class TerminalLaunchersTests(unittest.TestCase):
             sync.assert_called_once_with(Path("/work"), claude="claude")
             run.assert_called_once_with("claude", ["-n", "repo/topic"])
 
-    def test_claude_uses_native_for_refresh_when_the_typed_target_is_a_batch_shim(self):
-        with mock.patch.object(CLAUDE, "native_target_for_batch", return_value="C:/native/claude.exe") as resolve, \
-                mock.patch.object(CLAUDE, "sync_claude_standards") as sync, \
-                mock.patch.object(CLAUDE, "run_target", return_value=0):
-            self.assertEqual(0, CLAUDE.main(["--project", "/work", "--target", "C:/npm/claude.cmd", "chat"]))
-        resolve.assert_called_once_with("C:/npm/claude.cmd")
-        sync.assert_called_once_with(Path("/work"), claude="C:/native/claude.exe")
+    def test_claude_uses_native_for_refresh_for_batch_and_powershell_shims(self):
+        for suffix in (".cmd", ".ps1"):
+            with self.subTest(suffix=suffix), \
+                    mock.patch.object(CLAUDE, "native_target_for_shim", return_value="C:/native/claude.exe") as resolve, \
+                    mock.patch.object(CLAUDE, "sync_claude_standards") as sync, \
+                    mock.patch.object(CLAUDE, "run_target", return_value=0):
+                target = "C:/npm/claude" + suffix
+                self.assertEqual(0, CLAUDE.main(["--project", "/work", "--target", target, "chat"]))
+                resolve.assert_called_once_with(target)
+                sync.assert_called_once_with(Path("/work"), claude="C:/native/claude.exe")
 
     def test_codex_uses_native_for_refresh_but_preserves_typed_shim_and_args(self):
         special = ["exec", "space arg", "café", 'quote"arg']
@@ -159,6 +162,15 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertNotIn("cmd.exe", [part.casefold() for part in [*claude_command, *codex_command]])
         claude.assert_called_once_with()
         codex.assert_called_once_with()
+
+    def test_windows_supported_powershell_shims_use_native_without_powershell(self):
+        arguments = ['quote"arg', '', 'a b', 'café', '%USERPROFILE%', 'x&echo injected']
+        with mock.patch.object(COMMAND.os, "name", "nt"), \
+                mock.patch.object(COMMAND.agent_cli, "resolve_claude_executable", return_value="C:/native/claude.exe"), \
+                mock.patch.object(COMMAND.agent_cli, "resolve_codex_executable", return_value=("C:/native/codex.exe", {})), \
+                mock.patch.object(COMMAND.shutil, "which", side_effect=AssertionError("PowerShell must not be needed")):
+            self.assertEqual(["C:/native/claude.exe", *arguments], COMMAND.command_for_target("C:/npm/claude.ps1", arguments))
+            self.assertEqual(["C:/native/codex.exe", *arguments], COMMAND.command_for_target("C:/npm/codex.ps1", arguments))
 
     def test_windows_unknown_batch_launcher_fails_without_cmd(self):
         with mock.patch.object(COMMAND.os, "name", "nt"):

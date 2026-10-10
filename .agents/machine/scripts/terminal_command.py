@@ -18,18 +18,18 @@ CLAUDE_NON_SESSION_COMMANDS = frozenset({
 })
 
 
-def batch_launcher_kind(target: str) -> str | None:
-    """Return the supported CLI named by a Windows batch launcher, if any."""
+def native_shim_kind(target: str) -> str | None:
+    """Return the supported CLI named by a Windows launcher shim, if any."""
     name = target.replace("\\", "/").rsplit("/", 1)[-1].casefold()
-    if not name.endswith((".cmd", ".bat")):
+    if not name.endswith((".cmd", ".bat", ".ps1")):
         return None
     stem = name.rsplit(".", 1)[0]
     return stem if stem in {"claude", "codex"} else None
 
 
-def native_target_for_batch(target: str) -> str:
-    """Resolve a supported batch shim to its native executable without invoking cmd.exe."""
-    kind = batch_launcher_kind(target)
+def native_target_for_shim(target: str) -> str:
+    """Resolve a supported CLI shim to its native executable."""
+    kind = native_shim_kind(target)
     if target.replace("\\", "/").rsplit("/", 1)[-1].casefold().endswith((".cmd", ".bat")) and kind is None:
         raise OSError(f"unsupported batch launcher cannot run safely: {target}")
     if kind is None:
@@ -40,19 +40,21 @@ def native_target_for_batch(target: str) -> str:
         resolved, _version = agent_cli.resolve_codex_executable()
         return resolved
     except agent_cli.LaunchError as error:
-        raise OSError(f"{kind} batch launcher cannot run safely: {error}") from None
+        raise OSError(f"{kind} launcher shim cannot run safely: {error}") from None
 
 
 def command_for_target(target: str, arguments: list[str]) -> list[str]:
     """Build the platform-required argument list without changing the typed arguments."""
     suffix = Path(target).suffix.casefold()
+    if os.name == "nt" and native_shim_kind(target):
+        return [native_target_for_shim(target), *arguments]
     if os.name == "nt" and suffix == ".ps1":
         shell = shutil.which("pwsh") or shutil.which("powershell.exe")
         if not shell:
             raise OSError("PowerShell is required to run the selected CLI launcher")
         return [shell, "-NoProfile", "-File", target, *arguments]
     if os.name == "nt" and suffix in {".cmd", ".bat"}:
-        native = native_target_for_batch(target)
+        native = native_target_for_shim(target)
         return [native, *arguments]
     return [target, *arguments]
 
