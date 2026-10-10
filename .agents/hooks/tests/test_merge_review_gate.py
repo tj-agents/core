@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 HOOK = Path(__file__).resolve().parents[1] / "merge_review_gate.py"
+ADAPTER = Path(__file__).resolve().parents[3] / ".codex" / "adapters" / "pre_tool_use.py"
 sys.path.insert(0, str(HOOK.parent))
 M = "gh pr " + "merge"  # assembled so this file never contains the gated literal
 
@@ -589,6 +590,60 @@ class JurisdictionTests(unittest.TestCase):
                 result = self.run_hook(command, codex=True, native=True)
                 self.assertEqual(2, result.returncode)
                 self.assertIn("cannot prove this merge's checkout", result.stderr)
+
+    def test_native_shell_profiles_reject_commands_before_gh(self):
+        command = M + " 1 --squash --auto"
+        cases = (
+            ["bash", "+e", "-c", command],
+            ["bash", "-c", "-e", command],
+            ["bash", "-c", "--", command],
+            ["bash", "+c", command],
+            ["bash", "-oc", "posix", command],
+            ["bash", "-Oc", "extglob", command],
+            ["bash", "-rcfile", "-c", "-c", command],
+            ["bash", "-ooec", "errexit", "nounset", command],
+            ["dash", "-cI", command],
+            ["dash", "-ooec", "errexit", "nounset", command],
+            ["zsh", "-co", "errexit", command],
+            ["zsh", "-cO", command],
+            ["zsh", "--sh-word-split", "-c", command],
+            ["zsh", "-c-", command],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                result = self.run_hook(payload, codex=True, native=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("cannot prove this merge's checkout", result.stderr)
+
+    def test_native_ambiguous_sh_payload_refuses_before_jurisdiction(self):
+        result = self.run_hook(
+            ["sh", "-c", "+", "-e", M + " 1 --squash --auto"],
+            codex=True,
+            native=True,
+        )
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("ambiguous `sh` launcher", result.stderr)
+
+    def test_ambiguous_sh_payload_denies_through_codex_adapter_and_claude_dispatcher(self):
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "exec_command",
+            "cwd": str(self.root),
+            "tool_input": {"cmd": ["sh", "-c", "+", "-e", M + " 1 --squash --auto"]},
+            "turn_id": "codex-ambiguous-sh",
+        }
+        commands = (
+            [sys.executable, "-B", str(ADAPTER), str(HOOK)],
+            [sys.executable, "-B", str(HOOK.parent / "hook_dispatch.py"), str(HOOK)],
+        )
+        for argv in commands:
+            with self.subTest(argv=argv):
+                result = subprocess.run(argv, input=json.dumps(payload), capture_output=True, text=True)
+                self.assertEqual(0, result.returncode, result.stderr)
+                decision = json.loads(result.stdout)["hookSpecificOutput"]
+                self.assertEqual("deny", decision["permissionDecision"])
+                self.assertIn("ambiguous `sh` launcher", decision["permissionDecisionReason"])
 
     def test_native_powershell_command_span_rejects_an_unproved_target_before_gh(self):
         command = ["powershell.exe", "-NoProfile", "-Command", M + " 1 --squash --auto", ";"]

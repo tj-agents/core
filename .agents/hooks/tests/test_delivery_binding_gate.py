@@ -403,6 +403,16 @@ class GateSubprocessTests(unittest.TestCase):
     def test_a_merge_command_is_not_this_gates_business(self):
         self.assertEqual(0, self.run_hook(command="gh pr " + "merge 42 --auto").returncode)
 
+    def test_ambiguous_sh_payload_refuses_before_binding_work(self):
+        result = self.run_hook(
+            command=["sh", "-c", "+", "-e", CREATE + " --draft --title t --body b"],
+            event="PreToolUse",
+        )
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("ambiguous `sh` launcher", result.stderr)
+        self.assertFalse((self.repo / ".agents" / "persistent-workflow-binding.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

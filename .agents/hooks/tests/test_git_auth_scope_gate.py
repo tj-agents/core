@@ -6,7 +6,7 @@ import subprocess
 import sys
 import unittest
 import uuid
-from contextlib import ExitStack
+from contextlib import ExitStack, redirect_stderr
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -199,11 +199,59 @@ class CommandExtractionTests(unittest.TestCase):
             with self.subTest(payload=payload):
                 self.assertNotEqual(command, gate.extract_command("exec_command", {"command": payload}))
 
-    def test_short_unix_shell_argv_is_joined(self):
-        self.assertEqual(
-            "bash -lc",
-            gate.extract_command("exec_command", {"command": ["bash", "-lc"]}),
+    def test_short_unix_shell_argv_without_a_script_is_not_joined(self):
+        self.assertIsNone(gate.extract_command("exec_command", {"command": ["bash", "-lc"]}))
+
+    def test_known_unix_shell_profiles_select_the_command_operand(self):
+        command = "gh auth login"
+        cases = (
+            ["bash", "+e", "-c", command],
+            ["bash", "-c", "-e", command],
+            ["bash", "-c", "--", command],
+            ["bash", "+c", command],
+            ["bash", "-oc", "posix", command],
+            ["bash", "-Oc", "extglob", command],
+            ["bash", "-rcfile", "-c", "-c", command],
+            ["bash", "-ooec", "errexit", "nounset", command],
+            ["dash", "-cI", command],
+            ["dash", "-ooec", "errexit", "nounset", command],
+            ["zsh", "-co", "errexit", command],
+            ["zsh", "-cO", command],
+            ["zsh", "--sh-word-split", "-c", command],
+            ["zsh", "-c-", command],
         )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertEqual(command, gate.extract_command("exec_command", {"command": payload}))
+
+    def test_known_unix_shells_do_not_scan_script_files_or_option_values(self):
+        command = "gh auth login"
+        cases = (
+            ["bash", "--", "-c", command],
+            ["bash", "script.sh", "-c", command],
+            ["bash", "-s", "positional", "-c", command],
+            ["bash", "--rcfile", "-c", command],
+            ["bash", "-o", "-c", command],
+            ["bash", "--rcfile=-c", "-c", command],
+            ["bash", "-c", "--noprofile", command],
+            ["dash", "-o", "-c", command],
+            ["dash", "-O", "option", command],
+            ["zsh", "-oc", command],
+            ["bash", "-c", ""],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertNotEqual(command, gate.extract_command("exec_command", {"command": payload}))
+
+    def test_sh_refuses_disagreement_between_supported_profiles(self):
+        for payload in (
+            ["sh", "-coerrexit", "errexit", "gh auth login"],
+            ["sh", "-c", "+", "-e", "gh auth login"],
+        ):
+            with self.subTest(payload=payload), self.assertRaises(SystemExit) as exit_info, redirect_stderr(io.StringIO()) as stderr:
+                gate.extract_command("exec_command", {"command": payload})
+            self.assertEqual(2, exit_info.exception.code)
+            self.assertIn("ambiguous `sh` launcher", stderr.getvalue())
 
     def test_powershell_command_span_includes_trailing_arguments(self):
         command = "Write-Output SCRIPT"
@@ -276,6 +324,21 @@ class CommandExtractionTests(unittest.TestCase):
                         },
                     ),
                 )
+
+    def test_powershell_file_default_and_invalid_options_do_not_fall_through(self):
+        command = "gh auth login"
+        cases = (
+            ["powershell", "-File", "script.ps1", "-Command", command],
+            ["pwsh", "script.ps1", "-Command", command],
+            ["pwsh", "-Unknown", "-Command", command],
+            ["pwsh", "-CommandWith", command],
+            ["powershell", "-Command", "-"],
+            ["pwsh", "-EncodedCommand", "Z2ggYXV0aCBsb2dpbg=="],
+            ["pwsh", "-OutputFormat", "-Command", command],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertIsNone(gate.extract_command("exec_command", {"command": payload}))
 
     @unittest.skipUnless(os.name == "nt", "Windows PowerShell argv behavior only")
     def test_powershell_command_span_matches_execution(self):
