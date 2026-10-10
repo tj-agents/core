@@ -370,6 +370,20 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn("even in the same checkout", flat_launcher)
                 self.assertNotIn("Split a job that designs and then delivers", launcher)
 
+    def test_side_handoff_submission_keeps_the_parent_executing(self):
+        for host in ("codex", "claude"):
+            with self.subTest(host=host):
+                launcher = (
+                    self.root / f".agents/machine/utility/handoff-{host}/SKILL.md"
+                ).read_text(encoding="utf-8")
+                flat_launcher = " ".join(launcher.split())
+                self.assertIn("bounded side-workstream handoff", flat_launcher)
+                self.assertIn("retain the originating goal and foreground writer lease", flat_launcher)
+                self.assertIn("continue its next action in the same turn", flat_launcher)
+                self.assertIn("does not satisfy the originating goal's completion condition", flat_launcher)
+                self.assertIn("full-goal transfer follows `engineering:handoff`", flat_launcher)
+                self.assertNotIn("the handoff happened. Report it and stop.", launcher)
+
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
         authoring = authored_skill("plan-authoring").read_text(
