@@ -6,6 +6,7 @@ from git_auth_scope_gate import extract_command
 from merge_review_gate import canonical_merge_target_dir, is_codex_invocation, merge_target_dir
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workflows"))
+from delivery_runtime import DeliveryContractViolation, StandingMergeAuthorization
 from pr_body import validate_pr_body
 
 from hook_runtime import (
@@ -135,6 +136,21 @@ def authoritative_body(root, pr, repo=None):
     return result
 
 
+def auto_merge_enabled(root):
+    path = root / CONFIG_FILE
+    try:
+        policy = json.loads(path.read_text(encoding="utf-8"))
+        StandingMergeAuthorization().validate_policy(policy)
+    except (OSError, ValueError, DeliveryContractViolation):
+        return False
+    return policy.get("auto_merge", False) is True
+
+
+def auto_merge_wrapper(root):
+    payload = own_payload_root(__file__) / "workflows" / "auto_merge.py"
+    return payload if payload.is_file() else root / ".agents" / "workflows" / "auto_merge.py"
+
+
 def validate_before(data, command, parsed):
     operation, tokens, prefix = parsed
     try:
@@ -155,6 +171,8 @@ def validate_before(data, command, parsed):
                 return 0
         root = Path(working_directory(data)).resolve()
         if operation == "merge":
+            if "--disable-auto" in options and "--auto" not in options:
+                return 0
             normalized = re.sub(r"(?<= && )gh(?:\.exe)?(?= pr merge )", "gh", command, flags=re.IGNORECASE)
             if " && gh pr merge " in normalized:
                 checkout, merge_args = normalized.split(" && gh pr merge ", 1)
@@ -167,6 +185,14 @@ def validate_before(data, command, parsed):
             root = Path(canonical or merge_target_dir(command, data)).resolve()
             if not targets or not re.fullmatch(r"[1-9]\d*|https://github\.com/[^/]+/[^/]+/pull/[1-9]\d*", targets[0]):
                 raise ValueError("name the PR explicitly by number or URL")
+            if "--auto" in options:
+                if auto_merge_enabled(root):
+                    raise ValueError(
+                        "direct --auto is guarded; run exactly `python -B "
+                        + str(auto_merge_wrapper(root))
+                        + " --root " + str(root) + "`"
+                    )
+                raise ValueError("repository auto_merge is not enabled")
             authoritative_body(root, targets[0], options.get("--repo") or options.get("-R"))
             return 0
         if prefix:
