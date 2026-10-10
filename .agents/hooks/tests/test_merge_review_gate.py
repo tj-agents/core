@@ -577,6 +577,14 @@ class JurisdictionTests(unittest.TestCase):
         self.assertIn("cannot resolve PR #1", result.stderr)
         self.assertNotIn("cannot prove this merge's checkout", result.stderr)
 
+    def test_native_powershell_command_span_rejects_an_unproved_target_before_gh(self):
+        command = ["powershell.exe", "-NoProfile", "-Command", M + " 1 --squash --auto", ";"]
+
+        result = self.run_hook(command, codex=True, native=True)
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("cannot prove this merge's checkout", result.stderr)
+
     def test_codex_canonical_target_outside_an_opted_repo_is_not_review_gated(self):
         other = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(lambda: None)

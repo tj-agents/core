@@ -31,7 +31,7 @@ The original review artifact records complete approval and matching review and s
 
 ## Verification and review
 
-The completed independent review is recorded at `3bda8e91428216c1a7321e05382877682860454c`; it approved the source candidate and found no changed-line defects. After the `33fb4155973b8ee1d26a8fd6f2a27d8428f6f166` integration, Windows source revalidation passed: Codex Windows hook commands (3), hook control (26), harness manifests (13), and paired instructions (1). A bounded Unix-shell argv recovery selects the script immediately after `-c` or `-lc` only for Bash, sh, zsh, and dash when present; it retains PowerShell's existing final-argument handling and safely joins a short Unix argv. Its direct extractor suite passed (26), its native review-gate regression reached the target repository's actual review check, merge-review passed 84 cases with one platform skip, and persistent-workflow passed 33 cases with eight POSIX-shim skips. The shipped host-coverage validator accepts this goal's single plan-stage record. Catalog-digest and generated-output checks also passed after refreshing generated outputs locally.
+The completed independent review is recorded at `3bda8e91428216c1a7321e05382877682860454c`; it approved the source candidate and found no changed-line defects. After the `33fb4155973b8ee1d26a8fd6f2a27d8428f6f166` integration, Windows source revalidation passed: Codex Windows hook commands (3), hook control (26), harness manifests (13), and paired instructions (1). A bounded shell argv recovery selects Unix scripts immediately after `-c` or `-lc` only for Bash, sh, zsh, and dash when present, and consumes the PowerShell or pwsh span after `-c` or `-Command`, including common executable paths and trailing separators. Its direct extractor suite passed (27) with a harmless actual PowerShell probe; native review and continuation regressions rejected unproved canonical targets before `gh`, merge-review passed 85 cases with one platform skip, and persistent-workflow passed 34 cases with eight POSIX-shim skips. The shipped host-coverage validator accepts this goal's single plan-stage record. Catalog-digest and generated-output checks also passed after refreshing generated outputs locally.
 
 The reviewed tree intentionally contains pre-regeneration catalog metadata; the frozen CI workflow regenerates catalog digests and packages before verification. Exact-head Windows and Linux CI remain pending. Installed-profile activation remains unverified. Source and package checks describe source coverage only.
 
@@ -50,7 +50,7 @@ The reviewed tree intentionally contains pre-regeneration catalog metadata; the 
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "After the bounded Unix-shell argv recovery on the 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166 base, shared gate suites passed: merge-review 84 cases (one platform skip) and persistent-workflow 33 cases (eight POSIX-shim skips). The direct shared extractor suite passed (26), including short Unix argv and preserved PowerShell final-argument behavior. Host-coverage plan validation, catalog, and generation checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
+        "evidence": "After the bounded shell argv recovery on the 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166 base, shared gate suites passed: merge-review 85 cases (one platform skip) and persistent-workflow 34 cases (eight POSIX-shim skips). The direct shared extractor suite passed (27), including short Unix argv and a harmless PowerShell command-span probe. Catalog and generation checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
       }
     },
     {
@@ -61,7 +61,7 @@ The reviewed tree intentionally contains pre-regeneration catalog metadata; the 
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "After the bounded Unix-shell argv recovery on the 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166 base, shared gate suites passed: merge-review 84 cases (one platform skip) and persistent-workflow 33 cases (eight POSIX-shim skips). Native Unix-shell regressions reached the review and continuation checks, and the direct shared extractor suite passed (26), including short Unix argv and preserved PowerShell final-argument behavior. Codex Windows hook commands (3), hook control (26), harness manifests (13), paired instructions (1), host-coverage plan validation, catalog, and generation checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
+        "evidence": "After the bounded shell argv recovery on the 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166 base, shared gate suites passed: merge-review 85 cases (one platform skip) and persistent-workflow 34 cases (eight POSIX-shim skips). Native Unix-shell and PowerShell regressions reached the review and continuation checks, and the direct shared extractor suite passed (27), including short Unix argv and a harmless PowerShell command-span probe. Codex Windows hook commands (3), hook control (26), harness manifests (13), paired instructions (1), catalog, and generation checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
       }
     }
   ]

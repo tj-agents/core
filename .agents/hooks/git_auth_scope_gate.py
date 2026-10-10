@@ -113,18 +113,18 @@ def _shell_script_from_list(parts):
     cleaned = [str(p) for p in parts if isinstance(p, (str, int, float))]
     if not cleaned:
         return None
-    if len(cleaned) >= 3 and re.fullmatch(r"-[a-z]*c", cleaned[1]) and Path(cleaned[0]).name in (
+    shell = Path(cleaned[0].replace("\\", "/")).stem.lower()
+    if len(cleaned) >= 3 and re.fullmatch(r"-[a-z]*c", cleaned[1]) and shell in (
         "bash",
         "sh",
         "zsh",
         "dash",
     ):
         return cleaned[2]
-    if len(cleaned) >= 2 and re.fullmatch(r"-[a-z]*c", cleaned[1]) and Path(cleaned[0]).name in (
-        "pwsh",
-        "powershell",
-    ):
-        return cleaned[-1]
+    if shell in ("pwsh", "powershell"):
+        for index, option in enumerate(cleaned[1:], 1):
+            if option.lower() in ("-c", "-command"):
+                return " ".join(cleaned[index + 1:])
     return " ".join(cleaned)
 
 

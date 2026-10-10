@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -174,14 +175,37 @@ class CommandExtractionTests(unittest.TestCase):
             gate.extract_command("exec_command", {"command": ["bash", "-lc"]}),
         )
 
-    def test_powershell_argv_payload_keeps_its_last_argument_behavior(self):
-        self.assertEqual(
-            "trailing",
-            gate.extract_command(
-                "exec_command",
-                {"command": ["powershell", "-c", "script", "trailing"]},
-            ),
+    def test_powershell_command_span_includes_trailing_arguments(self):
+        command = "Write-Output SCRIPT"
+        cases = (
+            ["powershell.exe", "-NoProfile", "-Command", command, ";"],
+            [
+                r"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+                "-NoProfile",
+                "-Command",
+                command,
+                ";",
+            ],
+            ["pwsh", "-c", command, ";"],
+            ["/opt/powershell/pwsh", "-NoProfile", "-Command", command, ";"],
         )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertEqual(
+                    command + " ;",
+                    gate.extract_command("exec_command", {"command": payload}),
+                )
+
+    @unittest.skipUnless(os.name == "nt", "Windows PowerShell argv behavior only")
+    def test_powershell_command_span_matches_execution(self):
+        command = "Write-Output SCRIPT"
+        payload = ["powershell.exe", "-NoProfile", "-Command", command, ";"]
+
+        result = subprocess.run(payload, capture_output=True, text=True)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("SCRIPT", result.stdout.strip())
+        self.assertEqual(command + " ;", gate.extract_command("exec_command", {"command": payload}))
 
     def test_a_non_shell_tool_claims_no_jurisdiction(self):
         self.assertIsNone(gate.extract_command("Write", {"command": "gh auth refresh -s admin:org"}))
