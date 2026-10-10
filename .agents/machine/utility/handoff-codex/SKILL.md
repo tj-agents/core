@@ -44,9 +44,13 @@ A tab takes seconds to appear and a process listing is trivially misread — an 
 repository, which is worse than no handoff at all: they collide on the same files with neither aware of
 the other.
 
-If the launcher printed its confirmation, the handoff happened. Report it and stop. If it exited
-non-zero, say so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a
-second tab for the same request.
+If the launcher printed its confirmation, one handoff tab was submitted. For a bounded side-workstream
+handoff, retain the originating goal and foreground writer lease, then continue its next action in the
+same turn: the successful side handoff does not satisfy the originating goal's completion condition. A
+full-goal transfer follows `engineering:handoff`'s checkpoint, release and verified-pickup contract. An
+ordinary launcher-only request may report the submitted handoff as complete. If it exited non-zero, say
+so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a second tab for
+the same request.
 
 ## Model selection
 
