@@ -77,3 +77,7 @@ The supported CI-style command `python -B -m unittest discover -s .agents/hooks/
 `python -B scripts/update_catalog_digests.py` exited 0 and refreshed one generated catalog digest. `pwsh .agents/sync-generated.ps1` exited 0 with 3 generated changes, and `pwsh .agents/sync-generated.ps1 -Check` exited 0 after checking 504 package files from 75 shared definitions. Generated output remains unstaged.
 
 `python -B .agents/base/policy/plan-artifacts/scripts/host_coverage.py --stage plan --document plans/continuation-heartbeat-metadata/GOAL.md` exited 0 with one valid record and no errors. The implementation candidate is `699d25f` (`Preserve recovery metadata on heartbeat`): 3 authored files, 124 insertions, and no deletions.
+
+## Rebased parent requalification
+
+The candidate was rebased onto `origin/main` at `8b656fb197771916c58aea4418934aaa7648b1c0`, producing code commit `d26d1d3`. The focused both-host `ContinuationTests.test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground` passed through `workflow_ops.py` on the rebased tree. `scripts/update_catalog_digests.py`, `.agents/sync-generated.ps1`, and `.agents/sync-generated.ps1 -Check` also passed; the resulting generated output remains uncommitted. The next action is an exact-head independent review, followed by PR delivery if approved.
