@@ -24,6 +24,9 @@ Resolve the exact directory the request concerns and do not substitute another c
 Run the launcher with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/open_claude.py' --working-directory '<absolute-path>' --title '<short-title>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/open_claude.py' --working-directory '<absolute-path>' --title '<short-title>'
 ```
 On Windows, `python3` is often the Microsoft Store
