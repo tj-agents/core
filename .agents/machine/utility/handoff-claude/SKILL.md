@@ -110,12 +110,12 @@ Codex; it rejects L7
 and every Haiku family ID or alias before launch, and never trusts the hidden CLI default.
 
 Launch with `scripts/launch_claude.py`, beside this file:
+Run it with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
 python3 '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>' --lane '<L1..L6>'
 ```
-
-Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve the model and, where the table

@@ -24,6 +24,7 @@ fixture validation is not proof that a particular live session is reachable.
    and reuse it for this message. Do not put private message/history data into repository fixtures.
 3. Invoke the shipped helper with properly quoted shell arguments. `--codex` accepts a native executable
    path, not a command string; supply the actual executable if the PATH entry is a shell shim.
+   Use `python` on Windows or `python3` on Linux/macOS for both helper commands below.
 
 ```text
 python -B "<skill-directory>/scripts/codex_followup.py" --codex "<codex-executable>" --timeout 20 send --thread <exact-uuid> --cwd "<expected-directory>" --codex-home "<selected-profile>" --message-file "<message-file>" --receipt "<receipt-file>"

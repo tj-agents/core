@@ -9,6 +9,9 @@ route: infer
 
 # Bootstrap locked capabilities
 
+The commands below show Windows paths and use `python` in Windows PowerShell. On Linux/macOS, use
+`python3` with POSIX paths and the same script arguments.
+
 ## Generate repository host settings
 
 Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
