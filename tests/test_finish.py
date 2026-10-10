@@ -54,6 +54,19 @@ def git(cwd, *args):
 
 @unittest.skipUnless(sys.platform == "linux" or os.name == "nt", "Supported process backends")
 class FinishReaperProcessTests(unittest.TestCase):
+    @staticmethod
+    def fake_gh(root):
+        directory = root / "fake-gh"
+        directory.mkdir()
+        if os.name == "nt":
+            command = directory / "gh.cmd"
+            command.write_text("@echo off\r\necho []\r\n", encoding="utf-8")
+        else:
+            command = directory / "gh"
+            command.write_text("#!/bin/sh\nprintf '[]\\n'\n", encoding="utf-8")
+            command.chmod(0o755)
+        return directory
+
     def test_armed_observer_waits_for_exit_then_removes_worktree_and_obligation(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); bare = root / "origin.git"; primary = root / "primary"; worktree = root / "feature"; state = root / "state"
@@ -69,7 +82,12 @@ class FinishReaperProcessTests(unittest.TestCase):
             obligation = state / "merge-cleanup/obligations/one.json"; obligation.parent.mkdir(parents=True); obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
             host = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=worktree)
             started = self.process_started_at(host.pid)
-            result = state / "merge-cleanup/results/result.json"; env = dict(os.environ, AGENT_STATE_DIRECTORY=str(state), AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10")
+            result = state / "merge-cleanup/results/result.json"; env = dict(
+                os.environ,
+                AGENT_STATE_DIRECTORY=str(state),
+                AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
+                PATH=str(self.fake_gh(root)) + os.pathsep + os.environ.get("PATH", ""),
+            )
             invocation_id = "integration-invocation"
             observer = subprocess.Popen([
                 sys.executable, str(REAPER), "--host-pid", str(host.pid),
@@ -131,6 +149,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 AGENT_CLI_HOST_NAMES=host_name,
                 AGENT_FINISH_CLOSE_MODE="process",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
+                PATH=str(self.fake_gh(root)) + os.pathsep + os.environ.get("PATH", ""),
             )
             host = subprocess.Popen([
                 str(host_executable), "-c",
@@ -207,6 +226,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 AGENT_CLI_HOST_NAMES=host_name,
                 AGENT_FINISH_CLOSE_MODE="process",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
+                PATH=str(self.fake_gh(root)) + os.pathsep + os.environ.get("PATH", ""),
             )
             host = subprocess.Popen([
                 str(host_executable), "-c",
@@ -473,6 +493,21 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
         )
         git_call.assert_not_called()
         killer.assert_not_called()
+
+    def test_final_preflight_preserves_checkout_when_current_dependency_evidence_is_not_clear(self):
+        args = SimpleNamespace(
+            worktree=str(self.worktree), head="head", primary="primary", branch="branch",
+            default="main", session_id="ours", host_pid=10, host_start=1.0,
+        )
+        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
+        with mock.patch.object(finish_reaper.session_close, "fresh_removable_receipt", return_value=receipt), \
+                mock.patch.object(finish_reaper.session_close, "verified_exited", return_value=True), \
+                mock.patch.object(finish_reaper.session_close, "other_live_claimant", return_value=None), \
+                mock.patch.object(finish_reaper.session_close, "dependencies_are_clear", return_value=False), \
+                mock.patch.object(finish_reaper.session_close, "git") as git_call:
+            with self.assertRaisesRegex(session_close.Refusal, "current open PR evidence"):
+                finish_reaper.final_preflight(args)
+        git_call.assert_not_called()
 
     def test_obligation_removal_requires_both_session_and_worktree(self):
         directory = Path(self.temp.name) / "merge-cleanup/obligations"

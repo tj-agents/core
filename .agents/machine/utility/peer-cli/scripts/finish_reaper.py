@@ -105,6 +105,8 @@ def final_preflight(args):
         raise session_close.Refusal("original session host did not exit")
     if session_close.other_live_claimant(worktree, original_entry):
         raise session_close.Refusal("another verified live session claims this worktree")
+    if not session_close.dependencies_are_clear(Path(args.primary), args.branch):
+        raise session_close.Refusal("current open PR evidence does not permit cleanup")
     code, dirty, _ = session_close.git(worktree, "status", "--porcelain")
     if code or dirty:
         raise session_close.Refusal("worktree is no longer clean")
