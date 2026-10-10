@@ -42,7 +42,7 @@ incomplete.
   calling a terminal program directly.
 - Find the home directory with `Path.home()`. Gate Windows-only locations such as `LOCALAPPDATA` behind
   a platform check. POSIX executables have no `.exe`.
-- CI runs `verify` on Windows and `verify-linux` on Linux. A test that only one platform can run gives
+- CI runs `verify-windows` on Windows and `verify-linux` on Linux. A test that only one platform can run gives
   a skip reason, and the behaviour it covers also has a test on the other platform. Tests whose
   behaviour differs by platform pin the platform explicitly.
 
