@@ -127,8 +127,9 @@ class DeliveryContinuationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="continuation unicode ")
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name) / "work tree £"
-        self.root.mkdir()
+        root = Path(self.temp.name) / "work tree £"
+        root.mkdir()
+        self.root = root.resolve()
         self.owner_path = self.root / ".agents/continuation/owner.json"
         self.owner_path.parent.mkdir(parents=True)
         self.host = self.root / "native host"
@@ -174,6 +175,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         link = Path(receipt["timer_enable_path"])
         link.parent.mkdir()
         link.symlink_to(target)
+        self.assertTrue(scheduler._link_points_to(link, target))
         self.assertEqual(receipt["timer_enable_path"], self.receipt(10)["timer_enable_path"])
 
     def put_linux(self, receipt, transport):
@@ -457,6 +459,64 @@ class DeliveryContinuationTests(unittest.TestCase):
                                         self.owner_path, self.owner, self.root, transport, windows=False)
         self.assertTrue(pending.exists())
 
+    @unittest.skipIf(os.name == "nt", "POSIX symlink filesystem identity; Windows has task-identity coverage")
+    def test_linux_refuses_enable_link_that_only_lexically_targets_the_timer(self):
+        receipt = self.receipt()
+        transport = LinuxTransport(receipt)
+        self.put_linux(receipt, transport)
+        target = Path(receipt["timer_path"])
+        target.parent.mkdir(parents=True)
+        target.write_text("timer", encoding="utf-8")
+        link = Path(receipt["timer_enable_path"])
+        foreign = Path(self.temp.name) / "foreign"
+        (foreign / "subdir").mkdir(parents=True)
+        foreign_target = foreign / target.name
+        foreign_target.write_text("foreign timer", encoding="utf-8")
+        alias = link.parent.parent / "alias"
+        alias.symlink_to(foreign / "subdir", target_is_directory=True)
+        link.parent.mkdir()
+        link.symlink_to("../alias/../" + target.name)
+
+        apparent = link.parent / os.readlink(link)
+        self.assertEqual(os.path.normpath(str(target)), os.path.normpath(str(apparent)))
+        self.assertEqual(foreign_target.resolve(), apparent.resolve())
+        self.assertFalse(scheduler._link_points_to(link, target))
+        self.assertFalse(scheduler.verify_linux_ownership(receipt, self.owner_path, self.owner, self.root, transport))
+
+        receipt_path = self.owner_path.parent / "scheduler.json"
+        pending_path = self.owner_path.parent / "scheduler.pending.json"
+        scheduler.atomic_json(receipt_path, receipt)
+        before_files = dict(transport.files)
+        arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(self.host))
+        with patch.object(adapter, "receipt_for", return_value=receipt), \
+             self.assertRaisesRegex(RuntimeError, "exact ownership receipt"):
+            adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=False)
+        self.assertEqual(before_files, transport.files)
+        self.assertFalse(pending_path.exists())
+
+        scheduler.atomic_json(pending_path, {"previous": receipt, "proposed": receipt})
+        before_pending = pending_path.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "enable link"):
+            scheduler.reconcile_pending(pending_path, receipt_path, self.owner_path, self.owner, self.root,
+                                        transport, windows=False)
+        self.assertEqual(before_pending, pending_path.read_bytes())
+        self.assertEqual(before_files, transport.files)
+        with self.assertRaisesRegex(RuntimeError, "enable link"):
+            adapter.remove(self.owner, self.root, self.owner_path,
+                           self.args("remove", "--owner", str(self.owner_path)), transport)
+        self.assertEqual(before_pending, pending_path.read_bytes())
+        self.assertEqual(before_files, transport.files)
+
+        pending_path.unlink()
+        before_receipt = receipt_path.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "exact ownership receipt"):
+            adapter.remove(self.owner, self.root, self.owner_path,
+                           self.args("remove", "--owner", str(self.owner_path)), transport)
+        self.assertEqual(before_receipt, receipt_path.read_bytes())
+        self.assertEqual(before_files, transport.files)
+        self.assertFalse(any(any(operation in call for operation in ("disable", "enable", "daemon-reload"))
+                             for call in transport.calls))
+
     def test_linux_registration_refuses_foreign_loaded_evidence_before_mutation(self):
         receipt = self.receipt()
         transport = LinuxTransport(receipt)
@@ -513,8 +573,16 @@ class DeliveryContinuationTests(unittest.TestCase):
                                           self.host, 20, {"XDG_CONFIG_HOME": str(linked_config)})
         self.assertEqual(real_config.resolve() / "systemd/user", Path(receipt["unit_directory"]))
         self.assertEqual(Path(receipt["unit_directory"]) / receipt["timer_unit"], Path(receipt["timer_path"]))
+        target = Path(receipt["timer_path"])
+        target.parent.mkdir(parents=True)
+        target.write_text("timer", encoding="utf-8")
+        link = Path(receipt["timer_enable_path"])
+        link.parent.mkdir()
+        link.symlink_to(target)
+        self.assertTrue(scheduler._link_points_to(link, target))
+        link.unlink()
         external = self.root / "outside"
-        Path(receipt["service_path"]).parent.mkdir(parents=True)
+        Path(receipt["service_path"]).parent.mkdir(parents=True, exist_ok=True)
         Path(receipt["service_path"]).symlink_to(external)
         self.assertEqual(Path(receipt["unit_directory"]) / receipt["service_unit"], Path(receipt["service_path"]))
         with self.assertRaisesRegex(RuntimeError, "symlink"):
@@ -718,7 +786,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertTrue(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
 
     def test_installed_package_resources_and_custom_profile_are_portable(self):
-        package = Path(self.temp.name) / "installed package £"
+        package = (Path(self.temp.name) / "installed package £").resolve()
         scripts, workflows = package / "skills/persistent-workflow/scripts", package / "workflows"
         scripts.mkdir(parents=True)
         workflows.mkdir()
@@ -740,6 +808,56 @@ class DeliveryContinuationTests(unittest.TestCase):
                                 text=True, encoding="utf-8", capture_output=True, check=False)
         self.assertEqual(0, result.returncode)
         self.assertEqual(json.loads(payload), json.loads(result.stdout))
+
+    @unittest.skipUnless(os.name == "nt" or shutil.which("pwsh"),
+                         "requires inbox Windows PowerShell on Windows or the repository pwsh prerequisite on Linux")
+    def test_legacy_powershell_query_serializes_nested_actions_without_registration(self):
+        executable = "powershell.exe" if os.name == "nt" else "pwsh"
+
+        class ShadowTransport(scheduler.SchedulerTransport):
+            def __init__(self, tasks=None, failure=None):
+                self.tasks = tasks or []
+                self.failure = failure
+                self.calls = []
+
+            def run(self, args, **kwargs):
+                self.calls.append(tuple(args))
+                if self.failure:
+                    shadow = "function Get-ScheduledTask { throw '" + self.failure + "' };"
+                else:
+                    payload = json.dumps({"Tasks": self.tasks}, ensure_ascii=False).replace("'", "''")
+                    shadow = "$fixture = @'\n" + payload + "\n'@ | ConvertFrom-Json;function Get-ScheduledTask { @($fixture.Tasks) };"
+                command = list(args)
+                command[-1] = shadow + command[-1]
+                return super().run(command, **kwargs)
+
+        unrelated = str((self.root / "unrelated worktree").resolve())
+        nested = str((self.root / "unrelated worktree" / "nested").resolve())
+        tasks = [
+            {"TaskName": "AgentStandards-Delivery-one", "TaskPath": "\\",
+             "Actions": [{"WorkingDirectory": unrelated}]},
+            {"TaskName": "AgentStandards-Delivery-two", "TaskPath": "\\",
+             "Actions": [{"WorkingDirectory": nested}]},
+        ]
+        transport = ShadowTransport(tasks)
+        with patch.object(adapter.scheduler, "_powershell", return_value=executable):
+            result = transport.run([executable, "-NoProfile", "-NonInteractive", "-Command",
+                                    adapter.LEGACY_WINDOWS_SCRIPT], timeout=8)
+            self.assertEqual(0, result.returncode, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(tasks, payload["Tasks"])
+            adapter.legacy_conflict(self.root, transport, windows=True)
+
+            owned = ShadowTransport([{"TaskName": "AgentStandards-Delivery-owned", "TaskPath": "\\",
+                                      "Actions": [{"WorkingDirectory": str(self.root)}]}])
+            with self.assertRaisesRegex(RuntimeError, "legacy delivery task"):
+                adapter.legacy_conflict(self.root, owned, windows=True)
+
+            failed = ShadowTransport(failure="fixture query failure")
+            with self.assertRaisesRegex(RuntimeError, "legacy ScheduledTasks query failed: .*fixture query failure"):
+                adapter.legacy_conflict(self.root, failed, windows=True)
+
+        self.assertTrue(all("Register-ScheduledTask" not in call[-1] for call in transport.calls + owned.calls + failed.calls))
 
     @unittest.skipUnless(os.name == "nt" or shutil.which("pwsh"),
                          "requires inbox Windows PowerShell on Windows or the repository pwsh prerequisite on Linux")
