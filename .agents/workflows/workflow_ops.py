@@ -34,6 +34,8 @@ MAX_PR_READINESS_POLL_SECONDS = 300
 DEFAULT_MONITOR_SECONDS = 21600
 DEFAULT_OFFLINE_GAP_SECONDS = 300
 REVIEW_BUNDLE_RETENTION_SECONDS = 7 * 24 * 60 * 60
+# MoveFileEx reports a conflicting open handle as either access denied or sharing violation.
+WINDOWS_REPLACE_CONFLICTS = (5, 32)
 FAILURE_PATTERN = re.compile(
     r"(?:\bfailed\b|\bfailure\b|\berror\b|\bfatal\b|\bexception\b|\bpanic\b|\btimeout\b)",
     re.IGNORECASE,
@@ -226,7 +228,23 @@ def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    try:
+        retry_windows_sharing_violation(lambda: os.replace(temporary, path))
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def retry_windows_sharing_violation(action, timeout=2):
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return action()
+        except PermissionError as error:
+            if (os.name != "nt" or getattr(error, "winerror", None) not in WINDOWS_REPLACE_CONFLICTS
+                    or time.monotonic() >= deadline):
+                raise
+            time.sleep(0.01)
 
 
 def append_event(root, workflow_run_id, event):
