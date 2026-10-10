@@ -109,19 +109,22 @@ FALLBACK_MESSAGE = (
 
 
 def _shell_script_from_list(parts):
-    """A shell tool invoked as ``["bash", "-lc", "<script>"]`` carries its script after the option."""
+    """A Unix shell tool invoked as ``["bash", "-lc", "<script>"]`` carries its script after the option."""
     cleaned = [str(p) for p in parts if isinstance(p, (str, int, float))]
     if not cleaned:
         return None
-    if len(cleaned) >= 2 and re.fullmatch(r"-[a-z]*c", cleaned[1]) and Path(cleaned[0]).name in (
+    if len(cleaned) >= 3 and re.fullmatch(r"-[a-z]*c", cleaned[1]) and Path(cleaned[0]).name in (
         "bash",
         "sh",
         "zsh",
         "dash",
+    ):
+        return cleaned[2]
+    if len(cleaned) >= 2 and re.fullmatch(r"-[a-z]*c", cleaned[1]) and Path(cleaned[0]).name in (
         "pwsh",
         "powershell",
     ):
-        return cleaned[2]
+        return cleaned[-1]
     return " ".join(cleaned)
 
 

@@ -287,6 +287,22 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("no persistent-workflow binding", result.stderr)
 
+    def test_native_unix_shell_payload_with_trailing_arguments_is_blocked(self):
+        if not self.has_gh_shim:
+            self.skipTest("needs the POSIX gh shim")
+        command = [
+            "bash",
+            "-lc",
+            'pushd "' + str(self.repo.resolve()) + '" && ' + M + " 42 --squash --auto",
+            "trailing-$0",
+            "trailing-$1",
+        ]
+
+        result = self.run_hook(command, native=True)
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("no persistent-workflow binding", result.stderr)
+
     def test_non_terminal_pr_with_a_matching_binding_is_allowed(self):
         if not self.has_gh_shim:
             self.skipTest("needs the POSIX gh shim")
