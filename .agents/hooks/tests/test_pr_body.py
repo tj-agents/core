@@ -102,7 +102,7 @@ class HookTests(unittest.TestCase):
 
     def test_merge_always_checks_current_remote_body(self):
         with tempfile.TemporaryDirectory() as directory:
-            command = f'pushd "{directory}" && gh pr merge 42 --squash --auto'
+            command = f'pushd "{directory}" && gh pr merge 42 --squash'
             with patch.object(gate, "authoritative_body") as check:
                 self.assertEqual(0, self.run_gate(command, codex=True))
                 check.assert_called_once_with(Path(directory).resolve(), "42", None)
@@ -217,7 +217,7 @@ class HookTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory, patch.object(gate, "authoritative_body") as check:
                 checkout = Path(directory) / "GH.EXE pr merge -m folder"
                 checkout.mkdir()
-                command = f'pushd "{checkout}" && {executable} pr merge 42 --squash --auto'
+                command = f'pushd "{checkout}" && {executable} pr merge 42 --squash'
                 self.assertEqual(0, self.run_gate(command, codex=True))
                 check.assert_called_once_with(checkout.resolve(), "42", None)
                 self.assertEqual(2, self.run_gate(command + " && echo done", codex=True))
