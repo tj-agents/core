@@ -99,6 +99,9 @@ Launch with `scripts/launch_codex.py`, beside this file:
 Run it with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
 ```
 On Windows, `python3` is often the Microsoft Store
