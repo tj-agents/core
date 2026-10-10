@@ -118,10 +118,10 @@ Claude Code:
 ```
 
 Claude loads installed plugins at session start and `/plugin marketplace update` refreshes only the
-catalog. Typing `claude` in PowerShell, `open-claude`, `handoff-claude` and session recovery run
+catalog. Typing `claude` in Bash on Linux or PowerShell on Windows/Linux, `open-claude`, `handoff-claude` and session recovery run
 `.agents/machine/scripts/claude_standards_sync.py` first, so a session started through them loads the
 latest registered commit of every plugin the directory enables. The machine plugin's SessionStart hook
-adds one marked block to both PowerShell profiles that loads its own `claude` wrapper, so the wrapper
+adds one marked block to the supported terminal profiles that resolves its own `claude` wrapper, so the wrapper
 updates with the plugin and no checkout is pulled; set `BASE_AGENTS_CLAUDE_PROFILE=off` to opt out.
 From a core checkout, run it directly:
 
@@ -139,12 +139,12 @@ codex plugin add engineering@base-agents
 codex plugin add machine@base-agents
 ```
 
-Typing `codex` in PowerShell and using `handoff-codex` refresh configured Git marketplaces and
+Typing `codex` in Bash on Linux or PowerShell on Windows/Linux and using `handoff-codex` refreshes configured Git marketplaces and
 enabled plugins before Codex loads them. The launcher then records native Codex hook trust only for
 enabled plugins sourced from GitHub's `tj-agents` organisation, after checking the installed package
 against its unchanged Git source. Other publishers and user/project hooks retain normal trust review.
 Set `BASE_AGENTS_CODEX_HOOK_TRUST=off` to keep manual review for all hooks. The machine plugin's SessionStart hook adds a marked block
-to both PowerShell profiles. That block resolves the active installed machine package, so later
+to the supported terminal profiles. That block resolves the active installed machine package at invocation time, so later
 terminals load its `codex` wrapper without pulling this checkout. The first session after installing
 the package wires the profiles; open a new terminal to use the wrapper. Set
 `BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. A project pinned to a release continues to

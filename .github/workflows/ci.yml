@@ -91,18 +91,10 @@ jobs:
           ./tests/delivery-continuation.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/delivery-continuation.tests.ps1
 
-      - name: handoff launcher tests
-        shell: pwsh
-        run: |
-          ./tests/handoff-launchers.tests.ps1
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/handoff-launchers.tests.ps1
-
       - name: Codex terminal profile tests
         shell: pwsh
         run: |
           python -B -m unittest discover -s tests -p test_codex_terminal_profile.py
-          ./tests/codex-terminal-profile.tests.ps1
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/codex-terminal-profile.tests.ps1
 
       - name: source layout and package tests
         shell: pwsh
@@ -149,10 +141,6 @@ jobs:
       - name: skill packaging tests
         shell: pwsh
         run: ./tests/skill-packaging.tests.ps1
-
-      - name: Codex terminal profile tests
-        shell: pwsh
-        run: ./tests/codex-terminal-profile.tests.ps1
 
       # Hook subprocesses in some tests read stdin as their payload; a closed stdin stands in for the host,
       # which always closes it, so an inherited runner stdin can never leave a hook waiting.

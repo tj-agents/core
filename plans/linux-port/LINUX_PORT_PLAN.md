@@ -48,10 +48,10 @@ what still needs checking on Windows.
   deleted. Verified by opening a real tab in kitty on this machine (#108).
 - [x] 3. `handoff-claude` -> Python, then `handoff-codex` -> Python (`codex_marketplace_sync.ps1` with it).
   `engineering:handoff` works on Linux from here; verified with a real handoff.
-- [ ] 4. Terminal start hooks: `claude-profile.ps1`/`claude_terminal_profile.py` and `codex-profile.ps1`
-  refresh standards when `claude`/`codex` is typed, wired for bash as well as PowerShell (looking for
-  both `python3` and `python`); `agent-cli.ps1` deleted.
-- [ ] 5. `peer-cli` -> Python: `close.py` and `finish.py` (with `finish_reaper`/`session_close` ported) let
+- [ ] 4. Terminal start hooks: Python terminal-profile installers refresh standards when `claude`/`codex`
+  is typed, wired for Bash on Linux and PowerShell on Windows/Linux (discovering `python3`, `python`, and
+  Windows `py -3` without Store stubs); the retired PowerShell launchers are deleted.
+- [x] 5. `peer-cli` -> Python: `close.py` and `finish.py` (with `finish_reaper`/`session_close` ported) let
   a merged session on Linux remove its linked worktree and branch, clear its merge-cleanup obligation,
   record verified session exit, and close its own kitty/tmux/Konsole tab; `merge_cleanup_gate`'s message
   gives the per-platform Python commands. Verified by a real merge on Linux whose own tab closes itself.
@@ -65,7 +65,7 @@ what still needs checking on Windows.
   `Split` binding skipped the installer's ancestor reparse-point check (#160).
 - [x] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
   (`verify-linux`, #162); it blocks a PR once the repository ruleset lists it as a required check,
-  which the user approved requiring on 2026-10-10; configure it in the next session.
+  which the user approved requiring on 2026-10-10; enabling it awaits a supported publishing-app exception.
 - [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no shipped Markdown
   under `.agents/`, `.claude/` or `.codex/` tells an agent to run bare `python`, `powershell.exe`, `pwsh`
   or `wt.exe` without naming the platform (including the session exit in `merge` Step 5 and in
@@ -74,85 +74,144 @@ what still needs checking on Windows.
 
 ## Current progress
 
-Step 5 owns PR #181 (`Refactor/LinuxPeerCli`) in the linked checkout
-`/home/tommy/projects/tj-agents/core/.worktrees/LinuxPeerCliProof`. The originating session retains the
-whole goal from the primary checkout. The real native merge/finish acceptance session is not launched.
-The user requires one PR for this step; its authored paths keep the shared closure, terminal identity,
-observer, callers and host grants atomic. Generated output remains uncommitted.
+- PR: [#185](https://github.com/tj-agents/core/pull/185) (draft)
 
-The Python lifecycle and terminal/orphan ports are implemented. Windows and Linux CI passed at
-`6b336d4db569d73c2e775de8786ed2a832cf309e`, including the Windows observer's structured UTF-16
-scheduler XML and the Linux asynchronous exit fixture. The prior full local suites passed: 963
-source/package tests (17 skips), 990 shared runtime tests (four skips), generated-tree, catalog,
-tier and harness checks.
+Step 4 was picked up on `Refactor/LinuxTerminalStartHooks` with the boundary limited to terminal-start
+standards refresh, its tests and documentation. Its successor remains Step 7; Steps 7 and 10 are not
+implementation scope for this slice.
 
-The user requested `verify-windows`, matching `verify-linux`; this PR includes the rename and its
-permission-test/documentation references. The user approved requiring `verify-linux` in the next
-session. Main has no classic branch protection (the API returned “Branch not protected”) and no
-repository ruleset. The proposed `.windows`/`.linux` boundary for OS-specific machine integration is
-recorded in `.agents/machine/TECH_DEBT.md`; shared Python stays in `.agents`.
+The primary acknowledged the handoff and completed bounded L3 discovery. Native L4 implementation
+uses the canonical Codex lane table. Independent review found five
+confirmed defects; all five are repaired. Final local validation passed 1,006 source tests (18 skips)
+and 1,001 hook tests (four skips), plus generated-tree, catalog, harness and tier checks. The completed incremental review found one further maintenance-child isolation defect; that repair is
+complete and both full suites passed again. Real packaged session fixtures cover maintenance and
+permission convergence under hostile PYTHONPATH while preserving native CLI environment. The Windows fixture repair passed both full local suites; incremental review and fresh exact-head
+Windows/Linux CI remain before delivery. The maintenance review passed security; its Windows
+coverage finding (R7) is repaired with a platform-neutral test of both hosts’ real maintenance children,
+permission convergence and native CLI environment preservation. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
+solely to satisfy a separate ledger's graph requirements.
 
-Native and workflow review of the naming follow-up found no defect. Its mandatory full-branch security
-review confirmed two HIGH ownership defects (S5-006/S5-007 in `reviews/Refactor-LinuxPeerCli.md`):
-stale closure could force-close a successor's pane, and worktree cleanup excluded a resumed host by
-logical session ID alone. The native L4 worker repaired both. A tiny parent follow-up rechecks Windows
-fallback ownership and removes stale closure's force bypass. Focused suites pass: 29 close-tab and
-23 lifecycle tests. The orphaned resolution paragraph from retired PowerShell debt was also removed.
-Full local validation of the repaired candidate passed: 971 source tests (17 skips), 990 runtime tests
-(four skips), and all generated invariants. Native and fresh L2 ownership/workflow review returned no
-new findings. At `1874a1ebdb11a38cfb22fd879a05517acdf8b182`, run 38067879202 passed Linux CI and all
-Windows lifecycle entrypoint tests but failed one new fixture assertion: the temporary directory used
-Windows' short `RUNNER~1` path while production resolved its long `runneradmin` form. The tiny
-follow-up creates the fixture directory before resolving it; production identity/timeout behavior is unchanged.
-The parent owns focused/full validation, native incremental review, replacement CI and real merged
-Linux acceptance. Actual Windows desktop UI Automation remains unverified locally.
+The current cutover includes 28 authored paths in the trunk diff, including
+320 retired PowerShell runtime lines and 412 retired PowerShell test lines; generated output is excluded.
+Separate Claude/Codex ports could be shipped, but the user explicitly selected one reviewed PR per step.
+Keep this exception focused on the one shared profile/bootstrap/dispatch contract, validate actual shell
+integration, and include independent correctness/security review plus Windows/Linux CI. No additional
+runtime concern joins this slice. Historical references in other plans retain their original Windows acceptance evidence;
+they are deliberate historical survivors of the deleted scripts, not current launch instructions.
 
-A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
-its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
-race deletion; it already owns that exit check. Step 5 remains unchecked until the real merged CLI closes
-its own kitty tab through argument-free `finish.py`, and the parent verifies session exit plus worktree,
-branch and matching obligation removal. Causal post-merge regeneration must also succeed.
+GitHub inspection found no active main rulesets or classic branch protection. The user explicitly approved
+requiring `verify-linux` with a GitHub Actions exception on 2026-10-10. GitHub rejected that exception
+with HTTP 422: its built-in Actions integration cannot bypass this repository ruleset. The repository
+has no existing publishing-app credential (only `TJ_AGENTS_READ_TOKEN`). Protection remains unchanged
+to preserve the current post-merge generated-package publisher. An installed publishing app or a separate
+validated publishing-workflow change is required before enabling the approved check requirement.
+
+Step 5 is complete in merged PR #181: reviewed head `97bc4ffeacd1d05fbf3dc4deb235631f17150b1e`, merge
+`3ff817a923362ac21dbe6aae9fc14a3d4d787c6f`. Exact-head run 38069524094 passed `verify-windows` and
+`verify-linux`. Full local suites passed: 971 source tests (17 skips), 990 shared runtime tests
+(four skips), 29 close-tab tests and 23 lifecycle tests, plus generated-tree, catalog, tier and
+harness checks. Generated output was excluded from the PR.
+
+Real native Linux Codex session `01a126cd-2e74-7583-81a4-e8e5a2b1e12a` (PID 1949195,
+start 1791652342.1, kitty window 13) merged this PR and executed
+argument-free `finish.py`. The primary independently verified its exit and tab closure, linked
+worktree and local branch removal, and matching obligation clearance. Final receipt:
+`/home/tommy/.agents-state/merge-cleanup/results/d8f69af9dfb740a0bcd44a5b083bccdf.json`. Causal post-merge regeneration run 38070819051
+succeeded and produced `2dc76412f0794584e36b7440e5cde0bf7a0ce5ac`. Windows CI exercises the shared runtime;
+actual Windows desktop UI Automation remains unverified locally. Native Linux evidence uses the
+canonical authored source; it does not claim installation acceptance for either host.
+
+The Windows job is now `verify-windows`. Both platform jobs are required for this port’s delivery
+validation while the approved protection change awaits the publishing dependency above. The proposed
+`.windows`/`.linux` organization remains separate design debt in `.agents/machine/TECH_DEBT.md`;
+shared logic stays canonical in `.agents`.
 
 Previously merged: shared library #106, steps 1 #107, 2 #108, 3 #120/#137, 6 #125, 8 #160 and 9 #162.
-Step 3's native Codex handoff was verified in kitty. Step 4, then 7 and 10 remain after Step 5.
+Step 4, then 7 and 10 remain. The primary checkout is reused sequentially on
+`Refactor/LinuxTerminalStartHooks` for one fresh Step 4 session; its local checkpoint belongs in that
+next substantive PR, with no separate Step 5 metadata PR.
 
 ## Agent-host coverage
 
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "shared_source": ".agents/machine/utility/peer-cli and .agents/hooks/merge_cleanup_gate.py",
+  "shared_source": ".agents/machine/scripts terminal-profile installers, bootstrap and Python command dispatch",
   "hosts": [
     {
       "host": "claude",
-      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
-      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
-      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.claude_allow",
+      "behavior": "Typed claude commands resolve the active machine package and refresh standards before sessions; Bash/Linux and PowerShell/Windows/Linux use shared Python dispatch.",
+      "source": ".agents/machine/scripts/claude_terminal_profile.py; claude_terminal_launcher.py; terminal_command.py",
+      "mapping": ".agents/plugins/manifests/claude/machine-hooks.json; .agents/plugins/sources.json resources/machine/scripts mapping",
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Latest reviewed-head Linux source suite: 963 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
+            "evidence": "36 focused launcher/adapter checks (two Windows-only skips), 37 Codex-sync regressions, 1006 complete source tests (18 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     },
     {
       "host": "codex",
-      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
-      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
-      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.codex_prefix_rules",
+      "behavior": "Typed codex commands resolve the active machine package and refresh standards before sessions; Bash/Linux and PowerShell/Windows/Linux use shared Python dispatch.",
+      "source": ".agents/machine/scripts/codex_terminal_profile.py; codex_terminal_launcher.py; terminal_command.py",
+      "mapping": ".agents/plugins/manifests/codex/machine-hooks.json; .agents/plugins/sources.json resources/machine/scripts mapping",
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Latest reviewed-head Linux source suite: 963 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
+            "evidence": "36 focused launcher/adapter checks (two Windows-only skips), 37 Codex-sync regressions, 1006 complete source tests (18 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     }
   ]
 }
 ```
 
+## Reviews
+
+Independent full review of `fa5f7f3def036948fa30823adb6d31e2c1f72022` completed at
+`reviews/Refactor-LinuxTerminalStartHooks.md`: three HIGH and two MEDIUM findings require repair
+(import isolation, profile modes, PowerShell shims/arguments, and hook-control interpreter selection).
+The native reviewer and independent security/workflow lenses ran; parent verified evidence. Incremental
+review through `5301acfa8e40edcf0c2983ede33cbade36e35937` confirmed one further HIGH maintenance-child
+isolation finding. The parent reproduced hostile PYTHONPATH startup in both hosts; all maintenance
+children now use isolated Python, with real packaged-session and permissions-convergence coverage.
+The subsequent review added MEDIUM R7 for the missing Windows regression; its platform-neutral
+counterpart is implemented and passed locally. Final incremental review approved `75fe4c5a309cc12d06d7ae9ad5286755282ce896`;
+Windows CI run 38080350190 failed on the reviewed head; Linux CI passed. A bounded fresh L4
+unit-debug context repaired the Windows fixture paths, output decoding, dual-shell setup and
+incorrect execution of Linux Bash fixtures on Windows. New PowerShell counterparts retain fallback,
+exit-125 and active-package-update coverage. Full local suites passed again: 1,006 source tests
+(18 skips) and 1,001 hook tests (four skips). Incremental review of `19dfeacf4a82354ca2c75e4a0a4cce03ae5e3228` found R8: the new Windows
+no-interpreter regression asserted Write-Warning on stderr, although PowerShell emits it on stdout.
+The assertion now checks that stream and retains the fallback/single-launch checks. Both full local
+suites must pass again, followed by incremental review and exact-head Windows/Linux CI before merge.
+
 ## Next Steps
 
-Land 5 (`peer-cli`, `close` and `finish` first, per the tightened acceptance criterion above, so the
-`merge` skill's Step 5 session exit works on Linux) and 4 (terminal start hooks, deleting
-`agent-cli.ps1`); then 7 and 10. The user approved making `verify-linux` a required PR check on 2026-10-10; the next session should
-configure that requirement after inspecting the repository's current branch protection. Windows
-verification is named `verify-windows`.
+All runtime findings are repaired. Review R8 in the Windows fallback fixture is also repaired. The previously reviewed head `75fe4c5a309cc12d06d7ae9ad5286755282ce896`
+passed Linux CI but exposed Windows fixture defects. Those are repaired, and both full local suites
+passed again. Independently review this repair, push to the existing PR #185, and require new exact-head
+Windows/Linux CI in the primary
+checkout `/home/tommy/projects/tj-agents/core`, branch `Refactor/LinuxTerminalStartHooks`. Its successor
+owns Step 7 only after Step 4 lands. Do not implement Steps 7 or 10 in this session. The whole port
+remains authorized one reviewed PR per step.
+
+Scope: current slice only; full plan remains incomplete.
+Current slice: Step 4 terminal-start refresh and its authorized Linux-check requirement.
+Remaining scope: Steps 7 and 10, handed to a fresh session after Step 4 delivery.
+Done when: one reviewed Step 4 PR is merged with Windows/Linux CI green and its successor is launched.
+
+Step 4 has implemented Python terminal-profile installers and launchers for both hosts, wired for Bash on Linux
+and PowerShell on Windows/Linux. They discover `python3`, `python`, and Windows `py -3`, skip Store stubs,
+and replaced the retired PowerShell launchers. Platform directory reorganization is separate recorded debt
+and is outside this functional port.
+
+The user approved making `verify-linux` a required PR check with an Actions exemption on 2026-10-10.
+GitHub rejected the built-in Actions identity; do not enable the rule until an installed publishing app
+or a separately validated publishing-workflow change preserves generated-package publication.
+This approval does not add unrelated branch protection requirements. Windows CI is named
+`verify-windows`; both jobs must pass for the port's delivery validation.
+
+Use the repository workflow and one existing owning review for this step. Never commit generated
+`plugins/*` or catalog digests. The full local `tests/` and `.agents/hooks/tests/` suites remain required
+before every stable push, including repairs. The native specialist was rejected by the account in the
+previous session; the declared native terra/medium review fallback succeeded. Preserve all unrelated
+worktrees/sessions. No additional Step 5 PR is needed; its completed checkpoint rides in Step 4.
