@@ -184,6 +184,35 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
 
+    def test_questions_and_quoted_examples_do_not_authorize_execution(self):
+        self.write_goal()
+        for prompt in (
+            "How does plan-execution work?",
+            "Why didn't you finish the plan?",
+            "Explain how to implement the plan.",
+            'The example says "Implement the plan."',
+            "```text\nImplement the plan.\n",
+            "> Implement the plan.",
+            "`Implement the plan.`",
+            "“Implement the plan.”",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("", result.stdout)
+
+    def test_explicit_whole_skill_invocation_and_direct_question_authorize_execution(self):
+        for prompt in (
+            "engineering:plan-execution",
+            "$engineering:plan-execution",
+            "Can you implement the plan?",
+            "Can you please implement the plan?",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("engineering:plan-execution automatically selected", result.stdout)
+
     def test_implementing_a_plan_authoring_fix_still_selects_execution(self):
         result = self.run_hook("Implement the plan-authoring fix across all phases.")
         self.assertEqual(0, result.returncode, result.stderr)

@@ -32,12 +32,20 @@ def module(name, root):
     return value
 
 
-def read_json(path):
+def read_json(path, *, required=False):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, ValueError):
+    except FileNotFoundError:
         return None
-    return value if isinstance(value, dict) else None
+    except (OSError, UnicodeError, ValueError) as error:
+        if required:
+            raise RuntimeError(f"cannot read JSON artifact at {path}: {error}") from error
+        return None
+    if isinstance(value, dict):
+        return value
+    if required:
+        raise RuntimeError(f"cannot read JSON artifact at {path}: expected an object")
+    return None
 
 
 def exact_path(value):
@@ -159,8 +167,9 @@ def documented_blocker(owner):
     )
 
 
-def binding_active(runtime, root):
-    artifact = read_json(root / runtime.BINDING_FILE)
+def binding_active(runtime, root, artifact=None):
+    if artifact is None:
+        artifact = read_json(root / runtime.BINDING_FILE, required=True)
     if artifact is None:
         return False
     binding = runtime.binding_from_artifact(artifact)
@@ -180,11 +189,16 @@ def foreground_owns_current_process(owner, runtime):
     if runtime.process_identity(lease["pid"]) != lease.get("identity"):
         return False
     target = lease["pid"]
+    if os.getpid() == target:
+        return True
     if WINDOWS:
         try:
             result = subprocess.run(
                 ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                 "$id=$PID; while($id){if($id -eq [int]$env:CONTINUATION_FOREGROUND_PID){exit 0};$id=(Get-CimInstance Win32_Process -Filter \"ProcessId=$id\").ParentProcessId};exit 1"],
+                 "$target=[int]$env:CONTINUATION_FOREGROUND_PID;$processes=@{};Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object {$processes[[int]$_.ProcessId]=$_};$targetProcess=$processes[$target];"
+                 "if(!$targetProcess -or !$targetProcess.ExecutablePath){exit 1};$targetExecutable=$targetProcess.ExecutablePath;$id=$PID;"
+                 "while($id){$process=$processes[[int]$id];if(!$process -or !$process.ExecutablePath){exit 1};"
+                 "if($id -eq $target){exit 0};if($process.ExecutablePath -eq $targetExecutable){exit 1};$id=$process.ParentProcessId};exit 1"],
                 capture_output=True,
                 timeout=5,
                 env=dict(os.environ, CONTINUATION_FOREGROUND_PID=str(target)),
@@ -192,11 +206,17 @@ def foreground_owns_current_process(owner, runtime):
         except (OSError, subprocess.SubprocessError):
             return False
         return result.returncode == 0
+    try:
+        target_executable = os.readlink(f"/proc/{target}/exe")
+    except OSError:
+        return False
     current = os.getpid()
     while current:
-        if current == target:
-            return True
         try:
+            if current == target:
+                return True
+            if os.readlink(f"/proc/{current}/exe") == target_executable:
+                return False
             fields = Path(f"/proc/{current}/stat").read_text().rsplit(") ", 1)[1].split()
             current = int(fields[1])
         except (OSError, ValueError, IndexError):
@@ -217,21 +237,23 @@ def outcome(data):
     if matching_receipt and direct_control(str(receipt.get("prompt", ""))) in {"pause", "cancel", "stop"}:
         return None
     owner_path = root / ".agents" / "continuation" / "owner.json"
-    owner = read_json(owner_path)
     obligation = matching_receipt and receipt.get("execution_obligation") is True
     if matching_receipt and receipt.get("execution_suspended") is True:
         return None
-    if owner is None and not obligation and not (root / ".agents" / "persistent-workflow-binding.json").exists():
-        return None
-    if owner is not None and exact_path(owner.get("worktree")) != str(root):
-        return "Reconcile the canonical continuation owner before ending this turn: owner-worktree-changed"
     try:
+        owner = read_json(owner_path, required=True)
+        binding_path = root / ".agents" / "persistent-workflow-binding.json"
+        binding_artifact = read_json(binding_path, required=True)
+        if owner is None and not obligation and binding_artifact is None:
+            return None
+        if owner is not None and exact_path(owner.get("worktree")) != str(root):
+            return "Reconcile the canonical continuation owner before ending this turn: owner-worktree-changed"
         workflows = workflow_root()
         if str(workflows) not in sys.path:
             sys.path.insert(0, str(workflows))
         runtime = module("continuation_runtime", workflows)
         completion = module("completion", workflows)
-        active_binding = binding_active(runtime, root)
+        active_binding = binding_active(runtime, root, binding_artifact)
         if owner is None:
             if obligation or active_binding:
                 return "Initialize persistent-workflow for the active delivery binding before ending this turn."

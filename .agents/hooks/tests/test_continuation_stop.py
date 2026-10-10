@@ -74,8 +74,19 @@ class ContinuationStopTests(unittest.TestCase):
         return {"hook_event_name": "Stop", "cwd": str(self.root), "session_id": self.session}
 
     def call(self, receipt=None):
-        with patch.object(continuation_stop, "read_receipt", return_value=receipt or self.receipt()):
+        with patch.object(continuation_stop, "read_receipt", return_value=receipt if receipt is not None else self.receipt()):
             return continuation_stop.outcome(self.payload())
+
+    def assert_unreadable_artifact_blocks(self, path):
+        original_read = Path.read_text
+
+        def unreadable(candidate, *args, **kwargs):
+            if candidate.resolve() == path.resolve():
+                raise PermissionError("unreadable")
+            return original_read(candidate, *args, **kwargs)
+
+        with patch.object(Path, "read_text", side_effect=unreadable, autospec=True):
+            self.assertIn("unreadable", self.call({}))
 
     def test_routed_execution_without_an_owner_blocks_in_independent_repositories(self):
         for name in ("first", "second"):
@@ -185,6 +196,30 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
             self.assertIn("continuation owner", continuation_stop.outcome(payload))
 
+    def test_invalid_owner_artifacts_block_unrouted_stop(self):
+        path = self.root / ".agents/continuation/owner.json"
+        path.parent.mkdir(parents=True)
+        for payload in (b"{", b"\xff", b"[]"):
+            with self.subTest(payload=payload):
+                path.write_bytes(payload)
+                self.assertIn("cannot read JSON artifact", self.call({}))
+        self.assert_unreadable_artifact_blocks(path)
+
+    def test_invalid_binding_artifacts_block_unrouted_stop(self):
+        path = self.root / ".agents/persistent-workflow-binding.json"
+        path.parent.mkdir(exist_ok=True)
+        for payload in (b"{", b"\xff", b"[]"):
+            with self.subTest(payload=payload):
+                path.write_bytes(payload)
+                self.assertIn("cannot read JSON artifact", self.call({}))
+        self.assert_unreadable_artifact_blocks(path)
+
+    def test_pause_precedes_invalid_continuation_artifacts(self):
+        path = self.root / ".agents/continuation/owner.json"
+        path.parent.mkdir(parents=True)
+        path.write_text("{", encoding="utf-8")
+        self.assertIsNone(self.call(self.receipt(prompt="Pause.")))
+
     def test_stale_binding_blocks_an_active_owner(self):
         self.write_owner(self.owner())
         with patch.object(continuation_stop, "binding_active", side_effect=RuntimeError("binding-head-changed")):
@@ -210,6 +245,66 @@ class ContinuationStopTests(unittest.TestCase):
         self.assertIn("foreground ownership", self.call(receipt))
         self.write_owner(self.owner("working", foreground={"pid": os.getpid(), "identity": "reused"}))
         self.assertIsNone(self.call(receipt))
+
+    def test_foreground_association_requires_the_nearest_cli_owner(self):
+        lease = {"pid": 111, "identity": "identity"}
+        owner = {"foreground": lease}
+        runtime = Mock(process_identity=Mock(return_value="identity"))
+        with patch.object(continuation_stop, "WINDOWS", True), \
+             patch.object(continuation_stop.subprocess, "run", return_value=Mock(returncode=0)) as run:
+            self.assertTrue(continuation_stop.foreground_owns_current_process(owner, runtime))
+            self.assertIn("ExecutablePath", run.call_args.args[0][-1])
+        with patch.object(continuation_stop, "WINDOWS", True), \
+             patch.object(continuation_stop.subprocess, "run", return_value=Mock(returncode=1)):
+            self.assertFalse(continuation_stop.foreground_owns_current_process(owner, runtime))
+        with patch.object(continuation_stop, "WINDOWS", False), \
+             patch.object(continuation_stop.os, "getpid", return_value=333), \
+             patch.object(continuation_stop.os, "readlink", side_effect=lambda path: {
+                 "/proc/111/exe": "codex", "/proc/333/exe": "hook",
+             }[path]), \
+             patch.object(Path, "read_text", return_value="x) S 111 0"):
+            self.assertTrue(continuation_stop.foreground_owns_current_process(owner, runtime))
+        with patch.object(continuation_stop, "WINDOWS", False), \
+             patch.object(continuation_stop.os, "getpid", return_value=333), \
+             patch.object(continuation_stop.os, "readlink", side_effect=lambda path: {
+                 "/proc/111/exe": "codex", "/proc/333/exe": "hook", "/proc/222/exe": "codex",
+             }[path]), \
+             patch.object(Path, "read_text", side_effect=("x) S 222 0", "x) S 111 0")):
+            self.assertFalse(continuation_stop.foreground_owns_current_process(owner, runtime))
+        with patch.object(continuation_stop, "WINDOWS", False), \
+             patch.object(continuation_stop.os, "readlink", side_effect=OSError("missing")):
+            self.assertFalse(continuation_stop.foreground_owns_current_process(owner, runtime))
+        runtime.process_identity.return_value = "foreign"
+        self.assertFalse(continuation_stop.foreground_owns_current_process(owner, runtime))
+
+    def test_read_only_questions_do_not_create_or_resume_an_execution_obligation(self):
+        scratch = Path(self.temp.name) / "receipt-questions"
+        scratch.mkdir()
+        prompts = (
+            "How does plan-execution work?",
+            "Why didn't you finish the plan?",
+            "Explain how to implement the plan.",
+        )
+        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
+            for prompt in prompts:
+                with self.subTest(prompt=prompt):
+                    payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root),
+                                          "session_id": self.session, "prompt": prompt})
+                    with patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
+                        self.assertEqual(0, workflow_route.main())
+                    receipt = workflow_route.read_receipt(self.session)
+                    self.assertIsNot(receipt.get("execution_obligation"), True)
+                    self.assertIsNone(continuation_stop.outcome(self.payload()))
+            workflow_route.record_receipt(self.session, cwd=self.root, execution_obligation=True)
+            workflow_route.record_receipt(self.session, cwd=self.root, suspend_execution=True, prompt="Pause.")
+            for prompt in prompts:
+                payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root),
+                                      "session_id": self.session, "prompt": prompt})
+                with patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
+                    self.assertEqual(0, workflow_route.main())
+                receipt = workflow_route.read_receipt(self.session)
+                self.assertTrue(receipt["execution_suspended"])
+                self.assertIsNone(continuation_stop.outcome(self.payload()))
 
     def test_both_host_manifests_ship_the_shared_stop_gate(self):
         for host in ("codex", "claude"):

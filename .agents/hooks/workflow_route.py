@@ -13,9 +13,11 @@ import tempfile
 import time
 
 
-EXECUTION = re.compile(
-    r"\b(?:carry\s+on|complete|continue|deliver|execute|finish|implement|proceed|resume|"
-    r"work\s+through)\b",
+EXECUTION_DIRECTIVE = re.compile(
+    r"(?:^|[.!?;:,\n]|\b(?:and|but|then)\b)\s*"
+    r"(?:(?:please|go\s+ahead\s+and|can\s+you|could\s+you|would\s+you)\s+)*"
+    r"(?:i\s+(?:want|need)\s+(?:you\s+)?to\s+)?"
+    r"(?:carry\s+on|complete|continue|deliver|execute|finish|implement|proceed|resume|work\s+through)\b",
     re.IGNORECASE,
 )
 
@@ -105,19 +107,30 @@ def active_goal(cwd: Path) -> bool:
     return not COMPLETE_STATUS.search(body)
 
 
+def authorization_evidence(prompt: str) -> str:
+    evidence = re.sub(r"```[\s\S]*?(?:```|\Z)", " ", prompt)
+    evidence = re.sub(r"(?m)^\s*>.*$", " ", evidence)
+    evidence = re.sub(r"(?<!\w)`[^`\n]+`(?!\w)", " ", evidence)
+    evidence = re.sub(r'(?<!\w)"[^"\n]*"(?!\w)', " ", evidence)
+    evidence = re.sub(r"(?<!\w)'[^'\n]{2,}'(?!\w)", " ", evidence)
+    return re.sub(r"(?<!\w)[\u2018\u201c][^\u2019\u201d\n]*[\u2019\u201d](?!\w)", " ", evidence)
+
+
 def selects_plan_execution(prompt: str, cwd: Path) -> bool:
     """Return whether this prompt authorizes continued plan execution."""
-    if not prompt.strip():
+    evidence = authorization_evidence(prompt)
+    explicit = evidence.strip().lower() in {"engineering:plan-execution", "$engineering:plan-execution"}
+    if not evidence.strip():
         return False
-    if re.search(r"\bplan-execution\b", prompt, re.IGNORECASE):
+    if explicit:
         return True
 
-    executing = EXECUTION.search(prompt) is not None
+    executing = EXECUTION_DIRECTIVE.search(evidence) is not None
     if active_goal(cwd):
         return executing
     return executing and (
-        LONG_RUNNING.search(prompt) is not None
-        or OWNER_REFERENCE.search(prompt) is not None
+        LONG_RUNNING.search(evidence) is not None
+        or OWNER_REFERENCE.search(evidence) is not None
     )
 
 
