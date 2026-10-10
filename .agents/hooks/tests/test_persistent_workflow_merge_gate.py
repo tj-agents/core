@@ -303,6 +303,14 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("no persistent-workflow binding", result.stderr)
 
+    def test_native_pwsh_command_span_rejects_an_unproved_target_before_gh(self):
+        command = ["pwsh", "-c", M + " 42 --squash --auto", ";"]
+
+        result = self.run_hook(command, native=True)
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("cannot prove this merge's checkout", result.stderr)
+
     def test_non_terminal_pr_with_a_matching_binding_is_allowed(self):
         if not self.has_gh_shim:
             self.skipTest("needs the POSIX gh shim")
