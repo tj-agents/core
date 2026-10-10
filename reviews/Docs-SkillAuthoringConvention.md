@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `9c8168e9eca015e54ca1f8be73d0e5cc9f4f7597`  `(2026-10-09)`
+**Reviewed up to commit:** `244570bad7a8dc51c48fde3369225ac060ea9c6b`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -116,3 +116,35 @@ Remediation of F4–F8. Security layer not required.
 
 Dropped: the debt entry describing the opt-in it records (a debt entry must state its problem); the
 unwrapped step-3 line and the unexplained test count were fixed in passing.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `9c8168e9eca015e54ca1f8be73d0e5cc9f4f7597`
+**Candidate head:** `244570bad7a8dc51c48fde3369225ac060ea9c6b`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:6ec04f82f9d57ff5009efdd8882849797568b458c9e86959b282823b620dbd3e` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/s4pRz9qR4x3W_EJY_ht52c/Ir5lPrlGLFI9dH7c3l181S`
+**Candidate bundle identity:** `sha256:e460f462a5b5ecfac78401ccb8de2012cdd89643089dd5c6fa16258423fc955f`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F9–F11. Security layer not required.
+
+### Findings
+
+- [x] **F12 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:54`
+  The rewritten naming paragraph was not rewrapped (151 characters). Fix: rewrap. Fixed.
+- [x] **F13 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:54`
+  "No generator sees other plugins" is wrong in core, whose generator pools base, engineering and machine.
+  Fix: "Generation sees only this repository's plugins". Fixed.
+- [x] **F14 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:50`
+  "One hyphen away" is narrower than the hyphen-equality case core's generator checks. Fix: "differs only
+  by hyphens". Fixed.
+- [x] **F15 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:68`
+  The layout-owner sentence repeats the pointer in the owner list. Fix: drop it. Fixed.
+
+Dropped: the `kit:check` owner link (linking the owner is the rule), the debt entry's verified kit fact
+(evidence, not a rule), and the plan's re-validation note (true; Next Steps records the pending review).
+Re-validated: 803 + 983 tests, generation, tier payload, catalog, harness, packaging and reachability.
