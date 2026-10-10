@@ -14,7 +14,7 @@ POWERSHELL_CONTROL = re.compile(r"(\$|if\s*\()")
 
 def verify_job_commands():
     lines = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8").splitlines()
-    start = lines.index("  verify:")
+    start = lines.index("  verify-windows:")
     end = next(index for index in range(start + 1, len(lines)) if re.match(r"  \S", lines[index]))
     commands = []
     block_indent = None
