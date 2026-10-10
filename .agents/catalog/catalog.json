@@ -229,6 +229,13 @@
                 ]
               },
               {
+                "path": "hooks/continuation_stop.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
                 "path": "hooks/delivery_binding_gate.py",
                 "hosts": [
                   "claude",
