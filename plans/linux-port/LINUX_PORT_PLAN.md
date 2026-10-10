@@ -179,12 +179,14 @@ Windows CI run 38080350190 failed on the reviewed head; Linux CI passed. A bound
 unit-debug context repaired the Windows fixture paths, output decoding, dual-shell setup and
 incorrect execution of Linux Bash fixtures on Windows. New PowerShell counterparts retain fallback,
 exit-125 and active-package-update coverage. Full local suites passed again: 1,006 source tests
-(18 skips) and 1,001 hook tests (four skips). Incremental review of this repair and an exact-head
-Windows/Linux CI rerun remain before merge.
+(18 skips) and 1,001 hook tests (four skips). Incremental review of `19dfeacf4a82354ca2c75e4a0a4cce03ae5e3228` found R8: the new Windows
+no-interpreter regression asserted Write-Warning on stderr, although PowerShell emits it on stdout.
+The assertion now checks that stream and retains the fallback/single-launch checks. Both full local
+suites must pass again, followed by incremental review and exact-head Windows/Linux CI before merge.
 
 ## Next Steps
 
-All seven findings are repaired. The previously reviewed head `75fe4c5a309cc12d06d7ae9ad5286755282ce896`
+All runtime findings are repaired. Review R8 in the Windows fallback fixture is also repaired. The previously reviewed head `75fe4c5a309cc12d06d7ae9ad5286755282ce896`
 passed Linux CI but exposed Windows fixture defects. Those are repaired, and both full local suites
 passed again. Independently review this repair, push to the existing PR #185, and require new exact-head
 Windows/Linux CI in the primary
