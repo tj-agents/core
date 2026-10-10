@@ -16,7 +16,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from delivery_runtime import BINDING_FILE, PersistentDeliveryRouter, binding_from_artifact, DeliveryContractViolation
 from completion import CompletionError, completion_check
-from workflow_ops import atomic_json, parse_status_checks, repository_slug
+from workflow_ops import atomic_json, parse_status_checks, repository_slug, retry_windows_sharing_violation
 
 
 class Gate(RuntimeError):
@@ -36,7 +36,8 @@ def git(root, *args):
 
 
 def read(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return retry_windows_sharing_violation(
+        lambda: json.loads(Path(path).read_text(encoding="utf-8")))
 
 
 def fingerprint(value):

@@ -77,8 +77,8 @@ what still needs checking on Windows.
 Step 5 is owned by `Refactor/LinuxPeerCli` in the primary checkout; PR not opened. The implementation
 worker uses L4 from the canonical Codex table through the native CLI. The parent uses L3 for the
 remaining bounded terminal/cleanup investigation. A disposable Linux Git check confirmed that a linked
-worktree can be removed while a live process retains its cwd there; Linux needs an exit observer, but
-no wait-before-removal reaper. Windows retains waiting before removal.
+worktree can be removed while a live process retains its cwd there; Linux permits immediate removal, but the shared observer waits for verified exit before cleanup
+on both platforms so a failed terminal close cannot race deletion.
 
 Step 5 implementation and direct caller/permission migration are committed. Actual terminal inventories,
 stale-tab/title controls, Windows settings configuration, full observer binding/cancellation, Windows
@@ -118,6 +118,39 @@ convention in `CODE_CONVENTIONS.md`, labels `peer-cli` Windows-only, and adds st
 shipped instructions. Step 3b `handoff-codex` merged as #137; step 3 complete, verified by a real Codex
 tab opened on this machine from the Python launcher right after the merge (new kitty tab, native
 `codex-cli` resolved and launched, handoff receipt printed).
+
+## Agent-host coverage
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/machine/utility/peer-cli and .agents/hooks/merge_cleanup_gate.py",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
+      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
+      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.claude_allow",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Full source/package suite: 946 tests, 16 skips; shared runtime suite: 985 tests, 3 skips; synchronized affected source suite: 139 tests, 7 skips; affected workflow runtime: 86 tests. Harness mappings and Python lifecycle fixtures cover both hosts. Installed-host acceptance remains pending the real Linux merge and Windows CI."
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
+      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
+      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.codex_prefix_rules",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Full source/package suite: 946 tests, 16 skips; shared runtime suite: 985 tests, 3 skips; synchronized affected source suite: 139 tests, 7 skips; affected workflow runtime: 86 tests. Harness mappings and Python lifecycle fixtures cover both hosts. Installed-host acceptance remains pending the real Linux merge and Windows CI."
+      }
+    }
+  ]
+}
+```
 
 ## Next Steps
 
