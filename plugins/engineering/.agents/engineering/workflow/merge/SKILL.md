@@ -240,7 +240,8 @@ When the session remains attached to the primary checkout or another retained ch
 any plan close-out and the report, then run exactly this argument-free command as the final action:
 
 ```
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/close.ps1
+python3 -B <machine:peer-cli skill-directory>/scripts/close.py  # Linux/macOS
+python -B <machine:peer-cli skill-directory>\scripts\close.py  # Windows
 ```
 
 It verifies this session's registered host and attachment, closes only its own CLI or uniquely identified
@@ -255,7 +256,8 @@ no arguments and no leading `&`, because the harness allow rule matches only thi
 forward slashes since the Bash tool strips backslashes:
 
 ```
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1
+python3 -B <machine:peer-cli skill-directory>/scripts/finish.py  # Linux/macOS
+python -B <machine:peer-cli skill-directory>\scripts\finish.py  # Windows
 ```
 
 It verifies the receipt, detaches a reaper that removes the worktree and branch once this session exits, and
@@ -263,10 +265,10 @@ closes this session's CLI and tab. The reaper's result and the cleanup reminder 
 next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude and is not
 evidence that the old directory can be deleted.
 
-- Only when `finish.ps1` is unavailable or its preflight fails: if the harness exposes its native host
+- Only when `finish.py` is unavailable or its preflight fails: if the harness exposes its native host
   command interface, invoke `/cd <primary-checkout>` there and continue only after the host confirms that
   the session is attached to the primary checkout.
-- Only when `finish.ps1` is unavailable or its preflight fails: if that interface is unavailable, invoke
+- Only when `finish.py` is unavailable or its preflight fails: if that interface is unavailable, invoke
   the unqualified `handoff` workflow once with the primary checkout. Checkpoint the exact repository, merged
   PR, branch, remote head, target worktree, primary checkout, and remote default. Put the remaining Step 5
   cleanup and final inventory in the successor's `## Next Steps`. After verified launcher submission the
@@ -315,8 +317,8 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
 
 **Step 5 is a blocking post-merge gate. Do not report terminal delivery or leave the cleanup for a later
-session until `finish.ps1` has run or host retargeting plus the helper or native-Git path has produced the
-final inventory above. Only the `finish.ps1` path may enter Step 6 first.** The
+session until `finish.py` has run or host retargeting plus the helper or native-Git path has produced the
+final inventory above. Only the `finish.py` path may enter Step 6 first.** The
 worktree-cleanup audit gate and the merge-cleanup gate are backstops that make a missed cleanup visible, not
 a substitute for doing it immediately.
 
@@ -412,5 +414,5 @@ needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-run `finish.ps1` when the session is attached to the removable merged worktree, or `close.ps1` when its
+run `finish.py` when the session is attached to the removable merged worktree, or `close.py` when its
 checkout is retained. No preamble.
