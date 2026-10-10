@@ -24,6 +24,13 @@ python -B '<skill-directory>\scripts\repo_config.py' `
   --lock C:\path\to\project\.agents\capabilities.lock.json --mode write
 ```
 
+On Linux or macOS, run the same command in a POSIX shell with `python3` and POSIX paths:
+
+```sh
+python3 -B '<skill-directory>/scripts/repo_config.py' \
+  --lock /path/to/project/.agents/capabilities.lock.json --mode write
+```
+
 CI uses the same command with `--mode check`; it exits nonzero if either generated file drifts.
 Each GitHub source must match the owner in its catalog release. The generator
 owns Claude's marketplace, enabled-plugin, and `permissions.allow` keys, plus Codex's
@@ -40,6 +47,14 @@ requires Python 3.11 or newer. Preview lists every changed output without writin
 python -B '<skill-directory>\scripts\repo_config.py' `
   --root C:\path\to\checkout --scope local `
   --lock C:\path\to\checkout\.agents\capabilities.lock.json --mode preview
+```
+
+On Linux or macOS, run the same preview in a POSIX shell with `python3` and POSIX paths:
+
+```sh
+python3 -B '<skill-directory>/scripts/repo_config.py' \
+  --root /path/to/checkout --scope local \
+  --lock /path/to/checkout/.agents/capabilities.lock.json --mode preview
 ```
 
 Use the same arguments with `--mode write` to apply or `--mode check` to detect drift.
