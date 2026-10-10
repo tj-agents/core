@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -81,7 +82,7 @@ class ContinuationTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def state(self):
-        return json.loads(self.owner.read_text())
+        return runtime.read(self.owner)
 
     def fixture(self, mode, **extra):
         (self.root / "scenario.json").write_text(json.dumps({"mode": mode, **extra}))
@@ -220,6 +221,38 @@ class ContinuationTests(unittest.TestCase):
         stdout, stderr = first.communicate(timeout=10)
         self.assertEqual(first.returncode, 0, stderr)
         self.assertEqual(json.loads(stdout)["launches"], 1)
+
+    @unittest.skipUnless(os.name == "nt", "Windows sharing violations are Windows-only")
+    def test_owner_state_read_and_save_tolerate_an_open_reader(self):
+        original = self.state()
+        replacement = dict(original, reason="concurrent-save")
+        attempted = threading.Event()
+        errors = []
+        original_replace = runtime.atomic_json.__globals__["os"].replace
+
+        def replace(source, destination):
+            attempted.set()
+            return original_replace(source, destination)
+
+        def save():
+            try:
+                runtime.save(self.owner, replacement, "concurrent-save")
+            except BaseException as error:
+                errors.append(error)
+
+        with mock.patch.object(runtime.atomic_json.__globals__["os"], "replace", side_effect=replace):
+            with self.owner.open(encoding="utf-8") as reader:
+                reader.read()
+                writer = threading.Thread(target=save)
+                writer.start()
+                self.assertTrue(attempted.wait(timeout=5))
+                self.assertTrue(writer.is_alive())
+                self.assertEqual(runtime.read(self.owner)["reason"], original["reason"])
+            writer.join(timeout=5)
+
+        self.assertFalse(writer.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(runtime.read(self.owner)["reason"], "concurrent-save")
 
     def test_fresh_and_stale_foreground(self):
         claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))

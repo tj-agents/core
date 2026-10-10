@@ -109,7 +109,7 @@ def read_config(path: Path) -> tuple[bytes, dict[str, Any]]:
     if not path.exists():
         return b"", {}
     try:
-        raw = path.read_bytes()
+        raw = retry_windows_sharing_violation(path.read_bytes)
         parsed = tomllib.loads(raw.decode("utf-8"))
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise ControlError(f"cannot parse {path}: {error}") from error
@@ -128,7 +128,7 @@ def atomic_write(path: Path, data: bytes) -> None:
             output.write(data)
             output.flush()
             os.fsync(output.fileno())
-        os.replace(temporary, path)
+        retry_windows_sharing_violation(lambda: os.replace(temporary, path))
     finally:
         if temporary.exists():
             temporary.unlink()
@@ -138,12 +138,25 @@ def atomic_json(path: Path, value: dict[str, Any]) -> None:
     atomic_write(path, (json.dumps(value, sort_keys=True, indent=2) + "\n").encode("utf-8"))
 
 
+def retry_windows_sharing_violation(action: Any, timeout: float = 2) -> Any:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return action()
+        except PermissionError as error:
+            if (os.name != "nt" or getattr(error, "winerror", None) != 32
+                    or time.monotonic() >= deadline):
+                raise
+            time.sleep(0.01)
+
+
 def load_snapshot(path: Path) -> dict[str, Any] | None:
     reject_symlink(path)
     if not path.exists():
         return None
     try:
-        snapshot = json.loads(path.read_text(encoding="utf-8"))
+        snapshot = json.loads(retry_windows_sharing_violation(
+            lambda: path.read_text(encoding="utf-8")))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ControlError(f"cannot read hook-control snapshot {path}: {error}") from error
     if not isinstance(snapshot, dict) or type(snapshot.get("version")) is not int or snapshot["version"] != 1:

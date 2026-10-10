@@ -204,7 +204,23 @@ def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    try:
+        retry_windows_sharing_violation(lambda: os.replace(temporary, path))
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def retry_windows_sharing_violation(action, timeout=2):
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return action()
+        except PermissionError as error:
+            if (os.name != "nt" or getattr(error, "winerror", None) != 32
+                    or time.monotonic() >= deadline):
+                raise
+            time.sleep(0.01)
 
 
 def append_event(root, workflow_run_id, event):
