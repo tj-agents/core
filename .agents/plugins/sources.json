@@ -181,6 +181,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/continuation_stop.py",
+      "destination": "hooks/continuation_stop.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/delivery_binding_gate.py",
       "destination": "hooks/delivery_binding_gate.py"
     },

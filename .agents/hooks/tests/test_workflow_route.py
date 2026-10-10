@@ -184,6 +184,64 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
 
+    def test_questions_and_quoted_examples_do_not_authorize_execution(self):
+        prompts = (
+            "How does plan-execution work?",
+            "Why didn't you finish the plan?",
+            "Explain how to implement the plan.",
+            "How do I plan and implement the migration?",
+            "Can you explain how to plan and implement the migration?",
+            "Explain how to plan and implement the migration.",
+            "Please explain how to plan and implement the migration.",
+            "Should we plan and implement the migration?",
+            "Can I plan and implement the migration?",
+            "Would we plan and implement the migration?",
+            "Do we plan and implement the migration?",
+            "Do the agents plan and implement the migration?",
+            "Can't I plan and implement the migration?",
+            "Couldn’t we plan and implement the migration?",
+            "Won't we plan and implement the migration?",
+            "Must we plan and implement the migration?",
+            "Need I plan and implement the migration?",
+            "Must not plan and implement the migration.",
+            "Mustn't plan and implement the migration.",
+            'The example says "Implement the plan."',
+            "```text\nImplement the plan.\n",
+            "> Implement the plan.",
+            "`Implement the plan.`",
+            "“Implement the plan.”",
+        )
+        for active in (False, True):
+            if active:
+                self.write_goal()
+            for prompt in prompts:
+                with self.subTest(prompt=prompt, active_goal=active):
+                    result = self.run_hook(prompt)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertEqual("", result.stdout)
+            if active:
+                (self.cwd / "GOAL.md").unlink()
+
+    def test_explicit_whole_skill_invocation_and_direct_question_authorize_execution(self):
+        for prompt in (
+            "engineering:plan-execution",
+            "$engineering:plan-execution",
+            "Can you implement the plan?",
+            "Can you please implement the plan?",
+            "Could you plan and implement the migration?",
+            "Would you plan and implement the migration?",
+            "Need to plan and implement the migration.",
+            "Must plan and implement the migration.",
+            "Do the plan and implement the migration.",
+            "Have a plan and implement the migration.",
+            "How does it work? Implement the plan.",
+            "Explain the plan, then implement it.",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("engineering:plan-execution automatically selected", result.stdout)
+
     def test_implementing_a_plan_authoring_fix_still_selects_execution(self):
         result = self.run_hook("Implement the plan-authoring fix across all phases.")
         self.assertEqual(0, result.returncode, result.stderr)
