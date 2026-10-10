@@ -11,18 +11,48 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
+CLOSE = ROOT / ".agents/machine/utility/peer-cli/scripts/close.py"
+FINISH = ROOT / ".agents/machine/utility/peer-cli/scripts/finish.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
 import finish
+import close as own_close
+
+
+class HostFallbackTests(unittest.TestCase):
+    def test_unavailable_terminal_can_close_verified_host_without_wrapper(self):
+        entry = {"pid": 30, "pid_started_at": 3.0}
+        for module in (own_close, finish):
+            with self.subTest(module=module.__name__), \
+                    mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                    mock.patch.object(session_close, "verified_live", return_value=True), \
+                    mock.patch.object(module.close_tab, "close_entry",
+                                      side_effect=module.close_tab.TerminalUnavailable("unavailable")), \
+                    mock.patch.object(module.os, "kill") as killer:
+                module.close_host(entry)
+                killer.assert_called_once_with(30, module.signal.SIGTERM)
+
+    def test_fallback_rechecks_host_after_terminal_inspection(self):
+        entry = {"pid": 30, "pid_started_at": 3.0}
+        for module in (own_close, finish):
+            with self.subTest(module=module.__name__), \
+                    mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                    mock.patch.object(session_close, "verified_live", side_effect=[True, False]), \
+                    mock.patch.object(module.close_tab, "close_entry",
+                                      side_effect=module.close_tab.TerminalUnavailable("unavailable")), \
+                    mock.patch.object(module.os, "kill") as killer:
+                with self.assertRaisesRegex(session_close.Refusal, "identity changed"):
+                    module.close_host(entry)
+                killer.assert_not_called()
 
 
 def git(cwd, *args):
     return subprocess.run(["git", "-C", str(cwd), *args], text=True, capture_output=True, check=True).stdout.strip()
 
 
-@unittest.skipUnless(sys.platform == "linux", "Linux integration")
-class FinishReaperLinuxTests(unittest.TestCase):
-    def test_armed_observer_removes_worktree_then_waits_to_clear_obligation(self):
+@unittest.skipUnless(sys.platform == "linux" or os.name == "nt", "Supported process backends")
+class FinishReaperProcessTests(unittest.TestCase):
+    def test_armed_observer_waits_for_exit_then_removes_worktree_and_obligation(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); bare = root / "origin.git"; primary = root / "primary"; worktree = root / "feature"; state = root / "state"
             subprocess.run(["git", "init", "--bare", "-q", "-b", "main", str(bare)], check=True)
@@ -36,9 +66,16 @@ class FinishReaperLinuxTests(unittest.TestCase):
             (receipts / "receipt.json").write_text(json.dumps({"worktree": str(worktree), "primary": str(primary), "branch": "feature", "head": head, "default": "main", "verdict": "removable", "recorded_at": time.time()}), encoding="utf-8")
             obligation = state / "merge-cleanup/obligations/one.json"; obligation.parent.mkdir(parents=True); obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
             host = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=worktree)
-            raw = (Path("/proc") / str(host.pid) / "stat").read_text(encoding="utf-8").split(); boot = next(float(line.split()[1]) for line in Path("/proc/stat").read_text(encoding="utf-8").splitlines() if line.startswith("btime ")); started = boot + int(raw[21]) / os.sysconf("SC_CLK_TCK")
+            started = self.process_started_at(host.pid)
             result = state / "merge-cleanup/results/result.json"; env = dict(os.environ, AGENT_STATE_DIRECTORY=str(state), AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10")
-            observer = subprocess.Popen([sys.executable, str(REAPER), "--host-pid", str(host.pid), "--host-start", str(started), "--worktree", str(worktree), "--result", str(result), "--session-id", "ours", "--head", head, "--primary", str(primary), "--branch", "feature", "--default", "main"], env=env)
+            invocation_id = "integration-invocation"
+            observer = subprocess.Popen([
+                sys.executable, str(REAPER), "--host-pid", str(host.pid),
+                "--host-start", str(started), "--worktree", str(worktree),
+                "--result", str(result), "--session-id", "ours",
+                "--invocation-id", invocation_id, "--head", head,
+                "--primary", str(primary), "--branch", "feature", "--default", "main",
+            ], env=env)
             try:
                 for _ in range(200):
                     if result.exists(): break
@@ -46,22 +83,190 @@ class FinishReaperLinuxTests(unittest.TestCase):
                 record = json.loads(result.read_text(encoding="utf-8"))
                 (Path(str(result) + ".accepted")).write_text(
                     json.dumps({
-                        "reaper_pid": record["reaper_pid"],
+                        "host_pid": host.pid, "host_start": started,
+                        "worktree": str(worktree.resolve()), "session_id": "ours",
+                        "invocation_id": invocation_id, "head": head,
+                        "primary": str(primary), "branch": "feature", "default": "main",
+                        "accepted": time.time(), "reaper_pid": record["reaper_pid"],
                         "reaper_started_at": record["reaper_started_at"],
-                        "host_pid": host.pid,
+                        "observer_pid": record["reaper_pid"],
+                        "observer_started_at": record["reaper_started_at"],
                     }),
                     encoding="utf-8",
                 )
                 for _ in range(200):
-                    if not worktree.exists(): break
+                    if Path(str(result) + ".armed").exists(): break
                     time.sleep(.05)
-                self.assertFalse(worktree.exists()); self.assertTrue(obligation.exists())
+                self.assertTrue(worktree.exists())
+                self.assertTrue(obligation.exists())
                 host.terminate(); host.wait(5); observer.wait(10)
+                self.assertFalse(worktree.exists())
                 self.assertFalse(obligation.exists()); self.assertEqual(1, subprocess.run(["git", "-C", str(primary), "show-ref", "--verify", "--quiet", "refs/heads/feature"]).returncode)
                 self.assertEqual("succeeded", json.loads(result.read_text(encoding="utf-8"))["status"])
             finally:
-                if host.poll() is None: host.kill()
-                if observer.poll() is None: observer.kill()
+                if host.poll() is None:
+                    host.kill()
+                host.wait(timeout=5)
+                if observer.poll() is None:
+                    observer.kill()
+                observer.wait(timeout=5)
+
+    def test_close_entrypoint_records_verified_session_exit_without_removing_checkout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            worktree = root / "worktree"
+            state = root / "state"
+            host_executable, host_name = self.fixture_host(root)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(worktree)], check=True)
+            subprocess.run(["git", "-C", str(worktree), "config", "user.email", "t@example.com"], check=True)
+            subprocess.run(["git", "-C", str(worktree), "config", "user.name", "t"], check=True)
+            (worktree / "base").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(worktree), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(worktree), "commit", "-q", "-m", "base"], check=True)
+            env = dict(
+                os.environ,
+                AGENT_STATE_DIRECTORY=str(state),
+                AGENT_CLI_HOST_NAMES=host_name,
+                AGENT_FINISH_CLOSE_MODE="process",
+                AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
+            )
+            host = subprocess.Popen([
+                str(host_executable), "-c",
+                "import os, subprocess, sys, time; "
+                "\nwhile not os.path.exists(sys.argv[2]): time.sleep(.01)"
+                "\nraise SystemExit(subprocess.call([sys.executable, sys.argv[1]]))",
+                str(CLOSE), str(root / "start"),
+            ], cwd=worktree, env=env)
+            try:
+                started = self.process_started_at(host.pid)
+                sessions = state / "cli-sessions"
+                sessions.mkdir(parents=True)
+                (sessions / "ours.json").write_text(json.dumps({
+                    "session_id": "ours", "cwd": str(worktree), "pid": host.pid,
+                    "pid_started_at": started, "started_at": time.time(),
+                    "host": host_name,
+                }), encoding="utf-8")
+                (root / "start").touch()
+                result_directory = state / "merge-cleanup/results"
+                for _ in range(300):
+                    results = list(result_directory.glob("*.json")) if result_directory.exists() else []
+                    if results:
+                        break
+                    time.sleep(.05)
+                self.assertTrue(results)
+                result_path = results[0]
+                for _ in range(300):
+                    result = json.loads(result_path.read_text(encoding="utf-8"))
+                    if result.get("status") == "session-closed":
+                        break
+                    time.sleep(.05)
+                self.assertEqual("session-closed", result["status"])
+                self.assertTrue(result["session_exited"])
+                self.assertEqual("ours", result["session_id"])
+                self.assertTrue(worktree.is_dir())
+            finally:
+                if host.poll() is None:
+                    host.kill()
+                host.wait(timeout=5)
+
+    def test_finish_entrypoint_removes_verified_disposable_worktree_after_host_exit(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bare = root / "origin.git"
+            primary = root / "primary"
+            worktree = root / "feature"
+            state = root / "state"
+            host_executable, host_name = self.fixture_host(root)
+            subprocess.run(["git", "init", "--bare", "-q", "-b", "main", str(bare)], check=True)
+            subprocess.run(["git", "clone", "-q", str(bare), str(primary)], check=True)
+            for key, value in (("user.email", "t@example.com"), ("user.name", "t")):
+                subprocess.run(["git", "-C", str(primary), "config", key, value], check=True)
+            (primary / "base").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(primary), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(primary), "commit", "-q", "-m", "base"], check=True)
+            subprocess.run(["git", "-C", str(primary), "push", "-q", "-u", "origin", "main"], check=True)
+            subprocess.run(["git", "-C", str(primary), "remote", "set-head", "origin", "main"], check=True)
+            subprocess.run(["git", "-C", str(primary), "branch", "feature"], check=True)
+            subprocess.run(["git", "-C", str(primary), "worktree", "add", "-q", str(worktree), "feature"], check=True)
+            head = git(worktree, "rev-parse", "HEAD")
+            receipt_directory = state / "merge-cleanup/receipts"
+            receipt_directory.mkdir(parents=True)
+            (receipt_directory / "receipt.json").write_text(json.dumps({
+                "worktree": str(worktree), "primary": str(primary), "branch": "feature",
+                "head": head, "default": "main", "verdict": "removable",
+                "recorded_at": time.time(),
+            }), encoding="utf-8")
+            obligation = state / "merge-cleanup/obligations/ours.json"
+            obligation.parent.mkdir(parents=True)
+            obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
+            env = dict(
+                os.environ,
+                AGENT_STATE_DIRECTORY=str(state),
+                AGENT_CLI_HOST_NAMES=host_name,
+                AGENT_FINISH_CLOSE_MODE="process",
+                AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
+            )
+            host = subprocess.Popen([
+                str(host_executable), "-c",
+                "import os, subprocess, sys, time; "
+                "\nwhile not os.path.exists(sys.argv[2]): time.sleep(.01)"
+                "\nraise SystemExit(subprocess.call([sys.executable, sys.argv[1]]))",
+                str(FINISH), str(root / "start"),
+            ], cwd=worktree, env=env)
+            try:
+                started = self.process_started_at(host.pid)
+                sessions = state / "cli-sessions"
+                sessions.mkdir(parents=True)
+                (sessions / "ours.json").write_text(json.dumps({
+                    "session_id": "ours", "cwd": str(worktree), "pid": host.pid,
+                    "pid_started_at": started, "started_at": time.time(),
+                    "host": host_name,
+                }), encoding="utf-8")
+                (root / "start").touch()
+                result_directory = state / "merge-cleanup/results"
+                for _ in range(300):
+                    results = list(result_directory.glob("*.json")) if result_directory.exists() else []
+                    if results:
+                        break
+                    time.sleep(.05)
+                self.assertTrue(results)
+                result_path = results[0]
+                for _ in range(300):
+                    result = json.loads(result_path.read_text(encoding="utf-8"))
+                    if result.get("status") in {"succeeded", "branch-preserved", "failed"}:
+                        break
+                    time.sleep(.05)
+                self.assertEqual("succeeded", result["status"])
+                self.assertTrue(result["session_exited"])
+                self.assertFalse(worktree.exists())
+                self.assertFalse(obligation.exists())
+                self.assertEqual(
+                    1,
+                    subprocess.run([
+                        "git", "-C", str(primary), "show-ref", "--verify", "--quiet",
+                        "refs/heads/feature",
+                    ], check=False).returncode,
+                )
+            finally:
+                if host.poll() is None:
+                    host.kill()
+                host.wait(timeout=5)
+
+    @staticmethod
+    def fixture_host(root):
+        if os.name == "nt":
+            executable = Path(sys.executable)
+            return executable, executable.stem.casefold()
+        executable = root / "fixture-host"
+        os.symlink(sys.executable, executable)
+        return executable, "fixture-host"
+
+    @staticmethod
+    def process_started_at(pid):
+        process = session_close.register_session.build_process_lookup()(pid)
+        if process is None or not session_close.valid_identity(pid, process.started_at):
+            raise AssertionError("disposable host has no queryable process identity")
+        return process.started_at
 
 
 class ReceiptSafetyTests(unittest.TestCase):
@@ -162,6 +367,80 @@ class ProcessIdentityTests(unittest.TestCase):
                 self.assertFalse(session_close.verified_exited(pid, started))
 
 
+class ClaimAndObligationSafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.original_state = os.environ.get("AGENT_STATE_DIRECTORY")
+        os.environ["AGENT_STATE_DIRECTORY"] = self.temp.name
+        self.addCleanup(self.restore_state)
+
+    def restore_state(self):
+        if self.original_state is None:
+            os.environ.pop("AGENT_STATE_DIRECTORY", None)
+        else:
+            os.environ["AGENT_STATE_DIRECTORY"] = self.original_state
+
+    def write_entry(self, name, entry):
+        directory = Path(self.temp.name) / "cli-sessions"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / name).write_text(json.dumps(entry), encoding="utf-8")
+
+    def test_unknown_attached_claimant_blocks_cleanup(self):
+        worktree = Path(self.temp.name) / "worktree"
+        worktree.mkdir()
+        self.write_entry("unknown.json", {
+            "session_id": "other", "cwd": str(worktree), "pid": 99,
+            "pid_started_at": 5.0, "started_at": 6.0, "host": "codex",
+        })
+        with mock.patch.object(session_close, "identity_status", return_value="unknown"):
+            self.assertIsNotNone(session_close.other_live_claimant(worktree, "ours"))
+
+    def test_obligation_removal_requires_both_session_and_worktree(self):
+        directory = Path(self.temp.name) / "merge-cleanup/obligations"
+        directory.mkdir(parents=True)
+        worktree = Path(self.temp.name) / "one"
+        other = Path(self.temp.name) / "other"
+        records = {
+            "matching.json": {"session_id": "ours", "worktree": str(worktree)},
+            "same-session.json": {"session_id": "ours", "worktree": str(other)},
+            "same-worktree.json": {"session_id": "other", "worktree": str(worktree)},
+        }
+        for name, value in records.items():
+            (directory / name).write_text(json.dumps(value), encoding="utf-8")
+        session_close.remove_matching_obligations(worktree, "ours")
+        self.assertFalse((directory / "matching.json").exists())
+        self.assertTrue((directory / "same-session.json").exists())
+        self.assertTrue((directory / "same-worktree.json").exists())
+
+
+@unittest.skipUnless(os.name == "nt", "Windows wrapper qualification")
+class WindowsWrapperSafetyTests(unittest.TestCase):
+    def test_wrapper_requires_a_shell_command_that_launches_the_verified_host(self):
+        host = session_close.register_session.ProcessInfo(10, 20, "codex.exe", 100.0)
+        wrapper = session_close.register_session.ProcessInfo(20, 1, "pwsh.exe", 95.0)
+        original_table = session_close.register_session._windows_process_table
+        session_close.register_session._windows_process_table = lambda: {10: host, 20: wrapper}
+        self.addCleanup(
+            setattr, session_close.register_session, "_windows_process_table", original_table,
+        )
+        entry = {
+            "session_id": "ours", "cwd": "C:/worktree", "pid": 10,
+            "pid_started_at": 100.0, "started_at": 101.0, "host": "codex",
+        }
+        command = mock.Mock(returncode=0, stdout="pwsh -Command codex", stderr="")
+        with mock.patch.object(session_close, "process_info", return_value=host), mock.patch(
+                "subprocess.run", return_value=command):
+            self.assertEqual(
+                {"pid": 20, "started_at": 95.0},
+                session_close.qualified_windows_wrapper(entry),
+            )
+        foreign = mock.Mock(returncode=0, stdout="pwsh -NoProfile", stderr="")
+        with mock.patch.object(session_close, "process_info", return_value=host), mock.patch(
+                "subprocess.run", return_value=foreign):
+            self.assertIsNone(session_close.qualified_windows_wrapper(entry))
+
+
 class ObserverHandshakeTests(unittest.TestCase):
     def test_startup_record_requires_spawned_reaper_and_exact_binding(self):
         record = {
@@ -169,16 +448,65 @@ class ObserverHandshakeTests(unittest.TestCase):
             "host_start": 5.0,
             "worktree": "/tmp/worktree",
             "session_id": "session",
+            "invocation_id": "invocation",
+            "started": time.time(),
             "reaper_pid": 20,
             "reaper_started_at": 30.0,
         }
         with mock.patch.object(session_close, "verified_live", return_value=True):
             self.assertTrue(session_close.valid_observer_start(
-                record, 20, 10, 5.0, "/tmp/worktree", "session",
+                record, 20, 10, 5.0, "/tmp/worktree", "session", "invocation",
             ))
             self.assertFalse(session_close.valid_observer_start(
-                record, 21, 10, 5.0, "/tmp/worktree", "session",
+                record, 21, 10, 5.0, "/tmp/worktree", "session", "invocation",
             ))
             self.assertFalse(session_close.valid_observer_start(
-                record, 20, 11, 5.0, "/tmp/worktree", "session",
+                record, 20, 11, 5.0, "/tmp/worktree", "session", "invocation",
             ))
+
+    def test_startup_rejects_final_missing_and_future_bindings(self):
+        baseline = {
+            "host_pid": 10, "host_start": 5.0, "worktree": "/tmp/worktree",
+            "session_id": "session", "invocation_id": "invocation", "started": 100.0,
+            "reaper_pid": 20, "reaper_started_at": 30.0,
+        }
+        invalid = (
+            {"status": "failed"},
+            {"invocation_id": None},
+            {"started": float("nan")},
+            {"started": 200.0},
+        )
+        original_now = session_close.now
+        session_close.now = lambda: 100.0
+        self.addCleanup(setattr, session_close, "now", original_now)
+        with mock.patch.object(session_close, "verified_live", return_value=True):
+            for change in invalid:
+                with self.subTest(change=change):
+                    record = dict(baseline)
+                    record.update(change)
+                    self.assertFalse(session_close.valid_observer_start(
+                        record, 20, 10, 5.0, "/tmp/worktree", "session", "invocation",
+                    ))
+            self.assertFalse(session_close.valid_observer_start(
+                baseline, 20, 10, 5.0, "/tmp/worktree", "session", "invocation",
+                minimum_started=103.0,
+            ))
+
+    def test_armed_requires_full_acknowledged_identity(self):
+        expected = session_close.binding(10, 5.0, "/tmp/worktree", "session", "invocation")
+        observer = {
+            **expected, "started": 10.0, "reaper_pid": 20,
+            "reaper_started_at": 30.0, "observer_pid": 20, "observer_started_at": 30.0,
+        }
+        accepted = {
+            **expected, "accepted": 40.0, "reaper_pid": 20,
+            "reaper_started_at": 30.0, "observer_pid": 20, "observer_started_at": 30.0,
+        }
+        armed = {**accepted, "armed": 50.0}
+        original_now = session_close.now
+        session_close.now = lambda: 50.0
+        self.addCleanup(setattr, session_close, "now", original_now)
+        with mock.patch.object(session_close, "verified_live", return_value=True):
+            self.assertTrue(session_close.valid_armed(armed, expected, observer, accepted))
+            armed["session_id"] = "different"
+            self.assertFalse(session_close.valid_armed(armed, expected, observer, accepted))

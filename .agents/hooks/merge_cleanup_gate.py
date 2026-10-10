@@ -567,10 +567,11 @@ def handle_stop(data):
 
 
 def reminder_line(obligation):
+    python = "python" if os.name == "nt" else "python3"
     return (
         f"merge-cleanup: PR #{obligation.get('pr') or '?'} ({obligation.get('branch') or '?'}) "
         f"at {obligation.get('worktree')} still needs merge Step 5 cleanup "
-        f"(`python \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
+        f"(`{python} \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
     )
 
 
