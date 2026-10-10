@@ -81,3 +81,7 @@ The supported CI-style command `python -B -m unittest discover -s .agents/hooks/
 ## Rebased parent requalification
 
 The candidate was rebased onto `origin/main` at `8b656fb197771916c58aea4418934aaa7648b1c0`, producing code commit `d26d1d3`. The focused both-host `ContinuationTests.test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground` passed through `workflow_ops.py` on the rebased tree. `scripts/update_catalog_digests.py`, `.agents/sync-generated.ps1`, and `.agents/sync-generated.ps1 -Check` also passed; the resulting generated output remains uncommitted. The next action is an exact-head independent review, followed by PR delivery if approved.
+
+## Delivery gate
+
+The exact-head review found no actionable defect. Native and fallback independent reviewers could not start because the local runner fails during sandbox setup refresh; the parent independently reviewed the frozen runtime and test diff. The source branch is ready to publish, but the environment rejected `git push -u origin Fix/ContinuationHeartbeatMetadata` as external egress and requires explicit user approval. Resolver: Tommy. Resume condition: approve pushing this branch to `tj-agents/core` and opening its draft GitHub PR; exact-head CI, merge, and generated-publication observation remain owned afterward.
