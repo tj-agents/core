@@ -22,6 +22,8 @@ import harness_permissions  # noqa: E402
 
 INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.ps1"), ("machine", "close.ps1"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
+CONTINUATION_RUNTIME_OPERATIONS = ("init", "claim", "heartbeat", "yield", "checkpoint", "status", "wake")
+CONTINUATION_ADAPTER_OPERATIONS = ("claim", "register", "remove", "list", "wake")
 
 
 def validate_harness_schema(documents):
@@ -120,6 +122,23 @@ class HarnessManifestTests(unittest.TestCase):
         requires["marketplaces"][0]["repository"] = "another-org/core"
         with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+
+    def test_scoped_claude_script_operations_validate_and_unscoped_operations_fail(self):
+        requires = json.loads(
+            (ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
+        )["requires"]
+        harness_permissions.validate_requires(requires, "engineering")
+        allowed = "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py claim:*)"
+        for scope in ("claim", ":*"):
+            with self.subTest(scope=scope):
+                candidate = deepcopy(requires)
+                commands = candidate["permissions"]["claude_allow"]
+                commands[commands.index(allowed)] = allowed.replace("claim:*", scope)
+                with self.assertRaisesRegex(
+                    harness_permissions.bootstrap.BootstrapError,
+                    "script arguments require :\\*",
+                ):
+                    harness_permissions.validate_requires(candidate, "engineering")
 
 
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required for Test-Json")
@@ -230,6 +249,60 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
             f"{root}/skills/peer-cli/scripts/close.ps1",
             f"{root}/codex-skills/peer-cli/scripts/close.ps1",
         }, paths)
+
+    def test_continuation_runtime_and_adapter_permissions_cover_each_host_operation(self):
+        claude_allow, codex_rules = self.rendered("engineering")
+        root = self.PLUGIN_ROOT.replace("\\", "/")
+        runtime = f"{root}/workflows/continuation_runtime.py"
+        adapter_source = f"{root}/.agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1"
+        adapter_skill = f"{root}/skills/persistent-workflow/scripts/delivery-continuation.ps1"
+        adapter_codex = f"{root}/codex-skills/persistent-workflow/scripts/delivery-continuation.ps1"
+        normalized_allow = [entry.replace("\\", "/") for entry in claude_allow]
+        for operation in CONTINUATION_RUNTIME_OPERATIONS:
+            with self.subTest(host="claude", script="runtime", operation=operation):
+                self.assertIn(f"Bash(python -B {runtime} {operation}:*)", normalized_allow)
+                self.assertIn(f"PowerShell(python -B {runtime} {operation}:*)", normalized_allow)
+        for operation in CONTINUATION_ADAPTER_OPERATIONS:
+            with self.subTest(host="claude", script="adapter", operation=operation):
+                self.assertIn(
+                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation}:*)",
+                    normalized_allow,
+                )
+                self.assertIn(
+                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_source} {operation}:*)",
+                    normalized_allow,
+                )
+                self.assertIn(
+                    f"Bash(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation}:*)",
+                    normalized_allow,
+                )
+                self.assertIn(
+                    f"PowerShell(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {adapter_skill} {operation}:*)",
+                    normalized_allow,
+                )
+        runtime_rules = [rule for rule in codex_rules if runtime in json.dumps(rule).replace("\\\\", "/")]
+        self.assertEqual(1, len(runtime_rules))
+        self.assertEqual(list(CONTINUATION_RUNTIME_OPERATIONS), runtime_rules[0]["pattern"][-1])
+        runtime = runtime.replace("/", chr(92))
+        self.assertEqual(
+            [
+                ["python", "-B", runtime.replace("/", "\\\\"), "_child"],
+                ["python", "-B", runtime.replace("/", "\\\\"), "unknown"],
+            ],
+            runtime_rules[0]["not_match"],
+        )
+        adapter_rules = [rule for rule in codex_rules if adapter_codex in json.dumps(rule).replace("\\\\", "/")]
+        self.assertEqual(1, len(adapter_rules))
+        self.assertEqual(list(CONTINUATION_ADAPTER_OPERATIONS), adapter_rules[0]["pattern"][-1])
+        self.assertEqual(
+            {adapter_source, adapter_skill, adapter_codex},
+            {path.replace(chr(92), "/") for path in adapter_rules[0]["pattern"][-2]},
+        )
+        adapter_codex = adapter_codex.replace("/", chr(92))
+        self.assertEqual(
+            [["powershell.exe", "-NoProfile", "-File", adapter_codex.replace("/", "\\\\"), "unexpected"]],
+            adapter_rules[0]["not_match"],
+        )
 
     def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
         codex = shutil.which("codex")
