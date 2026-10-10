@@ -1,6 +1,6 @@
 ---
 name: docs-and-debt
-description: Keeping a repository's guidance corpus honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, tech debt recorded in the file owning the problem and deleted when fixed, and throwaway working markdown kept in the repo then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, finding the same rule in two places, logging tech debt, deciding to leave a problem unfixed, or creating a scratch analysis or handoff note.
+description: Keeping a repository's guidance corpus honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, tech debt recorded in the file owning the problem and deleted when fixed, and throwaway working markdown kept in the repo then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, deciding a refactor, migration or other change of direction, finding the same rule in two places, logging tech debt, deciding to leave a problem unfixed, or creating a scratch analysis or handoff note.
 
 kind: convention
 domain: process
@@ -110,6 +110,22 @@ row to respect, and getting it wrong is worse than having no skill at all.
 | Project-specific and expensive to miss silently | that repo's always-loaded instructions |
 | Cross-project and always applicable | your global agent instructions |
 
+### A change of direction is a standing rule from the moment it is decided
+
+**When a plan or task changes how a repository's code is written — a refactor, migration, new platform, new
+architecture or newly required pattern — write that rule into the repository's standing conventions when it
+is decided, before or with the first change that depends on it.** State the rule itself in the repository's
+root `AGENTS.md`, which every session loads, linking a convention doc only for further detail; the cost of
+missing it outranks the lowest-node default. A plan governs only its own work: a direction recorded there
+alone is invisible to every other session, which keeps writing the old way and builds new dependencies on
+it.
+
+The plan keeps the rollout — what moves and in what order. The `AGENTS.md` statement itself says what all
+new code does, its scope, and how code that has not moved yet is treated, such as ported rather than
+extended. Replace the superseded rule in the same change, cite no plan from it, and record code that has not
+moved as tech debt. A change that decides or depends on a direction its repository's conventions do not
+state is incomplete; review reports it with the missing convention as its fix.
+
 ## Tech debt
 
 Record tech debt in the `TECH_DEBT.md` belonging to the area that **owns the problem**; if that area has none,
@@ -118,11 +134,21 @@ hitting the same underlying cause is two entries, not one in their shared parent
 separately and are usually blocked by different things. **Once the debt is addressed, delete the entire
 entry** — a resolved entry retained as an archive is just another stale doc.
 
-**Everything you decide not to fix earns an entry** — a shortcut taken, and equally a defect, risk or rule
-violation you noticed and deliberately left alone. A shortcut is acceptable only where it is genuinely,
-provably the right call; "unrelated to what I was doing" is a perfectly good reason to leave a problem and no
-reason at all to leave it unwritten. Write it down as you make the decision, with the reasoning and an
-objective resolution condition — a problem only one agent ever saw is one nobody will fix.
+**Everything you decide not to fix, and do not hand off, earns an entry** — a shortcut taken, and equally a
+defect, risk or rule violation you noticed and deliberately left alone. A shortcut is acceptable only where
+it is genuinely, provably the right call; "unrelated to what I was doing" is a perfectly good reason to
+leave a problem and no reason at all to leave it unwritten. Write it down as you make the decision, with the
+reasoning and an objective resolution condition — a problem only one agent ever saw is one nobody will fix.
+
+**Every problem you notice is fixed, handed off or recorded before you move on, and the outcome reaches the
+default branch.** Handing off means launching a side workstream through `engineering:handoff`, or giving the
+problem to the active owner of its fix who confirms it is in their goal; that goal, which ends in a merged
+fix, is then the record. Anything else left unfixed gets the entry above, merged to the default branch in
+the current PR when that PR will land, otherwise in its own docs-only PR opened straight away. That PR is a
+meta-only slice with the same standing authorization planning artifacts have, and it lands as
+`engineering:plans`' "Planning artifacts always land" defines, including its validation, docs review and
+typed delivery gates. A chat reply, a message, an issue, a scratch file or an entry on a branch that may
+never merge is not a record.
 
 ## Throwaway working markdown
 

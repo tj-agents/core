@@ -107,6 +107,34 @@ class ProcessStandardsTests(unittest.TestCase):
             flat,
         )
 
+    def test_a_change_of_direction_is_stated_where_every_session_loads_it(self):
+        flat = " ".join(authored_skill("docs-and-debt").read_text(encoding="utf-8").split())
+
+        for phrase in (
+            "write that rule into the repository's standing conventions when it is decided, "
+            "before or with the first change that depends on it",
+            "State the rule itself in the repository's root `AGENTS.md`, which every session loads",
+            "A plan governs only its own work",
+            "The `AGENTS.md` statement itself says what all new code does, its scope, and how code "
+            "that has not moved yet is treated",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, flat)
+
+    def test_a_noticed_problem_is_recorded_on_the_default_branch(self):
+        flat = " ".join(authored_skill("docs-and-debt").read_text(encoding="utf-8").split())
+
+        for phrase in (
+            "Every problem you notice is fixed, handed off or recorded before you move on, "
+            "and the outcome reaches the default branch.",
+            "That PR is a meta-only slice with the same standing authorization planning artifacts "
+            "have, and it lands as `engineering:plans`' \"Planning artifacts always land\" defines",
+            "A chat reply, a message, an issue, a scratch file or an entry on a branch that may "
+            "never merge is not a record.",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, flat)
+
     def test_a_standards_defect_hands_off_in_the_same_turn(self):
         instructions = authored_skill("session-guidance").read_text(
             encoding="utf-8"
