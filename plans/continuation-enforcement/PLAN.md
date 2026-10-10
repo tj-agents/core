@@ -14,7 +14,7 @@ Do not assume the base package alone is sufficient. Determine whether the unmerg
 
 ## Next Steps
 
-R7 source/package acceptance passed: 30 routing/recovery and 26 Stop/integration tests, including compound and polite explanation questions with and without an active goal, actual receipt-to-Stop behavior, and later direct execution sentences. Generation and Check passed. Commit/push the authored correction, refresh binding and owner identity, then fresh incremental review and exact-head Windows/Linux CI. Previous 848598b CI completed green on both platforms. Merge only after current-head gates pass and verify causal main regeneration before completion/cleanup.
+R8 tiny follow-up accepted: full routing 30/30 and Stop 26/26 passed after generation and Check. The previous 4918af6 head's Windows/Linux CI completed green. Commit/push the authored follow-up, refresh the owner/binding and perform fresh incremental ordinary L4 source lenses plus exact-head CI; merge and verify causal main regeneration before terminal closeout.
 
 ## Deferred tech debt
 
@@ -101,3 +101,5 @@ Scope boundary: a fresh session without a routed execution obligation does not a
 2026-10-10 final parent review: R7 reproduces on the changed directive grammar: "How do I plan and implement the migration?", "Can you explain how to plan and implement the migration?", and "Explain how to plan and implement the migration." all incorrectly select execution. These are indirect questions/explanations and must not latch execution authority. Earlier accepted direct/mixed requests remain required regressions.
 
 2026-10-10 R7 acceptance: sentence-scoped authorization excludes indirect questions and explanation requests before matching internal conjunctions. Direct commands, polite implementation requests, mixed planning requests and a later direct execution sentence remain covered. Final complete routing 30/30 and Stop 26/26 passed after package generation/check. Verification artifacts: .git/agent-workflow/runs/continuation-enforcement-question-check/artifacts/. Fresh review and CI remain required.
+
+2026-10-10 R8 acceptance: interrogative auxiliary and subject handling excludes recommendation/capability questions before internal conjunctions; polite direct requests remain explicit positives. Actual source selection and receipt-to-Stop cases cover Should we, Can I, Would we and Do we, with/without active goals. Final routing 30/30 and Stop 26/26 passed with package generation/check. Artifacts: .git/agent-workflow/runs/continuation-enforcement-interrogative-check/artifacts/.
