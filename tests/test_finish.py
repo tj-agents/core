@@ -373,7 +373,7 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.worktree = Path(self.temp.name) / "worktree"
+        self.worktree = (Path(self.temp.name) / "worktree").resolve()
         self.worktree.mkdir()
         self.original_state = os.environ.get("AGENT_STATE_DIRECTORY")
         os.environ["AGENT_STATE_DIRECTORY"] = self.temp.name
