@@ -68,7 +68,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
     def active_launcher(self, host: str) -> Path:
         root = self.root / "active"
         script = root / "resources" / "machine" / "scripts" / f"{host}_terminal_launcher.py"
-        script.parent.mkdir(parents=True)
+        script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text(
             "import os, sys\n"
             "with open(os.environ['CALLS'], 'a', encoding='utf-8') as output:\n"
@@ -92,10 +92,24 @@ class TerminalProfileWiringTests(unittest.TestCase):
             self.skipTest("PowerShell is unavailable")
         return list(dict.fromkeys(found))
 
-    def run_powershell(self, shell: str, command: str) -> subprocess.CompletedProcess[str]:
-        command = "$PSNativeCommandArgumentPassing = 'Legacy'; " + command
+    def run_powershell(self, shell: str, command: str, mode: str = "Legacy") -> subprocess.CompletedProcess[str]:
+        command = f"$PSNativeCommandArgumentPassing = '{mode}'; " + command
         return subprocess.run([shell, "-NoProfile", "-Command", command], env=self.environment,
                               text=True, capture_output=True, check=False)
+
+    def active_argument_spy(self, host: str) -> Path:
+        root = self.root / f"{host}-argument-spy"
+        script = root / "resources" / "machine" / "scripts" / f"{host}_terminal_launcher.py"
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text(
+            "import json, os, sys\n"
+            "with open(os.environ['ARGUMENTS'], 'w', encoding='utf-8') as output:\n"
+            "    json.dump(sys.argv[1:], output, ensure_ascii=False)\n"
+            "print('live launcher output')\n"
+            "raise SystemExit(37)\n",
+            encoding="utf-8",
+        )
+        return root
 
     def native_codex(self, shim: Path) -> Path:
         name = "codex.exe" if os.name == "nt" else "codex"
@@ -187,6 +201,50 @@ class TerminalProfileWiringTests(unittest.TestCase):
         for shell in self.powershells():
             with self.subTest(shell=shell):
                 self.assert_codex_wiring(lambda command: self.run_powershell(shell, command), f". '{self.profile_path()}'; codex plugin list; codex exec; codex-hooks status", 0)
+
+    def test_powershell_payload_preserves_literal_arguments_for_each_host_and_mode(self):
+        project = self.root / "project café"
+        project.mkdir()
+        for shadow in ("json.py", "subprocess.py"):
+            (project / shadow).write_text("raise RuntimeError('project module was imported')\n", encoding="utf-8")
+        literal = ['a"b', '', 'a b', 'café', 'C:\\path with space\\']
+        modes = ("Legacy", "Standard")
+        for host, module, hook in (("claude", CLAUDE, False), ("codex", CODEX, False), ("codex", CODEX, True)):
+            arguments_path = self.root / f"{host}-{'hooks' if hook else 'cli'}-arguments.json"
+            active = self.active_argument_spy(host)
+            self.environment["ARGUMENTS"] = str(arguments_path)
+            if host == "claude":
+                cache = self.root / "claude-arguments-cache"
+                cache.mkdir(exist_ok=True)
+                (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
+                    "machine@base-agents": [{"scope": "user", "installPath": str(active)}]
+                }}), encoding="utf-8")
+                self.environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
+                target = self.executable("claude", "raise SystemExit(88)\n")
+            else:
+                self.environment["CODEX_HOME"] = str(self.root / "codex-arguments-home")
+                target = self.executable("codex", "raise SystemExit(88)\n")
+                shim = target
+                self.native_codex(shim)
+                cache = Path(self.environment["CODEX_HOME"]) / "plugins" / "cache" / "base-agents" / "machine" / "test"
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(active, cache, dirs_exist_ok=True)
+            self.install_profile(module)
+            command_name = "codex-hooks" if hook else host
+            quoted = " ".join("'" + value.replace("'", "''") + "'" for value in literal)
+            command = f". '{self.profile_path()}'; Set-Location '{project}'; {command_name} {quoted}; exit $LASTEXITCODE"
+            for shell in self.powershells():
+                for mode in modes:
+                    with self.subTest(host=host, hooks=hook, shell=shell, mode=mode):
+                        arguments_path.unlink(missing_ok=True)
+                        completed = self.run_powershell(shell, command, mode)
+                        self.assertEqual(37, completed.returncode, completed.stderr)
+                        self.assertEqual("live launcher output\n", completed.stdout)
+                        expected = ["--project", str(project), "--target", str(target)]
+                        if hook:
+                            expected.append("--hooks")
+                        expected.extend(["--", *literal])
+                        self.assertEqual(expected, json.loads(arguments_path.read_text(encoding="utf-8")))
 
 
 if __name__ == "__main__":

@@ -81,8 +81,8 @@ standards refresh, its tests and documentation. Its successor remains Step 7; St
 implementation scope for this slice.
 
 The primary acknowledged the handoff and completed bounded L3 discovery. Native L4 implementation
-uses the canonical Codex lane table; compatibility repairs and focused validation are complete; review and
-delivery remain. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
+uses the canonical Codex lane table. Initial full validation passed; independent review found five
+confirmed defects, now under serial remediation before fresh validation/review and delivery. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
 solely to satisfy a separate ledger's graph requirements.
 
 The current cutover measures about 1,900 added/deleted authored lines across 27 paths, including
@@ -160,12 +160,15 @@ next substantive PR, with no separate Step 5 metadata PR.
 
 ## Reviews
 
-Pending independent frozen code review at `reviews/Refactor-LinuxTerminalStartHooks.md`.
+Independent full review of `fa5f7f3def036948fa30823adb6d31e2c1f72022` completed at
+`reviews/Refactor-LinuxTerminalStartHooks.md`: three HIGH and two MEDIUM findings require repair
+(import isolation, profile modes, PowerShell shims/arguments, and hook-control interpreter selection).
+The native reviewer and independent security/workflow lenses ran; parent verified evidence.
 
 ## Next Steps
 
-Freeze and independently review the completed Step 4 implementation, then publish the stable candidate
-for Windows/Linux CI validation in the primary
+Repair the five confirmed Step 4 findings in the canonical review work order, rerun both complete local
+suites, and independently review the fixing delta before publishing it for Windows/Linux CI in the primary
 checkout `/home/tommy/projects/tj-agents/core`, branch `Refactor/LinuxTerminalStartHooks`. Its successor
 owns Step 7 only after Step 4 lands. Do not implement Steps 7 or 10 in this session. The whole port
 remains authorized one reviewed PR per step.

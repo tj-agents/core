@@ -8,6 +8,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from codex_marketplace_sync import SyncError, resolve_codex_for_sync, sync_codex_standards
 from terminal_command import flush_before_cli, run_target
 
@@ -18,7 +20,7 @@ def hook_control(arguments: list[str]) -> int:
         print("Codex hook-control utility is not installed", file=sys.stderr)
         return 1
     try:
-        return subprocess.run([sys.executable, "-B", str(script), *arguments]).returncode
+        return subprocess.run([sys.executable, "-I", "-B", str(script), *arguments]).returncode
     except OSError as error:
         print(f"Codex hook-control utility could not start: {error}", file=sys.stderr)
         return 1

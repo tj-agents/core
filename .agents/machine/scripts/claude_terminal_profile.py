@@ -14,11 +14,28 @@ END = "# <<< base-agents claude launcher <<<"
 OPT_OUT_ENV = "BASE_AGENTS_CLAUDE_PROFILE"
 
 BOOTSTRAP = r'''# This source string is necessary: the active package's launcher path is unknown until its registry is read.
-import json, os, subprocess, sys
+import base64, json, os, subprocess, sys
 from pathlib import Path
 
-probe = sys.argv[1:2] == ["--probe"]
-kind, target, project, *rest = sys.argv[2 if probe else 1:]
+payload = sys.argv[1:2] == ["--payload"]
+probe = sys.argv[2:3] == ["--probe"] if payload else sys.argv[1:2] == ["--probe"]
+if payload:
+    try:
+        encoded = os.environ.pop("BASE_AGENTS_TERMINAL_PAYLOAD")
+        data = json.loads(base64.b64decode(encoded, validate=True).decode("utf-8"))
+        kind = data["kind"]
+        target = data["target"]
+        project = data["project"]
+        rest = data.get("arguments", [])
+        if rest is None:
+            rest = []
+        if not all(isinstance(value, str) for value in (kind, target, project)) or not isinstance(rest, list) or not all(isinstance(value, str) for value in rest):
+            raise TypeError("payload")
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        print("standards: terminal launcher arguments are invalid; running the typed CLI without refresh", file=sys.stderr)
+        sys.exit(1 if probe else 125)
+else:
+    kind, target, project, *rest = sys.argv[2 if probe else 1:]
 typed_target = target
 hooks = kind == "codex-hooks"
 if hooks:
@@ -88,7 +105,7 @@ if not script.is_file():
     unavailable("the active machine " + kind + " launcher is unavailable")
 if probe:
     sys.exit(0)
-launcher = [sys.executable, "-B", str(script), "--project", project, "--target", typed_target]
+launcher = [sys.executable, "-I", "-B", str(script), "--project", project, "--target", typed_target]
 if hooks:
     launcher += ["--hooks", "--", *rest]
 else:
@@ -104,7 +121,7 @@ POWERSHELL_BLOCK = "\r\n".join((
     "    foreach ($baseAgentsCandidate in @(Get-Command $baseAgentsName -CommandType Application -ErrorAction SilentlyContinue)) {",
     "        if ($baseAgentsWindows -and $baseAgentsCandidate.Source -match '\\\\WindowsApps\\\\') { continue }",
     "        $baseAgentsArguments = if ($baseAgentsName -eq 'py') { @('-3') } else { @() }",
-    "        & $baseAgentsCandidate.Source @baseAgentsArguments -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>$null",
+    "        & $baseAgentsCandidate.Source @baseAgentsArguments -I -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>$null",
     "        if ($LASTEXITCODE -eq 0) { $baseAgentsPython = [pscustomobject]@{ Path = $baseAgentsCandidate.Source; Arguments = $baseAgentsArguments }; break }",
     "    }",
     "    if ($baseAgentsPython) { break }",
@@ -115,12 +132,35 @@ POWERSHELL_BLOCK = "\r\n".join((
     "if ($PSVersionTable.PSVersion -lt [version]'7.3' -or (Get-Variable PSNativeCommandArgumentPassing -ValueOnly -ErrorAction SilentlyContinue) -eq 'Legacy') {",
     '    $baseAgentsBootstrap = $baseAgentsBootstrap -replace \'(\\\\*)"\', \'$1$1\\"\'',
     '}',
+    "function Invoke-BaseAgentsBootstrap {",
+    "    param([string]$baseAgentsKind, [string]$baseAgentsTarget, [string]$baseAgentsProject, [string[]]$baseAgentsArguments, [object]$baseAgentsStatus)",
+    "    $baseAgentsStatus.Ran = $false",
+    "    $baseAgentsStatus.ExitCode = 125",
+    "    $baseAgentsPreviousPayload = [Environment]::GetEnvironmentVariable('BASE_AGENTS_TERMINAL_PAYLOAD', 'Process')",
+    "    $baseAgentsHadPayload = $null -ne $baseAgentsPreviousPayload",
+    "    $baseAgentsPayload = [ordered]@{ kind = $baseAgentsKind; target = $baseAgentsTarget; project = $baseAgentsProject; arguments = @($baseAgentsArguments) } | ConvertTo-Json -Compress",
+    "    try {",
+    "        $env:BASE_AGENTS_TERMINAL_PAYLOAD = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($baseAgentsPayload))",
+    "        & $baseAgentsPython.Path @($baseAgentsPython.Arguments) -I -B -c $baseAgentsBootstrap --payload --probe",
+    "        if ($LASTEXITCODE -eq 0) {",
+    "            $env:BASE_AGENTS_TERMINAL_PAYLOAD = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($baseAgentsPayload))",
+    "            & $baseAgentsPython.Path @($baseAgentsPython.Arguments) -I -B -c $baseAgentsBootstrap --payload",
+    "            $baseAgentsStatus.Ran = $true",
+    "            $baseAgentsStatus.ExitCode = $LASTEXITCODE",
+    "            return",
+    "        }",
+    "        return",
+    "    } finally {",
+    "        if ($baseAgentsHadPayload) { $env:BASE_AGENTS_TERMINAL_PAYLOAD = $baseAgentsPreviousPayload } else { Remove-Item Env:BASE_AGENTS_TERMINAL_PAYLOAD -ErrorAction SilentlyContinue }",
+    "    }",
+    "}",
     "function global:claude {",
     "    $baseAgentsTarget = @(Get-Command claude -All -CommandType Application, ExternalScript -ErrorAction SilentlyContinue)[0]",
     "    if (-not $baseAgentsTarget) { Write-Error 'claude executable not found on PATH'; return }",
     "    if ($baseAgentsPython) {",
-    "        & $baseAgentsPython.Path @($baseAgentsPython.Arguments) -B -c $baseAgentsBootstrap --probe claude $baseAgentsTarget.Source (Get-Location).Path",
-    "        if ($LASTEXITCODE -eq 0) { & $baseAgentsPython.Path @($baseAgentsPython.Arguments) -B -c $baseAgentsBootstrap claude $baseAgentsTarget.Source (Get-Location).Path @args; return }",
+    "        $baseAgentsStatus = [pscustomobject]@{ Ran = $false; ExitCode = 125 }",
+    "        Invoke-BaseAgentsBootstrap -baseAgentsKind 'claude' -baseAgentsTarget $baseAgentsTarget.Source -baseAgentsProject (Get-Location).Path -baseAgentsArguments (@($args)) -baseAgentsStatus $baseAgentsStatus",
+    "        if ($baseAgentsStatus.Ran) { return }",
     "    } else { Write-Warning 'standards: no usable Python was found; running the typed CLI without refresh' }",
     "    & $baseAgentsTarget.Source @args",
     "}",
@@ -132,7 +172,7 @@ BASH_BLOCK = "\n".join((
     "_base_agents_python() {",
     "  local candidate",
     "  for candidate in python3 python; do",
-    "    command -v \"$candidate\" >/dev/null 2>&1 && \"$candidate\" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1 && { command -v \"$candidate\"; return; }",
+    "    command -v \"$candidate\" >/dev/null 2>&1 && \"$candidate\" -I -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1 && { command -v \"$candidate\"; return; }",
     "  done",
     "  return 1",
     "}",
@@ -141,8 +181,8 @@ BASH_BLOCK = "\n".join((
     "  local target python",
     "  target=$(type -P claude) || { printf '%s\\n' 'claude executable not found on PATH' >&2; return 127; }",
     "  if python=$(_base_agents_python); then",
-    "    if \"$python\" -B -c \"$_base_agents_bootstrap\" --probe claude \"$target\" \"$PWD\"; then",
-    "      if \"$python\" -B -c \"$_base_agents_bootstrap\" claude \"$target\" \"$PWD\" \"$@\"; then return 0; else return $?; fi",
+    "    if \"$python\" -I -B -c \"$_base_agents_bootstrap\" --probe claude \"$target\" \"$PWD\"; then",
+    "      if \"$python\" -I -B -c \"$_base_agents_bootstrap\" claude \"$target\" \"$PWD\" \"$@\"; then return 0; else return $?; fi",
     "    fi",
     "  else printf '%s\\n' 'standards: no usable Python was found; running the typed CLI without refresh' >&2; fi",
     "  \"$target\" \"$@\"",
