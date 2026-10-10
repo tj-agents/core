@@ -5,7 +5,7 @@
 Canonical goal: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-DependentPrBranchCleanup/plans/dependent-pr-branch-cleanup/GOAL.md
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-DependentPrBranchCleanup
 Branch: Fix/DependentPrBranchCleanup
-Base: fetched origin/main at 8b656fb197771916c58aea4418934aaa7648b1c0
+Base: synchronized origin/main at b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e (original diagnosis base 8b656fb197771916c58aea4418934aaa7648b1c0)
 PR: not opened
 Originating work-plugin session: 01a12650-0c24-7573-9dc1-d0fa28c71a6c
 
@@ -37,7 +37,7 @@ Diagnosis lane L3: missing open-BASE evidence confirmed in cleanup_proof.py and 
 
 Independent recurring sandbox setup failure: ordinary commands cannot start, including login:false. Existing isolated Fix/SandboxSetupReadFailure goal already identified upstream OpenAI ACL bug PR51822; no host repair had occurred. One renewed machine:handoff-codex submission succeeded through scoped elevated execution, launching codex-cli 0.162.0 for that existing checkout. Prompt: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-DependentPrBranchCleanup/plans/dependent-pr-branch-cleanup/sandbox-repair-followup-prompt.txt. Successor pickup was observed in the existing sandbox goal; it authenticated and staged the fixed alpha runtime and retained the concrete installation gate. No runtime installation or successful ordinary-command acceptance has been observed. This session retains dependent-PR cleanup ownership.
 
-Focused validation: the original cleanup proof run passed 21 of 22 offline cases; its sole new empty-squash fixture defect was repaired. The primary-route selection then passed all three cases (saved branch deletion, open BASE retention, default-branch refusal). The fresh-receipt current HEAD/BASE grant case and detached reaper dependency case passed. Payload invariant and instruction-file pairing passed. Additional changed-surface finish and receipt selections are running. Logs: core/.git/agent-workflow/runs/dependent-cleanup/artifacts. Fetched origin/main advanced to b4e6f10 through unrelated continuation changes; synchronize after this authored checkpoint and before final review.
+Focused validation: the original cleanup proof run passed 21 of 22 offline cases; its sole new empty-squash fixture defect was repaired. The primary-route selection then passed all three cases (saved branch deletion, open BASE retention, default-branch refusal). The fresh-receipt current HEAD/BASE grant case and detached reaper dependency case passed. Payload invariant and instruction-file pairing passed. Receipt selection passed. The changed finish surface passed 22 of 24 tests; both failing Windows offline process fixtures were repaired and their targeted rerun passed (2 tests, 27.757s). The scheduled observer now receives its test-only offline forge stub as a staged fixture resource; no production observation bypass was added. Logs: core/.git/agent-workflow/runs/dependent-cleanup/artifacts. Authored checkpoint 8538879 was synchronized with unrelated origin/main continuation changes in merge 5045210. Catalog refresh, generated refresh/check, catalog check, harness check and skill packaging all passed after correcting source-root ordering.
 
 ## Next Steps
 
@@ -46,7 +46,7 @@ Current slice: one atomic dependent-PR cleanup safety repair against origin/main
 Remaining scope: focused and required generated/harness validation, immutable independent review, exact-head Windows/Linux CI, ordinary merge, causal regeneration and safe cleanup.
 Done when: the guard is merged with all required gates and causal regeneration green, and the isolated checkout is safely retired or intentionally retained for a verified live dependency.
 
-1. Implementation lease is returned and focused defect regressions passed. Finish pending changed-surface validation, synchronize the authored checkpoint with current origin/main, and refresh/verify generated packaging.
+1. All encountered fixture and packaging failures are repaired with focused green reruns. Checkpoint those corrections, freeze the synchronized candidate, publish the draft for exact-head CI and complete independent review.
 2. Complete immutable independent review, addressing confirmed findings through a new verified checkpoint. Preserve unrelated source and other owners.
 3. Add meaningful offline regression tests for this exact safety boundary, run focused affected checks and core-required generated/harness validation, then commit the source slice and complete independent review at its immutable head. Both hosts must be covered explicitly.
 4. Publish one stable candidate through plain Git/gh, preserve current review and CI gates, normally merge when authorized and green, verify only the causal generated publication, and clean up this isolated checkout safely under the repaired dependency guard. Record the actual outcome and any real gate in this same goal. Do not ask for routine continuation approval or report launch as completion.
@@ -64,9 +64,9 @@ Done when: the guard is merged with all required gates and causal regeneration g
       "source": ".agents/engineering/workflow/merge/SKILL.md; .agents/engineering/workflow/merge/scripts/cleanup_proof.py",
       "mapping": ".agents/plugins/sources.json maps the canonical engineering scope to plugins/engineering/skills/merge plus packaged shared resources",
       "verification": {
-        "level": "planned",
-        "result": "pending",
-        "evidence": "Run offline cleanup proof primary/linked dependency regressions, shared grant regressions, and generated package tests for both host entry points before independent frozen-head review"
+        "level": "source",
+        "result": "passed",
+        "evidence": "Offline linked/primary dependency proof and fresh-receipt grant cases passed; generated host packages, catalog, harness and skill packaging checks passed. This verifies source and generated resources, not installed host adoption; independent review and exact-head CI remain."
       }
     },
     {

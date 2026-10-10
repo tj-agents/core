@@ -55,17 +55,30 @@ def git(cwd, *args):
 @unittest.skipUnless(sys.platform == "linux" or os.name == "nt", "Supported process backends")
 class FinishReaperProcessTests(unittest.TestCase):
     @staticmethod
-    def fake_gh(root):
-        directory = root / "fake-gh"
+    def offline_forge_environment(root, environment):
+        directory = root / "offline-forge"
         directory.mkdir()
-        if os.name == "nt":
-            command = directory / "gh.cmd"
-            command.write_text("@echo off\r\necho []\r\n", encoding="utf-8")
-        else:
-            command = directory / "gh"
-            command.write_text("#!/bin/sh\nprintf '[]\\n'\n", encoding="utf-8")
-            command.chmod(0o755)
-        return directory
+        (directory / "sitecustomize.py").write_text(
+            "import subprocess\n"
+            "_run = subprocess.run\n"
+            "def _offline_run(arguments, *args, **kwargs):\n"
+            "    if isinstance(arguments, (list, tuple)) and arguments[:3] == ['gh', 'pr', 'list']:\n"
+            "        return subprocess.CompletedProcess(arguments, 0, '[]', '')\n"
+            "    return _run(arguments, *args, **kwargs)\n"
+            "subprocess.run = _offline_run\n"
+            "import shutil\n"
+            "_copy2 = shutil.copy2\n"
+            "def _offline_copy(source, destination, *args, **kwargs):\n"
+            "    copied = _copy2(source, destination, *args, **kwargs)\n"
+            "    if str(source).endswith('cleanup_dependency.py'):\n"
+            "        with open(destination, 'a', encoding='utf-8') as handle:\n"
+            "            handle.write(\"\\ndef observe_open_prs(branch, repo=None, cwd=None, fixture=None):\\n    return {'head': [], 'base': []}\\n\")\n"
+            "    return copied\n"
+            "shutil.copy2 = _offline_copy\n",
+            encoding="utf-8",
+        )
+        environment["PYTHONPATH"] = str(directory) + os.pathsep + environment.get("PYTHONPATH", "")
+        return environment
 
     def test_armed_observer_waits_for_exit_then_removes_worktree_and_obligation(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -82,12 +95,11 @@ class FinishReaperProcessTests(unittest.TestCase):
             obligation = state / "merge-cleanup/obligations/one.json"; obligation.parent.mkdir(parents=True); obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
             host = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=worktree)
             started = self.process_started_at(host.pid)
-            result = state / "merge-cleanup/results/result.json"; env = dict(
+            result = state / "merge-cleanup/results/result.json"; env = self.offline_forge_environment(root, dict(
                 os.environ,
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
-                PATH=str(self.fake_gh(root)) + os.pathsep + os.environ.get("PATH", ""),
-            )
+            ))
             invocation_id = "integration-invocation"
             observer = subprocess.Popen([
                 sys.executable, str(REAPER), "--host-pid", str(host.pid),
@@ -120,9 +132,10 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertTrue(worktree.exists())
                 self.assertTrue(obligation.exists())
                 host.terminate(); host.wait(5); observer.wait(10)
-                self.assertFalse(worktree.exists())
+                final = json.loads(result.read_text(encoding="utf-8"))
+                self.assertEqual("succeeded", final["status"], final)
+                self.assertFalse(worktree.exists(), final)
                 self.assertFalse(obligation.exists()); self.assertEqual(1, subprocess.run(["git", "-C", str(primary), "show-ref", "--verify", "--quiet", "refs/heads/feature"]).returncode)
-                self.assertEqual("succeeded", json.loads(result.read_text(encoding="utf-8"))["status"])
             finally:
                 if host.poll() is None:
                     host.kill()
@@ -143,14 +156,13 @@ class FinishReaperProcessTests(unittest.TestCase):
             (worktree / "base").write_text("base\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(worktree), "add", "."], check=True)
             subprocess.run(["git", "-C", str(worktree), "commit", "-q", "-m", "base"], check=True)
-            env = dict(
+            env = self.offline_forge_environment(root, dict(
                 os.environ,
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_CLI_HOST_NAMES=host_name,
                 AGENT_FINISH_CLOSE_MODE="process",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
-                PATH=str(self.fake_gh(root)) + os.pathsep + os.environ.get("PATH", ""),
-            )
+            ))
             host = subprocess.Popen([
                 str(host_executable), "-c",
                 "import os, subprocess, sys, time; "
@@ -220,14 +232,13 @@ class FinishReaperProcessTests(unittest.TestCase):
             obligation = state / "merge-cleanup/obligations/ours.json"
             obligation.parent.mkdir(parents=True)
             obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
-            env = dict(
+            env = self.offline_forge_environment(root, dict(
                 os.environ,
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_CLI_HOST_NAMES=host_name,
                 AGENT_FINISH_CLOSE_MODE="process",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
-                PATH=str(self.fake_gh(root)) + os.pathsep + os.environ.get("PATH", ""),
-            )
+            ))
             host = subprocess.Popen([
                 str(host_executable), "-c",
                 "import os, subprocess, sys, time; "
@@ -258,7 +269,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                     if result.get("status") in {"succeeded", "branch-preserved", "failed"}:
                         break
                     time.sleep(.05)
-                self.assertEqual("succeeded", result["status"])
+                self.assertEqual("succeeded", result["status"], result)
                 self.assertTrue(result["session_exited"])
                 self.assertFalse(worktree.exists())
                 self.assertFalse(obligation.exists())
