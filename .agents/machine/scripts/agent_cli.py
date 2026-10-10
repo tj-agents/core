@@ -272,7 +272,7 @@ def sync_claude_standards(working_directory, claude=None, out=print):
     if script is None:
         out('standards: claude_standards_sync.py was not found; this session loads the installed plugins')
         return
-    arguments = [sys.executable, '-B', str(script), '--project', str(working_directory)]
+    arguments = [sys.executable, '-I', '-B', str(script), '--project', str(working_directory)]
     if claude:
         arguments += ['--claude', str(claude)]
     try:

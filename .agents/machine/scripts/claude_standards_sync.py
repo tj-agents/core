@@ -438,7 +438,7 @@ def apply_harness_permissions(run=subprocess.run) -> None:
         return
     try:
         run(
-            [sys.executable, "-B", str(script), "--apply"],
+            [sys.executable, "-I", "-B", str(script), "--apply"],
             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
         )
     except Exception:  # noqa: BLE001

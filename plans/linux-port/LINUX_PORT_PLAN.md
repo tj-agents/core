@@ -82,13 +82,15 @@ implementation scope for this slice.
 
 The primary acknowledged the handoff and completed bounded L3 discovery. Native L4 implementation
 uses the canonical Codex lane table. Independent review found five
-confirmed defects; all five are repaired. Final local validation passed 1,000 source tests (17 skips)
-and 1,001 hook tests (four skips), plus generated-tree, catalog, harness and tier checks. Fresh
-incremental review and Windows/Linux CI remain before delivery. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
+confirmed defects; all five are repaired. Final local validation passed 1,001 source tests (17 skips)
+and 1,001 hook tests (four skips), plus generated-tree, catalog, harness and tier checks. The completed incremental review found one further maintenance-child isolation defect; that repair is
+complete and both full suites passed again. Real packaged session fixtures cover maintenance and
+permission convergence under hostile PYTHONPATH while preserving native CLI environment. Fresh review
+and Windows/Linux CI remain before delivery. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
 solely to satisfy a separate ledger's graph requirements.
 
-The current cutover includes 26 authored paths in the trunk diff, including
-321 retired PowerShell runtime lines and 412 retired PowerShell test lines; generated output is excluded.
+The current cutover includes 28 authored paths in the trunk diff, including
+320 retired PowerShell runtime lines and 412 retired PowerShell test lines; generated output is excluded.
 Separate Claude/Codex ports could be shipped, but the user explicitly selected one reviewed PR per step.
 Keep this exception focused on the one shared profile/bootstrap/dispatch contract, validate actual shell
 integration, and include independent correctness/security review plus Windows/Linux CI. No additional
@@ -142,7 +144,7 @@ next substantive PR, with no separate Step 5 metadata PR.
       "verification": {
         "level": "source",
         "result": "passed",
-            "evidence": "41 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1000 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
+            "evidence": "42 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1001 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     },
     {
@@ -153,7 +155,7 @@ next substantive PR, with no separate Step 5 metadata PR.
       "verification": {
         "level": "source",
         "result": "passed",
-            "evidence": "41 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1000 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
+            "evidence": "42 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1001 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     }
   ]
@@ -165,12 +167,15 @@ next substantive PR, with no separate Step 5 metadata PR.
 Independent full review of `fa5f7f3def036948fa30823adb6d31e2c1f72022` completed at
 `reviews/Refactor-LinuxTerminalStartHooks.md`: three HIGH and two MEDIUM findings require repair
 (import isolation, profile modes, PowerShell shims/arguments, and hook-control interpreter selection).
-The native reviewer and independent security/workflow lenses ran; parent verified evidence.
+The native reviewer and independent security/workflow lenses ran; parent verified evidence. Incremental
+review through `5301acfa8e40edcf0c2983ede33cbade36e35937` confirmed one further HIGH maintenance-child
+isolation finding. The parent reproduced hostile PYTHONPATH startup in both hosts; all maintenance
+children now use isolated Python, with real packaged-session and permissions-convergence coverage.
 
 ## Next Steps
 
-All five confirmed Step 4 findings are repaired and both complete local suites passed. Independently
-review the fixing delta before publishing it for Windows/Linux CI in the primary
+All six confirmed findings are repaired and both full local suites passed. Independently review the
+maintenance-isolation repair before publishing for Windows/Linux CI in the primary
 checkout `/home/tommy/projects/tj-agents/core`, branch `Refactor/LinuxTerminalStartHooks`. Its successor
 owns Step 7 only after Step 4 lands. Do not implement Steps 7 or 10 in this session. The whole port
 remains authorized one reviewed PR per step.
