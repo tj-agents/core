@@ -28,6 +28,12 @@ Each host skill entry point references one canonical definition under `.agents/`
 host-specific metadata or invocation mechanics required by that host. A host difference must be explicit;
 shared prose returns to `.agents/`.
 
+A host entry point repeats its canonical definition's name, description, kind and domain verbatim and has
+the fixed reference body; generation fails when either drifts. An entry point listed in
+`extended_host_adapters` in `.agents/plugins/sources.json` is the explicit exception: it may word its
+description and body for its host, generation checks only its name, kind, domain and single canonical
+reference, and its description is reviewed by hand whenever the canonical description changes.
+
 ## Distribution output
 
 `plugins/*` contains generated installable payloads. The build assembles canonical `.agents/` definitions,
