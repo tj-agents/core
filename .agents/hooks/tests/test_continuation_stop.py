@@ -105,7 +105,7 @@ class ContinuationStopTests(unittest.TestCase):
              patch.object(continuation_stop, "observed_wake", return_value=True):
             self.assertIn("Register and enable", self.call())
 
-    def test_scheduler_receipt_requires_matching_enabled_task_action(self):
+    def test_scheduler_receipt_uses_shared_read_only_verifier(self):
         owner = self.owner()
         path = self.root / ".agents/continuation/owner.json"
         path.parent.mkdir(parents=True)
@@ -115,25 +115,13 @@ class ContinuationStopTests(unittest.TestCase):
             "arguments": "wake", "helper": "helper", "python": "python", "script": "script",
         }
         (path.parent / "scheduler.json").write_text(json.dumps(receipt), encoding="utf-8")
-        task = {"TaskName": "task", "TaskPath": "\\", "State": "Ready", "Description": "owner",
-                "Actions": [{"Execute": "powershell.exe", "Arguments": "wake", "WorkingDirectory": str(self.root)}],
-                "Triggers": [{"Enabled": True}], "Enabled": True}
-        with patch.object(continuation_stop, "WINDOWS", True), \
-             patch.object(continuation_stop.subprocess, "run", return_value=Mock(returncode=0, stdout=json.dumps(task))):
+        verifier = Mock()
+        verifier.verify_receipt.return_value = True
+        with patch.object(continuation_stop, "module", return_value=verifier):
             self.assertTrue(continuation_stop.scheduler_ready(path, owner, self.root.resolve()))
-            for changed in (
-                {"State": "Disabled"},
-                {"Actions": []},
-                {"Actions": [{"Execute": "wrong", "Arguments": "wake", "WorkingDirectory": str(self.root)}]},
-                {"Triggers": []},
-            ):
-                with self.subTest(changed=changed):
-                    candidate = dict(task, **changed)
-                    continuation_stop.subprocess.run.return_value = Mock(returncode=0, stdout=json.dumps(candidate))
-                    self.assertFalse(continuation_stop.scheduler_ready(path, owner, self.root.resolve()))
-        receipt["owner_id"] = "foreign"
-        (path.parent / "scheduler.json").write_text(json.dumps(receipt), encoding="utf-8")
-        self.assertFalse(continuation_stop.scheduler_ready(path, owner, self.root.resolve()))
+        verifier.verify_receipt.return_value = False
+        with patch.object(continuation_stop, "module", return_value=verifier):
+            self.assertFalse(continuation_stop.scheduler_ready(path, owner, self.root.resolve()))
 
     def test_observed_wake_requires_this_owner(self):
         owner = self.owner()
