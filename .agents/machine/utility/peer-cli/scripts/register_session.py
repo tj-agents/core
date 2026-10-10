@@ -104,6 +104,7 @@ def _windows_process_table():
     TH32CS_SNAPPROCESS = 0x00000002
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     INVALID_HANDLE_VALUE = -1
+    ERROR_NO_MORE_FILES = 18
 
     class PROCESSENTRY32W(ctypes.Structure):
         _fields_ = [
@@ -165,7 +166,10 @@ def _windows_process_table():
     table = {}
     try:
         if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
-            return table
+            error = ctypes.get_last_error()
+            if error == ERROR_NO_MORE_FILES:
+                return table
+            raise OSError(error, "cannot enumerate the process table")
         while True:
             pid = int(entry.th32ProcessID)
             table[pid] = ProcessInfo(
@@ -175,7 +179,10 @@ def _windows_process_table():
                 started_at=started_at(pid),
             )
             if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
-                break
+                error = ctypes.get_last_error()
+                if error == ERROR_NO_MORE_FILES:
+                    break
+                raise OSError(error, "cannot enumerate the process table")
     finally:
         kernel32.CloseHandle(snapshot)
     return table
@@ -227,8 +234,8 @@ def _parse_ps_lstart(text):
 
     try:
         return datetime.datetime.strptime(text.strip(), "%a %b %d %H:%M:%S %Y").timestamp()
-    except ValueError:
-        return None
+    except ValueError as error:
+        raise ValueError("malformed ps process start time") from error
 
 
 def _ps_lookup(pid):
@@ -239,20 +246,22 @@ def _ps_lookup(pid):
             ["ps", "-o", "ppid=,comm=,lstart=", "-p", str(pid)],
             capture_output=True, text=True, timeout=2, check=False,
         )
-    except (OSError, subprocess.SubprocessError):
-        return None
+    except (OSError, subprocess.SubprocessError) as error:
+        raise OSError("ps process lookup failed") from error
     if result.returncode != 0:
-        return None
+        if not result.stdout.strip() and not result.stderr.strip():
+            return None
+        raise OSError("ps process lookup failed: " + result.stderr.strip())
     line = result.stdout.strip()
     if not line:
         return None
     parts = line.split(None, 2)
     if len(parts) < 3:
-        return None
+        raise ValueError("malformed ps process identity")
     try:
         ppid = int(parts[0])
-    except ValueError:
-        return None
+    except ValueError as error:
+        raise ValueError("malformed ps parent pid") from error
     return ProcessInfo(pid=pid, ppid=ppid, name=parts[1], started_at=_parse_ps_lstart(parts[2]))
 
 

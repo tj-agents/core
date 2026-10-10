@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -181,6 +182,23 @@ class MainTests(unittest.TestCase):
 
     def test_main_returns_zero_on_non_object_json(self):
         self.assertEqual(self._run_main_with_stdin("[1, 2, 3]"), 0)
+
+
+class ProcessLookupSafetyTests(unittest.TestCase):
+    def test_ps_distinguishes_missing_process_from_inspection_failures(self):
+        missing = mock.Mock(returncode=1, stdout="", stderr="")
+        denied = mock.Mock(returncode=1, stdout="", stderr="permission denied")
+        with mock.patch("subprocess.run", return_value=missing):
+            self.assertIsNone(register_session._ps_lookup(101))
+        with mock.patch("subprocess.run", return_value=denied):
+            with self.assertRaises(OSError):
+                register_session._ps_lookup(101)
+
+    def test_ps_rejects_malformed_identity_instead_of_reporting_absence(self):
+        malformed = mock.Mock(returncode=0, stdout="not-a-pid codex now", stderr="")
+        with mock.patch("subprocess.run", return_value=malformed):
+            with self.assertRaises(ValueError):
+                register_session._ps_lookup(101)
 
 
 if __name__ == "__main__":
