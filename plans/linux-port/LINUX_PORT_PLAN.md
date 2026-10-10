@@ -93,14 +93,17 @@ what still needs checking on Windows.
   suite passed 1,046 tests (18 skips), and complete `.agents/hooks/tests/` suite passed 1,030 tests
   (4 skips), both with Python bytecode writes disabled. Generated plugin/catalog output was restored.
   Workflow artifacts are under `.git/agent-workflow/runs/linux-platform-instructions/`.
-- Review: first docs pass found and fixed the Windows launcher examples and Markdown audit count. The
-  incremental pass approved the fixing head `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`; see
-  `reviews/Refactor-LinuxPlatformInstructions.md`. PR not opened.
+- Review: the first docs pass reviewed `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e` through
+  `838990937acc9f1d39d9799471a8b6293e159183`; its Windows command and audit-count findings were fixed.
+  The remediation pass approved the source candidate at `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`.
+  Later plan checkpoints receive their own incremental review before publication. PR not opened.
 - Step 10 slice assessment: one independent final-step PR from `origin/main` at
-  `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e`, with no stack dependency. The measured candidate is 32
-  authored files, 185 insertions and 146 deletions; it contains platform-qualified instruction text and
-  this plan, with no runtime code or generated output. Its verification gate is the generated-tree check,
-  both complete Python suites, fresh docs review, and exact-head Windows/Linux CI. The PR is not opened.
+  `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e`, with no stack dependency. The reviewed source candidate at
+  `0dbaa9adb801dd0173f1e30c5d59249574dd0a79` contains 32 authored files, 185 insertions and 146
+  deletions; it contains platform-qualified instruction text and the plan, with no runtime code or
+  generated output. This later plan-only checkpoint is reviewed as a separate delta. Its verification gate
+  is the generated-tree check, both complete Python suites, fresh docs review, and exact-head Windows/Linux
+  CI. The PR is not opened.
 
 Step 7 [#186](https://github.com/tj-agents/core/pull/186) is delivered. Reviewed head
 `66dcb2f054bdcf9a6ce67d85c3463faba3eccb21`, merge `9209cce2c4c03eeba81ec9fde88c10d1354673c5`;
@@ -185,11 +188,12 @@ Step 10 requires its own fresh review/work order; never carry Step 7's watermark
 
 ## Next Steps
 
-The Step 10 source audit, local checks and fresh docs review are complete. Findings were fixed in commits
-`d1a7679` and `0dbaa9a`; the clean incremental review is approved at `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`.
-Push this stable source candidate from `Refactor/LinuxPlatformInstructions` and open its one Step 10 PR.
-Keep generated `plugins/` and catalog output out of the PR. Require exact-head Windows/Linux CI, perform the
-authorized ordinary merge, and verify only the merge's causal generated publication before plan closeout.
+The Step 10 source audit and local checks are complete. Findings were fixed in commits `d1a7679` and
+`0dbaa9a`; the source candidate's incremental review approved `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`.
+Complete incremental review of this later plan checkpoint. Once the final branch head is approved, push
+that exact head and open the one Step 10 PR from `Refactor/LinuxPlatformInstructions`. Keep generated
+`plugins/` and catalog output out of the PR. Require exact-head Windows/Linux CI, perform the authorized
+ordinary merge, and verify only the merge's causal generated publication before plan closeout.
 
 Lane: L5, because the remaining instruction and test-reference cleanup is already decided and mechanical.
 Route any necessary runtime implementation judgment through L4; keep this one Step 10 slice focused.
