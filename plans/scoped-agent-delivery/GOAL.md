@@ -18,9 +18,9 @@ The originating Rust discovery and twelve-repository authorization rollout remai
 - Implementation: completed by `/root/implement_scoped_agent_delivery`
 - Review and delivery owner: originating `/root` session
 
-The original reviewed source delta contained eight paths: the two shared merge gates, their two focused test modules, the Codex engineering hook manifest, the engineering harness declaration, the Codex Windows hook-command tests, and this goal. The current candidate delta against `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05` also contains eight authored paths. `.agents/delivery-authorization.json` is already present on that base and is inherited published content, not an added path in this candidate. Generated `plugins/*` output and `.agents/catalog/catalog.json` remain uncommitted under core's source-only convention.
+The original reviewed source delta contained eight paths: the two shared merge gates, their two focused test modules, the Codex engineering hook manifest, the engineering harness declaration, the Codex Windows hook-command tests, and this goal. The current candidate delta against `3f06c88636ebb77fad3909ecfb367f0c3f50011c` also contains eight authored paths. `.agents/delivery-authorization.json` is already present on that base and is inherited published content, not an added path in this candidate. Generated `plugins/*` output and `.agents/catalog/catalog.json` remain uncommitted under core's source-only convention.
 
-The original review artifact records complete approval and matching review and security watermarks at source head `3bda8e91428216c1a7321e05382877682860454c`; those review identities remain historical. Since that review, the branch was normally integrated with `origin/main` through `29827dfcfd81e7d59c75d9bf179c90e4d15dbdc8`, which contains the already-reviewed core #174 policy landing, and then with current `origin/main` commit `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`. Parent corrective review identified SD-01 and SD-02 in the canonical review artifact; their source and goal corrections are now recorded in this working tree, and fresh review/reconciliation of the exact candidate is pending. No PR has been opened.
+The original review artifact records complete approval and matching review and security watermarks at source head `3bda8e91428216c1a7321e05382877682860454c`; those review identities remain historical. Since that review, the branch was normally integrated with `origin/main` through `29827dfcfd81e7d59c75d9bf179c90e4d15dbdc8`, which contains the already-reviewed core #174 policy landing, then with `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`, and then with merged core #175 at `3f06c88636ebb77fad3909ecfb367f0c3f50011c`. #175's generic Claude-and-Codex coverage enforcement is inherited upstream; this goal retains its scoped native-gate implementation and does not absorb that workstream. Parent corrective review identified SD-01 and SD-02 in the canonical review artifact; their source and goal corrections are now recorded in this working tree, and fresh review/reconciliation of the exact candidate is pending. No PR has been opened.
 
 ## Completed source slice
 
@@ -31,7 +31,7 @@ The original review artifact records complete approval and matching review and s
 
 ## Verification and review
 
-The completed independent review is recorded at `3bda8e91428216c1a7321e05382877682860454c`; it approved the source candidate and found no changed-line defects. After the `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05` integration, Windows source revalidation passed: 83 merge-review cases with one platform skip, 32 persistent-workflow cases with seven POSIX-shim skips, Codex Windows hook commands (3), hook-launch budget (4), engineering hooks (13), harness manifests (13), Codex hook snapshots (10 with four skips), and source layout (20). Catalog digest, generated-output, harness-manifest, and generated-path checks also passed after refreshing generated outputs locally.
+The completed independent review is recorded at `3bda8e91428216c1a7321e05382877682860454c`; it approved the source candidate and found no changed-line defects. After the `3f06c88636ebb77fad3909ecfb367f0c3f50011c` integration, Windows source revalidation passed: 83 merge-review cases with one platform skip, 32 persistent-workflow cases with seven POSIX-shim skips, Codex Windows hook commands (3), harness manifests (13), host-coverage validation (9), and workflow operations (86). The shipped host-coverage validator accepts this goal's single plan-stage record. Paired-instruction, catalog-digest, generated-output, harness-manifest, and generated-path checks also passed after refreshing generated outputs locally.
 
 The reviewed tree intentionally contains pre-regeneration catalog metadata; the frozen CI workflow regenerates catalog digests and packages before verification. Exact-head Windows and Linux CI remain pending. Installed-profile activation remains unverified. Source and package checks describe source coverage only.
 
@@ -50,7 +50,7 @@ The reviewed tree intentionally contains pre-regeneration catalog metadata; the 
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Windows shared gate suites passed: merge-review 83 cases (one platform skip) and persistent-workflow 32 cases (seven POSIX-shim skips). Manifest, harness, package and required generation checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
+        "evidence": "After the 3f06c88636ebb77fad3909ecfb367f0c3f50011c integration, Windows shared gate suites passed: merge-review 83 cases (one platform skip) and persistent-workflow 32 cases (seven POSIX-shim skips). Harness manifests (13), host-coverage validation (9), paired instructions, catalog, generation, and generated-path checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
       }
     },
     {
@@ -61,7 +61,7 @@ The reviewed tree intentionally contains pre-regeneration catalog metadata; the 
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Windows shared gate suites passed: merge-review 83 cases (one platform skip) and persistent-workflow 32 cases (seven POSIX-shim skips). The affected Codex Windows hook-command and budget checks, manifest, harness, package and required generation checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
+        "evidence": "After the 3f06c88636ebb77fad3909ecfb367f0c3f50011c integration, Windows shared gate suites passed: merge-review 83 cases (one platform skip) and persistent-workflow 32 cases (seven POSIX-shim skips). Codex Windows hook commands (3), harness manifests (13), host-coverage validation (9), paired instructions, catalog, generation, and generated-path checks passed. Exact-head Linux CI is pending; installed-profile activation is unverified."
       }
     }
   ]
