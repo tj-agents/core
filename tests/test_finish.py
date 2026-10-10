@@ -458,6 +458,136 @@ class WindowsWrapperSafetyTests(unittest.TestCase):
             table.assert_not_called()
 
 
+class WindowsObserverTaskTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="peer cli & xml ")
+        self.addCleanup(self.temporary.cleanup)
+        self.state = Path(self.temporary.name) / "state & xml"
+        self.original_state = os.environ.get("AGENT_STATE_DIRECTORY")
+        os.environ["AGENT_STATE_DIRECTORY"] = str(self.state)
+        self.addCleanup(self.restore_state)
+        self.platform = mock.patch.object(
+            session_close, "os", SimpleNamespace(
+                name="nt", environ=os.environ, fdopen=os.fdopen, close=os.close,
+            ),
+        )
+        self.platform.start()
+        self.addCleanup(self.platform.stop)
+
+    def restore_state(self):
+        if self.original_state is None:
+            os.environ.pop("AGENT_STATE_DIRECTORY", None)
+        else:
+            os.environ["AGENT_STATE_DIRECTORY"] = self.original_state
+
+    @staticmethod
+    def completed(returncode=0, stdout="", stderr=""):
+        return SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+
+    @staticmethod
+    def windows_arguments(command_line):
+        arguments = []
+        index = 0
+        while index < len(command_line):
+            while index < len(command_line) and command_line[index] in " \t":
+                index += 1
+            if index == len(command_line):
+                break
+            argument = []
+            quoted = False
+            while index < len(command_line):
+                if command_line[index] in " \t" and not quoted:
+                    break
+                slashes = 0
+                while index < len(command_line) and command_line[index] == "\\":
+                    slashes += 1
+                    index += 1
+                if index < len(command_line) and command_line[index] == '"':
+                    argument.append("\\" * (slashes // 2))
+                    if slashes % 2:
+                        argument.append('"')
+                        index += 1
+                    elif quoted and index + 1 < len(command_line) and command_line[index + 1] == '"':
+                        argument.append('"')
+                        index += 2
+                    else:
+                        quoted = not quoted
+                        index += 1
+                else:
+                    argument.append("\\" * slashes)
+                    if index < len(command_line):
+                        argument.append(command_line[index])
+                        index += 1
+            arguments.append("".join(argument))
+        return arguments
+
+    def test_long_special_arguments_register_as_a_structured_exec_action(self):
+        arguments = [
+            "--worktree", "C:\\a space\\<project>&\\quoted\"value",
+            "--proof", "x" * 600,
+        ]
+        calls = []
+        task_xml = {}
+
+        def scheduler(arguments, **kwargs):
+            calls.append((arguments, kwargs))
+            if arguments[0] == "whoami.exe":
+                return self.completed(stdout='"EXAMPLE\\A�da","S-1-5-21-123-456-789-1001"\r\n')
+            if arguments[1] == "/create":
+                task_xml["path"] = Path(arguments[arguments.index("/xml") + 1])
+                task_xml["contents"] = task_xml["path"].read_bytes()
+            return self.completed()
+
+        with mock.patch.object(session_close.subprocess, "run", side_effect=scheduler):
+            self.assertIsNone(session_close.start_observer(arguments))
+
+        namespace = {"task": session_close.TASK_SCHEDULER_NAMESPACE}
+        task = session_close.ET.fromstring(task_xml["contents"])
+        execute = task.find("task:Actions/task:Exec", namespace)
+        self.assertIsNotNone(execute)
+        executable = execute.findtext("task:Command", namespaces=namespace)
+        encoded_arguments = execute.findtext("task:Arguments", namespaces=namespace)
+        working_directory = execute.findtext("task:WorkingDirectory", namespaces=namespace)
+        self.assertEqual(sys.executable, executable)
+        self.assertGreater(len(encoded_arguments), 262)
+        decoded_arguments = self.windows_arguments(encoded_arguments)
+        self.assertTrue(decoded_arguments[0].endswith("finish_reaper.py"))
+        self.assertEqual(arguments, decoded_arguments[1:])
+        self.assertEqual(str(self.state), working_directory)
+        self.assertEqual("S-1-5-21-123-456-789-1001", task.findtext("task:Principals/task:Principal/task:UserId", namespaces=namespace))
+        self.assertEqual("PT0S", task.findtext("task:Settings/task:ExecutionTimeLimit", namespaces=namespace))
+        self.assertEqual(["whoami.exe", "/user", "/fo", "csv", "/nh"], calls[0][0])
+        self.assertEqual("InteractiveToken", task.findtext("task:Principals/task:Principal/task:LogonType", namespaces=namespace))
+        self.assertFalse(task_xml["path"].exists())
+        create = calls[1][0]
+        self.assertEqual(["schtasks.exe", "/create", "/tn"], create[:3])
+        self.assertIn("/xml", create)
+        self.assertNotIn("/tr", [part.casefold() for part in create])
+        self.assertEqual(["schtasks.exe", "/run"], calls[2][0][:2])
+        self.assertEqual(["schtasks.exe", "/delete"], calls[3][0][:2])
+
+    def test_registration_refusal_reports_scheduler_output_and_removes_task_and_xml(self):
+        calls = []
+        task_xml = {}
+
+        def scheduler(arguments, **kwargs):
+            calls.append(arguments)
+            if arguments[0] == "whoami.exe":
+                return self.completed(stdout='"EXAMPLE\\A�da","S-1-5-21-123-456-789-1001"\r\n')
+            if arguments[1] == "/create":
+                task_xml["path"] = Path(arguments[arguments.index("/xml") + 1])
+                return self.completed(returncode=5, stderr="ERROR: Access is denied.")
+            return self.completed()
+
+        with mock.patch.object(session_close.subprocess, "run", side_effect=scheduler), \
+                self.assertRaisesRegex(session_close.Refusal, "create.*exit 5.*Access is denied"):
+            session_close.start_observer(["--result", "C:\\result.json"])
+
+        self.assertFalse(task_xml["path"].exists())
+        self.assertEqual(["whoami.exe", "schtasks.exe", "schtasks.exe"], [call[0] for call in calls])
+        self.assertEqual("/delete", calls[-1][1])
+
+
 class ObserverHandshakeTests(unittest.TestCase):
     def test_startup_record_requires_spawned_reaper_and_exact_binding(self):
         worktree = str(Path("/tmp/worktree").resolve())

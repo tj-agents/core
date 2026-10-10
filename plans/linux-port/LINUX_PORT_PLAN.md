@@ -74,53 +74,33 @@ what still needs checking on Windows.
 
 ## Current progress
 
-Step 5 is owned by `Refactor/LinuxPeerCli` in the primary checkout; PR not opened. The implementation
-worker uses L4 from the canonical Codex table through the native CLI. The parent uses L3 for the
-remaining bounded terminal/cleanup investigation. A disposable Linux Git check confirmed that a linked
-worktree can be removed while a live process retains its cwd there; Linux permits immediate removal, but the shared observer waits for verified exit before cleanup
-on both platforms so a failed terminal close cannot race deletion.
+Step 5 owns PR #181 (`Refactor/LinuxPeerCli`) in the linked checkout
+`/home/tommy/projects/tj-agents/core/.worktrees/LinuxPeerCliProof`. The originating session retains the
+whole goal from the primary checkout. The real native merge/finish acceptance session is not launched.
+The user requires one PR for this step; its 40 authored paths keep the shared closure, terminal identity,
+observer, callers and host grants atomic. Generated output remains uncommitted.
 
-Step 5 implementation and direct caller/permission migration are committed. Actual terminal inventories,
-stale-tab/title controls, Windows settings configuration, full observer binding/cancellation, Windows
-wrapper qualification and unknown-owner recovery are implemented. Disposable close/finish process cases
-execute on Linux and Windows; real Windows UI Automation remains unverified locally.
-Local validation passes: 946 source/package tests (16 skips), 985 shared runtime tests (three skips),
-generated-tree check, tier payloads, catalog digests and harness declarations. Generated output restored.
-Full native/security review identified one stale-tab ownership defect; the small repair requires the
-recorded kitty window or tmux pane even when another tab has the same title. Its focused 30-test
-checkpoint passes. Remaining: fresh incremental review, Windows/Linux CI and the real merged-session
-acceptance.
-Step 5 remains unchecked until acceptance succeeds. Although Linux permits removal before exit, cleanup
-follows verified exit so a failed close cannot race deletion; the observer already owns that exit check.
+The Python lifecycle and terminal/orphan ports are implemented and reviewed. Local suites at
+`5f9f2e4d7e9925307007b57fea6399349dc880ee` passed: 961 source/package tests (17 skips), 990 shared runtime
+tests (four skips), generated-tree, catalog, tier and harness checks. Native and fresh process-safety
+reviews are complete in `reviews/Refactor-LinuxPeerCli.md`. Linux CI passed. Windows CI first caught an
+undefined wrapper-identity helper and a POSIX-only handshake fixture; those were repaired, including
+Windows wrapper coverage that runs on Linux. Replacement run 38059655193 still fails the two real
+close/finish entrypoint cases because Task Scheduler rejects detached observer registration. The bounded native L4 worker repaired
+startup with scheduler XML separating executable, arguments and working directory. Current-user SID,
+bounded diagnostics and focused cross-platform lifecycle coverage are included. All 19 lifecycle tests
+pass locally. The parent owns fresh review, full validation, replacement CI and delivery; the native
+implementation lane is available and was used.
+Windows desktop UI Automation remains unverified locally.
 
-Delivery slice: all Step 5 Python replacements, terminal handlers, registry identity, orphan recovery,
-cleanup-gate commands, matching machine harness permissions and regression tests, based on
-`b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`.
-The shared finish/close/observer/caller cutover stays atomic to preserve cleanup and exit guarantees.
-Scope assessment at `5d96fcb`: 40 changed paths; runtime 1,834 added/1,866 deleted lines in 18 paths;
-tests 958 added/2,659 deleted in 12 paths; guidance/permissions 153 added/116 deleted in 10 paths.
-Generated output is excluded. Most deleted test lines retire the PowerShell suites with their scripts.
-The user explicitly requires one PR for Step 5. Splitting shared closure from peer terminal resolution
-would split their common process/terminal identity API; splitting callers or permission grants from
-script deletion would leave cleanup unavailable; splitting test retirement would leave CI invoking
-deleted scripts. The independent configurator and orphan changes would normally be separate slices,
-but are existing Step 5 behavior the user included in this one-PR port. No further concern is admitted.
-The orphan repair adds 119 runtime lines and 82 test lines, removing 27 runtime lines, without adding a
-new concern or generated output. Verification requires both Python suites,
-generated-tree checks, Windows/Linux CI, and a real merged Linux session closing its own tab.
-The machine harness grants now reference the Python replacements; review that permission boundary
-explicitly before delivery.
-The workflow helper needs explicit canonical skill paths, for example
-`--lifecycle plan-execution=.agents/engineering/workflow/plan-execution/SKILL.md`;
-its default `.agents/skills/` lookup predates the source-layout migration.
+A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
+its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
+race deletion; it already owns that exit check. Step 5 remains unchecked until the real merged CLI closes
+its own kitty tab through argument-free `finish.py`, and the parent verifies session exit plus worktree,
+branch and matching obligation removal. Causal post-merge regeneration must also succeed.
 
-Shared library merged (#106, after the interim path fix #105). Kitty configured. Steps merged: 1 (#107),
-2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
-(#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). #166 makes the cross-platform direction a written
-convention in `CODE_CONVENTIONS.md`, labels `peer-cli` Windows-only, and adds step 10 for the rest of the
-shipped instructions. Step 3b `handoff-codex` merged as #137; step 3 complete, verified by a real Codex
-tab opened on this machine from the Python launcher right after the merge (new kitty tab, native
-`codex-cli` resolved and launched, handoff receipt printed).
+Previously merged: shared library #106, steps 1 #107, 2 #108, 3 #120/#137, 6 #125, 8 #160 and 9 #162.
+Step 3's native Codex handoff was verified in kitty. Step 4, then 7 and 10 remain after Step 5.
 
 ## Agent-host coverage
 
@@ -137,7 +117,7 @@ tab opened on this machine from the Python launcher right after the merge (new k
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Full source/package suite: 946 tests, 16 skips; shared runtime suite: 985 tests, 3 skips; synchronized affected source suite: 139 tests, 7 skips; affected workflow runtime: 86 tests. Harness mappings and Python lifecycle fixtures cover both hosts. Installed-host acceptance remains pending the real Linux merge and Windows CI."
+        "evidence": "Latest reviewed-head Linux source suite: 961 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
       }
     },
     {
@@ -148,7 +128,7 @@ tab opened on this machine from the Python launcher right after the merge (new k
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Full source/package suite: 946 tests, 16 skips; shared runtime suite: 985 tests, 3 skips; synchronized affected source suite: 139 tests, 7 skips; affected workflow runtime: 86 tests. Harness mappings and Python lifecycle fixtures cover both hosts. Installed-host acceptance remains pending the real Linux merge and Windows CI."
+        "evidence": "Latest reviewed-head Linux source suite: 961 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
       }
     }
   ]

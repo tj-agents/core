@@ -1,5 +1,6 @@
 """Shared verified-session and cleanup primitives for peer-cli (Python 3.9+)."""
 
+import csv
 import json
 import math
 import os
@@ -10,6 +11,7 @@ import sys
 import tempfile
 import time
 import uuid
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import register_session
@@ -34,6 +36,10 @@ FINAL_RESULT_STATUSES = frozenset({
     "cancelled", "not-accepted", "failed", "timeout", "succeeded",
     "branch-preserved", "session-closed",
 })
+TASK_SCHEDULER_NAMESPACE = "http://schemas.microsoft.com/windows/2004/02/mit/task"
+SCHEDULER_DIAGNOSTIC_LIMIT = 1000
+
+ET.register_namespace("", TASK_SCHEDULER_NAMESPACE)
 
 
 class Refusal(RuntimeError):
@@ -387,6 +393,66 @@ def observer_path():
     return Path(__file__).with_name("finish_reaper.py")
 
 
+def scheduler_diagnostic(completed):
+    parts = []
+    for name in ("stderr", "stdout"):
+        value = getattr(completed, name, "")
+        if value:
+            parts.append(name + "=" + " ".join(str(value).split()))
+    detail = "; ".join(parts)
+    if len(detail) > SCHEDULER_DIAGNOSTIC_LIMIT:
+        detail = detail[:SCHEDULER_DIAGNOSTIC_LIMIT] + "..."
+    suffix = ": " + detail if detail else ""
+    return "exit " + str(completed.returncode) + suffix
+
+
+def task_xml_element(name, text=None, **attributes):
+    element = ET.Element("{" + TASK_SCHEDULER_NAMESPACE + "}" + name, attributes)
+    if text is not None:
+        element.text = text
+    return element
+
+
+def windows_task_xml(user, command, working_directory):
+    task = task_xml_element("Task", version="1.3")
+    registration = ET.SubElement(task, "{" + TASK_SCHEDULER_NAMESPACE + "}RegistrationInfo")
+    registration.append(task_xml_element("Author", user))
+    principals = ET.SubElement(task, "{" + TASK_SCHEDULER_NAMESPACE + "}Principals")
+    principal = ET.SubElement(
+        principals, "{" + TASK_SCHEDULER_NAMESPACE + "}Principal", {"id": "CurrentUser"},
+    )
+    principal.append(task_xml_element("UserId", user))
+    principal.append(task_xml_element("LogonType", "InteractiveToken"))
+    principal.append(task_xml_element("RunLevel", "LeastPrivilege"))
+    settings = ET.SubElement(task, "{" + TASK_SCHEDULER_NAMESPACE + "}Settings")
+    settings.append(task_xml_element("AllowStartOnDemand", "true"))
+    settings.append(task_xml_element("MultipleInstancesPolicy", "IgnoreNew"))
+    settings.append(task_xml_element("DisallowStartIfOnBatteries", "false"))
+    settings.append(task_xml_element("StopIfGoingOnBatteries", "false"))
+    settings.append(task_xml_element("ExecutionTimeLimit", "PT0S"))
+    settings.append(task_xml_element("Hidden", "true"))
+    actions = ET.SubElement(task, "{" + TASK_SCHEDULER_NAMESPACE + "}Actions", {"Context": "CurrentUser"})
+    execute = ET.SubElement(actions, "{" + TASK_SCHEDULER_NAMESPACE + "}Exec")
+    execute.append(task_xml_element("Command", command[0]))
+    execute.append(task_xml_element("Arguments", subprocess.list2cmdline(command[1:])))
+    execute.append(task_xml_element("WorkingDirectory", str(working_directory)))
+    return ET.tostring(task, encoding="utf-8", xml_declaration=True)
+
+
+def current_windows_user(kwargs, timeout):
+    completed = subprocess.run(
+        ["whoami.exe", "/user", "/fo", "csv", "/nh"], **kwargs, check=False, timeout=timeout,
+    )
+    rows = list(csv.reader(completed.stdout.splitlines()))
+    user = rows[0][-1].strip() if len(rows) == 1 and rows[0] else ""
+    if completed.returncode or re.fullmatch(r"S-1-\d+(?:-\d+)+", user) is None:
+        raise Refusal(
+            "could not determine the current user for detached cleanup observer ("
+            + scheduler_diagnostic(completed) + ")"
+        )
+    return user
+
+
 def start_observer(arguments):
     staging = state_directory() / "merge-cleanup" / "observers" / uuid.uuid4().hex
     staging.mkdir(parents=True, exist_ok=False)
@@ -397,28 +463,50 @@ def start_observer(arguments):
               "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     timeout = bounded_timeout("AGENT_FINISH_SPAWN_TIMEOUT_SECONDS")
     if os.name == "nt":
-        # A one-shot scheduled task is outside the terminal's job object.
         task = "agent-finish-reaper-" + uuid.uuid4().hex
-        command_text = subprocess.list2cmdline(command)
+        scheduler_kwargs = {
+            "cwd": str(state_directory()), "stdin": subprocess.DEVNULL,
+            "capture_output": True, "text": True, "encoding": "utf-8", "errors": "replace",
+        }
+        descriptor, xml_path = tempfile.mkstemp(
+            prefix=".agent-finish-reaper-", suffix=".xml", dir=str(state_directory()),
+        )
+        registered = False
         try:
+            user = current_windows_user(scheduler_kwargs, timeout)
+            stream = os.fdopen(descriptor, "wb")
+            descriptor = None
+            with stream:
+                stream.write(windows_task_xml(user, command, state_directory()))
+            registered = True
             create = subprocess.run(
-                ["schtasks.exe", "/create", "/tn", task, "/sc", "once", "/st", "00:00",
-                 "/f", "/tr", command_text], **kwargs, check=False, timeout=timeout,
+                ["schtasks.exe", "/create", "/tn", task, "/xml", xml_path, "/f"],
+                **scheduler_kwargs, check=False, timeout=timeout,
             )
             if create.returncode:
-                raise Refusal("could not create a detached cleanup observer")
-            run = subprocess.run(["schtasks.exe", "/run", "/tn", task], **kwargs,
+                raise Refusal(
+                    "could not create a detached cleanup observer ("
+                    + scheduler_diagnostic(create) + ")"
+                )
+            run = subprocess.run(["schtasks.exe", "/run", "/tn", task], **scheduler_kwargs,
                                  check=False, timeout=timeout)
             if run.returncode:
-                raise Refusal("could not start a detached cleanup observer")
+                raise Refusal(
+                    "could not start a detached cleanup observer ("
+                    + scheduler_diagnostic(run) + ")"
+                )
         except subprocess.TimeoutExpired as error:
             raise Refusal("timed out starting detached cleanup observer") from error
         finally:
-            try:
-                subprocess.run(["schtasks.exe", "/delete", "/tn", task, "/f"], **kwargs,
-                               check=False, timeout=timeout)
-            except subprocess.TimeoutExpired:
-                pass
+            if descriptor is not None:
+                os.close(descriptor)
+            Path(xml_path).unlink(missing_ok=True)
+            if registered:
+                try:
+                    subprocess.run(["schtasks.exe", "/delete", "/tn", task, "/f"],
+                                   **scheduler_kwargs, check=False, timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    pass
         return None
     return subprocess.Popen(command, start_new_session=True, **kwargs).pid
 
