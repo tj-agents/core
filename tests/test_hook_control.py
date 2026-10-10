@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -271,6 +272,94 @@ class HookControlTests(unittest.TestCase):
             capture_output=True, text=True, check=False)
         self.assertEqual(restored.returncode, 0, restored.stderr)
         self.assertIn('hooks = true', config.read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows sharing violations are Windows-only')
+    def test_snapshot_read_and_write_tolerate_an_open_reader(self):
+        config = self.config()
+        config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        CONTROL.disable('global', config)
+        sidecar = CONTROL.sidecar_path(config)
+        original = CONTROL.load_snapshot(sidecar)
+        replacement = dict(original, disabled_sha256='a' * 64)
+        attempted = threading.Event()
+        errors = []
+        original_replace = CONTROL.os.replace
+        original_read_text = Path.read_text
+        read_attempts = 0
+        transient_winerrors = (5, 32)
+
+        def replace(source, destination):
+            attempted.set()
+            return original_replace(source, destination)
+
+        def write():
+            try:
+                CONTROL.atomic_json(sidecar, replacement)
+            except BaseException as error:
+                errors.append(error)
+
+        def read_text(path, *args, **kwargs):
+            nonlocal read_attempts
+            if path == sidecar:
+                read_attempts += 1
+                if read_attempts <= len(transient_winerrors):
+                    error = PermissionError(13, 'sharing violation')
+                    error.winerror = transient_winerrors[read_attempts - 1]
+                    raise error
+            return original_read_text(path, *args, **kwargs)
+
+        with mock.patch.object(CONTROL.os, 'replace', side_effect=replace):
+            with sidecar.open(encoding='utf-8') as reader:
+                reader.read()
+                writer = threading.Thread(target=write)
+                writer.start()
+                self.assertTrue(attempted.wait(timeout=5))
+                self.assertTrue(writer.is_alive())
+                with mock.patch.object(Path, 'read_text', new=read_text):
+                    self.assertEqual(CONTROL.load_snapshot(sidecar)['disabled_sha256'], original['disabled_sha256'])
+            writer.join(timeout=5)
+
+        self.assertFalse(writer.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(read_attempts, 3)
+        self.assertEqual(CONTROL.load_snapshot(sidecar)['disabled_sha256'], 'a' * 64)
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows sharing violations are Windows-only')
+    def test_snapshot_restore_tolerates_an_open_reader(self):
+        config = self.config()
+        config.write_text('[features]\nhooks = false\n', encoding='utf-8')
+        CONTROL.disable('global', config)
+        sidecar = CONTROL.sidecar_path(config)
+        attempted = threading.Event()
+        errors = []
+        restored = []
+        original_unlink = Path.unlink
+
+        def unlink(path, *args, **kwargs):
+            if path == sidecar:
+                attempted.set()
+            return original_unlink(path, *args, **kwargs)
+
+        def restore():
+            try:
+                restored.append(CONTROL.restore('global', config))
+            except BaseException as error:
+                errors.append(error)
+
+        with mock.patch.object(Path, 'unlink', new=unlink):
+            with sidecar.open(encoding='utf-8') as reader:
+                reader.read()
+                writer = threading.Thread(target=restore)
+                writer.start()
+                self.assertTrue(attempted.wait(timeout=5))
+                self.assertTrue(writer.is_alive())
+                self.assertEqual(CONTROL.load_snapshot(sidecar)['original'], False)
+            writer.join(timeout=5)
+
+        self.assertFalse(writer.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(restored[0]['restored'], False)
+        self.assertFalse(sidecar.exists())
 
     @unittest.skipUnless(sys.platform == 'win32', 'Windows lock contention is Windows-only')
     def test_windows_lock_retries_a_transient_open_permission_error(self):
