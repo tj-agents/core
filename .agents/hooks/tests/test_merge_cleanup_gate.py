@@ -136,6 +136,13 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual([], self.obligation_files())
 
+    def test_ambiguous_sh_payload_refuses_before_cleanup_work(self):
+        result = self.run_hook(self.payload(["sh", "-c", "+", "-e", "gh pr merge 1 --auto"]))
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("ambiguous `sh` launcher", result.stderr)
+        self.assertEqual([], self.obligation_files())
+
     def test_grace_selection_direct_vs_queued(self):
         direct = {"merge_mode": "direct"}
         queued = {"merge_mode": "queued"}

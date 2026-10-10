@@ -53,6 +53,7 @@ Contract: exit 0 = allow; exit 2 = block (stderr is fed back to the agent).
 import json
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from hook_runtime import claim_invocation
@@ -69,19 +70,51 @@ HOOK_NAME = "git-auth-scope-gate"
 SHELL_TOOLS = {"bash", "powershell", "shell", "exec_command", "unified_exec", "local_shell"}
 
 UNIX_SHELLS = {"bash", "sh", "zsh", "dash"}
-UNIX_SHORT_FLAGS = frozenset("ilrsabefhkmnptuvxBCEHPT")
-UNIX_SHORT_FLAGS_WITH_ARGUMENT = {"o", "O"}
-UNIX_BASH_LONG_FLAGS = {
-    "--debugger",
-    "--login",
-    "--noediting",
-    "--noprofile",
-    "--norc",
-    "--posix",
-    "--restricted",
-    "--verbose",
+BASH_SHORT_FLAGS = frozenset("abefhikmnprtuvxBCEHPTclsD")
+BASH_O_OPTIONS = {
+    "allexport", "braceexpand", "emacs", "errexit", "errtrace", "functrace", "hashall",
+    "histexpand", "history", "ignoreeof", "interactive-comments", "keyword", "monitor",
+    "noclobber", "noexec", "noglob", "nolog", "notify", "nounset", "onecmd", "physical",
+    "pipefail", "posix", "privileged", "verbose", "vi", "xtrace", "igncr",
 }
-UNIX_BASH_LONG_FLAGS_WITH_ARGUMENT = {"--init-file", "--rcfile"}
+BASH_O_CAP_OPTIONS = {
+    "autocd", "assoc_expand_once", "cdable_vars", "cdspell", "checkhash", "checkjobs",
+    "checkwinsize", "cmdhist", "compat31", "compat32", "compat40", "compat41", "compat42",
+    "compat43", "compat44", "completion_strip_exe", "complete_fullquote", "direxpand", "dirspell",
+    "dotglob", "execfail", "expand_aliases", "extdebug", "extglob", "extquote", "failglob",
+    "force_fignore", "globasciiranges", "globskipdots", "globstar", "gnu_errfmt", "histappend",
+    "histreedit", "histverify", "hostcomplete", "huponexit", "inherit_errexit",
+    "interactive_comments", "lastpipe", "lithist", "localvar_inherit", "localvar_unset",
+    "login_shell", "mailwarn", "no_empty_cmd_completion", "nocaseglob", "nocasematch",
+    "noexpand_translation", "nullglob", "patsub_replacement", "progcomp", "progcomp_alias",
+    "promptvars", "restricted_shell", "shift_verbose", "sourcepath", "varredir_close", "xpg_echo",
+}
+BASH_LONG_FLAGS = {
+    "debug", "debugger", "dump-po-strings", "dump-strings", "login", "noediting", "noprofile",
+    "norc", "posix", "pretty-print", "protected", "restricted", "verbose", "wordexp",
+}
+BASH_LONG_EXIT_FLAGS = {"help", "version"}
+BASH_LONG_VALUE_FLAGS = {"init-file", "rcfile"}
+DASH_SHORT_FLAGS = frozenset("efIimnsxvVECabulc")
+DASH_O_OPTIONS = {
+    "errexit", "noglob", "ignoreeof", "interactive", "monitor", "noexec", "stdin", "xtrace",
+    "verbose", "vi", "emacs", "noclobber", "allexport", "notify", "nounset", "nolog",
+    "pipefail", "debug", "priv",
+}
+ZSH_SHORT_FLAGS = frozenset("0123456789BCDEFGHIJKLMNOPQRSTUVWXYZadefghiklmnprstuvwxyz")
+ZSH_NAMED_FLAGS = {"shwordsplit", "noshwordsplit", "errexit", "noerrexit", "correctall", "nocorrectall"}
+POWERSHELL_VALUES = {
+    "configurationname", "config", "executionpolicy", "ex", "ep", "inputformat", "inp", "if",
+    "outputformat", "o", "of", "windowstyle", "w", "encodedarguments", "encodeda", "ea",
+}
+PWSH_VALUES = {"configurationfile", "custompipename", "cus", "settingsfile", "settings", "workingdirectory", "wo", "wd", "token", "to", "utctimestamp", "utc"}
+WINDOWS_POWERSHELL_VALUES = {"psconsolefile", "version", "v"}
+POWERSHELL_BOOLEANS = {"noexit", "noe", "noprofile", "nop", "nologo", "nol", "noninteractive", "noni", "sta", "mta"}
+PWSH_BOOLEANS = {"login", "l", "interactive", "i", "noprofileloadtime", "removeworkingdirectorytrailingcharacter"}
+POWERSHELL_EXECUTION_POLICIES = {"bypass", "allsigned", "default", "remotesigned", "restricted", "undefined", "unrestricted"}
+POWERSHELL_INPUT_FORMATS = {"text", "xml"}
+POWERSHELL_OUTPUT_FORMATS = {"text", "xml"}
+POWERSHELL_WINDOW_STYLES = {"normal", "minimized", "maximized", "hidden"}
 
 # A line continuation is whitespace to the shell and is not whitespace to `\s`: PowerShell's
 # backtick and sh's backslash both bridge `gh auth` on one line to `refresh` on the next, and
@@ -123,65 +156,248 @@ FALLBACK_MESSAGE = (
 )
 
 
+@dataclass(frozen=True)
+class ScriptResult:
+    kind: str
+    index: int = -1
+    script: str = ""
+    profiles: tuple = ()
+
+
+def _literal(parts, index):
+    return ScriptResult("literal", index, parts[index])
+
+
+def _shell_result(parts, index, command_requested, input_kind):
+    if command_requested:
+        return _literal(parts, index) if index < len(parts) else ScriptResult("invalid")
+    return ScriptResult(input_kind)
+
+
+def _bash_result(parts):
+    index = 1
+    command_requested = False
+    short_phase = False
+    while index < len(parts):
+        token = parts[index]
+        if token in ("-", "--"):
+            return _shell_result(parts, index + 1, command_requested, "stdin")
+        if token == "+":
+            index += 1
+            continue
+        if not short_phase and token[:1] in ("-", "+"):
+            prefix = token[:1]
+            name = token[2:] if token.startswith("--") else token[1:]
+            if name in BASH_LONG_EXIT_FLAGS:
+                return ScriptResult("exit")
+            if name in BASH_LONG_FLAGS:
+                index += 1
+                continue
+            if name in BASH_LONG_VALUE_FLAGS:
+                if index + 1 >= len(parts):
+                    return ScriptResult("invalid")
+                index += 2
+                continue
+            if token.startswith("--") or "=" in name:
+                return ScriptResult("invalid")
+            if prefix == "+" and not name:
+                index += 1
+                continue
+        if token[:1] not in ("-", "+") or len(token) == 1:
+            return _shell_result(parts, index, command_requested, "file")
+        short_phase = True
+        values = []
+        for flag in token[1:]:
+            if flag == "-":
+                return ScriptResult("invalid")
+            if flag == "c":
+                command_requested = True
+                continue
+            if flag in BASH_SHORT_FLAGS:
+                continue
+            if flag in ("o", "O"):
+                values.append(flag)
+                continue
+            return ScriptResult("invalid")
+        cursor = index + 1
+        for flag in values:
+            if cursor >= len(parts):
+                continue
+            value = parts[cursor].casefold()
+            if value not in (BASH_O_OPTIONS if flag == "o" else BASH_O_CAP_OPTIONS):
+                return ScriptResult("invalid")
+            cursor += 1
+        index = cursor
+    return ScriptResult("invalid" if command_requested else "file")
+
+
+def _dash_result(parts):
+    index = 1
+    command_requested = False
+    while index < len(parts):
+        token = parts[index]
+        if token in ("-", "--"):
+            return _shell_result(parts, index + 1, command_requested, "stdin")
+        if token == "+":
+            index += 1
+            continue
+        if token[:1] not in ("-", "+") or len(token) == 1:
+            return _shell_result(parts, index, command_requested, "file")
+        values = 0
+        for flag in token[1:]:
+            if flag == "-":
+                return ScriptResult("invalid")
+            if flag == "c":
+                command_requested = True
+            elif flag in DASH_SHORT_FLAGS:
+                continue
+            elif flag == "o":
+                values += 1
+            else:
+                return ScriptResult("invalid")
+        cursor = index + 1
+        for _ in range(values):
+            if cursor >= len(parts):
+                continue
+            if parts[cursor].casefold() not in DASH_O_OPTIONS:
+                return ScriptResult("invalid")
+            cursor += 1
+        index = cursor
+    return ScriptResult("invalid" if command_requested else "file")
+
+
+def _zsh_result(parts):
+    index = 1
+    command_requested = False
+    while index < len(parts):
+        token = parts[index]
+        if token in ("-", "+", "--", "+-"):
+            return _shell_result(parts, index + 1, command_requested, "stdin")
+        if token[:1] in ("-", "+") and len(token) > 2 and token[1] == "-":
+            name = token[2:].replace("-", "").replace("_", "").casefold()
+            if "=" in name or name not in ZSH_NAMED_FLAGS:
+                return ScriptResult("invalid")
+            index += 1
+            continue
+        if token[:1] not in ("-", "+") or len(token) == 1:
+            return _shell_result(parts, index, command_requested, "file")
+        letters = token[1:]
+        position = 0
+        while position < len(letters):
+            flag = letters[position]
+            if flag == "-":
+                if position != len(letters) - 1:
+                    return ScriptResult("invalid")
+                return _shell_result(parts, index + 1, command_requested, "stdin")
+            if flag == "c":
+                command_requested = True
+            elif flag == "o":
+                value = letters[position + 1:] or (parts[index + 1] if index + 1 < len(parts) else "")
+                if value.casefold() not in ZSH_NAMED_FLAGS:
+                    return ScriptResult("invalid")
+                if not letters[position + 1:]:
+                    index += 1
+                break
+            elif flag not in ZSH_SHORT_FLAGS:
+                return ScriptResult("invalid")
+            position += 1
+        index += 1
+    return ScriptResult("invalid" if command_requested else "file")
+
+
+def _sh_result(parts):
+    profiles = ("bash", "dash", "debian-dash", "zsh")
+    results = (_bash_result(parts), _dash_result(parts), _dash_result(parts), _zsh_result(parts))
+    viable = [(profile, result) for profile, result in zip(profiles, results) if result.kind != "invalid"]
+    literals = [(profile, result) for profile, result in viable if result.kind == "literal"]
+    nonliterals = [(profile, result) for profile, result in viable if result.kind != "literal"]
+    if not literals:
+        return ScriptResult("file")
+    if nonliterals or any(result.index != literals[0][1].index for _, result in literals):
+        return ScriptResult("ambiguous", profiles=tuple(profile for profile, _ in viable))
+    return literals[0][1]
+
+
+def _powershell_option(token):
+    if token.startswith("--"):
+        return token[2:].casefold()
+    if token[:1] in ("-", "/"):
+        return token[1:].casefold()
+    return ""
+
+
+def _powershell_result(parts, shell):
+    index = 1
+    while index < len(parts):
+        token = parts[index]
+        name = _powershell_option(token)
+        if not name:
+            return ScriptResult("file") if shell == "pwsh" else ScriptResult("literal", index, " ".join(parts[index:]))
+        if name in ("help", "h", "?", "version", "v"):
+            return ScriptResult("exit")
+        if name in ("file", "f"):
+            return ScriptResult("file")
+        if name in ("encodedcommand", "enc", "ec", "e"):
+            return ScriptResult("invalid")
+        if name in ("servermode", "s", "sshservermode", "ssh"):
+            return ScriptResult("stdin")
+        if shell == "pwsh" and name in ("commandwithargs", "cwa"):
+            if index + 1 >= len(parts) or parts[index + 1] == "-":
+                return ScriptResult("invalid")
+            return _literal(parts, index + 1)
+        if name and "command".startswith(name) or (shell == "pwsh" and name == "command"):
+            if index + 1 >= len(parts) or parts[index + 1] == "-":
+                return ScriptResult("invalid")
+            return ScriptResult("literal", index + 1, " ".join(parts[index + 1:]))
+        values = POWERSHELL_VALUES | (PWSH_VALUES if shell == "pwsh" else WINDOWS_POWERSHELL_VALUES)
+        booleans = POWERSHELL_BOOLEANS | (PWSH_BOOLEANS if shell == "pwsh" else set())
+        if name in values:
+            if index + 1 >= len(parts):
+                return ScriptResult("invalid")
+            value = parts[index + 1].casefold()
+            if name in ("executionpolicy", "ex", "ep") and value not in POWERSHELL_EXECUTION_POLICIES:
+                return ScriptResult("invalid")
+            if name in ("inputformat", "inp", "if") and value not in POWERSHELL_INPUT_FORMATS:
+                return ScriptResult("invalid")
+            if name in ("outputformat", "o", "of") and value not in POWERSHELL_OUTPUT_FORMATS:
+                return ScriptResult("invalid")
+            if name in ("windowstyle", "w") and value not in POWERSHELL_WINDOW_STYLES:
+                return ScriptResult("invalid")
+            index += 2
+            continue
+        if name in booleans:
+            index += 1
+            continue
+        return ScriptResult("invalid")
+    return ScriptResult("file")
+
+
+def _script_result(parts):
+    shell = Path(parts[0].replace("\\", "/")).stem.casefold()
+    if shell == "bash":
+        return _bash_result(parts)
+    if shell == "dash":
+        return _dash_result(parts)
+    if shell == "zsh":
+        return _zsh_result(parts)
+    if shell == "sh":
+        return _sh_result(parts)
+    if shell in ("pwsh", "powershell"):
+        return _powershell_result(parts, shell)
+    return None
+
+
 def _shell_script_from_list(parts):
-    """A Unix shell tool invoked as ``["bash", "-lc", "<script>"]`` carries its script after the option."""
     cleaned = [str(p) for p in parts if isinstance(p, (str, int, float))]
     if not cleaned:
         return None
-    shell = Path(cleaned[0].replace("\\", "/")).stem.lower()
-    if shell in UNIX_SHELLS:
-        index = 1
-        while index < len(cleaned):
-            option = cleaned[index]
-            if option == "--":
-                break
-            if option.startswith("--"):
-                name, equals, value = option.partition("=")
-                if shell == "bash" and name in UNIX_BASH_LONG_FLAGS_WITH_ARGUMENT:
-                    if equals or index + 1 < len(cleaned):
-                        index += 1 if equals else 2
-                        continue
-                    break
-                if shell == "bash" and option in UNIX_BASH_LONG_FLAGS:
-                    index += 1
-                    continue
-                break
-            if not option.startswith("-") or option == "-":
-                break
-            command_option = False
-            needs_argument = False
-            for position, flag in enumerate(option[1:]):
-                if flag == "c":
-                    command_option = True
-                    continue
-                if flag in UNIX_SHORT_FLAGS:
-                    continue
-                if flag in UNIX_SHORT_FLAGS_WITH_ARGUMENT and position == len(option) - 2:
-                    needs_argument = True
-                    continue
-                break
-            else:
-                script_index = index + 1 + int(needs_argument)
-                if command_option:
-                    if script_index < len(cleaned):
-                        return cleaned[script_index]
-                    break
-                if needs_argument and script_index >= len(cleaned):
-                    break
-                index = script_index
-                continue
-            if needs_argument and index + 1 < len(cleaned):
-                index += 2
-                continue
-            break
-    if shell in ("pwsh", "powershell"):
-        for index, option in enumerate(cleaned[1:], 1):
-            normalized = option[1:].casefold() if option[:1] in ("-", "/") else ""
-            if shell == "pwsh" and normalized in ("commandwithargs", "cwa"):
-                return cleaned[index + 1] if len(cleaned) > index + 1 else ""
-            if "command".startswith(normalized) and normalized:
-                return " ".join(cleaned[index + 1:])
-    return " ".join(cleaned)
+    result = _script_result(cleaned)
+    if result is None:
+        return " ".join(cleaned)
+    if result.kind == "ambiguous":
+        sys.stderr.write("SHELL EXTRACTION GATE: ambiguous `sh` launcher; use an explicitly named bash, dash, or zsh executable.\n")
+        raise SystemExit(2)
+    return result.script if result.kind == "literal" else None
 
 
 def extract_command(tool_name, tool_input):

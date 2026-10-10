@@ -316,6 +316,39 @@ class EndToEndTests(unittest.TestCase):
                 self.assertEqual(2, result.returncode)
                 self.assertIn("cannot prove this merge's checkout", result.stderr)
 
+    def test_native_shell_profiles_reject_commands_before_gh(self):
+        command = M + " 42 --squash --auto"
+        cases = (
+            ["bash", "+e", "-c", command],
+            ["bash", "-c", "-e", command],
+            ["bash", "-c", "--", command],
+            ["bash", "+c", command],
+            ["bash", "-oc", "posix", command],
+            ["bash", "-Oc", "extglob", command],
+            ["bash", "-rcfile", "-c", "-c", command],
+            ["bash", "-ooec", "errexit", "nounset", command],
+            ["dash", "-cI", command],
+            ["dash", "-ooec", "errexit", "nounset", command],
+            ["zsh", "-co", "errexit", command],
+            ["zsh", "-cO", command],
+            ["zsh", "--sh-word-split", "-c", command],
+            ["zsh", "-c-", command],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                result = self.run_hook(payload, native=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("cannot prove this merge's checkout", result.stderr)
+
+    def test_native_ambiguous_sh_payload_refuses_before_jurisdiction(self):
+        result = self.run_hook(
+            ["sh", "-c", "+", "-e", M + " 42 --squash --auto"],
+            native=True,
+        )
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("ambiguous `sh` launcher", result.stderr)
+
     def test_native_pwsh_command_span_rejects_an_unproved_target_before_gh(self):
         command = ["pwsh", "-c", M + " 42 --squash --auto", ";"]
 
