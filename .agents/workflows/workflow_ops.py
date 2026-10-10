@@ -2056,7 +2056,8 @@ def scoped_approval(root, repository, number, branch, supplied):
 def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None,
                   context=None):
     _matching_delivery_bind_context(root, context)
-    value = pull_request_state(root, pr)
+    repository = repository_slug(root)
+    value = pull_request_state(root, pr, repository)
     validation = validate_pr_body(value.get("body"))
     if not validation["valid"]:
         raise WorkflowOperationError("; ".join(validation["errors"]))
@@ -2069,7 +2070,6 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
     if state != "open":
         raise WorkflowOperationError(f"PR #{number} is {state or 'unknown'}, so it owns no delivery")
     reported = [str(item.get("path")) for item in value.get("files") or [] if item.get("path")]
-    repository = repository_slug(root)
     changed = _changed_paths_for_repository(root, repository, number, reported, value.get("changedFiles"))
     labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
     approval = scoped_approval(root, repository, number, branch, approval_record)
