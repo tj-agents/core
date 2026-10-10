@@ -196,6 +196,57 @@ class CommandExtractionTests(unittest.TestCase):
                     gate.extract_command("exec_command", {"command": payload}),
                 )
 
+    def test_powershell_command_abbreviations_and_slash_prefixes_include_the_command_span(self):
+        command = "Write-Output SCRIPT"
+        options = (
+            "-c",
+            "-co",
+            "-com",
+            "-comm",
+            "-comma",
+            "-comman",
+            "-command",
+            "/c",
+            "/co",
+            "/com",
+            "/comm",
+            "/comma",
+            "/comman",
+            "/command",
+            "-CoM",
+            "/CoM",
+        )
+        for option in options:
+            with self.subTest(option=option):
+                self.assertEqual(
+                    command + " ;",
+                    gate.extract_command(
+                        "exec_command",
+                        {"command": ["powershell.exe", "-NoProfile", option, command, ";"]},
+                    ),
+                )
+
+    def test_pwsh_command_with_args_uses_only_its_script_operand(self):
+        command = "Write-Output SCRIPT"
+        options = ("-CommandWithArgs", "-cwa", "/CommandWithArgs", "/cwa", "-CWA", "/CWA")
+        for option in options:
+            with self.subTest(option=option):
+                self.assertEqual(
+                    command,
+                    gate.extract_command(
+                        "exec_command",
+                        {
+                            "command": [
+                                "pwsh.exe",
+                                "-NoProfile",
+                                option,
+                                command,
+                                "gh auth refresh",
+                            ]
+                        },
+                    ),
+                )
+
     @unittest.skipUnless(os.name == "nt", "Windows PowerShell argv behavior only")
     def test_powershell_command_span_matches_execution(self):
         command = "Write-Output SCRIPT"

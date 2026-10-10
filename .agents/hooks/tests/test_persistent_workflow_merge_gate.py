@@ -311,6 +311,39 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("cannot prove this merge's checkout", result.stderr)
 
+    def test_native_powershell_command_options_reject_an_unproved_target_before_gh(self):
+        normal_options = (
+            "-c",
+            "-co",
+            "-com",
+            "-comm",
+            "-comma",
+            "-comman",
+            "-command",
+            "/c",
+            "/co",
+            "/com",
+            "/comm",
+            "/comma",
+            "/comman",
+            "/command",
+            "-CoM",
+            "/CoM",
+        )
+        with_args_options = ("-CommandWithArgs", "-cwa", "/CommandWithArgs", "/cwa", "-CWA", "/CWA")
+        for option in normal_options:
+            with self.subTest(option=option):
+                command = ["powershell.exe", "-NoProfile", option, M + " 42 --squash --auto", ";"]
+                result = self.run_hook(command, native=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("cannot prove this merge's checkout", result.stderr)
+        for option in with_args_options:
+            with self.subTest(option=option):
+                command = ["pwsh.exe", "-NoProfile", option, M + " 42 --squash --auto", ";"]
+                result = self.run_hook(command, native=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("cannot prove this merge's checkout", result.stderr)
+
     def test_non_terminal_pr_with_a_matching_binding_is_allowed(self):
         if not self.has_gh_shim:
             self.skipTest("needs the POSIX gh shim")
