@@ -170,12 +170,13 @@ def runtime_command(receipt):
 
 
 def adapter_command(receipt):
-    return [receipt["python"], "-I", "-B", receipt["script"], "wake", "--owner", receipt["owner_path"]]
+    return [receipt["python"], "-I", "-B", receipt["script"], "wake", "--owner", receipt["owner_path"],
+            "--host-executable", receipt["host_executable"]]
 
 
 def linux_units(receipt):
     service = ["[Unit]", "Description=" + receipt["description"], "", "[Service]", "Type=oneshot",
-               "TimeoutStartSec=900", "WorkingDirectory=" + reject_unsafe(receipt["worktree"]).replace("%", "%%")]
+               "TimeoutStartSec=7200", "WorkingDirectory=" + reject_unsafe(receipt["worktree"]).replace("%", "%%")]
     service.extend("Environment=" + systemd_environment_quote(key + "=" + value)
                    for key, value in receipt.get("profile_environment", {}).items())
     service.extend(["ExecStart=" + " ".join(systemd_quote(value) for value in receipt["adapter_command"]), ""])
@@ -196,9 +197,9 @@ def linux_receipt(owner, owner_path, adapter_path, runtime_path, python_path, ho
                "description": "Continuation owner " + owner_id,
                "service_unit": name + ".service", "timer_unit": name + ".timer",
                "unit_directory": str(directory.resolve()),
-               "service_path": str((directory / (name + ".service")).resolve()),
-               "timer_path": str((directory / (name + ".timer")).resolve()),
-               "timer_enable_path": str((directory / "timers.target.wants" / (name + ".timer")).absolute()),
+               "service_path": str(directory.resolve() / (name + ".service")),
+               "timer_path": str(directory.resolve() / (name + ".timer")),
+               "timer_enable_path": str(directory.resolve() / "timers.target.wants" / (name + ".timer")),
                "helper": str(Path(runtime_path).resolve()), "python": str(Path(python_path).resolve()),
                "script": str(Path(adapter_path).resolve()), "host_executable": str(Path(host_path).resolve()),
                "profile_environment": _profile_environment(environment or os.environ)}
@@ -215,9 +216,14 @@ def _powershell():
 
 
 WINDOWS_SCRIPT = r'''$ErrorActionPreference='Stop';[Console]::InputEncoding=[Text.UTF8Encoding]::new($false);[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);$payload=[Console]::In.ReadToEnd()|ConvertFrom-Json
-if($payload.operation -eq 'query'){$task=Get-ScheduledTask -TaskName $payload.task_name -TaskPath '\';[pscustomobject]@{TaskName=$task.TaskName;TaskPath=$task.TaskPath;State=$task.State.ToString();Description=$task.Description;Actions=@($task.Actions|Select-Object Execute,Arguments,WorkingDirectory);Triggers=@($task.Triggers|Select-Object Enabled);Enabled=$task.Settings.Enabled}|ConvertTo-Json -Compress;exit}
+if($payload.operation -eq 'query'){$tasks=@(Get-ScheduledTask|Where-Object {$_.TaskName -ieq $payload.task_name -and $_.TaskPath -ceq '\'});if($tasks.Count -eq 0){'null';exit};if($tasks.Count -ne 1){throw 'scheduled task query was ambiguous'};$task=$tasks[0];[pscustomobject]@{TaskName=$task.TaskName;TaskPath=$task.TaskPath;State=$task.State.ToString();Description=$task.Description;Actions=@($task.Actions|Select-Object Execute,Arguments,WorkingDirectory);Triggers=@($task.Triggers|Select-Object Enabled);Enabled=$task.Settings.Enabled}|ConvertTo-Json -Compress;exit}
 if($payload.operation -eq 'remove'){Unregister-ScheduledTask -TaskName $payload.task_name -TaskPath '\' -Confirm:$false;exit}
-$action=New-ScheduledTaskAction -Execute $payload.execute -Argument $payload.arguments -WorkingDirectory $payload.worktree;$trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes([int]$payload.interval) -RepetitionInterval (New-TimeSpan -Minutes([int]$payload.interval));$settings=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Seconds 900);Register-ScheduledTask -TaskName $payload.task_name -TaskPath '\' -Action $action -Trigger $trigger -Settings $settings -Description $payload.description -Force|Out-Null'''
+$action=New-ScheduledTaskAction -Execute $payload.execute -Argument $payload.arguments -WorkingDirectory $payload.worktree;$trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes([int]$payload.interval) -RepetitionInterval (New-TimeSpan -Minutes([int]$payload.interval));$settings=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Seconds 7200);Register-ScheduledTask -TaskName $payload.task_name -TaskPath '\' -Action $action -Trigger $trigger -Settings $settings -Description $payload.description -Force|Out-Null'''
+
+
+def windows_description(receipt):
+    profiles = json.dumps(receipt.get("profile_environment", {}), sort_keys=True, separators=(",", ":"))
+    return "Continuation owner " + receipt["owner_id"] + " profiles " + unit_hash(profiles)
 
 
 def windows_receipt(owner, owner_path, adapter_path, runtime_path, python_path, host_path, interval, environment=None):
@@ -228,6 +234,7 @@ def windows_receipt(owner, owner_path, adapter_path, runtime_path, python_path, 
                "helper": str(Path(runtime_path).resolve()), "python": str(Path(python_path).resolve()),
                "script": str(Path(adapter_path).resolve()), "host_executable": str(Path(host_path).resolve()),
                "profile_environment": _profile_environment(environment or os.environ)}
+    receipt["description"] = windows_description(receipt)
     receipt["adapter_command"] = adapter_command(receipt)
     receipt["runtime_command"] = runtime_command(receipt)
     receipt["execute"] = receipt["adapter_command"][0]
@@ -245,7 +252,7 @@ def _same_owner(receipt, owner_path, owner, root):
 def _unit_matches(transport, path, expected, digest):
     try:
         value = transport.read(path)
-    except (OSError, UnicodeError, KeyError):
+    except (FileNotFoundError, UnicodeError):
         return False
     return unit_hash(value) == digest and unit_hash(expected) == digest
 
@@ -265,8 +272,53 @@ def _show_unit(unit, transport):
         "--property=LoadState,ActiveState,FragmentPath,UnitFileState,DropInPaths,NeedDaemonReload"], timeout=5).stdout)
 
 
+def receipt_platform(receipt):
+    if not isinstance(receipt, dict):
+        raise SchedulerError("scheduler receipt is invalid")
+    platform = receipt.get("platform")
+    if platform in {"linux-systemd", "windows-scheduledtasks"}:
+        return platform
+    legacy_windows = (platform is None and receipt.get("version") == 2
+                      and isinstance(receipt.get("task_name"), str)
+                      and receipt["task_name"].startswith(TASK_PREFIX)
+                      and receipt.get("task_path") == "\\"
+                      and all(isinstance(receipt.get(key), str) and receipt[key]
+                              for key in ("description", "execute", "arguments"))
+                      and not any(key in receipt for key in ("service_path", "timer_path", "timer_enable_path")))
+    if legacy_windows:
+        return "windows-scheduledtasks"
+    raise SchedulerError("scheduler receipt has no recognized platform identity")
+
+
+def receipt_is_windows(receipt):
+    return receipt_platform(receipt) == "windows-scheduledtasks"
+
+
+def _link_points_to(link, target):
+    try:
+        value = os.readlink(str(link))
+    except OSError:
+        return False
+    actual = Path(value) if Path(value).is_absolute() else link.parent / value
+    return os.path.normpath(str(actual)) == os.path.normpath(str(target))
+
+
+def assert_linux_write_paths(receipt):
+    for path in (receipt["service_path"], receipt["timer_path"]):
+        if Path(path).is_symlink():
+            raise SchedulerError("systemd unit path is a symlink; refusing to write it")
+    link = Path(receipt["timer_enable_path"])
+    if link.exists() or link.is_symlink():
+        if not link.is_symlink() or not _link_points_to(link, Path(receipt["timer_path"])):
+            raise SchedulerError("timer enable link differs from its exact ownership receipt")
+
+
 def _linux_static(receipt, owner_path, owner, root, transport):
-    if not _same_owner(receipt, owner_path, owner, root) or receipt.get("platform") != "linux-systemd":
+    try:
+        platform = receipt_platform(receipt)
+    except SchedulerError:
+        return False
+    if not _same_owner(receipt, owner_path, owner, root) or platform != "linux-systemd":
         return False
     required = ("service_unit", "timer_unit", "unit_directory", "service_path", "timer_path", "timer_enable_path", "service_sha256", "timer_sha256")
     if not all(isinstance(receipt.get(key), str) and receipt[key] for key in required):
@@ -291,12 +343,12 @@ def _linux_static(receipt, owner_path, owner, root, transport):
     except SchedulerError:
         return False
     for state, path in ((service_state, receipt["service_path"]), (timer_state, receipt["timer_path"])):
-        if (state.get("LoadState") != "loaded" or state.get("FragmentPath") != str(Path(path).resolve())
+        if (state.get("LoadState") != "loaded" or state.get("FragmentPath") != str(path)
                 or state.get("DropInPaths", "") or state.get("NeedDaemonReload") != "no"):
             return False
     link = Path(receipt["timer_enable_path"])
     if link.exists() or link.is_symlink():
-        if not link.is_symlink() or str(link.resolve()) != str(Path(receipt["timer_path"]).resolve()):
+        if not link.is_symlink() or not _link_points_to(link, Path(receipt["timer_path"])):
             return False
     return True
 
@@ -326,12 +378,27 @@ def _windows_task(receipt, transport):
 
 
 def _windows_static(receipt, owner_path, owner, root, transport):
-    if not _same_owner(receipt, owner_path, owner, root) or receipt.get("platform") not in {None, "windows-scheduledtasks"}:
+    try:
+        platform = receipt_platform(receipt)
+    except SchedulerError:
+        return False
+    if not _same_owner(receipt, owner_path, owner, root) or platform != "windows-scheduledtasks":
         return False
     needed = ("task_name", "task_path", "description", "execute", "arguments")
     if not all(isinstance(receipt.get(key), str) and receipt[key] for key in needed):
         return False
     if receipt["task_name"] != owner_task_name(owner["owner_id"]) or receipt["task_path"] != "\\":
+        return False
+    if receipt.get("version") == 3:
+        if not all(isinstance(receipt.get(key), str) and receipt[key]
+                   for key in ("python", "script", "host_executable")):
+            return False
+        command = adapter_command(receipt)
+        if (receipt.get("adapter_command") != command or receipt["execute"] != command[0]
+                or receipt["arguments"] != subprocess.list2cmdline(command[1:])
+                or receipt["description"] != windows_description(receipt)):
+            return False
+    elif receipt.get("version") != 2:
         return False
     try:
         task = _windows_task(receipt, transport)
@@ -351,6 +418,8 @@ def verify_windows_ownership(receipt, owner_path, owner, root, transport=None):
 
 def verify_windows(receipt, owner_path, owner, root, transport=None):
     transport = transport or SchedulerTransport()
+    if not isinstance(receipt, dict) or receipt.get("version") != 3:
+        return False
     if not _windows_static(receipt, owner_path, owner, root, transport):
         return False
     try:
@@ -385,7 +454,7 @@ def _known_linux_files(candidate, transport):
     for path, expected in ((candidate["service_path"], service), (candidate["timer_path"], timer)):
         try:
             values[path] = transport.read(path)
-        except (OSError, KeyError):
+        except FileNotFoundError:
             values[path] = None
     return values
 
@@ -401,6 +470,42 @@ def _cleanup_initial_linux(proposed, transport):
         if actual[path] == expected:
             transport.remove(path)
     _result(transport, ["systemctl", "--user", "daemon-reload"], timeout=15)
+
+
+def _validate_linux_recovery_evidence(candidates, transport):
+    expected = {}
+    links = {}
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        service, timer = linux_units(candidate)
+        expected.setdefault(candidate["service_path"], set()).add(service)
+        expected.setdefault(candidate["timer_path"], set()).add(timer)
+        links.setdefault(candidate["timer_enable_path"], set()).add(candidate["timer_path"])
+        for unit, path in ((candidate["service_unit"], candidate["service_path"]),
+                           (candidate["timer_unit"], candidate["timer_path"])):
+            state = _show_unit(unit, transport)
+            if state.get("DropInPaths", ""):
+                raise SchedulerError("pending systemd unit has foreign loaded drop-ins; preserving transaction evidence")
+            fragment = state.get("FragmentPath", "")
+            if state.get("LoadState") == "loaded" and fragment != str(path):
+                raise SchedulerError("pending systemd unit has a foreign loaded fragment; preserving transaction evidence")
+            if fragment and fragment != str(path):
+                raise SchedulerError("pending systemd unit has a foreign fragment; preserving transaction evidence")
+    for path, identities in expected.items():
+        if Path(path).is_symlink():
+            raise SchedulerError("pending systemd unit is a symlink; preserving transaction evidence")
+        try:
+            actual = transport.read(path)
+        except FileNotFoundError:
+            continue
+        if actual not in identities:
+            raise SchedulerError("pending systemd unit matches neither recorded identity; preserving transaction evidence")
+    for path, targets in links.items():
+        link = Path(path)
+        if link.exists() or link.is_symlink():
+            if not link.is_symlink() or not any(_link_points_to(link, Path(target)) for target in targets):
+                raise SchedulerError("pending systemd enable link differs from recorded identity; preserving transaction evidence")
 
 
 def reconcile_pending(pending_path, receipt_path, owner_path, owner, root, transport=None, windows=None, dry_run=False):
@@ -419,11 +524,11 @@ def reconcile_pending(pending_path, receipt_path, owner_path, owner, root, trans
     current = _read_json(receipt_path)
     if current not in (None, previous, proposed):
         raise SchedulerError("scheduler receipt matches neither pending registration record")
+    previous_missing = pending.get("previous_missing", False)
+    if not isinstance(previous_missing, bool) or (previous_missing and previous is None):
+        raise SchedulerError("scheduler pending receipt has invalid prior absence state")
     if windows:
-        try:
-            actual = _windows_task(proposed, transport)
-        except SchedulerError:
-            actual = None
+        actual = _windows_task(proposed, transport)
         if actual is None:
             resolved = previous
         elif verify_windows_ownership(proposed, owner_path, owner, root, transport):
@@ -439,42 +544,30 @@ def reconcile_pending(pending_path, receipt_path, owner_path, owner, root, trans
                 atomic_json(receipt_path, resolved)
                 pending_path.unlink()
         return resolved
-    # Every present unit must be one of the recorded byte identities. This catches mixed/foreign overlays before writes.
-    all_paths = {proposed["service_path"], proposed["timer_path"]}
-    if previous:
-        all_paths.update((previous["service_path"], previous["timer_path"]))
-    expected = {}
-    for candidate in (proposed, previous):
-        if candidate:
-            service, timer = linux_units(candidate)
-            expected[candidate["service_path"]] = expected.get(candidate["service_path"], set()) | {service}
-            expected[candidate["timer_path"]] = expected.get(candidate["timer_path"], set()) | {timer}
-    for path in all_paths:
-        if Path(path).is_symlink():
-            raise SchedulerError("pending systemd unit is a symlink; preserving transaction evidence")
-        try:
-            actual = transport.read(path)
-        except (OSError, KeyError):
-            continue
-        if actual not in expected[path]:
-            raise SchedulerError("pending systemd unit matches neither recorded identity; preserving transaction evidence")
+    _validate_linux_recovery_evidence((proposed, previous), transport)
     proposed_owned = verify_linux_ownership(proposed, owner_path, owner, root, transport)
     previous_owned = previous and verify_linux_ownership(previous, owner_path, owner, root, transport)
     if proposed_owned:
         resolved = proposed
     elif previous_owned:
         resolved = previous
-    elif previous is None:
+    elif previous is None or previous_missing:
         if not dry_run:
             _cleanup_initial_linux(proposed, transport)
-            pending_path.unlink()
-        return None
+            if previous is None:
+                pending_path.unlink()
+            else:
+                atomic_json(receipt_path, previous)
+                pending_path.unlink()
+        return previous
     else:
         if not dry_run:
             service, timer = linux_units(previous)
             transport.write(previous["service_path"], service)
             transport.write(previous["timer_path"], timer)
             _result(transport, ["systemctl", "--user", "daemon-reload"], timeout=15)
+            if not verify_linux_ownership(previous, owner_path, owner, root, transport):
+                raise SchedulerError("restored scheduler differs from its exact ownership receipt after reload; preserving transaction evidence")
             _result(transport, ["systemctl", "--user", "enable", "--now", previous["timer_unit"]], timeout=15)
             atomic_json(receipt_path, previous)
             pending_path.unlink()
