@@ -55,9 +55,9 @@ Mistakes this session made that such a convention should have prevented, as evid
    restating them, and reconcile `SKILL_KINDS.md`'s separate-owner sentence with the new sizing rule in
    one place.
 3. Implement it, with discovery: make sure the sessions that add or change a skill actually load it (route
-   table, `AGENTS.md`, description trigger; see Decisions for what was kept). Add a focused test where a rule is machine-checkable; consider
-   whether description parity between canonical and host entries can be checked or generated instead of
-   copied.
+   table, `AGENTS.md`, description trigger; see Decisions for what was kept). Add a focused test where a
+   rule is machine-checkable; consider whether description parity between canonical and host entries can be
+   checked or generated instead of copied.
 4. Validate: both Python suites with `< /dev/null`, local `python -B scripts/update_catalog_digests.py` and
    `pwsh .agents/sync-generated.ps1` then `-Check`, tier payload, catalog `--check`, harness `--check`,
    `docs_reachability.py`. Leave `plugins/*` and catalog digest changes uncommitted.
@@ -109,8 +109,9 @@ Mistakes this session made that such a convention should have prevented, as evid
   generation `-Check`, tier payload, catalog and harness `--check`, `docs_reachability.py` and the packaging
   tests pass.
 - Step 5: first review pass `changes-requested` (F1 HIGH route table, F2–F3 LOW); all three fixed in
-  `33898c4` and re-validated (803 + 983 tests and every generation check). Incremental pass over the fix:
-  F4–F8, fixed or recorded.
+  `33898c4` and re-validated (803 + 983 tests and every generation check; the one removed test covered
+  the dropped route table). Second pass: F4 recorded as workflow debt, F5–F8 fixed in `9c8168e`. Third
+  pass: F9–F11 fixed and re-validated.
 
 ## Next Steps
 
@@ -119,4 +120,4 @@ Current slice: step 5, review.
 Remaining scope: PR, merge, cleanup, message #173's session.
 Done when: the convention is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 5: incremental review of the F4–F8 fixes, then the PR.
+Continue at Completion expectation step 5: incremental review of the F9–F11 fixes, then the PR.
