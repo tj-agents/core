@@ -1263,5 +1263,88 @@ class TelemetryTests(RepositoryFixture):
         self.assertEqual(1, metrics["wait_poll_calls"])
 
 
+class HostCoverageWorkflowTests(RepositoryFixture):
+    def coverage_record(self, head):
+        return {
+            "schema_version": 1,
+            "candidate_head": head,
+            "shared_source": ".agents/base/policy/plan-artifacts/SKILL.md",
+            "hosts": [
+                {
+                    "host": "claude",
+                    "behavior": "loads shared behavior",
+                    "source": ".claude/skills/example/SKILL.md",
+                    "mapping": "plugins/base/skills/example/SKILL.md",
+                    "verification": {"level": "source", "result": "passed", "evidence": "focused source test passed"},
+                },
+                {
+                    "host": "codex",
+                    "behavior": "loads shared behavior",
+                    "source": ".codex/skills/example/SKILL.md",
+                    "mapping": "plugins/base/codex-skills/example/SKILL.md",
+                    "verification": {"level": "source", "result": "passed", "evidence": "focused source test passed"},
+                },
+            ],
+        }
+
+    def write_work_order(self, head):
+        path = self.root / "reviews" / "Feature-Workflow-ops.md"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(
+            "# Review\n\n```agent-host-coverage\n" + json.dumps(self.coverage_record(head)) + "\n```\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def test_review_prepare_reports_shared_mapping_coverage_and_uses_frozen_head(self):
+        self.commit(".agents/plugins/sources.json", "{}\n", "change shared mapping")
+        descriptor = ops.review_prepare(self.root, "coverage", "origin/main", "HEAD", False)
+        self.assertTrue(descriptor["host_coverage"]["required"])
+        self.assertEqual([".agents/plugins/sources.json"], descriptor["host_coverage"]["paths"])
+        self.write_work_order(descriptor["head"])
+        self.commit("src/later.txt", "later\n", "move live head")
+
+        result = ops.review_host_check(self.root, "coverage", descriptor["artifact"], "reviews/Feature-Workflow-ops.md")
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(descriptor["head"], result["head"])
+
+    def test_review_host_check_rejects_a_moving_record_for_another_head(self):
+        self.commit(".agents/workflows/workflow_ops.py", "shared\n", "change workflow")
+        descriptor = ops.review_prepare(self.root, "coverage", "origin/main", "HEAD", False)
+        self.write_work_order("b" * 40)
+
+        result = ops.review_host_check(self.root, "coverage", descriptor["artifact"], "reviews/Feature-Workflow-ops.md")
+
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("candidate_head" in error for error in result["errors"]))
+
+    def test_delivery_coverage_preserves_ordinary_product_paths(self):
+        result = ops.delivery_host_coverage(self.root, "origin/main")
+        self.assertFalse(result["required"])
+        self.assertTrue(result["valid"])
+
+    def test_delivery_coverage_reuses_frozen_evidence_only_for_review_only_commits(self):
+        agent_head = self.commit(".agents/workflows/runtime.py", "shared\n", "change agent runtime")
+        work_order = self.write_work_order(agent_head)
+        work_order.write_text(
+            work_order.read_text(encoding="utf-8") + f"\nReviewed up to commit: `{agent_head}`\n",
+            encoding="utf-8",
+        )
+        self.git("add", "reviews/Feature-Workflow-ops.md")
+        self.git("commit", "-q", "-m", "stamp review")
+
+        stamped = ops.delivery_host_coverage(self.root, "origin/main")
+
+        self.assertTrue(stamped["valid"])
+        self.assertEqual(agent_head, stamped["coverage_head"])
+        self.commit(".agents/workflows/later.py", "changed\n", "move agent source")
+
+        moved = ops.delivery_host_coverage(self.root, "origin/main")
+
+        self.assertFalse(moved["valid"])
+        self.assertEqual(self.git("rev-parse", "HEAD"), moved["coverage_head"])
+
+
 if __name__ == "__main__":
     unittest.main()

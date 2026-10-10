@@ -2,7 +2,8 @@
   "schema_version": 1,
   "plugin": "base-agents/base",
   "source_roots": [
-    ".agents/base"
+    ".agents/base",
+    ".agents/base/policy/plan-artifacts/scripts/host_coverage.py"
   ],
   "requires": {
     "marketplaces": [
