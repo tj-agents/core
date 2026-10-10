@@ -71,9 +71,6 @@ _ENABLE_TOKENS = ("--auto", "--admin", "--merge", "--squash", "--rebase")
 
 CONFIG_FILE = ".agents/merge-gate.json"
 
-# Lowercased, and the hook's whole vocabulary: a harness whose shell tool is not named here
-# cannot be wired to this gate, because a matcher the hook ignores is enforcement that is inert
-# while looking wired. Codex's shell tool name is not established yet, so it carries no entry.
 SHELL_TOOLS = {"bash", "powershell", "shell", "exec_command", "unified_exec", "local_shell"}
 
 # Paths whose change makes a diff security-sensitive — a merge touching any of
