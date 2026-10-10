@@ -6,15 +6,9 @@ import re
 import subprocess
 import sys
 
-from workflow_route import read_receipt
+from workflow_route import direct_control, read_receipt
 
 WINDOWS = os.name == "nt"
-
-PAUSE = re.compile(
-    r"^\s*(?:please\s+)?(?:pause|cancel|stop)(?:\s+(?:this|the|our|my)?\s*"
-    r"(?:work|task|goal|plan|execution))?\s*[.!?]*\s*$",
-    re.IGNORECASE,
-)
 
 
 def workflow_root():
@@ -220,7 +214,7 @@ def outcome(data):
     root = Path(cwd).resolve()
     receipt = read_receipt(session)
     matching_receipt = receipt.get("worktree") == str(root)
-    if matching_receipt and isinstance(receipt.get("prompt"), str) and PAUSE.search(receipt["prompt"]):
+    if matching_receipt and direct_control(str(receipt.get("prompt", ""))) in {"pause", "cancel", "stop"}:
         return None
     owner_path = root / ".agents" / "continuation" / "owner.json"
     owner = read_json(owner_path)
