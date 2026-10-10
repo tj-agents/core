@@ -189,10 +189,11 @@ class TerminalLaunchersTests(unittest.TestCase):
                 "raise SystemExit(run_target(" + repr(str(target)) + ", " + repr(arguments) + "))"
             )
             completed = subprocess.run([sys.executable, "-B", "-c", dispatch], text=True,
-                                       capture_output=True, check=False)
+                                       encoding="utf-8", capture_output=True, check=False)
         self.assertEqual(29, completed.returncode)
         self.assertEqual(json.dumps(arguments, ensure_ascii=False, separators=(",", ":")) + "\n", completed.stdout)
 
+    @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
     def test_bash_set_eu_bare_command_and_missing_registry_fall_back(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
@@ -233,6 +234,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                 self.assertEqual(125, result.returncode)
                 self.assertIn("registry is malformed", result.stderr)
 
+    @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
     def test_bash_missing_interpreter_warns_and_falls_back(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
@@ -253,6 +255,7 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertEqual("fallback\n", result.stdout)
         self.assertIn("no usable Python", result.stderr)
 
+    @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
     def test_bash_preserves_a_real_cli_exit_125_without_a_second_launch(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
@@ -287,6 +290,7 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertEqual(125, completed.returncode)
         self.assertEqual("cli\n", actual_calls)
 
+    @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
     def test_bash_reads_the_active_claude_package_on_each_invocation(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
@@ -321,6 +325,7 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertEqual("first\nsecond\n", actual_calls)
 
+    @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
     def test_bash_bootstraps_ignore_project_local_standard_library_shadows(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
