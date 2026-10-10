@@ -118,6 +118,49 @@ class LinuxTerminalOwnershipTests(ReaperTestCase):
         with mock.patch.object(REAPER.sys, 'platform', 'linux'), mock.patch.object(REAPER, 'linux_process_table', return_value=synthetic):
             self.assertEqual(synthetic, REAPER.read_process_table())
 
+    def test_permission_denied_owner_stat_is_preserved_as_opaque(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            proc_root = Path(temporary)
+            (proc_root / '700').mkdir()
+            with mock.patch.object(Path, 'read_text', side_effect=PermissionError('denied')):
+                table = REAPER.linux_process_table(proc_root, boot=NOW, ticks=100)
+        self.assertEqual([700], [item.pid for item in table])
+        self.assertIsNone(table[0].started_at)
+
+    def test_malformed_owner_stat_is_preserved_as_opaque(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            proc_root = Path(temporary)
+            stat = proc_root / '700' / 'stat'
+            stat.parent.mkdir()
+            stat.write_text('700 (claude) R incomplete', encoding='utf-8')
+            table = REAPER.linux_process_table(proc_root, boot=NOW, ticks=100)
+        self.assertEqual([700], [item.pid for item in table])
+        self.assertIsNone(table[0].name)
+
+    def test_a_truly_vanished_proc_entry_is_omitted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            proc_root = Path(temporary)
+            stat = proc_root / '700' / 'stat'
+            stat.parent.mkdir()
+
+            def vanish(*args, **kwargs):
+                stat.parent.rmdir()
+                raise FileNotFoundError()
+
+            with mock.patch.object(Path, 'read_text', side_effect=vanish):
+                table = REAPER.linux_process_table(proc_root, boot=NOW, ticks=100)
+        self.assertEqual([], table)
+
+    def test_an_unavailable_proc_snapshot_is_not_an_empty_table(self):
+        proc_root = mock.Mock()
+        proc_root.iterdir.side_effect = PermissionError('denied')
+        self.assertIsNone(REAPER.linux_process_table(proc_root, boot=NOW, ticks=100))
+
+    def test_an_opaque_session_leader_keeps_its_peer(self):
+        leader = process(7777, None, None, None)
+        reparented = process(900, 100, 'claude', NOW - 30 * HOUR, terminal_pid=7777)
+        self.assertEqual([], self.orphans(leader, reparented))
+
 
 class GracePeriodTests(ReaperTestCase):
     def test_a_fully_orphaned_process_inside_the_grace_period_survives(self):
@@ -159,6 +202,19 @@ class OwnTreeTests(ReaperTestCase):
 
     def test_a_process_absent_from_the_table_still_protects_itself(self):
         self.assertEqual({999}, REAPER.own_tree(999, []))
+
+    def test_an_incomplete_self_ancestry_disables_candidates(self):
+        table = [
+            process(500, None, None, None),
+            process(900, 8888, 'claude.exe', NOW - 30 * HOUR),
+        ]
+        with mock.patch.object(REAPER, 'terminate') as terminate:
+            code = REAPER.run_report(
+                table, 500, NOW, ('claude',), REAPER.GRACE_SECONDS, True,
+                stream=io.StringIO(), enrich=list,
+            )
+        self.assertEqual(REAPER.EXIT_OK, code)
+        terminate.assert_not_called()
 
 
 class ProcessSelectionTests(ReaperTestCase):
@@ -290,6 +346,32 @@ class ReportTests(ReaperTestCase):
         code, output = self.report(table, True)
         self.assertEqual(REAPER.EXIT_TERMINATION, code)
         self.assertIn('FAILED pid was reused', output)
+
+
+class FreshIdentityTests(unittest.TestCase):
+    def test_reused_linux_identity_is_not_signalled(self):
+        candidate = process(900, 8888, 'claude', NOW - 30 * HOUR)
+        fresh = process(900, 8888, 'claude', NOW - 2 * HOUR)
+        with mock.patch.object(REAPER.sys, 'platform', 'linux'), mock.patch.object(
+            REAPER, 'linux_process_table', return_value=[fresh]
+        ), mock.patch.object(REAPER.os, 'kill') as kill:
+            self.assertEqual('pid was reused', REAPER.terminate(candidate))
+        kill.assert_not_called()
+
+    def test_unknown_linux_identity_is_not_signalled(self):
+        candidate = process(900, 8888, 'claude', NOW - 30 * HOUR)
+        fresh = process(900, None, None, None)
+        with mock.patch.object(REAPER.sys, 'platform', 'linux'), mock.patch.object(
+            REAPER, 'linux_process_table', return_value=[fresh]
+        ), mock.patch.object(REAPER.os, 'kill') as kill:
+            self.assertEqual('cannot confirm identity', REAPER.terminate(candidate))
+        kill.assert_not_called()
+
+    def test_non_finite_candidate_identity_is_not_signalled(self):
+        candidate = process(900, 8888, 'claude', float('nan'))
+        with mock.patch.object(REAPER.sys, 'platform', 'linux'), mock.patch.object(REAPER.os, 'kill') as kill:
+            self.assertEqual('cannot confirm identity', REAPER.terminate(candidate))
+        kill.assert_not_called()
 
 
 if __name__ == '__main__':

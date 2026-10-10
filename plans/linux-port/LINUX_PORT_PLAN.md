@@ -80,27 +80,33 @@ remaining bounded terminal/cleanup investigation. A disposable Linux Git check c
 worktree can be removed while a live process retains its cwd there; Linux needs an exit observer, but
 no wait-before-removal reaper. Windows retains waiting before removal.
 
-Initial runtime port, direct caller/permission migration and first identity-safety repair implemented.
-The identity checkpoint passes 149 tests (two platform skips). Actual stale-tab/title controls and
-the Windows settings configurator are restored; their focused suite passes 29 tests. Remaining before
-publication: unknown-owner handling in Linux orphan recovery, then the final validation/review gates.
-Observer binding, refreshed preflight/cancellation, Windows wrapper qualification and disposable close/
-finish process coverage are implemented. The process integration cases now also execute on Windows CI;
-real Windows UI Automation remains unverified locally. Cleanup reminder commands select the platform's
-interpreter. The combined peer lifecycle suite and cleanup gate suite pass.
-These specified repairs select L4 with serialized path ownership. Then regenerate packages, run both
-full suites, review, Windows/Linux CI, and the real merged-session acceptance. Step 5 remains unchecked
-until that acceptance succeeds. Although Linux permits removal before exit, cleanup will follow verified
-exit so a failed close cannot race deletion; the shared observer already owns that exit check.
+Step 5 implementation and direct caller/permission migration are committed. Actual terminal inventories,
+stale-tab/title controls, Windows settings configuration, full observer binding/cancellation, Windows
+wrapper qualification and unknown-owner recovery are implemented. Disposable close/finish process cases
+execute on Linux and Windows; real Windows UI Automation remains unverified locally.
+Local validation passes: 946 source/package tests (16 skips), 985 shared runtime tests (three skips),
+generated-tree check, tier payloads, catalog digests and harness declarations. Generated output restored.
+Remaining: frozen native/security review, Windows/Linux CI, and the real merged-session acceptance.
+Step 5 remains unchecked until acceptance succeeds. Although Linux permits removal before exit, cleanup
+follows verified exit so a failed close cannot race deletion; the observer already owns that exit check.
 
 Delivery slice: all Step 5 Python replacements, terminal handlers, registry identity, orphan recovery,
 cleanup-gate commands, matching machine harness permissions and regression tests, based on
 `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`.
 The shared finish/close/observer/caller cutover stays atomic to preserve cleanup and exit guarantees.
-Review the measured runtime/test size before publication. Verification requires both Python suites,
+Scope assessment at `5d96fcb`: 40 changed paths; runtime 1,834 added/1,866 deleted lines in 18 paths;
+tests 958 added/2,659 deleted in 12 paths; guidance/permissions 153 added/116 deleted in 10 paths.
+Generated output is excluded. Most deleted test lines retire the PowerShell suites with their scripts.
+The user explicitly requires one PR for Step 5. Splitting shared closure from peer terminal resolution
+would split their common process/terminal identity API; splitting callers or permission grants from
+script deletion would leave cleanup unavailable; splitting test retirement would leave CI invoking
+deleted scripts. The independent configurator and orphan changes would normally be separate slices,
+but are existing Step 5 behavior the user included in this one-PR port. No further concern is admitted.
+The orphan repair adds 119 runtime lines and 82 test lines, removing 27 runtime lines, without adding a
+new concern or generated output. Verification requires both Python suites,
 generated-tree checks, Windows/Linux CI, and a real merged Linux session closing its own tab.
-The machine harness currently grants the retired PowerShell close/finish commands; migrate those grants
-with the scripts and review the permission boundary explicitly before delivery.
+The machine harness grants now reference the Python replacements; review that permission boundary
+explicitly before delivery.
 The workflow helper needs explicit canonical skill paths, for example
 `--lifecycle plan-execution=.agents/engineering/workflow/plan-execution/SKILL.md`;
 its default `.agents/skills/` lookup predates the source-layout migration.
