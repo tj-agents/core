@@ -159,6 +159,15 @@ class CommandExtractionTests(unittest.TestCase):
             gate.extract_command("exec_command", {"command": ["bash", "-lc", "gh auth login"]}),
         )
 
+    def test_codex_argv_payload_uses_the_script_before_shell_arguments(self):
+        self.assertEqual(
+            "gh auth login",
+            gate.extract_command(
+                "exec_command",
+                {"command": ["bash", "-lc", "gh auth login", "trailing-$0", "trailing-$1"]},
+            ),
+        )
+
     def test_a_non_shell_tool_claims_no_jurisdiction(self):
         self.assertIsNone(gate.extract_command("Write", {"command": "gh auth refresh -s admin:org"}))
 
