@@ -6,22 +6,23 @@ Run from the primary checkout, or argument-less from inside the worktree being f
 and cross-checked against a slice-3 cleanup obligation for that worktree when one is recorded. Resolves
 the primary from the first `git worktree list --porcelain` entry, then applies these gates in order:
 
-1. the target is a registered, non-primary, attached (non-detached) worktree on exactly the given
-   branch and head;
+1. the target is a registered attached worktree on exactly the given branch and head, or the primary
+   checkout on the default branch with a separately verified saved branch ref;
 2. a fresh `gh pr view <pr>` reports `MERGED` with `headRefOid` equal to the given head;
 3. the merge commit is an ancestor of `origin/<default>` (fetched first);
-4. `gh pr list --state open --head <branch>` returns no PRs;
+4. fresh authoritative open-PR evidence returns neither HEAD users nor BASE dependents for `<branch>`;
 5. `git status --porcelain=v2 --untracked-files=all` in the target is empty, or (argument-less from
    inside the target) remaining changes are archived under `<state>/merge-cleanup/set-aside/` and the
    tree is re-checked clean.
 
-All gates pass: prints `removable` and the exact `worktree remove`/`branch -d`/`branch -D` commands,
-exit 0. Any gate fails: prints `preserve: <reason>`, exit 1. Either way, a JSON receipt is written
+All deletion gates pass: prints `removable` and the exact deletion commands, exit 0. An open BASE
+dependent prints `retained-dependency`, exit 0, and keeps the checkout and branch. Any other gate fails:
+prints `preserve: <reason>`, exit 1. Either way, a JSON receipt is written
 under `<AGENT_STATE_DIRECTORY|~/.agents-state>/merge-cleanup/receipts/`.
 
-`CLEANUP_PROOF_FORGE_FIXTURE` names a JSON file with optional `pr_view`, `open_prs` and (for the
-argument-less `--pr` resolution) `pr_for_branch` keys to replace the `gh` calls for offline tests;
-absent, all three call the real `gh` CLI.
+`CLEANUP_PROOF_FORGE_FIXTURE` names a JSON file with `pr_view`, `open_head_prs`, `open_base_prs` and
+(for the argument-less `--pr` resolution) `pr_for_branch` keys to replace the `gh` calls for offline
+tests; absent, all calls use the real `gh` CLI.
 """
 
 import argparse
@@ -34,6 +35,19 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+
+def dependency_helper_directory():
+    source = Path(__file__).resolve()
+    for parent in source.parents:
+        for candidate in (parent / "hooks", parent / ".agents" / "hooks"):
+            if (candidate / "cleanup_dependency.py").is_file():
+                return candidate
+    raise RuntimeError("cleanup dependency helper is unavailable")
+
+
+sys.path.insert(0, str(dependency_helper_directory()))
+from cleanup_dependency import EvidenceError, observe_open_prs
 
 
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
@@ -194,14 +208,20 @@ def list_worktrees(cwd):
     return entries
 
 
-def resolve_target(cwd, worktree, branch, head):
+def resolve_target(cwd, worktree, branch, head, default):
     entries = list_worktrees(cwd)
     if not entries:
         raise Preserve("no worktree records found")
     primary = entries[0]["path"]
     target = Path(worktree).resolve()
     if target == primary:
-        raise Preserve(f"{target} is the primary checkout")
+        current = entries[0]
+        if current["branch"] != default:
+            raise Preserve(f"{target} is on {current['branch']!r}, not the default branch {default!r}")
+        saved = run_git(primary, "rev-parse", "refs/heads/" + branch)
+        if saved.returncode != 0 or saved.stdout.strip() != head:
+            raise Preserve(f"saved branch {branch!r} does not resolve to {head!r}")
+        return primary, target, True
     matches = [entry for entry in entries if entry["path"] == target]
     if not matches:
         raise Preserve(f"{target} is not a registered worktree")
@@ -212,7 +232,7 @@ def resolve_target(cwd, worktree, branch, head):
         raise Preserve(f"{target} is on branch {entry['branch']!r}, not {branch!r}")
     if entry["head"] != head:
         raise Preserve(f"{target} is at {entry['head']!r}, not {head!r}")
-    return primary, target
+    return primary, target, False
 
 
 def require_clean(target):
@@ -405,22 +425,14 @@ def require_contained(primary, default, merge_oid):
         raise Preserve(f"merge commit {merge_oid} is not an ancestor of origin/{default}")
 
 
-def open_prs(branch, repo, fixture):
-    if fixture is not None:
-        return fixture.get("open_prs", [])
-    result = gh(repo, "pr", "list", "--state", "open", "--head", branch, "--json", "number")
-    if result.returncode != 0:
-        raise Preserve(f"gh pr list for {branch} failed: {result.stderr.strip()}")
+def require_safe_dependencies(branch, repo, primary, fixture):
     try:
-        return json.loads(result.stdout)
-    except ValueError as error:
-        raise Preserve(f"gh pr list for {branch} returned invalid JSON: {error}") from error
-
-
-def require_no_open_pr(branch, repo, fixture):
-    prs = open_prs(branch, repo, fixture)
-    if prs:
+        evidence = observe_open_prs(branch, repo=repo, cwd=primary, fixture=fixture)
+    except EvidenceError as error:
+        raise Preserve(str(error)) from error
+    if evidence["head"]:
         raise Preserve(f"an open PR exists for branch {branch}")
+    return evidence
 
 
 def branch_deletion_command(primary, branch, default):
@@ -429,10 +441,16 @@ def branch_deletion_command(primary, branch, default):
     return f'git -C "{primary}" branch -D {branch}'
 
 
+def validate_branch(branch):
+    if not isinstance(branch, str) or not branch or any(
+            char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-" for char in branch):
+        raise Preserve(f"branch {branch!r} cannot be emitted in a cleanup command")
+
+
 def run(args):
     cwd = Path.cwd()
-    default = args.default or default_branch(cwd)
-    fixture = load_fixture()
+    default = args.default
+    fixture = None
     worktree_value = args.worktree
     branch = args.branch
     head = args.head
@@ -443,34 +461,48 @@ def run(args):
     primary = None
     set_aside_path = None
     commands = []
+    dependencies = []
+    dependency_evidence = None
     try:
+        default = default or default_branch(cwd)
+        fixture = load_fixture()
         if worktree_value is None or branch is None or head is None:
             derived_worktree, derived_branch, derived_head = derive_context(cwd)
             worktree_value = worktree_value or derived_worktree
             branch = branch or derived_branch
             head = head or derived_head
+        validate_branch(branch)
+        if branch == default:
+            raise Preserve("the default branch cannot be deleted")
         worktree = Path(worktree_value).resolve()
         obligation = obligation_for_worktree(worktree)
         if pr is None:
             pr = resolve_pr(branch, args.repo, fixture, obligation)
-        primary, target = resolve_target(cwd, worktree_value, branch, head)
-        records = status_entries(target)
+        primary, target, primary_branch_route = resolve_target(cwd, worktree_value, branch, head, default)
+        records = [] if primary_branch_route else status_entries(target)
         merge_oid = require_merged(pr, head, args.repo, fixture)
         require_contained(primary, default, merge_oid)
-        require_no_open_pr(branch, args.repo, fixture)
-        if records:
-            if cwd_is_inside_target(cwd, target):
-                try:
-                    set_aside_path = set_aside(target, records, branch, head, pr)
-                except OSError as error:
-                    raise Preserve(f"set-aside failed for {target}: {error}") from error
-            else:
-                raise Preserve(f"{target} has uncommitted or untracked changes")
-        require_clean(target)
-        commands = [
-            f'git -C "{primary}" worktree remove -- "{target}"',
-            branch_deletion_command(primary, branch, default),
-        ]
+        dependency_evidence = require_safe_dependencies(branch, args.repo, primary, fixture)
+        dependencies = dependency_evidence["base"]
+        if dependencies:
+            verdict = "retained-dependency"
+            reason = f"open PRs depend on branch {branch} as their base"
+        else:
+            if records:
+                if cwd_is_inside_target(cwd, target):
+                    try:
+                        set_aside_path = set_aside(target, records, branch, head, pr)
+                    except OSError as error:
+                        raise Preserve(f"set-aside failed for {target}: {error}") from error
+                else:
+                    raise Preserve(f"{target} has uncommitted or untracked changes")
+            if not primary_branch_route:
+                require_clean(target)
+                commands.append(f'git -C "{primary}" worktree remove -- "{target}"')
+            commands.extend([
+                branch_deletion_command(primary, branch, default),
+                f'git -C "{primary}" push origin --delete {branch}',
+            ])
     except Preserve as error:
         verdict = "preserve"
         reason = error.reason
@@ -478,7 +510,7 @@ def run(args):
         if worktree_value is None:
             worktree_value = str(cwd)
 
-    worktree = Path(worktree_value).resolve()
+    worktree = Path(worktree_value or cwd).resolve()
     save_receipt(receipt_path(worktree), {
         "worktree": str(worktree),
         "primary": str(primary) if primary is not None else None,
@@ -488,6 +520,8 @@ def run(args):
         "merge_oid": merge_oid,
         "default": default,
         "verdict": verdict,
+        "dependencies": dependencies,
+        "dependency_evidence": dependency_evidence,
         "set_aside": set_aside_path,
         "recorded_at": time.time(),
     })
@@ -496,6 +530,11 @@ def run(args):
         print("removable")
         for command in commands:
             print(command)
+        return 0
+    if verdict == "retained-dependency":
+        print("retained-dependency")
+        for dependency in dependencies:
+            print(f"PR #{dependency['number']} ({dependency['head_ref_name']} at {dependency['head_ref_oid']})")
         return 0
     print(f"preserve: {reason}")
     return 1

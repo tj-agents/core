@@ -282,10 +282,19 @@ Do not make the user choose between these paths or teach them this lifecycle det
 `/cd` pause already defined by `base:cd` applies when the automatic handoff capability is genuinely
 unavailable or its diagnosed launcher fails.
 
-Resolve the repository's own worktree command under the primary checkout and prefer it for a
-worktree-developed branch. It refuses every unsafe state and handles the platform details — junctions, long
-paths, Git administration, branch deletion — and the repository's own docs own that list, so trust the
-refusal instead of second-guessing it:
+Before invoking a repository helper or any Git deletion command, run `cleanup_proof.py` against the delivered
+branch. It requires fresh authoritative evidence that no open PR uses the branch as either its HEAD or BASE.
+For a linked checkout, run it from inside that checkout. For a branch developed in the primary checkout after
+that checkout has moved to the default branch, pass the primary path with the saved delivery branch and exact
+delivery head explicitly: `--worktree <primary-checkout> --branch <saved-branch> --head <saved-head> --pr <n>`.
+It verifies that saved local ref instead of the primary checkout's current default-branch HEAD. A `preserve:`
+result stops cleanup. A `retained-dependency` result records the dependent PR identities and completes this
+parent's cleanup by retaining the branch and checkout; run `close.py`, never `finish.py`, for that outcome.
+
+Only after `cleanup_proof.py` prints `removable`, resolve the repository's own worktree command under the
+primary checkout and prefer it for a worktree-developed branch. It refuses every unsafe state and handles the
+platform details — junctions, long paths, Git administration, branch deletion — and the repository's own docs
+own that list, so trust the refusal instead of second-guessing it:
 
 ```powershell
 $worktreeHelper = Join-Path <primary-checkout> 'scripts/worktrees.ps1'
@@ -298,10 +307,11 @@ Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout hel
 skip cleanup. Apply the same gates with native Git from the primary checkout:
 
 1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py`; from
-   elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It refuses the
-   primary checkout, a detached or mismatched target,
-   a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
-   squash/rebase-safe containment proof), and a still-open PR for the head. Run from inside a proven
+   elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It supports the
+   primary branch-only route only with an explicit saved branch and head. It refuses a detached or mismatched
+   target, a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
+   squash/rebase-safe containment proof), a still-open PR for the head, and missing, malformed, or failed
+   HEAD/BASE observation. Run from inside a proven
    merged target, it sets uncommitted leftovers aside under `<state>/merge-cleanup/set-aside/` and cleans
    the tree; from elsewhere a dirty tree still preserves. `preserve:` stops cleanup.
 2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
@@ -310,7 +320,8 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    the old local branch with the same lowercase `-d` only after it is no longer checked out. Double-quote each
    path and run each command on its own; that exact form is what the plugin's harness grant approves; when
    `-d` refuses a squash- or rebase-merged branch, the proof covers exactly this head, so delete it with
-   `git -C <primary-checkout> branch -D <branch>`.
+   `git -C <primary-checkout> branch -D <branch>`. Execute the proof's prescribed remote deletion command
+   only after the same fresh proof printed `removable`.
 3. Re-run `git worktree list --porcelain`, the local branch inventory, and primary-checkout status. The
    target must be absent, the local merged branch must be gone, a primary checkout moved to the default must be
    current on it, and pre-existing user files must remain. Treat any removal error or residual target path

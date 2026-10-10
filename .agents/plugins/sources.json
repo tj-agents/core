@@ -121,6 +121,11 @@
     },
     {
       "plugin": "machine",
+      "source": ".agents/hooks/cleanup_dependency.py",
+      "destination": "hooks/cleanup_dependency.py"
+    },
+    {
+      "plugin": "machine",
       "source": ".agents/machine/scripts",
       "destination": "resources/machine/scripts"
     },
@@ -218,6 +223,11 @@
       "plugin": "engineering",
       "source": ".agents/hooks/harness_grant.py",
       "destination": "hooks/harness_grant.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/cleanup_dependency.py",
+      "destination": "hooks/cleanup_dependency.py"
     },
     {
       "plugin": "engineering",
