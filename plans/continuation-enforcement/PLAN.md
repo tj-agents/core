@@ -14,7 +14,7 @@ Do not assume the base package alone is sufficient. Determine whether the unmerg
 
 ## Next Steps
 
-R9/R10 source/package acceptance completed: Stop 26/26 passed; routing's full 30-test run had one existing recovery subprocess timeout, and the complete affected recovery method passed unchanged in a focused rerun. All other routing tests passed. No assertions/timeouts were weakened. Commit/push the authored correction, refresh owner/binding and perform fresh ordinary L4 incremental review plus exact-head Windows/Linux CI. Previous b8482a6 CI completed green. Merge and verify causal main regeneration before terminal closeout.
+Final source 13a22abe36841079c2e07866d8c4148c0ca6595f is pushed in core PR #184. Owner/binding refreshed. Fresh ordinary L4 incremental review b8482a6..13a22ab is in progress; source/package acceptance is recorded below. Exact-head Linux CI is green, Windows is actively monitored. After review and CI gates pass, run current-head PR/body/base preflight, merge, verify causal main regeneration and its complete CI, then complete the canonical goal, remove its owned scheduler/binding and safely close the source worktree. Retain the Rust host checkout and unrelated work.
 
 ## Deferred tech debt
 
@@ -105,3 +105,7 @@ Scope boundary: a fresh session without a routed execution obligation does not a
 2026-10-10 R8 acceptance: interrogative auxiliary and subject handling excludes recommendation/capability questions before internal conjunctions; polite direct requests remain explicit positives. Actual source selection and receipt-to-Stop cases cover Should we, Can I, Would we and Do we, with/without active goals. Final routing 30/30 and Stop 26/26 passed with package generation/check. Artifacts: .git/agent-workflow/runs/continuation-enforcement-interrogative-check/artifacts/.
 
 2026-10-10 R9/R10 acceptance: restored direct Need to/Must/Do/Have compound requests, scoped ambiguous auxiliaries to interrogative subjects, excluded negative modal contractions and preserved explicit must-not prohibitions. Full Stop 26/26 passed after final package generation/check. Full routing 30 tests reported one PreToolUse recovery timeout (Don’t only plan it, implement it, active goal); isolated complete mixed-planning recovery method passed unchanged, with its original 20-second limit. No functional assertion failed. Artifacts: .git/agent-workflow/runs/continuation-enforcement-auxiliary-check/artifacts/. Exact-head CI owns the complete clean matrix.
+
+2026-10-10 exact-head source CI 38076473447 passed guard, Windows and Linux for 13a22ab. Final review retains only R11: noun-subject Do questions changed from read-only to execution after auxiliary narrowing. Preserve sentence punctuation to distinguish the question while retaining direct Do/Have commands and later execution sentences. Coordinated-negation suggestions are pre-existing in the actual route and are excluded from this incremental repair. Fresh exact-head review/CI follow the small correction.
+
+2026-10-10 R11 acceptance: the two routing question/direct-request methods and actual receipt-to-Stop question method passed unchanged timeouts/assertions. The source preserves sentence punctuation before excluding ambiguous Do/Have interrogatives, retaining direct auxiliary commands and separate later execution. Latest main integrated at e63a6e6; no writer remains.

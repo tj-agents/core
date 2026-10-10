@@ -24,6 +24,7 @@ INDIRECT_EXECUTION_CONTEXT = re.compile(
     r"^\s*(?:(?:please|can\s+you|could\s+you|would\s+you)\s+)*(?:"
     r"(?:how|why|what|when|where|whether)\b|"
     r"(?:should|shall|does|did|is|are|was|were|has|had)\b|"
+    r"(?:do|have)\b(?=[^.!?;\n]*\?)|"
     r"(?:do|have)(?:n['\u2019]t)?\s+(?:i|we|you|they|he|she)\b|"
     r"(?:must|need)(?:\s+not|n['\u2019]t)\b|"
     r"(?:must|need)(?:n['\u2019]t)?\s+(?:i|we|you|they|he|she|it|this|that|the|a|an)\b|"
@@ -134,7 +135,7 @@ def authorization_evidence(prompt: str) -> str:
 def execution_authorized(evidence: str) -> bool:
     return any(
         INDIRECT_EXECUTION_CONTEXT.search(unit) is None and EXECUTION_DIRECTIVE.search(unit)
-        for unit in re.split(r"[.!?;\n]+", evidence)
+        for unit in re.split(r"(?<=[.!?;\n])", evidence)
     )
 
 
