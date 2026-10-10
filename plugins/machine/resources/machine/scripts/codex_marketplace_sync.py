@@ -3,8 +3,8 @@
 trust any of tj-agents' own hook definitions among them.
 
 A faithful Python port of codex_marketplace_sync.ps1. Exposes sync_codex_standards() for launch_codex.py
-to call before opening a handoff tab, and a CLI (`--codex <exe> --project <dir>`) for codex-profile.ps1 to
-call from a typed `codex` in a terminal. Not runnable from a terminal in any other way.
+to call before opening a handoff tab, and for codex_terminal_launcher.py to call from a typed `codex` in a
+terminal. Not runnable from a terminal in any other way.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def is_codex_shim(executable):
     """Whether <executable> is a launch-time shim rather than the native binary itself: a `.ps1`/`.cmd`
     wrapper, or a POSIX `#!` script. Used to tell a caller-supplied `--codex` that already names the npm
     entry point from one that names the real executable, so only the former is re-resolved."""
-    if Path(executable).suffix.casefold() in ('.ps1', '.cmd'):
+    if Path(executable).suffix.casefold() in ('.ps1', '.cmd', '.bat'):
         return True
     try:
         with open(executable, 'rb') as handle:
@@ -60,6 +60,18 @@ def is_codex_shim(executable):
         # native, so it is re-resolved rather than trusted as-is.
         return True
 
+
+
+def resolve_codex_for_sync(codex: str | None) -> str:
+    """Return a native Codex binary for maintenance, retaining the typed shim for final launch."""
+    if codex and not is_codex_shim(codex):
+        return codex
+    agent_cli = _load_agent_cli()
+    try:
+        resolved, _version = agent_cli.resolve_codex_executable()
+    except agent_cli.LaunchError as error:
+        raise SyncError(str(error)) from None
+    return resolved
 
 def invoke_codex_sync_command(codex_executable, arguments, cwd=None, run=subprocess.run, timeout=None):
     """Run one `codex <arguments>` call and parse its stdout as JSON.
@@ -95,7 +107,7 @@ def invoke_codex_sync_command(codex_executable, arguments, cwd=None, run=subproc
 def invoke_codex_hook_trust(codex_executable, working_directory, helper_script, cwd=None, run=subprocess.run, out=print):
     """Run the hook-trust helper with the current interpreter, against a snapshot of itself."""
     try:
-        result = run([sys.executable, '-B', str(helper_script), '--codex', str(codex_executable),
+        result = run([sys.executable, '-I', '-B', str(helper_script), '--codex', str(codex_executable),
                      '--project', str(working_directory)], cwd=cwd, capture_output=True,
                     text=True, encoding='utf-8', errors='replace', timeout=PLUGIN_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
@@ -181,13 +193,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--project', type=Path, default=Path.cwd())
     arguments = parser.parse_args(argv)
     try:
-        codex = arguments.codex
-        if not codex or is_codex_shim(codex):
-            agent_cli = _load_agent_cli()
-            try:
-                codex, _version = agent_cli.resolve_codex_executable()
-            except agent_cli.LaunchError as error:
-                raise SyncError(str(error)) from None
+        codex = resolve_codex_for_sync(arguments.codex)
         sync_codex_standards(codex, arguments.project)
         return 0
     except SyncError as error:
