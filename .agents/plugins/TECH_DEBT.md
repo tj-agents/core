@@ -1,14 +1,17 @@
 # Plugin host integration debt
 
-## Arbitrary terminal prose is outside the completion runtime
+## Continuation Stop enforcement still needs installed-host acceptance
 
-The completion runtime validates supported workflow receipts and the terminal reports those workflows
-produce. Codex and Claude provide no package hook that intercepts arbitrary final prose, so a session can
-still type an unsupported completion claim outside that path.
+Codex and Claude expose Stop events that can keep an unfinished execution active. The shared
+continuation gate checks session execution obligations, canonical owners, delivery identity and
+registered wakes; source and package tests alone do not establish that a host loaded and trusted it.
+An untrusted, disabled or failed-to-launch hook can still be skipped by the host, and arbitrary prose
+without an observed execution obligation cannot manufacture execution authority.
 
-Resolve when both hosts expose a trusted terminal-response interception point that can require the canonical
-completion check before a user-visible success claim. Until then, do not claim installed-host adoption from
-source tests alone.
+Resolve when fresh Codex and Claude sessions in independent personal repositories prove that an
+unfinished authorized goal cannot end without verified completion, a genuine typed gate or a matching
+registered wake, including repeated Stop events and hook refresh/trust activation. Keep that live
+acceptance distinct from source test results.
 
 ## Callout enforcement has bounded host signals
 
@@ -16,8 +19,8 @@ The callout-repair gate blocks automatic feedback substitution and checks paired
 against the prepared standards-repair goal. Claude's Stop hook also holds recognized callouts.
 Callout detection covers explicit mistake wording that names standards or workflow mechanisms;
 it cannot establish the meaning of every complaint,
-whether a standard caused it, or whether assistant text substantively answers a question. Codex has no
-registered result or Stop hook, and specialized host tools can bypass normal plugin hooks. Source
+whether a standard caused it, or whether assistant text substantively answers a question. Codex's callout gate has no
+registered result or Stop check, and specialized host tools can bypass normal plugin hooks. Source
 regressions and packaging checks do not establish live activation or interception of SendFeedback.
 
 Resolve when both hosts expose trusted semantic callout and answer signals, successful source-owner
@@ -128,3 +131,13 @@ directories.
 Resolve when generation emits the plain host entry points from the canonical definitions, so only an
 entry with a genuine host difference (`extended_host_adapters`) is authored under `.codex/` or `.claude/`,
 and `engineering:skill-authoring` no longer tells authors to copy the description.
+
+## Codex Windows sandbox setup fails before shell execution
+
+On 2026-10-10, attempts to read the installed plan-execution and lanes entry points failed with
+orchestrator_helper_exit_nonzero and helper_unknown_error: setup refresh had errors before PowerShell
+started. The same files read successfully through unsandboxed execution. Tommy explicitly deferred
+this host issue while the continuation enforcement repair proceeds; do not conflate it with missing
+shared core capabilities.
+
+Resolve separately when sandboxed file reads and repository commands launch without escalation.

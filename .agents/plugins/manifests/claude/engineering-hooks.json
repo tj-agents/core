@@ -95,6 +95,19 @@
         "hooks": [
           {
             "type": "command",
+            "timeout": 60,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/continuation_stop.py"
+            ]
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "timeout": 30,
             "command": "python",
             "args": [
