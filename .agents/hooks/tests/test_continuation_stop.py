@@ -284,6 +284,10 @@ class ContinuationStopTests(unittest.TestCase):
             "How does plan-execution work?",
             "Why didn't you finish the plan?",
             "Explain how to implement the plan.",
+            "How do I plan and implement the migration?",
+            "Can you explain how to plan and implement the migration?",
+            "Explain how to plan and implement the migration.",
+            "Please explain how to plan and implement the migration.",
         )
         with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
             for prompt in prompts:
