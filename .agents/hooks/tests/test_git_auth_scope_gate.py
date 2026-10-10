@@ -169,6 +169,36 @@ class CommandExtractionTests(unittest.TestCase):
             ),
         )
 
+    def test_unix_shell_launch_options_select_the_script_before_positional_arguments(self):
+        command = "gh auth login"
+        cases = (
+            ["bash", "--noprofile", "-lc", command, "trailing-$0", "trailing-$1"],
+            ["bash", "-l", "-c", command, "trailing-$0", "trailing-$1"],
+            ["bash", "-cl", command, "trailing-$0", "trailing-$1"],
+            ["bash", "--rcfile", "bashrc", "-c", command, "trailing-$0"],
+            ["bash", "--init-file", "bashrc", "-c", command, "trailing-$0"],
+            ["bash", "-o", "posix", "-c", command, "trailing-$0"],
+            ["bash", "-co", "posix", command, "trailing-$0"],
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.assertEqual(command, gate.extract_command("exec_command", {"command": payload}))
+
+    def test_unix_shell_stops_before_a_script_path_or_option_terminator(self):
+        command = "gh auth login"
+        for payload in (
+            ["bash", "script.sh", "-c", command],
+            ["bash", "--", "-c", command],
+            ["bash", "--noprofile", "-c"],
+            ["bash", "--rcfile"],
+            ["bash", "-o"],
+            ["bash", "--rcfile", "-c", command],
+            ["bash", "--init-file", "-c", command],
+            ["bash", "-o", "-c", command],
+        ):
+            with self.subTest(payload=payload):
+                self.assertNotEqual(command, gate.extract_command("exec_command", {"command": payload}))
+
     def test_short_unix_shell_argv_is_joined(self):
         self.assertEqual(
             "bash -lc",
