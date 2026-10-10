@@ -56,6 +56,12 @@ def parse_args(argv, agent_cli):
     parser.add_argument('--bypass-hook-trust', action='store_true')
     args = parser.parse_args(argv)
 
+    # L7 work stays inside an existing session: rejected before anything else runs, regardless of
+    # whether --model or --frontier is also given, because the lane itself -- not what it would have
+    # paired with -- is what a handoff can never open.
+    if args.lane == 'L7':
+        raise agent_cli.LaunchError('--lane L7 is for in-session clerical work and cannot open a handoff.')
+
     # --frontier is the tier no lane resolves to and tolerates no competing selection beside it, so
     # passing it alongside --lane or --model is a contradiction to reject rather than an ambiguity to
     # rank. --reasoning-effort is the one flag it still accepts, for a user who named the pace as well as
@@ -65,12 +71,6 @@ def parse_args(argv, agent_cli):
             '--frontier rejects --lane and --model beside it: the frontier tier is an explicit user '
             'request, not one selection among several.'
         )
-
-    # L7 work stays inside an existing session: rejected before anything else runs, regardless of
-    # whether --model is also given, because the lane itself -- not the model it would have paired
-    # with -- is what a handoff can never open.
-    if args.lane == 'L7':
-        raise agent_cli.LaunchError('--lane L7 is for in-session clerical work and cannot open a handoff.')
 
     return args
 

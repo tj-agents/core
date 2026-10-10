@@ -56,7 +56,9 @@ def is_codex_shim(executable):
         with open(executable, 'rb') as handle:
             return handle.read(2) == b'#!'
     except OSError:
-        return False
+        # Matches agent_cli._is_script's own fail-safe direction: an unreadable path cannot be confirmed
+        # native, so it is re-resolved rather than trusted as-is.
+        return True
 
 
 def invoke_codex_sync_command(codex_executable, arguments, cwd=None, run=subprocess.run, timeout=None):
@@ -72,24 +74,34 @@ def invoke_codex_sync_command(codex_executable, arguments, cwd=None, run=subproc
                      text=True, encoding='utf-8', errors='replace', timeout=timeout)
     except subprocess.TimeoutExpired:
         raise SyncError(f"Codex plugin sync timed out after {timeout}s: {' '.join(arguments)}") from None
-    except RuntimeError as error:
-        raise SyncError(str(error)) from None
+    except (RuntimeError, OSError) as error:
+        raise SyncError(f"Codex plugin sync could not start: {' '.join(arguments)}: {error}") from None
     if result.returncode != 0:
         combined = (result.stdout or '') + (result.stderr or '')
         raise SyncError(f"Codex plugin sync failed: {' '.join(arguments)}: {combined.strip()}")
     try:
-        return json.loads(result.stdout)
+        parsed = json.loads(result.stdout)
     except ValueError:
         raise SyncError(
             f"Codex plugin sync returned invalid JSON: {' '.join(arguments)}: {result.stdout.strip()!r}"
         ) from None
+    if not isinstance(parsed, dict):
+        raise SyncError(
+            f"Codex plugin sync returned a non-object JSON value: {' '.join(arguments)}: {result.stdout.strip()!r}"
+        )
+    return parsed
 
 
 def invoke_codex_hook_trust(codex_executable, working_directory, helper_script, cwd=None, run=subprocess.run, out=print):
     """Run the hook-trust helper with the current interpreter, against a snapshot of itself."""
-    result = run([sys.executable, '-B', str(helper_script), '--codex', str(codex_executable),
-                 '--project', str(working_directory)], cwd=cwd, capture_output=True,
-                text=True, encoding='utf-8', errors='replace')
+    try:
+        result = run([sys.executable, '-B', str(helper_script), '--codex', str(codex_executable),
+                     '--project', str(working_directory)], cwd=cwd, capture_output=True,
+                    text=True, encoding='utf-8', errors='replace', timeout=PLUGIN_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        raise SyncError(f'Codex hook trust timed out after {PLUGIN_TIMEOUT_SECONDS}s') from None
+    except OSError as error:
+        raise SyncError(f'Codex hook trust could not start: {error}') from None
     for line in (result.stdout or '').splitlines():
         out(line)
     if result.stderr:
