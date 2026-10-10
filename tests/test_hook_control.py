@@ -286,6 +286,7 @@ class HookControlTests(unittest.TestCase):
         original_replace = CONTROL.os.replace
         original_read_text = Path.read_text
         read_attempts = 0
+        transient_winerrors = (5, 32)
 
         def replace(source, destination):
             attempted.set()
@@ -301,9 +302,9 @@ class HookControlTests(unittest.TestCase):
             nonlocal read_attempts
             if path == sidecar:
                 read_attempts += 1
-                if read_attempts == 1:
+                if read_attempts <= len(transient_winerrors):
                     error = PermissionError(13, 'sharing violation')
-                    error.winerror = 32
+                    error.winerror = transient_winerrors[read_attempts - 1]
                     raise error
             return original_read_text(path, *args, **kwargs)
 
@@ -320,7 +321,7 @@ class HookControlTests(unittest.TestCase):
 
         self.assertFalse(writer.is_alive())
         self.assertEqual(errors, [])
-        self.assertEqual(read_attempts, 2)
+        self.assertEqual(read_attempts, 3)
         self.assertEqual(CONTROL.load_snapshot(sidecar)['disabled_sha256'], 'a' * 64)
 
     @unittest.skipUnless(sys.platform == 'win32', 'Windows sharing violations are Windows-only')
