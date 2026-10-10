@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `2a4b65f436d81222680c23409d3347838618207a`  `(2026-10-10)`
+**Reviewed up to commit:** `1dd4c1629152038e2da0d16630d473ccdb436879`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -177,3 +177,29 @@ Remediation of F12–F15. Security layer not required.
 Dropped: restoring the removed layout sentence (the owner list already covers it), the "only this
 repository's plugins" bound (accurate), the 112-character line (a URL), and a duplicated plan note
 (removed). Re-validated: 803 + 983 tests and every generation check.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `2a4b65f436d81222680c23409d3347838618207a`
+**Candidate head:** `1dd4c1629152038e2da0d16630d473ccdb436879`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:6ec04f82f9d57ff5009efdd8882849797568b458c9e86959b282823b620dbd3e` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/7gOJuKgT5DaKS7lo_0Z2Tp/_jGm3h8eDJJkt7uYo0B3ig`
+**Candidate bundle identity:** `sha256:1902c5dce1c7f227aded15883c739f6a6408deb20eac5e3bf0c061b5f7035dcf`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F16–F17. Security layer not required.
+
+### Findings
+
+- [x] **F18 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:67`
+  "Plain entry point" and "registered as a host extension" are undefined, so an author cannot tell which
+  entry points generation checks. Fix: say "thin" and name `extended_host_adapters` in
+  `.agents/plugins/sources.json`. Fixed.
+
+Dropped: self-matches against this repository's installed copies (the check governs choosing a new
+name), a later third-party clash (covered by "already shared"), and the split ledger line (tidied).
+Re-validated: 803 + 983 tests and every generation check.
