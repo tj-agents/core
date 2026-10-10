@@ -26,6 +26,7 @@ AUTHORIZATION_KEYS = {
     "instruction",
     "always_stop_paths",
     "hold_label",
+    "authorized_stop_classes",
 }
 
 # Change classes whose risk neither the hard floor nor the selected end-to-end tier can observe, so a
@@ -56,6 +57,16 @@ STOP_CLASSES = (
             re.I,
         ),
     ),
+)
+
+EXEMPTIBLE_STOP_CLASSES = frozenset(
+    {
+        "ci-workflow",
+        "migration",
+        "auth",
+        "money",
+        "published-contract",
+    }
 )
 
 
@@ -145,10 +156,33 @@ class StandingMergeAuthorization:
         hold_label = policy.get("hold_label")
         if hold_label is not None and (not isinstance(hold_label, str) or not hold_label.strip()):
             raise DeliveryContractViolation("`hold_label` must be a nonempty string when present")
+        authorized_stop_classes = policy.get("authorized_stop_classes", [])
+        if not isinstance(authorized_stop_classes, list):
+            raise DeliveryContractViolation("`authorized_stop_classes` must be a list")
+        if any(not isinstance(name, str) for name in authorized_stop_classes):
+            raise DeliveryContractViolation("`authorized_stop_classes` entries must be strings")
+        authorized_stop_classes = set(authorized_stop_classes)
+        unknown_stop_classes = authorized_stop_classes - EXEMPTIBLE_STOP_CLASSES
+        if unknown_stop_classes:
+            raise DeliveryContractViolation(
+                "`authorized_stop_classes` has unknown classes "
+                f"{sorted(unknown_stop_classes)!r}"
+            )
+        if len(authorized_stop_classes) != len(policy.get("authorized_stop_classes", [])):
+            raise DeliveryContractViolation("`authorized_stop_classes` entries must be unique")
+        if authorized_stop_classes and mode not in {"auto", "merge"}:
+            raise DeliveryContractViolation(
+                "`authorized_stop_classes` requires auto or merge standing authorization"
+            )
         return policy
 
     def stop_patterns(self, policy):
-        patterns = list(STOP_CLASSES)
+        authorized_stop_classes = set(policy.get("authorized_stop_classes", []))
+        patterns = [
+            (name, pattern)
+            for name, pattern in STOP_CLASSES
+            if name == "standing-authorization" or name not in authorized_stop_classes
+        ]
         for entry in policy.get("always_stop_paths", []):
             patterns.append(("repository-declared", re.compile(entry)))
         return patterns

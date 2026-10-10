@@ -72,10 +72,12 @@ standing instruction, goal authorization, or matching scoped approval, authority
 merge requires a user decision.
 
 The binder reads authoritative forge state and resolves `.agents/delivery-authorization.json`, when
-present, against the current changed paths and labels. Six stop classes hold everywhere: the authorization
-table itself, CI workflow, migration, auth, money and published contract. Repository stop paths and its
-hold label also apply; without a table, `human-gate` is the hold label. A scoped approval cannot bypass
-these stops. **Re-run the binder on every rebind:** a repaired head may add a stop path or hold.
+present, against the current changed paths and labels. The authorization table itself always stops.
+With `standing_authorization` set to `auto` or `merge`, its optional `authorized_stop_classes` list may
+name each of `ci-workflow`, `migration`, `auth`, `money` and `published-contract` at most once. Repository
+stop paths and its hold label still apply; without a table, `human-gate` is the hold label. A scoped
+approval cannot add exemptions or bypass a stop. **Re-run the binder on every rebind:** a repaired head
+may add a stop path or hold.
 
 The artifact retains matching approval wording and provenance as `scoped_approval` across wakes and
 supported repairs to the same PR, worktree and branch. Each rebind refreshes the remote head, checks and
