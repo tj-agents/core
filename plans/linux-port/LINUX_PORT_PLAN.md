@@ -96,7 +96,7 @@ what still needs checking on Windows.
 - Review: the first docs pass reviewed `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e` through
   `838990937acc9f1d39d9799471a8b6293e159183`; its Windows command and audit-count findings were fixed.
   The remediation pass approved the source candidate at `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`.
-  Later plan checkpoints receive their own incremental review before publication. PR not opened.
+  Later plan checkpoints receive their own incremental review before publication.
 - Step 10 slice assessment: one independent final-step PR with no stack dependency. Its initial source candidate
   was based on `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e`; before final review the branch was synchronized to
   current `origin/main` at `1bb1c130b2d1762bce07b599bb0fbb7e311c6749`. The initial reviewed source candidate at
