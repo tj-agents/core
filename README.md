@@ -49,6 +49,25 @@ three packages. `base` remains the common behavior package, while `engineering` 
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
 
+## Repository auto-merge
+
+An engineering-enabled repository can opt into guarded agent auto-merge in its existing
+`.agents/delivery-authorization.json`:
+
+```json
+{
+  "standing_authorization": "auto",
+  "instruction": "Merge green reviewed PRs",
+  "auto_merge": true
+}
+```
+
+Set `"auto_merge": false`, or omit it, to disable the capability. This setting only permits the guarded
+workflow command to request GitHub auto-merge; it does not authorize a merge. Standing or scoped merge
+authority, every stop class and hold label, exact-head checks, current independent review, security review,
+and checkout identity must still pass. The guarded workflow rechecks the declaration at execution time, so
+disabling it after a delivery binding prevents arming auto-merge.
+
 ## Layout
 
 - `.agents/` is the canonical host-neutral source. Base, engineering and machine ownership is expressed
