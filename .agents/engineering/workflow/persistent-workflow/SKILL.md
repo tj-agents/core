@@ -17,6 +17,8 @@ keeps the current owner and leaves the returned actions open.
 
 Run the same read-only check before a foreground terminal report:
 
+Run the Python helpers with `python` on Windows or `python3` on Linux/macOS:
+
 ```bash
 python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
 ```
@@ -69,7 +71,8 @@ authority; this workflow does not create a competing plan or permission.
 Use the packaged `<engineering-package-root>/workflows/continuation_runtime.py` module from an installed
 package, resolving the package root from the installed host skill entry, or its source counterpart
 `.agents/workflows/continuation_runtime.py` in a checkout. Initialize the durable owner with the canonical
-goal path, completion condition, exact authorized actions, authority record and current harness:
+goal path, completion condition, exact authorized actions, authority record and current harness. Run it with
+`python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B "<engineering-package-root>/workflows/continuation_runtime.py" init --root ROOT --goal GOALPATH --completion TEXT --actions ACTION [ACTION ...] --authority TEXT --harness codex|claude
