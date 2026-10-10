@@ -105,14 +105,22 @@ not call owner checkpoint itself. Continue to honor the canonical goal and autho
 The runtime lease coordinates its own writers; it does not gate arbitrary host writes or replace the
 harness's permission controls.
 
-The Windows adapter is shipped beside each host's `persistent-workflow` entry at
-`<skill-directory>/scripts/delivery-continuation.ps1`. Initialize and claim the foreground
+The cross-platform adapter is shipped beside each host's `persistent-workflow` entry at
+`<skill-directory>/scripts/delivery_continuation.py`. Initialize and claim the foreground
 owner before `register`; the adapter supports `register`, `remove`, `list`, and `wake`. The Python runtime
 supports `status` and `wake` against `--owner OWNER`. Remove only at a terminal result. Yield the foreground
 lease before waiting. Do not register another task for an
 existing owner or claim unattended progress before the host and scheduler report success. Other platforms
 must use an implemented runtime adapter; if none is available, state the limitation and continue
 independent authorized work in the current session.
+
+On Linux, registration requires a reachable `systemctl --user` manager and creates a receipt-owned systemd
+user oneshot service and timer. On Windows it requires inbox Windows PowerShell's ScheduledTasks capability.
+Neither path changes lingering or login policy: a Linux user timer runs only while the existing user manager
+runs. Use `python3` on Linux/macOS and `python` on Windows. Pin the native host executable explicitly when
+registering; for example, use `python3 -B "<skill-directory>/scripts/delivery_continuation.py" register --owner OWNER --host-executable /absolute/path/to/codex`
+on Linux/macOS, or `python -B "<skill-directory>\\scripts\\delivery_continuation.py" register --owner OWNER --host-executable C:\\absolute\\path\\to\\codex.exe`
+on Windows. Use `--dry-run` to inspect a proposed registration without changing scheduler or receipt files.
 
 Establish durable continuation through successful initialization, foreground claim, scheduler registration
 and an observed wake. Child execution resolves L4 model and effort from the packaged canonical lane table.
