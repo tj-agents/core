@@ -32,6 +32,7 @@ CODEX = module("codex_terminal_launcher")
 SYNC = module("codex_marketplace_sync")
 COMMAND = module("terminal_command")
 PROFILE = module("claude_terminal_profile")
+CODEX_PROFILE = module("codex_terminal_profile")
 
 
 class TerminalLaunchersTests(unittest.TestCase):
@@ -307,6 +308,72 @@ class TerminalLaunchersTests(unittest.TestCase):
             actual_calls = calls.read_text(encoding="utf-8")
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertEqual("first\nsecond\n", actual_calls)
+
+    def test_bash_bootstraps_ignore_project_local_standard_library_shadows(self):
+        if shutil.which("bash") is None:
+            self.skipTest("Bash is unavailable")
+        with tempfile.TemporaryDirectory(prefix="terminal isolated bootstrap ") as directory:
+            root = Path(directory)
+            home, bin_dir, project = root / "home", root / "bin", root / "project"
+            bin_dir.mkdir()
+            project.mkdir()
+            for shadow in ("json.py", "subprocess.py"):
+                (project / shadow).write_text("raise RuntimeError('project module was imported')\n", encoding="utf-8")
+            environment = dict(os.environ, HOME=str(home), PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+            pythonpath_shadow = root / "pythonpath-shadow"
+            pythonpath_shadow.mkdir()
+            for shadow in ("json.py", "subprocess.py"):
+                (pythonpath_shadow / shadow).write_text("raise RuntimeError('PYTHONPATH module was imported')\n", encoding="utf-8")
+            environment["PYTHONPATH"] = str(pythonpath_shadow)
+            for host, profile in (("claude", PROFILE), ("codex", CODEX_PROFILE)):
+                cli = bin_dir / host
+                cli.write_text("#!/bin/sh\nexit 88\n", encoding="utf-8")
+                cli.chmod(cli.stat().st_mode | 0o111)
+                active = root / f"{host}-active"
+                launcher = active / "resources" / "machine" / "scripts" / f"{host}_terminal_launcher.py"
+                launcher.parent.mkdir(parents=True)
+                launcher.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+                if host == "claude":
+                    cache = root / "claude-cache"
+                    cache.mkdir()
+                    (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
+                        "machine@base-agents": [{"scope": "user", "installPath": str(active)}]
+                    }}), encoding="utf-8")
+                    environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
+                else:
+                    native = bin_dir / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / "codex"
+                    native.parent.mkdir(parents=True)
+                    native.write_text("#!/bin/sh\nprintf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"version\":\"test\",\"enabled\":true}]}'\n", encoding="utf-8")
+                    native.chmod(native.stat().st_mode | 0o111)
+                    codex_home = root / "codex-home"
+                    cache = codex_home / "plugins" / "cache" / "base-agents" / "machine" / "test"
+                    cache.parent.mkdir(parents=True)
+                    shutil.copytree(active, cache)
+                    environment["CODEX_HOME"] = str(codex_home)
+                profile_path = home / ".bashrc"
+                profile_path.parent.mkdir(exist_ok=True)
+                profile_path.write_text(profile.BASH_BLOCK, encoding="utf-8")
+                completed = subprocess.run(
+                    ["bash", "--noprofile", "--norc", "-c", f". '{profile_path}'; cd '{project}'; {host} 'a b'"],
+                    env=environment, text=True, encoding="utf-8", capture_output=True, check=False,
+                )
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn('"a b"', completed.stdout)
+
+    def test_isolated_packaged_launchers_use_only_their_script_directory(self):
+        with tempfile.TemporaryDirectory(prefix="terminal launcher pythonpath ") as directory:
+            shadow = Path(directory) / "shadow"
+            shadow.mkdir()
+            for name in ("agent_cli.py", "codex_marketplace_sync.py", "json.py", "subprocess.py", "terminal_command.py"):
+                (shadow / name).write_text("raise RuntimeError('PYTHONPATH module was imported')\n", encoding="utf-8")
+            environment = dict(os.environ, PYTHONPATH=str(shadow))
+            for script in ("claude_terminal_launcher.py", "codex_terminal_launcher.py"):
+                with self.subTest(script=script):
+                    completed = subprocess.run(
+                        [sys.executable, "-I", "-B", str(SCRIPTS / script), "--help"],
+                        env=environment, text=True, encoding="utf-8", capture_output=True, check=False,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
 
 
 if __name__ == "__main__":
