@@ -184,7 +184,7 @@ def sync_codex_standards(codex_executable, working_directory, out=print, run=sub
 
             return selected
     finally:
-        apply_harness_permissions(run=run)
+        apply_harness_permissions(resolved, run=run)
 
 
 def main(argv: list[str] | None = None) -> int:

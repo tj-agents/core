@@ -79,6 +79,18 @@ stop paths and its hold label still apply; without a table, `human-gate` is the 
 approval cannot add exemptions or bypass a stop. **Re-run the binder on every rebind:** a repaired head
 may add a stop path or hold.
 
+`auto_merge` is a separate optional boolean in that same declaration. Omit it or set it to `false` to keep
+GitHub auto-merge unavailable. With `true`, after the normal green exact-head, independent-review and merge
+authorization decision, invoke only the packaged guarded command:
+
+```text
+python -B workflows/auto_merge.py --root ROOT
+```
+
+It reloads the declaration and authority, complete remote diff and labels, live PR readiness, exact local and
+remote branch/head/worktree identity, and the canonical review and security evidence before executing its
+fixed GitHub command. Do not run `gh pr merge --auto` directly; the delivery hook directs it to this wrapper.
+
 The artifact retains matching approval wording and provenance as `scoped_approval` across wakes and
 supported repairs to the same PR, worktree and branch. Each rebind refreshes the remote head, checks and
 review evidence and reevaluates the stops. A stopped head retains the approval record but resolves
