@@ -50,10 +50,10 @@ duplicate within the repository; core's generator also rejects two names equal o
 removed.
 
 Before choosing a name, check this repository's skills and every installed plugin on both hosts for the
-same bare name and for a near miss: a plural, a reordered phrase, or a name one hyphen away. No generator
-sees other plugins, and none catches every near miss. Choose a different name for a near miss. When a bare name is shared with another publisher, write
-the qualified `plugin:name` in every reference to it, because a bare name may select the other plugin's
-skill.
+same bare name and for a near miss: a plural, a reordered phrase, or a name that differs only by hyphens.
+Generation sees only this repository's plugins, and no generator catches every near miss. Choose a
+different name for a near miss. When a bare name is shared with another publisher, write the qualified
+`plugin:name` in every reference to it, because a bare name may select the other plugin's skill.
 
 ## Write the description as the selection trigger
 
@@ -65,7 +65,7 @@ skill is probably too broad as well.
 
 Where host entry points are authored, as in core, they carry the canonical description verbatim and
 generation fails when a copy differs: change the canonical description and every host entry point in the
-same commit. The repository's layout owner says whether its entry points are authored or generated.
+same commit.
 
 ## A skill folder holds only what ships
 
