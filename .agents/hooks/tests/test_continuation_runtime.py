@@ -284,6 +284,49 @@ class ContinuationTests(unittest.TestCase):
                  "--state", "waiting", "--reason", "foreground confirmed", "--next-action", "resume")
         self.assertEqual(self.wake()["state"], "complete")
 
+    def test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground(self):
+        for harness in ("claude", "codex"):
+            with self.subTest(harness=harness):
+                self.owner.unlink()
+                self.cli("init", "--root", str(self.root), "--goal", "goal.md",
+                         "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
+                         "--harness", harness, "--actions", "edit", "test")
+                claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+                token = claimed["foreground"]["token"]
+                preserved = {key: claimed[key] for key in (
+                    "state", "goal", "repo", "worktree", "branch", "head", "authority",
+                    "max_launches", "max_failures", "deadline", "timeout_seconds", "lease_seconds",
+                )}
+                lease = {key: claimed["foreground"][key] for key in ("token", "pid", "identity")}
+
+                refreshed = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                                     "--reason", "Refresh recovery instructions", "--next-action", "Run focused checks")
+                self.assertEqual(refreshed["reason"], "Refresh recovery instructions")
+                self.assertEqual(refreshed["next_action"], "Run focused checks")
+                self.assertEqual({key: refreshed[key] for key in preserved}, preserved)
+                self.assertEqual({key: refreshed["foreground"][key] for key in lease}, lease)
+
+                for arguments in ((), ("--reason", "", "--next-action", "")):
+                    unchanged = self.cli("heartbeat", "--owner", str(self.owner), "--token", token, *arguments)
+                    self.assertEqual(unchanged["reason"], "Refresh recovery instructions")
+                    self.assertEqual(unchanged["next_action"], "Run focused checks")
+                    self.assertEqual({key: unchanged[key] for key in preserved}, preserved)
+                    self.assertEqual({key: unchanged["foreground"][key] for key in lease}, lease)
+
+                before_invalid_token = self.state()
+                invalid_token = self.cli("heartbeat", "--owner", str(self.owner), "--token", "invalid",
+                                         "--reason", "must not persist", "--next-action", "must not persist", code=2)
+                self.assertEqual(invalid_token["reason"], "foreground-token-invalid")
+                self.assertEqual(self.state(), before_invalid_token)
+
+                dead = self.state()
+                dead["foreground"]["identity"] = "dead-identity"
+                runtime.atomic_json(self.owner, dead)
+                invalid_identity = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                                            "--reason", "must not persist", "--next-action", "must not persist", code=2)
+                self.assertEqual(invalid_identity["reason"], "foreground-token-invalid")
+                self.assertEqual(self.state(), dead)
+
     def test_orphan_writer_gate_after_supervisor_exit(self):
         self.fixture("complete", sleep=3)
         supervisor = self.start(*self.wake_args())

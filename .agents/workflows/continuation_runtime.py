@@ -550,6 +550,10 @@ def operate(path, state, args):
             raise Gate("foreground-token-invalid")
         if operation == "heartbeat":
             lease["activity"] = time.time()
+            if args.reason.strip():
+                state["reason"] = args.reason
+            if args.next_action.strip():
+                state["next_action"] = args.next_action
         elif operation == "yield":
             state["foreground"] = None
             transition(state, "waiting", args.reason or "foreground-yielded", args.next_action or state["next_action"])
