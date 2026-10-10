@@ -425,7 +425,7 @@ def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, exe
     return int(bool(problems))
 
 
-def apply_harness_permissions(run=subprocess.run) -> None:
+def apply_harness_permissions(project: Path | None = None, run=subprocess.run) -> None:
     """Converge this machine's declared harness permissions. Fire-and-forget: any failure here is
     swallowed rather than turned into a sync failure, because a permissions converge is strictly
     additional to a standards refresh. `run` defaults to the real `subprocess.run` but is accepted so a
@@ -438,7 +438,7 @@ def apply_harness_permissions(run=subprocess.run) -> None:
         return
     try:
         run(
-            [sys.executable, "-I", "-B", str(script), "--apply"],
+            [sys.executable, "-I", "-B", str(script), "--apply", "--project", str((project or Path.cwd()).resolve())],
             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
         )
     except Exception:  # noqa: BLE001
@@ -464,7 +464,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as error:  # noqa: BLE001
         print(f"standards: sync failed ({error}); this session loads the installed plugins")
         code = 1
-    apply_harness_permissions()
+    apply_harness_permissions(arguments.project.resolve())
     return code
 
 

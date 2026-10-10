@@ -434,9 +434,17 @@ class GateSubprocessTests(unittest.TestCase):
         self.assertEqual(HEAD, binding["head"])
         self.assertEqual(str(self.repo.resolve()), binding["worktree"])
         self.assertEqual("auto", binding["merge_authorization"]["mode"])
+        self.assertFalse(binding["auto_merge"])
         self.assertEqual(
             [{"check_id": "900", "run_id": "500", "head_sha": HEAD}], binding["pending_evidence"]
         )
+
+    def test_explicit_false_is_bound_separately_from_merge_authorization(self):
+        self.write_policy(auto_merge=False)
+        result = self.run_hook()
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertFalse(self.binding()["auto_merge"])
+        self.assertEqual("auto", self.binding()["merge_authorization"]["mode"])
 
     def test_a_stop_class_diff_is_bound_with_no_authorization(self):
         self.write_pr(files=("README.md", ".github/workflows/verify.yml"))
@@ -531,8 +539,19 @@ class GateSubprocessTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("could not be bound", result.stderr)
 
-    def test_a_merge_command_is_not_this_gates_business(self):
-        self.assertEqual(0, self.run_hook(command="gh pr " + "merge 42 --auto").returncode)
+    def test_direct_auto_merge_is_denied_when_the_repository_does_not_enable_it(self):
+        result = self.run_hook(command="gh pr merge 42 --auto", event="PreToolUse")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("auto_merge is not enabled", result.stderr)
+
+    def test_direct_auto_merge_is_directed_to_the_guarded_wrapper_when_enabled(self):
+        self.write_policy(auto_merge=True)
+        result = self.run_hook(command="gh pr merge 42 --auto", event="PreToolUse")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("auto_merge.py --root", result.stderr)
+
+    def test_disable_auto_remains_allowed(self):
+        self.assertEqual(0, self.run_hook(command="gh pr merge 42 --disable-auto", event="PreToolUse").returncode)
 
 
 if __name__ == "__main__":
