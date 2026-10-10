@@ -8,6 +8,8 @@ import codecs
 import os
 from pathlib import Path
 import sys
+import stat
+import tempfile
 
 START = "# >>> base-agents claude launcher >>>"
 END = "# <<< base-agents claude launcher <<<"
@@ -229,6 +231,20 @@ def profile_encoding(raw: bytes) -> str:
     return "utf-8"
 
 
+def write_profile(path: Path, data: bytes) -> None:
+    mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
+    descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            if os.name != "nt":
+                os.fchmod(stream.fileno(), mode)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def ensure(path: Path, block: str = POWERSHELL_BLOCK) -> bool:
     raw = path.read_bytes() if path.is_file() else b""
     encoding = profile_encoding(raw)
@@ -247,9 +263,7 @@ def ensure(path: Path, block: str = POWERSHELL_BLOCK) -> bool:
         newline = "\r\n" if "\r\n" in text or path.suffix.casefold() == ".ps1" else "\n"
         updated = (prefix + newline * 2 if prefix else "") + block + newline
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_bytes(updated.encode(encoding))
-    os.replace(temporary, path)
+    write_profile(path, updated.encode(encoding))
     return True
 
 

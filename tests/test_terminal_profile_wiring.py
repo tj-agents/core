@@ -9,9 +9,11 @@ from pathlib import Path
 import shutil
 import shlex
 import subprocess
+import stat
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,6 +166,36 @@ class TerminalProfileWiringTests(unittest.TestCase):
         # The disposable active launcher is only a profile-delegation spy; command dispatch belongs
         # to the installed Python launcher and is exercised directly below.
         self.assertEqual(sum(line.startswith("refresh ") for line in calls), 3)
+
+    @unittest.skipIf(os.name == "nt", "POSIX profile modes are verified on Linux")
+    def test_install_and_refresh_preserve_private_profile_permissions(self):
+        prior_umask = os.umask(0o022)
+        try:
+            for module in (CLAUDE, CODEX):
+                with self.subTest(profile=module.__name__):
+                    path = self.root / (module.__name__ + ".bashrc")
+                    path.write_text("private=value\n", encoding="utf-8")
+                    path.chmod(0o600)
+                    self.assertTrue(module.ensure(path, module.BASH_BLOCK))
+                    self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
+                    refreshed = module.BASH_BLOCK.replace(module.END, "# refreshed\n" + module.END)
+                    self.assertTrue(module.ensure(path, refreshed))
+                    self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
+                    self.assertTrue(path.read_text(encoding="utf-8").startswith("private=value\n"))
+        finally:
+            os.umask(prior_umask)
+        self.assertEqual([], list(self.root.glob(".*.tmp")))
+
+    def test_failed_profile_replacement_keeps_original_and_removes_temporary_file(self):
+        for module in (CLAUDE, CODEX):
+            with self.subTest(profile=module.__name__):
+                path = self.root / (module.__name__ + ".bashrc")
+                path.write_bytes(b"original\n")
+                with mock.patch.object(CLAUDE.os, "replace", side_effect=OSError("blocked")):
+                    with self.assertRaisesRegex(OSError, "blocked"):
+                        module.ensure(path, module.BASH_BLOCK)
+                self.assertEqual(b"original\n", path.read_bytes())
+                self.assertEqual([], list(self.root.glob(".*.tmp")))
 
     def test_claude_bash_refresh_only_sessions_and_preserve_arguments(self):
         self.assert_claude_wiring(self.run_bash, f". {shlex.quote(str(self.home / '.bashrc'))}; claude plugin list; claude --resume session; claude")

@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import sys
 
-from claude_terminal_profile import BOOTSTRAP, documents_directory, profile_encoding, profile_paths
+from claude_terminal_profile import BOOTSTRAP, documents_directory, profile_encoding, profile_paths, write_profile
 
 
 START = "# >>> base-agents codex launcher >>>"
@@ -137,9 +137,7 @@ def ensure(path: Path, block: str = POWERSHELL_BLOCK) -> bool:
         newline = "\r\n" if "\r\n" in text or path.suffix.casefold() == ".ps1" else "\n"
         updated = (prefix + newline * 2 if prefix else "") + block + newline
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_bytes(updated.encode(encoding))
-    os.replace(temporary, path)
+    write_profile(path, updated.encode(encoding))
     return True
 
 
