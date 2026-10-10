@@ -21,6 +21,14 @@ import harness_permissions
 
 
 CLEANUP = "Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"
+
+
+def cleanup_entries(root):
+    """CLEANUP rendered for one plugin root in both separator spellings, built without the renderer."""
+    forward, backslash = str(root).replace("\\", "/"), str(root).replace("/", "\\")
+    return sorted([f"Bash(python -B {forward}/cleanup_proof.py)", f"Bash(python -B {backslash}\\cleanup_proof.py)"])
+
+
 SAMPLE_RULE = {
     "pattern": [["python", "python3", "py"], "-B", "${PLUGIN_ROOT}/sample/finish.py"],
     "justification": "test rule",
@@ -126,10 +134,10 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertIn(str(self.settings_path()), drifted)
 
     def test_stale_owned_entries_are_removed(self):
-        v1 = install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        v1 = install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
         before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
-        self.assertTrue(set(harness_permissions.render_claude_allow([CLEANUP], v1)) <= set(before))
+        self.assertEqual(cleanup_entries(v1), sorted(before))
 
         clear_claude_plugin(self.claude_config, "engineering")
         SYNC.synchronize(self.environ, "apply")
@@ -191,17 +199,16 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(self.rules_path().is_file())
 
     def test_a_version_path_change_rerenders(self):
-        v1 = install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
 
         clear_claude_plugin(self.claude_config, "engineering")
-        v2 = install_claude_plugin(self.claude_config, "engineering", "v2", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        v2 = install_claude_plugin(self.claude_config, "engineering", "v2", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
 
-        # Compare exact rendered entries: a bare "v1" substring also matches a random temporary directory.
-        allow = set(json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"])
-        self.assertFalse(set(harness_permissions.render_claude_allow([CLEANUP], v1)) & allow)
-        self.assertTrue(set(harness_permissions.render_claude_allow([CLEANUP], v2)) <= allow)
+        # Exact entries, not a "v1" substring, which a random temporary directory name can contain.
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertEqual(cleanup_entries(v2), sorted(allow))
 
     def test_idempotent_second_apply_is_byte_identical(self):
         install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
