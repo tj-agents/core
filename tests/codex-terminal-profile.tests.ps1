@@ -67,11 +67,12 @@ if ($isWindowsHost) {
     $nativeDispatch = @"
 @echo off
 if "%1" == "--version" goto version
-echo %* >> "$callsPath"
-if "%*" == "plugin marketplace upgrade --json" goto upgrade
-if "%*" == "plugin list --available --json" goto list
-if "%*" == "plugin add machine@base-agents --json" goto add
-echo Unexpected native codex call: %* 1>&2
+set "call=%1 %2 %3 %4"
+echo %call% >> "$callsPath"
+if "%call%" == "plugin marketplace upgrade --json" goto upgrade
+if "%call%" == "plugin list --available --json" goto list
+if "%call%" == "plugin add machine@base-agents --json" goto add
+echo Unexpected native codex call: %call% 1>&2
 exit /b 2
 :version
 echo codex-cli 0.160.0
