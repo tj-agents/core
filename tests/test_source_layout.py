@@ -52,7 +52,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(74, len(skills))
+        self.assertEqual(75, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
@@ -94,7 +94,7 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/base/skills/agent-files/scripts/session-context.py",
             "plugins/base/skills/plan-artifacts/scripts/session-context.py",
             "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
-            "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
+            "plugins/machine/skills/handoff-codex/scripts/launch_codex.py",
             "plugins/machine/codex-skills/handoff-claude/scripts/launch_claude.py",
             "plugins/machine/resources/machine/scripts/history.py",
             "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
@@ -108,9 +108,9 @@ class SourceLayoutTests(unittest.TestCase):
         ):
             self.assertIn(relative, output)
         self.assertEqual(
-            output["plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1"],
+            output["plugins/machine/skills/handoff-codex/scripts/launch_codex.py"],
             SYNC.canonical_output_bytes(
-                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes()
+                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch_codex.py").read_bytes()
             ),
         )
 
@@ -333,6 +333,18 @@ class SourceLayoutTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValueError, "Duplicate public skill name"):
+            SYNC.build(self.root)
+
+    def test_public_names_equal_without_hyphens_fail_generation(self):
+        source = self.root / ".agents/engineering/workflow/techdebt"
+        near_miss = self.root / ".agents/engineering/workflow/tech-debt"
+        shutil.copytree(source, near_miss)
+        skill = near_miss / "SKILL.md"
+        skill.write_text(
+            skill.read_text(encoding="utf-8").replace("name: techdebt", "name: tech-debt"),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "differ only by hyphens: tech-debt, techdebt"):
             SYNC.build(self.root)
 
     def test_resources_and_generated_roots_cannot_escape_ownership(self):

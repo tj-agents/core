@@ -20,6 +20,15 @@ SPEC.loader.exec_module(SYNC)
 import harness_permissions
 
 
+CLEANUP = "Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"
+
+
+def cleanup_entries(root):
+    """CLEANUP rendered for one plugin root in both separator spellings, built without the renderer."""
+    forward, backslash = str(root).replace("\\", "/"), str(root).replace("/", "\\")
+    return sorted([f"Bash(python -B {forward}/cleanup_proof.py)", f"Bash(python -B {backslash}\\cleanup_proof.py)"])
+
+
 SAMPLE_RULE = {
     "pattern": [["python", "python3", "py"], "-B", "${PLUGIN_ROOT}/sample/finish.py"],
     "justification": "test rule",
@@ -114,7 +123,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.settings_path().write_text(json.dumps(content), encoding="utf-8")
 
     def test_user_entries_survive(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         self.write_settings({"permissions": {"allow": ["Bash(user-thing)"]}})
 
         drifted, warnings = SYNC.synchronize(self.environ, "apply")
@@ -125,10 +134,10 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertIn(str(self.settings_path()), drifted)
 
     def test_stale_owned_entries_are_removed(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        v1 = install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
         before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
-        self.assertTrue(any("v1" in entry for entry in before))
+        self.assertEqual(cleanup_entries(v1), sorted(before))
 
         clear_claude_plugin(self.claude_config, "engineering")
         SYNC.synchronize(self.environ, "apply")
@@ -190,19 +199,20 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(self.rules_path().is_file())
 
     def test_a_version_path_change_rerenders(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
 
         clear_claude_plugin(self.claude_config, "engineering")
-        install_claude_plugin(self.claude_config, "engineering", "v2", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        v2 = install_claude_plugin(self.claude_config, "engineering", "v2", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
 
+        # Exact equality also proves every v1 entry is gone; a "v1" substring check matched random
+        # temporary directory names.
         allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
-        self.assertFalse(any("v1" in entry for entry in allow))
-        self.assertTrue(any("v2" in entry for entry in allow))
+        self.assertEqual(cleanup_entries(v2), sorted(allow))
 
     def test_idempotent_second_apply_is_byte_identical(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         install_codex_plugin(self.codex_home, "machine", "2.0.0", codex_rules=[SAMPLE_RULE])
 
         SYNC.synchronize(self.environ, "apply")
@@ -216,7 +226,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertEqual(rules_first, self.rules_path().read_bytes())
 
     def test_settings_with_foreign_formatting_are_untouched_when_allow_already_matches(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
         data = json.loads(self.settings_path().read_text(encoding="utf-8"))
         data["theme"] = "dark"
@@ -229,7 +239,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertEqual(foreign.encode("utf-8"), self.settings_path().read_bytes())
 
     def test_malformed_settings_warn_and_do_not_write(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         self.settings_path().parent.mkdir(parents=True, exist_ok=True)
         self.settings_path().write_text("{not json", encoding="utf-8")
 
@@ -240,7 +250,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertEqual("{not json", self.settings_path().read_text(encoding="utf-8"))
 
     def test_unreadable_installed_plugins_json_warns_and_leaves_claude_target_untouched(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
         before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
         self.assertTrue(before)
@@ -256,7 +266,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertEqual(before, after)
 
     def test_malformed_shape_installed_plugins_json_warns_and_leaves_claude_target_untouched(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
         before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
         self.assertTrue(before)
@@ -298,7 +308,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertEqual(before, self.rules_path().read_bytes())
 
     def test_check_exit_codes(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
 
         drifted, warnings = SYNC.synchronize(self.environ, "check")
         self.assertTrue(drifted)
@@ -309,7 +319,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertEqual([], drifted)
 
     def test_opt_out_disables_both_modes(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         self.environ["BASE_AGENTS_HARNESS_PERMISSIONS"] = "off"
 
         drifted, warnings = SYNC.synchronize(self.environ, "apply")
@@ -319,7 +329,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(self.settings_path().is_file())
 
     def test_both_separator_spellings_are_rendered(self):
-        root = install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        root = install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")
 
         allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
@@ -328,9 +338,9 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertIn(f"Bash(python -B {backslash}\\cleanup_proof.py)", allow)
 
     def test_multiple_scopes_all_survive(self):
-        install_claude_plugin(self.claude_config, "engineering", "user-root", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"], scope="user")
+        install_claude_plugin(self.claude_config, "engineering", "user-root", [CLEANUP], scope="user")
         install_claude_plugin(
-            self.claude_config, "engineering", "local-root", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"],
+            self.claude_config, "engineering", "local-root", [CLEANUP],
             scope="local", project_path=self.root / "some-project",
         )
 
@@ -341,7 +351,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertTrue(any("local-root" in entry for entry in allow))
 
     def test_print_mode_resolves_an_exact_invocation(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
 
         lines, warnings = SYNC.print_invocations(self.environ, "cleanup_proof.py")
 
