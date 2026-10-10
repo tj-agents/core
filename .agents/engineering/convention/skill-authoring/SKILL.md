@@ -47,11 +47,11 @@ and checklists with the skill they support.
 A public name is a lowercase hyphenated word or phrase naming the subject an agent has in mind when it
 needs the skill, not the mechanism inside it. Generation enforces the syntax and rejects an exact
 duplicate within the repository; core's generator also rejects two names equal once their hyphens are
-removed. Where generation does not, check the repository for a hyphen-only near miss yourself.
+removed.
 
-No generator sees other plugins. Before choosing a name, check every installed plugin on both
-hosts for the same bare name and for a near miss: a plural, a reordered phrase, or a name one hyphen
-away. Choose a different name for a near miss. When a bare name is shared with another publisher, write
+Before choosing a name, check this repository's skills and every installed plugin on both hosts for the
+same bare name and for a near miss: a plural, a reordered phrase, or a name one hyphen away. No generator
+sees other plugins, and none catches every near miss. Choose a different name for a near miss. When a bare name is shared with another publisher, write
 the qualified `plugin:name` in every reference to it, because a bare name may select the other plugin's
 skill.
 
@@ -65,7 +65,7 @@ skill is probably too broad as well.
 
 Where host entry points are authored, as in core, they carry the canonical description verbatim and
 generation fails when a copy differs: change the canonical description and every host entry point in the
-same commit. A kit-layout repository generates its host entry points instead.
+same commit. The repository's layout owner says whether its entry points are authored or generated.
 
 ## A skill folder holds only what ships
 
