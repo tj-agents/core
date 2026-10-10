@@ -107,7 +107,7 @@ def invoke_codex_sync_command(codex_executable, arguments, cwd=None, run=subproc
 def invoke_codex_hook_trust(codex_executable, working_directory, helper_script, cwd=None, run=subprocess.run, out=print):
     """Run the hook-trust helper with the current interpreter, against a snapshot of itself."""
     try:
-        result = run([sys.executable, '-B', str(helper_script), '--codex', str(codex_executable),
+        result = run([sys.executable, '-I', '-B', str(helper_script), '--codex', str(codex_executable),
                      '--project', str(working_directory)], cwd=cwd, capture_output=True,
                     text=True, encoding='utf-8', errors='replace', timeout=PLUGIN_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
