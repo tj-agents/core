@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 import subprocess
 import sys
 import tempfile
@@ -414,8 +415,12 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
         self.assertTrue((directory / "same-worktree.json").exists())
 
 
-@unittest.skipUnless(os.name == "nt", "Windows wrapper qualification")
 class WindowsWrapperSafetyTests(unittest.TestCase):
+    def setUp(self):
+        platform = mock.patch.object(session_close, "os", SimpleNamespace(name="nt"))
+        platform.start()
+        self.addCleanup(platform.stop)
+
     def test_wrapper_requires_a_shell_command_that_launches_the_verified_host(self):
         host = session_close.register_session.ProcessInfo(10, 20, "codex.exe", 100.0)
         wrapper = session_close.register_session.ProcessInfo(20, 1, "pwsh.exe", 95.0)
@@ -441,12 +446,25 @@ class WindowsWrapperSafetyTests(unittest.TestCase):
             self.assertIsNone(session_close.qualified_windows_wrapper(entry))
 
 
+    def test_reused_host_identity_cannot_qualify_a_wrapper(self):
+        entry = {
+            "session_id": "ours", "cwd": "C:/worktree", "pid": 10,
+            "pid_started_at": 100.0, "started_at": 101.0, "host": "codex",
+        }
+        reused = session_close.register_session.ProcessInfo(10, 20, "codex.exe", 200.0)
+        with mock.patch.object(session_close, "process_info", return_value=reused), \
+                mock.patch.object(session_close.register_session, "_windows_process_table") as table:
+            self.assertIsNone(session_close.qualified_windows_wrapper(entry))
+            table.assert_not_called()
+
+
 class ObserverHandshakeTests(unittest.TestCase):
     def test_startup_record_requires_spawned_reaper_and_exact_binding(self):
+        worktree = str(Path("/tmp/worktree").resolve())
         record = {
             "host_pid": 10,
             "host_start": 5.0,
-            "worktree": "/tmp/worktree",
+            "worktree": worktree,
             "session_id": "session",
             "invocation_id": "invocation",
             "started": time.time(),
@@ -455,13 +473,13 @@ class ObserverHandshakeTests(unittest.TestCase):
         }
         with mock.patch.object(session_close, "verified_live", return_value=True):
             self.assertTrue(session_close.valid_observer_start(
-                record, 20, 10, 5.0, "/tmp/worktree", "session", "invocation",
+                record, 20, 10, 5.0, worktree, "session", "invocation",
             ))
             self.assertFalse(session_close.valid_observer_start(
-                record, 21, 10, 5.0, "/tmp/worktree", "session", "invocation",
+                record, 21, 10, 5.0, worktree, "session", "invocation",
             ))
             self.assertFalse(session_close.valid_observer_start(
-                record, 20, 11, 5.0, "/tmp/worktree", "session", "invocation",
+                record, 20, 11, 5.0, worktree, "session", "invocation",
             ))
 
     def test_startup_rejects_final_missing_and_future_bindings(self):
