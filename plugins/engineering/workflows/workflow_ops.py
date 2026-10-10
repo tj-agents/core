@@ -1,6 +1,7 @@
 import argparse
 import base64
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -54,10 +55,31 @@ EXTERNAL_ACCOUNT_PATTERN = re.compile(
     r"(?:account.{0,80}(?:disabled|suspended|restricted)|organization.{0,80}(?:disabled|suspended|restricted))",
     re.IGNORECASE,
 )
+HOST_COVERAGE_MODULE = None
 
 
 class WorkflowOperationError(RuntimeError):
     pass
+
+
+def host_coverage_module():
+    global HOST_COVERAGE_MODULE
+    if HOST_COVERAGE_MODULE is not None:
+        return HOST_COVERAGE_MODULE
+    candidates = (
+        Path(__file__).resolve().parent / "host_coverage.py",
+        Path(__file__).resolve().parents[1] / "base" / "policy" / "plan-artifacts" / "scripts" / "host_coverage.py",
+    )
+    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if path is None:
+        raise WorkflowOperationError("host coverage validator is not available")
+    spec = importlib.util.spec_from_file_location("agent_host_coverage", path)
+    if spec is None or spec.loader is None:
+        raise WorkflowOperationError("host coverage validator could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    HOST_COVERAGE_MODULE = module
+    return module
 
 
 class MonitorLease:
@@ -782,6 +804,38 @@ def descriptor_identity(value):
     return digest({key: item for key, item in value.items() if key not in excluded})
 
 
+def review_work_order(root, branch):
+    slug = branch.replace("/", "-").replace("\\", "-")
+    return root / "reviews" / f"{slug}.md"
+
+
+def coverage_requirement(paths):
+    return host_coverage_module().agent_surface_paths(paths)
+
+
+def review_host_check(root, workflow_run_id, descriptor_path, work_order):
+    descriptor = load_descriptor(root, workflow_run_id, descriptor_path)
+    paths = coverage_requirement(descriptor["paths"])
+    expected = review_work_order(root, descriptor["branch"])
+    candidate = (root / work_order).resolve()
+    if candidate != expected.resolve():
+        raise WorkflowOperationError("host coverage must use the canonical review work order")
+    result = {
+        "schema_version": SCHEMA_VERSION,
+        "operation": "review-host-check",
+        "required": bool(paths),
+        "paths": paths,
+        "work_order": str(expected.relative_to(root)).replace("\\", "/"),
+        "head": descriptor["head"],
+    }
+    if paths:
+        result.update(host_coverage_module().validate_documents([expected], "review", descriptor["head"]))
+    else:
+        result.update({"stage": "review", "valid": True, "errors": [], "record_count": 0})
+    append_event(root, workflow_run_id, {"kind": "operation", "operation": "review-host-check", "valid": result["valid"]})
+    return result
+
+
 def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
     cleanup_review_bundles(root)
     sync = synchronize_for_review(root, base_ref) if synchronize else None
@@ -808,6 +862,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         tree_archive = materialize_tree(root, head, locations["tree_archive"], locations["tree"])
         tree_sha256 = tree_content_digest(locations["tree"])
         skills, route_violations = route_findings(locations["tree"], paths)
+        agent_paths = coverage_requirement(paths)
         rules = []
         for name in skills:
             path = locations["tree"] / ".agents" / "skills" / name / "SKILL.md"
@@ -825,6 +880,10 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
             "tree_archive_sha256": hashlib.sha256(tree_archive).hexdigest(),
             "tree_content_sha256": tree_sha256,
             "paths": paths,
+            "host_coverage": {
+                "required": bool(agent_paths),
+                "paths": agent_paths,
+            },
             "path_digest": path_digest,
             "patch_sha256": hashlib.sha256(patch).hexdigest(),
             "rules": rules,
@@ -1602,12 +1661,36 @@ def delivery_owner(root, workflow_run_id, ledger=None, pr_url=None):
             "head": value["headRefOid"], "base": value["baseRefName"], "action": action}
 
 
+def delivery_host_coverage(root, base_ref):
+    head = git(root, "rev-parse", "HEAD")
+    base = git(root, "merge-base", base_ref, head)
+    paths = git(root, "diff", "--name-only", base, head).splitlines()
+    agent_paths = coverage_requirement(paths)
+    review = review_binding(root, git(root, "branch", "--show-current"), head)
+    coverage_head = review["reviewed_sha"] or head
+    result = {
+        "required": bool(agent_paths),
+        "paths": agent_paths,
+        "head": head,
+        "coverage_head": coverage_head,
+        "base": base,
+    }
+    if agent_paths:
+        work_order = root / review["work_order"]
+        result["work_order"] = str(work_order.relative_to(root)).replace("\\", "/")
+        result.update(host_coverage_module().validate_documents([work_order], "review", coverage_head))
+    else:
+        result.update({"stage": "review", "valid": True, "errors": [], "record_count": 0})
+    return result
+
+
 def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref, ledger=None, pr_url=None):
     ownership = delivery_owner(root, workflow_run_id, ledger, pr_url)
     owning_base = f"origin/{ownership['base']}" if ownership.get("base") else None
     base_ref = base_ref or owning_base or "origin/main"
     inspection = inspect_repository(root, workflow_run_id)
     review = review_reconcile(root, workflow_run_id, descriptor_path, base_ref) if descriptor_path else None
+    coverage = delivery_host_coverage(root, base_ref)
     counts = git(root, "rev-list", "--left-right", "--count", f"{base_ref}...HEAD").split()
     base_behind = int(counts[0]) if len(counts) == 2 else None
     branch_valid = bool(re.fullmatch(r"[A-Z][A-Za-z0-9-]*/[A-Z][A-Za-z0-9-]*", inspection["branch"]))
@@ -1633,6 +1716,8 @@ def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref, ledger=
         blockers.append("uncommitted-code")
     if review and review["review_required"]:
         blockers.append("review-invalidated")
+    if coverage["required"] and not coverage["valid"]:
+        blockers.append("host-coverage-invalid")
     result = {
         "schema_version": SCHEMA_VERSION,
         "operation": "delivery-preflight",
@@ -1643,6 +1728,7 @@ def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref, ledger=
         "code_dirty_paths": code_dirty,
         "documentation_dirty_paths": [path for path in inspection["dirty_paths"] if path not in code_dirty],
         "review": review,
+        "host_coverage": coverage,
         "blockers": blockers,
         "ready": not blockers,
     }
@@ -2029,6 +2115,10 @@ def parser():
     review.add_argument("--head", default="HEAD")
     review.add_argument("--synchronize", action="store_true")
 
+    host_check = commands.add_parser("review-host-check")
+    host_check.add_argument("--descriptor", required=True)
+    host_check.add_argument("--work-order", required=True)
+
     reconcile = commands.add_parser("review-reconcile")
     reconcile.add_argument("--descriptor", required=True)
     reconcile.add_argument("--base", default="origin/main")
@@ -2101,6 +2191,8 @@ def main(argv=None):
         result = inspect_repository(root, arguments.workflow_run_id)
     elif arguments.operation == "review-prepare":
         result = review_prepare(root, arguments.workflow_run_id, arguments.base, arguments.head, arguments.synchronize)
+    elif arguments.operation == "review-host-check":
+        result = review_host_check(root, arguments.workflow_run_id, arguments.descriptor, arguments.work_order)
     elif arguments.operation == "review-reconcile":
         result = review_reconcile(root, arguments.workflow_run_id, arguments.descriptor, arguments.base)
     elif arguments.operation == "monitor":
@@ -2146,6 +2238,8 @@ def main(argv=None):
         result = cleanup(root, arguments.workflow_run_id, arguments.retention_days)
     emit(result)
     if arguments.operation == "delivery-preflight" and not result["ready"]:
+        return 1
+    if arguments.operation == "review-host-check" and not result["valid"]:
         return 1
     return 0 if result.get("exit_state") != "failed" and result.get("budget", {}).get("allowed", True) else 1
 

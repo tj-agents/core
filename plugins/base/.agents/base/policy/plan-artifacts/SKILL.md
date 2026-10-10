@@ -85,6 +85,26 @@ successor was started before releasing ownership. Never launch duplicate owners.
 is available, preserve a recoverable checkpoint and state that limitation rather than claiming a transfer
 occurred. A user request for only a handoff prompt does not authorize launching a session.
 
+## Agent-host coverage
+
+An agent-behavior plan, fix, or review records one fenced `agent-host-coverage` JSON object. It has
+`schema_version: 1`, a nonempty `shared_source`, and exactly two `hosts` entries: `claude` and `codex`.
+Each host names its `behavior`, `source`, `mapping`, and `verification` with `level`, `result`, and
+evidence. Planning may use `planned` and `pending`; a review uses `source` or `installed` with `passed`
+or `limited`, adds its full frozen `candidate_head`, and replaces the one moving coverage record in its
+work order. A `limited` result also records an `exception` object containing concrete
+`constraint_evidence` and the `supported_other_host_outcome`.
+
+Validate a plan before advancing it. The helper requires Python 3.9 or newer: use `python` on
+Windows and `python3` on Linux and macOS.
+
+```text
+python -B "<skill-directory>/scripts/host_coverage.py" --stage plan --document <plan-path>
+```
+
+The validator rejects omissions, duplicate host or JSON keys, placeholder values, and malformed records.
+Source verification and installed-host acceptance remain distinct evidence.
+
 ## Context delivery
 
 The packaged SessionStart hook reads this file relative to its own script, including on startup, resume,
