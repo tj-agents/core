@@ -112,7 +112,8 @@ Mistakes this session made that such a convention should have prevented, as evid
   `33898c4` and re-validated (803 + 983 tests and every generation check; the one removed test covered
   the dropped route table). Second pass: F4 recorded as workflow debt, F5–F8 fixed in `9c8168e`. Third
   pass: F9–F11 fixed and re-validated. Fourth pass: F12–F15 fixed and re-validated.
-  Fifth pass: F16–F17 fixed. Sixth pass: F18 fixed. Each fix re-validated.
+  Fifth pass: F16–F17 fixed. Sixth pass: F18 fixed. Seventh pass: F19
+  fixed. Each fix re-validated.
 
 ## Next Steps
 
@@ -121,4 +122,4 @@ Current slice: step 5, review.
 Remaining scope: PR, merge, cleanup, message #173's session.
 Done when: the convention is merged to `main` and this worktree is cleaned up.
 
-Continue at Completion expectation step 5: incremental review of the F18 fix, then the PR.
+Continue at Completion expectation step 5: incremental review of the F19 fix, then the PR.

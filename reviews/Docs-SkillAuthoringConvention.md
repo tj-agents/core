@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `1dd4c1629152038e2da0d16630d473ccdb436879`  `(2026-10-10)`
+**Reviewed up to commit:** `975460a6fc4288a19c206c07bdd78194c82717ec`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -202,4 +202,29 @@ Remediation of F16–F17. Security layer not required.
 
 Dropped: self-matches against this repository's installed copies (the check governs choosing a new
 name), a later third-party clash (covered by "already shared"), and the split ledger line (tidied).
+Re-validated: 803 + 983 tests and every generation check.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `1dd4c1629152038e2da0d16630d473ccdb436879`
+**Candidate head:** `975460a6fc4288a19c206c07bdd78194c82717ec`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:6ec04f82f9d57ff5009efdd8882849797568b458c9e86959b282823b620dbd3e` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/o4qhwkab2bNUQXX-f68KOt/fRoP0dfumXfXJaLSU4P-pZ`
+**Candidate bundle identity:** `sha256:2bea072d610a527aa550ca3279e2432365ef6561df58d97a747a57d6a1cf0e64`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F18. Security layer not required.
+
+### Findings
+
+- [x] **F19 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:68`
+  "Change ... every host entry point" contradicts the next sentence's exception for host extensions,
+  and the paragraph names core-internal configuration in a generic convention ("thin" stays undefined).
+  Fix: one generic rule (update every authored copy in the same commit) and defer which entry points
+  repeat or rephrase the description, and what generation checks, to the layout owner. Fixed.
+
 Re-validated: 803 + 983 tests and every generation check.
