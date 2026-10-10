@@ -194,12 +194,30 @@ def receipt_path(session: str) -> Path:
     return Path(tempfile.gettempdir()) / RECEIPTS / f"{digest}.json"
 
 
-def record_receipt(session: str, prompt_id=None) -> None:
+def record_receipt(session: str, prompt_id=None, cwd: Path | None = None,
+                   execution_obligation=False, suspend_execution=False,
+                   prompt: str | None = None) -> None:
     path = receipt_path(session)
     now = time.time()
     receipt = {"routed_at": now}
+    previous = read_receipt(session)
     if isinstance(prompt_id, str) and prompt_id:
         receipt["prompt_id"] = prompt_id
+    if cwd is not None:
+        worktree = str(cwd.resolve())
+        receipt["worktree"] = worktree
+        retained = previous.get("execution_obligation") is True and previous.get("worktree") == worktree
+        if execution_obligation or retained:
+            receipt["execution_obligation"] = True
+            receipt["execution_obligation_at"] = (
+                now if execution_obligation else previous.get("execution_obligation_at", now)
+            )
+        if suspend_execution and retained:
+            receipt["execution_suspended"] = True
+        elif retained and previous.get("execution_suspended") is True and not execution_obligation:
+            receipt["execution_suspended"] = True
+    if isinstance(prompt, str) and prompt:
+        receipt["prompt"] = prompt
     try:
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(receipt), encoding="utf-8")
@@ -307,7 +325,7 @@ def recover(data: dict) -> str | None:
     routed_at = receipt.get("routed_at")
     if isinstance(routed_at, (int, float)) and routed_at >= submitted:
         if prompt_id:
-            record_receipt(session, prompt_id)
+            record_receipt(session, prompt_id, Path(cwd).resolve(), prompt=prompt)
         return None
     if not claim_recovery(session, submitted):
         return None
@@ -315,7 +333,14 @@ def recover(data: dict) -> str | None:
         context = route(prompt, Path(cwd).resolve())
     except (OSError, RuntimeError, ValueError) as error:
         context = f"workflow-route: cannot recover this prompt's route: {error}"
-    record_receipt(session, prompt_id)
+    record_receipt(
+        session,
+        prompt_id,
+        Path(cwd).resolve(),
+        bool(context and "engineering:plan-execution automatically selected" in context),
+        bool(context and "engineering:plan-authoring automatically selected" in context),
+        prompt,
+    )
     return RECOVERED + context if context else None
 
 
@@ -358,7 +383,14 @@ def main() -> int:
         emit("UserPromptSubmit", context)
     session = data.get("session_id")
     if isinstance(session, str) and session:
-        record_receipt(session, data.get("prompt_id"))
+        record_receipt(
+            session,
+            data.get("prompt_id"),
+            Path(cwd_value).resolve(),
+            bool(context and "engineering:plan-execution automatically selected" in context),
+            bool(context and "engineering:plan-authoring automatically selected" in context),
+            prompt,
+        )
     return 0
 
 

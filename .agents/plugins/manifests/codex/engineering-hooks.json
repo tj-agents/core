@@ -92,6 +92,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 60,
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/continuation_stop.py\"",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/continuation_stop.py\""
+          }
+        ]
+      }
     ]
   }
 }
