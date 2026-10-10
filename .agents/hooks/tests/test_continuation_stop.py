@@ -292,6 +292,13 @@ class ContinuationStopTests(unittest.TestCase):
             "Can I plan and implement the migration?",
             "Would we plan and implement the migration?",
             "Do we plan and implement the migration?",
+            "Can't I plan and implement the migration?",
+            "Couldn’t we plan and implement the migration?",
+            "Won't we plan and implement the migration?",
+            "Must we plan and implement the migration?",
+            "Need I plan and implement the migration?",
+            "Must not plan and implement the migration.",
+            "Mustn't plan and implement the migration.",
         )
         with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
             for prompt in prompts:

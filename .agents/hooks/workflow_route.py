@@ -23,7 +23,12 @@ EXECUTION_DIRECTIVE = re.compile(
 INDIRECT_EXECUTION_CONTEXT = re.compile(
     r"^\s*(?:(?:please|can\s+you|could\s+you|would\s+you)\s+)*(?:"
     r"(?:how|why|what|when|where|whether)\b|"
-    r"(?:should|shall|do|does|did|is|are|was|were|has|have|had|must|need)\b|"
+    r"(?:should|shall|does|did|is|are|was|were|has|had)\b|"
+    r"(?:do|have)(?:n['\u2019]t)?\s+(?:i|we|you|they|he|she)\b|"
+    r"(?:must|need)(?:\s+not|n['\u2019]t)\b|"
+    r"(?:must|need)(?:n['\u2019]t)?\s+(?:i|we|you|they|he|she|it|this|that|the|a|an)\b|"
+    r"(?:can['\u2019]t|cannot|(?:could|would|may|might)n['\u2019]t|won['\u2019]t)\s+"
+    r"(?:i|we|you|they|he|she|it|this|that)\b|"
     r"(?:can|could|would|will|may|might)\s+(?:i|we|they|he|she|it|this|that)\b|"
     r"(?:explain|describe|tell\s+me|show\s+me)\s+"
     r"(?:how|why|what|when|where|whether)\b"

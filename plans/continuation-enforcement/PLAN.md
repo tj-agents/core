@@ -14,7 +14,7 @@ Do not assume the base package alone is sufficient. Determine whether the unmerg
 
 ## Next Steps
 
-R8 tiny follow-up accepted: full routing 30/30 and Stop 26/26 passed after generation and Check. The previous 4918af6 head's Windows/Linux CI completed green. Commit/push the authored follow-up, refresh the owner/binding and perform fresh incremental ordinary L4 source lenses plus exact-head CI; merge and verify causal main regeneration before terminal closeout.
+R9/R10 source/package acceptance completed: Stop 26/26 passed; routing's full 30-test run had one existing recovery subprocess timeout, and the complete affected recovery method passed unchanged in a focused rerun. All other routing tests passed. No assertions/timeouts were weakened. Commit/push the authored correction, refresh owner/binding and perform fresh ordinary L4 incremental review plus exact-head Windows/Linux CI. Previous b8482a6 CI completed green. Merge and verify causal main regeneration before terminal closeout.
 
 ## Deferred tech debt
 
@@ -103,3 +103,5 @@ Scope boundary: a fresh session without a routed execution obligation does not a
 2026-10-10 R7 acceptance: sentence-scoped authorization excludes indirect questions and explanation requests before matching internal conjunctions. Direct commands, polite implementation requests, mixed planning requests and a later direct execution sentence remain covered. Final complete routing 30/30 and Stop 26/26 passed after package generation/check. Verification artifacts: .git/agent-workflow/runs/continuation-enforcement-question-check/artifacts/. Fresh review and CI remain required.
 
 2026-10-10 R8 acceptance: interrogative auxiliary and subject handling excludes recommendation/capability questions before internal conjunctions; polite direct requests remain explicit positives. Actual source selection and receipt-to-Stop cases cover Should we, Can I, Would we and Do we, with/without active goals. Final routing 30/30 and Stop 26/26 passed with package generation/check. Artifacts: .git/agent-workflow/runs/continuation-enforcement-interrogative-check/artifacts/.
+
+2026-10-10 R9/R10 acceptance: restored direct Need to/Must/Do/Have compound requests, scoped ambiguous auxiliaries to interrogative subjects, excluded negative modal contractions and preserved explicit must-not prohibitions. Full Stop 26/26 passed after final package generation/check. Full routing 30 tests reported one PreToolUse recovery timeout (Don’t only plan it, implement it, active goal); isolated complete mixed-planning recovery method passed unchanged, with its original 20-second limit. No functional assertion failed. Artifacts: .git/agent-workflow/runs/continuation-enforcement-auxiliary-check/artifacts/. Exact-head CI owns the complete clean matrix.
