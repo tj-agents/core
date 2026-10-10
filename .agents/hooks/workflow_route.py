@@ -13,9 +13,11 @@ import tempfile
 import time
 
 
-EXECUTION = re.compile(
-    r"\b(?:carry\s+on|complete|continue|deliver|execute|finish|implement|proceed|resume|"
-    r"work\s+through)\b",
+EXECUTION_DIRECTIVE = re.compile(
+    r"(?:^|[.!?;:,\n]|\b(?:and|but|then)\b)\s*"
+    r"(?:(?:please|go\s+ahead\s+and|can\s+you|could\s+you|would\s+you)\s+)*"
+    r"(?:i\s+(?:want|need)\s+(?:you\s+)?to\s+)?"
+    r"(?:carry\s+on|complete|continue|deliver|execute|finish|implement|proceed|resume|work\s+through)\b",
     re.IGNORECASE,
 )
 
@@ -84,6 +86,14 @@ RECOVERED = (
     "workflow-route: the UserPromptSubmit hook did not deliver this prompt's route (it timed out "
     "or failed), so the route is delivered with this tool call instead.\n\n"
 )
+DIRECT_CONTROL = re.compile(r"^\s*(?:please\s+)?(?P<action>pause|cancel|stop|resume|continue)"
+                            r"(?:\s+(?:(?:this|it)(?:\s+(?:work|task|goal|plan|execution))?|"
+                            r"(?:the|our|my)?\s*(?:work|task|goal|plan|execution)))?\s*[.!?]*\s*$", re.I)
+
+
+def direct_control(prompt: str) -> str | None:
+    match = DIRECT_CONTROL.fullmatch(prompt)
+    return match["action"].lower() if match else None
 
 
 def active_goal(cwd: Path) -> bool:
@@ -97,19 +107,30 @@ def active_goal(cwd: Path) -> bool:
     return not COMPLETE_STATUS.search(body)
 
 
+def authorization_evidence(prompt: str) -> str:
+    evidence = re.sub(r"```[\s\S]*?(?:```|\Z)", " ", prompt)
+    evidence = re.sub(r"(?m)^\s*>.*$", " ", evidence)
+    evidence = re.sub(r"(?<!\w)`[^`\n]+`(?!\w)", " ", evidence)
+    evidence = re.sub(r'(?<!\w)"[^"\n]*"(?!\w)', " ", evidence)
+    evidence = re.sub(r"(?<!\w)'[^'\n]{2,}'(?!\w)", " ", evidence)
+    return re.sub(r"(?<!\w)[\u2018\u201c][^\u2019\u201d\n]*[\u2019\u201d](?!\w)", " ", evidence)
+
+
 def selects_plan_execution(prompt: str, cwd: Path) -> bool:
     """Return whether this prompt authorizes continued plan execution."""
-    if not prompt.strip():
+    evidence = authorization_evidence(prompt)
+    explicit = evidence.strip().lower() in {"engineering:plan-execution", "$engineering:plan-execution"}
+    if not evidence.strip():
         return False
-    if re.search(r"\bplan-execution\b", prompt, re.IGNORECASE):
+    if explicit:
         return True
 
-    executing = EXECUTION.search(prompt) is not None
+    executing = EXECUTION_DIRECTIVE.search(evidence) is not None
     if active_goal(cwd):
         return executing
     return executing and (
-        LONG_RUNNING.search(prompt) is not None
-        or OWNER_REFERENCE.search(prompt) is not None
+        LONG_RUNNING.search(evidence) is not None
+        or OWNER_REFERENCE.search(evidence) is not None
     )
 
 
@@ -194,12 +215,33 @@ def receipt_path(session: str) -> Path:
     return Path(tempfile.gettempdir()) / RECEIPTS / f"{digest}.json"
 
 
-def record_receipt(session: str, prompt_id=None) -> None:
+def record_receipt(session: str, prompt_id=None, cwd: Path | None = None,
+                   execution_obligation=False, suspend_execution=False,
+                   prompt: str | None = None, resume_execution=False) -> None:
     path = receipt_path(session)
     now = time.time()
     receipt = {"routed_at": now}
+    previous = read_receipt(session)
     if isinstance(prompt_id, str) and prompt_id:
         receipt["prompt_id"] = prompt_id
+    if cwd is not None:
+        worktree = str(cwd.resolve())
+        receipt["worktree"] = worktree
+        same_worktree = previous.get("worktree") == worktree
+        retained = previous.get("execution_obligation") is True and same_worktree
+        if execution_obligation or retained:
+            receipt["execution_obligation"] = True
+            receipt["execution_obligation_at"] = (
+                now if execution_obligation else previous.get("execution_obligation_at", now)
+            )
+        if suspend_execution:
+            receipt["execution_suspended"] = True
+        elif resume_execution:
+            receipt["execution_suspended"] = False
+        elif same_worktree and previous.get("execution_suspended") is True and not execution_obligation:
+            receipt["execution_suspended"] = True
+    if isinstance(prompt, str) and prompt:
+        receipt["prompt"] = prompt
     try:
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(receipt), encoding="utf-8")
@@ -307,7 +349,7 @@ def recover(data: dict) -> str | None:
     routed_at = receipt.get("routed_at")
     if isinstance(routed_at, (int, float)) and routed_at >= submitted:
         if prompt_id:
-            record_receipt(session, prompt_id)
+            record_receipt(session, prompt_id, Path(cwd).resolve(), prompt=prompt)
         return None
     if not claim_recovery(session, submitted):
         return None
@@ -315,7 +357,15 @@ def recover(data: dict) -> str | None:
         context = route(prompt, Path(cwd).resolve())
     except (OSError, RuntimeError, ValueError) as error:
         context = f"workflow-route: cannot recover this prompt's route: {error}"
-    record_receipt(session, prompt_id)
+    record_receipt(
+        session,
+        prompt_id,
+        Path(cwd).resolve(),
+        bool(context and "engineering:plan-execution automatically selected" in context),
+        bool(context and "engineering:plan-authoring automatically selected" in context) or direct_control(prompt) in {"pause", "cancel", "stop"},
+        prompt,
+        direct_control(prompt) in {"resume", "continue"},
+    )
     return RECOVERED + context if context else None
 
 
@@ -358,7 +408,15 @@ def main() -> int:
         emit("UserPromptSubmit", context)
     session = data.get("session_id")
     if isinstance(session, str) and session:
-        record_receipt(session, data.get("prompt_id"))
+        record_receipt(
+            session,
+            data.get("prompt_id"),
+            Path(cwd_value).resolve(),
+            bool(context and "engineering:plan-execution automatically selected" in context),
+            bool(context and "engineering:plan-authoring automatically selected" in context) or direct_control(prompt) in {"pause", "cancel", "stop"},
+            prompt,
+            direct_control(prompt) in {"resume", "continue"},
+        )
     return 0
 
 
