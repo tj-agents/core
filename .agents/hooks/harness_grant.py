@@ -4,11 +4,11 @@ Approves exactly the commands the merge procedures prescribe, and only in a repo
 origin is a trusted GitHub owner (`harness-trust.json` beside this file):
 
 - `git -C "<checkout>" merge --no-edit origin/<default>` from a branch other than the default;
-- `git -C "<checkout>" worktree remove -- "<worktree>"` for a linked worktree whose head is
-  already on `origin/<default>`, or whose exact worktree/branch has a fresh `cleanup_proof.py`
-  receipt;
-- `git -C "<checkout>" branch -d <branch>` for a branch already on `origin/<default>`, or `branch
-  -D <branch>` when a fresh matching receipt covers it instead.
+- `git -C "<checkout>" worktree remove -- "<worktree>"` for a linked worktree whose exact
+  worktree/branch has a fresh `cleanup_proof.py` receipt and has no current open HEAD users or BASE
+  dependents;
+- `git -C "<checkout>" branch -d <branch>` or `branch -D <branch>` when a fresh matching receipt
+  and a current open-PR observation both cover it.
 
 Each must be the whole command. A PreToolUse allow covers the entire tool call, so a compound
 command, an unquoted or relative path, or a `--force` never matches. Anything that does not match
@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 from hook_runtime import COMMAND_TIMEOUT_SECONDS, grant, is_trusted_checkout
+from cleanup_dependency import EvidenceError, observe_open_prs
 
 SHELL_TOOLS = {"bash", "powershell"}
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
@@ -85,10 +86,6 @@ def default_branch(checkout):
     return ref[len("origin/"):] if ref.startswith("origin/") else None
 
 
-def on_default(checkout, commit, default):
-    return git_succeeds(checkout, "merge-base", "--is-ancestor", commit, "origin/" + default)
-
-
 def linked_worktrees(checkout):
     """``{resolved path: (head, branch)}`` for every linked worktree, excluding the main one."""
     try:
@@ -144,6 +141,14 @@ def worktree_receipt_authorizes(worktree, branch, head):
     )
 
 
+def dependencies_are_clear(checkout, branch):
+    try:
+        evidence = observe_open_prs(branch, cwd=checkout)
+    except EvidenceError:
+        return False
+    return not evidence["head"] and not evidence["base"]
+
+
 def branch_receipt_authorizes(checkout, branch):
     if not git_succeeds(checkout, "show-ref", "--verify", "--quiet", "refs/heads/" + branch):
         return False
@@ -181,9 +186,11 @@ def remove_is_safe(checkout, raw_worktree, default):
     if entry is None:
         return False
     head, branch = entry
-    if on_default(checkout, head, default):
-        return True
-    return branch is not None and worktree_receipt_authorizes(target, branch, head)
+    return (
+        branch is not None
+        and worktree_receipt_authorizes(target, branch, head)
+        and dependencies_are_clear(checkout, branch)
+    )
 
 
 def branch_delete_is_safe(checkout, branch, flag, default):
@@ -191,9 +198,7 @@ def branch_delete_is_safe(checkout, branch, flag, default):
         return False
     if not git_succeeds(checkout, "show-ref", "--verify", "--quiet", "refs/heads/" + branch):
         return False
-    if flag == "-d" and on_default(checkout, "refs/heads/" + branch, default):
-        return True
-    return branch_receipt_authorizes(checkout, branch)
+    return branch_receipt_authorizes(checkout, branch) and dependencies_are_clear(checkout, branch)
 
 
 def main():
@@ -227,10 +232,10 @@ def main():
         reason = "harness-grant: syncing a feature branch with origin/" + default
     elif pattern is _REMOVE_RE:
         safe = remove_is_safe(checkout, match.group("worktree"), default)
-        reason = "harness-grant: removing a worktree merged into origin/" + default + " or covered by a cleanup receipt"
+        reason = "harness-grant: removing a worktree covered by a fresh cleanup receipt and dependency observation"
     else:
         safe = branch_delete_is_safe(checkout, match.group("branch"), match.group("flag"), default)
-        reason = "harness-grant: deleting a branch merged into origin/" + default + " or covered by a cleanup receipt"
+        reason = "harness-grant: deleting a branch covered by a fresh cleanup receipt and dependency observation"
 
     if safe:
         grant(reason + " in a trusted repository.")

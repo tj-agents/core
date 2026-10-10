@@ -80,11 +80,12 @@ def rebase_merge(primary, worktree, branch):
     return merge_oid, new_head
 
 
-def write_fixture(path, pr_view, open_prs=None, pr_for_branch=None):
+def write_fixture(path, pr_view, open_head_prs=None, open_base_prs=None, pr_for_branch=None):
     path.write_text(
         json.dumps({
             "pr_view": pr_view,
-            "open_prs": open_prs if open_prs is not None else [],
+            "open_head_prs": open_head_prs if open_head_prs is not None else [],
+            "open_base_prs": open_base_prs if open_base_prs is not None else [],
             "pr_for_branch": pr_for_branch,
         }),
         encoding="utf-8",
@@ -277,8 +278,106 @@ class CleanupProofTests(unittest.TestCase):
         fixture = self.fixture_path()
         write_fixture(
             fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
-            open_prs=[{"number": 99}],
+            open_head_prs=[{"number": 99, "headRefName": "child", "headRefOid": "a" * 40}],
         )
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+
+        self.assertEqual(1, result.returncode)
+        self.assertTrue(result.stdout.startswith("preserve:"))
+        self.assertTrue(worktree.exists())
+
+    def test_an_open_base_dependent_retains_the_linked_branch_and_checkout(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            open_base_prs=[{"number": 99, "headRefName": "child", "headRefOid": "a" * 40}],
+        )
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(result.stdout.startswith("retained-dependency"))
+        self.assertTrue(worktree.exists())
+        self.assertEqual(head, git(primary, "rev-parse", "refs/heads/feature"))
+        receipt = load_receipt(self.state.name, worktree)
+        self.assertEqual("retained-dependency", receipt["verdict"])
+        self.assertEqual(
+            [{"number": 99, "head_ref_name": "child", "head_ref_oid": "a" * 40}],
+            receipt["dependencies"],
+        )
+
+    def test_primary_branch_route_uses_the_saved_branch_head_after_checkout_moves_to_main(self):
+        bare, primary = init_repo(self.root)
+        git(primary, "checkout", "-q", "-b", "feature")
+        (primary / "feature.txt").write_text("feature\n", encoding="utf-8")
+        git(primary, "add", "feature.txt")
+        git(primary, "commit", "-q", "-m", "feature")
+        git(primary, "push", "-q", "-u", "origin", "feature")
+        head = git(primary, "rev-parse", "HEAD")
+        merge_oid = squash_merge(primary, "feature")
+
+        fixture = self.fixture_path()
+        write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}})
+        result = self.run_proof(primary, primary, "feature", head, 1, fixture=fixture)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(result.stdout.startswith("removable"))
+        self.assertNotIn("worktree remove", result.stdout)
+        self.assertIn("push origin --delete feature", result.stdout)
+        self.run_commands(result.stdout)
+        self.assertEqual(1, subprocess.run(
+            ["git", "-C", str(primary), "show-ref", "--verify", "--quiet", "refs/heads/feature"],
+            capture_output=True, text=True,
+        ).returncode)
+
+    def test_primary_branch_route_retains_a_saved_branch_with_an_open_base_dependent(self):
+        bare, primary = init_repo(self.root)
+        git(primary, "checkout", "-q", "-b", "feature")
+        (primary / "feature.txt").write_text("feature\n", encoding="utf-8")
+        git(primary, "add", "feature.txt")
+        git(primary, "commit", "-q", "-m", "feature")
+        git(primary, "push", "-q", "-u", "origin", "feature")
+        head = git(primary, "rev-parse", "HEAD")
+        merge_oid = squash_merge(primary, "feature")
+
+        fixture = self.fixture_path()
+        write_fixture(
+            fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            open_base_prs=[{"number": 99, "headRefName": "child", "headRefOid": "a" * 40}],
+        )
+        result = self.run_proof(primary, primary, "feature", head, 1, fixture=fixture)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(result.stdout.startswith("retained-dependency"))
+        self.assertEqual(head, git(primary, "rev-parse", "refs/heads/feature"))
+
+    def test_primary_branch_route_refuses_the_default_branch(self):
+        bare, primary = init_repo(self.root)
+        head = git(primary, "rev-parse", "HEAD")
+        fixture = self.fixture_path()
+        write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": head}})
+
+        result = self.run_proof(primary, primary, "main", head, 1, fixture=fixture)
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("default branch", result.stdout)
+
+    def test_missing_or_malformed_base_evidence_preserves(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        head = git(worktree, "rev-parse", "HEAD")
+        merge_oid = merge_commit_merge(primary, "feature")
+        fixture = self.fixture_path()
+        fixture.write_text(json.dumps({
+            "pr_view": {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            "open_head_prs": [],
+            "open_base_prs": {"number": 99},
+        }), encoding="utf-8")
+
         result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
 
         self.assertEqual(1, result.returncode)
@@ -515,7 +614,11 @@ class CleanupProofTests(unittest.TestCase):
         merge_oid = merge_commit_merge(primary, "feature")
         (worktree / "untracked.txt").write_text("dirty\n", encoding="utf-8")
 
-        fixture = {"pr_view": {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}}, "open_prs": []}
+        fixture = {
+            "pr_view": {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
+            "open_head_prs": [],
+            "open_base_prs": [],
+        }
         args = CLEANUP_PROOF.argparse.Namespace(
             worktree=str(worktree), branch="feature", head=head, pr=7, default="main", repo=None,
         )
