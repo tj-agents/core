@@ -273,10 +273,8 @@ class TerminalProfileWiringTests(unittest.TestCase):
                 self.assertEqual("fallback\n", completed.stdout)
                 self.assertIn("registry could not be read", completed.stderr)
 
-    @unittest.skipUnless(os.name == "nt", "the no-interpreter fallback is a Windows PowerShell check")
-    def test_claude_windows_powershell_falls_back_without_a_usable_python(self):
+    def test_claude_powershell_falls_back_without_a_usable_python(self):
         self.executable("claude", "print('fallback')\n")
-        self.environment["PATH"] = str(self.bin)
         self.install_profile(CLAUDE)
         override = (
             "function Get-Command { param($Name, [switch]$All, $CommandType, $ErrorAction) "
@@ -287,8 +285,10 @@ class TerminalProfileWiringTests(unittest.TestCase):
             with self.subTest(shell=shell):
                 completed = self.run_powershell(shell, override + f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
                 self.assertEqual(0, completed.returncode, completed.stderr)
-                self.assertEqual("fallback\n", completed.stdout)
-                self.assertIn("no usable Python", completed.stderr)
+                self.assertEqual("", completed.stderr)
+                self.assertEqual("fallback", completed.stdout.splitlines()[-1])
+                self.assertEqual(1, completed.stdout.splitlines().count("fallback"))
+                self.assertIn("no usable Python", completed.stdout)
 
     def test_claude_powershell_preserves_a_real_cli_exit_125_without_a_second_launch(self):
         active = self.root / "exit-status-active"
