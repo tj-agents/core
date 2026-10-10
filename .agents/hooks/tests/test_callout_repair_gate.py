@@ -182,7 +182,7 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.assertEqual("block", self.run_hook("Stop")["decision"])
         self.assertEqual({}, self.run_hook("Stop", stop_hook_active=True))
 
-    def test_manifests_ship_supported_events_without_inventing_codex_stop(self):
+    def test_manifests_ship_only_supported_callout_events(self):
         for host in ("claude", "codex"):
             manifest = json.loads((ROOT / f".agents/plugins/manifests/{host}/engineering-hooks.json").read_text())
             for event in ("UserPromptSubmit", "PreToolUse"):
@@ -190,7 +190,7 @@ class CalloutRepairGateTests(unittest.TestCase):
             if host == "claude":
                 self.assertIn("callout_repair_gate.py", json.dumps(manifest["hooks"]["Stop"]))
             else:
-                self.assertNotIn("Stop", manifest["hooks"])
+                self.assertNotIn("callout_repair_gate.py", json.dumps(manifest["hooks"].get("Stop", [])))
 
 
 if __name__ == "__main__":
