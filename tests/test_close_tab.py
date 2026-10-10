@@ -1,40 +1,17 @@
-import os
+import importlib.util
 from pathlib import Path
-import shutil
-import subprocess
+import sys
 import unittest
 
+PATH = Path(__file__).resolve().parents[1] / ".agents/machine/utility/peer-cli/scripts/close_tab.py"
+sys.path.insert(0, str(PATH.parent))
+spec = importlib.util.spec_from_file_location("close_tab", PATH); close_tab = importlib.util.module_from_spec(spec); spec.loader.exec_module(close_tab)
 
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "tests" / "close-tab.tests.ps1"
-
-
-def run_with(shell):
-    return subprocess.run(
-        [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(SCRIPT)],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-
-
-@unittest.skipUnless(os.name == "nt", "Windows is required")
 class CloseTabTests(unittest.TestCase):
-    def test_windows_powershell_5(self):
-        if not shutil.which("powershell.exe"):
-            self.skipTest("Windows PowerShell 5.1 is required")
-        result = run_with("powershell.exe")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("PASS close-tab.tests.ps1", result.stdout)
+    def test_missing_or_unverified_native_identity_refuses(self):
+        with self.assertRaises(close_tab.TerminalRefusal):
+            close_tab.close_entry({"pid": 0, "pid_started_at": 0, "terminal": {"kind": "kitty"}})
 
-    def test_powershell_7(self):
-        if not shutil.which("pwsh"):
-            self.skipTest("PowerShell 7 is required")
-        result = run_with("pwsh")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("PASS close-tab.tests.ps1", result.stdout)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_windows_adapter_uses_exact_id_and_no_keystrokes(self):
+        source = PATH.with_name("windows_terminal_uia.ps1").read_text(encoding="utf-8")
+        self.assertIn("AutomationIdProperty, $TabId", source); self.assertIn("WindowsTerminal", source); self.assertNotIn("SendKeys", source)

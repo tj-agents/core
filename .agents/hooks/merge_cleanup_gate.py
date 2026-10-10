@@ -70,10 +70,11 @@ LAUNCHER_PY_SCRIPTS = ("agent_cli.py", "transfer.py", "launch_codex.py", "launch
 LAUNCHER_PS1_SCRIPTS = ("launch-codex.ps1", "launch-claude.ps1")
 
 EXEMPT_PY_SCRIPTS = (
-    "workflow_ops.py", "cleanup_proof.py", "merge_cleanup_gate.py", *LAUNCHER_PY_SCRIPTS,
+    "workflow_ops.py", "cleanup_proof.py", "merge_cleanup_gate.py", "peer_cli.py", "close_tab.py",
+    "finish.py", "close.py", "finish_reaper.py", "configure_terminal_tab_close.py", *LAUNCHER_PY_SCRIPTS,
 )
 EXEMPT_PS1_SCRIPTS = (
-    "worktrees.ps1", "peer-cli.ps1", "close-tab.ps1", "finish.ps1", "close.ps1", "finish_reaper.ps1",
+    "worktrees.ps1",
     *LAUNCHER_PS1_SCRIPTS,
 )
 
@@ -164,16 +165,15 @@ def command_is_exempt(command):
 MESSAGE = (
     "MERGE CLEANUP GATE: `gh pr merge` for PR #{pr} ({branch}) ran from {worktree} at {time} "
     "and merge Step 5 cleanup has not completed.\n"
-    "- Not merged yet? Keep monitoring — `python .agents/workflows/workflow_ops.py ... "
+    "- Not merged yet? Keep monitoring — `{python} .agents/workflows/workflow_ops.py ... "
     "monitor --kind pr --id {pr} --head {head}`, `gh pr view/checks` and `gh run list/view/watch` "
     "are never blocked.\n"
-    "- Merged? Finish Step 6 and the report. For a removable linked checkout, from inside {worktree} run `python -B {cleanup_proof}` "
-    "and `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>"
-    "/scripts/finish.ps1`, exactly, with no arguments: it closes this CLI and removes the worktree. "
-    "For a primary or retained checkout, run the argument-free sibling `close.ps1` after the report; "
+    "- Merged? Finish Step 6 and the report. For a removable linked checkout, from inside {worktree} run `{python} -B {cleanup_proof}` "
+    "and `{python} -B <machine:peer-cli skill-directory>/scripts/finish.py`, exactly, with no arguments: it closes this CLI and removes the worktree. "
+    "For a primary or retained checkout, run the argument-free sibling `close.py` after the report; "
     "it verifies session exit and retains the checkout. Elsewhere, follow `engineering:merge` Step 5.\n"
     "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
-    "`python \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
+    "`{python} \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
     "This repeats every 10 minutes until cleanup completes, a handoff launcher transfers it, "
     "or verified session exit clears it."
 )
@@ -257,7 +257,8 @@ def nag_cooldown_seconds():
 
 
 def normalize_path_text(value):
-    return str(value).replace("\\", "/").rstrip("/").casefold()
+    text = str(value).replace("\\", "/").rstrip("/")
+    return text.casefold() if os.name == "nt" else text
 
 
 def under_or_equal(candidate, root):
@@ -305,6 +306,7 @@ def deny_message(obligation, codex):
         time=stamp,
         cleanup_proof=cleanup_proof,
         hook_path=str(Path(__file__).resolve()),
+        python="python" if os.name == "nt" else "python3",
     )
 
 

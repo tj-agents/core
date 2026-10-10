@@ -51,9 +51,9 @@ EXIT_UNSUPPORTED = 2
 EXIT_TERMINATION = 3
 
 Process = collections.namedtuple(
-    "Process", "pid parent_pid name started_at private_bytes console_host_pid"
+    "Process", "pid parent_pid name started_at private_bytes console_host_pid terminal_pid"
 )
-Process.__new__.__defaults__ = (None, None)
+Process.__new__.__defaults__ = (None, None, None)
 
 
 def state_directory(environ=None, home=None):
@@ -134,6 +134,19 @@ def console_is_gone(process, by_pid):
     return process.console_host_pid not in by_pid
 
 
+def terminal_is_gone(process, by_pid):
+    """Linux session ownership is a second signal after init/subreaper reparenting.
+
+    A terminal close can reparent its child to init or a subreaper, so parent liveness alone is not
+    ownership.  `/proc/<pid>/stat` records the session leader; when that verified terminal/session
+    owner is absent from the same snapshot, the agent is a candidate.  Missing information is unknown,
+    never evidence for termination.
+    """
+    if not process.terminal_pid or process.terminal_pid == process.pid:
+        return False
+    return process.terminal_pid not in by_pid
+
+
 def candidates(table, self_pid, now, names=DEFAULT_PROCESS_NAMES, grace=GRACE_SECONDS):
     """Named processes old enough to judge and outside this session's own tree."""
     targets = {str(name).casefold() for name in names}
@@ -153,7 +166,7 @@ def orphans_among(candidates_, table):
     orphans = [
         process
         for process in candidates_
-        if parent_is_gone(process, by_pid) or console_is_gone(process, by_pid)
+        if parent_is_gone(process, by_pid) or console_is_gone(process, by_pid) or terminal_is_gone(process, by_pid)
     ]
     return sorted(orphans, key=lambda process: process.started_at)
 
@@ -387,7 +400,42 @@ def windows_process_table():
         kernel32.CloseHandle(snapshot)
 
 
+def _linux_boot_time():
+    with open("/proc/stat", encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("btime "):
+                return float(line.split()[1])
+    raise OSError("/proc/stat has no btime")
+
+
+def linux_process_table():
+    """A conservative `/proc` snapshot, including session ownership for reparented children."""
+    boot = _linux_boot_time()
+    ticks = os.sysconf("SC_CLK_TCK")
+    table = []
+    for child in Path("/proc").iterdir():
+        if not child.name.isdigit():
+            continue
+        try:
+            raw = (child / "stat").read_text(encoding="utf-8")
+            close = raw.rindex(")")
+            name = raw[raw.index("(") + 1:close]
+            fields = raw[close + 2:].split()
+            # state, ppid, pgrp, session, tty_nr, ... starttime (field 22).
+            parent, session, started_ticks = int(fields[1]), int(fields[3]), int(fields[19])
+            table.append(Process(int(child.name), parent, name, boot + started_ticks / ticks,
+                                 None, None, session))
+        except (OSError, ValueError, IndexError):
+            continue
+    return table
+
+
 def read_process_table():
+    if sys.platform == "linux":
+        try:
+            return linux_process_table()
+        except OSError:
+            return None
     if os.name != "nt":
         return None
     try:
@@ -419,6 +467,17 @@ def terminate(process):
     Classification and termination are separate passes, and Windows reuses a pid the moment it is
     free, so the start time is re-read through a fresh handle rather than trusted from the snapshot.
     """
+    if sys.platform == "linux":
+        current = next((item for item in linux_process_table() if item.pid == process.pid), None)
+        if current is None or current.started_at is None or process.started_at is None:
+            return "cannot confirm identity"
+        if abs(current.started_at - process.started_at) > 1:
+            return "pid was reused"
+        try:
+            os.kill(process.pid, 15)
+        except OSError as error:
+            return "termination refused ({})".format(error)
+        return None
     if os.name != "nt":
         return "unsupported platform"
     import ctypes

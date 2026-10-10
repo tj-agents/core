@@ -1,7 +1,7 @@
 """SessionStart hook: record this session's id, tab title, directory and host pid.
 
 The launchers export `AGENT_CLI_TAB_TITLE` when they open a tab (`agent_cli.py`'s `launch_tab`); a
-session started by hand exports nothing and records a null title. `peer-cli.ps1` reads these entries to
+session started by hand exports nothing and records a null title. `peer_cli.py` reads these entries to
 resolve a session from the tab title a user can see, and the reverse.
 
 Codex runs hooks through a shell, so the parent pid is a transient shell rather than the CLI. The
@@ -274,6 +274,25 @@ def read_payload():
     return value if isinstance(value, dict) else {}
 
 
+def terminal_identity(environ=None):
+    """Return the exact terminal handle available to this session, never a title guess."""
+    values = os.environ if environ is None else environ
+    if values.get("KITTY_WINDOW_ID") and values.get("KITTY_LISTEN_ON"):
+        return {"kind": "kitty", "window_id": values["KITTY_WINDOW_ID"],
+                "listen_on": values["KITTY_LISTEN_ON"]}
+    if values.get("TMUX_PANE"):
+        return {"kind": "tmux", "pane_id": values["TMUX_PANE"]}
+    if values.get("KONSOLE_DBUS_SESSION") and values.get("KONSOLE_DBUS_WINDOW"):
+        return {"kind": "konsole", "session": values["KONSOLE_DBUS_SESSION"],
+                "window": values["KONSOLE_DBUS_WINDOW"]}
+    if values.get("WT_SESSION"):
+        identity = {"kind": "windows-terminal", "session": values["WT_SESSION"]}
+        if values.get("AGENT_WINDOWS_TERMINAL_TAB_ID"):
+            identity["automation_id"] = values["AGENT_WINDOWS_TERMINAL_TAB_ID"]
+        return identity
+    return None
+
+
 def record(data, lookup=None, host_names=None):
     session = data.get("session_id") or data.get("sessionId")
     if not session:
@@ -292,6 +311,9 @@ def record(data, lookup=None, host_names=None):
         entry["pid_started_at"] = pid_started_at
     if host is not None:
         entry["host"] = host
+    terminal = terminal_identity()
+    if terminal is not None:
+        entry["terminal"] = terminal
     destination = state_directory() / f"{session}.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
