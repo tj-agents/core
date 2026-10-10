@@ -23,6 +23,8 @@ EXECUTION_DIRECTIVE = re.compile(
 INDIRECT_EXECUTION_CONTEXT = re.compile(
     r"^\s*(?:(?:please|can\s+you|could\s+you|would\s+you)\s+)*(?:"
     r"(?:how|why|what|when|where|whether)\b|"
+    r"(?:should|shall|do|does|did|is|are|was|were|has|have|had|must|need)\b|"
+    r"(?:can|could|would|will|may|might)\s+(?:i|we|they|he|she|it|this|that)\b|"
     r"(?:explain|describe|tell\s+me|show\s+me)\s+"
     r"(?:how|why|what|when|where|whether)\b"
     r")",

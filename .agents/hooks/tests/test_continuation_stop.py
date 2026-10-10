@@ -288,6 +288,10 @@ class ContinuationStopTests(unittest.TestCase):
             "Can you explain how to plan and implement the migration?",
             "Explain how to plan and implement the migration.",
             "Please explain how to plan and implement the migration.",
+            "Should we plan and implement the migration?",
+            "Can I plan and implement the migration?",
+            "Would we plan and implement the migration?",
+            "Do we plan and implement the migration?",
         )
         with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
             for prompt in prompts:
