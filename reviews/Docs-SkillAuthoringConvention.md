@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `33898c46c0585ce7f8d5ebcf31ca66906079a170`  `(2026-10-09)`
+**Reviewed up to commit:** `9c8168e9eca015e54ca1f8be73d0e5cc9f4f7597`  `(2026-10-09)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -85,3 +85,34 @@ Remediation of F1–F3. No routed rules (the route table is removed); security l
   The F2 fix asserts how kit's check behaves (an unowned claim about another repository) and leaves a
   kit-layout author no instruction to check within the repository. Fix: drop the kit claim and tell the
   author to check for a hyphen-only near miss wherever generation does not. Fixed.
+
+## Review pass — 2026-10-09 — incremental
+
+**Candidate base:** `33898c46c0585ce7f8d5ebcf31ca66906079a170`
+**Candidate head:** `9c8168e9eca015e54ca1f8be73d0e5cc9f4f7597`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:d74fc481d824915c190fa73044655de1c1c4d0cc5192c7864b4baddf48d16435` `(4 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/GYTEcEeUHOsjEMuMk7MGfk/hOPHXB-tZr2pFxAkDqIOnK`
+**Candidate bundle identity:** `sha256:f7accff75597f2e4add7b8fa2a5f2510fc3b0931a985d86fdca94bf257586980`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F4–F8. Security layer not required.
+
+### Findings
+
+- [x] **F9 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:68`
+  "A kit-layout repository generates its host entry points instead" is still an unowned claim about kit.
+  Fix: defer to the repository's layout owner. Fixed.
+- [x] **F10 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:50`
+  "Where generation does not" is ambiguous and limits the within-repository check to hyphen near misses,
+  while the installed-plugin check need not include the repository being authored. Fix: one near-miss
+  check over this repository's skills and every installed plugin. Fixed.
+- [x] **F11 — LOW — native-general** — `plans/skill-authoring-convention/GOAL.md:109`
+  No re-validation is recorded after `9c8168e` changed a shipped `SKILL.md`. Fix: re-run generation,
+  catalog, harness, packaging and both suites and record it. Fixed (803 + 983 tests, every check green).
+
+Dropped: the debt entry describing the opt-in it records (a debt entry must state its problem); the
+unwrapped step-3 line and the unexplained test count were fixed in passing.
