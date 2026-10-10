@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `4236f6f2a25bcf0ff2df5558a08dc64a05bc0fd3`  `(2026-10-10)`
+**Reviewed up to commit:** `d8189522a413c32d11575a44083331f769ab5890`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -280,4 +280,30 @@ Remediation of F20. Security layer not required.
 Dropped: a description-hash gate for extended adapters (an enhancement; the hand review is the stated
 rule), the claimed conflict with "may add only host-specific metadata" (a host-worded description is
 host-specific metadata), and the convention sentence the plugin debt entry already names for removal.
+Re-validated: 803 + 983 tests and every generation check.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `4236f6f2a25bcf0ff2df5558a08dc64a05bc0fd3`
+**Candidate head:** `d8189522a413c32d11575a44083331f769ab5890`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:273f978d0fea9586c21ca2e9c33f6e4372aa53890f83a0f45d2179b5b90e6ffa` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/XxZBHsIIGUzhR0CSOKldN3/Dh53qcLROt3Wu4TD9SgZC1`
+**Candidate bundle identity:** `sha256:072ad53113715bb3650c2b311a592b4c82365b146e97783f10dd7acc6f37a6c5`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F21. Security layer not required.
+
+### Findings
+
+- [x] **F22 — LOW — native-general** — `SOURCE_LAYOUT.md:31`
+  The F21 rewrite dropped the plain entry point's name, kind, domain and fixed-body invariant and the
+  extended entry point's single canonical link, left "the rest" undefined, scoped the extended review to
+  description changes only, and pointed at a function name. Fix: state the complete invariant for both
+  kinds of entry point, review an extended entry point on any canonical change, and name the generation
+  check command as the enforcement. Fixed; the plugin debt entry now agrees with its owner.
+
 Re-validated: 803 + 983 tests and every generation check.
