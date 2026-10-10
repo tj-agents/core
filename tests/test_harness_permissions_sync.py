@@ -125,10 +125,10 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertIn(str(self.settings_path()), drifted)
 
     def test_stale_owned_entries_are_removed(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        v1 = install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
         SYNC.synchronize(self.environ, "apply")
         before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
-        self.assertTrue(any("v1" in entry for entry in before))
+        self.assertTrue(any(v1.as_posix() in entry for entry in before))
 
         clear_claude_plugin(self.claude_config, "engineering")
         SYNC.synchronize(self.environ, "apply")
@@ -190,16 +190,17 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(self.rules_path().is_file())
 
     def test_a_version_path_change_rerenders(self):
-        install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        v1 = install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
         SYNC.synchronize(self.environ, "apply")
 
         clear_claude_plugin(self.claude_config, "engineering")
-        install_claude_plugin(self.claude_config, "engineering", "v2", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
+        v2 = install_claude_plugin(self.claude_config, "engineering", "v2", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
         SYNC.synchronize(self.environ, "apply")
 
+        # Match the version's own root: a bare "v1" also matches a random temporary directory name.
         allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
-        self.assertFalse(any("v1" in entry for entry in allow))
-        self.assertTrue(any("v2" in entry for entry in allow))
+        self.assertFalse(any(f"{v1.as_posix()}/" in entry for entry in allow))
+        self.assertTrue(any(f"{v2.as_posix()}/" in entry for entry in allow))
 
     def test_idempotent_second_apply_is_byte_identical(self):
         install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
