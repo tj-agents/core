@@ -41,7 +41,7 @@ or a different worktree ends ownership and surfaces a human decision; never sile
 Resolve authority from the repository's recorded standing instruction, the user authorization kept in
 the owning goal record (`engineering:merging` owns that goal-wide scope), or an observed user approval
 for this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
-the binding artifact:
+the binding artifact. Run this helper with `python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B .agents/workflows/workflow_ops.py --root ROOT --workflow-run-id ID delivery-bind --pr NUMBER [--approval-record PATH]

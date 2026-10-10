@@ -44,6 +44,8 @@ Resolve the target before reading or writing review state. An implementation wor
 remote base exactly once, immediately before this final review, while the worktree is clean. Then invoke the
 shared deterministic review preparation operation:
 
+Run these Python workflow commands with `python` on Windows or `python3` on Linux/macOS:
+
 ```bash
 python <engineering>/workflows/workflow_ops.py --root <repository-root> --workflow-run-id <id> review-prepare --base <actual-base> --head HEAD --synchronize
 ```
@@ -112,7 +114,7 @@ back to the parent over the same descriptor and bundle.
 Two mechanical rule sources; neither depends on anything wired into the reviewed repository.
 
 **Tier conventions — every repository.** Run the tier gate shipped with this plugin in conventions mode
-against the reviewed repository root:
+against the reviewed repository root, using `python` on Windows or `python3` on Linux/macOS:
 
 ```bash
 python <engineering>/hooks/tier_gate.py --conventions --project <repository-root>
