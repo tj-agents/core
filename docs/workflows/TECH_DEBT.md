@@ -65,3 +65,15 @@ Resolve when every reader and writer of `owner.json`, in the runtime and the tes
 Windows, whether through the owner lock or a sharing-violation-safe read and replace, and a Windows test
 proves it deterministically: a save succeeds while a reader holds the file open, and a read succeeds across
 a save. Apply the same outcome to `hook_control.py`'s snapshot or record why it cannot race.
+
+## Review routing requires the write-time opt-in
+
+`review-prepare` names the skills a review owes only through `.agents/skill-routes.json`, and carrying that
+table also opts the repository into the write-time router and the red-run gate. The router blocks every
+write while any routed skill is unresolved or plugin discovery fails. Core therefore carries no table, so a
+review of a changed `SKILL.md` is not required to load `engineering:skill-authoring`; the description and
+`AGENTS.md` are its only discovery.
+
+Resolve when a route can apply at review time alone, without opting the repository into write-time routing
+or the red-run gate, and core routes authored `SKILL.md` paths to `engineering:skill-authoring` through it,
+with a test that `review-prepare` names the skill for such a path.

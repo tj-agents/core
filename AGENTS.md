@@ -23,6 +23,9 @@ CI's guard rejects generated paths and the post-merge job regenerates and commit
 `pwsh .agents/sync-generated.ps1` locally only to refresh the tree for tests, and leave its output
 uncommitted. See [`SOURCE_LAYOUT.md`](SOURCE_LAYOUT.md).
 
+Read [`engineering:skill-authoring`](.agents/engineering/convention/skill-authoring/SKILL.md) before
+deciding to create, split, merge, rename or retire a skill, including while planning one.
+
 A utility skill must not depend on a manually assembled, machine-local file the plugin does not ship.
 See [`PACKAGING.md`](PACKAGING.md).
 
