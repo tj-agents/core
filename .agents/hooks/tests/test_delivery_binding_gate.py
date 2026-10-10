@@ -48,7 +48,7 @@ class ScopedApprovalTests(unittest.TestCase):
         for name, kwargs in (
                 ("repository_slug", {"return_value": "example/test"}),
                 ("pull_request_state", {"side_effect": lambda *args: self.value}),
-                ("changed_paths", {"side_effect": lambda *args: [item["path"] for item in self.value["files"]]}),
+                ("_changed_paths_for_repository", {"side_effect": lambda *args: [item["path"] for item in self.value["files"]]}),
                 ("git", {"return_value": "feature"}),
                 ("review_binding", {"side_effect": lambda root, branch, head: {
                     "work_order": "reviews/feature.md", "work_order_order": ["full"], "reviewed_sha": head}}),
@@ -79,6 +79,26 @@ class ScopedApprovalTests(unittest.TestCase):
         self.assertEqual("b" * 40, bound["head"])
         self.assertEqual(self.record, bound["scoped_approval"])
         self.assertEqual({"mode": "merge", "instruction": self.record["instruction"]}, bound["merge_authorization"])
+
+    def test_each_bind_uses_one_fresh_origin_for_paths_and_binding_identity(self):
+        origins = ("example/test", "example/next")
+        with patch.object(workflow_ops, "repository_slug", side_effect=origins) as slug, \
+                patch.object(workflow_ops, "pull_request_state", side_effect=lambda *args: self.value) as summary, \
+                patch.object(
+                    workflow_ops,
+                    "_changed_paths_for_repository",
+                    side_effect=lambda root, repository, *args: [item["path"] for item in self.value["files"]],
+                ) as paths:
+            first = self.bind(explicit=True)
+            self.value["headRefOid"] = "b" * 40
+            self.value["url"] = "https://github.com/example/next/pull/42"
+            second = self.bind()
+
+        self.assertEqual("example/test", first["repo"])
+        self.assertEqual("example/next", second["repo"])
+        self.assertEqual(2, slug.call_count)
+        self.assertEqual(["example/test", "example/next"], [call.args[2] for call in summary.call_args_list])
+        self.assertEqual(["example/test", "example/next"], [call.args[1] for call in paths.call_args_list])
 
     def test_no_record_keeps_missing_authority(self):
         bound = self.bind()
@@ -303,8 +323,15 @@ class GateSubprocessTests(unittest.TestCase):
             shim = self.bindir / "gh.cmd"
             shim.write_text(
                 "@echo off\r\n"
-                'echo %* | findstr /C:"api --paginate" >nul\r\n'
-                f'if %errorlevel%==0 (type "{self.diff_payload}") else (type "{self.gh_payload}")\r\n',
+                'if /I "%~1"=="api" if /I "%~2"=="--paginate" goto api\r\n'
+                'if /I "%~1"=="pr" if /I "%~2"=="view" goto view\r\n'
+                "exit /b 1\r\n"
+                ":api\r\n"
+                f'type "{self.diff_payload}"\r\n'
+                "exit /b 0\r\n"
+                ":view\r\n"
+                f'type "{self.gh_payload}"\r\n'
+                "exit /b 0\r\n",
                 encoding="utf-8",
             )
         else:
@@ -438,7 +465,11 @@ class GateSubprocessTests(unittest.TestCase):
 
     def test_the_hold_label_withholds_authorization_on_an_ordinary_diff(self):
         self.write_pr(labels=("human-gate",))
-        self.run_hook()
+        result = self.run_hook()
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("now has a delivery owner", result.stderr)
+        self.assertIn("ABSENT", result.stderr)
+        self.assertIn("human-gate", result.stderr)
         self.assertEqual("absent", self.binding()["merge_authorization"]["mode"])
 
     def test_a_truncated_paginated_file_set_creates_no_binding(self):
