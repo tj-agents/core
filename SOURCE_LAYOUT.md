@@ -28,11 +28,10 @@ Each host skill entry point references one canonical definition under `.agents/`
 host-specific metadata or invocation mechanics required by that host. A host difference must be explicit;
 shared prose returns to `.agents/`.
 
-A host entry point repeats its canonical definition's name, description, kind and domain verbatim and has
-the fixed reference body; generation fails when either drifts. An entry point listed in
-`extended_host_adapters` in `.agents/plugins/sources.json` is the explicit exception: it may word its
-description and body for its host, generation checks only its name, kind, domain and single canonical
-reference, and its description is reviewed by hand whenever the canonical description changes.
+A host entry point repeats its canonical definition's description verbatim. A skill listed in
+`extended_host_adapters` in `.agents/plugins/sources.json` may word the description and body of its
+entry points for each host; review those whenever its canonical description changes, because generation
+does not compare them. `validate_adapters` in `scripts/sync_plugin_packages.py` enforces the rest.
 
 ## Distribution output
 

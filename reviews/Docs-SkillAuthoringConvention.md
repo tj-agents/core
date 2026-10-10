@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `c84ae5b8bcdc72ed43fb3d5ac2a58c06c07527b0`  `(2026-10-10)`
+**Reviewed up to commit:** `4236f6f2a25bcf0ff2df5558a08dc64a05bc0fd3`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -252,4 +252,32 @@ Remediation of F19. Security layer not required.
   rule and the `extended_host_adapters` exception, with its hand review, in `SOURCE_LAYOUT.md`, and have
   the convention say to update repeating entry points and review rewording ones. Fixed.
 
+Re-validated: 803 + 983 tests and every generation check.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `c84ae5b8bcdc72ed43fb3d5ac2a58c06c07527b0`
+**Candidate head:** `4236f6f2a25bcf0ff2df5558a08dc64a05bc0fd3`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:b58cac523513586fc80176dc1f1a0038ddd265540b6fdf6de8db990cc42f49b0` `(4 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/pIPNksfWCO1e-FnP1TYfAX/pAszdJXgov3KyFS51k1nVG`
+**Candidate bundle identity:** `sha256:1445aae7aae854a932a4022a1db7b616178828e4446b0abb6535852894737674`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F20. Security layer not required.
+
+### Findings
+
+- [x] **F21 — LOW — native-general** — `SOURCE_LAYOUT.md:34`
+  The new parity paragraph enumerates generator checks incompletely ("checks only its name, kind, domain
+  and single canonical reference" omits the roster and lane/model checks) and calls a per-skill list
+  per-entry-point. Fix: state the rule and the exception per skill, and name `validate_adapters` as the
+  enforcement instead of enumerating it. Fixed.
+
+Dropped: a description-hash gate for extended adapters (an enhancement; the hand review is the stated
+rule), the claimed conflict with "may add only host-specific metadata" (a host-worded description is
+host-specific metadata), and the convention sentence the plugin debt entry already names for removal.
 Re-validated: 803 + 983 tests and every generation check.
