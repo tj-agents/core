@@ -123,7 +123,10 @@ def _shell_script_from_list(parts):
         return cleaned[2]
     if shell in ("pwsh", "powershell"):
         for index, option in enumerate(cleaned[1:], 1):
-            if option.lower() in ("-c", "-command"):
+            normalized = option[1:].casefold() if option[:1] in ("-", "/") else ""
+            if shell == "pwsh" and normalized in ("commandwithargs", "cwa"):
+                return cleaned[index + 1] if len(cleaned) > index + 1 else ""
+            if "command".startswith(normalized) and normalized:
                 return " ".join(cleaned[index + 1:])
     return " ".join(cleaned)
 

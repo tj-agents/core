@@ -585,6 +585,39 @@ class JurisdictionTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("cannot prove this merge's checkout", result.stderr)
 
+    def test_native_powershell_command_options_reject_an_unproved_target_before_gh(self):
+        normal_options = (
+            "-c",
+            "-co",
+            "-com",
+            "-comm",
+            "-comma",
+            "-comman",
+            "-command",
+            "/c",
+            "/co",
+            "/com",
+            "/comm",
+            "/comma",
+            "/comman",
+            "/command",
+            "-CoM",
+            "/CoM",
+        )
+        with_args_options = ("-CommandWithArgs", "-cwa", "/CommandWithArgs", "/cwa", "-CWA", "/CWA")
+        for option in normal_options:
+            with self.subTest(option=option):
+                command = ["powershell.exe", "-NoProfile", option, M + " 1 --squash --auto", ";"]
+                result = self.run_hook(command, codex=True, native=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("cannot prove this merge's checkout", result.stderr)
+        for option in with_args_options:
+            with self.subTest(option=option):
+                command = ["pwsh.exe", "-NoProfile", option, M + " 1 --squash --auto", ";"]
+                result = self.run_hook(command, codex=True, native=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("cannot prove this merge's checkout", result.stderr)
+
     def test_codex_canonical_target_outside_an_opted_repo_is_not_review_gated(self):
         other = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(lambda: None)
