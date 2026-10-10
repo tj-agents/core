@@ -90,47 +90,42 @@ Native Codex 0.162.1 and Claude 2.1.296 are installed and authenticated but abse
 Registration therefore pins the native host, Python, runtime and adapter; profiles remain on disk and only
 nonsecret custom profile settings enter the receipt. Existing owner state and budgets must be preserved.
 
-Specified implementation selects L4. The canonical table-selected native CLI capability probe passed.
-A bounded native worker produced the initial Python adapter/shared verifier, coupled Stop hook and host
-entry updates, and Python tests. It reported 13 focused source tests, 26 Stop tests, 23 process checks and
-package invariants passing. Parent verification rejected that candidate: Linux bypassed adapter cleanup,
-Windows would recurse through its own wake command, systemd property ordering was assumed, timer removal
-left activation behind, and pending replacement recovery lacked the required two-file semantics.
+Specified implementation and serial remediation used bounded native L4 workers; all write leases ended.
+The first frozen candidate `6acd48a166149a3eb53c2ca6c0a1f801e44d4d64` received native/general, workflow and
+L2 security review. Ten confirmed defects are retained in `reviews/Refactor-LinuxDeliveryContinuation.md`.
+The resolved repairs fail closed on observation errors, preserve stale receipts in interrupted transactions,
+inspect loaded fragments/drop-ins and links before mutations, verify restoration after reload before enable,
+retain lexical final unit paths, and pin platform-dependent tests. Version-2 Windows receipts support verified
+migration/removal but cannot establish readiness for the retired runtime. Native host commands and Windows
+profile settings are bound to actual registered definitions; owner state and child budgets remain unchanged.
+The two-hour outer scheduler envelope preserves the prior Windows behavior around the 900-second child limit.
+Latest worker artifacts: `/tmp/step7-final-repair-result.txt`, `/tmp/step7-post-repair-result.txt` and matching logs.
 
-A sole bounded L4 repair worker returned and its write lease ended; the parent owns
-this plan, acceptance, review and delivery. Prompt/result/log:
-`/tmp/step7-repair-prompt.txt`, `/tmp/step7-repair-result.txt`, `/tmp/step7-repair.log`.
-The disposable native-host acceptance fixture is
-`/tmp/step7 Linux continuation café`, with initialized owner `1bd2d7962e6c8a71423e7b69` and driver
-`/tmp/step7-acceptance-driver.py`. A real systemd timer resumed authenticated Codex, executed its bounded
-tool action and recorded owner/nonce/cwd plus systemd invocation `fc6adfb0a4244ce19e2ce39578e151c1`.
-The foreground lease prevented a duplicate launch; unchanged evidence kept launches at one with zero
-failures. Terminal cleanup removed only this fixture's units, enable link and scheduler receipt, preserving
-owner, result and witness. Captured artifacts live under `.git/agent-workflow/runs/linux-delivery-continuation/artifacts/`:
-`cc011fbbe5a4693d-linux-live-registration-foreground-retry.log` and
-`b5c0458ae87a3c85-unchanged-evidence-and-terminal-cleanup.log`; fixture `witness.json` and its owner retain
-the actual native checkpoint. No acceptance scheduler remains registered.
-
-The resolved repair keeps ScheduledTasks on Windows and systemd on Linux, separate scheduler/runtime locks,
-exact ownership versus readiness checks, nonmutating dry-run, previous/proposed transaction evidence and
-safe interrupted initial/replacement recovery. Both schedulers invoke the adapter; it invokes the runtime
-once with its native pin. Named systemd properties, definition bytes, loaded paths, reload state, overlays
-and enabled/active timer state establish readiness. Terminal cleanup disables only the owned timer before
-removing files/receipts; it must not stop its own running service. Recognized old Windows receipts remain
-eligible only for verified replacement/removal.
+Final focused verification passed 38 tests (one inbox-Windows skip). The actual repaired Linux fixture is
+`/tmp/step7 repaired Linux continuation café`, owner `745873ebbcc1fabef269fb96`. Its timer fired on
+2026-10-10 at 22:49:56 BST and resumed authenticated Codex. Native tool execution recorded nonce
+`221a33428a1b4e1094c3522b78a51f48`, exact cwd and systemd invocation `031160ec206c4cb6824b87402eb3c140`.
+Foreground ownership prevented a duplicate; unchanged evidence retained one launch and zero failures.
+Terminal cleanup then ran inside the actual owned systemd service, removing its units, enable link and
+scheduler receipt while preserving owner/result/witness. Both disposable acceptance schedulers are retired.
+Artifacts under `.git/agent-workflow/runs/linux-delivery-continuation/artifacts/`:
+`f4859a2b2e9c4247-repaired-live-foreground-registration.log`,
+`1328bce0b8c6c15e-repaired-timer-native-witness.log`,
+`e871d479e6c5f918-repaired-terminal-service-cleanup.log` and
+`7b2e44e8d62c1b8d-stable-focused-scheduler-check.log`.
 
 The old PowerShell runtime is retired. Its repository-only test entry becomes a thin wrapper for the Python
 suite, preserving the existing CI workflow unchanged; Linux already discovers that suite. This retains the
 CI seam without changing standing delivery authorization. Generated plugins/catalog output remain uncommitted.
 
-Scope is 13 authored paths, including 1,285 new runtime/test lines and retirement of the old runtime/tests.
-An atomic exception covers the replacement, Stop verifier, coupled entry points and scheduler tests: splitting
-those would ship a broken continuation contract. Step 10 and directory organization are excluded. Re-measure
-before review; full Python suites, package invariants, independent review, exact-head Windows/Linux CI and an
-actual timer-driven native-host checkpoint qualify this PR. The source suite passed 1,027 tests (18 platform
-skips), the hook suite passed 1,029 (4 skips), and generated-tree/catalog/harness/tier checks passed.
-Real unit-parser verification caught and corrected WorkingDirectory quoting; re-registration preserves the
-enable-link identity after symlink creation. Source checks do not establish Windows desktop acceptance.
+Scope is 13 authored paths, roughly 2,450 added/deleted lines including runtime/test retirement.
+An atomic exception covers replacement, shared Stop verification, coupled entries and scheduler tests:
+splitting these would ship a broken continuation contract. Step 10 and directory organization are excluded.
+The final stable source suite passed 1,044 tests (18 platform skips); the complete hook suite passed 1,029 tests (4 platform skips).
+Generation/catalog/harness/tier checks passed. A prior hook run failed after a final source edit invalidated
+its catalog fixtures; output was refreshed before the fresh unchanged-source suites. Independent incremental
+review and exact-head Windows/Linux CI remain required. Source checks do not establish Windows desktop or
+installed-host acceptance.
 
 Previous delivery: Step 4 [#185](https://github.com/tj-agents/core/pull/185), reviewed head
 `60007dafde033708d44326d99ef5320a4e8c25a9`, merge `4c07ec1335176d0867bffcf3a84e147b989cdb41`,
@@ -171,7 +166,7 @@ block independent Step 7 work; both platform checks still gate this port's deliv
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Complete source/hook suites and shared adapter fixtures passed. Actual systemd timer resumed authenticated Codex and recorded a native tool checkpoint, duplicate suppression and terminal cleanup in the isolated fixture; installed-host adoption and Windows desktop acceptance remain unverified. Exact-head Windows/Linux CI remains pending."
+        "evidence": "Complete source/hook suites and shared adapter fixtures passed. Actual repaired systemd timer resumed authenticated Codex and recorded a native tool checkpoint, duplicate suppression and cleanup inside the owned service; installed-host adoption and Windows desktop acceptance remain unverified. Exact-head Windows/Linux CI remains pending."
       }
     }
   ]
@@ -180,17 +175,21 @@ block independent Step 7 work; both platform checks still gate this port's deliv
 
 ## Reviews
 
-Step 7 review has not started. Commit a focused-green candidate, synchronize once with the actual base,
-freeze it and run independent native/general/security review before delivery. The native specialist was
-rejected by the account during Step 4; the declared terra/medium fallback succeeded. Step 4's completed
-work order was retired; Git-private audit is `.git/agent-workflow/runs/linux-terminal-start-hooks/completed-step4-review.md`.
+The first full pass at `6acd48a166149a3eb53c2ca6c0a1f801e44d4d64` requested changes on ten confirmed
+findings. Serial repair and focused verification are complete; the original pass identity/text/severities
+remain frozen. Both full suites passed; commit the repairs with this checkpoint and run fresh incremental
+native/general/workflow/security review before publication. Work order: `reviews/Refactor-LinuxDeliveryContinuation.md`.
+The native specialist was rejected by the account during Step 4; the declared terra/medium fallback succeeded.
+Step 4's retired work order audit is `.git/agent-workflow/runs/linux-terminal-start-hooks/completed-step4-review.md`.
 
 ## Next Steps
 
-Implementation and actual Linux acceptance are complete; the fixture scheduler has been retired. Commit
-only authored paths, synchronize once and freeze the candidate for independent native/general/security
-review. Fix confirmed findings at L4 and revalidate before stable push. The parent retains Step 7 ownership
-through reviewed delivery, causal publication and fresh Step 10 handoff.
+Implementation and final actual Linux acceptance are complete; both disposable schedulers are retired.
+Commit only authored repairs/checkpoint, freeze the incremental delta
+from the completed watermark, and obtain independent current-head review. Then publish one stable Step 7 PR,
+require both exact-head platform CI checks, merge through the authorized ordinary mechanism, verify causal
+post-merge generation and retire only this slice's binding/owner. Preserve the closeout in this plan and
+launch one fresh Step 10 successor from the published base. The parent retains delivery ownership until launch.
 
 Scope: current slice only; full plan remains incomplete.
 Current slice: Step 7 Python delivery continuation, including actual Linux scheduler acceptance.

@@ -41,10 +41,15 @@ class LinuxTransport(scheduler.SchedulerTransport):
         self.files = {}
         self.calls = []
         self.fail_enable = False
-        self.state = {"active": "active", "enabled": "enabled", "dropins": "", "reload": "no"}
+        self.foreign_after_reload = None
+        self.state = {"active": "active", "enabled": "enabled", "dropins": "", "reload": "no", "fragment": None}
 
     def run(self, args, **kwargs):
         self.calls.append(tuple(args))
+        if "daemon-reload" in args:
+            self.state["reload"] = "no"
+            if self.foreign_after_reload:
+                self.state.update(self.foreign_after_reload)
         if self.fail_enable and "enable" in args:
             return Result(returncode=1, stderr="injected registration failure")
         if "enable" in args:
@@ -58,7 +63,7 @@ class LinuxTransport(scheduler.SchedulerTransport):
                 return Result(returncode=1, stderr="missing")
             path = receipt["service_path"] if unit == receipt["service_unit"] else receipt["timer_path"]
             # systemd emits named records, and may choose an order independently of --property.
-            values = {"FragmentPath": path, "NeedDaemonReload": self.state["reload"], "LoadState": "loaded",
+            values = {"FragmentPath": self.state["fragment"] or path, "NeedDaemonReload": self.state["reload"], "LoadState": "loaded",
                       "DropInPaths": self.state["dropins"], "ActiveState": self.state["active"],
                       "UnitFileState": self.state["enabled"]}
             return Result("\n".join(key + "=" + values[key] for key in
@@ -69,7 +74,10 @@ class LinuxTransport(scheduler.SchedulerTransport):
         self.files[str(path)] = text
 
     def read(self, path):
-        return self.files[str(path)]
+        try:
+            return self.files[str(path)]
+        except KeyError as error:
+            raise FileNotFoundError(path) from error
 
     def remove(self, path):
         self.files.pop(str(path), None)
@@ -80,14 +88,27 @@ class WindowsTransport(scheduler.SchedulerTransport):
         self.task = task
         self.calls = []
         self.fail_register = False
+        self.query_error = None
+        self.query_invalid_json = False
+        self.legacy_tasks = []
 
     def run(self, args, **kwargs):
         self.calls.append(tuple(args))
         payload = json.loads(kwargs.get("input_text") or "{}")
         operation = payload.get("operation")
+        if args[-1] == adapter.LEGACY_WINDOWS_SCRIPT:
+            if self.query_error:
+                return Result(returncode=1, stderr=self.query_error)
+            if self.query_invalid_json:
+                return Result("{")
+            return Result(json.dumps({"Tasks": self.legacy_tasks}))
         if operation == "query":
+            if self.query_error:
+                return Result(returncode=1, stderr=self.query_error)
+            if self.query_invalid_json:
+                return Result("{")
             if self.task is None:
-                return Result(returncode=1, stderr="not found")
+                return Result("null")
             return Result(json.dumps(self.task))
         if operation == "register":
             if self.fail_register:
@@ -140,6 +161,8 @@ class DeliveryContinuationTests(unittest.TestCase):
         unit.write_text(service, encoding="utf-8")
         result = subprocess.run(["systemd-analyze", "--user", "verify", "--man=no", str(unit)],
                                 capture_output=True, text=True, encoding="utf-8", timeout=15)
+        if result.returncode and "SO_PASSRIGHTS" in result.stderr and "Operation not permitted" in result.stderr:
+            self.skipTest("systemd user parser unavailable in this sandbox; Windows has the inbox PowerShell counterpart")
         self.assertEqual(0, result.returncode, result.stderr)
 
     @unittest.skipIf(os.name == "nt", "POSIX systemd enable links; Windows re-registration uses task identity")
@@ -172,7 +195,8 @@ class DeliveryContinuationTests(unittest.TestCase):
         linux = self.receipt()
         windows = self.windows_receipt()
         for receipt in (linux, windows):
-            self.assertEqual([receipt["python"], "-I", "-B", receipt["script"], "wake", "--owner", str(self.owner_path)], receipt["adapter_command"])
+            self.assertEqual([receipt["python"], "-I", "-B", receipt["script"], "wake", "--owner", str(self.owner_path),
+                              "--host-executable", receipt["host_executable"]], receipt["adapter_command"])
             self.assertEqual([receipt["python"], "-I", "-B", receipt["helper"], "wake", "--owner", str(self.owner_path),
                               "--host-command", receipt["host_executable"]], receipt["runtime_command"])
             self.assertNotEqual(receipt["adapter_command"], receipt["runtime_command"])
@@ -192,7 +216,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.assertTrue(scheduler.verify_linux(receipt, self.owner_path, self.owner, self.root, transport))
         self.assertTrue(any("--value" not in call for call in transport.calls if "show" in call))
 
-    def test_linux_rejects_loaded_dropin_stale_path_and_symlink(self):
+    def test_linux_rejects_loaded_dropin_and_stale_path(self):
         receipt = self.receipt()
         transport = LinuxTransport(receipt)
         self.put_linux(receipt, transport)
@@ -201,6 +225,12 @@ class DeliveryContinuationTests(unittest.TestCase):
         transport.state["dropins"] = ""
         transport.state["reload"] = "yes"
         self.assertFalse(scheduler.verify_linux_ownership(receipt, self.owner_path, self.owner, self.root, transport))
+
+    @unittest.skipIf(os.name == "nt", "POSIX symlink identity; Windows has task-identity coverage")
+    def test_linux_rejects_symlinked_unit_path(self):
+        receipt = self.receipt()
+        transport = LinuxTransport(receipt)
+        self.put_linux(receipt, transport)
         transport.state["reload"] = "no"
         Path(receipt["service_path"]).parent.mkdir(parents=True)
         Path(receipt["service_path"]).symlink_to(self.host)
@@ -246,7 +276,7 @@ class DeliveryContinuationTests(unittest.TestCase):
         arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(self.host),
                               "--interval-minutes", "10")
         with patch.object(adapter, "receipt_for", return_value=proposed):
-            result = adapter.register(self.owner, self.root, self.owner_path, arguments, transport)
+            result = adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=False)
         self.assertEqual(proposed["timer_unit"], result["registered"])
         self.assertEqual(proposed, json.loads((self.owner_path.parent / "scheduler.json").read_text(encoding="utf-8")))
         self.assertTrue(scheduler.verify_linux(proposed, self.owner_path, self.owner, self.root, transport))
@@ -307,7 +337,7 @@ class DeliveryContinuationTests(unittest.TestCase):
             scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json", self.owner_path, self.owner, self.root, transport, windows=False, dry_run=True)
         self.assertEqual(before, (pending.read_bytes(), transport.files))
 
-    def test_windows_transaction_refuses_unknown_live_task_and_recovers_absent_previous(self):
+    def test_windows_task_identity_recovery_refuses_unknown_live_task_and_recovers_absent_previous(self):
         previous = self.windows_receipt()
         proposed = dict(previous)
         proposed["interval_minutes"] = 10
@@ -323,6 +353,261 @@ class DeliveryContinuationTests(unittest.TestCase):
         resolved = scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json", self.owner_path, self.owner, self.root, transport, windows=True)
         self.assertEqual(previous, resolved)
         self.assertEqual(previous, json.loads((self.owner_path.parent / "scheduler.json").read_text(encoding="utf-8")))
+
+    def test_windows_query_and_legacy_transport_errors_preserve_transaction_evidence(self):
+        receipt = self.windows_receipt()
+        pending = self.owner_path.parent / "scheduler.pending.json"
+        scheduler.atomic_json(pending, {"previous": None, "proposed": receipt})
+        transport = WindowsTransport()
+        transport.query_error = "access denied"
+        before = pending.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "command failed"):
+            scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
+                                        self.owner_path, self.owner, self.root, transport, windows=True)
+        self.assertEqual(before, pending.read_bytes())
+        with self.assertRaisesRegex(RuntimeError, "legacy ScheduledTasks query failed"):
+            adapter.legacy_conflict(self.root, transport, windows=True)
+        transport.query_error = None
+        transport.query_invalid_json = True
+        with self.assertRaisesRegex(RuntimeError, "invalid JSON"):
+            scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
+                                        self.owner_path, self.owner, self.root, transport, windows=True)
+        self.assertEqual(before, pending.read_bytes())
+        transport.query_invalid_json = False
+        transport.legacy_tasks = [{"TaskName": "AgentStandards-Delivery-old", "TaskPath": "\\",
+                                   "Actions": [{"WorkingDirectory": str(self.root)}]}]
+        with self.assertRaisesRegex(RuntimeError, "legacy delivery task"):
+            adapter.legacy_conflict(self.root, transport, windows=True)
+
+    def test_known_version_two_windows_receipt_migrates_for_remove_but_arbitrary_receipts_do_not(self):
+        receipt = self.windows_receipt()
+        receipt["version"] = 2
+        receipt.pop("platform")
+        receipt["description"] = "Continuation owner " + self.owner["owner_id"]
+        transport = WindowsTransport(self.windows_task(receipt))
+        self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+        scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
+        result = adapter.remove(self.owner, self.root, self.owner_path,
+                                self.args("remove", "--owner", str(self.owner_path)), transport)
+        self.assertTrue(result["removed"])
+        self.assertIsNone(transport.task)
+        arbitrary = {"version": 3, "owner_id": self.owner["owner_id"], "owner_path": str(self.owner_path),
+                     "worktree": str(self.root), "task_name": "anything"}
+        with self.assertRaisesRegex(scheduler.SchedulerError, "recognized platform"):
+            scheduler.receipt_is_windows(arbitrary)
+
+    def test_stale_receipt_survives_failed_reregistration_and_recovers_without_old_scheduler(self):
+        stale = self.receipt()
+        scheduler.atomic_json(self.owner_path.parent / "scheduler.json", stale)
+        transport = LinuxTransport(stale)
+        transport.fail_enable = True
+        arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(self.host),
+                              "--interval-minutes", "10")
+        proposed = self.receipt(10)
+        with patch.object(adapter, "receipt_for", return_value=proposed), \
+             self.assertRaisesRegex(RuntimeError, "injected registration failure"):
+            adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=False)
+        pending = json.loads((self.owner_path.parent / "scheduler.pending.json").read_text(encoding="utf-8"))
+        self.assertEqual(stale, pending["previous"])
+        self.assertTrue(pending["previous_missing"])
+        transport.fail_enable = False
+        with patch.object(adapter, "receipt_for", return_value=proposed):
+            result = adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=False)
+        self.assertEqual("register", result["action"])
+        self.assertFalse((self.owner_path.parent / "scheduler.pending.json").exists())
+
+    def test_loaded_linux_recovery_evidence_is_prechecked_without_mutation(self):
+        previous = self.receipt()
+        proposed = self.receipt(10)
+        transport = LinuxTransport(previous)
+        self.put_linux(previous, transport)
+        pending = self.owner_path.parent / "scheduler.pending.json"
+        scheduler.atomic_json(pending, {"previous": previous, "proposed": proposed})
+        before_files = dict(transport.files)
+        transport.state["dropins"] = "/foreign/override.conf"
+        with self.assertRaisesRegex(RuntimeError, "foreign loaded drop-ins"):
+            scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
+                                        self.owner_path, self.owner, self.root, transport, windows=False)
+        self.assertTrue(pending.exists())
+        self.assertEqual(before_files, transport.files)
+        transport.state.update(dropins="", fragment="/foreign/fragment.service")
+        with self.assertRaisesRegex(RuntimeError, "foreign loaded fragment"):
+            scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
+                                        self.owner_path, self.owner, self.root, transport, windows=False)
+        self.assertTrue(pending.exists())
+        transport.state.update(fragment=None)
+        transport.state.update(reload="yes")
+        result = scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
+                                             self.owner_path, self.owner, self.root, transport, windows=False)
+        self.assertEqual(previous, result)
+
+    @unittest.skipIf(os.name == "nt", "POSIX enable-link identity; Windows has task-identity recovery coverage")
+    def test_linux_recovery_rejects_foreign_enable_link(self):
+        previous = self.receipt()
+        proposed = self.receipt(10)
+        transport = LinuxTransport(previous)
+        self.put_linux(previous, transport)
+        pending = self.owner_path.parent / "scheduler.pending.json"
+        scheduler.atomic_json(pending, {"previous": previous, "proposed": proposed})
+        link = Path(previous["timer_enable_path"])
+        link.parent.mkdir(parents=True)
+        link.symlink_to(self.root / "foreign.timer")
+        with self.assertRaisesRegex(RuntimeError, "enable link"):
+            scheduler.reconcile_pending(pending, self.owner_path.parent / "scheduler.json",
+                                        self.owner_path, self.owner, self.root, transport, windows=False)
+        self.assertTrue(pending.exists())
+
+    def test_linux_registration_refuses_foreign_loaded_evidence_before_mutation(self):
+        receipt = self.receipt()
+        transport = LinuxTransport(receipt)
+        transport.state["dropins"] = "/foreign/override.conf"
+        arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(self.host))
+        with patch.object(adapter, "receipt_for", return_value=receipt), \
+             self.assertRaisesRegex(RuntimeError, "foreign loaded drop-ins"):
+            adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=False)
+        self.assertFalse(transport.files)
+        self.assertFalse((self.owner_path.parent / "scheduler.pending.json").exists())
+
+    def test_linux_registration_rechecks_ownership_after_reload_before_enabling(self):
+        receipt = self.receipt()
+        transport = LinuxTransport(receipt)
+        transport.foreign_after_reload = {"dropins": "/foreign/override.conf"}
+        arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(self.host))
+        with patch.object(adapter, "receipt_for", return_value=receipt), \
+             self.assertRaisesRegex(RuntimeError, "after reload"):
+            adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=False)
+        self.assertFalse(any("enable" in call for call in transport.calls))
+        self.assertTrue((self.owner_path.parent / "scheduler.pending.json").exists())
+
+    def test_linux_recovery_rechecks_restored_ownership_after_reload_before_enabling(self):
+        previous = self.receipt()
+        proposed = scheduler.linux_receipt(self.owner, self.owner_path, self.root / "new adapter.py",
+                                           ROOT / ".agents/workflows/continuation_runtime.py", sys.executable,
+                                           self.host, 10, self.environment)
+        transport = LinuxTransport(previous)
+        old_service, _ = scheduler.linux_units(previous)
+        _, new_timer = scheduler.linux_units(proposed)
+        transport.write(previous["service_path"], old_service)
+        transport.write(previous["timer_path"], new_timer)
+        transport.foreign_after_reload = {"dropins": "/foreign/override.conf"}
+        receipt_path = self.owner_path.parent / "scheduler.json"
+        pending = self.owner_path.parent / "scheduler.pending.json"
+        scheduler.atomic_json(receipt_path, previous)
+        scheduler.atomic_json(pending, {"previous": previous, "proposed": proposed})
+        before_receipt = receipt_path.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "restored scheduler differs"):
+            scheduler.reconcile_pending(pending, receipt_path, self.owner_path, self.owner, self.root,
+                                        transport, windows=False)
+        self.assertFalse(any("enable" in call for call in transport.calls))
+        self.assertEqual(before_receipt, receipt_path.read_bytes())
+        self.assertTrue(pending.exists())
+
+    @unittest.skipIf(os.name == "nt", "POSIX symlink filesystem identity; Windows has task-identity coverage")
+    def test_linux_paths_keep_final_components_lexical_and_reject_symlinks_before_writes(self):
+        real_config = Path(self.temp.name) / "real config"
+        linked_config = Path(self.temp.name) / "linked config"
+        real_config.mkdir()
+        linked_config.symlink_to(real_config, target_is_directory=True)
+        receipt = scheduler.linux_receipt(self.owner, self.owner_path, ADAPTER,
+                                          ROOT / ".agents/workflows/continuation_runtime.py", sys.executable,
+                                          self.host, 20, {"XDG_CONFIG_HOME": str(linked_config)})
+        self.assertEqual(real_config.resolve() / "systemd/user", Path(receipt["unit_directory"]))
+        self.assertEqual(Path(receipt["unit_directory"]) / receipt["timer_unit"], Path(receipt["timer_path"]))
+        external = self.root / "outside"
+        Path(receipt["service_path"]).parent.mkdir(parents=True)
+        Path(receipt["service_path"]).symlink_to(external)
+        self.assertEqual(Path(receipt["unit_directory"]) / receipt["service_unit"], Path(receipt["service_path"]))
+        with self.assertRaisesRegex(RuntimeError, "symlink"):
+            adapter.write_linux(receipt, self.owner_path, self.owner, self.root, LinuxTransport(receipt))
+
+    def test_unpinned_registration_binds_host_to_linux_and_windows_actions(self):
+        arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(self.host))
+        linux_receipt = self.receipt()
+        linux = LinuxTransport(linux_receipt)
+        with patch.object(adapter, "receipt_for", return_value=linux_receipt):
+            linux_result = adapter.register(self.owner, self.root, self.owner_path, arguments, linux, windows=False)
+        self.assertEqual("register", linux_result["action"])
+        stored = json.loads((self.owner_path.parent / "scheduler.json").read_text(encoding="utf-8"))
+        self.assertEqual(["--host-executable", str(self.host.resolve())], stored["adapter_command"][-2:])
+        adapter.remove(self.owner, self.root, self.owner_path, self.args("remove", "--owner", str(self.owner_path)), linux)
+        windows_host = self.root / "explicit.exe"
+        windows_host.write_text("native", encoding="utf-8")
+        windows = WindowsTransport()
+        windows_arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(windows_host))
+        windows_receipt = scheduler.windows_receipt(self.owner, self.owner_path, ADAPTER,
+                                                    ROOT / ".agents/workflows/continuation_runtime.py", sys.executable,
+                                                    windows_host, 20, self.environment)
+        with patch.object(adapter, "receipt_for", return_value=windows_receipt):
+            windows_result = adapter.register(self.owner, self.root, self.owner_path, windows_arguments, windows, windows=True)
+        self.assertEqual("register", windows_result["action"])
+        self.assertIn("--host-executable", windows.task["Actions"][0]["Arguments"])
+        replacement = dict(windows_receipt)
+        replacement["interval_minutes"] = 10
+        replacement_arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", str(windows_host),
+                                          "--interval-minutes", "10")
+        with patch.object(adapter, "receipt_for", return_value=replacement):
+            replacement_result = adapter.register(self.owner, self.root, self.owner_path,
+                                                  replacement_arguments, windows, windows=True)
+        self.assertEqual("register", replacement_result["action"])
+        self.assertEqual(10, json.loads((self.owner_path.parent / "scheduler.json").read_text(encoding="utf-8"))["interval_minutes"])
+
+    def test_receipt_only_host_substitution_is_rejected_on_both_platforms(self):
+        alternate = self.root / "alternate host"
+        alternate.write_text("#!/bin/sh\n", encoding="utf-8")
+        alternate.chmod(alternate.stat().st_mode | stat.S_IXUSR)
+        receipt = self.receipt()
+        transport = LinuxTransport(receipt)
+        self.put_linux(receipt, transport)
+        scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
+        receipt["host_executable"] = str(alternate.resolve())
+        receipt["adapter_command"] = scheduler.adapter_command(receipt)
+        receipt["runtime_command"] = scheduler.runtime_command(receipt)
+        scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
+        with self.assertRaisesRegex(RuntimeError, "host executable"):
+            adapter.wake(self.owner, self.root, self.owner_path,
+                         self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
+        windows = self.windows_receipt()
+        windows_transport = WindowsTransport(self.windows_task(windows))
+        alternate_windows = self.root / "alternate.exe"
+        alternate_windows.write_text("native", encoding="utf-8")
+        windows["host_executable"] = str(alternate_windows.resolve())
+        windows["adapter_command"] = scheduler.adapter_command(windows)
+        windows["runtime_command"] = scheduler.runtime_command(windows)
+        self.owner["host_executable"] = str((self.root / "native host.exe").resolve())
+        self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
+        scheduler.atomic_json(self.owner_path.parent / "scheduler.json", windows)
+        with self.assertRaisesRegex(RuntimeError, "host executable"):
+            adapter.wake(self.owner, self.root, self.owner_path,
+                         self.args("wake", "--owner", str(self.owner_path), "--host-executable", self.owner["host_executable"]),
+                         windows_transport)
+
+    def test_windows_v3_rejects_changed_host_command_with_stale_registered_action_before_launch(self):
+        receipt = self.windows_receipt()
+        transport = WindowsTransport(self.windows_task(receipt))
+        alternate = self.root / "alternate.exe"
+        alternate.write_text("native", encoding="utf-8")
+        receipt["host_executable"] = str(alternate.resolve())
+        receipt["adapter_command"] = scheduler.adapter_command(receipt)
+        receipt["runtime_command"] = scheduler.runtime_command(receipt)
+        scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
+        with patch.object(adapter.subprocess, "run") as runtime:
+            with self.assertRaisesRegex(RuntimeError, "unavailable"):
+                adapter.wake(self.owner, self.root, self.owner_path,
+                             self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(alternate)),
+                             transport)
+        runtime.assert_not_called()
+
+    def test_outer_scheduler_timeout_keeps_adapter_and_child_budgets(self):
+        receipt = self.receipt()
+        service, _ = scheduler.linux_units(receipt)
+        self.assertIn("TimeoutStartSec=7200", service)
+        self.assertIn("ExecutionTimeLimit (New-TimeSpan -Seconds 7200)", scheduler.WINDOWS_SCRIPT)
+        self.assertIn("timeout=930", ADAPTER.read_text(encoding="utf-8"))
+
+    def test_python_version_guard_runs_before_scheduler_import(self):
+        with patch.object(sys, "version_info", (3, 8, 0)):
+            with self.assertRaisesRegex(RuntimeError, "Python 3.9"):
+                load("delivery_continuation_python38", ADAPTER)
 
     def test_windows_registration_and_cleanup_are_exact_without_runtime_recursion(self):
         receipt = self.windows_receipt()
@@ -350,7 +635,7 @@ class DeliveryContinuationTests(unittest.TestCase):
 
         with patch.object(adapter, "receipt_for", return_value=receipt), patch.object(adapter.scheduler, "atomic_json", side_effect=fail_receipt):
             with self.assertRaisesRegex(OSError, "receipt"):
-                adapter.register(self.owner, self.root, self.owner_path, arguments, transport)
+                adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=False)
         self.assertTrue((self.owner_path.parent / "scheduler.pending.json").exists())
         with scheduler.lifecycle_lock(self.owner_path.parent) as first:
             self.assertTrue(first)
@@ -367,7 +652,8 @@ class DeliveryContinuationTests(unittest.TestCase):
         calls = []
         with patch.object(adapter.subprocess, "run", side_effect=lambda *args, **kwargs: calls.append((args, kwargs)) or Result()), \
              patch.object(adapter, "read_json", side_effect=[receipt, self.owner, FileNotFoundError]):
-            result = adapter.wake(self.owner, self.root, self.owner_path, self.args("wake", "--owner", str(self.owner_path)), transport)
+            result = adapter.wake(self.owner, self.root, self.owner_path,
+                                  self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
         self.assertEqual("complete", result["state"])
         self.assertEqual(receipt["runtime_command"], calls[0][0][0])
         self.assertEqual("/safe profile £", calls[0][1]["env"]["CODEX_HOME"])
@@ -386,7 +672,8 @@ class DeliveryContinuationTests(unittest.TestCase):
         self.owner_path.write_text(json.dumps(self.owner), encoding="utf-8")
         with patch.object(adapter.subprocess, "run", return_value=Result()):
             with self.assertRaisesRegex(RuntimeError, "foreign pending"):
-                adapter.wake(self.owner, self.root, self.owner_path, self.args("wake", "--owner", str(self.owner_path)), transport)
+                adapter.wake(self.owner, self.root, self.owner_path,
+                             self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
         self.assertTrue((self.owner_path.parent / "scheduler.json").exists())
         self.assertTrue((self.owner_path.parent / "scheduler.pending.json").exists())
 
@@ -397,25 +684,38 @@ class DeliveryContinuationTests(unittest.TestCase):
         receipt["script"] = str(self.root / "stale adapter.py")
         scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
         with self.assertRaisesRegex(RuntimeError, "pinned script"):
-            adapter.wake(self.owner, self.root, self.owner_path, self.args("wake", "--owner", str(self.owner_path)), transport)
+            adapter.wake(self.owner, self.root, self.owner_path,
+                         self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
         receipt = self.receipt()
         self.put_linux(receipt, transport)
         transport.state.update(active="inactive", enabled="disabled")
         scheduler.atomic_json(self.owner_path.parent / "scheduler.json", receipt)
         with self.assertRaisesRegex(RuntimeError, "unavailable"):
-            adapter.wake(self.owner, self.root, self.owner_path, self.args("wake", "--owner", str(self.owner_path)), transport)
+            adapter.wake(self.owner, self.root, self.owner_path,
+                         self.args("wake", "--owner", str(self.owner_path), "--host-executable", str(self.host)), transport)
 
     def test_posix_and_windows_native_pin_refusals(self):
         bad = self.root / "not executable"
         bad.write_text("x", encoding="utf-8")
-        with self.assertRaisesRegex(RuntimeError, "execute"):
-            adapter.existing_host(self.owner, str(bad))
+        with patch.object(adapter.os, "access", return_value=False), self.assertRaisesRegex(RuntimeError, "execute"):
+            adapter.existing_host(self.owner, str(bad), windows=False)
         command = self.root / "host.cmd"
         command.write_text("x", encoding="utf-8")
         with self.assertRaisesRegex(RuntimeError, "native .exe"):
             adapter.existing_host(self.owner, str(command), windows=True)
         with self.assertRaisesRegex(RuntimeError, "missing"):
             adapter.load_owner(self.owner_path.parent)
+
+    def test_windows_profile_changes_require_the_registered_description_to_match(self):
+        receipt = self.windows_receipt()
+        transport = WindowsTransport(self.windows_task(receipt))
+        self.assertTrue(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+        receipt["profile_environment"]["CODEX_HOME"] = "/unregistered profile"
+        self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+        receipt["description"] = scheduler.windows_description(receipt)
+        self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+        transport.task["Description"] = receipt["description"]
+        self.assertTrue(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
 
     def test_installed_package_resources_and_custom_profile_are_portable(self):
         package = Path(self.temp.name) / "installed package £"
@@ -440,6 +740,30 @@ class DeliveryContinuationTests(unittest.TestCase):
                                 text=True, encoding="utf-8", capture_output=True, check=False)
         self.assertEqual(0, result.returncode)
         self.assertEqual(json.loads(payload), json.loads(result.stdout))
+
+    @unittest.skipUnless(os.name == "nt" or shutil.which("pwsh"),
+                         "requires inbox Windows PowerShell on Windows or the repository pwsh prerequisite on Linux")
+    def test_powershell_query_returns_case_variant_and_absence_without_registration(self):
+        receipt = self.windows_receipt()
+        command = (
+            "function Get-ScheduledTask { param([string]$TaskPath) "
+            "if($PSBoundParameters.ContainsKey('TaskPath')){throw 'enumerate tasks before filtering'};"
+            "[pscustomobject]@{TaskName='" + receipt["task_name"].lower() + "';TaskPath=$payload.fixture_task_path;State='Ready';"
+            "Description='foreign';Actions=@([pscustomobject]@{Execute='x';Arguments='y';WorkingDirectory='z'});"
+            "Triggers=@([pscustomobject]@{Enabled=$true});Settings=[pscustomobject]@{Enabled=$true}} };"
+            + scheduler.WINDOWS_SCRIPT
+        )
+        executable = "powershell.exe" if os.name == "nt" else "pwsh"
+        for task_path in ("\\", "\\foreign\\"):
+            result = subprocess.run([executable, "-NoProfile", "-NonInteractive", "-Command", command],
+                                    input=json.dumps({"operation": "query", "task_name": receipt["task_name"],
+                                                      "fixture_task_path": task_path}),
+                                    text=True, encoding="utf-8", capture_output=True, check=False)
+            self.assertEqual(0, result.returncode, result.stderr)
+            if task_path == "\\":
+                self.assertEqual(receipt["task_name"].lower(), json.loads(result.stdout)["TaskName"])
+            else:
+                self.assertIsNone(json.loads(result.stdout))
 
 
 if __name__ == "__main__":
