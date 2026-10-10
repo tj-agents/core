@@ -20,7 +20,7 @@ The originating Rust discovery and twelve-repository authorization rollout remai
 
 The reviewed source delta contains eight paths: the two shared merge gates, their two focused test modules, the Codex engineering hook manifest, the engineering harness declaration, the Codex Windows hook-command tests, and this goal. The current integrated candidate adds `.agents/delivery-authorization.json`, for nine authored paths total. Generated `plugins/*` output and `.agents/catalog/catalog.json` remain uncommitted under core's source-only convention.
 
-The review artifact records complete approval and matching review and security watermarks at the source head, with no unresolved findings. Since the source review, the branch was normally integrated with `origin/main` through `29827dfcfd81e7d59c75d9bf179c90e4d15dbdc8`, which contains the already-reviewed core #174 policy landing. The current candidate head is `2e7a2a7fd424a1e8e222f7793cc5acff2424e20f`. This integration adds `.agents/delivery-authorization.json` and updates this goal alongside the reviewed source. The parent must complete fresh incremental review/reconciliation over the exact current candidate before publication. No PR has been opened.
+The review artifact records complete approval and matching review and security watermarks at the source head, with no unresolved findings. Since the source review, the branch was normally integrated with `origin/main` through `29827dfcfd81e7d59c75d9bf179c90e4d15dbdc8`, which contains the already-reviewed core #174 policy landing. The branch now also includes the normal integration of current `origin/main` commit `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`. The source slice adds `.agents/delivery-authorization.json` and updates this goal alongside the reviewed source. The parent must complete fresh incremental review/reconciliation over the exact current candidate before publication. No PR has been opened.
 
 ## Completed source slice
 
@@ -31,7 +31,7 @@ The review artifact records complete approval and matching review and security w
 
 ## Verification and review
 
-The completed independent review is recorded at `3bda8e91428216c1a7321e05382877682860454c`; it approved the source candidate and found no changed-line defects. Windows source tests passed: 83 merge-review cases with one platform skip, and 32 persistent-workflow cases with seven POSIX-shim skips. The affected Codex Windows hook-command and budget checks, manifest and harness checks, package checks, and required generation and generation-check passed after refreshing generated outputs locally.
+The completed independent review is recorded at `3bda8e91428216c1a7321e05382877682860454c`; it approved the source candidate and found no changed-line defects. After the `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05` integration, Windows source revalidation passed: 83 merge-review cases with one platform skip, 32 persistent-workflow cases with seven POSIX-shim skips, Codex Windows hook commands (3), hook-launch budget (4), engineering hooks (13), harness manifests (13), Codex hook snapshots (10 with four skips), and source layout (20). Catalog digest, generated-output, harness-manifest, and generated-path checks also passed after refreshing generated outputs locally.
 
 The reviewed tree intentionally contains pre-regeneration catalog metadata; the frozen CI workflow regenerates catalog digests and packages before verification. Exact-head Windows and Linux CI remain pending. Installed-profile activation remains unverified. Source and package checks describe source coverage only.
 
