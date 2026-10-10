@@ -33,6 +33,8 @@ MAX_PR_READINESS_POLL_SECONDS = 300
 DEFAULT_MONITOR_SECONDS = 21600
 DEFAULT_OFFLINE_GAP_SECONDS = 300
 REVIEW_BUNDLE_RETENTION_SECONDS = 7 * 24 * 60 * 60
+# MoveFileEx reports a conflicting open handle as either access denied or sharing violation.
+WINDOWS_REPLACE_CONFLICTS = (5, 32)
 FAILURE_PATTERN = re.compile(
     r"(?:\bfailed\b|\bfailure\b|\berror\b|\bfatal\b|\bexception\b|\bpanic\b|\btimeout\b)",
     re.IGNORECASE,
@@ -217,7 +219,7 @@ def retry_windows_sharing_violation(action, timeout=2):
         try:
             return action()
         except PermissionError as error:
-            if (os.name != "nt" or getattr(error, "winerror", None) != 32
+            if (os.name != "nt" or getattr(error, "winerror", None) not in WINDOWS_REPLACE_CONFLICTS
                     or time.monotonic() >= deadline):
                 raise
             time.sleep(0.01)
