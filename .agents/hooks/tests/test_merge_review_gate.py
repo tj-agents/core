@@ -561,6 +561,22 @@ class JurisdictionTests(unittest.TestCase):
         self.assertIn("cannot resolve PR #1", result.stderr)
         self.assertNotIn("cannot prove this merge's checkout", result.stderr)
 
+    def test_native_unix_shell_payload_with_trailing_arguments_reaches_the_review_gate(self):
+        self.opt_in()
+        command = [
+            "bash",
+            "-lc",
+            'pushd "' + str(self.root) + '" && ' + M + " 1 --squash --auto",
+            "trailing-$0",
+            "trailing-$1",
+        ]
+
+        result = self.run_hook(command, codex=True, native=True)
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("cannot resolve PR #1", result.stderr)
+        self.assertNotIn("cannot prove this merge's checkout", result.stderr)
+
     def test_codex_canonical_target_outside_an_opted_repo_is_not_review_gated(self):
         other = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(lambda: None)

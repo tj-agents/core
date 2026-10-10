@@ -109,7 +109,7 @@ FALLBACK_MESSAGE = (
 
 
 def _shell_script_from_list(parts):
-    """A shell tool invoked as ``["bash", "-lc", "<script>"]`` carries its script in the last arg."""
+    """A shell tool invoked as ``["bash", "-lc", "<script>"]`` carries its script after the option."""
     cleaned = [str(p) for p in parts if isinstance(p, (str, int, float))]
     if not cleaned:
         return None
@@ -121,7 +121,7 @@ def _shell_script_from_list(parts):
         "pwsh",
         "powershell",
     ):
-        return cleaned[-1]
+        return cleaned[2]
     return " ".join(cleaned)
 
 
