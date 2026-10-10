@@ -14,7 +14,7 @@ Do not assume the base package alone is sufficient. Determine whether the unmerg
 
 ## Next Steps
 
-The shared Stop gate, routing obligation receipt and both host declarations are implemented. Source/package generation checks and PowerShell packaging passed. The local checkpoint passed: 18 Stop regressions, 14 routing regressions, fresh source/packaged Stop callback, typed blocked-owner compatibility, generation/check and packaging declarations. Commit the authored candidate, run independent frozen native and workflow review at L4, and deliver the source PR through Windows/Linux CI and merge. Keep the canonical continuation owner claimed and renewed while foreground work continues.
+Review and Linux CI repairs are verified locally: direct cancellation referents, durable session/worktree pause suspension, and one-interpreter Claude Stop dispatch. Commit the coherent authored repair, push once, refresh the exact PR delivery binding and rebind this continuation owner, then run fresh incremental review and exact-head Windows/Linux CI. Merge only after both gates pass and verify causal main regeneration.
 
 ## Deferred tech debt
 
@@ -27,7 +27,7 @@ Codex sandbox setup failed before PowerShell launch (orchestrator_helper_exit_no
 
 ## Source ownership and delivery slice
 
-Source repository: tj-agents/core. Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ContinuationEnforcement. Branch: Fix/ContinuationEnforcement. Base: origin/main at 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166. PR: not opened.
+Source repository: tj-agents/core. Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ContinuationEnforcement. Branch: Fix/ContinuationEnforcement. Base: origin/main at 33fb4155973b8ee1d26a8fd6f2a27d8428f6f166. PR: https://github.com/tj-agents/core/pull/184.
 
 This slice adds shared continuation Stop enforcement, its execution-obligation receipt, both host hook declarations, shipping requirements and regression tests. Expected under 1,000 substantive lines. It has no dependency on the work-plugin communications changes or the existing monitor-activation PR #161; neither active checkout is an implementation target.
 
@@ -89,3 +89,7 @@ Initialized the existing goal in this worktree's .agents/continuation/owner.json
 A disposable native Codex 0.162.0 profile proved terminal interception: the first Stop callback returned decision=block with stop_hook_active=false and final text FIRST; the same session continued to CONTINUED, then Stop called again with stop_hook_active=true. Normal user configuration and plugin installation were unchanged. Artifacts: C:/Users/TommySeery/source/repos/tj-agents/rust/.worktrees/Fix-ContinuationEnforcement/_stop_host_probe/received.jsonl, native_exec.jsonl and last_message.txt. This proves native Stop continuation, not installed acceptance of the new gate. Claude live acceptance remains unobserved.
 
 Scope boundary: a fresh session without a routed execution obligation does not adopt another session's active foreground owner. The same owning CLI remains subject to the gate when process ancestry and recorded creation identity establish foreground ownership; routed obligations remain enforced independently of ancestry. The gate cannot recover authorization from arbitrary assistant prose or an absent/untrusted routing hook. Linux can enforce missing/active owners and verified terminals; current scheduler registration remains a Windows runtime capability, so Linux waiting cannot claim an enabled wake without a supported scheduler.
+
+2026-10-10 delivery checkpoint: opened draft core PR #184 at d108247. Frozen native CLI review could not read source because of the deferred sandbox defect; supported fresh L4 native-general and workflow lenses inspected the exact immutable bundle. Parent finalized changes-requested at that head and validated both host coverage declarations. Review findings are in reviews/Fix-ContinuationEnforcement.md; normal-profile gate activation remains unobserved. Source CI run 38065040829 Linux source-layout suite ran 897 tests and found only nine launch-budget subcase failures: the new dedicated Claude Stop command doubled the existing interpreter launch. Do not weaken that check. Shared pause suspension and direct referents are being repaired before a stable follow-up push.
+
+2026-10-10 repair acceptance: Stop integration 21/21 (actual prompt hook and registered packaged Claude dispatcher included), routing 14/14, dispatcher 20/20, launch budget 4/4, generated Check passed. Restored Claude deadline25/timeout30; no test or timeout weakened. Source integrates origin/main at 9f3d4dd. Review findings R1/R2 are resolved with a fresh incremental watermark still required.

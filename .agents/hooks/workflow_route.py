@@ -84,6 +84,14 @@ RECOVERED = (
     "workflow-route: the UserPromptSubmit hook did not deliver this prompt's route (it timed out "
     "or failed), so the route is delivered with this tool call instead.\n\n"
 )
+DIRECT_CONTROL = re.compile(r"^\s*(?:please\s+)?(?P<action>pause|cancel|stop|resume|continue)"
+                            r"(?:\s+(?:(?:this|it)(?:\s+(?:work|task|goal|plan|execution))?|"
+                            r"(?:the|our|my)?\s*(?:work|task|goal|plan|execution)))?\s*[.!?]*\s*$", re.I)
+
+
+def direct_control(prompt: str) -> str | None:
+    match = DIRECT_CONTROL.fullmatch(prompt)
+    return match["action"].lower() if match else None
 
 
 def active_goal(cwd: Path) -> bool:
@@ -196,7 +204,7 @@ def receipt_path(session: str) -> Path:
 
 def record_receipt(session: str, prompt_id=None, cwd: Path | None = None,
                    execution_obligation=False, suspend_execution=False,
-                   prompt: str | None = None) -> None:
+                   prompt: str | None = None, resume_execution=False) -> None:
     path = receipt_path(session)
     now = time.time()
     receipt = {"routed_at": now}
@@ -206,15 +214,18 @@ def record_receipt(session: str, prompt_id=None, cwd: Path | None = None,
     if cwd is not None:
         worktree = str(cwd.resolve())
         receipt["worktree"] = worktree
-        retained = previous.get("execution_obligation") is True and previous.get("worktree") == worktree
+        same_worktree = previous.get("worktree") == worktree
+        retained = previous.get("execution_obligation") is True and same_worktree
         if execution_obligation or retained:
             receipt["execution_obligation"] = True
             receipt["execution_obligation_at"] = (
                 now if execution_obligation else previous.get("execution_obligation_at", now)
             )
-        if suspend_execution and retained:
+        if suspend_execution:
             receipt["execution_suspended"] = True
-        elif retained and previous.get("execution_suspended") is True and not execution_obligation:
+        elif resume_execution:
+            receipt["execution_suspended"] = False
+        elif same_worktree and previous.get("execution_suspended") is True and not execution_obligation:
             receipt["execution_suspended"] = True
     if isinstance(prompt, str) and prompt:
         receipt["prompt"] = prompt
@@ -338,8 +349,9 @@ def recover(data: dict) -> str | None:
         prompt_id,
         Path(cwd).resolve(),
         bool(context and "engineering:plan-execution automatically selected" in context),
-        bool(context and "engineering:plan-authoring automatically selected" in context),
+        bool(context and "engineering:plan-authoring automatically selected" in context) or direct_control(prompt) in {"pause", "cancel", "stop"},
         prompt,
+        direct_control(prompt) in {"resume", "continue"},
     )
     return RECOVERED + context if context else None
 
@@ -388,8 +400,9 @@ def main() -> int:
             data.get("prompt_id"),
             Path(cwd_value).resolve(),
             bool(context and "engineering:plan-execution automatically selected" in context),
-            bool(context and "engineering:plan-authoring automatically selected" in context),
+            bool(context and "engineering:plan-authoring automatically selected" in context) or direct_control(prompt) in {"pause", "cancel", "stop"},
             prompt,
+            direct_control(prompt) in {"resume", "continue"},
         )
     return 0
 

@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -157,7 +158,8 @@ class ContinuationStopTests(unittest.TestCase):
         self.write_owner(self.owner("blocked", reason="approval-needed", pr=7))
         self.assertIsNone(self.call())
         self.write_owner(self.owner())
-        self.assertIsNone(self.call(self.receipt(prompt="Please pause this work.")))
+        for prompt in ("Please pause this work.", "Cancel it.", "Cancel this."):
+            self.assertIsNone(self.call(self.receipt(prompt=prompt)))
         self.assertIsNotNone(self.call(self.receipt(prompt="Why did it stop?\n```text\nstop\n```")))
 
     def test_old_completed_owner_cannot_satisfy_new_execution_obligation(self):
@@ -209,7 +211,7 @@ class ContinuationStopTests(unittest.TestCase):
         self.write_owner(self.owner("working", foreground={"pid": os.getpid(), "identity": "reused"}))
         self.assertIsNone(self.call(receipt))
 
-    def test_both_host_manifests_ship_the_dedicated_stop_gate(self):
+    def test_both_host_manifests_ship_the_shared_stop_gate(self):
         for host in ("codex", "claude"):
             manifest = json.loads((ROOT / f".agents/plugins/manifests/{host}/engineering-hooks.json").read_text(encoding="utf-8"))
             self.assertIn("continuation_stop.py", json.dumps(manifest["hooks"]["Stop"]))
@@ -243,6 +245,53 @@ class ContinuationStopTests(unittest.TestCase):
         self.assertEqual(4, resumed["execution_obligation_at"])
         self.assertNotIn("execution_suspended", resumed)
 
+    def test_pause_persists_across_prompts_until_explicit_resume(self):
+        scratch = Path(self.temp.name) / "controls"
+        scratch.mkdir()
+        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
+            for previous_obligation in (False, True):
+                session = f"controls-{previous_obligation}"
+                workflow_route.record_receipt(session, cwd=self.root, execution_obligation=previous_obligation)
+                for prompt in ("Cancel it.", "Cancel this.", "Please pause this work."):
+                    control = workflow_route.direct_control(prompt)
+                    self.assertIn(control, {"pause", "cancel"})
+                    workflow_route.record_receipt(session, cwd=self.root, suspend_execution=True, prompt=prompt)
+                    workflow_route.record_receipt(session, cwd=self.root, prompt="Status?")
+                    receipt = workflow_route.read_receipt(session)
+                    self.assertTrue(receipt["execution_suspended"])
+                    with patch.object(continuation_stop, "read_receipt", return_value=receipt):
+                        self.assertIsNone(continuation_stop.outcome({**self.payload(), "session_id": session}))
+                    workflow_route.record_receipt(session, cwd=self.root, prompt="Continue.", resume_execution=True)
+                    self.assertFalse(workflow_route.read_receipt(session)["execution_suspended"])
+
+    def test_prompt_hook_persists_cancel_and_resumes_the_existing_obligation(self):
+        scratch = Path(self.temp.name) / "prompt-controls"
+        scratch.mkdir()
+        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
+            workflow_route.record_receipt(self.session, cwd=self.root, execution_obligation=True)
+            for prompt in ("Cancel it.", "Status?", "Continue."):
+                payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root), "session_id": self.session, "prompt": prompt})
+                with patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
+                    self.assertEqual(0, workflow_route.main())
+                receipt = workflow_route.read_receipt(self.session)
+                with patch.object(continuation_stop, "read_receipt", return_value=receipt):
+                    result = continuation_stop.outcome(self.payload())
+                if prompt == "Continue.":
+                    self.assertIsNotNone(result)
+                else:
+                    self.assertTrue(receipt["execution_suspended"])
+                    self.assertIsNone(result)
+
+    def test_control_commands_do_not_adopt_quoted_text_or_other_worktrees(self):
+        for prompt in ('"Cancel it."', "Why did it stop?", "Continue? What does that mean?", "```text\nstop\n```", "The log says cancel this."):
+            self.assertIsNone(workflow_route.direct_control(prompt))
+        scratch = Path(self.temp.name) / "isolation"
+        scratch.mkdir()
+        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)):
+            workflow_route.record_receipt("isolated", cwd=self.root, suspend_execution=True, prompt="Pause.")
+            workflow_route.record_receipt("isolated", cwd=self.root.parent, prompt="Status?")
+            self.assertNotIn("execution_suspended", workflow_route.read_receipt("isolated"))
+
     def test_source_and_generated_stop_hooks_block_a_routed_missing_owner(self):
         scratch = Path(self.temp.name) / "receipt"
         receipt = scratch / "agents-workflow-route" / (workflow_route.hashlib.sha256(self.session.encode("utf-8")).hexdigest() + ".json")
@@ -257,6 +306,17 @@ class ContinuationStopTests(unittest.TestCase):
                                         capture_output=True, text=True, cwd=self.root, env=environment, timeout=20)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual("block", json.loads(result.stdout)["decision"])
+        package = ROOT / "plugins/engineering"
+        manifest = json.loads((package / "hooks/claude.json").read_text(encoding="utf-8"))
+        hooks = [hook for group in manifest["hooks"]["Stop"] for hook in group["hooks"]]
+        self.assertEqual(1, len(hooks))
+        args = [value.replace("${CLAUDE_PLUGIN_ROOT}", str(package)) for value in hooks[0]["args"]]
+        result = subprocess.run([sys.executable, *args], input=payload, capture_output=True, text=True,
+                                cwd=self.root, env=environment, timeout=hooks[0]["timeout"])
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("block", json.loads(result.stdout)["decision"])
+        self.assertIn("persistent-workflow", json.loads(result.stdout)["reason"])
+
 
 
 if __name__ == "__main__":

@@ -95,19 +95,6 @@
         "hooks": [
           {
             "type": "command",
-            "timeout": 60,
-            "command": "python",
-            "args": [
-              "-B",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/continuation_stop.py"
-            ]
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "timeout": 30,
             "command": "python",
             "args": [
@@ -115,6 +102,7 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "25",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/continuation_stop.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
