@@ -19,7 +19,7 @@ HOUR = 3600
 NOW = 1_800_000_000.0
 
 
-def process(pid, parent_pid, name, started_at, console_host_pid=None, private_bytes=0):
+def process(pid, parent_pid, name, started_at, console_host_pid=None, private_bytes=0, terminal_pid=None):
     return REAPER.Process(
         pid=pid,
         parent_pid=parent_pid,
@@ -27,6 +27,7 @@ def process(pid, parent_pid, name, started_at, console_host_pid=None, private_by
         started_at=started_at,
         private_bytes=private_bytes,
         console_host_pid=console_host_pid,
+        terminal_pid=terminal_pid,
     )
 
 
@@ -87,6 +88,21 @@ class DeadConsoleTests(ReaperTestCase):
     def test_an_unknown_console_host_is_not_treated_as_orphaned(self):
         unknown = process(900, 100, 'claude.exe', NOW - 30 * HOUR, console_host_pid=None)
         self.assertEqual([], self.orphans(unknown))
+
+
+class LinuxTerminalOwnershipTests(ReaperTestCase):
+    def test_reparented_agent_with_gone_session_leader_is_reaped(self):
+        reparented = process(900, 100, 'claude', NOW - 30 * HOUR, terminal_pid=7777)
+        self.assertEqual([900], self.orphans(reparented))
+
+    def test_live_session_leader_keeps_reparented_agent(self):
+        leader = process(7777, 1, 'bash', NOW - 31 * HOUR, terminal_pid=7777)
+        reparented = process(900, 100, 'claude', NOW - 30 * HOUR, terminal_pid=7777)
+        self.assertEqual([], self.orphans(leader, reparented))
+
+    def test_missing_terminal_identity_is_not_a_kill_signal(self):
+        reparented = process(900, 100, 'claude', NOW - 30 * HOUR)
+        self.assertEqual([], self.orphans(reparented))
 
 
 class GracePeriodTests(ReaperTestCase):

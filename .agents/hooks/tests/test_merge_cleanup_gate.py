@@ -195,8 +195,8 @@ class MergeCleanupGateTests(unittest.TestCase):
         for command in (
             "git status", "git -C \"" + str(worktree) + "\" fetch", "git worktree list",
             "gh pr view 3", "gh run list", "python cleanup_proof.py --worktree x",
-            "pwsh close-tab.ps1 -List",
-            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\plugins\\peer-cli\\scripts\\finish.ps1",
+            "python3 close_tab.py --list",
+            "python finish.py",
             'git commit -am "fix the red sync PR"', "git show HEAD",
             'gh pr create --title "sync" --body "fix"',
             "git commit -am x && git push",
@@ -206,7 +206,7 @@ class MergeCleanupGateTests(unittest.TestCase):
             "echo hi && git log",
             'git commit -am "fix a bug; closes #123 | && done"',
             "./cleanup_proof.py --worktree x",
-            "& 'C:\\plugins\\peer-cli\\scripts\\finish.ps1'",
+            "./finish.py",
             'cd "' + str(worktree) + '"',
             "popd",
         ):
@@ -783,7 +783,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(head, obligation["head"])
         self.assertIn(f"--head {head}", denied.stderr)
         self.assertNotIn("<head>", denied.stderr)
-        self.assertIn("finish.ps1", denied.stderr)
+        self.assertIn("finish.py", denied.stderr)
 
         self.run_hook(self.payload(merge_command, codex=False, session="claude-session"))
         claude_path, _ = self.sole_obligation() if len(self.obligation_files()) == 1 else (None, None)

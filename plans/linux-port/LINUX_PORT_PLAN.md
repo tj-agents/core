@@ -74,6 +74,29 @@ what still needs checking on Windows.
 
 ## Current progress
 
+Step 5 is owned by `Refactor/LinuxPeerCli` in the primary checkout; PR not opened. The implementation
+worker uses L4 from the canonical Codex table through the native CLI. The parent uses L3 for the
+remaining bounded terminal/cleanup investigation. A disposable Linux Git check confirmed that a linked
+worktree can be removed while a live process retains its cwd there; Linux needs an exit observer, but
+no wait-before-removal reaper. Windows retains waiting before removal.
+
+Initial runtime port implemented. Focused session/terminal/orphan tests passed (51 tests), as did
+cleanup-gate tests (45 tests). Required remaining work: migrate the machine permissions and direct
+retired-script callers, preserve the retired cleanup safety cases in Python, regenerate packages,
+run both full suites, review, Windows/Linux CI, and the real merged-session acceptance.
+
+Delivery slice: all Step 5 Python replacements, terminal handlers, registry identity, orphan recovery,
+cleanup-gate commands, matching machine harness permissions and regression tests, based on
+`b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`.
+The shared finish/close/observer/caller cutover stays atomic to preserve cleanup and exit guarantees.
+Review the measured runtime/test size before publication. Verification requires both Python suites,
+generated-tree checks, Windows/Linux CI, and a real merged Linux session closing its own tab.
+The machine harness currently grants the retired PowerShell close/finish commands; migrate those grants
+with the scripts and review the permission boundary explicitly before delivery.
+The workflow helper needs explicit canonical skill paths, for example
+`--lifecycle plan-execution=.agents/engineering/workflow/plan-execution/SKILL.md`;
+its default `.agents/skills/` lookup predates the source-layout migration.
+
 Shared library merged (#106, after the interim path fix #105). Kitty configured. Steps merged: 1 (#107),
 2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
 (#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). #166 makes the cross-platform direction a written
