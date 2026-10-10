@@ -7,6 +7,7 @@
 **Review status:** `complete`
 **Reviewed up to commit:** `dcf86bb4791dc66d33defa8fbeef7050112e6975`  `(2026-10-10)`
 **Judgment:** `approved`
+**Security-reviewed up to commit:** `dbed2b32504ebd9dd9375f863946212e7de369ac`  `(2026-10-10)`
 
 ## Review pass — 2026-10-07 — full
 
@@ -118,3 +119,16 @@ the real code; all 10 addressed in `dcf86bb`:
   already documents the tradeoff, and production code never goes through cmd.exe either way.
 
 Full `tests/` (885) and `.agents/hooks/tests/` (985) suites green locally after every fix in this pass.
+
+## Security review — 2026-10-10
+
+`.github/workflows/ci.yml` is a security-sensitive path touched by this branch (a 3-line removal of the
+now-redundant dedicated Codex-marketplace-sync CI step, superseded by Python test discovery). Ran the
+`security-review` skill over the branch's own diff against `main`, scoped to this PR's actual changed
+files (filtering out unrelated `main`-history noise that landed on top of the stale diff baseline).
+Zero findings: every subprocess call this PR adds or changes uses list-form argv with no `shell=True`
+and no untrusted/remote input crossing a trust boundary (executable paths from local filesystem/PATH/npm
+config; JSON parsed via `json.loads` from a locally-installed trusted CLI's own `--json` stdout, never
+`pickle`/`yaml.load`); no auth, crypto, secrets, or web surface in scope; the one PowerShell
+string-interpolated command this PR removes (`agent_recovery.py`'s old `_sync_codex`) reduces attack
+surface rather than adding any.
