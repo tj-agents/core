@@ -90,8 +90,13 @@ scheduler XML, current-user SID and useful diagnostics. Run 38061315556 now iden
 registration defect precisely: the Windows scheduler cannot switch the UTF-8 XML encoding. The tiny
 follow-up writes UTF-16 with its matching declaration and BOM, with a regression assertion. All 19
 lifecycle tests pass locally. The parent owns full validation, fresh review, replacement CI and delivery;
-the native implementation lane is available and was used. Windows desktop UI Automation remains
-unverified locally.
+the native implementation lane is available and was used. The reviewed encoding candidate is
+`b1201d04ba910aa7a9a327525a5186068f87860c`. Linux run 38063265128 exposed an unchanged adapter fixture:
+a killed grandchild remained in disk sleep at its fixed 150 ms zombie assertion. The identical fixture
+passed in the preceding pipeline (38061315556). Its tiny follow-up now observes terminal exit within
+the already existing five-second test deadline and retains the stopped-heartbeat assertion; runtime
+budgets are unchanged. Windows CI for the encoding candidate is still pending. Windows desktop UI
+Automation remains unverified locally.
 
 A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
 its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
