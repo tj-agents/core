@@ -64,11 +64,9 @@ skill. Include only triggers this skill owns; a trigger that belongs to another 
 compete, and the wrong one can win. A description that would match most tasks is too broad, and the
 skill is probably too broad as well.
 
-Where host entry points are authored, as in core, a thin entry point carries the canonical description
-verbatim and generation fails when it differs: change the canonical description and every host entry point
-in the same commit. An entry point listed in core's `extended_host_adapters`
-(`.agents/plugins/sources.json`) may word its description for its host; review it by hand when the
-canonical description changes.
+A description change is one change: update every authored copy of the description in the same commit.
+The repository's layout owner says which host entry points repeat the canonical description, which may
+word it for their host, and what generation checks.
 
 ## A skill folder holds only what ships
 
