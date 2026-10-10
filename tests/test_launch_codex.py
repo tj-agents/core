@@ -130,6 +130,14 @@ class LaunchCodexTests(unittest.TestCase):
         self.assertIn('--lane L7 is for in-session clerical work and cannot open a handoff', err)
         self.agent_cli.launch_tab.assert_not_called()
 
+    def test_lane_l7_is_rejected_even_with_frontier(self):
+        # Same guarantee against --frontier: the L7-specific message must still surface, not the
+        # --frontier/--lane conflict message, regardless of which check argparse happens to run first.
+        code, _, err = self.run_main('--lane', 'L7', '--frontier')
+        self.assertEqual(code, 1)
+        self.assertIn('--lane L7 is for in-session clerical work and cannot open a handoff', err)
+        self.agent_cli.launch_tab.assert_not_called()
+
     def test_frontier_still_accepts_an_explicit_reasoning_effort(self):
         self.run_main('--frontier', '--reasoning-effort', 'high')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']

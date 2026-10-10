@@ -187,6 +187,16 @@ class SyncCodexStandardsTests(unittest.TestCase):
             SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
         self.assertIn('invalid JSON', str(raised.exception))
 
+    def test_a_non_object_json_value_from_a_sync_command_is_a_sync_error(self):
+        # A future/older Codex build answering with a bare array or scalar must not reach .get() and
+        # raise AttributeError; sync_codex_standards only ever calls .get() on this return value.
+        def run(argv, cwd=None, **kwargs):
+            return completed(argv, 0, stdout='[]')
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('non-object JSON', str(raised.exception))
+
     def test_a_stderr_warning_beside_valid_stdout_json_is_not_a_parse_error(self):
         # Only stdout is parsed as JSON; stderr is for an error message only, never mixed into the parse.
         def run(argv, cwd=None, **kwargs):
@@ -268,6 +278,37 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.assertIn('timed out', str(raised.exception))
         self.assertIn('plugin marketplace upgrade --json', str(raised.exception))
 
+    def test_a_failure_to_start_a_plugin_call_is_a_sync_error_not_a_raw_traceback(self):
+        def run(argv, cwd=None, **kwargs):
+            raise FileNotFoundError('no such file or directory')
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('plugin marketplace upgrade --json', str(raised.exception))
+
+    def test_a_hook_trust_timeout_is_a_sync_error(self):
+        fake = FakeCodex()
+
+        def run(argv, cwd=None, timeout=None, **kwargs):
+            if argv[0] == sys.executable:
+                raise SYNC.subprocess.TimeoutExpired(argv, timeout)
+            return fake.run(argv, cwd=cwd, **kwargs)
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('timed out', str(raised.exception))
+
+    def test_a_failure_to_start_hook_trust_is_a_sync_error_not_a_raw_traceback(self):
+        fake = FakeCodex()
+
+        def run(argv, cwd=None, **kwargs):
+            if argv[0] == sys.executable:
+                raise OSError('no such file or directory')
+            return fake.run(argv, cwd=cwd, **kwargs)
+
+        with self.assertRaises(SYNC.SyncError):
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+
     def test_harness_permissions_converge_once_on_a_successful_sync(self):
         fake = FakeCodex()
         SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
@@ -348,14 +389,19 @@ class MainCliTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='codex marketplace sync cli ')
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
+        # A real, native-shaped (non-script) file: is_codex_shim() must open it to tell, and an
+        # unreadable/nonexistent path is now treated as a shim (re-resolved), so a literal placeholder
+        # path no longer stands in for "native executable, use as-is" the way it could before that fix.
+        self.native_codex = self.project / 'native-codex'
+        self.native_codex.write_bytes(b'\x7fELFnot a script\n')
 
     def test_a_successful_sync_exits_zero(self):
         import unittest.mock as mock
         with mock.patch.object(SYNC, 'sync_codex_standards', return_value=['base@base-agents']) as synced:
-            code = SYNC.main(['--codex', '/bin/codex', '--project', str(self.project)])
+            code = SYNC.main(['--codex', str(self.native_codex), '--project', str(self.project)])
         self.assertEqual(code, 0)
         synced.assert_called_once()
-        self.assertEqual(synced.call_args.args[0], '/bin/codex')
+        self.assertEqual(synced.call_args.args[0], str(self.native_codex))
 
     def test_a_sync_error_is_reported_and_exits_nonzero(self):
         import io
@@ -364,7 +410,7 @@ class MainCliTests(unittest.TestCase):
         with mock.patch.object(SYNC, 'sync_codex_standards', side_effect=SYNC.SyncError('boom')):
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
-                code = SYNC.main(['--codex', '/bin/codex', '--project', str(self.project)])
+                code = SYNC.main(['--codex', str(self.native_codex), '--project', str(self.project)])
         self.assertEqual(code, 1)
         self.assertIn('boom', err.getvalue())
 
@@ -429,8 +475,11 @@ class IsCodexShimTests(unittest.TestCase):
         binary.write_bytes(b'\x7fELFnot a script\n')
         self.assertFalse(SYNC.is_codex_shim(str(binary)))
 
-    def test_a_nonexistent_path_is_not_a_shim(self):
-        self.assertFalse(SYNC.is_codex_shim(str(self.base / 'missing')))
+    def test_an_unreadable_path_is_treated_as_a_shim_so_it_gets_re_resolved(self):
+        # Matches agent_cli._is_script's own fail-safe direction (True on OSError): an unreadable path
+        # cannot be confirmed native, so main() re-resolves it via agent_cli.resolve_codex_executable()
+        # rather than silently trusting it as-is.
+        self.assertTrue(SYNC.is_codex_shim(str(self.base / 'missing')))
 
 
 if __name__ == '__main__':

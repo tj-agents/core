@@ -137,7 +137,8 @@ def compare_codex_version(left, right):
 def npm_global_prefix():
     """The npm global install prefix, or None when npm is unavailable or reports nothing."""
     try:
-        result = subprocess.run(['npm', 'config', 'get', 'prefix'], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(['npm', 'config', 'get', 'prefix'], capture_output=True, text=True,
+                                 encoding='utf-8', errors='replace', timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
     if result.returncode != 0:
