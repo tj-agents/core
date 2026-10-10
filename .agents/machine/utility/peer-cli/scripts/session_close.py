@@ -180,7 +180,8 @@ def qualified_windows_wrapper(entry):
     if os.name != "nt" or not valid_entry(entry):
         return None
     host = process_info(entry["pid"])
-    if host is None or not same_identity(host.started_at, entry["pid_started_at"]):
+    if (host is None or abs(host.started_at - entry["pid_started_at"])
+            > IDENTITY_TOLERANCE_SECONDS):
         return None
     try:
         table = register_session._windows_process_table()
