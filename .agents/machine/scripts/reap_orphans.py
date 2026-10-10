@@ -32,6 +32,7 @@ destructive path needs `--apply` from a human or the `AGENT_REAP_ORPHANS` opt-in
 import argparse
 import collections
 import json
+import math
 import os
 import sys
 import time
@@ -83,6 +84,39 @@ def children_by_parent(table):
     for process in table:
         children.setdefault(process.parent_pid, []).append(process.pid)
     return children
+
+
+def valid_pid(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def valid_started_at(value):
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value > 0
+    )
+
+
+def has_valid_identity(process):
+    return valid_pid(process.pid) and valid_started_at(process.started_at)
+
+
+def own_ancestry_is_known(pid, table):
+    """Whether this run can identify its own ancestry without guessing past an opaque row."""
+    by_pid = index_by_pid(table)
+    current = by_pid.get(pid)
+    seen = set()
+    while current is not None:
+        if current.pid in seen or not valid_pid(current.parent_pid):
+            return current.pid in seen or type(current.parent_pid) is int and current.parent_pid == 0
+        seen.add(current.pid)
+        parent = by_pid.get(current.parent_pid)
+        if parent is None:
+            return True
+        current = parent
+    return False
 
 
 def own_tree(pid, table):
@@ -149,6 +183,8 @@ def terminal_is_gone(process, by_pid):
 
 def candidates(table, self_pid, now, names=DEFAULT_PROCESS_NAMES, grace=GRACE_SECONDS):
     """Named processes old enough to judge and outside this session's own tree."""
+    if not own_ancestry_is_known(self_pid, table):
+        return []
     targets = {str(name).casefold() for name in names}
     protected = own_tree(self_pid, table)
     return [
@@ -156,7 +192,7 @@ def candidates(table, self_pid, now, names=DEFAULT_PROCESS_NAMES, grace=GRACE_SE
         for process in table
         if name_matches(process.name, targets)
         and process.pid not in protected
-        and process.started_at is not None
+        and has_valid_identity(process)
         and now - process.started_at >= grace
     ]
 
@@ -400,33 +436,59 @@ def windows_process_table():
         kernel32.CloseHandle(snapshot)
 
 
-def _linux_boot_time():
-    with open("/proc/stat", encoding="utf-8") as handle:
+def _linux_boot_time(proc_root=Path("/proc")):
+    with (proc_root / "stat").open(encoding="utf-8") as handle:
         for line in handle:
             if line.startswith("btime "):
                 return float(line.split()[1])
     raise OSError("/proc/stat has no btime")
 
 
-def linux_process_table():
-    """A conservative `/proc` snapshot, including session ownership for reparented children."""
-    boot = _linux_boot_time()
-    ticks = os.sysconf("SC_CLK_TCK")
+def _opaque_process(pid):
+    return Process(pid, None, None, None, None, None, None)
+
+
+def linux_process_table(proc_root=None, boot=None, ticks=None):
+    """A conservative `/proc` snapshot that preserves unreadable owners as opaque rows.
+
+    A failure to inspect the snapshot itself returns ``None``. A process that vanishes while its
+    stat file is read is omitted; malformed or inaccessible stat data remains present but unknown.
+    """
+    proc_root = Path("/proc") if proc_root is None else proc_root
+    try:
+        boot = _linux_boot_time(proc_root) if boot is None else boot
+        ticks = os.sysconf("SC_CLK_TCK") if ticks is None else ticks
+        if not valid_started_at(boot) or not valid_started_at(ticks):
+            return None
+        entries = proc_root.iterdir()
+    except (OSError, ValueError):
+        return None
     table = []
-    for child in Path("/proc").iterdir():
-        if not child.name.isdigit():
-            continue
-        try:
-            raw = (child / "stat").read_text(encoding="utf-8")
-            close = raw.rindex(")")
-            name = raw[raw.index("(") + 1:close]
-            fields = raw[close + 2:].split()
-            # state, ppid, pgrp, session, tty_nr, ... starttime (field 22).
-            parent, session, started_ticks = int(fields[1]), int(fields[3]), int(fields[19])
-            table.append(Process(int(child.name), parent, name, boot + started_ticks / ticks,
-                                 None, None, session))
-        except (OSError, ValueError, IndexError):
-            continue
+    try:
+        for child in entries:
+            if not child.name.isdigit():
+                continue
+            pid = int(child.name)
+            try:
+                raw = (child / "stat").read_text(encoding="utf-8")
+                close = raw.rindex(")")
+                name = raw[raw.index("(") + 1:close]
+                fields = raw[close + 2:].split()
+                # state, ppid, pgrp, session, tty_nr, ... starttime (field 22).
+                parent, session, started_ticks = int(fields[1]), int(fields[3]), int(fields[19])
+                started_at = boot + started_ticks / ticks
+                if not valid_pid(parent) and parent != 0:
+                    raise ValueError("invalid parent pid")
+                if not valid_pid(session) or not valid_started_at(started_at):
+                    raise ValueError("invalid process identity")
+                table.append(Process(pid, parent, name, started_at, None, None, session))
+            except FileNotFoundError:
+                if child.exists():
+                    table.append(_opaque_process(pid))
+            except (OSError, ValueError, IndexError):
+                table.append(_opaque_process(pid))
+    except OSError:
+        return None
     return table
 
 
@@ -434,7 +496,7 @@ def read_process_table():
     if sys.platform == "linux":
         try:
             return linux_process_table()
-        except OSError:
+        except (OSError, ValueError):
             return None
     if os.name != "nt":
         return None
@@ -467,9 +529,14 @@ def terminate(process):
     Classification and termination are separate passes, and Windows reuses a pid the moment it is
     free, so the start time is re-read through a fresh handle rather than trusted from the snapshot.
     """
+    if not has_valid_identity(process):
+        return "cannot confirm identity"
     if sys.platform == "linux":
-        current = next((item for item in linux_process_table() if item.pid == process.pid), None)
-        if current is None or current.started_at is None or process.started_at is None:
+        fresh_table = linux_process_table()
+        if fresh_table is None:
+            return "cannot confirm identity"
+        current = next((item for item in fresh_table if item.pid == process.pid), None)
+        if current is None or not has_valid_identity(current):
             return "cannot confirm identity"
         if abs(current.started_at - process.started_at) > 1:
             return "pid was reused"
@@ -484,9 +551,9 @@ def terminate(process):
 
     kernel32 = _kernel32()
     current = _started_at(kernel32, process.pid)
-    if current is None:
+    if not valid_started_at(current):
         return "cannot confirm identity"
-    if process.started_at is None or abs(current - process.started_at) > 1:
+    if abs(current - process.started_at) > 1:
         return "pid was reused"
     handle = kernel32.OpenProcess(PROCESS_TERMINATE, False, process.pid)
     if not handle:
