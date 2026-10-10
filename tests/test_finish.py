@@ -17,6 +17,7 @@ FINISH = ROOT / ".agents/machine/utility/peer-cli/scripts/finish.py"
 sys.path.insert(0, str(REAPER.parent))
 import session_close
 import finish
+import finish_reaper
 import close as own_close
 
 
@@ -372,6 +373,8 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
+        self.worktree = Path(self.temp.name) / "worktree"
+        self.worktree.mkdir()
         self.original_state = os.environ.get("AGENT_STATE_DIRECTORY")
         os.environ["AGENT_STATE_DIRECTORY"] = self.temp.name
         self.addCleanup(self.restore_state)
@@ -388,14 +391,87 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
         (directory / name).write_text(json.dumps(entry), encoding="utf-8")
 
     def test_unknown_attached_claimant_blocks_cleanup(self):
-        worktree = Path(self.temp.name) / "worktree"
-        worktree.mkdir()
+        worktree = self.worktree
+        own = {"session_id": "ours", "pid": 98, "pid_started_at": 4.0}
         self.write_entry("unknown.json", {
             "session_id": "other", "cwd": str(worktree), "pid": 99,
             "pid_started_at": 5.0, "started_at": 6.0, "host": "codex",
         })
         with mock.patch.object(session_close, "identity_status", return_value="unknown"):
-            self.assertIsNotNone(session_close.other_live_claimant(worktree, "ours"))
+            self.assertIsNotNone(session_close.other_live_claimant(worktree, own))
+
+    def test_only_exact_own_session_process_is_excluded(self):
+        worktree = self.worktree
+        own = {"session_id": "ours", "pid": 10, "pid_started_at": 1.0}
+        self.write_entry("ours.json", {
+            "session_id": "ours", "cwd": str(worktree), "pid": 10,
+            "pid_started_at": 1.0, "started_at": 2.0, "host": "codex",
+        })
+        with mock.patch.object(session_close, "identity_status", return_value="live"):
+            self.assertIsNone(session_close.other_live_claimant(worktree, own))
+        for suffix, pid, started, status in (
+                ("different-pid", 11, 1.0, "live"),
+                ("different-start", 10, 3.0, "unknown"),
+        ):
+            with self.subTest(suffix=suffix):
+                self.write_entry("ours.json", {
+                    "session_id": "ours", "cwd": str(worktree), "pid": pid,
+                    "pid_started_at": started, "started_at": 4.0, "host": "codex",
+                })
+                with mock.patch.object(session_close, "identity_status", return_value=status):
+                    self.assertIsNotNone(session_close.other_live_claimant(worktree, own))
+
+    def test_finish_preflight_passes_full_own_identity_to_claim_check(self):
+        entry = {"session_id": "ours", "pid": 10, "pid_started_at": 1.0,
+                 "cwd": str(self.worktree)}
+        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
+        with mock.patch.object(finish.session_close, "own_host_and_entry", return_value=entry), \
+                mock.patch.object(finish.session_close, "worktree_from_cwd", return_value=self.worktree), \
+                mock.patch.object(finish.session_close, "under_or_equal", return_value=True), \
+                mock.patch.object(finish.session_close, "fresh_removable_receipt", return_value=receipt), \
+                mock.patch.object(finish.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
+                mock.patch.object(finish.session_close, "start_observer") as observer, \
+                mock.patch.object(finish.os, "kill") as killer:
+            with self.assertRaisesRegex(session_close.Refusal, "another verified"):
+                finish.main(["--worktree", str(self.worktree)])
+        claimant.assert_called_once_with(self.worktree, entry)
+        observer.assert_not_called()
+        killer.assert_not_called()
+
+    def test_refresh_cleanup_passes_full_own_identity_to_claim_check(self):
+        entry = {"session_id": "ours", "pid": 10, "pid_started_at": 1.0,
+                 "cwd": str(self.worktree)}
+        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
+        with mock.patch.object(finish.session_close, "own_host_and_entry", return_value=entry), \
+                mock.patch.object(finish.session_close, "worktree_from_cwd", return_value=self.worktree), \
+                mock.patch.object(finish.session_close, "under_or_equal", return_value=True), \
+                mock.patch.object(finish.session_close, "fresh_removable_receipt", return_value=receipt), \
+                mock.patch.object(finish.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
+                mock.patch.object(finish.os, "kill") as killer:
+            with self.assertRaisesRegex(session_close.Refusal, "another registered"):
+                finish.refresh_cleanup(entry, self.worktree, receipt)
+        claimant.assert_called_once_with(self.worktree, entry)
+        killer.assert_not_called()
+
+    def test_final_preflight_blocks_same_id_successor_without_removing_or_signalling(self):
+        args = SimpleNamespace(
+            worktree=str(self.worktree), head="head", primary="primary", branch="branch",
+            default="main", session_id="ours", host_pid=10, host_start=1.0,
+        )
+        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
+        with mock.patch.object(finish_reaper.session_close, "fresh_removable_receipt", return_value=receipt), \
+                mock.patch.object(finish_reaper.session_close, "verified_exited", return_value=True), \
+                mock.patch.object(finish_reaper.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
+                mock.patch.object(finish_reaper.session_close, "git") as git_call, \
+                mock.patch.object(finish_reaper.os, "kill") as killer:
+            with self.assertRaisesRegex(session_close.Refusal, "another verified"):
+                finish_reaper.final_preflight(args)
+        claimant.assert_called_once_with(
+            self.worktree,
+            {"session_id": "ours", "pid": 10, "pid_started_at": 1.0},
+        )
+        git_call.assert_not_called()
+        killer.assert_not_called()
 
     def test_obligation_removal_requires_both_session_and_worktree(self):
         directory = Path(self.temp.name) / "merge-cleanup/obligations"
