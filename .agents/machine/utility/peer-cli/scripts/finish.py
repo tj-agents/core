@@ -37,7 +37,7 @@ def refresh_cleanup(entry, worktree, expected_receipt):
     receipt = session_close.fresh_removable_receipt(worktree)
     if any(receipt.get(key) != expected_receipt[key] for key in expected_receipt):
         raise session_close.Refusal("cleanup receipt changed while observer started")
-    if session_close.other_live_claimant(worktree, entry["session_id"]):
+    if session_close.other_live_claimant(worktree, entry):
         raise session_close.Refusal("another registered session claims this worktree")
     code, dirty, _ = session_close.git(worktree, "status", "--porcelain")
     if code or dirty:
@@ -54,7 +54,7 @@ def main(argv=None):
     if session_close.path_key(worktree) != session_close.path_key(attached) or not session_close.under_or_equal(os.getcwd(), entry["cwd"]):
         raise session_close.Refusal("target is not this session's own attachment")
     receipt = session_close.fresh_removable_receipt(worktree)
-    if session_close.other_live_claimant(worktree, entry["session_id"]):
+    if session_close.other_live_claimant(worktree, entry):
         raise session_close.Refusal("another verified live registered session claims this worktree")
     code, dirty, _ = session_close.git(worktree, "status", "--porcelain")
     if code or dirty:

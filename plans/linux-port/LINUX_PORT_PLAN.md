@@ -80,23 +80,26 @@ whole goal from the primary checkout. The real native merge/finish acceptance se
 The user requires one PR for this step; its authored paths keep the shared closure, terminal identity,
 observer, callers and host grants atomic. Generated output remains uncommitted.
 
-The Python lifecycle and terminal/orphan ports are implemented and reviewed through
-`6b336d4db569d73c2e775de8786ed2a832cf309e`. Full local validation passed: 963 source/package tests
-(17 skips), 990 shared runtime tests (four skips), 19 focused lifecycle tests, generated-tree, catalog,
-tier and harness checks. Windows CI passed at the UTF-16 scheduler encoding candidate
-`b1201d04ba910aa7a9a327525a5186068f87860c`; its Linux run exposed an unchanged adapter fixture that
-asserted zombie state after a fixed 150 ms. The identical fixture passed in the preceding pipeline.
-The follow-up observes terminal exit within its existing five-second deadline and retains the stopped
-heartbeat assertion. Linux CI at that follow-up passed; Windows CI remains pending.
+The Python lifecycle and terminal/orphan ports are implemented. Windows and Linux CI passed at
+`6b336d4db569d73c2e775de8786ed2a832cf309e`, including the Windows observer's structured UTF-16
+scheduler XML and the Linux asynchronous exit fixture. The prior full local suites passed: 963
+source/package tests (17 skips), 990 shared runtime tests (four skips), generated-tree, catalog,
+tier and harness checks.
 
-The user requested the Windows job name `verify-windows`, matching `verify-linux`; this PR includes
-that rename and its permission-test/documentation references. The user also approved requiring
-`verify-linux` in the next session. The proposed `.windows`/`.linux` source boundary for OS-specific
-machine integration is recorded in `.agents/machine/TECH_DEBT.md`; shared Python stays in `.agents`.
-The naming/debt follow-up now requires full local validation, incremental review, a security review
-of the full branch because `.github/` changed, and replacement Windows/Linux CI. The native L4
-implementation lane is available and was used. Actual Windows desktop UI Automation is unverified
-locally.
+The user requested `verify-windows`, matching `verify-linux`; this PR includes the rename and its
+permission-test/documentation references. The user approved requiring `verify-linux` in the next
+session. Main has no classic branch protection (the API returned “Branch not protected”) and no
+repository ruleset. The proposed `.windows`/`.linux` boundary for OS-specific machine integration is
+recorded in `.agents/machine/TECH_DEBT.md`; shared Python stays in `.agents`.
+
+Native and workflow review of the naming follow-up found no defect. Its mandatory full-branch security
+review confirmed two HIGH ownership defects (S5-006/S5-007 in `reviews/Refactor-LinuxPeerCli.md`):
+stale closure could force-close a successor's pane, and worktree cleanup excluded a resumed host by
+logical session ID alone. The native L4 worker repaired both. A tiny parent follow-up rechecks Windows
+fallback ownership and removes stale closure's force bypass. Focused suites pass: 29 close-tab and
+23 lifecycle tests. The orphaned resolution paragraph from retired PowerShell debt was also removed.
+The parent owns full validation, fresh incremental review, a stable batched push, replacement CI, and
+real merged Linux acceptance. Actual Windows desktop UI Automation remains unverified locally.
 
 A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
 its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
