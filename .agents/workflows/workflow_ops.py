@@ -13,6 +13,7 @@ import sys
 import tarfile
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -62,6 +63,12 @@ HOST_COVERAGE_MODULE = None
 
 class WorkflowOperationError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class _DeliveryBindContext:
+    root: Path
+    common_git_directory: Path
 
 
 def host_coverage_module():
@@ -180,6 +187,36 @@ def common_git_directory(root):
     return common.resolve()
 
 
+def _delivery_bind_context(start):
+    completed = run_process(
+        [
+            "git",
+            "rev-parse",
+            "--path-format=absolute",
+            "--show-toplevel",
+            "--git-common-dir",
+        ],
+        start,
+    )
+    records = completed.stdout.splitlines()
+    if len(records) != 2 or any(not record.strip() for record in records):
+        raise WorkflowOperationError("git did not return the delivery binding repository context")
+    root, common = (Path(record) for record in records)
+    if not root.is_absolute() or not common.is_absolute():
+        raise WorkflowOperationError("git returned a non-absolute delivery binding repository context")
+    root = root.resolve()
+    common = common.resolve()
+    if not root.is_dir() or not common.is_dir():
+        raise WorkflowOperationError("git returned an unusable delivery binding repository context")
+    return _DeliveryBindContext(root, common)
+
+
+def _matching_delivery_bind_context(root, context):
+    if context is not None and context.root != Path(root).resolve():
+        raise WorkflowOperationError("delivery binding repository context does not match this checkout")
+    return context
+
+
 def worktree_roots(root):
     listing = run_process(
         ["git", "worktree", "list", "--porcelain", "-z"], root, text=False
@@ -191,16 +228,18 @@ def worktree_roots(root):
     return roots
 
 
-def state_root(root):
-    target = common_git_directory(root) / "agent-workflow"
+def state_root(root, context=None):
+    context = _matching_delivery_bind_context(root, context)
+    common = context.common_git_directory if context is not None else common_git_directory(root)
+    target = common / "agent-workflow"
     target.mkdir(parents=True, exist_ok=True)
     return target
 
 
-def run_root(root, workflow_run_id):
+def run_root(root, workflow_run_id, context=None):
     if not isinstance(workflow_run_id, str) or not workflow_run_id.strip():
         raise WorkflowOperationError("workflow run id is required")
-    runs = state_root(root) / "runs"
+    runs = state_root(root, context) / "runs"
     candidate = runs / workflow_run_id
     try:
         parts = candidate.relative_to(runs).parts
@@ -247,8 +286,8 @@ def retry_windows_sharing_violation(action, timeout=2):
             time.sleep(0.01)
 
 
-def append_event(root, workflow_run_id, event):
-    path = run_root(root, workflow_run_id) / "telemetry.jsonl"
+def append_event(root, workflow_run_id, event, context=None):
+    path = run_root(root, workflow_run_id, context) / "telemetry.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {"schema_version": SCHEMA_VERSION, "at": utc_now(), **event}
     with path.open("a", encoding="utf-8") as stream:
@@ -1847,14 +1886,14 @@ def pr_body_check(root, pr, repo=None):
     }
 
 
-def changed_paths(root, pr, reported, expected_count=None):
+def _changed_paths_for_repository(root, repository, pr, reported, expected_count=None):
     """Every path the PR changes, from GitHub's paginated pull-files endpoint.
 
     `gh pr view --json files` stops at 100 entries and `gh pr diff` is unavailable once a pull request
     exceeds GitHub's unified-diff file limit. Standing authorization needs the complete path set, so use
     the paginated REST collection, require every summary path, and verify GitHub's authoritative count.
     """
-    endpoint = f"repos/{repository_slug(root)}/pulls/{pr}/files?per_page=100"
+    endpoint = f"repos/{repository}/pulls/{pr}/files?per_page=100"
     completed = run_process(
         ["gh", "api", "--paginate", endpoint, "--jq", ".[].filename"], root, check=False
     )
@@ -1876,6 +1915,12 @@ def changed_paths(root, pr, reported, expected_count=None):
             + "; the changed-path set is not established"
         )
     return paths
+
+
+def changed_paths(root, pr, reported, expected_count=None):
+    return _changed_paths_for_repository(
+        root, repository_slug(root), pr, reported, expected_count
+    )
 
 def pending_evidence(rollup, head):
     """Every not-yet-terminal check as an exact `(check id, run id, head)` triple.
@@ -2008,8 +2053,11 @@ def scoped_approval(root, repository, number, branch, supplied):
     return record
 
 
-def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None):
-    value = pull_request_state(root, pr)
+def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None,
+                  context=None):
+    _matching_delivery_bind_context(root, context)
+    repository = repository_slug(root)
+    value = pull_request_state(root, pr, repository)
     validation = validate_pr_body(value.get("body"))
     if not validation["valid"]:
         raise WorkflowOperationError("; ".join(validation["errors"]))
@@ -2022,9 +2070,8 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
     if state != "open":
         raise WorkflowOperationError(f"PR #{number} is {state or 'unknown'}, so it owns no delivery")
     reported = [str(item.get("path")) for item in value.get("files") or [] if item.get("path")]
-    changed = changed_paths(root, number, reported, value.get("changedFiles"))
+    changed = _changed_paths_for_repository(root, repository, number, reported, value.get("changedFiles"))
     labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
-    repository = repository_slug(root)
     approval = scoped_approval(root, repository, number, branch, approval_record)
     resolution = standing_authorization(root, changed, labels)
     if approval is not None and (resolution["stopped_by"] is None
@@ -2072,6 +2119,7 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
             "head": head,
             "authorization": resolution["merge_authorization"]["mode"],
         },
+        context,
     )
     return {
         "schema_version": SCHEMA_VERSION,
@@ -2199,9 +2247,14 @@ def parser():
 
 def main(argv=None):
     arguments = parser().parse_args(argv)
-    root = repository_root(Path(arguments.root).resolve())
+    context = None
+    if arguments.operation == "delivery-bind":
+        context = _delivery_bind_context(Path(arguments.root).resolve())
+        root = context.root
+    else:
+        root = repository_root(Path(arguments.root).resolve())
     if arguments.operation != "pr-body-check":
-        run_root(root, arguments.workflow_run_id)
+        run_root(root, arguments.workflow_run_id, context)
     if arguments.operation == "run":
         command = arguments.command[1:] if arguments.command[:1] == ["--"] else arguments.command
         result = compact_run(root, arguments.workflow_run_id, arguments.label, command, arguments.summary_lines, arguments.failure_items, arguments.summary_bytes)
@@ -2248,7 +2301,7 @@ def main(argv=None):
         )
         result = delivery_bind(
             root, arguments.workflow_run_id, arguments.pr, arguments.completion_condition, handoff,
-            arguments.approval_record,
+            arguments.approval_record, context,
         )
     elif arguments.operation == "delivery-release":
         result = delivery_release(root, arguments.workflow_run_id, arguments.reason)
