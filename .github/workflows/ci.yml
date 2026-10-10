@@ -97,9 +97,6 @@ jobs:
           ./tests/handoff-launchers.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/handoff-launchers.tests.ps1
 
-      - name: Codex marketplace startup sync tests
-        shell: pwsh
-        run: ./tests/codex-marketplace-sync.tests.ps1
       - name: Codex terminal profile tests
         shell: pwsh
         run: |

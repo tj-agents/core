@@ -1,8 +1,7 @@
-# Shared launch primitives for the native agent CLIs. Dot-sourced by handoff-codex and the terminal
-# claude launcher so the terminal invocation and the parent-session environment scrub have one owner:
-# both of them open the same kind of Windows Terminal tab, and the differences between them are narrow
-# enough to pass in. Not runnable on its own. open-claude and handoff-claude have moved to agent_cli.py
-# beside this file, which every remaining launcher moves to in turn; keep the two consistent until then.
+# Shared launch primitives for the native agent CLIs. Dot-sourced by the terminal claude launcher
+# (claude-profile.ps1), its only remaining consumer, which only calls Sync-ClaudeStandards here. Not
+# runnable on its own. open-claude, handoff-claude and handoff-codex have all moved to agent_cli.py beside
+# this file, which claude-profile.ps1 moves to in turn; keep the two consistent until then.
 
 
 # Session state a Claude Code parent exports into anything it spawns. NO_COLOR=1 alone makes the child

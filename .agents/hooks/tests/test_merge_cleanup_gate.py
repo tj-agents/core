@@ -279,6 +279,26 @@ class MergeCleanupGateTests(unittest.TestCase):
         ))
         self.assertEqual(0, again.returncode, again.stderr)
 
+    def test_python_launcher_command_is_exempt_and_stamps_transfer(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        self.run_hook(self.payload(merge_command, session="s1"))
+        path, _ = self.sole_obligation()
+        self.edit_obligation(path, recorded_at=time.time() - gate.DIRECT_GRACE_SECONDS - 1)
+
+        for command in (
+            'python3 launch_codex.py --working-directory . --prompt-path p.md --title t',
+            'python launch_claude.py --working-directory . --prompt-path p.md --title t',
+        ):
+            with self.subTest(command=command):
+                launch = self.run_hook(self.payload(command, session="s1", cwd=str(worktree)))
+                self.assertEqual(0, launch.returncode, launch.stderr)
+                obligation = json.loads(path.read_text(encoding="utf-8"))
+                self.assertIsNotNone(obligation["transferred_at"])
+                self.assertEqual("s1", obligation["transferred_by"])
+                self.edit_obligation(path, transferred_at=None, transferred_by=None)
+
     def test_post_transfer_rearm_denies_prefix_matched_session_after_3600s(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
@@ -302,6 +322,23 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(2, matched.returncode)
         self.assertIn("MERGE CLEANUP GATE", matched.stderr)
 
+    def test_python_launcher_cures_a_rearmed_obligation_rather_than_being_denied(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        self.run_hook(self.payload(merge_command, session="s1"))
+        path, _ = self.sole_obligation()
+        self.edit_obligation(
+            path,
+            transferred_at=time.time() - gate.TRANSFER_REARM_SECONDS - 1,
+            transferred_by="s1",
+        )
+
+        relaunch = self.run_hook(self.payload(
+            'python3 launch_codex.py --working-directory . --prompt-path p.md --title t',
+            session="s1", cwd=str(worktree),
+        ))
+        self.assertEqual(0, relaunch.returncode, relaunch.stderr)
 
     def test_worktree_deletion_keeps_session_exit_enforcement_at_primary(self):
         bare, primary = init_repo(self.root)
