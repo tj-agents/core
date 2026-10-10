@@ -50,7 +50,7 @@ class CloseTabTests(unittest.TestCase):
                     close_tab.close_stale_entry({"title": "same", "terminal": recorded})
                 closer.assert_not_called()
 
-    def test_stale_windows_title_fallback_refuses_another_registered_peer(self):
+    def test_stale_windows_title_fallback_refuses_any_other_registered_peer(self):
         stale = {"session_id": "stale", "title": "same",
                  "terminal": {"kind": "windows-terminal", "wt_session": "old"}}
         live = {"session_id": "live", "title": "same",
@@ -64,13 +64,9 @@ class CloseTabTests(unittest.TestCase):
                                       return_value=[(Path("stale"), stale), (Path("live"), live)]), \
                     mock.patch.object(close_tab.session_close, "liveness", return_value=state), \
                     mock.patch.object(close_tab, "close_actual") as closer:
-                if state is False:
+                with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
                     close_tab.close_stale_entry(stale)
-                    closer.assert_called_once_with(target, force=True)
-                else:
-                    with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
-                        close_tab.close_stale_entry(stale)
-                    closer.assert_not_called()
+                closer.assert_not_called()
 
     def test_stale_linux_target_requires_recorded_identity_despite_matching_title(self):
         cases = (

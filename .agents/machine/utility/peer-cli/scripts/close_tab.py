@@ -331,9 +331,7 @@ def close_stale_entry(entry):
     title_only = kind == "windows-terminal" and not identity.get("automation_id")
     if title_only:
         registered = [item for _path, item in session_close.entries()
-                      if item.get("title") == title
-                      and (item.get("session_id") == entry.get("session_id")
-                           or session_close.liveness(item) is not False)]
+                      if item.get("title") == title]
         if len(registered) != 1:
             raise TerminalRefusal("the recorded stale terminal title is absent or ambiguous")
     matches = [target for target in targets if target["title"] == title
