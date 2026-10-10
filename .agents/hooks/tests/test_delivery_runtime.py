@@ -53,7 +53,7 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
                     self.policy(authorized_stop_classes=[name]), [path]
                 )
                 self.assertEqual(
-                    {"merge_authorization", "standing", "stopped_by"}, set(resolution)
+                    {"auto_merge", "merge_authorization", "standing", "stopped_by"}, set(resolution)
                 )
                 self.assertEqual("auto", resolution["merge_authorization"]["mode"])
                 self.assertIsNone(resolution["stopped_by"])
