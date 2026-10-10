@@ -82,11 +82,13 @@ class ScopedApprovalTests(unittest.TestCase):
 
     def test_each_bind_uses_one_fresh_origin_for_paths_and_binding_identity(self):
         origins = ("example/test", "example/next")
-        with patch.object(workflow_ops, "repository_slug", side_effect=origins) as slug, patch.object(
-            workflow_ops,
-            "_changed_paths_for_repository",
-            side_effect=lambda root, repository, *args: [item["path"] for item in self.value["files"]],
-        ) as paths:
+        with patch.object(workflow_ops, "repository_slug", side_effect=origins) as slug, \
+                patch.object(workflow_ops, "pull_request_state", side_effect=lambda *args: self.value) as summary, \
+                patch.object(
+                    workflow_ops,
+                    "_changed_paths_for_repository",
+                    side_effect=lambda root, repository, *args: [item["path"] for item in self.value["files"]],
+                ) as paths:
             first = self.bind(explicit=True)
             self.value["headRefOid"] = "b" * 40
             self.value["url"] = "https://github.com/example/next/pull/42"
@@ -95,6 +97,7 @@ class ScopedApprovalTests(unittest.TestCase):
         self.assertEqual("example/test", first["repo"])
         self.assertEqual("example/next", second["repo"])
         self.assertEqual(2, slug.call_count)
+        self.assertEqual(["example/test", "example/next"], [call.args[2] for call in summary.call_args_list])
         self.assertEqual(["example/test", "example/next"], [call.args[1] for call in paths.call_args_list])
 
     def test_no_record_keeps_missing_authority(self):

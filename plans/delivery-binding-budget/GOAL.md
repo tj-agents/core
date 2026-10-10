@@ -18,7 +18,7 @@ Live Feature/ConfigurableAutoMerge owns its atomic preference/guard/validator la
 
 An authenticated unchanged-method trace captured delivery-bind exceeding10.055s during mock gh pr view before atomic binding write. Same missing-binding error reproduced on exact base; new launcher parsing is not reached by this string payload. Existing test discarded hook result, and a timeout after writing binding still passed its artifact assertion. Five Git plus two GH launches occur inside the binder: separate root/common setup, origin twice, then another common lookup for telemetry. Passing binder had only0.428s margin. No harmless-flake classification or timeout increase is justified.
 
-Accepted read-only design: C:/Users/TommySeery/source/repos/tj-agents/rust/.worktrees/Fix-RustStandardDiscovery/.agents/continuation/shell-preparation-binding-budget-repair-design.json, SHA25690f7b96fd2dcfec844853fe0fe64497c42eeb930fa5a0be0daa2680c71cd8524. It is context, never a runtime dependency. Original evidence SHAf467bc5d79d34a929b7c7f8e3da0e371b96bc812777881115d223977d942eda9. Prior WinError32 lock owner is unproven. Owned-tree timeout drainage is a separate follow-on, outside this lease.
+Original evidence SHA is `f467bc5d79d34a929b7c7f8e3da0e371b96bc812777881115d223977d942eda9`. Prior WinError32 lock owner is unproven. Owned-tree timeout drainage is a separate follow-on, outside this lease.
 
 ## Accepted implementation
 
@@ -28,18 +28,83 @@ Thread optional context through existing state_root/run_root/append_event/delive
 
 Use exact cmd built-in first/second operand dispatch in the Windows GH fixture, avoiding echo/findstr nested pipelines. api plus --paginate returns the same complete diff; pr plus view returns summary; unsupported shapes fail. Keep Linux behavior equivalent. Strengthen original hold method: require returncode2 AND 'now has a delivery owner' stderr AND human-gate/ABSENT reason before retaining existing binding-absence-authority assertion. Code2 alone also means failure and is insufficient. No binder mock, skipped assertions or inflated budget.
 
+## Implemented source mechanism
+
+This execution record is self-contained. The private context and same-target consumer are authored in [`.agents/workflows/workflow_ops.py`](../../.agents/workflows/workflow_ops.py); the fresh-origin regression is in [`.agents/hooks/tests/test_delivery_binding_gate.py`](../../.agents/hooks/tests/test_delivery_binding_gate.py). They do not depend on a disposable design artifact or another checkout.
+
+The private context remains invocation-local and immutable:
+
+```python
+@dataclass(frozen=True)
+class _DeliveryBindContext:
+    root: Path
+    common_git_directory: Path
+
+
+def _delivery_bind_context(start):
+    completed = run_process(
+        [
+            "git",
+            "rev-parse",
+            "--path-format=absolute",
+            "--show-toplevel",
+            "--git-common-dir",
+        ],
+        start,
+    )
+    records = completed.stdout.splitlines()
+    if len(records) != 2 or any(not record.strip() for record in records):
+        raise WorkflowOperationError("git did not return the delivery binding repository context")
+    root, common = (Path(record) for record in records)
+    if not root.is_absolute() or not common.is_absolute():
+        raise WorkflowOperationError("git returned a non-absolute delivery binding repository context")
+    root = root.resolve()
+    common = common.resolve()
+    if not root.is_dir() or not common.is_dir():
+        raise WorkflowOperationError("git returned an unusable delivery binding repository context")
+    return _DeliveryBindContext(root, common)
+```
+
+BB01 captures the origin before the summary and passes that exact captured value to both authoritative consumers:
+
+```python
+def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None,
+                  context=None):
+    _matching_delivery_bind_context(root, context)
+    repository = repository_slug(root)
+    value = pull_request_state(root, pr, repository)
+    validation = validate_pr_body(value.get("body"))
+    if not validation["valid"]:
+        raise WorkflowOperationError("; ".join(validation["errors"]))
+```
+
+```python
+    reported = [str(item.get("path")) for item in value.get("files") or [] if item.get("path")]
+    changed = _changed_paths_for_repository(root, repository, number, reported, value.get("changedFiles"))
+    labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
+    approval = scoped_approval(root, repository, number, branch, approval_record)
+```
+
+[`AGENTS.md`](../../AGENTS.md) makes `.agents/` the canonical authored source and requires generated plugin output to remain uncommitted. [`CODE_CONVENTIONS.md`](../../CODE_CONVENTIONS.md) requires cross-platform Python standard-library runtime code and argument-list subprocesses. [`PACKAGING.md`](../../PACKAGING.md) requires package generation and harness-manifest checks; generated output validates this source but is not part of this candidate commit.
+
 ## Next Steps
 
 Scope: this bounded source defect through verified publication and own safe cleanup.
-Current slice: specified L4 implementation and actual consumer qualification.
-Remaining scope: stable commit, frozen review/security/both-host coverage, exact CI, normal merge, causal generated publication and cleanup.
+Current slice: BB01 serial source correction after parent review at `98658d9672fceb2c9cbfc347f8b4fa78147f4e36` requested changes.
+Remaining scope: parent-owned fresh incremental review, exact CI, normal merge, causal generated publication and cleanup after this corrected candidate releases.
 Done when: truthful real subprocess hold fixture binds an owner within unchanged10s and preserves absent authority for a hold; context cannot redirect state or reuse stale permission; source review/CI/publication pass. Source delivery does not prove normal-profile activation or complete the parent rollout.
+
+## BB01 qualification and release boundary
+
+`test_workflow_ops.py` passed 90 tests during the prior candidate qualification. BB01 changes only the existing delivery-bind summary call to pass its already-captured repository; its focused regression and the complete `test_delivery_binding_gate.py` suite passed 35 tests in 53.789 seconds. The gate suite covers the shared Claude and Codex payload paths and the truthful hold-label subprocess. The unchanged ten-second budget remains in force.
+
+The parent synchronized the source candidate to `eeb369732b34334be41fd602dadcd186ba565c19` before the reviewed head `98658d9672fceb2c9cbfc347f8b4fa78147f4e36`; the source/test diff from `8b656fb197771916c58aea4418934aaa7648b1c0` to that synchronized base was empty. Core184 is already causally published and its checkout retired. This collaboration writer now prepares only the corrected local source commit; the parent resumes fresh incremental review, delivery, publication, and cleanup after release.
 
 1. Before edits, acknowledge pickup here with exact native session identity. Read Core AGENTS/CODE_CONVENTIONS and installed bugfix/lanes/persistent-workflow. Ordinary exec setup currently fails before launch; use sandbox_permissions=require_escalated,login=false. If that supported execution path is unavailable, explicitly record failed-before-edits/no-claim and the precise gate; do not ask the user to retry or leave parent ownership ambiguous.
 2. Implement only accepted regions; meaningful tests cover real linked-worktree/spaces/non-ASCII Git context, malformed/mismatched context, initial and telemetry containment/redirect revalidation, fresh policy/origin/head/labels across invocations and truthful held-label actual subprocess. Keep all affected existing scoped-authority checks. Capture measured actual binder duration/headroom with existing deadline, not count-only success. Reconcile any current-main delta; no blind replacement or broad base sync.
 3. Run affected focused suites and actual repository generation/harness/package checks. Diagnose every failure causally, no timeouts/check weakening. Record actual both-host source verification here, run real plan-host check, measure all authored files and commit stable source. Leave generated output unstaged.
-4. Own exact frozen review with required independent evidence; fix retained findings. Current both-host review record and actual host check precede approval. Open plain gh PR, preserve checks/authorization, observe exact-head complete CI, normally merge when approved/green, verify causally linked main CI and generated commit. No stacked PR or installation.
-5. Record completion or genuine gate/resolver/resume condition; safely retire only this merged checkout through supported lifecycle, preserving primary and other owners. A commit, launch, open PR or started CI is not completion. Parent continues its existing rollout.
+4. Release the corrected local commit to the parent with the focused regression, full gate suite, generated-check evidence, actual diff measurement, and limits. The parent owns fresh incremental review, delivery, publication, and cleanup.
+5. Core184 is already causally published and its checkout is retired. This source candidate does not claim installed activation, PR creation, review approval, CI completion, merge, publication, or cleanup.
 
 ## Host coverage
 
@@ -56,3 +121,7 @@ Parent recovers the unclaimed implementation through one bounded L4 collaboratio
 ## Implementation pickup
 
 `/root/implement_delivery_binding_budget` claimed the sole bounded collaboration-writer lease within parent native Codex session `01a122c4-e884-7402-a873-9fa7449e5c37` on 2026-10-10; it created no continuation owner. The worktree was on `Fix/DeliveryBindingBudget` with only this untracked goal directory before the claim; no accepted source path had local edits.
+
+## BB01 correction pickup
+
+`/root/implement_delivery_binding_budget` renewed the sole bounded collaboration-writer lease within the same parent native Codex session on 2026-10-10 to resolve frozen finding BB01 from `reviews/Fix-DeliveryBindingBudget.md`. This is a serial correction, not an independent native session or continuation owner. The parent retains the work order, review, delivery, publication, and cleanup; this writer owns only `.agents/workflows/workflow_ops.py`, `.agents/hooks/tests/test_delivery_binding_gate.py`, and this goal until its corrected stable commit is released.
