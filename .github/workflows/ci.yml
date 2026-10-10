@@ -19,7 +19,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: python3 -B scripts/check_generated_paths.py --base "origin/${BASE_REF}"
 
-  verify:
+  verify-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -113,7 +113,7 @@ jobs:
         run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v
 
   verify-linux:
-    # The same generated-tree checks and Python suites as verify, on Linux, so a POSIX-only regression
+    # The same generated-tree checks and Python suites as verify-windows, on Linux, so a POSIX-only regression
     # fails a pull request instead of surfacing only on a Linux machine.
     runs-on: ubuntu-latest
     steps:
