@@ -103,7 +103,7 @@ Full local validation of the repaired candidate passed: 971 source tests (17 ski
 new findings. At `1874a1ebdb11a38cfb22fd879a05517acdf8b182`, run 38067879202 passed Linux CI and all
 Windows lifecycle entrypoint tests but failed one new fixture assertion: the temporary directory used
 Windows' short `RUNNER~1` path while production resolved its long `runneradmin` form. The tiny
-follow-up resolves the fixture directory too; production identity/timeout behavior is unchanged.
+follow-up creates the fixture directory before resolving it; production identity/timeout behavior is unchanged.
 The parent owns focused/full validation, native incremental review, replacement CI and real merged
 Linux acceptance. Actual Windows desktop UI Automation remains unverified locally.
 
