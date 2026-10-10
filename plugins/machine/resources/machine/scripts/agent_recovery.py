@@ -371,14 +371,14 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
 def _sync_codex(executable, directory):
     if os.name != "nt":
         return
-    source = HERE / "codex_marketplace_sync.ps1"
-    if not source.is_file():
-        source = HERE / "resources/machine/scripts/codex_marketplace_sync.ps1"
-    if not source.is_file():
+    try:
+        sync = _load("codex_marketplace_sync")
+    except RuntimeError:
         return
-    command = ". '{}' ; Sync-CodexStandards -CodexExecutable '{}' -WorkingDirectory '{}' | Out-Null".format(
-        str(source).replace("'", "''"), str(executable).replace("'", "''"), str(directory).replace("'", "''"))
-    subprocess.run(["pwsh", "-NoProfile", "-Command", command], check=False, timeout=90)
+    try:
+        sync.sync_codex_standards(executable, directory, out=lambda _line: None)
+    except sync.SyncError:
+        pass
 
 
 def main(argv=None):

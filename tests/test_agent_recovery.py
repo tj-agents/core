@@ -164,6 +164,27 @@ class RecoveryTests(unittest.TestCase):
     def test_loader_caches_native_exception_identity(self):
         self.assertIs(RECOVERY._load("agent_cli").LaunchTimeout, RECOVERY._load("agent_cli").LaunchTimeout)
 
+    def test_sync_codex_loads_the_python_sync_module_on_windows(self):
+        sync = mock.Mock()
+        sync.SyncError = RECOVERY._load("codex_marketplace_sync").SyncError
+        with mock.patch.object(RECOVERY.os, "name", "nt"), \
+             mock.patch.object(RECOVERY, "_load", return_value=sync):
+            RECOVERY._sync_codex("native-codex", self.cwd)
+        sync.sync_codex_standards.assert_called_once_with("native-codex", self.cwd, out=mock.ANY)
+
+    def test_sync_codex_swallows_a_sync_error_rather_than_raising(self):
+        sync = RECOVERY._load("codex_marketplace_sync")
+        with mock.patch.object(RECOVERY.os, "name", "nt"), \
+             mock.patch.object(sync, "sync_codex_standards", side_effect=sync.SyncError("offline")), \
+             mock.patch.object(RECOVERY, "_load", return_value=sync):
+            RECOVERY._sync_codex("native-codex", self.cwd)
+
+    def test_sync_codex_is_a_no_op_off_windows(self):
+        with mock.patch.object(RECOVERY.os, "name", "posix"), \
+             mock.patch.object(RECOVERY, "_load") as loader:
+            RECOVERY._sync_codex("native-codex", self.cwd)
+        loader.assert_not_called()
+
     def test_main_reports_native_launch_failure(self):
         cli = RECOVERY._load("agent_cli")
         with mock.patch.object(RECOVERY, "open_session", side_effect=cli.LaunchError("terminal unavailable")), \

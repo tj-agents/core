@@ -1,8 +1,9 @@
 """Shared launch primitives for the native agent CLIs, on Windows and POSIX.
 
-Imported by open-claude and handoff-claude so the environment scrub, executable discovery, standards
-sync, lane lookup and terminal argument escaping have one owner. handoff-codex still uses the PowerShell
-agent-cli.ps1 until its own Python port lands. Not runnable on its own.
+Imported by open-claude, handoff-claude and handoff-codex so the environment scrub, executable discovery,
+standards sync, lane lookup and terminal argument escaping have one owner. The terminal claude launcher
+(claude-profile.ps1) still uses the PowerShell agent-cli.ps1 until its own Python port lands. Not runnable
+on its own.
 """
 
 import glob
@@ -133,7 +134,20 @@ def compare_codex_version(left, right):
     return 0
 
 
-def codex_candidate_paths(which=shutil.which, local_app_data=None):
+def npm_global_prefix():
+    """The npm global install prefix, or None when npm is unavailable or reports nothing."""
+    try:
+        result = subprocess.run(['npm', 'config', 'get', 'prefix'], capture_output=True, text=True,
+                                 encoding='utf-8', errors='replace', timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    prefix = result.stdout.strip()
+    return prefix or None
+
+
+def codex_candidate_paths(which=shutil.which, local_app_data=None, npm_prefix=npm_global_prefix):
     name = 'codex.exe' if IS_WINDOWS else 'codex'
     candidates = []
 
@@ -143,6 +157,27 @@ def codex_candidate_paths(which=shutil.which, local_app_data=None):
     # without the node process in front. Windows npm puts the shim beside node_modules; POSIX npm symlinks
     # bin/codex to the package's own bin/codex.js, two levels below the package root.
     shim = which('codex')
+
+    # A session launched from a desktop entry (not a login shell) often has PATH built from the display
+    # manager rather than the shell rc files that add a user npm prefix's bin directory, so `which` finds
+    # nothing even though the global install is on disk. `npm config get prefix` resolves it directly,
+    # the same way the native install under home is checked for Claude, below any PATH lookup.
+    if not shim and not IS_WINDOWS:
+        prefix = npm_prefix()
+        if prefix:
+            direct = Path(prefix) / 'bin' / name
+            if direct.is_file():
+                shim = str(direct)
+
+    # `codex` on PATH is not always that shim: a standalone install, or a PATH that puts the vendored
+    # binary ahead of the npm one, lands the native executable on PATH directly. On POSIX that is whatever
+    # is not a `#!` script; on Windows the npm entry point is a `.cmd`/`.ps1`, never a `.exe`, so any `.exe`
+    # found here is native. Its realpath is included too, in case the PATH entry is itself a symlink.
+    if shim and ((IS_WINDOWS and Path(shim).suffix.casefold() == '.exe')
+                 or (not IS_WINDOWS and not _is_script(os.path.realpath(shim)))):
+        candidates.append(shim)
+        candidates.append(os.path.realpath(shim))
+
     if shim:
         roots = [
             Path(shim).parent / 'node_modules' / '@openai' / 'codex',

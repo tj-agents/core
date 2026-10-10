@@ -303,9 +303,8 @@ class PluginDeliveryTests(unittest.TestCase):
 
     def test_the_machine_plugin_ships_the_same_tables_for_its_launchers(self):
         # The handoff launchers resolve their lane/frontier flags from resources/lanes, two hops up from
-        # either shared library beside it (agent-cli.ps1 for handoff-codex, agent_cli.py for handoff-claude)
-        # -- the same hop that finds .agents/lanes in the authored layout. A machine-only install must price
-        # a lane identically to an engineering one.
+        # the shared agent_cli.py beside each of them -- the same hop that finds .agents/lanes in the
+        # authored layout. A machine-only install must price a lane identically to an engineering one.
         for name in ("claude.json", "codex.json", "resolve.py", "agent-body.md", "handoff-agent-body.md"):
             with self.subTest(name=name):
                 shipped = ROOT / "plugins" / "machine" / "resources" / "lanes" / name
