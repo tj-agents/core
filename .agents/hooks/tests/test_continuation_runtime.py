@@ -231,6 +231,7 @@ class ContinuationTests(unittest.TestCase):
         original_replace = runtime.atomic_json.__globals__["os"].replace
         original_read_text = Path.read_text
         read_attempts = 0
+        transient_winerrors = (5, 32)
 
         def replace(source, destination):
             attempted.set()
@@ -246,9 +247,9 @@ class ContinuationTests(unittest.TestCase):
             nonlocal read_attempts
             if path == self.owner:
                 read_attempts += 1
-                if read_attempts == 1:
+                if read_attempts <= len(transient_winerrors):
                     error = PermissionError(13, "sharing violation")
-                    error.winerror = 32
+                    error.winerror = transient_winerrors[read_attempts - 1]
                     raise error
             return original_read_text(path, *args, **kwargs)
 
@@ -265,7 +266,7 @@ class ContinuationTests(unittest.TestCase):
 
         self.assertFalse(writer.is_alive())
         self.assertEqual(errors, [])
-        self.assertEqual(read_attempts, 2)
+        self.assertEqual(read_attempts, 3)
         self.assertEqual(runtime.read(self.owner)["reason"], "concurrent-save")
 
     def test_fresh_and_stale_foreground(self):
