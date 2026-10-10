@@ -315,22 +315,22 @@
       "path": ".claude/skills/persistent-workflow/SKILL.md",
       "source_path": ".claude/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "87aee19e175d06cc92d27d6cfb9800c9e7d5c218bfa857e893a4b39babb533f6",
+      "sha256": "479a7c0aa2fc47b8563701776e3c794674343f7f23a8fc26f326136ab01a3bd5",
       "adaptation": "Claude host behavior extends and references the canonical .agents workflow definition."
     },
     {
       "path": ".codex/skills/persistent-workflow/SKILL.md",
       "source_path": ".codex/workflow-skills/persistent-workflow/SKILL.md",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "f2a911b6c2ae900bb2ec99df179b669a0475126bf6d43ff4cb156ed977c25c3a",
+      "sha256": "7e54dc045b59ab07e2a99b02849362ea1ab60166ebb30b8a70a5290ae42c1e8d",
       "adaptation": "Codex host behavior extends and references the canonical .agents workflow definition."
     },
     {
-      "path": ".agents/engineering/workflow/persistent-workflow/scripts/delivery-continuation.ps1",
-      "source_path": "scripts/delivery-continuation.ps1",
+      "path": ".agents/engineering/workflow/persistent-workflow/scripts/delivery_continuation.py",
+      "source_path": "scripts/delivery_continuation.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "8db85aaadec524130fbbe27ba8634e8ad44377b260c48d77cedb653b5efef0fb",
-      "adaptation": "Shared continuation launcher is canonical under .agents and packaged beside both host discovery entries."
+      "sha256": "0cb3df64b4a9bc7753aab288dc7948f0841e202d635471899ff542ca04bdf1af",
+      "adaptation": "Cross-platform continuation adapter is canonical under .agents and packaged beside both host discovery entries."
     },
     {
       "path": ".agents/hooks/tests/test_goal_preflight.py",
