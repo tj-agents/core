@@ -21,6 +21,8 @@ except ModuleNotFoundError:
 
 SIDECAR_SUFFIX = ".hook-control.json"
 LOCK_SUFFIX = ".hook-control.lock"
+# MoveFileEx reports a conflicting open handle as either access denied or sharing violation.
+WINDOWS_REPLACE_CONFLICTS = (5, 32)
 NORMAL_HEADER = re.compile(r"^\s*\[features\]\s*(?:#.*)?(?:\r?\n)?$")
 HEADER = re.compile(r"^\s*\[[^\]]+\]\s*(?:#.*)?(?:\r?\n)?$")
 NORMAL_HOOKS = re.compile(r"^(\s*)hooks(\s*=\s*)(true|false)(\s*(?:#.*)?)(\r?\n)?$", re.IGNORECASE)
@@ -144,7 +146,7 @@ def retry_windows_sharing_violation(action: Any, timeout: float = 2) -> Any:
         try:
             return action()
         except PermissionError as error:
-            if (os.name != "nt" or getattr(error, "winerror", None) != 32
+            if (os.name != "nt" or getattr(error, "winerror", None) not in WINDOWS_REPLACE_CONFLICTS
                     or time.monotonic() >= deadline):
                 raise
             time.sleep(0.01)
