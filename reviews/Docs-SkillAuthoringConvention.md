@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `975460a6fc4288a19c206c07bdd78194c82717ec`  `(2026-10-10)`
+**Reviewed up to commit:** `c84ae5b8bcdc72ed43fb3d5ac2a58c06c07527b0`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -226,5 +226,30 @@ Remediation of F18. Security layer not required.
   and the paragraph names core-internal configuration in a generic convention ("thin" stays undefined).
   Fix: one generic rule (update every authored copy in the same commit) and defer which entry points
   repeat or rephrase the description, and what generation checks, to the layout owner. Fixed.
+
+Re-validated: 803 + 983 tests and every generation check.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `975460a6fc4288a19c206c07bdd78194c82717ec`
+**Candidate head:** `c84ae5b8bcdc72ed43fb3d5ac2a58c06c07527b0`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:6ec04f82f9d57ff5009efdd8882849797568b458c9e86959b282823b620dbd3e` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/3IIaht-Db6hLaXo-rAt51W/ANulOW8oydLTzbZbRrhpd2`
+**Candidate bundle identity:** `sha256:09bff7468a6bed465bc9e96ea7d8339e181ac4826b8ec7065237c02ef9400d02`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F19. Security layer not required.
+
+### Findings
+
+- [x] **F20 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:68`
+  The convention defers description parity to the layout owner, but `SOURCE_LAYOUT.md` does not state
+  it, and the hand review of a host-worded description is no longer said anywhere. Fix: state the parity
+  rule and the `extended_host_adapters` exception, with its hand review, in `SOURCE_LAYOUT.md`, and have
+  the convention say to update repeating entry points and review rewording ones. Fixed.
 
 Re-validated: 803 + 983 tests and every generation check.
