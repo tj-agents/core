@@ -151,7 +151,7 @@ adopt unrelated automation to clear this administrator dependency. Both platform
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Audited 245 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. Complete source suite passed 1,046 tests (18 skips), complete hook suite passed 1,030 tests (4 skips), and generated check found 506 files current. Exact-head platform CI remains required; installed-host adoption was not exercised."
+        "evidence": "Audited 248 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. Complete source suite passed 1,046 tests (18 skips), complete hook suite passed 1,030 tests (4 skips), and generated check found 506 files current. Exact-head platform CI remains required; installed-host adoption was not exercised."
       }
     },
     {
@@ -162,7 +162,7 @@ adopt unrelated automation to clear this administrator dependency. Both platform
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Audited 245 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. Complete source suite passed 1,046 tests (18 skips), complete hook suite passed 1,030 tests (4 skips), and generated check found 506 files current. Exact-head platform CI remains required; installed-host adoption was not exercised."
+        "evidence": "Audited 248 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. Complete source suite passed 1,046 tests (18 skips), complete hook suite passed 1,030 tests (4 skips), and generated check found 506 files current. Exact-head platform CI remains required; installed-host adoption was not exercised."
       }
     }
   ]
