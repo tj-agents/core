@@ -356,6 +356,8 @@ class MergeCleanupGateTests(unittest.TestCase):
                 context = json.loads(reminder.stdout)["hookSpecificOutput"]["additionalContext"]
                 self.assertIn("PR #3", context)
                 self.assertIn("self-close is still required", context)
+                interpreter = "python" if os.name == "nt" else "python3"
+                self.assertIn(f"`{interpreter} ", context)
         self.assertTrue(path.exists())
 
         other_session = self.run_hook(self.payload(

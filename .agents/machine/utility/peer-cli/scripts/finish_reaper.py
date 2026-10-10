@@ -8,17 +8,33 @@ import session_close
 
 def arguments():
     parser = argparse.ArgumentParser()
-    for name, kind, required in (("host-pid", int, True), ("host-start", float, True), ("worktree", str, True), ("result", str, True), ("parent-pid", int, False), ("parent-start", float, False), ("session-id", str, False), ("head", str, False), ("primary", str, False), ("branch", str, False), ("default", str, False), ("accept-timeout", float, False)):
-        parser.add_argument("--" + name, type=kind, required=required, default=60 if name == "accept-timeout" else None)
+    values = (
+        ("host-pid", int, True), ("host-start", float, True),
+        ("worktree", str, True), ("result", str, True),
+        ("session-id", str, True), ("invocation-id", str, True),
+        ("parent-pid", int, False), ("parent-start", float, False),
+        ("head", str, False), ("primary", str, False),
+        ("branch", str, False), ("default", str, False),
+        ("spawn-timeout", float, False), ("armed-timeout", float, False),
+        ("accept-timeout", float, False), ("reaper-timeout", float, False),
+        ("state-directory", str, False), ("host-names", str, False),
+    )
+    for name, kind, required in values:
+        parser.add_argument("--" + name, type=kind, required=required)
     return parser.parse_args()
 
 
-def bounded_timeout(name, default, maximum):
+def bounded_timeout(value, name):
+    if value is None:
+        return session_close.bounded_timeout(name)
     try:
-        value = float(os.environ.get(name, default))
-    except ValueError:
-        return default
-    return value if 0 < value <= maximum else default
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return session_close.DEFAULT_TIMEOUTS[name]
+    if (not session_close.math.isfinite(parsed) or parsed <= 0
+            or parsed > session_close.MAX_TIMEOUTS[name]):
+        return session_close.DEFAULT_TIMEOUTS[name]
+    return parsed
 
 
 def result(path, status, **extra):
@@ -28,18 +44,20 @@ def result(path, status, **extra):
     session_close.write_json(path, value)
 
 
-def await_acceptance(path, pid, started, host_pid, timeout):
+def await_acceptance(path, observer, expected, timeout):
     end = session_close.now() + timeout
     while session_close.now() < end:
         if Path(str(path) + ".cancelled").exists():
             return False
         value = session_close.read_json(str(path) + ".accepted")
-        if (value and value.get("reaper_pid") == pid and value.get("host_pid") == host_pid
-                and session_close.valid_identity(value.get("reaper_pid"), value.get("reaper_started_at"))
-                and abs(value["reaper_started_at"] - started) <= 2):
+        if value and session_close.valid_acknowledgement(value, expected, observer):
             session_close.write_json(
                 str(path) + ".armed",
-                {"armed": session_close.now(), "reaper_pid": pid, "reaper_started_at": started},
+                {**expected, "armed": session_close.now(),
+                 "reaper_pid": observer["reaper_pid"],
+                 "reaper_started_at": observer["reaper_started_at"],
+                 "observer_pid": observer["reaper_pid"],
+                 "observer_started_at": observer["reaper_started_at"]},
             )
             return True
         time.sleep(.05)
@@ -47,11 +65,13 @@ def await_acceptance(path, pid, started, host_pid, timeout):
 
 
 def await_exit(args):
-    end = session_close.now() + bounded_timeout("AGENT_FINISH_REAPER_TIMEOUT_SECONDS", 600, 3600)
+    end = session_close.now() + bounded_timeout(args.reaper_timeout, "AGENT_FINISH_REAPER_TIMEOUT_SECONDS")
     watched = [(args.host_pid, args.host_start)]
     if os.name == "nt" and args.parent_pid and args.parent_start:
         watched.append((args.parent_pid, args.parent_start))
     while session_close.now() < end:
+        if Path(str(args.result) + ".cancelled").exists():
+            return False
         if all(session_close.verified_exited(pid, started) for pid, started in watched):
             return True
         time.sleep(.25)
@@ -64,10 +84,11 @@ def registered(worktree, primary):
 
 
 def branch_checked_out(primary, branch):
-    code, output, _ = session_close.git(primary, "worktree", "list", "--porcelain")
-    if code:
+    try:
+        records = session_close.worktree_registrations(primary)
+    except session_close.Refusal:
         return True
-    return "branch refs/heads/" + branch in output.splitlines()
+    return any(record["branch"] == "refs/heads/" + branch for record in records)
 
 
 def final_preflight(args):
@@ -98,21 +119,21 @@ def remove_worktree_and_branch(args):
     if not preserved and branch_checked_out(primary, args.branch):
         preserved = True
     if not preserved:
-        ancestor, _, _ = session_close.git(primary, "merge-base", "--is-ancestor", "refs/heads/" + args.branch, "origin/" + args.default)
-        if ancestor not in (0, 1):
-            return "failed", {"error": "could not verify the cleanup branch relationship"}
-        # The branch may have moved after worktree removal; never delete a different ref.
+        # The branch may have moved or become checked out after removal.
         code, latest, _ = session_close.git(primary, "rev-parse", "--verify", "--quiet", "refs/heads/" + args.branch)
         if code != 0 or latest != args.head:
             preserved = True
         else:
             if Path(str(args.result) + ".cancelled").exists():
                 return "cancelled", {"error": "cleanup observer was cancelled"}
-            code, _out, error = session_close.git(
-                primary, "update-ref", "-d", "refs/heads/" + args.branch, args.head,
-            )
-            if code:
-                return "failed", {"error": "git branch deletion failed: " + error}
+            if branch_checked_out(primary, args.branch):
+                preserved = True
+            else:
+                code, _out, error = session_close.git(
+                    primary, "update-ref", "-d", "refs/heads/" + args.branch, args.head,
+                )
+                if code:
+                    return "failed", {"error": "git branch deletion failed: " + error}
     if worktree.exists() or registered(worktree, primary):
         return "failed", {"error": "worktree remains registered or present"}
     return ("branch-preserved" if preserved else "succeeded"), {}
@@ -120,44 +141,55 @@ def remove_worktree_and_branch(args):
 
 def main():
     args = arguments()
+    if args.state_directory:
+        os.environ["AGENT_STATE_DIRECTORY"] = args.state_directory
+    if args.host_names:
+        os.environ["AGENT_CLI_HOST_NAMES"] = args.host_names
     target = Path(args.result)
     own = session_close.process_info(os.getpid())
-    started = own.started_at if own else session_close.now()
-    if not session_close.write_json(target, {
-            "started": session_close.now(), "host_pid": args.host_pid, "host_start": args.host_start,
-            "worktree": args.worktree, "session_id": args.session_id, "reaper_pid": os.getpid(),
-            "reaper_started_at": started,
-    }, exclusive=True):
+    if own is None:
+        return 0
+    cleanup_fields = {
+        key: getattr(args, key)
+        for key in ("head", "primary", "branch", "default")
+        if getattr(args, key) is not None
+    }
+    expected = session_close.binding(
+        args.host_pid, args.host_start, args.worktree, args.session_id,
+        args.invocation_id, cleanup_fields,
+    )
+    if args.parent_pid is not None or args.parent_start is not None:
+        expected.update({"parent_pid": args.parent_pid, "parent_start": args.parent_start})
+    observer = {
+        **expected,
+        "started": session_close.now(),
+        "reaper_pid": own.pid,
+        "reaper_started_at": own.started_at,
+        "observer_pid": own.pid,
+        "observer_started_at": own.started_at,
+    }
+    if not session_close.write_json(target, observer, exclusive=True):
         return 0
     cleanup = all(getattr(args, key) for key in ("head", "primary", "branch", "default"))
-    if not await_acceptance(target, os.getpid(), started, args.host_pid, args.accept_timeout):
+    accept_timeout = bounded_timeout(args.accept_timeout, "AGENT_FINISH_ACCEPT_TIMEOUT_SECONDS")
+    if not await_acceptance(target, observer, expected, accept_timeout):
         result(target, "cancelled" if Path(str(target) + ".cancelled").exists() else "not-accepted")
         return 0
     try:
-        if cleanup and os.name != "nt":
+        if not await_exit(args):
+            status = "cancelled" if Path(str(target) + ".cancelled").exists() else "timeout"
+            result(target, status, error="verified host (or Windows wrapper) did not exit")
+            return 0
+        if cleanup:
             status, extra = remove_worktree_and_branch(args)
             if status not in {"succeeded", "branch-preserved"}:
                 result(target, status, **extra)
                 return 0
-        if not cleanup or os.name == "nt":
-            if not await_exit(args):
-                result(target, "timeout", error="verified host (or Windows wrapper) did not exit")
-                return 0
-            if cleanup:
-                status, extra = remove_worktree_and_branch(args)
-                if status not in {"succeeded", "branch-preserved"}:
-                    result(target, status, **extra)
-                    return 0
-        elif not await_exit(args):
-            result(target, "timeout", cleanup=status, **extra)
-            return 0
-        if cleanup:
-            session_close.remove_matching_obligations(worktree=args.worktree)
-            result(target, status, host_pid=args.host_pid, host_start=args.host_start,
-                   worktree=args.worktree, session_id=args.session_id, session_exited=True, **extra)
+            session_close.remove_matching_obligations(args.worktree, args.session_id)
+            result(target, status, session_exited=True, **extra)
         else:
-            session_close.remove_matching_obligations(session_id=args.session_id)
-            result(target, "session-closed", session_id=args.session_id, checkout_retained=True, session_exited=True)
+            session_close.remove_matching_obligations(args.worktree, args.session_id)
+            result(target, "session-closed", checkout_retained=True, session_exited=True)
     except session_close.Refusal as error:
         result(target, "failed", error=str(error))
     return 0
