@@ -74,7 +74,7 @@ what still needs checking on Windows.
 
 ## Current progress
 
-- PR: not opened
+- PR: [#185](https://github.com/tj-agents/core/pull/185) (draft)
 
 Step 4 was picked up on `Refactor/LinuxTerminalStartHooks` with the boundary limited to terminal-start
 standards refresh, its tests and documentation. Its successor remains Step 7; Steps 7 and 10 are not
@@ -82,11 +82,11 @@ implementation scope for this slice.
 
 The primary acknowledged the handoff and completed bounded L3 discovery. Native L4 implementation
 uses the canonical Codex lane table. Independent review found five
-confirmed defects; all five are repaired. Final local validation passed 1,002 source tests (17 skips)
+confirmed defects; all five are repaired. Final local validation passed 1,006 source tests (18 skips)
 and 1,001 hook tests (four skips), plus generated-tree, catalog, harness and tier checks. The completed incremental review found one further maintenance-child isolation defect; that repair is
 complete and both full suites passed again. Real packaged session fixtures cover maintenance and
-permission convergence under hostile PYTHONPATH while preserving native CLI environment. Fresh review
-and Windows/Linux CI remain before delivery. The maintenance review passed security; its Windows
+permission convergence under hostile PYTHONPATH while preserving native CLI environment. The Windows fixture repair passed both full local suites; incremental review and fresh exact-head
+Windows/Linux CI remain before delivery. The maintenance review passed security; its Windows
 coverage finding (R7) is repaired with a platform-neutral test of both hosts’ real maintenance children,
 permission convergence and native CLI environment preservation. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
 solely to satisfy a separate ledger's graph requirements.
@@ -146,7 +146,7 @@ next substantive PR, with no separate Step 5 metadata PR.
       "verification": {
         "level": "source",
         "result": "passed",
-            "evidence": "43 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1002 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
+            "evidence": "36 focused launcher/adapter checks (two Windows-only skips), 37 Codex-sync regressions, 1006 complete source tests (18 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     },
     {
@@ -157,7 +157,7 @@ next substantive PR, with no separate Step 5 metadata PR.
       "verification": {
         "level": "source",
         "result": "passed",
-            "evidence": "43 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1002 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
+            "evidence": "36 focused launcher/adapter checks (two Windows-only skips), 37 Codex-sync regressions, 1006 complete source tests (18 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     }
   ]
@@ -174,12 +174,20 @@ review through `5301acfa8e40edcf0c2983ede33cbade36e35937` confirmed one further 
 isolation finding. The parent reproduced hostile PYTHONPATH startup in both hosts; all maintenance
 children now use isolated Python, with real packaged-session and permissions-convergence coverage.
 The subsequent review added MEDIUM R7 for the missing Windows regression; its platform-neutral
-counterpart is implemented and passed locally. Final incremental review remains required.
+counterpart is implemented and passed locally. Final incremental review approved `75fe4c5a309cc12d06d7ae9ad5286755282ce896`;
+Windows CI run 38080350190 failed on the reviewed head; Linux CI passed. A bounded fresh L4
+unit-debug context repaired the Windows fixture paths, output decoding, dual-shell setup and
+incorrect execution of Linux Bash fixtures on Windows. New PowerShell counterparts retain fallback,
+exit-125 and active-package-update coverage. Full local suites passed again: 1,006 source tests
+(18 skips) and 1,001 hook tests (four skips). Incremental review of this repair and an exact-head
+Windows/Linux CI rerun remain before merge.
 
 ## Next Steps
 
-All seven findings are repaired and both full suites passed. Independently review the cross-platform
-coverage repair before publishing for Windows/Linux CI in the primary
+All seven findings are repaired. The previously reviewed head `75fe4c5a309cc12d06d7ae9ad5286755282ce896`
+passed Linux CI but exposed Windows fixture defects. Those are repaired, and both full local suites
+passed again. Independently review this repair, push to the existing PR #185, and require new exact-head
+Windows/Linux CI in the primary
 checkout `/home/tommy/projects/tj-agents/core`, branch `Refactor/LinuxTerminalStartHooks`. Its successor
 owns Step 7 only after Step 4 lands. Do not implement Steps 7 or 10 in this session. The whole port
 remains authorized one reviewed PR per step.

@@ -37,14 +37,16 @@ class TerminalProfileWiringTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="terminal profile wiring ")
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.home = self.root / "home"
         self.documents = self.root / "Documents"
         self.bin = self.root / "bin"
         self.bin.mkdir()
         self.calls = self.root / "calls.txt"
         self.environment = os.environ.copy()
-        self.environment.update({"HOME": str(self.home), "PATH": f"{self.bin}{os.pathsep}{self.environment['PATH']}", "CALLS": str(self.calls)})
+        self.environment.update({"HOME": str(self.home), "PATH": f"{self.bin}{os.pathsep}{self.environment['PATH']}", "CALLS": str(self.calls),
+                                 "CLAUDE_CONFIG_DIR": str(self.root / "claude-config"),
+                                 "CLAUDE_CODE_PLUGIN_CACHE_DIR": str(self.root / "missing-claude-cache")})
 
     def executable(self, name: str, body: str) -> Path:
         if os.name == "nt":
@@ -261,11 +263,105 @@ class TerminalProfileWiringTests(unittest.TestCase):
             with self.subTest(shell=shell):
                 self.assert_claude_wiring(lambda command: self.run_powershell(shell, command), f". '{self.profile_path()}'; claude plugin list; claude --resume session; claude")
 
+    def test_claude_powershell_falls_back_when_its_registry_cannot_be_read(self):
+        self.executable("claude", "print('fallback')\n")
+        self.install_profile(CLAUDE)
+        for shell in self.powershells():
+            with self.subTest(shell=shell):
+                completed = self.run_powershell(shell, f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual("fallback\n", completed.stdout)
+                self.assertIn("registry could not be read", completed.stderr)
+
+    @unittest.skipUnless(os.name == "nt", "the no-interpreter fallback is a Windows PowerShell check")
+    def test_claude_windows_powershell_falls_back_without_a_usable_python(self):
+        self.executable("claude", "print('fallback')\n")
+        self.environment["PATH"] = str(self.bin)
+        self.install_profile(CLAUDE)
+        override = (
+            "function Get-Command { param($Name, [switch]$All, $CommandType, $ErrorAction) "
+            "if ($Name -in @('python', 'python3', 'py')) { return }; "
+            "Microsoft.PowerShell.Core\\Get-Command @PSBoundParameters }; "
+        )
+        for shell in self.powershells():
+            with self.subTest(shell=shell):
+                completed = self.run_powershell(shell, override + f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual("fallback\n", completed.stdout)
+                self.assertIn("no usable Python", completed.stderr)
+
+    def test_claude_powershell_preserves_a_real_cli_exit_125_without_a_second_launch(self):
+        active = self.root / "exit-status-active"
+        launcher = active / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text(
+            "import os\n"
+            "with open(os.environ['CALLS'], 'a', encoding='utf-8') as output:\n"
+            "    output.write('refresh\\n')\n"
+            "raise SystemExit(125)\n",
+            encoding="utf-8",
+        )
+        cache = self.root / "exit-status-cache"
+        cache.mkdir()
+        (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
+            "machine@base-agents": [{"scope": "user", "installPath": str(active)}],
+        }}), encoding="utf-8")
+        self.environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
+        self.executable("claude", "import os\nopen(os.environ['CALLS'], 'a').write('cli\\n')\n")
+        self.install_profile(CLAUDE)
+        for shell in self.powershells():
+            with self.subTest(shell=shell):
+                self.calls.unlink(missing_ok=True)
+                completed = self.run_powershell(shell, f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
+                self.assertEqual(125, completed.returncode, completed.stderr)
+                self.assertEqual("refresh\n", self.calls.read_text(encoding="utf-8"))
+
+    def test_claude_powershell_reads_the_active_package_on_each_invocation(self):
+        self.executable("claude", "raise SystemExit(99)\n")
+        cache = self.root / "active-package-cache"
+        cache.mkdir()
+        packages = []
+        for label in ("first", "second"):
+            package = self.root / label
+            launcher = package / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
+            launcher.parent.mkdir(parents=True)
+            launcher.write_text(
+                "import os\n"
+                "with open(os.environ['CALLS'], 'a', encoding='utf-8') as output:\n"
+                f"    output.write('{label}\\n')\n",
+                encoding="utf-8",
+            )
+            packages.append(package)
+        registry = cache / "installed_plugins.json"
+        second = cache / "second.json"
+        registry.write_text(json.dumps({"plugins": {
+            "machine@base-agents": [{"scope": "user", "installPath": str(packages[0])}],
+        }}), encoding="utf-8")
+        second.write_text(json.dumps({"plugins": {
+            "machine@base-agents": [{"scope": "user", "installPath": str(packages[1])}],
+        }}), encoding="utf-8")
+        self.environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
+        self.install_profile(CLAUDE)
+        for shell in self.powershells():
+            with self.subTest(shell=shell):
+                self.calls.unlink(missing_ok=True)
+                registry.write_text(json.dumps({"plugins": {
+                    "machine@base-agents": [{"scope": "user", "installPath": str(packages[0])}],
+                }}), encoding="utf-8")
+                command = (
+                    f". '{self.profile_path()}'; claude; "
+                    f"Copy-Item -LiteralPath '{second}' -Destination '{registry}' -Force; "
+                    "claude; exit $LASTEXITCODE"
+                )
+                completed = self.run_powershell(shell, command)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertEqual("first\nsecond\n", self.calls.read_text(encoding="utf-8"))
+
     def assert_codex_wiring(self, run, command: str, expected_code: int):
         self.calls.unlink(missing_ok=True)
         active = self.active_launcher("codex")
         hooks = active / ".agents" / "machine" / "utility" / "hook-control" / "scripts" / "hook_control.py"
-        hooks.parent.mkdir(parents=True)
+        hooks.parent.mkdir(parents=True, exist_ok=True)
         hooks.write_text("import os, sys\nopen(os.environ['CALLS'], 'a').write('hooks ' + ' '.join(sys.argv[1:]) + '\\n')\n", encoding="utf-8")
         self.environment["CODEX_HOME"] = str(self.root / "codex-home")
         shim = self.executable("codex", "import os, sys\nopen(os.environ['CALLS'], 'a').write('codex ' + ' '.join(sys.argv[1:]) + '\\n')\n")
