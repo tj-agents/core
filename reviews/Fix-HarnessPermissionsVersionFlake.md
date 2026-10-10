@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `be1d55a5c6e0fd06c8e4385c72e2441048c215e7`  `(2026-10-10)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `1340c47729b4786efedef76ad87dae1e31db7403`  `(2026-10-10)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-10 — full
 
@@ -86,3 +86,22 @@ Remediation of F3. Security layer not required.
 
 Dropped: the helper's separator logic mirroring `path_spellings` (the file's established oracle, as in
 `test_both_separator_spellings_are_rendered`) and its single-template scope (named for `CLEANUP`).
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `be1d55a5c6e0fd06c8e4385c72e2441048c215e7`
+**Candidate head:** `1340c47729b4786efedef76ad87dae1e31db7403`
+**Candidate branch:** `Fix/HarnessPermissionsVersionFlake`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:de8f60fd0969faf2f102169d8fe562e495f28e5ce1a9c6ffd986e92d3fa7e998` `(2 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/DFZRNDO0hxwIzU-J0jk0Av/eHV13pkez4eyZrE53GjjsJ`
+**Candidate bundle identity:** `sha256:ca1037268fb5c6f6368532b0f10ef3876bb4bf92cb90a40a1d388524693a818c`
+**Work-order path:** `reviews/Fix-HarnessPermissionsVersionFlake.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Remediation of F4–F5. Security layer not required.
+
+### Findings
+
+No findings (native layer at `low` effort over the F4–F5 remediation).
