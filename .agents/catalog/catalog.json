@@ -193,7 +193,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:52a4033f084116bed39977f8aef2cc92e4761ce68b463a8ce84e135b2ac8422b",
+          "digest": "sha256:f5c4ead046e2abd118092912340a6707f36ee8808db39321f861b501bbbb0a31",
           "harness": {
             "marketplaces": [
               {
@@ -444,7 +444,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:7bf6e53a5719c3796e4e1d28e4a182b95ba71c994a60b63c302da1e375131b47",
+          "digest": "sha256:94c1a70231537ba780e2743a652df689bf6b4628fa336e8a7b86672cb960b1b6",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -508,14 +508,22 @@
             ],
             "permissions": {
               "claude_allow": [
-                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
-                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1)",
-                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)",
-                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1)",
-                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1)",
-                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1)",
-                "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1)",
-                "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
                 "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
@@ -525,92 +533,68 @@
                 {
                   "pattern": [
                     [
-                      "powershell",
-                      "powershell.exe",
-                      "pwsh",
-                      "pwsh.exe"
+                      "python",
+                      "python3"
                     ],
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
+                    "-B",
                     [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1",
-                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.ps1",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.ps1"
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py",
+                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
                     ]
                   ],
-                  "justification": "engineering:merge Step 5: finish closes this session's own CLI and removes its merged worktree after cleanup_proof.py approved it",
+                  "justification": "engineering:merge Step 5: finish closes this verified session and removes its merged worktree after cleanup_proof.py approved it",
                   "match": [
                     [
-                      "powershell",
-                      "-NoProfile",
-                      "-ExecutionPolicy",
-                      "Bypass",
-                      "-File",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py"
                     ],
                     [
-                      "powershell.exe",
-                      "-NoProfile",
-                      "-ExecutionPolicy",
-                      "Bypass",
-                      "-File",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.ps1"
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
                     ]
                   ],
                   "not_match": [
                     [
-                      "powershell",
-                      "-NoProfile",
-                      "-File",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.ps1"
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
                     ]
                   ]
                 },
                 {
                   "pattern": [
                     [
-                      "powershell",
-                      "powershell.exe",
-                      "pwsh",
-                      "pwsh.exe"
+                      "python",
+                      "python3"
                     ],
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
+                    "-B",
                     [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1",
-                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/close.ps1",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.ps1"
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py",
+                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
                     ]
                   ],
                   "justification": "Close only this verified completed CLI session while retaining its checkout",
                   "match": [
                     [
-                      "powershell",
-                      "-NoProfile",
-                      "-ExecutionPolicy",
-                      "Bypass",
-                      "-File",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1"
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py"
                     ],
                     [
-                      "powershell.exe",
-                      "-NoProfile",
-                      "-ExecutionPolicy",
-                      "Bypass",
-                      "-File",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.ps1"
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
                     ]
                   ],
                   "not_match": [
                     [
-                      "powershell",
-                      "-NoProfile",
-                      "-File",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.ps1"
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
                     ]
                   ]
                 },

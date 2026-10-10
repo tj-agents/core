@@ -161,7 +161,7 @@ recorded release marker. Without `finish` it cannot end its own host process or 
 successor's `## Next Steps` must gate the operation on that marker, then close the predecessor itself with
 `machine:peer-cli`: resolve the registry entry whose `cwd` is the target checkout (and the recorded session
 id or tab title when the goal names one); `close` verifies the recorded host pid and start time against the
-live process, `close-tab.ps1` takes the tab, and an unverifiable entry stays open with the user named as
+live process, `close_tab.py` takes only its exact native terminal identity, and an unverifiable entry stays open with the user named as
 resolver. The successor then performs the operation from the target checkout and treats a command error or
 residual path as incomplete rather than accepting partial Git cleanup.
 

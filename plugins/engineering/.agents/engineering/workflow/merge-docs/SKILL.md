@@ -120,6 +120,6 @@ meta-only, and that the base is clean. If the diff turned out not to be meta-onl
 and routed to `engineering:merge`.
 
 After that report, apply `engineering:merge` Step 5's terminal session operation: run the argument-free
-`finish.ps1` for this session's removable linked checkout, or its sibling `close.ps1` for a primary or
-retained checkout. Preserve the checkout when using `close.ps1`; completion requires verified session
+`finish.py` for this session's removable linked checkout, or its sibling `close.py` for a primary or
+retained checkout. Run `python3 -B` on Linux/macOS or `python -B` on Windows. Preserve the checkout when using `close.py`; completion requires verified session
 exit independently of branch deletion.
