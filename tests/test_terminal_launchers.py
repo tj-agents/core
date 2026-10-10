@@ -460,6 +460,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                         os.environ,
                         AGENT_STATE_DIRECTORY=str(state),
                         HOME=str(home),
+                        USERPROFILE=str(home),
                         CODEX_HOME=str(home / ".codex"),
                         CLAUDE_CONFIG_DIR=str(config),
                         CLAUDE_CODE_PLUGIN_CACHE_DIR=str(plugins),
@@ -479,6 +480,110 @@ class TerminalLaunchersTests(unittest.TestCase):
                         env=environment, text=True, encoding="utf-8", capture_output=True, check=False,
                     )
                     self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
+                    self.assertFalse(marker.exists(), marker.read_text(encoding="utf-8") if marker.exists() else "")
+                    self.assertEqual(str(shadow), native_environment.read_text(encoding="utf-8"))
+                    settings = json.loads((config / "settings.json").read_text(encoding="utf-8"))
+                    self.assertIn("Bash(echo trusted)", settings["permissions"]["allow"])
+
+    def test_launcher_mains_isolate_maintenance_children_on_every_platform(self):
+        with tempfile.TemporaryDirectory(prefix="terminal maintenance child isolation ") as directory:
+            root = Path(directory)
+            shadow = root / "hostile"
+            shadow.mkdir()
+            marker = root / "hostile-sitecustomize-ran"
+            (shadow / "sitecustomize.py").write_text(
+                "from pathlib import Path\nimport os\nPath(os.environ['HOSTILE_MARKER']).write_text('ran')\n",
+                encoding="utf-8",
+            )
+            recorder = root / "native.py"
+            recorder.write_text(
+                "from pathlib import Path\nimport os\nPath(os.environ['NATIVE_PYTHONPATH']).write_text(os.environ['PYTHONPATH'])\n",
+                encoding="utf-8",
+            )
+
+            for host in ("claude", "codex"):
+                with self.subTest(host=host):
+                    host_root = root / host
+                    home = host_root / "home"
+                    config = host_root / "config"
+                    cache = host_root / "claude-cache"
+                    codex_home = host_root / "codex-home"
+                    state = host_root / "state"
+                    project = host_root / "project"
+                    package = host_root / "package"
+                    native_environment = host_root / "native-pythonpath"
+                    project.mkdir(parents=True)
+                    package.mkdir()
+                    (package / "harness.json").write_text(json.dumps({
+                        "requires": {
+                            "marketplaces": [], "plugins": [], "hooks": [],
+                            "permissions": {"claude_allow": ["Bash(echo trusted)"], "codex_prefix_rules": []},
+                        },
+                    }), encoding="utf-8")
+                    cache.mkdir(parents=True)
+                    registry = {"plugins": {
+                        "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
+                    }}
+                    for plugins in (config / "plugins", cache):
+                        plugins.mkdir(parents=True, exist_ok=True)
+                        (plugins / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
+                        (plugins / "known_marketplaces.json").write_text(json.dumps({
+                            "base-agents": {"source": {"source": "github", "repo": "tj-agents/core"}},
+                        }), encoding="utf-8")
+                    environment = {
+                        "AGENT_STATE_DIRECTORY": str(state),
+                        "BASE_AGENTS_CODEX_HOOK_TRUST": "off",
+                        "BASE_AGENTS_HARNESS_PERMISSIONS": "on",
+                        "CLAUDE_CODE_PLUGIN_CACHE_DIR": str(cache),
+                        "CLAUDE_CONFIG_DIR": str(config),
+                        "CODEX_HOME": str(codex_home),
+                        "HOME": str(home),
+                        "HOSTILE_MARKER": str(marker),
+                        "NATIVE_PYTHONPATH": str(native_environment),
+                        "PYTHONPATH": str(shadow),
+                        "USERPROFILE": str(home),
+                    }
+
+                    def run_native(_target, _arguments):
+                        return subprocess.run(
+                            [sys.executable, "-I", "-B", str(recorder)], check=False,
+                        ).returncode
+
+                    hook_trust = None
+                    with mock.patch.dict(os.environ, environment):
+                        if host == "claude":
+                            with mock.patch.object(CLAUDE, "run_target", side_effect=run_native):
+                                code = CLAUDE.main(["--project", str(project), "--target", "trusted-native", "session"])
+                        else:
+                            def codex_sync_command(_executable, arguments, **_kwargs):
+                                if arguments == ["plugin", "marketplace", "upgrade", "--json"]:
+                                    return {"errors": []}
+                                if arguments == ["plugin", "list", "--available", "--json"]:
+                                    return {"installed": [{
+                                        "pluginId": "machine@base-agents", "enabled": True,
+                                        "marketplaceSource": {"sourceType": "git"},
+                                    }], "available": []}
+                                if arguments == ["plugin", "add", "machine@base-agents", "--json"]:
+                                    return {"pluginId": "machine@base-agents"}
+                                raise AssertionError(arguments)
+
+                            hook_trust = mock.Mock(
+                                wraps=CODEX.sync_codex_standards.__globals__["invoke_codex_hook_trust"],
+                            )
+                            with mock.patch.object(CODEX, "resolve_codex_for_sync", return_value=sys.executable), \
+                                    mock.patch.object(CODEX, "run_target", side_effect=run_native), \
+                                    mock.patch.dict(
+                                        CODEX.sync_codex_standards.__globals__,
+                                        {
+                                            "invoke_codex_sync_command": codex_sync_command,
+                                            "invoke_codex_hook_trust": hook_trust,
+                                        },
+                                    ):
+                                code = CODEX.main(["--project", str(project), "--target", "trusted-native", "session"])
+
+                    self.assertEqual(0, code)
+                    if hook_trust is not None:
+                        hook_trust.assert_called_once()
                     self.assertFalse(marker.exists(), marker.read_text(encoding="utf-8") if marker.exists() else "")
                     self.assertEqual(str(shadow), native_environment.read_text(encoding="utf-8"))
                     settings = json.loads((config / "settings.json").read_text(encoding="utf-8"))
