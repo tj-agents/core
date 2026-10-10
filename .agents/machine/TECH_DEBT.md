@@ -138,3 +138,15 @@ keeps the directory locked, and the reaper records a failed removal; the cleanup
 
 **Resolution condition.** The reaper can read another process's current directory, or the host records it,
 so finish can tell a shell that pins the worktree from one that does not.
+
+## Platform-specific machine integrations lack an explicit source boundary
+
+Windows-only installers, shell profiles and terminal integration currently sit beside shared machine
+code. As Linux integration grows, explicit `.windows` and `.linux` adapter directories would make
+platform ownership easier to find. Shared Python implementations and capability definitions retain
+their canonical home in `.agents`; platform folders should contain only OS-specific integration.
+
+**Resolution condition.** Document the platform adapter layout in `SOURCE_LAYOUT.md`, move the
+OS-specific integration into its owning directories, and update installation, packaging and imports
+with Windows and Linux verification. Keep this structural change separate from the functional Linux
+port so each delivery remains reviewable.

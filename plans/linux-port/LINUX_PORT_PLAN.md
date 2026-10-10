@@ -65,7 +65,7 @@ what still needs checking on Windows.
   `Split` binding skipped the installer's ancestor reparse-point check (#160).
 - [x] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
   (`verify-linux`, #162); it blocks a PR once the repository ruleset lists it as a required check,
-  which awaits the user's decision after a few green runs.
+  which the user approved requiring on 2026-10-10; configure it in the next session.
 - [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no shipped Markdown
   under `.agents/`, `.claude/` or `.codex/` tells an agent to run bare `python`, `powershell.exe`, `pwsh`
   or `wt.exe` without naming the platform (including the session exit in `merge` Step 5 and in
@@ -77,26 +77,26 @@ what still needs checking on Windows.
 Step 5 owns PR #181 (`Refactor/LinuxPeerCli`) in the linked checkout
 `/home/tommy/projects/tj-agents/core/.worktrees/LinuxPeerCliProof`. The originating session retains the
 whole goal from the primary checkout. The real native merge/finish acceptance session is not launched.
-The user requires one PR for this step; its 40 authored paths keep the shared closure, terminal identity,
+The user requires one PR for this step; its authored paths keep the shared closure, terminal identity,
 observer, callers and host grants atomic. Generated output remains uncommitted.
 
-The Python lifecycle and terminal/orphan ports are implemented and reviewed. Local suites at
-`1752aebbdf11da132c342dfb0ce8a8e3dc839c32` passed: 963 source/package tests (17 skips), 990 shared runtime
-tests (four skips), 19 focused lifecycle tests, generated-tree, catalog, tier and harness checks.
-Native and fresh process-safety reviews are complete in `reviews/Refactor-LinuxPeerCli.md`. Linux CI
-passed. Windows CI exposed an undefined wrapper helper and an incompatible handshake fixture, then
-rejected the long observer command. The bounded native L4 worker replaced registration with structured
-scheduler XML, current-user SID and useful diagnostics. Run 38061315556 now identifies the remaining
-registration defect precisely: the Windows scheduler cannot switch the UTF-8 XML encoding. The tiny
-follow-up writes UTF-16 with its matching declaration and BOM, with a regression assertion. All 19
-lifecycle tests pass locally. The parent owns full validation, fresh review, replacement CI and delivery;
-the native implementation lane is available and was used. The reviewed encoding candidate is
-`b1201d04ba910aa7a9a327525a5186068f87860c`. Linux run 38063265128 exposed an unchanged adapter fixture:
-a killed grandchild remained in disk sleep at its fixed 150 ms zombie assertion. The identical fixture
-passed in the preceding pipeline (38061315556). Its tiny follow-up now observes terminal exit within
-the already existing five-second test deadline and retains the stopped-heartbeat assertion; runtime
-budgets are unchanged. Windows CI for the encoding candidate is still pending. Windows desktop UI
-Automation remains unverified locally.
+The Python lifecycle and terminal/orphan ports are implemented and reviewed through
+`6b336d4db569d73c2e775de8786ed2a832cf309e`. Full local validation passed: 963 source/package tests
+(17 skips), 990 shared runtime tests (four skips), 19 focused lifecycle tests, generated-tree, catalog,
+tier and harness checks. Windows CI passed at the UTF-16 scheduler encoding candidate
+`b1201d04ba910aa7a9a327525a5186068f87860c`; its Linux run exposed an unchanged adapter fixture that
+asserted zombie state after a fixed 150 ms. The identical fixture passed in the preceding pipeline.
+The follow-up observes terminal exit within its existing five-second deadline and retains the stopped
+heartbeat assertion. Linux CI at that follow-up passed; Windows CI remains pending.
+
+The user requested the Windows job name `verify-windows`, matching `verify-linux`; this PR includes
+that rename and its permission-test/documentation references. The user also approved requiring
+`verify-linux` in the next session. The proposed `.windows`/`.linux` source boundary for OS-specific
+machine integration is recorded in `.agents/machine/TECH_DEBT.md`; shared Python stays in `.agents`.
+The naming/debt follow-up now requires full local validation, incremental review, a security review
+of the full branch because `.github/` changed, and replacement Windows/Linux CI. The native L4
+implementation lane is available and was used. Actual Windows desktop UI Automation is unverified
+locally.
 
 A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
 its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
@@ -144,5 +144,6 @@ Step 3's native Codex handoff was verified in kitty. Step 4, then 7 and 10 remai
 
 Land 5 (`peer-cli`, `close` and `finish` first, per the tightened acceptance criterion above, so the
 `merge` skill's Step 5 session exit works on Linux) and 4 (terminal start hooks, deleting
-`agent-cli.ps1`); then 7 and 10. After `verify-linux` has had a few green runs, ask the user whether the
-repository ruleset should require it.
+`agent-cli.ps1`); then 7 and 10. The user approved making `verify-linux` a required PR check on 2026-10-10; the next session should
+configure that requirement after inspecting the repository's current branch protection. Windows
+verification is named `verify-windows`.
