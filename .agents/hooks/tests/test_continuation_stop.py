@@ -292,6 +292,7 @@ class ContinuationStopTests(unittest.TestCase):
             "Can I plan and implement the migration?",
             "Would we plan and implement the migration?",
             "Do we plan and implement the migration?",
+            "Do the agents plan and implement the migration?",
             "Can't I plan and implement the migration?",
             "Couldn’t we plan and implement the migration?",
             "Won't we plan and implement the migration?",
