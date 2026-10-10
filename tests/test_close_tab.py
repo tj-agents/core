@@ -30,6 +30,29 @@ def completed(stdout="", returncode=0, stderr=""):
 
 
 class CloseTabTests(unittest.TestCase):
+    def test_stale_linux_target_requires_recorded_identity_despite_matching_title(self):
+        cases = (
+            ("kitty", "kitty_inventory", {"window_id": "1", "listen_on": "unix:/kitty"},
+             {"window_id": "2", "listen_on": "unix:/kitty"}),
+            ("tmux", "tmux_inventory", {"pane_id": "%1", "socket": "/tmp/tmux"},
+             {"pane_id": "%2", "socket": "/tmp/tmux"}),
+        )
+        for kind, inventory, recorded, replacement in cases:
+            with self.subTest(kind=kind):
+                identity = {"kind": kind, **recorded}
+                entry = {"title": "same", "terminal": identity}
+                other = {"title": "same", "identity": {"kind": kind, **replacement}}
+                exact = {"title": "same", "identity": identity}
+                with mock.patch.object(close_tab, inventory, return_value=[other]), \
+                        mock.patch.object(close_tab, "close_actual") as closer:
+                    with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
+                        close_tab.close_stale_entry(entry)
+                    closer.assert_not_called()
+                with mock.patch.object(close_tab, inventory, return_value=[other, exact]), \
+                        mock.patch.object(close_tab, "close_actual") as closer:
+                    close_tab.close_stale_entry(entry)
+                    closer.assert_called_once_with(exact, force=True)
+
     def test_missing_or_unverified_native_identity_refuses(self):
         entry = {"pid": 0, "pid_started_at": 0, "terminal": {"kind": "kitty"}}
         with self.assertRaisesRegex(close_tab.TerminalRefusal, "unknown"):

@@ -86,7 +86,10 @@ wrapper qualification and unknown-owner recovery are implemented. Disposable clo
 execute on Linux and Windows; real Windows UI Automation remains unverified locally.
 Local validation passes: 946 source/package tests (16 skips), 985 shared runtime tests (three skips),
 generated-tree check, tier payloads, catalog digests and harness declarations. Generated output restored.
-Remaining: frozen native/security review, Windows/Linux CI, and the real merged-session acceptance.
+Full native/security review identified one stale-tab ownership defect; the small repair requires the
+recorded kitty window or tmux pane even when another tab has the same title. Its focused 30-test
+checkpoint passes. Remaining: fresh incremental review, Windows/Linux CI and the real merged-session
+acceptance.
 Step 5 remains unchecked until acceptance succeeds. Although Linux permits removal before exit, cleanup
 follows verified exit so a failed close cannot race deletion; the observer already owns that exit check.
 
