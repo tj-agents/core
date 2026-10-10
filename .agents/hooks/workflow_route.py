@@ -20,6 +20,14 @@ EXECUTION_DIRECTIVE = re.compile(
     r"(?:carry\s+on|complete|continue|deliver|execute|finish|implement|proceed|resume|work\s+through)\b",
     re.IGNORECASE,
 )
+INDIRECT_EXECUTION_CONTEXT = re.compile(
+    r"^\s*(?:(?:please|can\s+you|could\s+you|would\s+you)\s+)*(?:"
+    r"(?:how|why|what|when|where|whether)\b|"
+    r"(?:explain|describe|tell\s+me|show\s+me)\s+"
+    r"(?:how|why|what|when|where|whether)\b"
+    r")",
+    re.IGNORECASE,
+)
 
 PLANNING_DIRECTIVE = re.compile(
     r"(?:^|[.!?;:,\n]|\b(?:and|but|then)\b)\s*"
@@ -116,6 +124,13 @@ def authorization_evidence(prompt: str) -> str:
     return re.sub(r"(?<!\w)[\u2018\u201c][^\u2019\u201d\n]*[\u2019\u201d](?!\w)", " ", evidence)
 
 
+def execution_authorized(evidence: str) -> bool:
+    return any(
+        INDIRECT_EXECUTION_CONTEXT.search(unit) is None and EXECUTION_DIRECTIVE.search(unit)
+        for unit in re.split(r"[.!?;\n]+", evidence)
+    )
+
+
 def selects_plan_execution(prompt: str, cwd: Path) -> bool:
     """Return whether this prompt authorizes continued plan execution."""
     evidence = authorization_evidence(prompt)
@@ -125,7 +140,7 @@ def selects_plan_execution(prompt: str, cwd: Path) -> bool:
     if explicit:
         return True
 
-    executing = EXECUTION_DIRECTIVE.search(evidence) is not None
+    executing = execution_authorized(evidence)
     if active_goal(cwd):
         return executing
     return executing and (

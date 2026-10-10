@@ -185,21 +185,30 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         self.assertEqual("", result.stdout)
 
     def test_questions_and_quoted_examples_do_not_authorize_execution(self):
-        self.write_goal()
-        for prompt in (
+        prompts = (
             "How does plan-execution work?",
             "Why didn't you finish the plan?",
             "Explain how to implement the plan.",
+            "How do I plan and implement the migration?",
+            "Can you explain how to plan and implement the migration?",
+            "Explain how to plan and implement the migration.",
+            "Please explain how to plan and implement the migration.",
             'The example says "Implement the plan."',
             "```text\nImplement the plan.\n",
             "> Implement the plan.",
             "`Implement the plan.`",
             "“Implement the plan.”",
-        ):
-            with self.subTest(prompt=prompt):
-                result = self.run_hook(prompt)
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual("", result.stdout)
+        )
+        for active in (False, True):
+            if active:
+                self.write_goal()
+            for prompt in prompts:
+                with self.subTest(prompt=prompt, active_goal=active):
+                    result = self.run_hook(prompt)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertEqual("", result.stdout)
+            if active:
+                (self.cwd / "GOAL.md").unlink()
 
     def test_explicit_whole_skill_invocation_and_direct_question_authorize_execution(self):
         for prompt in (
@@ -207,6 +216,8 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
             "$engineering:plan-execution",
             "Can you implement the plan?",
             "Can you please implement the plan?",
+            "How does it work? Implement the plan.",
+            "Explain the plan, then implement it.",
         ):
             with self.subTest(prompt=prompt):
                 result = self.run_hook(prompt)
