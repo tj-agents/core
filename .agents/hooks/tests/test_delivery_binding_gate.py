@@ -126,6 +126,74 @@ class ScopedApprovalTests(unittest.TestCase):
         self.value["labels"] = [{"name": "delivery-hold"}]
         self.assertEqual("absent", self.bind()["merge_authorization"]["mode"])
 
+    def test_all_exemptions_leave_the_policy_table_custom_stops_and_holds_active(self):
+        policy = {
+            "standing_authorization": "auto",
+            "instruction": "Merge green reviewed PRs",
+            "authorized_stop_classes": [
+                "ci-workflow",
+                "migration",
+                "auth",
+                "money",
+                "published-contract",
+            ],
+            "always_stop_paths": [r"^special/"],
+            "hold_label": "delivery-hold",
+        }
+        (self.root / ".agents/delivery-authorization.json").write_text(json.dumps(policy))
+
+        self.value["files"] = [{"path": ".agents/delivery-authorization.json"}]
+        bound = self.bind(explicit=True)
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertEqual("standing-authorization", bound["authorization_resolution"]["stopped_by"]["class"])
+
+        self.value["headRefOid"] = "b" * 40
+        self.value["files"] = [{"path": "special/handler.py"}]
+        bound = self.bind()
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertEqual("repository-declared", bound["authorization_resolution"]["stopped_by"]["class"])
+
+        self.value["headRefOid"] = "c" * 40
+        self.value["files"] = [{"path": "README.md"}]
+        self.value["labels"] = [{"name": "delivery-hold"}]
+        bound = self.bind()
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertEqual("hold-label", bound["authorization_resolution"]["stopped_by"]["class"])
+
+    def test_removing_an_exemption_or_adding_a_hold_revokes_a_rebind(self):
+        policy = {
+            "standing_authorization": "auto",
+            "instruction": "Merge green reviewed PRs",
+            "authorized_stop_classes": ["ci-workflow"],
+        }
+        policy_path = self.root / ".agents/delivery-authorization.json"
+        policy_path.write_text(json.dumps(policy))
+        self.value["files"] = [{"path": ".github/workflows/verify.yml"}]
+        self.assertEqual("merge", self.bind(explicit=True)["merge_authorization"]["mode"])
+
+        policy.pop("authorized_stop_classes")
+        policy_path.write_text(json.dumps(policy))
+        self.value["headRefOid"] = "b" * 40
+        bound = self.bind()
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertEqual("ci-workflow", bound["authorization_resolution"]["stopped_by"]["class"])
+
+        policy["authorized_stop_classes"] = ["ci-workflow"]
+        policy["hold_label"] = "delivery-hold"
+        policy_path.write_text(json.dumps(policy))
+        self.value["headRefOid"] = "c" * 40
+        self.value["files"] = [{"path": "README.md"}]
+        self.value["labels"] = [{"name": "delivery-hold"}]
+        bound = self.bind()
+        self.assertEqual("absent", bound["merge_authorization"]["mode"])
+        self.assertEqual("hold-label", bound["authorization_resolution"]["stopped_by"]["class"])
+
+    def test_a_scoped_approval_cannot_inject_authorized_stop_classes(self):
+        self.record["authorized_stop_classes"] = ["ci-workflow"]
+
+        with self.assertRaisesRegex(workflow_ops.WorkflowOperationError, "requires exact identity"):
+            self.bind(explicit=True)
+
     def test_successor_pr_branch_checkout_or_repository_does_not_inherit(self):
         for change in ("pr", "branch", "checkout", "repository"):
             with self.subTest(change=change):
@@ -291,20 +359,34 @@ class GateSubprocessTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_hook(self, *, command=None, response=None, cwd=None, dispatch=False, event="PostToolUse"):
+    def run_hook(
+        self,
+        *,
+        command=None,
+        response=None,
+        cwd=None,
+        dispatch=False,
+        event="PostToolUse",
+        tool_name="Bash",
+        tool_input=None,
+        codex=False,
+    ):
         env = dict(os.environ)
         env["PATH"] = str(self.bindir) + os.pathsep + env["PATH"]
+        command = command or (CREATE + " --draft --title t --body b")
         payload = {
             "session_id": uuid.uuid4().hex,
             "hook_event_name": event,
             "tool_use_id": uuid.uuid4().hex,
-            "tool_name": "Bash",
+            "tool_name": tool_name,
             "cwd": str(cwd or self.repo),
-            "tool_input": {"command": command or (CREATE + " --draft --title t --body b")},
+            "tool_input": tool_input if tool_input is not None else {"command": command},
             "tool_response": response
             if response is not None
             else "https://github.com/Concertable/agents/pull/42\n",
         }
+        if codex:
+            payload["turn_id"] = uuid.uuid4().hex
         scripts = [str(HOOK.parent / "hook_dispatch.py"), str(HOOK)] if dispatch else [str(HOOK)]
         return subprocess.run(
             [sys.executable, *scripts], input=json.dumps(payload),
@@ -335,6 +417,24 @@ class GateSubprocessTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("ABSENT", result.stderr)
         self.assertEqual("absent", self.binding()["merge_authorization"]["mode"])
+
+    def test_claude_and_codex_payloads_reach_the_same_exempted_binder(self):
+        self.write_policy(authorized_stop_classes=["ci-workflow"])
+        command = CREATE + " --draft --title t --body b"
+        payloads = (
+            ("Bash", {"command": command}, False),
+            ("exec_command", {"cmd": command}, True),
+            ("unified_exec", {"input": ["bash", "-lc", command]}, True),
+        )
+        for tool_name, tool_input, codex in payloads:
+            with self.subTest(tool_name=tool_name):
+                self.write_pr(files=(".github/workflows/verify.yml",))
+                result = self.run_hook(tool_name=tool_name, tool_input=tool_input, codex=codex)
+                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+                binding = self.binding()
+                self.assertEqual("auto", binding["merge_authorization"]["mode"])
+                self.assertIsNone(binding["authorization_resolution"]["stopped_by"])
+                (self.repo / ".agents" / "persistent-workflow-binding.json").unlink()
 
     def test_the_hold_label_withholds_authorization_on_an_ordinary_diff(self):
         self.write_pr(labels=("human-gate",))

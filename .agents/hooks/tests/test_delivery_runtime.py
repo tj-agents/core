@@ -7,12 +7,96 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / ".agents" / "workflows"
 sys.path.insert(0, str(WORKFLOWS))
-from delivery_runtime import DeliveryContractViolation, PersistentDeliveryRouter
+from delivery_runtime import DeliveryContractViolation, PersistentDeliveryRouter, StandingMergeAuthorization
 
 
 HEAD = "a" * 40
 REPAIR_HEAD = "b" * 40
 SUCCESSOR_HEAD = "c" * 40
+
+
+class StandingMergeAuthorizationTests(unittest.TestCase):
+    stop_paths = {
+        "ci-workflow": ".github/workflows/verify.yml",
+        "migration": "db/migrations/001.sql",
+        "auth": "identity/handler.py",
+        "money": "billing/invoice.py",
+        "published-contract": "contracts/public.json",
+    }
+
+    def setUp(self):
+        self.authorization = StandingMergeAuthorization()
+
+    def policy(self, **overrides):
+        policy = {
+            "standing_authorization": "auto",
+            "instruction": "Merge green reviewed changes.",
+        }
+        policy.update(overrides)
+        return policy
+
+    def test_omitted_or_empty_authorized_stop_classes_keeps_every_generic_stop(self):
+        for configured in (None, []):
+            for name, path in self.stop_paths.items():
+                with self.subTest(configured=configured, name=name):
+                    policy = self.policy()
+                    if configured is not None:
+                        policy["authorized_stop_classes"] = configured
+                    resolution = self.authorization.resolve(policy, [path])
+                    self.assertEqual("absent", resolution["merge_authorization"]["mode"])
+                    self.assertEqual(name, resolution["stopped_by"]["class"])
+
+    def test_each_authorized_stop_class_exempts_only_its_matching_generic_stop(self):
+        for name, path in self.stop_paths.items():
+            with self.subTest(name=name):
+                resolution = self.authorization.resolve(
+                    self.policy(authorized_stop_classes=[name]), [path]
+                )
+                self.assertEqual(
+                    {"merge_authorization", "standing", "stopped_by"}, set(resolution)
+                )
+                self.assertEqual("auto", resolution["merge_authorization"]["mode"])
+                self.assertIsNone(resolution["stopped_by"])
+
+    def test_a_subset_leaves_other_generic_stops_active(self):
+        policy = self.policy(authorized_stop_classes=["ci-workflow", "migration"])
+
+        for name in ("ci-workflow", "migration"):
+            with self.subTest(name=name):
+                self.assertIsNone(self.authorization.resolve(policy, [self.stop_paths[name]])["stopped_by"])
+        resolution = self.authorization.resolve(policy, [self.stop_paths["auth"]])
+        self.assertEqual("auth", resolution["stopped_by"]["class"])
+
+    def test_an_overlapping_path_stops_for_an_unexempted_class(self):
+        resolution = self.authorization.resolve(
+            self.policy(authorized_stop_classes=["ci-workflow"]),
+            [".github/workflows/authorization.yml"],
+        )
+
+        self.assertEqual("auth", resolution["stopped_by"]["class"])
+
+    def test_authorized_stop_class_contract_rejects_invalid_values(self):
+        invalid = (
+            ("non-list", "ci-workflow", "must be a list"),
+            ("unhashable", [["ci-workflow"]], "entries must be strings"),
+            ("non-string", [1], "entries must be strings"),
+            ("unknown", ["unknown"], "unknown classes"),
+            ("duplicate", ["ci-workflow", "ci-workflow"], "must be unique"),
+        )
+        for name, classes, message in invalid:
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(DeliveryContractViolation, message):
+                    self.authorization.validate_policy(self.policy(authorized_stop_classes=classes))
+
+    def test_authorized_stop_classes_require_standing_authority(self):
+        with self.assertRaisesRegex(DeliveryContractViolation, "requires auto or merge"):
+            self.authorization.validate_policy(
+                {
+                    "standing_authorization": "absent",
+                    "instruction": None,
+                    "authorized_stop_classes": ["ci-workflow"],
+                }
+            )
 
 
 class PersistentDeliveryRouterTests(unittest.TestCase):
