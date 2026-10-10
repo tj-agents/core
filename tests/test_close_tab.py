@@ -57,13 +57,20 @@ class CloseTabTests(unittest.TestCase):
                 "terminal": {"kind": "windows-terminal", "wt_session": "current"}}
         target = {"title": "same", "identity": {"kind": "windows-terminal",
                   "automation_id": "live-tab"}}
-        with mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
-                mock.patch.object(close_tab.session_close, "entries",
-                                  return_value=[(Path("stale"), stale), (Path("live"), live)]), \
-                mock.patch.object(close_tab, "close_actual") as closer:
-            with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
-                close_tab.close_stale_entry(stale)
-            closer.assert_not_called()
+        for state in (True, None, False):
+            with self.subTest(other_peer_liveness=state), \
+                    mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+                    mock.patch.object(close_tab.session_close, "entries",
+                                      return_value=[(Path("stale"), stale), (Path("live"), live)]), \
+                    mock.patch.object(close_tab.session_close, "liveness", return_value=state), \
+                    mock.patch.object(close_tab, "close_actual") as closer:
+                if state is False:
+                    close_tab.close_stale_entry(stale)
+                    closer.assert_called_once_with(target, force=True)
+                else:
+                    with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
+                        close_tab.close_stale_entry(stale)
+                    closer.assert_not_called()
 
     def test_stale_linux_target_requires_recorded_identity_despite_matching_title(self):
         cases = (
