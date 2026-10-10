@@ -10,6 +10,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 REAPER = ROOT / ".agents/machine/utility/peer-cli/scripts/finish_reaper.py"
+sys.path.insert(0, str(REAPER.parent))
+import session_close
+import finish
 
 
 def git(cwd, *args):
@@ -50,3 +53,64 @@ class FinishReaperLinuxTests(unittest.TestCase):
             finally:
                 if host.poll() is None: host.kill()
                 if observer.poll() is None: observer.kill()
+
+
+class ReceiptSafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.worktree = Path(self.temp.name) / "worktree"
+        self.worktree.mkdir()
+        self.original_state = os.environ.get("AGENT_STATE_DIRECTORY")
+        os.environ["AGENT_STATE_DIRECTORY"] = self.temp.name
+        self.addCleanup(self.restore_state)
+        self.original_git = session_close.git
+        self.original_now = session_close.now
+        session_close.git = lambda _cwd, *args: (0, "head" if args[-1] == "HEAD" else "branch", "")
+        session_close.now = lambda: 1000.0
+        self.addCleanup(self.restore_helpers)
+
+    def restore_state(self):
+        if self.original_state is None: os.environ.pop("AGENT_STATE_DIRECTORY", None)
+        else: os.environ["AGENT_STATE_DIRECTORY"] = self.original_state
+
+    def restore_helpers(self):
+        session_close.git = self.original_git; session_close.now = self.original_now
+
+    def receipt(self, **changes):
+        value = {"worktree": str(self.worktree), "primary": str(Path(self.temp.name) / "primary"), "branch": "branch", "head": "head", "default": "main", "verdict": "removable", "recorded_at": 999.0}
+        value.update(changes)
+        directory = Path(self.temp.name) / "merge-cleanup/receipts"; directory.mkdir(parents=True, exist_ok=True)
+        (directory / "entry.json").write_text(json.dumps(value), encoding="utf-8")
+
+    def test_missing_malformed_stale_future_and_nonremovable_receipts_refuse(self):
+        with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
+        for name, changes in (("malformed", {}), ("stale", {"recorded_at": -9999}), ("future", {"recorded_at": 2000}), ("preserve", {"verdict": "preserve"})):
+            with self.subTest(name=name):
+                directory = Path(self.temp.name) / "merge-cleanup/receipts"; directory.mkdir(parents=True, exist_ok=True)
+                for item in directory.iterdir(): item.unlink()
+                if name == "malformed": (directory / "entry.json").write_text("[", encoding="utf-8")
+                else: self.receipt(**changes)
+                with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
+
+    def test_moved_head_and_primary_refuse(self):
+        self.receipt()
+        session_close.git = lambda _cwd, *args: (0, "moved" if args[-1] == "HEAD" else "branch", "")
+        with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
+        session_close.git = lambda _cwd, *args: (0, "head" if args[-1] == "HEAD" else "branch", "")
+        directory = Path(self.temp.name) / "merge-cleanup/receipts"
+        (directory / "entry.json").unlink(); self.receipt(primary=str(self.worktree))
+        with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
+
+    def test_finish_refuses_a_foreign_worktree_before_receipt_or_observer(self):
+        original = (finish.session_close.own_host_and_entry, finish.session_close.worktree_from_cwd,
+                    finish.session_close.under_or_equal, finish.session_close.fresh_removable_receipt)
+        finish.session_close.own_host_and_entry = lambda: {"cwd": str(self.worktree), "session_id": "ours"}
+        finish.session_close.worktree_from_cwd = lambda: self.worktree
+        finish.session_close.under_or_equal = lambda *_args: True
+        finish.session_close.fresh_removable_receipt = lambda *_args: self.fail("receipt must not be read")
+        try:
+            with self.assertRaises(session_close.Refusal): finish.main(["--worktree", str(Path(self.temp.name) / "foreign")])
+        finally:
+            (finish.session_close.own_host_and_entry, finish.session_close.worktree_from_cwd,
+             finish.session_close.under_or_equal, finish.session_close.fresh_removable_receipt) = original
