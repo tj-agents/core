@@ -6,6 +6,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,7 +43,15 @@ class FinishReaperLinuxTests(unittest.TestCase):
                 for _ in range(200):
                     if result.exists(): break
                     time.sleep(.05)
-                record = json.loads(result.read_text(encoding="utf-8")); (Path(str(result) + ".accepted")).write_text(json.dumps({"reaper_pid": record["reaper_pid"], "reaper_started_at": record["reaper_started_at"]}), encoding="utf-8")
+                record = json.loads(result.read_text(encoding="utf-8"))
+                (Path(str(result) + ".accepted")).write_text(
+                    json.dumps({
+                        "reaper_pid": record["reaper_pid"],
+                        "reaper_started_at": record["reaper_started_at"],
+                        "host_pid": host.pid,
+                    }),
+                    encoding="utf-8",
+                )
                 for _ in range(200):
                     if not worktree.exists(): break
                     time.sleep(.05)
@@ -66,7 +75,12 @@ class ReceiptSafetyTests(unittest.TestCase):
         self.addCleanup(self.restore_state)
         self.original_git = session_close.git
         self.original_now = session_close.now
-        session_close.git = lambda _cwd, *args: (0, "head" if args[-1] == "HEAD" else "branch", "")
+        def fake_git(_cwd, *args):
+            if args[:3] == ("worktree", "list", "--porcelain"):
+                return 0, "worktree " + str(self.worktree.resolve()), ""
+            return 0, "head" if args[-1] == "HEAD" else "branch", ""
+
+        session_close.git = fake_git
         session_close.now = lambda: 1000.0
         self.addCleanup(self.restore_helpers)
 
@@ -95,9 +109,13 @@ class ReceiptSafetyTests(unittest.TestCase):
 
     def test_moved_head_and_primary_refuse(self):
         self.receipt()
-        session_close.git = lambda _cwd, *args: (0, "moved" if args[-1] == "HEAD" else "branch", "")
+        session_close.git = lambda _cwd, *args: (
+            0, "moved" if args[-1] == "HEAD" else "branch", ""
+        )
         with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
-        session_close.git = lambda _cwd, *args: (0, "head" if args[-1] == "HEAD" else "branch", "")
+        session_close.git = lambda _cwd, *args: (
+            0, "head" if args[-1] == "HEAD" else "branch", ""
+        )
         directory = Path(self.temp.name) / "merge-cleanup/receipts"
         (directory / "entry.json").unlink(); self.receipt(primary=str(self.worktree))
         with self.assertRaises(session_close.Refusal): session_close.fresh_removable_receipt(self.worktree)
@@ -114,3 +132,53 @@ class ReceiptSafetyTests(unittest.TestCase):
         finally:
             (finish.session_close.own_host_and_entry, finish.session_close.worktree_from_cwd,
              finish.session_close.under_or_equal, finish.session_close.fresh_removable_receipt) = original
+
+
+class ProcessIdentityTests(unittest.TestCase):
+    def test_absent_zombie_reused_and_unqueryable_are_distinct(self):
+        original = session_close.register_session.build_process_lookup
+        self.addCleanup(setattr, session_close.register_session, "build_process_lookup", original)
+
+        session_close.register_session.build_process_lookup = lambda: lambda _pid: None
+        self.assertEqual(session_close.identity_status(101, 10.0), "exited")
+        self.assertTrue(session_close.verified_exited(101, 10.0))
+
+        reused = session_close.register_session.ProcessInfo(101, 1, "codex", 20.0)
+        session_close.register_session.build_process_lookup = lambda: lambda _pid: reused
+        self.assertEqual(session_close.identity_status(101, 10.0), "reused")
+        self.assertFalse(session_close.verified_exited(101, 10.0))
+
+        def unreadable(_pid):
+            raise PermissionError("denied")
+
+        session_close.register_session.build_process_lookup = lambda: unreadable
+        self.assertEqual(session_close.identity_status(101, 10.0), "unknown")
+        self.assertFalse(session_close.verified_exited(101, 10.0))
+
+    def test_invalid_pid_and_timestamp_are_unknown(self):
+        for pid, started in ((0, 1.0), (1, 0.0), (1, float("nan")), (True, 1.0)):
+            with self.subTest(pid=pid, started=started):
+                self.assertEqual(session_close.identity_status(pid, started), "unknown")
+                self.assertFalse(session_close.verified_exited(pid, started))
+
+
+class ObserverHandshakeTests(unittest.TestCase):
+    def test_startup_record_requires_spawned_reaper_and_exact_binding(self):
+        record = {
+            "host_pid": 10,
+            "host_start": 5.0,
+            "worktree": "/tmp/worktree",
+            "session_id": "session",
+            "reaper_pid": 20,
+            "reaper_started_at": 30.0,
+        }
+        with mock.patch.object(session_close, "verified_live", return_value=True):
+            self.assertTrue(session_close.valid_observer_start(
+                record, 20, 10, 5.0, "/tmp/worktree", "session",
+            ))
+            self.assertFalse(session_close.valid_observer_start(
+                record, 21, 10, 5.0, "/tmp/worktree", "session",
+            ))
+            self.assertFalse(session_close.valid_observer_start(
+                record, 20, 11, 5.0, "/tmp/worktree", "session",
+            ))

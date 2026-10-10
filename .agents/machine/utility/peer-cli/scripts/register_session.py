@@ -199,24 +199,26 @@ def _linux_clock_ticks():
 def _linux_lookup(pid):
     try:
         raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
-    except OSError:
+    except FileNotFoundError:
         return None
+    except OSError:
+        raise
     try:
         name_start = raw.index("(")
         name_end = raw.rindex(")")
-    except ValueError:
-        return None
+    except ValueError as error:
+        raise ValueError("malformed /proc process identity") from error
     name = raw[name_start + 1:name_end]
     fields = raw[name_end + 2:].split()
     try:
         ppid = int(fields[1])
         starttime_ticks = int(fields[19])
-    except (IndexError, ValueError):
-        return None
+    except (IndexError, ValueError) as error:
+        raise ValueError("malformed /proc process fields") from error
     try:
         started_at = _linux_boot_time() + starttime_ticks / _linux_clock_ticks()
     except OSError:
-        return None
+        raise
     return ProcessInfo(pid=pid, ppid=ppid, name=name, started_at=started_at)
 
 
@@ -262,6 +264,25 @@ def build_process_lookup():
     return _ps_lookup
 
 
+def process_table():
+    """Return a best-effort process table for discovery, never a permission bypass."""
+    if os.name == "nt":
+        return _windows_process_table()
+    if sys.platform == "linux":
+        table = {}
+        for path in Path("/proc").iterdir():
+            if not path.name.isdigit():
+                continue
+            try:
+                info = _linux_lookup(int(path.name))
+            except (OSError, ValueError):
+                continue
+            if info is not None:
+                table[info.pid] = info
+        return table
+    return {}
+
+
 def read_payload():
     try:
         raw = sys.stdin.read()
@@ -277,15 +298,28 @@ def read_payload():
 def terminal_identity(environ=None):
     """Return the exact terminal handle available to this session, never a title guess."""
     values = os.environ if environ is None else environ
+    if values.get("TMUX_PANE"):
+        tmux = values.get("TMUX", "")
+        tmux_parts = tmux.split(",") if tmux else []
+        socket = tmux_parts[0] if tmux_parts else None
+        identity = {"kind": "tmux", "pane_id": values["TMUX_PANE"]}
+        if socket:
+            identity["socket"] = socket
+        if len(tmux_parts) == 3 and tmux_parts[2]:
+            identity["session_index"] = tmux_parts[2]
+        return identity
     if values.get("KITTY_WINDOW_ID") and values.get("KITTY_LISTEN_ON"):
         return {"kind": "kitty", "window_id": values["KITTY_WINDOW_ID"],
                 "listen_on": values["KITTY_LISTEN_ON"]}
-    if values.get("TMUX_PANE"):
-        return {"kind": "tmux", "pane_id": values["TMUX_PANE"]}
-    if values.get("KONSOLE_DBUS_SESSION") and values.get("KONSOLE_DBUS_WINDOW"):
-        return {"kind": "konsole", "session": values["KONSOLE_DBUS_SESSION"],
-                "window": values["KONSOLE_DBUS_WINDOW"]}
-    if values.get("WT_SESSION"):
+    if (values.get("KONSOLE_DBUS_SERVICE") and values.get("KONSOLE_DBUS_SESSION")
+            and values.get("KONSOLE_DBUS_WINDOW")):
+        return {
+            "kind": "konsole",
+            "service": values["KONSOLE_DBUS_SERVICE"],
+            "session": values["KONSOLE_DBUS_SESSION"],
+            "window": values["KONSOLE_DBUS_WINDOW"],
+        }
+    if os.name == "nt" and values.get("WT_SESSION"):
         identity = {"kind": "windows-terminal", "session": values["WT_SESSION"]}
         if values.get("AGENT_WINDOWS_TERMINAL_TAB_ID"):
             identity["automation_id"] = values["AGENT_WINDOWS_TERMINAL_TAB_ID"]

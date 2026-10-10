@@ -36,16 +36,25 @@ def main(argv=None):
                 "--worktree", str(worktree), "--result", str(result), "--session-id", entry["session_id"],
                 "--head", receipt["head"], "--primary", receipt["primary"], "--branch", receipt["branch"],
                 "--default", receipt["default"]]
-    session_close.start_observer(observer)
+    observer_pid = session_close.start_observer(observer)
     started = session_close.wait_for_record(result, 15)
-    if not started or started.get("host_pid") != entry["pid"] or not started.get("reaper_pid"):
+    if not session_close.valid_observer_start(
+            started, observer_pid, entry["pid"], entry["pid_started_at"], worktree,
+            entry["session_id"],
+    ):
+        session_close.cancel_observer(result, "observer startup was invalid or timed out")
         raise session_close.Refusal("cleanup observer did not confirm startup; nothing was closed")
     session_close.write_json(str(result) + ".accepted", {"accepted": time.time(), "reaper_pid": started["reaper_pid"], "reaper_started_at": started["reaper_started_at"], "host_pid": entry["pid"]})
     armed = session_close.wait_for_record(str(result) + ".armed", 10)
-    if not armed or armed.get("reaper_pid") != started["reaper_pid"]:
-        session_close.write_json(str(result) + ".cancelled", {"cancelled": time.time(), "reason": "observer was not armed"})
+    if (not armed or armed.get("reaper_pid") != started["reaper_pid"]
+            or armed.get("reaper_started_at") != started["reaper_started_at"]):
+        session_close.cancel_observer(result, "observer was not armed")
         raise session_close.Refusal("cleanup observer did not acknowledge acceptance; nothing was closed")
-    close_host(entry)
+    try:
+        close_host(entry)
+    except Exception:
+        session_close.cancel_observer(result, "terminal close failed")
+        raise
     return 0
 
 
