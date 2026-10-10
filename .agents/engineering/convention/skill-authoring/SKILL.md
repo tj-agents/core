@@ -52,8 +52,9 @@ removed.
 Before choosing a name, check this repository's skills and every installed plugin on both hosts for the
 same bare name and for a near miss: a plural, a reordered phrase, or a name that differs only by hyphens.
 Generation sees only this repository's plugins, and no generator catches every near miss. Choose a
-different name for a near miss. When a bare name is shared with another publisher, write the qualified
-`plugin:name` in every reference to it, because a bare name may select the other plugin's skill.
+different name for an exact match or a near miss. Where a bare name is already shared with another
+publisher, write the qualified `plugin:name` in every reference to it, because a bare name may select the
+other plugin's skill.
 
 ## Write the description as the selection trigger
 
@@ -63,9 +64,10 @@ skill. Include only triggers this skill owns; a trigger that belongs to another 
 compete, and the wrong one can win. A description that would match most tasks is too broad, and the
 skill is probably too broad as well.
 
-Where host entry points are authored, as in core, they carry the canonical description verbatim and
-generation fails when a copy differs: change the canonical description and every host entry point in the
-same commit.
+Where host entry points are authored, as in core, a plain entry point carries the canonical description
+verbatim and generation fails when it differs: change the canonical description and every host entry point
+in the same commit. An entry point registered as a host extension may word its description for that host;
+review it by hand when the canonical description changes.
 
 ## A skill folder holds only what ships
 

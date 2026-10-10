@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `244570bad7a8dc51c48fde3369225ac060ea9c6b`  `(2026-10-10)`
+**Reviewed up to commit:** `2a4b65f436d81222680c23409d3347838618207a`  `(2026-10-10)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-09 — full
@@ -148,3 +148,32 @@ Remediation of F9–F11. Security layer not required.
 Dropped: the `kit:check` owner link (linking the owner is the rule), the debt entry's verified kit fact
 (evidence, not a rule), and the plan's re-validation note (true; Next Steps records the pending review).
 Re-validated: 803 + 983 tests, generation, tier payload, catalog, harness, packaging and reachability.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `244570bad7a8dc51c48fde3369225ac060ea9c6b`
+**Candidate head:** `2a4b65f436d81222680c23409d3347838618207a`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:6ec04f82f9d57ff5009efdd8882849797568b458c9e86959b282823b620dbd3e` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/v3rYiTkyIOhoeQj6iSPJsi/xl4dqA3H1psXLoavbxDx9G`
+**Candidate bundle identity:** `sha256:7db4909bbb8fcc71446d958d9ac57ef2ccbb400cffe2383f6330cb81533fa5a5`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Remediation of F12–F15. Security layer not required.
+
+### Findings
+
+- [x] **F16 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:66`
+  Description parity is said to fail generation for every authored entry point, but entries listed in
+  `extended_host_adapters` are compared on name, kind and domain only. Fix: scope the guarantee to plain
+  entry points and tell authors to review an extension's description by hand. Fixed.
+- [x] **F17 — LOW — native-general** — `.agents/engineering/convention/skill-authoring/SKILL.md:55`
+  A near miss must be renamed while an exact clash with another publisher is allowed. Fix: choose a
+  different name for either; qualification applies only where a clash already exists. Fixed.
+
+Dropped: restoring the removed layout sentence (the owner list already covers it), the "only this
+repository's plugins" bound (accurate), the 112-character line (a URL), and a duplicated plan note
+(removed). Re-validated: 803 + 983 tests and every generation check.
