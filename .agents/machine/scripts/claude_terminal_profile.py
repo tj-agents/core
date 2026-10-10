@@ -120,7 +120,7 @@ POWERSHELL_BLOCK = "\r\n".join((
     "$baseAgentsPython = $null",
     "$baseAgentsWindows = $IsWindows -or $env:OS -eq 'Windows_NT'",
     "foreach ($baseAgentsName in $(if ($baseAgentsWindows) { @('python', 'python3', 'py') } else { @('python3', 'python') })) {",
-    "    foreach ($baseAgentsCandidate in @(Get-Command $baseAgentsName -CommandType Application -ErrorAction SilentlyContinue)) {",
+    "    foreach ($baseAgentsCandidate in @(Get-Command $baseAgentsName -All -CommandType Application -ErrorAction SilentlyContinue)) {",
     "        if ($baseAgentsWindows -and $baseAgentsCandidate.Source -match '\\\\WindowsApps\\\\') { continue }",
     "        $baseAgentsArguments = if ($baseAgentsName -eq 'py') { @('-3') } else { @() }",
     "        & $baseAgentsCandidate.Source @baseAgentsArguments -I -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>$null",
