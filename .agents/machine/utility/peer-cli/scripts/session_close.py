@@ -282,9 +282,21 @@ def own_host_and_entry(cwd=None):
     raise Refusal("cannot resolve a verified registry attachment for this host and current directory")
 
 
-def other_live_claimant(worktree, own_session):
+def same_session_process(left, right):
+    return (
+        isinstance(left, dict)
+        and isinstance(right, dict)
+        and nonempty_string(left.get("session_id"))
+        and left.get("session_id") == right.get("session_id")
+        and valid_identity(left.get("pid"), left.get("pid_started_at"))
+        and left.get("pid") == right.get("pid")
+        and left.get("pid_started_at") == right.get("pid_started_at")
+    )
+
+
+def other_live_claimant(worktree, own_entry):
     for _path, entry in entries():
-        if entry.get("session_id") == own_session:
+        if same_session_process(entry, own_entry):
             continue
         if not nonempty_string(entry.get("cwd")) or not under_or_equal(entry["cwd"], worktree):
             continue

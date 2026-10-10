@@ -96,7 +96,14 @@ def final_preflight(args):
     receipt = session_close.fresh_removable_receipt(worktree)
     if any(receipt.get(key) != getattr(args, key) for key in ("head", "primary", "branch", "default")):
         raise session_close.Refusal("cleanup receipt no longer matches the accepted cleanup target")
-    if session_close.other_live_claimant(worktree, args.session_id):
+    original_entry = {
+        "session_id": args.session_id,
+        "pid": args.host_pid,
+        "pid_started_at": args.host_start,
+    }
+    if not session_close.verified_exited(args.host_pid, args.host_start):
+        raise session_close.Refusal("original session host did not exit")
+    if session_close.other_live_claimant(worktree, original_entry):
         raise session_close.Refusal("another verified live session claims this worktree")
     code, dirty, _ = session_close.git(worktree, "status", "--porcelain")
     if code or dirty:

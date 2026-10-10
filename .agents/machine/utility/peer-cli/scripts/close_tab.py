@@ -214,14 +214,18 @@ def same_target(left, right):
     return False
 
 
-def target_liveness(target):
+def target_liveness(target, fallback_entry=None):
     matched = []
-    for registered in registered_targets():
+    targets = registered_targets()
+    for registered in targets:
         entry = registered["entry"]
-        if entry.get("title") != target.get("title"):
-            continue
         if same_target(entry.get("terminal", {}), target.get("identity", {})):
             matched.append(registered["live"])
+    if not matched and fallback_entry is not None:
+        titled = [item for item in targets if item["entry"].get("title") == target.get("title")]
+        if (len(titled) == 1
+                and session_close.same_session_process(titled[0]["entry"], fallback_entry)):
+            matched.append(titled[0]["live"])
     if not matched:
         return None
     if any(value is True for value in matched):
@@ -290,8 +294,8 @@ def konsole_roots(identity):
     return roots
 
 
-def close_actual(target, force=False):
-    live = target_liveness(target)
+def close_actual(target, force=False, fallback_entry=None):
+    live = target_liveness(target, fallback_entry)
     if live is not False and not force:
         raise TerminalRefusal("target is live or unknown; pass --force only to close an explicit tab")
     identity = target["identity"]
@@ -338,7 +342,11 @@ def close_stale_entry(entry):
                and (title_only or same_target(target["identity"], identity))]
     if len(matches) != 1:
         raise TerminalRefusal("the recorded stale terminal tab is absent or ambiguous")
-    close_actual(matches[0], force=True)
+    fallback_entry = registered[0] if title_only else None
+    target_live = target_liveness(matches[0], fallback_entry)
+    if target_live is not False:
+        raise TerminalRefusal("the re-enumerated stale terminal target is live or unknown")
+    close_actual(matches[0], fallback_entry=fallback_entry)
 
 
 def close_entry(entry, force=False):

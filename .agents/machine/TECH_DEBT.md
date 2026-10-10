@@ -127,9 +127,6 @@ Resolve when the sync runs under one overall deadline that stops its whole proce
 both Windows and POSIX, reports a `standards:` line and then launches, with a test that a hung
 grandchild cannot hold the launch past that deadline.
 
-**Resolution condition.** Every live CLI is registered with its current directory (the host reports cwd
-changes, or the registry records them), so attachment can be proven from the registry alone.
-
 ## A shared parent shell can keep the worktree locked after finish
 
 `finish.py` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started

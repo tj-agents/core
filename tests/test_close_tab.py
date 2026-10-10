@@ -32,14 +32,16 @@ def completed(stdout="", returncode=0, stderr=""):
 class CloseTabTests(unittest.TestCase):
     def test_stale_windows_fallback_requires_unique_title_and_honors_recorded_id(self):
         identity = {"kind": "windows-terminal", "wt_session": "native-session"}
-        entry = {"title": "same", "terminal": identity}
+        entry = {"session_id": "stale", "pid": 10, "pid_started_at": 1.0,
+                 "title": "same", "terminal": identity}
         target = {"title": "same", "identity": {"kind": "windows-terminal",
                   "automation_id": "tab-2"}}
         with mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
                 mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
+                mock.patch.object(close_tab.session_close, "liveness", return_value=False), \
                 mock.patch.object(close_tab, "close_actual") as closer:
             close_tab.close_stale_entry(entry)
-            closer.assert_called_once_with(target, force=True)
+            closer.assert_called_once_with(target, fallback_entry=entry)
         for recorded, targets in ((identity, [target, target]),
                                   ({**identity, "automation_id": "tab-1"}, [target])):
             with self.subTest(recorded=recorded, targets=targets), \
@@ -48,6 +50,24 @@ class CloseTabTests(unittest.TestCase):
                     mock.patch.object(close_tab, "close_actual") as closer:
                 with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
                     close_tab.close_stale_entry({"title": "same", "terminal": recorded})
+                closer.assert_not_called()
+
+    def test_stale_windows_title_fallback_refuses_native_successor_with_changed_title(self):
+        stale = {"session_id": "old", "title": "old title",
+                 "terminal": {"kind": "windows-terminal"}}
+        successor = {"session_id": "new", "title": "new title",
+                     "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"}}
+        target = {"title": "old title", "identity": successor["terminal"]}
+        for state in (True, None):
+            with self.subTest(state=state), \
+                    mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+                    mock.patch.object(close_tab.session_close, "entries",
+                                      return_value=[(Path("old"), stale), (Path("new"), successor)]), \
+                    mock.patch.object(close_tab.session_close, "liveness",
+                                      side_effect=lambda entry: False if entry is stale else state), \
+                    mock.patch.object(close_tab, "close_actual") as closer:
+                with self.assertRaisesRegex(close_tab.TerminalRefusal, "live or unknown"):
+                    close_tab.close_stale_entry(stale)
                 closer.assert_not_called()
 
     def test_stale_windows_title_fallback_refuses_any_other_registered_peer(self):
@@ -87,9 +107,58 @@ class CloseTabTests(unittest.TestCase):
                         close_tab.close_stale_entry(entry)
                     closer.assert_not_called()
                 with mock.patch.object(close_tab, inventory, return_value=[other, exact]), \
+                        mock.patch.object(close_tab.session_close, "entries",
+                                          return_value=[(Path("stale"), entry)]), \
+                        mock.patch.object(close_tab.session_close, "liveness", return_value=False), \
                         mock.patch.object(close_tab, "close_actual") as closer:
                     close_tab.close_stale_entry(entry)
-                    closer.assert_called_once_with(exact, force=True)
+                    closer.assert_called_once_with(exact, fallback_entry=None)
+
+    def test_stale_linux_target_refuses_live_or_unknown_successor_with_same_native_target(self):
+        for kind, inventory, identity in (
+                ("kitty", "kitty_inventory", {"window_id": "1", "listen_on": "unix:/kitty"}),
+                ("tmux", "tmux_inventory", {"pane_id": "%1", "socket": "/tmp/tmux"}),
+        ):
+            with self.subTest(kind=kind):
+                recorded = {"kind": kind, **identity}
+                stale = {"session_id": "same", "title": "old title", "terminal": recorded,
+                         "pid": 10, "pid_started_at": 1.0}
+                successor = {"session_id": "same", "title": "new title", "terminal": recorded,
+                             "pid": 20, "pid_started_at": 2.0}
+                target = {"title": "old title", "identity": recorded}
+                for state in (True, None):
+                    with self.subTest(state=state), \
+                            mock.patch.object(close_tab, inventory, return_value=[target]), \
+                            mock.patch.object(close_tab.session_close, "entries",
+                                              return_value=[(Path("same.json"), successor)]), \
+                            mock.patch.object(close_tab.session_close, "liveness", return_value=state), \
+                            mock.patch.object(close_tab, "close_actual") as closer:
+                        with self.assertRaisesRegex(close_tab.TerminalRefusal, "live or unknown"):
+                            close_tab.close_stale_entry(stale)
+                        closer.assert_not_called()
+
+    def test_stale_close_rechecks_a_successor_registered_after_the_first_guard(self):
+        for kind, inventory, identity in (
+                ("tmux", "tmux_inventory", {"pane_id": "%1", "socket": "/tmp/tmux"}),
+                ("windows-terminal", "windows_inventory", {"automation_id": "tab-2"}),
+        ):
+            with self.subTest(kind=kind):
+                recorded = {"kind": kind, **({} if kind == "windows-terminal" else identity)}
+                stale = {"session_id": "same", "title": "old", "terminal": recorded,
+                         "pid": 10, "pid_started_at": 1.0}
+                successor = {**stale, "pid": 20, "pid_started_at": 2.0}
+                target = {"title": "old", "identity": {"kind": kind, **identity}}
+                reads = [[(Path("same"), stale)], [(Path("same"), successor)]]
+                if kind == "windows-terminal":
+                    reads.insert(0, [(Path("same"), stale)])
+                with mock.patch.object(close_tab, inventory, return_value=[target]), \
+                        mock.patch.object(close_tab.session_close, "entries", side_effect=reads), \
+                        mock.patch.object(close_tab.session_close, "liveness",
+                                          side_effect=lambda entry: False if entry is stale else True), \
+                        mock.patch.object(close_tab, "run") as terminal_command:
+                    with self.assertRaises(close_tab.TerminalRefusal):
+                        close_tab.close_stale_entry(stale)
+                terminal_command.assert_not_called()
 
     def test_missing_or_unverified_native_identity_refuses(self):
         entry = {"pid": 0, "pid_started_at": 0, "terminal": {"kind": "kitty"}}
@@ -201,6 +270,14 @@ class CloseTabTests(unittest.TestCase):
             close_tab.close_actual(target, force=True)
         self.assertEqual(runner.call_args.args[0][-2:], ["-t", "%1"])
         killer.assert_not_called()
+
+    def test_explicit_title_force_keeps_direct_actual_tab_authorization(self):
+        target = {"title": "running", "identity": {"kind": "tmux", "pane_id": "%1"},
+                  "actual": True}
+        with mock.patch.object(close_tab, "merged_inventory", return_value=[target]), \
+                mock.patch.object(close_tab, "close_actual") as closer:
+            self.assertEqual(0, close_tab.main(["--title", "running", "--force"]))
+        closer.assert_called_once_with(target, force=True)
 
     def test_windows_unique_title_must_resolve_to_one_live_uia_tab(self):
         entry = {"title": "peer", "pid": 7, "pid_started_at": 2.0,
