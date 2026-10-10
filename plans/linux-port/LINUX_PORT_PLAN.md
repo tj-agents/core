@@ -65,7 +65,7 @@ what still needs checking on Windows.
   `Split` binding skipped the installer's ancestor reparse-point check (#160).
 - [x] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
   (`verify-linux`, #162); it blocks a PR once the repository ruleset lists it as a required check,
-  which awaits the user's decision after a few green runs.
+  which the user approved requiring on 2026-10-10; configure it in the next session.
 - [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no shipped Markdown
   under `.agents/`, `.claude/` or `.codex/` tells an agent to run bare `python`, `powershell.exe`, `pwsh`
   or `wt.exe` without naming the platform (including the session exit in `merge` Step 5 and in
@@ -74,17 +74,85 @@ what still needs checking on Windows.
 
 ## Current progress
 
-Shared library merged (#106, after the interim path fix #105). Kitty configured. Steps merged: 1 (#107),
-2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
-(#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). #166 makes the cross-platform direction a written
-convention in `CODE_CONVENTIONS.md`, labels `peer-cli` Windows-only, and adds step 10 for the rest of the
-shipped instructions. Step 3b `handoff-codex` merged as #137; step 3 complete, verified by a real Codex
-tab opened on this machine from the Python launcher right after the merge (new kitty tab, native
-`codex-cli` resolved and launched, handoff receipt printed).
+Step 5 owns PR #181 (`Refactor/LinuxPeerCli`) in the linked checkout
+`/home/tommy/projects/tj-agents/core/.worktrees/LinuxPeerCliProof`. The originating session retains the
+whole goal from the primary checkout. The real native merge/finish acceptance session is not launched.
+The user requires one PR for this step; its authored paths keep the shared closure, terminal identity,
+observer, callers and host grants atomic. Generated output remains uncommitted.
+
+The Python lifecycle and terminal/orphan ports are implemented. Windows and Linux CI passed at
+`6b336d4db569d73c2e775de8786ed2a832cf309e`, including the Windows observer's structured UTF-16
+scheduler XML and the Linux asynchronous exit fixture. The prior full local suites passed: 963
+source/package tests (17 skips), 990 shared runtime tests (four skips), generated-tree, catalog,
+tier and harness checks.
+
+The user requested `verify-windows`, matching `verify-linux`; this PR includes the rename and its
+permission-test/documentation references. The user approved requiring `verify-linux` in the next
+session. Main has no classic branch protection (the API returned “Branch not protected”) and no
+repository ruleset. The proposed `.windows`/`.linux` boundary for OS-specific machine integration is
+recorded in `.agents/machine/TECH_DEBT.md`; shared Python stays in `.agents`.
+
+Native and workflow review of the naming follow-up found no defect. Its mandatory full-branch security
+review confirmed two HIGH ownership defects (S5-006/S5-007 in `reviews/Refactor-LinuxPeerCli.md`):
+stale closure could force-close a successor's pane, and worktree cleanup excluded a resumed host by
+logical session ID alone. The native L4 worker repaired both. A tiny parent follow-up rechecks Windows
+fallback ownership and removes stale closure's force bypass. Focused suites pass: 29 close-tab and
+23 lifecycle tests. The orphaned resolution paragraph from retired PowerShell debt was also removed.
+Full local validation of the repaired candidate passed: 971 source tests (17 skips), 990 runtime tests
+(four skips), and all generated invariants. Native and fresh L2 ownership/workflow review returned no
+new findings. At `1874a1ebdb11a38cfb22fd879a05517acdf8b182`, run 38067879202 passed Linux CI and all
+Windows lifecycle entrypoint tests but failed one new fixture assertion: the temporary directory used
+Windows' short `RUNNER~1` path while production resolved its long `runneradmin` form. The tiny
+follow-up creates the fixture directory before resolving it; production identity/timeout behavior is unchanged.
+The parent owns focused/full validation, native incremental review, replacement CI and real merged
+Linux acceptance. Actual Windows desktop UI Automation remains unverified locally.
+
+A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
+its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
+race deletion; it already owns that exit check. Step 5 remains unchecked until the real merged CLI closes
+its own kitty tab through argument-free `finish.py`, and the parent verifies session exit plus worktree,
+branch and matching obligation removal. Causal post-merge regeneration must also succeed.
+
+Previously merged: shared library #106, steps 1 #107, 2 #108, 3 #120/#137, 6 #125, 8 #160 and 9 #162.
+Step 3's native Codex handoff was verified in kitty. Step 4, then 7 and 10 remain after Step 5.
+
+## Agent-host coverage
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/machine/utility/peer-cli and .agents/hooks/merge_cleanup_gate.py",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
+      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
+      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.claude_allow",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Latest reviewed-head Linux source suite: 963 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
+      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
+      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.codex_prefix_rules",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Latest reviewed-head Linux source suite: 963 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
+      }
+    }
+  ]
+}
+```
 
 ## Next Steps
 
 Land 5 (`peer-cli`, `close` and `finish` first, per the tightened acceptance criterion above, so the
 `merge` skill's Step 5 session exit works on Linux) and 4 (terminal start hooks, deleting
-`agent-cli.ps1`); then 7 and 10. After `verify-linux` has had a few green runs, ask the user whether the
-repository ruleset should require it.
+`agent-cli.ps1`); then 7 and 10. The user approved making `verify-linux` a required PR check on 2026-10-10; the next session should
+configure that requirement after inspecting the repository's current branch protection. Windows
+verification is named `verify-windows`.

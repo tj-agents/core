@@ -127,21 +127,23 @@ Resolve when the sync runs under one overall deadline that stops its whole proce
 both Windows and POSIX, reports a `standards:` line and then launches, with a test that a hung
 grandchild cannot hold the launch past that deadline.
 
-## finish.ps1 trusts the starting directory for attachment
-
-Run without arguments, `finish.ps1` treats the worktree containing its starting directory as its own and
-refuses only when another live registered session sits there. A session can therefore `cd` into another
-merged worktree and finish it. The receipt gates (merged at exactly that head, clean tree, no open PR) mean
-nothing unmerged is lost, but an unregistered session still attached there would lose its directory.
-
-**Resolution condition.** Every live CLI is registered with its current directory (the host reports cwd
-changes, or the registry records them), so attachment can be proven from the registry alone.
-
 ## A shared parent shell can keep the worktree locked after finish
 
-`finish.ps1` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started
+`finish.py` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started
 by hand from a long-lived shell whose current directory is inside the worktree, that shell survives, Windows
 keeps the directory locked, and the reaper records a failed removal; the cleanup reminder then surfaces it.
 
 **Resolution condition.** The reaper can read another process's current directory, or the host records it,
 so finish can tell a shell that pins the worktree from one that does not.
+
+## Platform-specific machine integrations lack an explicit source boundary
+
+Windows-only installers, shell profiles and terminal integration currently sit beside shared machine
+code. As Linux integration grows, explicit `.windows` and `.linux` adapter directories would make
+platform ownership easier to find. Shared Python implementations and capability definitions retain
+their canonical home in `.agents`; platform folders should contain only OS-specific integration.
+
+**Resolution condition.** Document the platform adapter layout in `SOURCE_LAYOUT.md`, move the
+OS-specific integration into its owning directories, and update installation, packaging and imports
+with Windows and Linux verification. Keep this structural change separate from the functional Linux
+port so each delivery remains reviewable.
