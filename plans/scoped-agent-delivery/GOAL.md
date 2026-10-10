@@ -18,9 +18,9 @@ The originating Rust discovery and twelve-repository authorization rollout remai
 - Implementation: completed by `/root/implement_scoped_agent_delivery`
 - Review and delivery owner: originating `/root` session
 
-The reviewed source delta contains eight paths: the two shared merge gates, their two focused test modules, the Codex engineering hook manifest, the engineering harness declaration, the Codex Windows hook-command tests, and this goal. The current integrated candidate adds `.agents/delivery-authorization.json`, for nine authored paths total. Generated `plugins/*` output and `.agents/catalog/catalog.json` remain uncommitted under core's source-only convention.
+The original reviewed source delta contained eight paths: the two shared merge gates, their two focused test modules, the Codex engineering hook manifest, the engineering harness declaration, the Codex Windows hook-command tests, and this goal. The current candidate delta against `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05` also contains eight authored paths. `.agents/delivery-authorization.json` is already present on that base and is inherited published content, not an added path in this candidate. Generated `plugins/*` output and `.agents/catalog/catalog.json` remain uncommitted under core's source-only convention.
 
-The review artifact records complete approval and matching review and security watermarks at the source head, with no unresolved findings. Since the source review, the branch was normally integrated with `origin/main` through `29827dfcfd81e7d59c75d9bf179c90e4d15dbdc8`, which contains the already-reviewed core #174 policy landing. The branch now also includes the normal integration of current `origin/main` commit `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`. The source slice adds `.agents/delivery-authorization.json` and updates this goal alongside the reviewed source. The parent must complete fresh incremental review/reconciliation over the exact current candidate before publication. No PR has been opened.
+The original review artifact records complete approval and matching review and security watermarks at source head `3bda8e91428216c1a7321e05382877682860454c`; those review identities remain historical. Since that review, the branch was normally integrated with `origin/main` through `29827dfcfd81e7d59c75d9bf179c90e4d15dbdc8`, which contains the already-reviewed core #174 policy landing, and then with current `origin/main` commit `b4b576fa6a999fd43031e8c49aefaf32aa3a7d05`. Parent corrective review identified SD-01 and SD-02 in the canonical review artifact; their source and goal corrections are now recorded in this working tree, and fresh review/reconciliation of the exact candidate is pending. No PR has been opened.
 
 ## Completed source slice
 
@@ -40,7 +40,7 @@ The reviewed tree intentionally contains pre-regeneration catalog metadata; the 
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "shared_source": ".agents/base/policy/plan-artifacts/SKILL.md and scripts/host_coverage.py",
+  "shared_source": ".agents/hooks/merge_review_gate.py and .agents/hooks/persistent_workflow_merge_gate.py",
   "hosts": [
     {
       "host": "claude",

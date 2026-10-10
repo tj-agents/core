@@ -64,9 +64,6 @@ CONFIG_FILE = ".agents/persistent-workflow-gate.json"
 BINDING_FILE = ".agents/persistent-workflow-binding.json"
 HOOK_NAME = "persistent-workflow-merge-gate"
 
-# Lowercased, and the hook's whole vocabulary. Claude only, deliberately: this gate fails CLOSED, so
-# a matcher naming a shell the script cannot parse a command out of would block a real merge. Codex's
-# shell tool name is not established, exactly as for merge_review_gate.py.
 SHELL_TOOLS = {"bash", "powershell", "shell", "exec_command", "unified_exec", "local_shell"}
 
 _GIT_CWD = ["."]
