@@ -76,8 +76,8 @@ what still needs checking on Windows.
 
 - Worktree: `/home/tommy/projects/tj-agents/core` (primary, reused sequentially)
 - Branch: `Refactor/LinuxPlatformInstructions`
-- Base: `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e` (current main, containing the verified Step 7 publication)
-- PR: [#191](https://github.com/tj-agents/core/pull/191), draft; exact-head Windows/Linux CI pending
+- Base: `1bb1c130b2d1762bce07b599bb0fbb7e311c6749` (current main, containing the verified Step 7 publication)
+- PR: [#191](https://github.com/tj-agents/core/pull/191), draft; synchronized head review and exact-head Windows/Linux CI pending
 - Workflow run: `linux-platform-instructions`
 - Recovery owner: this single-file legacy plan; no companion roadmap/ledger is required.
 - Transfer: Step 10 pickup acknowledged in this context before deliverable writes.
@@ -97,13 +97,15 @@ what still needs checking on Windows.
   `838990937acc9f1d39d9799471a8b6293e159183`; its Windows command and audit-count findings were fixed.
   The remediation pass approved the source candidate at `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`.
   Later plan checkpoints receive their own incremental review before publication. PR not opened.
-- Step 10 slice assessment: one independent final-step PR from `origin/main` at
-  `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e`, with no stack dependency. The reviewed source candidate at
+- Step 10 slice assessment: one independent final-step PR with no stack dependency. Its initial source candidate
+  was based on `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e`; before final review the branch was synchronized to
+  current `origin/main` at `1bb1c130b2d1762bce07b599bb0fbb7e311c6749`. The initial reviewed source candidate at
   `0dbaa9adb801dd0173f1e30c5d59249574dd0a79` contains 32 authored files, 185 insertions and 146
   deletions; it contains platform-qualified instruction text and the plan, with no runtime code or
-  generated output. The later plan-only checkpoints received separate incremental reviews, and final head
-  `fd9dc5a1ab862bad07cc9ba0cd63e801db0f9185` is approved. Draft PR #191 is open from this exact head;
-  exact-head Windows/Linux CI is pending.
+  generated output. The later plan-only checkpoints received separate incremental reviews; head
+  `fd9dc5a1ab862bad07cc9ba0cd63e801db0f9185` was approved before main moved. Draft PR #191 was opened from
+  that head. The current synchronized candidate requires its own final incremental review and exact-head
+  Windows/Linux CI.
 
 Step 7 [#186](https://github.com/tj-agents/core/pull/186) is delivered. Reviewed head
 `66dcb2f054bdcf9a6ce67d85c3463faba3eccb21`, merge `9209cce2c4c03eeba81ec9fde88c10d1354673c5`;
@@ -190,10 +192,13 @@ Step 10 requires its own fresh review/work order; never carry Step 7's watermark
 
 The Step 10 source audit and local checks are complete. Findings were fixed in commits `d1a7679` and
 `0dbaa9a`; the source candidate's incremental review approved `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`.
-The later plan checkpoints were incrementally reviewed; final head
-`fd9dc5a1ab862bad07cc9ba0cd63e801db0f9185` is approved and published as draft PR #191. Keep generated
-`plugins/` and catalog output out of the PR. Require exact-head Windows/Linux CI, perform the authorized
-ordinary merge, and verify only the merge's causal generated publication before plan closeout.
+The later plan checkpoints were incrementally reviewed; head
+`fd9dc5a1ab862bad07cc9ba0cd63e801db0f9185` was approved and published as draft PR #191. Main advanced with
+a change to one overlapping canonical instruction file, so the branch was synchronized to current main at
+`1bb1c130b2d1762bce07b599bb0fbb7e311c6749`. Complete final incremental review of the synchronized candidate,
+update the PR to that exact head, require its Windows/Linux CI, perform the authorized ordinary merge, and
+verify only the merge's causal generated publication before plan closeout. Keep generated `plugins/` and
+catalog output out of the authored PR diff.
 
 Lane: L5, because the remaining instruction and test-reference cleanup is already decided and mechanical.
 Route any necessary runtime implementation judgment through L4; keep this one Step 10 slice focused.
