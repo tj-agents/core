@@ -436,7 +436,7 @@ def windows_task_xml(user, command, working_directory):
     execute.append(task_xml_element("Command", command[0]))
     execute.append(task_xml_element("Arguments", subprocess.list2cmdline(command[1:])))
     execute.append(task_xml_element("WorkingDirectory", str(working_directory)))
-    return ET.tostring(task, encoding="utf-8", xml_declaration=True)
+    return ET.tostring(task, encoding="utf-16", xml_declaration=True)
 
 
 def current_windows_user(kwargs, timeout):

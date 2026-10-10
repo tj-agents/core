@@ -542,6 +542,8 @@ class WindowsObserverTaskTests(unittest.TestCase):
             self.assertIsNone(session_close.start_observer(arguments))
 
         namespace = {"task": session_close.TASK_SCHEDULER_NAMESPACE}
+        self.assertTrue(task_xml["contents"].startswith(b"\xff\xfe"))
+        self.assertIn("encoding='utf-16'", task_xml["contents"].decode("utf-16").splitlines()[0])
         task = session_close.ET.fromstring(task_xml["contents"])
         execute = task.find("task:Actions/task:Exec", namespace)
         self.assertIsNotNone(execute)

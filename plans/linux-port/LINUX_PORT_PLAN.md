@@ -81,17 +81,17 @@ The user requires one PR for this step; its 40 authored paths keep the shared cl
 observer, callers and host grants atomic. Generated output remains uncommitted.
 
 The Python lifecycle and terminal/orphan ports are implemented and reviewed. Local suites at
-`5f9f2e4d7e9925307007b57fea6399349dc880ee` passed: 961 source/package tests (17 skips), 990 shared runtime
-tests (four skips), generated-tree, catalog, tier and harness checks. Native and fresh process-safety
-reviews are complete in `reviews/Refactor-LinuxPeerCli.md`. Linux CI passed. Windows CI first caught an
-undefined wrapper-identity helper and a POSIX-only handshake fixture; those were repaired, including
-Windows wrapper coverage that runs on Linux. Replacement run 38059655193 still fails the two real
-close/finish entrypoint cases because Task Scheduler rejects detached observer registration. The bounded native L4 worker repaired
-startup with scheduler XML separating executable, arguments and working directory. Current-user SID,
-bounded diagnostics and focused cross-platform lifecycle coverage are included. All 19 lifecycle tests
-pass locally. The parent owns fresh review, full validation, replacement CI and delivery; the native
-implementation lane is available and was used.
-Windows desktop UI Automation remains unverified locally.
+`1752aebbdf11da132c342dfb0ce8a8e3dc839c32` passed: 963 source/package tests (17 skips), 990 shared runtime
+tests (four skips), 19 focused lifecycle tests, generated-tree, catalog, tier and harness checks.
+Native and fresh process-safety reviews are complete in `reviews/Refactor-LinuxPeerCli.md`. Linux CI
+passed. Windows CI exposed an undefined wrapper helper and an incompatible handshake fixture, then
+rejected the long observer command. The bounded native L4 worker replaced registration with structured
+scheduler XML, current-user SID and useful diagnostics. Run 38061315556 now identifies the remaining
+registration defect precisely: the Windows scheduler cannot switch the UTF-8 XML encoding. The tiny
+follow-up writes UTF-16 with its matching declaration and BOM, with a regression assertion. All 19
+lifecycle tests pass locally. The parent owns full validation, fresh review, replacement CI and delivery;
+the native implementation lane is available and was used. Windows desktop UI Automation remains
+unverified locally.
 
 A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
 its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
@@ -117,7 +117,7 @@ Step 3's native Codex handoff was verified in kitty. Step 4, then 7 and 10 remai
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Latest reviewed-head Linux source suite: 961 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
+        "evidence": "Latest reviewed-head Linux source suite: 963 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
       }
     },
     {
@@ -128,7 +128,7 @@ Step 3's native Codex handoff was verified in kitty. Step 4, then 7 and 10 remai
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Latest reviewed-head Linux source suite: 961 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
+        "evidence": "Latest reviewed-head Linux source suite: 963 tests, 17 skips; shared runtime suite: 990 tests, four skips; generated-tree, catalog, tier and harness checks passed. Both host permission mappings and lifecycle fixtures were reviewed. Windows observer repair validation/CI and real merged Linux acceptance remain pending; actual Windows desktop UI Automation is unverified locally."
       }
     }
   ]
