@@ -98,8 +98,14 @@ stale closure could force-close a successor's pane, and worktree cleanup exclude
 logical session ID alone. The native L4 worker repaired both. A tiny parent follow-up rechecks Windows
 fallback ownership and removes stale closure's force bypass. Focused suites pass: 29 close-tab and
 23 lifecycle tests. The orphaned resolution paragraph from retired PowerShell debt was also removed.
-The parent owns full validation, fresh incremental review, a stable batched push, replacement CI, and
-real merged Linux acceptance. Actual Windows desktop UI Automation remains unverified locally.
+Full local validation of the repaired candidate passed: 971 source tests (17 skips), 990 runtime tests
+(four skips), and all generated invariants. Native and fresh L2 ownership/workflow review returned no
+new findings. At `1874a1ebdb11a38cfb22fd879a05517acdf8b182`, run 38067879202 passed Linux CI and all
+Windows lifecycle entrypoint tests but failed one new fixture assertion: the temporary directory used
+Windows' short `RUNNER~1` path while production resolved its long `runneradmin` form. The tiny
+follow-up resolves the fixture directory too; production identity/timeout behavior is unchanged.
+The parent owns focused/full validation, native incremental review, replacement CI and real merged
+Linux acceptance. Actual Windows desktop UI Automation remains unverified locally.
 
 A disposable Linux Git experiment confirmed that a worktree can be removed while a live process retains
 its cwd. The shared observer still waits for verified exit on both platforms so failed closure cannot
