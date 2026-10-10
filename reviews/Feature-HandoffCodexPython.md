@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `28fbce2d0874152b9ec0ffcc55f25465a7216bd5`  `(2026-10-09)`
+**Reviewed up to commit:** `dcf86bb4791dc66d33defa8fbeef7050112e6975`  `(2026-10-10)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-07 — full
@@ -66,5 +66,55 @@ efficiency, or convention issues cleared the confirm/plausible bar.
   sync returned invalid JSON: plugin marketplace upgrade --json". Root cause: the test's C# relay stub
   spawns `cmd.exe` without `/d`, so GitHub's windows-latest `\AutoRun` registry value runs first and its
   output lands ahead of the batch dispatch's own JSON on stdout. Fixed in `28fbce2` (adds `/d`); also
-  widened the parse-failure message to quote the unparseable text for any future repeat. `verify-linux`
-  and `guard` passed on this same push; `verify` re-run pending.
+  widened the parse-failure message to quote the unparseable text for any future repeat.
+- [x] `verify` failed again after the `/d` fix (run `37988870513`/`37989927676`/`38007331240`), same
+  symptom, same root cause class: the batch had no `@echo off`, so cmd echoed every executed line onto
+  stdout ahead of the real JSON (`9f66024`); then the call-order comparison itself failed on a trailing
+  space cmd's own echo adds to the three batch-served calls regardless of `%*` vs explicit `%1`-`%4`
+  tokens (`763c4cc`, confirmed not a token-extraction issue), fixed by trimming the logged calls before
+  comparison since production code never goes through cmd.exe either way (`6fb070e`). `verify` passed
+  green on run `38007881871` (23m41s), alongside `verify-linux` and `guard`.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `28fbce2d0874152b9ec0ffcc55f25465a7216bd5` (the prior pass's own watermark; no further
+unrelated `main` merges landed in between)
+**Candidate head:** `dcf86bb4791dc66d33defa8fbeef7050112e6975`
+**Candidate branch:** `Feature/HandoffCodexPython`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Feature-HandoffCodexPython.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Claude Code `code-review` (high) over the full branch-vs-main diff (requested when the merge
+gate refused a stale-review merge attempt at `6fb070e`). 10 findings, all confirmed or plausible against
+the real code; all 10 addressed in `dcf86bb`:
+
+- [x] `agent_recovery.py`'s `_sync_codex()` still referenced the deleted `codex_marketplace_sync.ps1` via
+  pwsh, silently disabling the Windows Codex-resume standards sync. Now loads the ported Python module
+  in-process via the file's own `_load()` helper, with new tests (`test_sync_codex_*`).
+- [x] `invoke_codex_sync_command`/`invoke_codex_hook_trust` didn't catch `OSError`, so a bad executable
+  path crashed with a raw traceback instead of a clean `SyncError`; `invoke_codex_hook_trust` also had no
+  outer timeout, unlike every other codex call in the file. Both fixed, with new tests.
+- [x] `is_codex_shim()`'s OSError fallback returned `False` (trust as native), inverting
+  `agent_cli._is_script`'s own fail-safe `True` (re-resolve). Matched the two; updated the one test that
+  pinned the old (wrong) polarity, and the two `MainCliTests` fixtures that relied on a nonexistent
+  placeholder path standing in for "native, use as-is."
+- [x] `sync_codex_standards()` assumed codex's JSON was always an object; a bare array/scalar raised
+  `AttributeError` instead of a clean `SyncError`. `invoke_codex_sync_command` now validates the shape.
+- [x] `launch_codex.py` checked the `--frontier`/`--lane` conflict before `--lane L7`, reversing the
+  retired `.ps1`'s order and making the adjacent comment false. L7 now wins, with a regression test for
+  `--lane L7 --frontier` together.
+- [x] `agent_cli.npm_global_prefix()` decoded npm's output with no explicit encoding, unlike every sibling
+  call this branch adds. Pinned to `utf-8`/`replace`.
+- [x] `merge_cleanup_gate.py`'s `LAUNCHER_RE` and `EXEMPT_PY_SCRIPTS` hand-duplicated the launcher names
+  and had already drifted once within this PR (the earlier fix above). Both now derive from one shared
+  `LAUNCHER_PY_SCRIPTS`/`LAUNCHER_PS1_SCRIPTS` source; full hooks suite re-verified green after.
+- [x] `codex-profile.ps1`'s `Find-CodexPython` addition is a real `CODE_CONVENTIONS.md` violation (new
+  behaviour on a PowerShell script still awaiting its port). Recorded as tracked tech debt in
+  `.agents/machine/TECH_DEBT.md` rather than attempted as unscoped work here; resolves with plan step 4.
+- [x] `tests/codex-terminal-profile.tests.ps1`'s blanket `.Trim()` (landed in the CI-fix pass above)
+  slightly widens what the call-order assertion can catch. Accepted as-is: the comment at the call site
+  already documents the tradeoff, and production code never goes through cmd.exe either way.
+
+Full `tests/` (885) and `.agents/hooks/tests/` (985) suites green locally after every fix in this pass.
