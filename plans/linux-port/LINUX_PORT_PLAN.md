@@ -77,7 +77,7 @@ what still needs checking on Windows.
 - Worktree: `/home/tommy/projects/tj-agents/core` (primary, reused sequentially)
 - Branch: `Refactor/LinuxPlatformInstructions`
 - Base: `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e` (current main, containing the verified Step 7 publication)
-- PR: not opened (Step 10)
+- PR: [#191](https://github.com/tj-agents/core/pull/191), draft; exact-head Windows/Linux CI pending
 - Workflow run: `linux-platform-instructions`
 - Recovery owner: this single-file legacy plan; no companion roadmap/ledger is required.
 - Transfer: Step 10 pickup acknowledged in this context before deliverable writes.
@@ -101,9 +101,9 @@ what still needs checking on Windows.
   `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e`, with no stack dependency. The reviewed source candidate at
   `0dbaa9adb801dd0173f1e30c5d59249574dd0a79` contains 32 authored files, 185 insertions and 146
   deletions; it contains platform-qualified instruction text and the plan, with no runtime code or
-  generated output. This later plan-only checkpoint is reviewed as a separate delta. Its verification gate
-  is the generated-tree check, both complete Python suites, fresh docs review, and exact-head Windows/Linux
-  CI. The PR is not opened.
+  generated output. The later plan-only checkpoints received separate incremental reviews, and final head
+  `fd9dc5a1ab862bad07cc9ba0cd63e801db0f9185` is approved. Draft PR #191 is open from this exact head;
+  exact-head Windows/Linux CI is pending.
 
 Step 7 [#186](https://github.com/tj-agents/core/pull/186) is delivered. Reviewed head
 `66dcb2f054bdcf9a6ce67d85c3463faba3eccb21`, merge `9209cce2c4c03eeba81ec9fde88c10d1354673c5`;
@@ -190,8 +190,8 @@ Step 10 requires its own fresh review/work order; never carry Step 7's watermark
 
 The Step 10 source audit and local checks are complete. Findings were fixed in commits `d1a7679` and
 `0dbaa9a`; the source candidate's incremental review approved `0dbaa9adb801dd0173f1e30c5d59249574dd0a79`.
-Complete incremental review of this later plan checkpoint. Once the final branch head is approved, push
-that exact head and open the one Step 10 PR from `Refactor/LinuxPlatformInstructions`. Keep generated
+The later plan checkpoints were incrementally reviewed; final head
+`fd9dc5a1ab862bad07cc9ba0cd63e801db0f9185` is approved and published as draft PR #191. Keep generated
 `plugins/` and catalog output out of the PR. Require exact-head Windows/Linux CI, perform the authorized
 ordinary merge, and verify only the merge's causal generated publication before plan closeout.
 
