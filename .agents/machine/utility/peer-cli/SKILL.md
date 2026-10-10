@@ -83,7 +83,10 @@ always refuses unless `--all` is present, even if it happens to match one tab. L
 unknown targets refuse unless `--force`; force changes only that terminal-tab liveness decision and never
 authorizes a process signal. Linux closes the exact kitty window or tmux pane, preserving siblings. Windows
 rescans UI Automation at close time and never uses focus keystrokes. A stale registered peer can be closed
-only by this explicit re-enumerated tab path, not by trusting its dead host process.
+only by this explicit re-enumerated tab path, not by trusting its dead host process. For a stale Windows
+registration without an automation ID, its title must identify exactly one registered peer and one actual
+tab. Another exited registration with the same title remains ambiguous because its tab may still exist;
+inspect `close_tab.py --list` and select the visible target with `--title` instead.
 
 Its two refusals both exist because they were broken first:
 
