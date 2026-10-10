@@ -168,6 +168,21 @@ class CommandExtractionTests(unittest.TestCase):
             ),
         )
 
+    def test_short_unix_shell_argv_is_joined(self):
+        self.assertEqual(
+            "bash -lc",
+            gate.extract_command("exec_command", {"command": ["bash", "-lc"]}),
+        )
+
+    def test_powershell_argv_payload_keeps_its_last_argument_behavior(self):
+        self.assertEqual(
+            "trailing",
+            gate.extract_command(
+                "exec_command",
+                {"command": ["powershell", "-c", "script", "trailing"]},
+            ),
+        )
+
     def test_a_non_shell_tool_claims_no_jurisdiction(self):
         self.assertIsNone(gate.extract_command("Write", {"command": "gh auth refresh -s admin:org"}))
 
