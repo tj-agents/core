@@ -176,7 +176,11 @@ try {
     if ((Get-Command codex).CommandType -ne 'Function') { throw 'Typed Codex was not wrapped' }
     $result = codex exec
     if ($result -ne 'LAUNCHED exec') { throw "Wrong Codex launch: $result" }
-    $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS)
+    # .Trim() because cmd.exe's own echo of %1-%4 on this runner has trailed every batch-served line (the
+    # three native codex calls) with one extra space; the PowerShell-served lines (list --json, trust,
+    # exec) never have it. Immaterial either way: codex_marketplace_sync.py's own subprocess.run always
+    # receives this plugin's clean argv, never a string run through cmd.exe at all.
+    $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS | ForEach-Object { $_.Trim() })
     $expected = @('plugin list --json', 'plugin marketplace upgrade --json',
         'plugin list --available --json', 'plugin add machine@base-agents --json', 'trust tj-agents hooks', 'exec')
     if (($calls -join '|') -ne ($expected -join '|')) { throw "Wrong call order: $($calls -join '|')" }
@@ -187,7 +191,7 @@ try {
     if ($result -notmatch 'refresh failed' -or $result -notmatch 'LAUNCHED exec') {
         throw "A failed refresh did not warn and launch Codex: $result"
     }
-    $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS)
+    $calls = @(Get-Content -LiteralPath $env:CODEX_TEST_CALLS | ForEach-Object { $_.Trim() })
     if (($calls -join '|') -ne 'plugin marketplace upgrade --json|exec') {
         throw "Failed refresh made unexpected calls: $($calls -join '|')"
     }
