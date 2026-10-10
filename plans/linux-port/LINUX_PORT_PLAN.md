@@ -65,7 +65,7 @@ what still needs checking on Windows.
   `Split` binding skipped the installer's ancestor reparse-point check (#160).
 - [x] 9. CI runs the generated-tree checks and both Python suites on Linux as well as Windows
   (`verify-linux`, #162); it blocks a PR once the repository ruleset lists it as a required check,
-  which the user approved requiring on 2026-10-10; configure it in the next session.
+  which the user approved requiring on 2026-10-10; enabling it awaits a supported publishing-app exception.
 - [ ] 10. Shipped instructions follow `CODE_CONVENTIONS.md`'s Supported platforms: no shipped Markdown
   under `.agents/`, `.claude/` or `.codex/` tells an agent to run bare `python`, `powershell.exe`, `pwsh`
   or `wt.exe` without naming the platform (including the session exit in `merge` Step 5 and in
@@ -81,11 +81,13 @@ standards refresh, its tests and documentation. Its successor remains Step 7; St
 implementation scope for this slice.
 
 The primary acknowledged the handoff and completed bounded L3 discovery. Native L4 implementation
-uses the canonical Codex lane table. Initial full validation passed; independent review found five
-confirmed defects, now under serial remediation before fresh validation/review and delivery. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
+uses the canonical Codex lane table. Independent review found five
+confirmed defects; all five are repaired. Final local validation passed 1,000 source tests (17 skips)
+and 1,001 hook tests (four skips), plus generated-tree, catalog, harness and tier checks. Fresh
+incremental review and Windows/Linux CI remain before delivery. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
 solely to satisfy a separate ledger's graph requirements.
 
-The current cutover measures about 1,900 added/deleted authored lines across 27 paths, including
+The current cutover includes 26 authored paths in the trunk diff, including
 321 retired PowerShell runtime lines and 412 retired PowerShell test lines; generated output is excluded.
 Separate Claude/Codex ports could be shipped, but the user explicitly selected one reviewed PR per step.
 Keep this exception focused on the one shared profile/bootstrap/dispatch contract, validate actual shell
@@ -115,8 +117,8 @@ succeeded and produced `2dc76412f0794584e36b7440e5cde0bf7a0ce5ac`. Windows CI ex
 actual Windows desktop UI Automation remains unverified locally. Native Linux evidence uses the
 canonical authored source; it does not claim installation acceptance for either host.
 
-The Windows job is now `verify-windows`. The user approved requiring `verify-linux` in the next
-session; recheck the current main protection before applying that specific requirement. The proposed
+The Windows job is now `verify-windows`. Both platform jobs are required for this port’s delivery
+validation while the approved protection change awaits the publishing dependency above. The proposed
 `.windows`/`.linux` organization remains separate design debt in `.agents/machine/TECH_DEBT.md`;
 shared logic stays canonical in `.agents`.
 
@@ -140,7 +142,7 @@ next substantive PR, with no separate Step 5 metadata PR.
       "verification": {
         "level": "source",
         "result": "passed",
-            "evidence": "21 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 991 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
+            "evidence": "41 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1000 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     },
     {
@@ -151,7 +153,7 @@ next substantive PR, with no separate Step 5 metadata PR.
       "verification": {
         "level": "source",
         "result": "passed",
-            "evidence": "21 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 991 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
+            "evidence": "41 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 1000 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     }
   ]
@@ -167,8 +169,8 @@ The native reviewer and independent security/workflow lenses ran; parent verifie
 
 ## Next Steps
 
-Repair the five confirmed Step 4 findings in the canonical review work order, rerun both complete local
-suites, and independently review the fixing delta before publishing it for Windows/Linux CI in the primary
+All five confirmed Step 4 findings are repaired and both complete local suites passed. Independently
+review the fixing delta before publishing it for Windows/Linux CI in the primary
 checkout `/home/tommy/projects/tj-agents/core`, branch `Refactor/LinuxTerminalStartHooks`. Its successor
 owns Step 7 only after Step 4 lands. Do not implement Steps 7 or 10 in this session. The whole port
 remains authorized one reviewed PR per step.
@@ -183,8 +185,9 @@ and PowerShell on Windows/Linux. They discover `python3`, `python`, and Windows 
 and replaced the retired PowerShell launchers. Platform directory reorganization is separate recorded debt
 and is outside this functional port.
 
-The user approved making `verify-linux` a required PR check on 2026-10-10. Inspect current main
-protection/rulesets, preserve existing requirements and apply that specific requirement in this session.
+The user approved making `verify-linux` a required PR check with an Actions exemption on 2026-10-10.
+GitHub rejected the built-in Actions identity; do not enable the rule until an installed publishing app
+or a separately validated publishing-workflow change preserves generated-package publication.
 This approval does not add unrelated branch protection requirements. Windows CI is named
 `verify-windows`; both jobs must pass for the port's delivery validation.
 

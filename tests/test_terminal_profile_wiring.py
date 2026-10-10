@@ -150,6 +150,62 @@ class TerminalProfileWiringTests(unittest.TestCase):
         self.assertEqual(0, compiled.returncode, compiled.stderr)
         return native
 
+    def versioned_python(self, name: str, version: tuple[int, int], label: str) -> Path:
+        if os.name == "nt":
+            script = self.bin / f"{name}.py"
+            script.write_text(
+                "import os, sys\n"
+                "code = next((value for value in sys.argv[1:] if 'version_info' in value), '')\n"
+                f"version = {version!r}\n"
+                "if code:\n"
+                "    required = (3, 11) if '(3, 11)' in code else (3, 9)\n"
+                "    raise SystemExit(0 if version >= required else 1)\n"
+                "with open(os.environ['INTERPRETERS'], 'a', encoding='utf-8') as output:\n"
+                f"    output.write({label!r} + '\\n')\n"
+                "os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n",
+                encoding="utf-8",
+            )
+            path = self.bin / f"{name}.cmd"
+            path.write_text(f'@echo off\r\n"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+            return path
+        path = self.bin / name
+        path.write_text(
+            "#!/bin/sh\n"
+            "case \"$*\" in\n"
+            f"  *'(3, 11)'*) exit {0 if version >= (3, 11) else 1} ;;\n"
+            f"  *'(3, 9)'*) exit {0 if version >= (3, 9) else 1} ;;\n"
+            "esac\n"
+            f"printf '%s\\n' '{label}' >> \"$INTERPRETERS\"\n"
+            f"exec {shlex.quote(sys.executable)} \"$@\"\n",
+            encoding="utf-8",
+        )
+        path.chmod(path.stat().st_mode | 0o111)
+        return path
+
+    def codex_interpreter_fixture(self) -> tuple[Path, Path]:
+        active = self.root / "codex-interpreter-active"
+        launcher = active / "resources" / "machine" / "scripts" / "codex_terminal_launcher.py"
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text(
+            "import os, sys\n"
+            "with open(os.environ['CALLS'], 'a', encoding='utf-8') as output:\n"
+            "    output.write(('hooks' if '--hooks' in sys.argv else 'refresh') + '\\n')\n",
+            encoding="utf-8",
+        )
+        target = self.executable("codex", "raise SystemExit(88)\n")
+        if os.name == "nt":
+            self.native_codex(target)
+        else:
+            native = self.bin / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / "codex"
+            native.parent.mkdir(parents=True)
+            native.write_text("#!/bin/sh\nprintf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"version\":\"test\",\"enabled\":true}]}'\n", encoding="utf-8")
+            native.chmod(native.stat().st_mode | 0o111)
+        codex_home = self.root / "codex-interpreter-home"
+        cache = codex_home / "plugins" / "cache" / "base-agents" / "machine" / "test"
+        cache.parent.mkdir(parents=True)
+        shutil.copytree(active, cache)
+        return codex_home, active
+
     def assert_claude_wiring(self, run, command: str):
         self.calls.unlink(missing_ok=True)
         active = self.active_launcher("claude")
@@ -233,6 +289,104 @@ class TerminalProfileWiringTests(unittest.TestCase):
         for shell in self.powershells():
             with self.subTest(shell=shell):
                 self.assert_codex_wiring(lambda command: self.run_powershell(shell, command), f". '{self.profile_path()}'; codex plugin list; codex exec; codex-hooks status", 0)
+
+    def test_powershell_skips_windows_store_aliases_before_usable_python(self):
+        active = self.active_argument_spy("claude")
+        arguments = self.root / "arguments.json"
+        cache = self.root / "alias-cache"
+        cache.mkdir()
+        (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
+            "machine@base-agents": [{"scope": "user", "installPath": str(active)}]
+        }}), encoding="utf-8")
+        self.environment.update(CLAUDE_CODE_PLUGIN_CACHE_DIR=str(cache), ARGUMENTS=str(arguments), OS="Windows_NT")
+        self.executable("claude", "raise SystemExit(88)\n")
+        stub = r"C:\Users\test\WindowsApps\python.exe"
+        interpreter = str(sys.executable).replace("'", "''")
+        override = (
+            "function Get-Command { param($Name, [switch]$All, $CommandType, $ErrorAction) "
+            "if ($Name -eq 'python') { "
+            "[pscustomobject]@{ Source = '" + stub + "' }; "
+            "[pscustomobject]@{ Source = '" + interpreter + "' }; return }; "
+            "if ($Name -in @('python3', 'py')) { return }; "
+            "Microsoft.PowerShell.Core\\Get-Command @PSBoundParameters }; "
+        )
+        for module in (CLAUDE, CODEX):
+            profile_path = self.root / (module.__name__ + ".ps1")
+            profile_path.write_text(module.POWERSHELL_BLOCK, encoding="utf-8")
+            for shell in self.powershells():
+                with self.subTest(profile=module.__name__, shell=shell):
+                    command = override + f". '{profile_path}'; if (-not $baseAgentsPython) {{ throw 'usable Python missed' }}; "
+                    if module is CODEX:
+                        command += "if (-not $baseAgentsCodexHooksPython) { throw 'usable hook Python missed' }; "
+                    command += "if ($baseAgentsPython.Path -ne '" + interpreter + "') { throw 'wrong interpreter' }; exit 0"
+                    completed = self.run_powershell(shell, command)
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    self.assertEqual("", completed.stderr)
+
+    def test_codex_hooks_selects_python_311_without_changing_refresh_selection(self):
+        codex_home, _active = self.codex_interpreter_fixture()
+        first_name, second_name = ("python", "python3") if os.name == "nt" else ("python3", "python")
+        self.versioned_python(first_name, (3, 9), "python39")
+        self.versioned_python(second_name, (3, 11), "python311")
+        interpreters = self.root / "interpreters.txt"
+        codex_bash = self.root / "codex-profile.sh"
+        claude_bash = self.root / "claude-profile.sh"
+        codex_powershell = self.root / "codex-profile.ps1"
+        claude_powershell = self.root / "claude-profile.ps1"
+        codex_bash.write_text(CODEX.BASH_BLOCK, encoding="utf-8")
+        claude_bash.write_text(CLAUDE.BASH_BLOCK, encoding="utf-8")
+        codex_powershell.write_text(CODEX.POWERSHELL_BLOCK, encoding="utf-8")
+        claude_powershell.write_text(CLAUDE.POWERSHELL_BLOCK, encoding="utf-8")
+        environment = dict(self.environment, PATH=str(self.bin), CODEX_HOME=str(codex_home), INTERPRETERS=str(interpreters))
+        bash_orders = ((codex_bash, claude_bash), (claude_bash, codex_bash))
+        if os.name != "nt":
+            for first, second in bash_orders:
+                with self.subTest(shell="bash", order=(first.name, second.name)):
+                    self.calls.unlink(missing_ok=True)
+                    interpreters.unlink(missing_ok=True)
+                    completed = subprocess.run(
+                        ["/bin/bash", "--noprofile", "--norc", "-c", f". {shlex.quote(str(first))}; . {shlex.quote(str(second))}; codex plugin list; codex-hooks status"],
+                        env=environment, text=True, encoding="utf-8", capture_output=True, check=False,
+                    )
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    self.assertEqual(["python39", "python39", "python311"], interpreters.read_text(encoding="utf-8").splitlines())
+        powershell_orders = ((codex_powershell, claude_powershell), (claude_powershell, codex_powershell))
+        for shell in self.powershells():
+            for first, second in powershell_orders:
+                with self.subTest(shell=shell, order=(first.name, second.name)):
+                    self.calls.unlink(missing_ok=True)
+                    interpreters.unlink(missing_ok=True)
+                    command = f"$PSNativeCommandArgumentPassing = 'Legacy'; . '{first}'; . '{second}'; codex plugin list; codex-hooks status; exit $LASTEXITCODE"
+                    completed = subprocess.run([shell, "-NoProfile", "-Command", command], env=environment,
+                                               text=True, encoding="utf-8", capture_output=True, check=False)
+                    self.assertEqual(0, completed.returncode, completed.stderr)
+                    self.assertEqual(["python39", "python39", "python311", "python311"], interpreters.read_text(encoding="utf-8").splitlines())
+
+    def test_codex_hooks_requires_python_311_without_running_hook_control(self):
+        codex_home, _active = self.codex_interpreter_fixture()
+        first_name = "python" if os.name == "nt" else "python3"
+        self.versioned_python(first_name, (3, 9), "python39")
+        bash_profile = self.root / "codex-profile.sh"
+        powershell_profile = self.root / "codex-profile.ps1"
+        bash_profile.write_text(CODEX.BASH_BLOCK, encoding="utf-8")
+        powershell_profile.write_text(CODEX.POWERSHELL_BLOCK, encoding="utf-8")
+        environment = dict(self.environment, PATH=str(self.bin), CODEX_HOME=str(codex_home), INTERPRETERS=str(self.root / "interpreters.txt"))
+        if os.name != "nt":
+            bash = subprocess.run(
+                ["/bin/bash", "--noprofile", "--norc", "-c", f". {shlex.quote(str(bash_profile))}; codex-hooks status"],
+                env=environment, text=True, encoding="utf-8", capture_output=True, check=False,
+            )
+            self.assertEqual(1, bash.returncode)
+            self.assertIn("requires Python 3.11", bash.stderr)
+            self.assertFalse((codex_home / "config.toml").exists())
+        for shell in self.powershells():
+            with self.subTest(shell=shell):
+                command = f"$PSNativeCommandArgumentPassing = 'Legacy'; . '{powershell_profile}'; codex-hooks status; exit $LASTEXITCODE"
+                completed = subprocess.run([shell, "-NoProfile", "-Command", command], env=environment,
+                                           text=True, encoding="utf-8", capture_output=True, check=False)
+                self.assertEqual(1, completed.returncode)
+                self.assertIn("requires Python 3.11", completed.stderr)
+                self.assertFalse((codex_home / "config.toml").exists())
 
     def test_powershell_payload_preserves_literal_arguments_for_each_host_and_mode(self):
         project = self.root / "project café"
