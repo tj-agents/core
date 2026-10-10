@@ -497,6 +497,12 @@ def discover(root: Path, config: dict) -> dict[str, dict]:
                 "scope": scope["name"],
                 "relative": path.relative_to(root).as_posix(),
             }
+    # `tech-debt` beside `techdebt` reads as one skill to a person and as two to a matcher.
+    unhyphenated: dict[str, str] = {}
+    for name in sorted(found):
+        other = unhyphenated.setdefault(name.replace("-", ""), name)
+        if other != name:
+            raise ValueError(f"Public skill names differ only by hyphens: {other}, {name}")
     return found
 
 
