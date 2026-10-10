@@ -110,7 +110,7 @@ def receipt_for(owner, path, interval, host, windows=None):
     return scheduler.linux_receipt(owner, path, __file__, runtime, python, host, interval, os.environ)
 
 
-LEGACY_WINDOWS_SCRIPT = r'''$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);$tasks=@(Get-ScheduledTask|Where-Object {$_.TaskPath -ceq '\' -and $_.TaskName.StartsWith('AgentStandards-Delivery-',[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object {[pscustomobject]@{TaskName=$_.TaskName;TaskPath=$_.TaskPath;Actions=@($_.Actions|Select-Object WorkingDirectory)}});[pscustomobject]@{Tasks=$tasks}|ConvertTo-Json -Compress'''
+LEGACY_WINDOWS_SCRIPT = r'''$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);$tasks=@(Get-ScheduledTask|Where-Object {$_.TaskPath -ceq '\' -and $_.TaskName.StartsWith('AgentStandards-Delivery-',[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object {[pscustomobject]@{TaskName=$_.TaskName;TaskPath=$_.TaskPath;Actions=@($_.Actions|Select-Object WorkingDirectory)}});[pscustomobject]@{Tasks=$tasks}|ConvertTo-Json -Depth 5 -Compress'''
 
 
 def legacy_conflict(root, transport, windows=None):

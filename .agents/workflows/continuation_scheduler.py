@@ -297,10 +297,10 @@ def receipt_is_windows(receipt):
 def _link_points_to(link, target):
     try:
         value = os.readlink(str(link))
-    except OSError:
+        actual = Path(value) if Path(value).is_absolute() else Path(link).parent / value
+        return actual.resolve(strict=True) == Path(target).resolve(strict=True)
+    except (OSError, RuntimeError):
         return False
-    actual = Path(value) if Path(value).is_absolute() else link.parent / value
-    return os.path.normpath(str(actual)) == os.path.normpath(str(target))
 
 
 def assert_linux_write_paths(receipt):

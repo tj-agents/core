@@ -76,7 +76,7 @@ what still needs checking on Windows.
 - Worktree: `/home/tommy/projects/tj-agents/core` (primary, reused sequentially)
 - Branch: `Refactor/LinuxDeliveryContinuation`
 - Base: `8b656fb197771916c58aea4418934aaa7648b1c0` (verified current with origin/main)
-- PR: not opened (Step 7)
+- PR: https://github.com/tj-agents/core/pull/186 (draft, Step 7)
 - Workflow run: `linux-delivery-continuation`
 - Recovery owner: this single-file legacy plan; no companion roadmap/ledger is required for this slice.
 
@@ -92,7 +92,7 @@ nonsecret custom profile settings enter the receipt. Existing owner state and bu
 
 Specified implementation and serial remediation used bounded native L4 workers; all write leases ended.
 The first frozen candidate `6acd48a166149a3eb53c2ca6c0a1f801e44d4d64` received native/general, workflow and
-L2 security review. Ten confirmed defects are retained in `reviews/Refactor-LinuxDeliveryContinuation.md`.
+L2 security review. Twelve confirmed defects are retained in `reviews/Refactor-LinuxDeliveryContinuation.md`.
 The resolved repairs fail closed on observation errors, preserve stale receipts in interrupted transactions,
 inspect loaded fragments/drop-ins and links before mutations, verify restoration after reload before enable,
 retain lexical final unit paths, and pin platform-dependent tests. Version-2 Windows receipts support verified
@@ -101,7 +101,7 @@ profile settings are bound to actual registered definitions; owner state and chi
 The two-hour outer scheduler envelope preserves the prior Windows behavior around the 900-second child limit.
 Latest worker artifacts: `/tmp/step7-final-repair-result.txt`, `/tmp/step7-post-repair-result.txt` and matching logs.
 
-Final focused verification passed 38 tests (one inbox-Windows skip). The actual repaired Linux fixture is
+Latest focused verification passed 40 tests (one inbox-Windows skip). The actual repaired Linux fixture is
 `/tmp/step7 repaired Linux continuation café`, owner `745873ebbcc1fabef269fb96`. Its timer fired on
 2026-10-10 at 22:49:56 BST and resumed authenticated Codex. Native tool execution recorded nonce
 `221a33428a1b4e1094c3522b78a51f48`, exact cwd and systemd invocation `031160ec206c4cb6824b87402eb3c140`.
@@ -118,13 +118,16 @@ The old PowerShell runtime is retired. Its repository-only test entry becomes a 
 suite, preserving the existing CI workflow unchanged; Linux already discovers that suite. This retains the
 CI seam without changing standing delivery authorization. Generated plugins/catalog output remain uncommitted.
 
-Scope is 13 authored paths, roughly 2,450 added/deleted lines including runtime/test retirement.
+Scope is 13 authored paths, roughly 2,600 added/deleted lines including runtime/test retirement.
 An atomic exception covers replacement, shared Stop verification, coupled entries and scheduler tests:
 splitting these would ship a broken continuation contract. Step 10 and directory organization are excluded.
-The final stable source suite passed 1,044 tests (18 platform skips); the complete hook suite passed 1,029 tests (4 platform skips).
+The latest stable source suite passed 1,046 tests (18 platform skips); the complete hook suite passed 1,029 tests (4 platform skips).
 Generation/catalog/harness/tier checks passed. A prior hook run failed after a final source edit invalidated
-its catalog fixtures; output was refreshed before the fresh unchanged-source suites. Independent incremental
-review and exact-head Windows/Linux CI remain required. Source checks do not establish Windows desktop or
+its catalog fixtures; output was refreshed before the fresh unchanged-source suites. Repair head `eae3ce3b22e8eb496feb0a79369a4d6a7c2475fc` is published on draft PR #186.
+Incremental review completed with two additional confirmed defects (foreign link traversal and legacy JSON depth).
+PR #186 Windows CI failed three canonical-path fixture comparisons; one bounded serial L4 worker owns repairs.
+Both findings and the Windows fixtures are repaired. The focused suite, both complete suites and generation/catalog/harness checks passed on unchanged source before the next stable push.
+Fresh incremental review and both platform CI jobs still gate this delivery. Source checks do not establish Windows desktop or
 installed-host acceptance.
 
 Previous delivery: Step 4 [#185](https://github.com/tj-agents/core/pull/185), reviewed head
@@ -177,19 +180,23 @@ block independent Step 7 work; both platform checks still gate this port's deliv
 
 The first full pass at `6acd48a166149a3eb53c2ca6c0a1f801e44d4d64` requested changes on ten confirmed
 findings. Serial repair and focused verification are complete; the original pass identity/text/severities
-remain frozen. Both full suites passed; commit the repairs with this checkpoint and run fresh incremental
-native/general/workflow/security review before publication. Work order: `reviews/Refactor-LinuxDeliveryContinuation.md`.
+remain frozen. Both full suites passed. Repairs are committed at `eae3ce3b22e8eb496feb0a79369a4d6a7c2475fc`;
+fresh incremental review completed with two security findings. Native/general and workflow found no defects.
+Exact-head Windows job 114323438386/run 38089699252 failed three short/long-path fixture comparisons.
+The serial L4 repair lease ended. Filesystem-resolved timer targets and depth-5 legacy JSON now have regression coverage; fixtures use canonical paths.
+Both complete suites passed; a fresh incremental pass follows the repair commit. Original frozen pass text and judgments are preserved. Work order: `reviews/Refactor-LinuxDeliveryContinuation.md`.
 The native specialist was rejected by the account during Step 4; the declared terra/medium fallback succeeded.
 Step 4's retired work order audit is `.git/agent-workflow/runs/linux-terminal-start-hooks/completed-step4-review.md`.
 
 ## Next Steps
 
 Implementation and final actual Linux acceptance are complete; both disposable schedulers are retired.
-Commit only authored repairs/checkpoint, freeze the incremental delta
-from the completed watermark, and obtain independent current-head review. Then publish one stable Step 7 PR,
-require both exact-head platform CI checks, merge through the authorized ordinary mechanism, verify causal
-post-merge generation and retire only this slice's binding/owner. Preserve the closeout in this plan and
-launch one fresh Step 10 successor from the published base. The parent retains delivery ownership until launch.
+All twelve findings and the Windows fixture failure are repaired; focused and complete suites passed.
+Commit only the authored repairs/checkpoint, freeze the next delta from the completed watermark, publish the
+stable candidate to PR #186 and refresh its existing owner/binding. Run fresh independent incremental review
+and require both exact-head platform CI jobs before the authorized ordinary merge. Verify causal post-merge
+generation, retire only this slice's binding/owner, preserve closeout in this plan and launch one fresh
+Step 10 successor from the published base. The parent retains delivery ownership until launch.
 
 Scope: current slice only; full plan remains incomplete.
 Current slice: Step 7 Python delivery continuation, including actual Linux scheduler acceptance.
