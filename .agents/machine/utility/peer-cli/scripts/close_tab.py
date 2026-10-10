@@ -328,8 +328,9 @@ def close_stale_entry(entry):
         targets = windows_inventory()
     else:
         raise TerminalRefusal("stale-tab close is unsupported for this terminal")
+    title_only = kind == "windows-terminal" and not identity.get("automation_id")
     matches = [target for target in targets if target["title"] == title
-               and same_target(target["identity"], identity)]
+               and (title_only or same_target(target["identity"], identity))]
     if len(matches) != 1:
         raise TerminalRefusal("the recorded stale terminal tab is absent or ambiguous")
     close_actual(matches[0], force=True)

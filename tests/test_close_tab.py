@@ -30,6 +30,24 @@ def completed(stdout="", returncode=0, stderr=""):
 
 
 class CloseTabTests(unittest.TestCase):
+    def test_stale_windows_fallback_requires_unique_title_and_honors_recorded_id(self):
+        identity = {"kind": "windows-terminal", "wt_session": "native-session"}
+        entry = {"title": "same", "terminal": identity}
+        target = {"title": "same", "identity": {"kind": "windows-terminal",
+                  "automation_id": "tab-2"}}
+        with mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+                mock.patch.object(close_tab, "close_actual") as closer:
+            close_tab.close_stale_entry(entry)
+            closer.assert_called_once_with(target, force=True)
+        for recorded, targets in ((identity, [target, target]),
+                                  ({**identity, "automation_id": "tab-1"}, [target])):
+            with self.subTest(recorded=recorded, targets=targets), \
+                    mock.patch.object(close_tab, "windows_inventory", return_value=targets), \
+                    mock.patch.object(close_tab, "close_actual") as closer:
+                with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
+                    close_tab.close_stale_entry({"title": "same", "terminal": recorded})
+                closer.assert_not_called()
+
     def test_stale_linux_target_requires_recorded_identity_despite_matching_title(self):
         cases = (
             ("kitty", "kitty_inventory", {"window_id": "1", "listen_on": "unix:/kitty"},
