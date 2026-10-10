@@ -20,6 +20,7 @@ SPEC.loader.exec_module(SYNC)
 import harness_permissions
 
 
+CLEANUP = "Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"
 SAMPLE_RULE = {
     "pattern": [["python", "python3", "py"], "-B", "${PLUGIN_ROOT}/sample/finish.py"],
     "justification": "test rule",
@@ -128,7 +129,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         v1 = install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
         SYNC.synchronize(self.environ, "apply")
         before = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
-        self.assertTrue(any(v1.as_posix() in entry for entry in before))
+        self.assertTrue(set(harness_permissions.render_claude_allow([CLEANUP], v1)) <= set(before))
 
         clear_claude_plugin(self.claude_config, "engineering")
         SYNC.synchronize(self.environ, "apply")
@@ -197,10 +198,10 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         v2 = install_claude_plugin(self.claude_config, "engineering", "v2", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
         SYNC.synchronize(self.environ, "apply")
 
-        # Match the version's own root: a bare "v1" also matches a random temporary directory name.
-        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
-        self.assertFalse(any(f"{v1.as_posix()}/" in entry for entry in allow))
-        self.assertTrue(any(f"{v2.as_posix()}/" in entry for entry in allow))
+        # Compare exact rendered entries: a bare "v1" substring also matches a random temporary directory.
+        allow = set(json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"])
+        self.assertFalse(set(harness_permissions.render_claude_allow([CLEANUP], v1)) & allow)
+        self.assertTrue(set(harness_permissions.render_claude_allow([CLEANUP], v2)) <= allow)
 
     def test_idempotent_second_apply_is_byte_identical(self):
         install_claude_plugin(self.claude_config, "engineering", "v1", ["Bash(python -B ${PLUGIN_ROOT}/cleanup_proof.py)"])
