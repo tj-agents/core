@@ -120,11 +120,17 @@ def own_host_and_entry(cwd=None):
             break
         ancestry.add(info.pid)
         current = info.ppid
+    matches = []
     for _path, entry in entries():
         if not under_or_equal(cwd, entry.get("cwd", cwd)):
             continue
         if entry.get("pid") in ancestry and verified_live(entry.get("pid"), entry.get("pid_started_at")):
-            return entry
+            matches.append(entry)
+    if matches:
+        matches.sort(key=lambda item: item.get("started_at", 0), reverse=True)
+        if len(matches) == 1 or matches[0].get("started_at") != matches[1].get("started_at"):
+            return matches[0]
+        raise Refusal("multiple equally recent verified registry attachments match this host")
     raise Refusal("cannot resolve a verified registry attachment for this host and current directory")
 
 
@@ -167,7 +173,9 @@ def fresh_removable_receipt(worktree):
     receipt = matching_receipt(worktree)
     if receipt.get("verdict") != "removable":
         raise Refusal("the cleanup receipt is not removable")
-    if not isinstance(receipt.get("recorded_at"), (int, float)) or now() - receipt["recorded_at"] > RECEIPT_MAX_AGE_SECONDS:
+    if (not isinstance(receipt.get("recorded_at"), (int, float)) or
+            receipt["recorded_at"] > now() + IDENTITY_TOLERANCE_SECONDS or
+            now() - receipt["recorded_at"] > RECEIPT_MAX_AGE_SECONDS):
         raise Refusal("the cleanup receipt is stale; run cleanup_proof.py again")
     code, head, _ = git(worktree, "rev-parse", "HEAD")
     branch_code, branch, _ = git(worktree, "rev-parse", "--abbrev-ref", "HEAD")

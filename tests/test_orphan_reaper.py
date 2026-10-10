@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,6 +104,19 @@ class LinuxTerminalOwnershipTests(ReaperTestCase):
     def test_missing_terminal_identity_is_not_a_kill_signal(self):
         reparented = process(900, 100, 'claude', NOW - 30 * HOUR)
         self.assertEqual([], self.orphans(reparented))
+
+    @unittest.skipUnless(__import__('sys').platform == 'linux', '/proc is required')
+    def test_linux_backend_reads_this_process_from_proc(self):
+        table = REAPER.linux_process_table()
+        current = [item for item in table if item.pid == __import__('os').getpid()]
+        self.assertEqual(1, len(current))
+        self.assertIsNotNone(current[0].started_at)
+        self.assertIsInstance(current[0].terminal_pid, int)
+
+    def test_read_table_selects_linux_backend(self):
+        synthetic = [process(1, 0, 'init', NOW)]
+        with mock.patch.object(REAPER.sys, 'platform', 'linux'), mock.patch.object(REAPER, 'linux_process_table', return_value=synthetic):
+            self.assertEqual(synthetic, REAPER.read_process_table())
 
 
 class GracePeriodTests(ReaperTestCase):
