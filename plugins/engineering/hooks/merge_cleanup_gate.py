@@ -61,12 +61,20 @@ EXEMPT_GH_VERBS = (
     r"pr\s+(?:view|checks|list|create|edit|ready|comment|merge)",
     r"run\s+(?:list|view|watch|rerun)",
 )
+# A handoff launcher is a script that can transfer this obligation to a successor session (consumed by
+# LAUNCHER_RE below). It is also always exempt from the gate's own enforcement check -- the one command
+# the gate's deny message tells the agent to run next must never itself be denied -- so each list below
+# is built from this single source instead of hand-duplicating the names into both places, which already
+# drifted once (LAUNCHER_RE gained the Python launchers without EXEMPT_PY_SCRIPTS following).
+LAUNCHER_PY_SCRIPTS = ("agent_cli.py", "transfer.py", "launch_codex.py", "launch_claude.py")
+LAUNCHER_PS1_SCRIPTS = ("launch-codex.ps1", "launch-claude.ps1")
+
 EXEMPT_PY_SCRIPTS = (
-    "workflow_ops.py", "cleanup_proof.py", "agent_cli.py", "transfer.py", "merge_cleanup_gate.py",
+    "workflow_ops.py", "cleanup_proof.py", "merge_cleanup_gate.py", *LAUNCHER_PY_SCRIPTS,
 )
 EXEMPT_PS1_SCRIPTS = (
-    "worktrees.ps1", "peer-cli.ps1", "close-tab.ps1", "launch-codex.ps1",
-    "launch-claude.ps1", "finish.ps1", "close.ps1", "finish_reaper.ps1",
+    "worktrees.ps1", "peer-cli.ps1", "close-tab.ps1", "finish.ps1", "close.ps1", "finish_reaper.ps1",
+    *LAUNCHER_PS1_SCRIPTS,
 )
 
 NEUTRAL_SEGMENT_RE = re.compile(
@@ -98,7 +106,8 @@ DIRECT_SCRIPT_SEGMENT_RE = re.compile(
 
 PUSHD_RE = re.compile(r"""\bpushd\s+(?:"([^"]+)"|'([^']+)'|(\S+))""", re.IGNORECASE)
 LAUNCHER_RE = re.compile(
-    r"launch-codex\.ps1|launch-claude\.ps1|agent_cli\.py|transfer\.py", re.IGNORECASE
+    "|".join(re.escape(name) for name in (*LAUNCHER_PS1_SCRIPTS, *LAUNCHER_PY_SCRIPTS)),
+    re.IGNORECASE,
 )
 
 

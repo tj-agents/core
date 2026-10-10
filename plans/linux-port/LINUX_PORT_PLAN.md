@@ -46,13 +46,18 @@ what still needs checking on Windows.
 - [x] 1. CI guard rejects committed catalog digests, so concurrent PRs stop conflicting on them (#107).
 - [x] 2. `open-claude` -> `scripts/open_claude.py` with the tab handlers; SKILL.md updated; `.ps1`
   deleted. Verified by opening a real tab in kitty on this machine (#108).
-- [ ] 3. `handoff-claude` -> Python, then `handoff-codex` -> Python (`codex_marketplace_sync.ps1` with it).
+- [x] 3. `handoff-claude` -> Python, then `handoff-codex` -> Python (`codex_marketplace_sync.ps1` with it).
   `engineering:handoff` works on Linux from here; verified with a real handoff.
 - [ ] 4. Terminal start hooks: `claude-profile.ps1`/`claude_terminal_profile.py` and `codex-profile.ps1`
   refresh standards when `claude`/`codex` is typed, wired for bash as well as PowerShell (looking for
   both `python3` and `python`); `agent-cli.ps1` deleted.
-- [ ] 5. `peer-cli` -> Python, listing and closing tabs in the detected terminal; `reap_orphans.py` stops
-  assuming `wt.exe` is the parent.
+- [ ] 5. `peer-cli` -> Python: `close.py` and `finish.py` (with `finish_reaper`/`session_close` ported) let
+  a merged session on Linux remove its linked worktree and branch, clear its merge-cleanup obligation,
+  record verified session exit, and close its own kitty/tmux/Konsole tab; `merge_cleanup_gate`'s message
+  gives the per-platform Python commands. Verified by a real merge on Linux whose own tab closes itself.
+  Linux can remove a worktree out from under a live cwd, so the reaper may only be needed for the tab
+  close -- confirm before porting it. Then the rest of `peer-cli` (list and close in the detected
+  terminal); `reap_orphans.py` stops assuming `wt.exe` is the parent.
 - [x] 6. `clip` -> Python, using the platform clipboard (#125).
 - [ ] 7. `persistent-workflow`'s `delivery-continuation.ps1` -> Python, verified on Linux.
 - [x] 8. Tests that failed only on Linux pass: POSIX shell collapsed the Codex snapshot loader's escaped
@@ -73,10 +78,13 @@ Shared library merged (#106, after the interim path fix #105). Kitty configured.
 2 `open-claude` (#108), 3a `handoff-claude` (#120, a real handoff tab verified on this machine), 6 `clip`
 (#125), 8 Linux-only test failures (#160), 9 Linux CI (#162). #166 makes the cross-platform direction a written
 convention in `CODE_CONVENTIONS.md`, labels `peer-cli` Windows-only, and adds step 10 for the rest of the
-shipped instructions. Step 3b `handoff-codex` in review as #137.
+shipped instructions. Step 3b `handoff-codex` merged as #137; step 3 complete, verified by a real Codex
+tab opened on this machine from the Python launcher right after the merge (new kitty tab, native
+`codex-cli` resolved and launched, handoff receipt printed).
 
 ## Next Steps
 
-Land 3b; then 5 (`peer-cli`, `close` and `finish` first, so the `merge` skill's Step 5 session exit
-works on Linux) and 4 (terminal start hooks, deleting `agent-cli.ps1`); then 7 and 10. After `verify-linux`
-has had a few green runs, ask the user whether the repository ruleset should require it.
+Land 5 (`peer-cli`, `close` and `finish` first, per the tightened acceptance criterion above, so the
+`merge` skill's Step 5 session exit works on Linux) and 4 (terminal start hooks, deleting
+`agent-cli.ps1`); then 7 and 10. After `verify-linux` has had a few green runs, ask the user whether the
+repository ruleset should require it.

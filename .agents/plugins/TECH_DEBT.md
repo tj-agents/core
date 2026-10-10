@@ -115,3 +115,16 @@ Resolve when the delivery owner records each host's supported review/enqueue int
 wires and verifies equivalent gates where the host supports them, and documents any observed
 API/runtime constraint with the other host's supported outcome. Require fresh trusted-session
 Claude and Codex acceptance evidence before claiming installed enforcement parity.
+
+## Host skill entry points are copied by hand
+
+Every skill has a canonical `SKILL.md` and two host entry points under `.codex/skills/` and
+`.claude/skills/`. The entry points repeat the canonical name, description, kind and domain and a fixed
+reference body. `validate_adapters` in `scripts/sync_plugin_packages.py` fails generation when a copy
+drifts, so the copies cannot silently disagree, but an author still writes each one by hand and every
+description change touches three files. kit-layout repositories already generate their host skill
+directories.
+
+Resolve when generation emits the plain host entry points from the canonical definitions, so only an
+entry with a genuine host difference (`extended_host_adapters`) is authored under `.codex/` or `.claude/`,
+and `engineering:skill-authoring` no longer tells authors to copy the description.
