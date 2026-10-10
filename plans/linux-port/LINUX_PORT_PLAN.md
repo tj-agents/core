@@ -80,12 +80,14 @@ remaining bounded terminal/cleanup investigation. A disposable Linux Git check c
 worktree can be removed while a live process retains its cwd there; Linux needs an exit observer, but
 no wait-before-removal reaper. Windows retains waiting before removal.
 
-Initial runtime port and direct caller/permission migration implemented. Focused tests pass, including
-the refreshed package's harness permission suite. Before publication, repair the terminal ownership
-checks and routing, Windows and Konsole close paths, unknown-process handling and observer cancellation,
-and preserve their safety cases in Python. The repair phase selects L4: these are specified defects
-with concrete regression tests. Then regenerate packages, run both full suites, review, Windows/Linux
-CI, and the real merged-session acceptance. Step 5 remains unchecked until that acceptance succeeds.
+Initial runtime port, direct caller/permission migration and first identity-safety repair implemented.
+The focused checkpoint passes 149 tests (two platform skips). Remaining before publication: restore
+actual stale-tab/title controls and the Windows settings configurator; complete observer binding,
+refreshed preflight/cancellation, Windows wrapper qualification and disposable process/Git coverage.
+These specified repairs select L4 with separate path ownership. Then regenerate packages, run both
+full suites, review, Windows/Linux CI, and the real merged-session acceptance. Step 5 remains unchecked
+until that acceptance succeeds. Although Linux permits removal before exit, cleanup will follow verified
+exit so a failed close cannot race deletion; the shared observer already owns that exit check.
 
 Delivery slice: all Step 5 Python replacements, terminal handlers, registry identity, orphan recovery,
 cleanup-gate commands, matching machine harness permissions and regression tests, based on

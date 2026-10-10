@@ -131,6 +131,39 @@ class RecordTests(unittest.TestCase):
         self.assertIsNone(register_session.record({}))
 
 
+class TerminalIdentityTests(unittest.TestCase):
+    def test_tmux_wins_over_outer_kitty_and_captures_original_server_socket(self):
+        identity = register_session.terminal_identity({
+            "TMUX": "/tmp/tmux-100/default,99,0",
+            "TMUX_PANE": "%7",
+            "KITTY_WINDOW_ID": "4",
+            "KITTY_LISTEN_ON": "unix:/kitty",
+        })
+        self.assertEqual(identity, {
+            "kind": "tmux",
+            "pane_id": "%7",
+            "socket": "/tmp/tmux-100/default",
+            "session_index": "0",
+        })
+
+    def test_konsole_preserves_service_and_full_session_path(self):
+        identity = register_session.terminal_identity({
+            "KONSOLE_DBUS_SERVICE": "org.kde.konsole-123",
+            "KONSOLE_DBUS_SESSION": "/Sessions/7",
+            "KONSOLE_DBUS_WINDOW": "/Windows/1",
+        })
+        self.assertEqual(identity["service"], "org.kde.konsole-123")
+        self.assertEqual(identity["session"], "/Sessions/7")
+
+    def test_wt_session_does_not_select_windows_terminal_off_windows(self):
+        original = register_session.os.name
+        try:
+            register_session.os.name = "posix"
+            self.assertIsNone(register_session.terminal_identity({"WT_SESSION": "from-wsl"}))
+        finally:
+            register_session.os.name = original
+
+
 class MainTests(unittest.TestCase):
     def _run_main_with_stdin(self, text):
         original_stdin = sys.stdin

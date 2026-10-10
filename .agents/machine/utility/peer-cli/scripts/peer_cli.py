@@ -4,6 +4,8 @@ import os
 import signal
 import sys
 from pathlib import Path
+
+import close_tab
 import register_session
 import session_close
 
@@ -32,16 +34,10 @@ def records():
 
 def unrecorded(items):
     known = {item.get("pid") for item in items}
-    if sys.platform != "linux":
-        return []
     found = []
-    for directory in Path("/proc").iterdir():
-        if not directory.name.isdigit():
-            continue
-        pid = int(directory.name)
+    for pid, info in register_session.process_table().items():
         if pid in known:
             continue
-        info = session_close.process_info(pid)
         if info and Path(info.name).stem.casefold() in register_session.read_host_names():
             found.append({"pid": pid, "title": None, "session_id": None, "cwd": None,
                           "alive": True, "recorded": False})
@@ -78,8 +74,13 @@ def main(argv=None):
     if args.action == "resolve":
         print(target["session_id"])
         return 0
+    terminal = target.get("terminal")
     if target["alive"] is False:
-        print("already gone")
+        if not args.force or not isinstance(terminal, dict):
+            print("already gone")
+            return 0
+        close_tab.close_entry(target, force=True)
+        print("Closed stale {!r}.".format(target.get("title") or target["session_id"]))
         return 0
     if target["alive"] is not True:
         raise session_close.Refusal("liveness is unknown; refusing to kill an unverified identity")
@@ -88,7 +89,10 @@ def main(argv=None):
         return 0
     if not session_close.verified_live(target["pid"], target.get("pid_started_at")):
         raise session_close.Refusal("host identity changed before close")
-    os.kill(target["pid"], signal.SIGTERM)
+    if isinstance(terminal, dict):
+        close_tab.close_entry(target, force=args.force)
+    else:
+        os.kill(target["pid"], signal.SIGTERM)
     print("Closed {!r}.".format(target.get("title") or target["session_id"]))
     return 0
 

@@ -38,7 +38,7 @@ existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe`/`co
 no entry, so a running CLI is never invisible just because it predates the registry.
 
 Liveness matches the recorded pid and its OS start time. An entry that cannot be matched is unknown, not
-dead, and `close` and `close_tab.py` refuse it without `--force`; an unknown identity is never killed.
+dead, and `close` and `close_tab.py` refuse it; an unknown identity is never killed.
 
 ## Closing the tab, not just the process
 
@@ -51,17 +51,18 @@ python3 -B <skill-directory>/scripts/configure_terminal_tab_close.py
 python3 -B <skill-directory>/scripts/close_tab.py --list
 ```
 
-The configurator gives the Windows Terminal settings path and is a no-op on Linux. `close_tab.py` closes
-only a registered live host with an exact native terminal identity (kitty window, tmux pane, Konsole DBus
-session/window, or Windows Terminal UI Automation id); it never uses focus or wildcard title matching.
+The configurator gives the Windows Terminal settings path and is a no-op on Linux. `close_tab.py` resolves
+an actual terminal target before acting: the registered host must belong to the exact kitty window, tmux
+pane on its recorded server, or Konsole session process ancestry. On Windows it rescans UI Automation and
+uses either a recorded automation id or a unique registered/live title; it never uses focus or wildcard
+title matching. Konsole has no supported D-Bus close method: it signals the verified session root process,
+so the terminal profile must be configured to close a tab when that process exits.
 
 Its two refusals both exist because they were broken first:
 
-- **A wildcard reports and stops.** A pattern written to match several can match exactly one and close it
-  silently. `-All` opts in; an exact title is itself the decision.
-- **A live tab is refused.** Liveness is per tab, read from the session registry, so a stale tab is still
-  closable in a window full of busy ones. A title with no registry entry predates the hook and counts as
-  live, because unknown is not dead. `-Force` overrides.
+- **Unknown is never dead.** Failed process inspection, malformed identity and PID reuse do not authorize
+  a kill or cleanup. Force can select an explicit stale terminal target, but never bypasses pid/start-time
+  verification for a process signal.
 
 Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
 that through `finish.py`, beside these scripts.
