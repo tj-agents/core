@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -271,6 +272,42 @@ class HookControlTests(unittest.TestCase):
             capture_output=True, text=True, check=False)
         self.assertEqual(restored.returncode, 0, restored.stderr)
         self.assertIn('hooks = true', config.read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows sharing violations are Windows-only')
+    def test_snapshot_read_and_write_tolerate_an_open_reader(self):
+        config = self.config()
+        config.write_text('[features]\nhooks = true\n', encoding='utf-8')
+        CONTROL.disable('global', config)
+        sidecar = CONTROL.sidecar_path(config)
+        original = CONTROL.load_snapshot(sidecar)
+        replacement = dict(original, disabled_sha256='a' * 64)
+        attempted = threading.Event()
+        errors = []
+        original_replace = CONTROL.os.replace
+
+        def replace(source, destination):
+            attempted.set()
+            return original_replace(source, destination)
+
+        def write():
+            try:
+                CONTROL.atomic_json(sidecar, replacement)
+            except BaseException as error:
+                errors.append(error)
+
+        with mock.patch.object(CONTROL.os, 'replace', side_effect=replace):
+            with sidecar.open(encoding='utf-8') as reader:
+                reader.read()
+                writer = threading.Thread(target=write)
+                writer.start()
+                self.assertTrue(attempted.wait(timeout=5))
+                self.assertTrue(writer.is_alive())
+                self.assertEqual(CONTROL.load_snapshot(sidecar)['disabled_sha256'], original['disabled_sha256'])
+            writer.join(timeout=5)
+
+        self.assertFalse(writer.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(CONTROL.load_snapshot(sidecar)['disabled_sha256'], 'a' * 64)
 
     @unittest.skipUnless(sys.platform == 'win32', 'Windows lock contention is Windows-only')
     def test_windows_lock_retries_a_transient_open_permission_error(self):
