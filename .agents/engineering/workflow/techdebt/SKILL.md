@@ -9,7 +9,7 @@ domain: process
 # Working one tech-debt item — or a small bundle — to a PR
 
 Take a tech-debt item all the way to a focused PR in its selected checkout, so nothing touches in-flight branches.
-This is the *resolution* workflow; where a debt entry lives and when it is deleted is the `docs-and-debt`
+This is the *resolution* workflow; where a debt entry lives and when it is deleted is the `debt-records`
 standard. A single item is the default shape; bundling more than one into the same PR is the exception
 below, not a second workflow.
 
@@ -65,7 +65,7 @@ below, not a second workflow.
 3. **Investigate.** Read the surrounding code and understand the real root cause before touching anything,
    for each item in the bundle.
 4. **Fix it properly.** Always the long-term, scalable solution, never the hacky shortcut — the shortcut
-   rule and its one exception are the `docs-and-debt` standard. It can span multiple PRs; if it genuinely
+   rule and its one exception are the `debt-records` standard. It can span multiple PRs; if it genuinely
    needs splitting, say so in one line, drop it from any bundle, and start with the first PR on its own
    branch.
 5. **Verify.** Build the affected projects to zero errors and run the affected unit/integration tests. Do
@@ -73,7 +73,7 @@ below, not a second workflow.
 6. **Close the loop.** Give each item its own commit — never squash a bundle into one — so the PR reads as
    N independent, individually-revertable changes. In the commit for a given item, delete that item's
    resolved entry from its `TECH_DEBT.md` — or, for a multi-PR cut-over, the final PR deletes it while
-   earlier PRs record progress in the entry (the deletion rule is the `docs-and-debt` standard). Then push
+   earlier PRs record progress in the entry (the deletion rule is the `debt-records` standard). Then push
    and open one PR covering the whole bundle following the `open-pr` standard, with a body section per
    item. Do not set an E2E label while opening the PR; the merge procedure's tier selection normalizes it
    mechanically at merge time.

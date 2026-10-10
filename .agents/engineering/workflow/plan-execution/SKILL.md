@@ -138,7 +138,7 @@ it, or the next material checkpoint falls due.
 3. Implement the selected slice and run focused checks through the shared `run` operation so detailed output
    remains an artifact and the model receives only bounded results. When the slice depends on a change of
    direction that the repository's standing conventions do not state yet, whoever decided it, land that
-   convention in this slice under `engineering:docs-and-debt`. Enter
+   convention in this slice under `engineering:docs`. Enter
    `engineering:failing-tests` once a test run itself comes back red, diagnose the cause,
    repair it, and return to this same loop without asking the user to relay output or approve routine
    continuation.

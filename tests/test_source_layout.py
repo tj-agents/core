@@ -52,7 +52,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(74, len(skills))
+        self.assertEqual(76, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")

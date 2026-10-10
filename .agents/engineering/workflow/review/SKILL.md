@@ -131,7 +131,7 @@ Invoke additional standards only when the diff plainly touches their domain; a m
 route-table defect rather than a list to duplicate here. If the candidate contains plans or
 implementation-ready design references, load plans and apply its implementation-design review gate to
 those artifacts, including their implementation-path standards. If the candidate decides or depends on a
-change of repository direction, apply `docs-and-debt`'s direction-change rule against the frozen tree's
+change of repository direction, apply `engineering:docs`' direction-change rule against the frozen tree's
 standing conventions.
 
 Record the owning `review` lifecycle and the helper's routed technical rule identities with

@@ -108,7 +108,7 @@ class ProcessStandardsTests(unittest.TestCase):
         )
 
     def test_a_change_of_direction_is_stated_where_every_session_loads_it(self):
-        flat = " ".join(authored_skill("docs-and-debt").read_text(encoding="utf-8").split())
+        flat = " ".join(authored_skill("docs").read_text(encoding="utf-8").split())
 
         for phrase in (
             "write that rule into the repository's standing conventions when it is decided, "
@@ -122,7 +122,7 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(phrase, flat)
 
     def test_a_noticed_problem_is_recorded_on_the_default_branch(self):
-        flat = " ".join(authored_skill("docs-and-debt").read_text(encoding="utf-8").split())
+        flat = " ".join(authored_skill("debt-records").read_text(encoding="utf-8").split())
 
         for phrase in (
             "Every problem you notice is fixed, handed off or recorded before you move on, "
@@ -134,6 +134,31 @@ class ProcessStandardsTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
+
+    def test_working_markdown_is_deleted_once_it_has_served_its_purpose(self):
+        flat = " ".join(authored_skill("docs").read_text(encoding="utf-8").split())
+
+        self.assertIn("never in a temp or scratchpad directory", flat)
+        self.assertIn("delete the file once it has served its purpose", flat)
+
+    def test_docs_and_debt_only_routes_to_its_replacements(self):
+        body = authored_skill("docs-and-debt").read_text(encoding="utf-8")
+
+        for owner in ("docs", "debt-records"):
+            with self.subTest(owner=owner):
+                self.assertIn(f"`engineering:{owner}`", body)
+        self.assertIn("owns no rule", body)
+        # A rule in the routing entry would be a second owner: below the title it holds one routing
+        # sentence and one bullet per replacement, with no rule lead, section or code.
+        front, separator, content = body.partition("\n---\n")
+        self.assertTrue(front.startswith("---") and separator, "front matter missing")
+        lines = [line for line in content.splitlines() if line.strip()]
+        bullets = [line for line in lines if line.startswith("- ")]
+        self.assertEqual(2, len(bullets))
+        self.assertTrue(all(line.startswith("- `engineering:") for line in bullets))
+        self.assertEqual(1, sum(line.startswith("#") for line in lines))
+        self.assertNotIn("**", content)
+        self.assertNotIn("```", content)
 
     def test_a_standards_defect_hands_off_in_the_same_turn(self):
         instructions = authored_skill("session-guidance").read_text(

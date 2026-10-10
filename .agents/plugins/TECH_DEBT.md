@@ -98,3 +98,14 @@ This narrows the mutable-loader race to bytes checked and staged by the bootstra
 against a same-user attacker who can replace Python, the temporary directory, or the process itself. The
 package loader continues to verify the complete selected snapshot before it dispatches a hook. Generation
 still enforces cmd.exe's 8191-character command limit, but command length no longer grows with loader size.
+
+## Generation packages skill-local `TECH_DEBT.md` files
+
+Package generation copies every file beside a canonical `SKILL.md` into the canonical package tree and
+both host discovery entries, so a skill-local `TECH_DEBT.md` ships three times in each generated package.
+`bootstrap-capabilities` does so today. Consumers receive maintainer records, and the `techdebt` survey of
+every `TECH_DEBT.md` sees the generated copies beside the authored one. Until this is fixed, an entry owned
+by one skill lives in its package's `TECH_DEBT.md` (for example `.agents/engineering/TECH_DEBT.md`).
+
+Resolve when generation excludes `TECH_DEBT.md` from skill-local resources, with a test, and no
+`TECH_DEBT.md` appears under `plugins/` after `pwsh .agents/sync-generated.ps1`.

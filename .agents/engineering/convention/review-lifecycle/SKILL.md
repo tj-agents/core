@@ -120,7 +120,7 @@ Use one status vocabulary:
   work, are recorded.
 
 Do not introduce a second deferred status. Any postponed work is `[wontfix]` here and must be handed off or
-recorded in the same stroke, with an objective resolution condition, as `engineering:docs-and-debt`
+recorded in the same stroke, with an objective resolution condition, as `engineering:debt-records`
 requires.
 
 Use one severity vocabulary. `CRITICAL` is an immediately exploitable security, data-loss, or catastrophic
