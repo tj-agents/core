@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `d8189522a413c32d11575a44083331f769ab5890`  `(2026-10-10)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `91cfa47ab80a2bab1cb64596a7bbe6198de98ef8`  `(2026-10-10)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — full
 
@@ -307,3 +307,23 @@ Remediation of F21. Security layer not required.
   check command as the enforcement. Fixed; the plugin debt entry now agrees with its owner.
 
 Re-validated: 803 + 983 tests and every generation check.
+
+## Review pass — 2026-10-10 — incremental
+
+**Candidate base:** `d8189522a413c32d11575a44083331f769ab5890`
+**Candidate head:** `91cfa47ab80a2bab1cb64596a7bbe6198de98ef8`
+**Candidate branch:** `Docs/SkillAuthoringConvention`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:273f978d0fea9586c21ca2e9c33f6e4372aa53890f83a0f45d2179b5b90e6ffa` `(3 paths)`
+**Candidate bundle:** `/tmp/review/VStsc1BqWYIHGazuKQv89R/Q-75IY-e53caPiuhTbepG7/9-amoCFVLoF-NJlRfGhWwF`
+**Candidate bundle identity:** `sha256:79192f65fa891cbb5a5cbd51da60212da62eeabee29e5b1914bdfccb86d8a6cc`
+**Work-order path:** `reviews/Docs-SkillAuthoringConvention.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Remediation of F22. Security layer not required.
+
+### Findings
+
+No findings. Native layer ran at `low` effort (high-confidence defects only) over this one-paragraph
+remediation; the parent checked the paragraph against `validate_adapters`.
