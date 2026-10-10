@@ -56,64 +56,11 @@ def scheduler_ready(path, owner, root):
     receipt = read_json(path.parent / "scheduler.json")
     if receipt is None:
         return False
-    if receipt.get("owner_id") != owner.get("owner_id"):
-        return False
-    if exact_path(receipt.get("owner_path")) != str(path.resolve()):
-        return False
-    if exact_path(receipt.get("worktree")) != str(root):
-        return False
-    if receipt.get("enabled") is False:
-        return False
-    if not all(isinstance(receipt.get(key), str) and receipt[key] for key in
-               ("task_name", "task_path", "helper", "python", "script")):
-        return False
-    if not WINDOWS:
-        return False
     try:
-        environment = dict(os.environ, CONTINUATION_TASK_NAME=receipt["task_name"],
-                           CONTINUATION_TASK_PATH=receipt["task_path"])
-        result = subprocess.run(
-            [
-                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                "[Console]::OutputEncoding=[Text.UTF8Encoding]::new();$task = Get-ScheduledTask -TaskName $env:CONTINUATION_TASK_NAME "
-                "-TaskPath $env:CONTINUATION_TASK_PATH; "
-                "[pscustomobject]@{TaskName=$task.TaskName;TaskPath=$task.TaskPath;"
-                "State=$task.State.ToString();Description=$task.Description;"
-                "Actions=@($task.Actions | Select-Object Execute,Arguments,WorkingDirectory);"
-                "Triggers=@($task.Triggers);Enabled=$task.Settings.Enabled} | ConvertTo-Json -Compress",
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=5,
-            env=environment,
-        )
-    except (OSError, subprocess.SubprocessError):
+        scheduler = module("continuation_scheduler", workflow_root())
+        return scheduler.verify_receipt(receipt, path, owner, root, windows=WINDOWS)
+    except (OSError, RuntimeError, ValueError, TypeError):
         return False
-    try:
-        task = json.loads(result.stdout)
-    except ValueError:
-        return False
-    if not isinstance(task, dict) or task.get("State") == "Disabled":
-        return False
-    actions = task.get("Actions")
-    if not isinstance(actions, list) or len(actions) != 1:
-        return False
-    action = actions[0]
-    triggers = task.get("Triggers")
-    if not isinstance(action, dict) or task.get("Enabled") is not True or not triggers:
-        return False
-    if not any(isinstance(trigger, dict) and trigger.get("Enabled") is True for trigger in triggers):
-        return False
-    return (
-        task.get("TaskName") == receipt["task_name"]
-        and task.get("TaskPath") == receipt["task_path"]
-        and task.get("Description") == receipt["description"]
-        and action.get("Execute") == receipt["execute"]
-        and action.get("Arguments") == receipt["arguments"]
-        and exact_path(action.get("WorkingDirectory")) == str(root)
-    )
 
 
 def observed_wake(path, owner):
