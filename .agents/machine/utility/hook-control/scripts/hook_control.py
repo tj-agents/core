@@ -375,7 +375,7 @@ def restore(scope: str, config: Path) -> dict[str, Any]:
             raise ControlError("features.hooks changed while disabled; refusing to overwrite the user value")
         if original is False:
             reject_symlink(sidecar)
-            sidecar.unlink()
+            retry_windows_sharing_violation(sidecar.unlink)
             return {"action": "on", "changed": False, "config": str(config), "restored": original}
         updated = edit_value(raw, parsed, original)
         if config.exists() and config.read_bytes() != raw:
@@ -395,7 +395,7 @@ def restore(scope: str, config: Path) -> dict[str, Any]:
         else:
             atomic_write(config, updated)
         reject_symlink(sidecar)
-        sidecar.unlink()
+        retry_windows_sharing_violation(sidecar.unlink)
         return {"action": "on", "changed": True, "config": str(config), "restored": original}
 
 

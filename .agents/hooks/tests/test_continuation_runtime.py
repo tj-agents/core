@@ -229,6 +229,8 @@ class ContinuationTests(unittest.TestCase):
         attempted = threading.Event()
         errors = []
         original_replace = runtime.atomic_json.__globals__["os"].replace
+        original_read_text = Path.read_text
+        read_attempts = 0
 
         def replace(source, destination):
             attempted.set()
@@ -240,6 +242,16 @@ class ContinuationTests(unittest.TestCase):
             except BaseException as error:
                 errors.append(error)
 
+        def read_text(path, *args, **kwargs):
+            nonlocal read_attempts
+            if path == self.owner:
+                read_attempts += 1
+                if read_attempts == 1:
+                    error = PermissionError(13, "sharing violation")
+                    error.winerror = 32
+                    raise error
+            return original_read_text(path, *args, **kwargs)
+
         with mock.patch.object(runtime.atomic_json.__globals__["os"], "replace", side_effect=replace):
             with self.owner.open(encoding="utf-8") as reader:
                 reader.read()
@@ -247,11 +259,13 @@ class ContinuationTests(unittest.TestCase):
                 writer.start()
                 self.assertTrue(attempted.wait(timeout=5))
                 self.assertTrue(writer.is_alive())
-                self.assertEqual(runtime.read(self.owner)["reason"], original["reason"])
+                with mock.patch.object(Path, "read_text", new=read_text):
+                    self.assertEqual(runtime.read(self.owner)["reason"], original["reason"])
             writer.join(timeout=5)
 
         self.assertFalse(writer.is_alive())
         self.assertEqual(errors, [])
+        self.assertEqual(read_attempts, 2)
         self.assertEqual(runtime.read(self.owner)["reason"], "concurrent-save")
 
     def test_fresh_and_stale_foreground(self):
