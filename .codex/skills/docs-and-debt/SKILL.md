@@ -1,6 +1,6 @@
 ---
 name: docs-and-debt
-description: Compatibility entry for existing callers of the retired docs-and-debt name; remove after 2027-04-09. It owns no rule and routes to its replacement conventions; never select it for new work.
+description: Compatibility entry for existing callers of the retired docs-and-debt name; remove after 2027-04-09. It owns no rule and routes to engineering:docs and engineering:debt-records; never select it for new work.
 
 kind: convention
 domain: process
