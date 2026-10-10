@@ -303,6 +303,19 @@ class EndToEndTests(unittest.TestCase):
         self.assertEqual(2, result.returncode)
         self.assertIn("no persistent-workflow binding", result.stderr)
 
+    def test_native_unix_shell_launch_options_reject_an_unproved_target_before_gh(self):
+        options = (
+            ["--noprofile", "-lc"],
+            ["-l", "-c"],
+            ["-cl"],
+        )
+        for option in options:
+            with self.subTest(option=option):
+                command = ["bash", *option, M + " 42 --squash --auto", "trailing-$0", "trailing-$1"]
+                result = self.run_hook(command, native=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn("cannot prove this merge's checkout", result.stderr)
+
     def test_native_pwsh_command_span_rejects_an_unproved_target_before_gh(self):
         command = ["pwsh", "-c", M + " 42 --squash --auto", ";"]
 

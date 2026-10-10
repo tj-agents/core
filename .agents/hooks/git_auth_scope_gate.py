@@ -68,6 +68,21 @@ HOOK_NAME = "git-auth-scope-gate"
 # hook ignores is enforcement that is inert while looking wired.
 SHELL_TOOLS = {"bash", "powershell", "shell", "exec_command", "unified_exec", "local_shell"}
 
+UNIX_SHELLS = {"bash", "sh", "zsh", "dash"}
+UNIX_SHORT_FLAGS = frozenset("ilrsabefhkmnptuvxBCEHPT")
+UNIX_SHORT_FLAGS_WITH_ARGUMENT = {"o", "O"}
+UNIX_BASH_LONG_FLAGS = {
+    "--debugger",
+    "--login",
+    "--noediting",
+    "--noprofile",
+    "--norc",
+    "--posix",
+    "--restricted",
+    "--verbose",
+}
+UNIX_BASH_LONG_FLAGS_WITH_ARGUMENT = {"--init-file", "--rcfile"}
+
 # A line continuation is whitespace to the shell and is not whitespace to `\s`: PowerShell's
 # backtick and sh's backslash both bridge `gh auth` on one line to `refresh` on the next, and
 # without collapsing them first the pattern below simply does not match a command that runs.
@@ -114,13 +129,51 @@ def _shell_script_from_list(parts):
     if not cleaned:
         return None
     shell = Path(cleaned[0].replace("\\", "/")).stem.lower()
-    if len(cleaned) >= 3 and re.fullmatch(r"-[a-z]*c", cleaned[1]) and shell in (
-        "bash",
-        "sh",
-        "zsh",
-        "dash",
-    ):
-        return cleaned[2]
+    if shell in UNIX_SHELLS:
+        index = 1
+        while index < len(cleaned):
+            option = cleaned[index]
+            if option == "--":
+                break
+            if option.startswith("--"):
+                name, equals, value = option.partition("=")
+                if shell == "bash" and name in UNIX_BASH_LONG_FLAGS_WITH_ARGUMENT:
+                    if equals or index + 1 < len(cleaned):
+                        index += 1 if equals else 2
+                        continue
+                    break
+                if shell == "bash" and option in UNIX_BASH_LONG_FLAGS:
+                    index += 1
+                    continue
+                break
+            if not option.startswith("-") or option == "-":
+                break
+            command_option = False
+            needs_argument = False
+            for position, flag in enumerate(option[1:]):
+                if flag == "c":
+                    command_option = True
+                    continue
+                if flag in UNIX_SHORT_FLAGS:
+                    continue
+                if flag in UNIX_SHORT_FLAGS_WITH_ARGUMENT and position == len(option) - 2:
+                    needs_argument = True
+                    continue
+                break
+            else:
+                script_index = index + 1 + int(needs_argument)
+                if command_option:
+                    if script_index < len(cleaned):
+                        return cleaned[script_index]
+                    break
+                if needs_argument and script_index >= len(cleaned):
+                    break
+                index = script_index
+                continue
+            if needs_argument and index + 1 < len(cleaned):
+                index += 2
+                continue
+            break
     if shell in ("pwsh", "powershell"):
         for index, option in enumerate(cleaned[1:], 1):
             normalized = option[1:].casefold() if option[:1] in ("-", "/") else ""
