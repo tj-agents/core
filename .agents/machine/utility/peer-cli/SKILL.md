@@ -1,6 +1,6 @@
 ---
 name: peer-cli
-description: List, inspect and close the other Claude CLI sessions and their Windows Terminal tabs, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session or a stale tab, or to check what another session is doing before continuing. Windows-only until its Python port lands.
+description: List, inspect and close the other Claude or Codex CLI sessions and their terminal tabs, addressed by the tab title the user can see rather than an internal session name. Use when asked which CLIs are running, which tab to close, to close a finished session or a stale tab, or to check what another session is doing before continuing.
 
 kind: utility
 domain: machine
@@ -9,7 +9,7 @@ route: infer
 
 # Peer CLI sessions
 
-Windows-only until its Python port lands: its scripts need Windows PowerShell and Windows Terminal.
+The runtime is Python 3.9+ on Windows and Linux. Use `python3` on Linux/macOS and `python` on Windows.
 
 Two naming systems describe the same window. A session's own name is derived by the harness from its
 branch or directory (`refactor-postgresauthconsumer-ec`), while its tab is titled by whoever launched it
@@ -19,26 +19,36 @@ This skill addresses peers by tab title.
 `ListAgents` and `SendMessage` remain the way to enumerate and talk to in-harness peers. This skill is for
 the two things they do not do: resolving the title the user sees, and ending a session.
 
-```powershell
-& '<skill-directory>\scripts\peer-cli.ps1' list
-& '<skill-directory>\scripts\peer-cli.ps1' list -All
-& '<skill-directory>\scripts\peer-cli.ps1' list -Under 'C:\Users\name\source\repos\some-org'
-& '<skill-directory>\scripts\peer-cli.ps1' list -IncludeUnrecorded
-& '<skill-directory>\scripts\peer-cli.ps1' resolve 'Postgres sweep: Search'
-& '<skill-directory>\scripts\peer-cli.ps1' close 'Postgres sweep: Search'
+```sh
+# Linux/macOS: install Python 3.9+ as python3 before using this utility.
+python3 -B <skill-directory>/scripts/peer_cli.py list
+python3 -B <skill-directory>/scripts/peer_cli.py list --all
+python3 -B <skill-directory>/scripts/peer_cli.py list --under /path/to/some-org
+python3 -B <skill-directory>/scripts/peer_cli.py list --include-unrecorded
+python3 -B <skill-directory>/scripts/peer_cli.py resolve 'Postgres sweep: Search'
+python3 -B <skill-directory>/scripts/peer_cli.py close 'Postgres sweep: Search'
 ```
 
-`list` defaults to what the caller plausibly cares about: sessions under the current repository and under
-its parent folder (sibling checkouts in the same org). `-Under <path>` scopes explicitly instead; `-All`
-drops scoping and shows every recorded session on the machine. Outside a git repository, `list` cannot
-auto-scope and behaves like `-All`.
+```sh
+# Windows
+python -B <skill-directory>\scripts\peer_cli.py list
+python -B <skill-directory>\scripts\peer_cli.py close "Postgres sweep: Search"
+```
 
-`close` prompts unless `-Force`. A session records itself at SessionStart, so one started before that hook
-existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe`/`codex.exe` processes that own
+If that interpreter is not available, install Python 3.9+ and ensure `python` (Windows) or `python3`
+(Linux/macOS) is on PATH.
+
+`list` defaults to what the caller plausibly cares about: sessions under the current repository and under
+its parent folder (sibling checkouts in the same org). `--under <path>` scopes explicitly instead; `--all`
+drops scoping and shows every recorded session on the machine. Outside a git repository, `list` cannot
+auto-scope and behaves like `--all`.
+
+`close` prompts unless `--force`. A session records itself at SessionStart, so one started before that hook
+existed has no entry — `--include-unrecorded` also reports live `claude.exe`/`codex.exe` processes that own
 no entry, so a running CLI is never invisible just because it predates the registry.
 
 Liveness matches the recorded pid and its OS start time. An entry that cannot be matched is unknown, not
-dead, and `close` and `close-tab.ps1` refuse it without `-Force`.
+dead, and `close` and `close_tab.py` refuse it; an unknown identity is never killed.
 
 ## Closing the tab, not just the process
 
@@ -46,33 +56,53 @@ Ending the process is not closing the window. Terminal's default `closeOnExit: a
 whose process exited non-zero, and a killed one always does, so `peer-cli close` on its own leaves a dead
 pane. Two things fix that, and both are here:
 
-```powershell
-& '<skill-directory>\scripts\configure-terminal-tab-close.ps1'          # once per machine
-& '<skill-directory>\scripts\close-tab.ps1' -List
-& '<skill-directory>\scripts\close-tab.ps1' 'Postgres sweep: Search'
+```sh
+python3 -B <skill-directory>/scripts/configure_terminal_tab_close.py
+python3 -B <skill-directory>/scripts/close_tab.py --list
+python3 -B <skill-directory>/scripts/close_tab.py --title 'Postgres sweep: Search'
 ```
 
-The configurator sets `closeOnExit: always` on Terminal's profile defaults, so from then on a session
-takes its tab with it. `close-tab.ps1` is for tabs already left behind: Terminal exposes no command-line
-verb for closing one, so it drives UI Automation — it finds the `TabItem` whose Name matches and invokes
-that tab's own `CloseButton`, never a keystroke that would land on whichever tab has focus.
+```sh
+# Windows
+python -B <skill-directory>\scripts\configure_terminal_tab_close.py --preview
+python -B <skill-directory>\scripts\close_tab.py --list
+```
+
+On Windows, the configurator edits the default Windows Terminal `settings.json` path (or an explicit
+`--settings-path`), preserving JSONC layout and making a timestamped backup. Use `--preview` before a
+real change; `--close-on-exit` accepts `always`, `graceful`, `automatic`, or `never`. On Linux it is a
+no-op unless an explicit disposable `--settings-path` is supplied for a portable test.
+
+`close_tab.py --list` inventories actual tabs in the detected kitty or tmux terminal, or all Windows
+Terminal tabs through UI Automation; it also shows registered targets not presently discoverable. The
+Konsole rows are registry-backed only because Konsole has no safe global tab inventory. Its recorded full
+D-Bus service/session path is re-queried before a verified peer close.
+
+`close_tab.py --title` operates only on exactly one actual tab. A wildcard title (`*`, `?`, or `[...]`)
+always refuses unless `--all` is present, even if it happens to match one tab. Live, unrecorded, and
+unknown targets refuse unless `--force`; force changes only that terminal-tab liveness decision and never
+authorizes a process signal. Linux closes the exact kitty window or tmux pane, preserving siblings. Windows
+rescans UI Automation at close time and never uses focus keystrokes. A stale registered peer can be closed
+only by this explicit re-enumerated tab path, not by trusting its dead host process. For a stale Windows
+registration without an automation ID, its title must identify exactly one registered peer and one actual
+tab. Another exited registration with the same title remains ambiguous because its tab may still exist;
+inspect `close_tab.py --list` and select the visible target with `--title` instead.
 
 Its two refusals both exist because they were broken first:
 
-- **A wildcard reports and stops.** A pattern written to match several can match exactly one and close it
-  silently. `-All` opts in; an exact title is itself the decision.
-- **A live tab is refused.** Liveness is per tab, read from the session registry, so a stale tab is still
-  closable in a window full of busy ones. A title with no registry entry predates the hook and counts as
-  live, because unknown is not dead. `-Force` overrides.
+- **Unknown is never dead.** Failed process inspection, malformed identity and PID reuse do not authorize
+  a kill or cleanup. Force can select an explicit stale terminal target, but never bypasses pid/start-time
+  verification for a process signal.
 
 Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
-that through `finish.ps1`, beside these scripts.
+that through `finish.py`, beside these scripts.
 
-For a completed session whose checkout must remain, on Windows run exactly
-`powershell.exe -NoProfile -ExecutionPolicy Bypass -File <skill-directory>/scripts/close.ps1` with no
+For a completed session whose checkout must remain, run exactly
+`python3 -B <skill-directory>/scripts/close.py` on Linux/macOS or
+`python -B <skill-directory>\scripts\close.py` on Windows, with no
 arguments after the completion report. It requires this host's verified registry entry and attachment,
 closes only its own host or uniquely identified tab, and records session exit without changing files,
-branches or worktree registration. `finish.ps1` retains ownership of removable linked-worktree cleanup.
+branches or worktree registration. `finish.py` retains ownership of removable linked-worktree cleanup.
 
 ## Closing a peer
 
