@@ -19,7 +19,8 @@ This skill addresses peers by tab title.
 `ListAgents` and `SendMessage` remain the way to enumerate and talk to in-harness peers. This skill is for
 the two things they do not do: resolving the title the user sees, and ending a session.
 
-```powershell
+```sh
+# Linux/macOS: install Python 3.9+ as python3 before using this utility.
 python3 -B <skill-directory>/scripts/peer_cli.py list
 python3 -B <skill-directory>/scripts/peer_cli.py list --all
 python3 -B <skill-directory>/scripts/peer_cli.py list --under /path/to/some-org
@@ -28,13 +29,22 @@ python3 -B <skill-directory>/scripts/peer_cli.py resolve 'Postgres sweep: Search
 python3 -B <skill-directory>/scripts/peer_cli.py close 'Postgres sweep: Search'
 ```
 
+```sh
+# Windows
+python -B <skill-directory>\scripts\peer_cli.py list
+python -B <skill-directory>\scripts\peer_cli.py close "Postgres sweep: Search"
+```
+
+If that interpreter is not available, install Python 3.9+ and ensure `python` (Windows) or `python3`
+(Linux/macOS) is on PATH.
+
 `list` defaults to what the caller plausibly cares about: sessions under the current repository and under
-its parent folder (sibling checkouts in the same org). `-Under <path>` scopes explicitly instead; `-All`
+its parent folder (sibling checkouts in the same org). `--under <path>` scopes explicitly instead; `--all`
 drops scoping and shows every recorded session on the machine. Outside a git repository, `list` cannot
-auto-scope and behaves like `-All`.
+auto-scope and behaves like `--all`.
 
 `close` prompts unless `--force`. A session records itself at SessionStart, so one started before that hook
-existed has no entry — `-IncludeUnrecorded` also reports live `claude.exe`/`codex.exe` processes that own
+existed has no entry — `--include-unrecorded` also reports live `claude.exe`/`codex.exe` processes that own
 no entry, so a running CLI is never invisible just because it predates the registry.
 
 Liveness matches the recorded pid and its OS start time. An entry that cannot be matched is unknown, not
@@ -46,17 +56,34 @@ Ending the process is not closing the window. Terminal's default `closeOnExit: a
 whose process exited non-zero, and a killed one always does, so `peer-cli close` on its own leaves a dead
 pane. Two things fix that, and both are here:
 
-```powershell
+```sh
 python3 -B <skill-directory>/scripts/configure_terminal_tab_close.py
 python3 -B <skill-directory>/scripts/close_tab.py --list
+python3 -B <skill-directory>/scripts/close_tab.py --title 'Postgres sweep: Search'
 ```
 
-The configurator gives the Windows Terminal settings path and is a no-op on Linux. `close_tab.py` resolves
-an actual terminal target before acting: the registered host must belong to the exact kitty window, tmux
-pane on its recorded server, or Konsole session process ancestry. On Windows it rescans UI Automation and
-uses either a recorded automation id or a unique registered/live title; it never uses focus or wildcard
-title matching. Konsole has no supported D-Bus close method: it signals the verified session root process,
-so the terminal profile must be configured to close a tab when that process exits.
+```sh
+# Windows
+python -B <skill-directory>\scripts\configure_terminal_tab_close.py --preview
+python -B <skill-directory>\scripts\close_tab.py --list
+```
+
+On Windows, the configurator edits the default Windows Terminal `settings.json` path (or an explicit
+`--settings-path`), preserving JSONC layout and making a timestamped backup. Use `--preview` before a
+real change; `--close-on-exit` accepts `always`, `graceful`, `automatic`, or `never`. On Linux it is a
+no-op unless an explicit disposable `--settings-path` is supplied for a portable test.
+
+`close_tab.py --list` inventories actual tabs in the detected kitty or tmux terminal, or all Windows
+Terminal tabs through UI Automation; it also shows registered targets not presently discoverable. The
+Konsole rows are registry-backed only because Konsole has no safe global tab inventory. Its recorded full
+D-Bus service/session path is re-queried before a verified peer close.
+
+`close_tab.py --title` operates only on exactly one actual tab. A wildcard title (`*`, `?`, or `[...]`)
+always refuses unless `--all` is present, even if it happens to match one tab. Live, unrecorded, and
+unknown targets refuse unless `--force`; force changes only that terminal-tab liveness decision and never
+authorizes a process signal. Linux closes the exact kitty window or tmux pane, preserving siblings. Windows
+rescans UI Automation at close time and never uses focus keystrokes. A stale registered peer can be closed
+only by this explicit re-enumerated tab path, not by trusting its dead host process.
 
 Its two refusals both exist because they were broken first:
 

@@ -39,6 +39,44 @@ class PeerCliTests(unittest.TestCase):
             "terminal": {"kind": "windows-terminal"},
         }
         with mock.patch.object(peer_cli, "records", return_value=[stale]):
-            with mock.patch.object(peer_cli.close_tab, "close_entry") as close_terminal:
+            with mock.patch.object(peer_cli.close_tab, "close_stale_entry") as close_terminal, \
+                    mock.patch.object(peer_cli.os, "kill") as killer:
                 self.assertEqual(peer_cli.main(["close", "stale", "--force"]), 0)
-        close_terminal.assert_called_once_with(stale, force=True)
+        close_terminal.assert_called_once_with(stale)
+        killer.assert_not_called()
+
+    def test_windows_uia_unavailable_uses_verified_host_only_fallback(self):
+        target = {
+            "title": "peer", "session_id": "peer", "pid": 31, "pid_started_at": 4.0,
+            "terminal": {"kind": "windows-terminal"},
+        }
+        with mock.patch.object(peer_cli.close_tab, "close_entry",
+                               side_effect=peer_cli.close_tab.TerminalUnavailable("no UIA")), \
+                mock.patch.object(peer_cli.session_close, "verified_live", return_value=True), \
+                mock.patch.object(peer_cli.os, "kill") as killer:
+            self.assertTrue(peer_cli.close_terminal_or_host(target, force=False))
+        killer.assert_called_once_with(31, peer_cli.signal.SIGTERM)
+
+    def test_windows_ambiguous_tab_never_uses_host_only_fallback(self):
+        target = {
+            "title": "peer", "session_id": "peer", "pid": 31, "pid_started_at": 4.0,
+            "terminal": {"kind": "windows-terminal"},
+        }
+        with mock.patch.object(peer_cli.close_tab, "close_entry",
+                               side_effect=peer_cli.close_tab.TerminalRefusal("ambiguous")), \
+                mock.patch.object(peer_cli.os, "kill") as killer:
+            with self.assertRaisesRegex(peer_cli.close_tab.TerminalRefusal, "ambiguous"):
+                peer_cli.close_terminal_or_host(target, force=False)
+        killer.assert_not_called()
+
+    def test_unknown_identity_never_signals_a_process_even_with_force(self):
+        target = {
+            "title": "unknown", "session_id": "unknown", "pid": 31,
+            "pid_started_at": 4.0, "alive": None,
+            "terminal": {"kind": "windows-terminal"},
+        }
+        with mock.patch.object(peer_cli, "records", return_value=[target]), \
+                mock.patch.object(peer_cli.os, "kill") as killer:
+            with self.assertRaisesRegex(peer_cli.session_close.Refusal, "unknown"):
+                peer_cli.main(["close", "unknown", "--force"])
+        killer.assert_not_called()
