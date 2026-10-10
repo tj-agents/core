@@ -48,9 +48,9 @@ what still needs checking on Windows.
   deleted. Verified by opening a real tab in kitty on this machine (#108).
 - [x] 3. `handoff-claude` -> Python, then `handoff-codex` -> Python (`codex_marketplace_sync.ps1` with it).
   `engineering:handoff` works on Linux from here; verified with a real handoff.
-- [ ] 4. Terminal start hooks: `claude-profile.ps1`/`claude_terminal_profile.py` and `codex-profile.ps1`
-  refresh standards when `claude`/`codex` is typed, wired for bash as well as PowerShell (looking for
-  both `python3` and `python`); `agent-cli.ps1` deleted.
+- [ ] 4. Terminal start hooks: Python terminal-profile installers refresh standards when `claude`/`codex`
+  is typed, wired for Bash on Linux and PowerShell on Windows/Linux (discovering `python3`, `python`, and
+  Windows `py -3` without Store stubs); the retired PowerShell launchers are deleted.
 - [x] 5. `peer-cli` -> Python: `close.py` and `finish.py` (with `finish_reaper`/`session_close` ported) let
   a merged session on Linux remove its linked worktree and branch, clear its merge-cleanup obligation,
   record verified session exit, and close its own kitty/tmux/Konsole tab; `merge_cleanup_gate`'s message
@@ -73,6 +73,32 @@ what still needs checking on Windows.
   each shipped script retires with that script's port or gains a Linux counterpart.
 
 ## Current progress
+
+- PR: not opened
+
+Step 4 was picked up on `Refactor/LinuxTerminalStartHooks` with the boundary limited to terminal-start
+standards refresh, its tests and documentation. Its successor remains Step 7; Steps 7 and 10 are not
+implementation scope for this slice.
+
+The primary acknowledged the handoff and completed bounded L3 discovery. Native L4 implementation
+uses the canonical Codex lane table; compatibility repairs and focused validation are complete; review and
+delivery remain. The existing single-file legacy plan remains the recovery owner, without adding a roadmap
+solely to satisfy a separate ledger's graph requirements.
+
+The current cutover measures about 1,900 added/deleted authored lines across 27 paths, including
+321 retired PowerShell runtime lines and 412 retired PowerShell test lines; generated output is excluded.
+Separate Claude/Codex ports could be shipped, but the user explicitly selected one reviewed PR per step.
+Keep this exception focused on the one shared profile/bootstrap/dispatch contract, validate actual shell
+integration, and include independent correctness/security review plus Windows/Linux CI. No additional
+runtime concern joins this slice. Historical references in other plans retain their original Windows acceptance evidence;
+they are deliberate historical survivors of the deleted scripts, not current launch instructions.
+
+GitHub inspection found no active main rulesets or classic branch protection. The user explicitly approved
+requiring `verify-linux` with a GitHub Actions exception on 2026-10-10. GitHub rejected that exception
+with HTTP 422: its built-in Actions integration cannot bypass this repository ruleset. The repository
+has no existing publishing-app credential (only `TJ_AGENTS_READ_TOKEN`). Protection remains unchanged
+to preserve the current post-merge generated-package publisher. An installed publishing app or a separate
+validated publishing-workflow change is required before enabling the approved check requirement.
 
 Step 5 is complete in merged PR #181: reviewed head `97bc4ffeacd1d05fbf3dc4deb235631f17150b1e`, merge
 `3ff817a923362ac21dbe6aae9fc14a3d4d787c6f`. Exact-head run 38069524094 passed `verify-windows` and
@@ -104,55 +130,55 @@ next substantive PR, with no separate Step 5 metadata PR.
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "shared_source": ".agents/machine/utility/peer-cli and .agents/hooks/merge_cleanup_gate.py",
+  "shared_source": ".agents/machine/scripts terminal-profile installers, bootstrap and Python command dispatch",
   "hosts": [
     {
       "host": "claude",
-      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
-      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
-      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.claude_allow",
+      "behavior": "Typed claude commands resolve the active machine package and refresh standards before sessions; Bash/Linux and PowerShell/Windows/Linux use shared Python dispatch.",
+      "source": ".agents/machine/scripts/claude_terminal_profile.py; claude_terminal_launcher.py; terminal_command.py",
+      "mapping": ".agents/plugins/manifests/claude/machine-hooks.json; .agents/plugins/sources.json resources/machine/scripts mapping",
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "971 source tests (17 skips), 990 runtime tests (four skips), 29 close-tab tests and 23 lifecycle tests passed locally; generated invariants and both host mappings passed. Exact-head verify-windows and verify-linux CI passed. Installed-host adoption and actual Windows desktop UI Automation are not claimed."
+            "evidence": "21 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 991 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     },
     {
       "host": "codex",
-      "behavior": "Merged sessions use the shared Python close/finish lifecycle with verified process and terminal ownership.",
-      "source": ".agents/machine/utility/peer-cli/scripts/*.py; .agents/machine/scripts/reap_orphans.py",
-      "mapping": ".agents/plugins/sources.json machine mappings and .agents/plugins/harness/machine.json permissions.codex_prefix_rules",
+      "behavior": "Typed codex commands resolve the active machine package and refresh standards before sessions; Bash/Linux and PowerShell/Windows/Linux use shared Python dispatch.",
+      "source": ".agents/machine/scripts/codex_terminal_profile.py; codex_terminal_launcher.py; terminal_command.py",
+      "mapping": ".agents/plugins/manifests/codex/machine-hooks.json; .agents/plugins/sources.json resources/machine/scripts mapping",
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "971 source tests (17 skips), 990 runtime tests (four skips), 29 close-tab tests and 23 lifecycle tests passed locally; generated invariants and both host mappings passed. Exact-head verify-windows and verify-linux CI passed. Actual native Linux Codex merge/argument-free finish proved verified process exit, kitty tab closure, worktree/branch removal and matching obligation clearance; receipt /home/tommy/.agents-state/merge-cleanup/results/d8f69af9dfb740a0bcd44a5b083bccdf.json. Installed-host adoption and actual Windows desktop UI Automation are not claimed."
+            "evidence": "21 focused terminal tests (one Windows-only skip), 37 Codex-sync regressions, 991 complete source tests (17 skips) and 1001 complete shared-runtime tests (four skips) passed locally. Bash and PowerShell, including legacy argument mode, used disposable profiles. Generated-tree, catalog, harness and tier invariants passed. Windows CI, installed-host adoption and a real Windows desktop remain pending."
       }
     }
   ]
 }
 ```
 
+## Reviews
+
+Pending independent frozen code review at `reviews/Refactor-LinuxTerminalStartHooks.md`.
+
 ## Next Steps
 
-Step 5 is complete. The fresh successor owns Step 4 only in the primary checkout
-`/home/tommy/projects/tj-agents/core`, branch `Refactor/LinuxTerminalStartHooks`.
-Implement, review, run both complete local suites before stable pushes, validate Windows/Linux CI and
-merge one Step 4 PR, then checkpoint and hand off to a fresh session for Step 7. Do not implement
-Steps 7 or 10 in this session. The whole port remains authorized one reviewed PR per step.
+Freeze and independently review the completed Step 4 implementation, then publish the stable candidate
+for Windows/Linux CI validation in the primary
+checkout `/home/tommy/projects/tj-agents/core`, branch `Refactor/LinuxTerminalStartHooks`. Its successor
+owns Step 7 only after Step 4 lands. Do not implement Steps 7 or 10 in this session. The whole port
+remains authorized one reviewed PR per step.
 
-First acknowledge this handoff in this goal, inspect the existing shell/profile wiring and establish
-Step 4's implementation boundary. Lane L3 for bounded discovery because profile and shell integration
-still need examination; route specified implementation to L4. Native Codex CLI supports the configured
-L4 model; the built-in subagent roster is not the native CLI model catalog. Follow the available lane
-control without repeating the predecessor's erroneous model-unavailability exception. Remove the
-working pointer `plans/linux-port/HANDOFF_STEP4.md` after reading it, so it does not become permanent guidance.
+Scope: current slice only; full plan remains incomplete.
+Current slice: Step 4 terminal-start refresh and its authorized Linux-check requirement.
+Remaining scope: Steps 7 and 10, handed to a fresh session after Step 4 delivery.
+Done when: one reviewed Step 4 PR is merged with Windows/Linux CI green and its successor is launched.
 
-Step 4 ports terminal-start standards refresh for both hosts: `claude-profile.ps1`/
-`claude_terminal_profile.py` and `codex-profile.ps1`, wired for bash and PowerShell and discovering
-both `python3` and `python`. Delete `agent-cli.ps1`; resolve the machine debt about
-`Find-CodexPython` as its behavior moves into the Python replacement. Read README.md before structure
-changes and CODE_CONVENTIONS.md before runtime changes. Platform directory reorganization is separate
-recorded debt and is outside this functional port.
+Step 4 has implemented Python terminal-profile installers and launchers for both hosts, wired for Bash on Linux
+and PowerShell on Windows/Linux. They discover `python3`, `python`, and Windows `py -3`, skip Store stubs,
+and replaced the retired PowerShell launchers. Platform directory reorganization is separate recorded debt
+and is outside this functional port.
 
 The user approved making `verify-linux` a required PR check on 2026-10-10. Inspect current main
 protection/rulesets, preserve existing requirements and apply that specific requirement in this session.

@@ -37,7 +37,7 @@ class TerminalProfileTests(unittest.TestCase):
     def test_both_editions_get_the_block_once(self):
         code, output = self.run_hook()
         self.assertEqual(code, 0)
-        self.assertIn('new PowerShell terminals now refresh Claude plugins', output)
+        self.assertIn('new terminals now refresh Claude plugins', output)
         for path in self.paths:
             self.assertEqual(path.read_bytes().decode('utf-8'), PROFILE.BLOCK + '\r\n')
         self.assertEqual(self.run_hook(), (0, ''))

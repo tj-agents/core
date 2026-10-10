@@ -22,8 +22,8 @@ SPEC.loader.exec_module(CLI)
 
 
 # A model of what Windows Terminal does to `wt --window 0 new-tab ... --suppressApplicationTitle <exe>
-# <args>` before the tab process sees it, ported from the C# stub in handoff-launchers.tests.ps1, where each
-# stage was checked against a real wt.exe. First it splits its own argv on `;` into subcommands, unescaping
+# <args>` before the tab process sees it, ported from the former C# launcher fixture, where each stage was
+# checked against a real wt.exe. First it splits its own argv on `;` into subcommands, unescaping
 # `\;` to a literal `;` by dropping one backslash. Then it re-joins the tab command into one string, quoting
 # a token only when it contains a space and escaping nothing inside it, and the tab process parses that
 # string by CommandLineToArgvW rules.

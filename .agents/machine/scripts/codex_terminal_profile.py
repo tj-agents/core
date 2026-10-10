@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Install minimal terminal adapters for the active machine plugin's ``codex`` launcher."""
+
 from __future__ import annotations
 
 import argparse
@@ -6,42 +8,93 @@ import os
 from pathlib import Path
 import sys
 
-from claude_terminal_profile import documents_directory, profile_encoding, profile_paths
+from claude_terminal_profile import BOOTSTRAP, documents_directory, profile_encoding, profile_paths
 
 
 START = "# >>> base-agents codex launcher >>>"
 END = "# <<< base-agents codex launcher <<<"
 OPT_OUT_ENV = "BASE_AGENTS_CODEX_PROFILE"
-BLOCK = "\r\n".join((
+
+POWERSHELL_BLOCK = "\r\n".join((
     START,
-    "$baseAgentsCodexProfile = $null",
-    "try {",
-    "    $baseAgentsCodexCommand = @(Get-Command codex -CommandType Application, ExternalScript"
-    " -ErrorAction SilentlyContinue)[0]",
-    "    if ($baseAgentsCodexCommand) {",
-    "        $baseAgentsCodexInventory = & $baseAgentsCodexCommand.Source plugin list --json |"
-    " ConvertFrom-Json -ErrorAction Stop",
-    "        if ($LASTEXITCODE -eq 0) {",
-    "            $baseAgentsCodexMachine = @($baseAgentsCodexInventory.installed |"
-    " Where-Object { $_.pluginId -eq 'machine@base-agents' -and $_.enabled })[0]",
-    "            if ($baseAgentsCodexMachine.version -match '^[A-Za-z0-9][A-Za-z0-9._-]*$' -and"
-    " $baseAgentsCodexMachine.version -notmatch '\\.\\.') {",
-    "                $baseAgentsCodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME }"
-    " else { Join-Path $env:USERPROFILE '.codex' }",
-    "                $baseAgentsCodexProfile = Join-Path $baseAgentsCodexHome"
-    " ('plugins\\cache\\base-agents\\machine\\' + $baseAgentsCodexMachine.version +"
-    " '\\resources\\machine\\scripts\\codex-profile.ps1')",
-    "            }",
-    "        }",
+    "$baseAgentsPython = $null",
+    "$baseAgentsWindows = $IsWindows -or $env:OS -eq 'Windows_NT'",
+    "foreach ($baseAgentsName in $(if ($baseAgentsWindows) { @('python', 'python3', 'py') } else { @('python3', 'python') })) {",
+    "    foreach ($baseAgentsCandidate in @(Get-Command $baseAgentsName -CommandType Application -ErrorAction SilentlyContinue)) {",
+    "        if ($baseAgentsWindows -and $baseAgentsCandidate.Source -match '\\\\WindowsApps\\\\') { continue }",
+    "        $baseAgentsArguments = if ($baseAgentsName -eq 'py') { @('-3') } else { @() }",
+    "        & $baseAgentsCandidate.Source @baseAgentsArguments -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>$null",
+    "        if ($LASTEXITCODE -eq 0) { $baseAgentsPython = [pscustomobject]@{ Path = $baseAgentsCandidate.Source; Arguments = $baseAgentsArguments }; break }",
     "    }",
-    "} catch { }",
-    "if ($baseAgentsCodexProfile -and (Test-Path -LiteralPath $baseAgentsCodexProfile)) {"
-    " . $baseAgentsCodexProfile }",
+    "    if ($baseAgentsPython) { break }",
+    "}",
+    "$baseAgentsBootstrap = @'",
+    BOOTSTRAP,
+    "'@",
+    "if ($PSVersionTable.PSVersion -lt [version]'7.3' -or (Get-Variable PSNativeCommandArgumentPassing -ValueOnly -ErrorAction SilentlyContinue) -eq 'Legacy') {",
+    '    $baseAgentsBootstrap = $baseAgentsBootstrap -replace \'(\\\\*)"\', \'$1$1\\"\'',
+    '}',
+    "function global:codex {",
+    "    $baseAgentsTarget = @(Get-Command codex -All -CommandType Application, ExternalScript -ErrorAction SilentlyContinue)[0]",
+    "    if (-not $baseAgentsTarget) { Write-Error 'codex executable not found on PATH'; return }",
+    "    if ($baseAgentsPython) {",
+    "        & $baseAgentsPython.Path @($baseAgentsPython.Arguments) -B -c $baseAgentsBootstrap --probe codex $baseAgentsTarget.Source (Get-Location).Path",
+    "        if ($LASTEXITCODE -eq 0) { & $baseAgentsPython.Path @($baseAgentsPython.Arguments) -B -c $baseAgentsBootstrap codex $baseAgentsTarget.Source (Get-Location).Path @args; return }",
+    "    } else { Write-Warning 'standards: no usable Python was found; running the typed CLI without refresh' }",
+    "    & $baseAgentsTarget.Source @args",
+    "}",
+    "function global:codex-hooks {",
+    "    $baseAgentsTarget = @(Get-Command codex -All -CommandType Application, ExternalScript -ErrorAction SilentlyContinue)[0]",
+    "    if (-not $baseAgentsTarget -or -not $baseAgentsPython) { Write-Error 'Codex hook-control utility is not installed'; return }",
+    "    & $baseAgentsPython.Path @($baseAgentsPython.Arguments) -B -c $baseAgentsBootstrap codex-hooks $baseAgentsTarget.Source (Get-Location).Path @args",
+    "}",
     END,
 ))
 
+BASH_BLOCK = "\n".join((
+    START,
+    "_base_agents_python() {",
+    "  local candidate",
+    "  for candidate in python3 python; do",
+    "    command -v \"$candidate\" >/dev/null 2>&1 && \"$candidate\" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1 && { command -v \"$candidate\"; return; }",
+    "  done",
+    "  return 1",
+    "}",
+    "_base_agents_bootstrap='" + BOOTSTRAP.replace("'", "'\\''") + "'",
+    "codex() {",
+    "  local target python",
+    "  target=$(type -P codex) || { printf '%s\\n' 'codex executable not found on PATH' >&2; return 127; }",
+    "  if python=$(_base_agents_python); then",
+    "    if \"$python\" -B -c \"$_base_agents_bootstrap\" --probe codex \"$target\" \"$PWD\"; then",
+    "      if \"$python\" -B -c \"$_base_agents_bootstrap\" codex \"$target\" \"$PWD\" \"$@\"; then return 0; else return $?; fi",
+    "    fi",
+    "  else printf '%s\\n' 'standards: no usable Python was found; running the typed CLI without refresh' >&2; fi",
+    "  \"$target\" \"$@\"",
+    "}",
+    "codex-hooks() {",
+    "  local target python",
+    "  target=$(type -P codex) || { printf '%s\\n' 'Codex hook-control utility is not installed' >&2; return 1; }",
+    "  python=$(_base_agents_python) || { printf '%s\\n' 'Codex hook-control utility requires Python 3.9 or newer' >&2; return 1; }",
+    "  \"$python\" -B -c \"$_base_agents_bootstrap\" codex-hooks \"$target\" \"$PWD\" \"$@\"",
+    "}",
+    END,
+))
 
-def ensure(path: Path) -> bool:
+BLOCK = POWERSHELL_BLOCK
+
+
+def terminal_paths(home: Path, documents: Path | None = None) -> list[tuple[Path, str]]:
+    if documents is not None:
+        return [(path, POWERSHELL_BLOCK) for path in profile_paths(documents)]
+    if os.name == "nt":
+        return [(path, POWERSHELL_BLOCK) for path in profile_paths(documents or documents_directory())]
+    return [
+        (home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1", POWERSHELL_BLOCK),
+        (home / ".bashrc", BASH_BLOCK),
+    ]
+
+
+def ensure(path: Path, block: str = POWERSHELL_BLOCK) -> bool:
     raw = path.read_bytes() if path.is_file() else b""
     encoding = profile_encoding(raw)
     text = raw.decode(encoding)
@@ -51,12 +104,13 @@ def ensure(path: Path) -> bool:
     if START in text:
         before, rest = text.split(START, 1)
         body, after = rest.split(END, 1)
-        if (START + body + END).replace("\r\n", "\n") == BLOCK.replace("\r\n", "\n"):
+        if (START + body + END).replace("\r\n", "\n") == block.replace("\r\n", "\n"):
             return False
-        updated = before + BLOCK + after
+        updated = before + block + after
     else:
         prefix = text.rstrip()
-        updated = (prefix + "\r\n\r\n" if prefix else "") + BLOCK + "\r\n"
+        newline = "\r\n" if "\r\n" in text or path.suffix.casefold() == ".ps1" else "\n"
+        updated = (prefix + newline * 2 if prefix else "") + block + newline
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_bytes(updated.encode(encoding))
@@ -65,26 +119,26 @@ def ensure(path: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--documents", type=Path)
+    parser.add_argument("--home", type=Path)
     arguments = parser.parse_args(argv)
-    if os.environ.get(OPT_OUT_ENV, "").strip().lower() == "off" or (os.name != "nt" and arguments.documents is None):
+    if os.environ.get(OPT_OUT_ENV, "").strip().lower() == "off":
         return 0
     try:
-        paths = profile_paths(arguments.documents or documents_directory())
+        paths = terminal_paths(arguments.home or Path.home(), arguments.documents)
     except OSError as error:
-        print(f"standards: the PowerShell Codex launcher was not installed ({error})")
+        print(f"standards: the Codex terminal launchers were not installed ({error})")
         return 0
     changed = []
-    for path in paths:
+    for path, block in paths:
         try:
-            if ensure(path):
+            if ensure(path, block):
                 changed.append(path)
         except (OSError, UnicodeError, ValueError) as error:
-            print(f"standards: the PowerShell Codex launcher was not installed in {path} ({error})")
+            print(f"standards: the Codex terminal launcher was not installed in {path} ({error})")
     if changed:
-        print("standards: new PowerShell terminals now refresh Codex plugins before `codex` starts "
-              f"({', '.join(str(path) for path in changed)})")
+        print(f"standards: new terminals now refresh Codex plugins before `codex` starts ({', '.join(str(path) for path in changed)})")
     return 0
 
 
