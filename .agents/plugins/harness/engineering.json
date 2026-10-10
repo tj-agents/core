@@ -3,8 +3,8 @@
   "plugin": "base-agents/engineering",
   "source_roots": [
     ".agents/engineering",
-    ".agents/workflows",
-    ".agents/hooks/cleanup_dependency.py"
+    ".agents/hooks/cleanup_dependency.py",
+    ".agents/workflows"
   ],
   "requires": {
     "marketplaces": [
