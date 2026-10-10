@@ -21,8 +21,15 @@ foreach ($window in @($root.FindAll([System.Windows.Automation.TreeScope]::Child
     }
 }
 if ($Json) {
-    @($tabs | ForEach-Object { [pscustomobject]@{ title = $_.Title; automationId = $_.AutomationId } }) |
-        ConvertTo-Json -Compress
+    # ConvertTo-Json enumerates a single pipeline object differently from an array. Build the
+    # brackets ourselves so Windows PowerShell 5.1 emits [] for zero tabs and an array for one or many.
+    $items = @($tabs | ForEach-Object {
+        ConvertTo-Json -InputObject ([pscustomobject]@{
+            title = $_.Title
+            automationId = $_.AutomationId
+        }) -Compress
+    })
+    Write-Output ('[' + ($items -join ',') + ']')
     return
 }
 if (-not $TabId -and -not $Title) { throw 'Specify -TabId or -Title.' }
@@ -32,6 +39,6 @@ $matches = @($tabs | Where-Object {
 if ($matches.Count -ne 1) { throw 'Windows Terminal target is absent or ambiguous.' }
 $close = New-Object System.Windows.Automation.PropertyCondition(
     [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'CloseButton')
-$button = $matches[0].FindFirst([System.Windows.Automation.TreeScope]::Descendants, $close)
+$button = $matches[0].Element.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $close)
 if (-not $button) { throw "Windows Terminal tab '$($matches[0].Title)' has no close button." }
 $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()

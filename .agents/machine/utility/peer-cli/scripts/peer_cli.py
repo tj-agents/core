@@ -52,6 +52,23 @@ def select(items, needle):
     return matches[0]
 
 
+def close_terminal_or_host(target, force):
+    """Close a verified terminal, falling back only when Windows UIA is unavailable."""
+    terminal = target.get("terminal")
+    if not isinstance(terminal, dict):
+        return False
+    try:
+        close_tab.close_entry(target, force=force)
+    except close_tab.TerminalUnavailable:
+        if terminal.get("kind") != "windows-terminal":
+            raise
+        if not session_close.verified_live(target["pid"], target.get("pid_started_at")):
+            raise session_close.Refusal("host identity changed before host-only fallback")
+        os.kill(target["pid"], signal.SIGTERM)
+        return True
+    return False
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("list", "resolve", "close"))
@@ -79,7 +96,7 @@ def main(argv=None):
         if not args.force or not isinstance(terminal, dict):
             print("already gone")
             return 0
-        close_tab.close_entry(target, force=True)
+        close_tab.close_stale_entry(target)
         print("Closed stale {!r}.".format(target.get("title") or target["session_id"]))
         return 0
     if target["alive"] is not True:
@@ -90,16 +107,18 @@ def main(argv=None):
     if not session_close.verified_live(target["pid"], target.get("pid_started_at")):
         raise session_close.Refusal("host identity changed before close")
     if isinstance(terminal, dict):
-        close_tab.close_entry(target, force=args.force)
+        host_only = close_terminal_or_host(target, force=args.force)
     else:
         os.kill(target["pid"], signal.SIGTERM)
-    print("Closed {!r}.".format(target.get("title") or target["session_id"]))
+        host_only = False
+    suffix = " (host only; the tab may remain)." if host_only else "."
+    print("Closed {!r}{}".format(target.get("title") or target["session_id"], suffix))
     return 0
 
 
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except session_close.Refusal as error:
+    except (session_close.Refusal, close_tab.TerminalRefusal) as error:
         print("peer-cli: " + str(error), file=sys.stderr)
         raise SystemExit(2)
