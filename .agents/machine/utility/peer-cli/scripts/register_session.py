@@ -1,7 +1,7 @@
 """SessionStart hook: record this session's id, tab title, directory and host pid.
 
 The launchers export `AGENT_CLI_TAB_TITLE` when they open a tab (`agent_cli.py`'s `launch_tab`); a
-session started by hand exports nothing and records a null title. `peer-cli.ps1` reads these entries to
+session started by hand exports nothing and records a null title. `peer_cli.py` reads these entries to
 resolve a session from the tab title a user can see, and the reverse.
 
 Codex runs hooks through a shell, so the parent pid is a transient shell rather than the CLI. The
@@ -104,6 +104,7 @@ def _windows_process_table():
     TH32CS_SNAPPROCESS = 0x00000002
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     INVALID_HANDLE_VALUE = -1
+    ERROR_NO_MORE_FILES = 18
 
     class PROCESSENTRY32W(ctypes.Structure):
         _fields_ = [
@@ -165,7 +166,10 @@ def _windows_process_table():
     table = {}
     try:
         if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
-            return table
+            error = ctypes.get_last_error()
+            if error == ERROR_NO_MORE_FILES:
+                return table
+            raise OSError(error, "cannot enumerate the process table")
         while True:
             pid = int(entry.th32ProcessID)
             table[pid] = ProcessInfo(
@@ -175,7 +179,10 @@ def _windows_process_table():
                 started_at=started_at(pid),
             )
             if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
-                break
+                error = ctypes.get_last_error()
+                if error == ERROR_NO_MORE_FILES:
+                    break
+                raise OSError(error, "cannot enumerate the process table")
     finally:
         kernel32.CloseHandle(snapshot)
     return table
@@ -199,24 +206,26 @@ def _linux_clock_ticks():
 def _linux_lookup(pid):
     try:
         raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
-    except OSError:
+    except FileNotFoundError:
         return None
+    except OSError:
+        raise
     try:
         name_start = raw.index("(")
         name_end = raw.rindex(")")
-    except ValueError:
-        return None
+    except ValueError as error:
+        raise ValueError("malformed /proc process identity") from error
     name = raw[name_start + 1:name_end]
     fields = raw[name_end + 2:].split()
     try:
         ppid = int(fields[1])
         starttime_ticks = int(fields[19])
-    except (IndexError, ValueError):
-        return None
+    except (IndexError, ValueError) as error:
+        raise ValueError("malformed /proc process fields") from error
     try:
         started_at = _linux_boot_time() + starttime_ticks / _linux_clock_ticks()
     except OSError:
-        return None
+        raise
     return ProcessInfo(pid=pid, ppid=ppid, name=name, started_at=started_at)
 
 
@@ -225,8 +234,8 @@ def _parse_ps_lstart(text):
 
     try:
         return datetime.datetime.strptime(text.strip(), "%a %b %d %H:%M:%S %Y").timestamp()
-    except ValueError:
-        return None
+    except ValueError as error:
+        raise ValueError("malformed ps process start time") from error
 
 
 def _ps_lookup(pid):
@@ -237,20 +246,22 @@ def _ps_lookup(pid):
             ["ps", "-o", "ppid=,comm=,lstart=", "-p", str(pid)],
             capture_output=True, text=True, timeout=2, check=False,
         )
-    except (OSError, subprocess.SubprocessError):
-        return None
+    except (OSError, subprocess.SubprocessError) as error:
+        raise OSError("ps process lookup failed") from error
     if result.returncode != 0:
-        return None
+        if not result.stdout.strip() and not result.stderr.strip():
+            return None
+        raise OSError("ps process lookup failed: " + result.stderr.strip())
     line = result.stdout.strip()
     if not line:
         return None
     parts = line.split(None, 2)
     if len(parts) < 3:
-        return None
+        raise ValueError("malformed ps process identity")
     try:
         ppid = int(parts[0])
-    except ValueError:
-        return None
+    except ValueError as error:
+        raise ValueError("malformed ps parent pid") from error
     return ProcessInfo(pid=pid, ppid=ppid, name=parts[1], started_at=_parse_ps_lstart(parts[2]))
 
 
@@ -260,6 +271,25 @@ def build_process_lookup():
     if sys.platform == "linux":
         return _linux_lookup
     return _ps_lookup
+
+
+def process_table():
+    """Return a best-effort process table for discovery, never a permission bypass."""
+    if os.name == "nt":
+        return _windows_process_table()
+    if sys.platform == "linux":
+        table = {}
+        for path in Path("/proc").iterdir():
+            if not path.name.isdigit():
+                continue
+            try:
+                info = _linux_lookup(int(path.name))
+            except (OSError, ValueError):
+                continue
+            if info is not None:
+                table[info.pid] = info
+        return table
+    return {}
 
 
 def read_payload():
@@ -272,6 +302,38 @@ def read_payload():
     except ValueError:
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def terminal_identity(environ=None):
+    """Return the exact terminal handle available to this session, never a title guess."""
+    values = os.environ if environ is None else environ
+    if values.get("TMUX_PANE"):
+        tmux = values.get("TMUX", "")
+        tmux_parts = tmux.split(",") if tmux else []
+        socket = tmux_parts[0] if tmux_parts else None
+        identity = {"kind": "tmux", "pane_id": values["TMUX_PANE"]}
+        if socket:
+            identity["socket"] = socket
+        if len(tmux_parts) == 3 and tmux_parts[2]:
+            identity["session_index"] = tmux_parts[2]
+        return identity
+    if values.get("KITTY_WINDOW_ID") and values.get("KITTY_LISTEN_ON"):
+        return {"kind": "kitty", "window_id": values["KITTY_WINDOW_ID"],
+                "listen_on": values["KITTY_LISTEN_ON"]}
+    if (values.get("KONSOLE_DBUS_SERVICE") and values.get("KONSOLE_DBUS_SESSION")
+            and values.get("KONSOLE_DBUS_WINDOW")):
+        return {
+            "kind": "konsole",
+            "service": values["KONSOLE_DBUS_SERVICE"],
+            "session": values["KONSOLE_DBUS_SESSION"],
+            "window": values["KONSOLE_DBUS_WINDOW"],
+        }
+    if os.name == "nt" and values.get("WT_SESSION"):
+        identity = {"kind": "windows-terminal", "session": values["WT_SESSION"]}
+        if values.get("AGENT_WINDOWS_TERMINAL_TAB_ID"):
+            identity["automation_id"] = values["AGENT_WINDOWS_TERMINAL_TAB_ID"]
+        return identity
+    return None
 
 
 def record(data, lookup=None, host_names=None):
@@ -292,6 +354,9 @@ def record(data, lookup=None, host_names=None):
         entry["pid_started_at"] = pid_started_at
     if host is not None:
         entry["host"] = host
+    terminal = terminal_identity()
+    if terminal is not None:
+        entry["terminal"] = terminal
     destination = state_directory() / f"{session}.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")

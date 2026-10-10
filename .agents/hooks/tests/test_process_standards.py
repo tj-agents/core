@@ -370,6 +370,20 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn("even in the same checkout", flat_launcher)
                 self.assertNotIn("Split a job that designs and then delivers", launcher)
 
+    def test_side_handoff_submission_keeps_the_parent_executing(self):
+        for host in ("codex", "claude"):
+            with self.subTest(host=host):
+                launcher = (
+                    self.root / f".agents/machine/utility/handoff-{host}/SKILL.md"
+                ).read_text(encoding="utf-8")
+                flat_launcher = " ".join(launcher.split())
+                self.assertIn("bounded side-workstream handoff", flat_launcher)
+                self.assertIn("retain the originating goal and foreground writer lease", flat_launcher)
+                self.assertIn("continue its next action in the same turn", flat_launcher)
+                self.assertIn("does not satisfy the originating goal's completion condition", flat_launcher)
+                self.assertIn("full-goal transfer follows `engineering:handoff`", flat_launcher)
+                self.assertNotIn("the handoff happened. Report it and stop.", launcher)
+
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
         authoring = authored_skill("plan-authoring").read_text(
@@ -471,7 +485,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "proof covers exactly this head, so delete it with",
             "branch -D <branch>",
             "Step 5 is a blocking post-merge gate",
-            "Only the `finish.ps1` path may enter Step 6 first",
+            "Only the `finish.py` path may enter Step 6 first",
             "never remove that path",
         ):
             with self.subTest(required=required):
@@ -494,10 +508,10 @@ class ProcessStandardsTests(unittest.TestCase):
             "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
             "the session closes itself as the delivery's final action, after Step 6",
             'no arguments and no leading `&`, because the harness allow rule matches only this string',
-            'powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1',
+            'python3 -B <machine:peer-cli skill-directory>/scripts/finish.py',
             "detaches a reaper that removes the worktree and branch once this session exits",
             "closes this session's CLI and tab",
-            "Only when `finish.ps1` is unavailable or its preflight fails",
+            "Only when `finish.py` is unavailable or its preflight fails",
             "shell `cd`, or `git -C` does not retarget Codex or Claude",
             "invoke `/cd <primary-checkout>` there",
             "invoke the unqualified `handoff` workflow once with the primary checkout",
@@ -508,9 +522,9 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        self.assertLess(cleanup.index("finish.ps1"), cleanup.index("$worktreeHelper"))
+        self.assertLess(cleanup.index("finish.py"), cleanup.index("$worktreeHelper"))
         self.assertLess(
-            cleanup.index("finish.ps1"),
+            cleanup.index("finish.py"),
             cleanup.index("worktree remove -- <target-worktree>"),
         )
 
