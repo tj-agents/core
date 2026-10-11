@@ -104,6 +104,11 @@ arguments after the completion report. It requires this host's verified registry
 closes only its own host or uniquely identified tab, and records session exit without changing files,
 branches or worktree registration. `finish.py` retains ownership of removable linked-worktree cleanup.
 
+Run self-session close and finish with visibility of the registered native host. When a command sandbox
+isolates the process tree, use the harness's supported host-side execution path, subject to its permission
+review. A sandbox wrapper is not the registered CLI; keep the PID/start-time checks. If registration is
+missing, repair the machine plugin's installation and session attachment before attempting closure.
+
 ## Closing a peer
 
 Close one when it is **finished or duplicating**, and say which and why before you do:
