@@ -61,6 +61,13 @@ Run `python <skill-directory>/scripts/admission.py check --record <absolute-regi
 --session <session> --prompt-sha256 <digest> --callout-id <nonce>` in the current turn. The successful
 result is a locator only; the gate rereads the selected entry and its evidence before releasing that turn.
 
+The linked repair goal declares `Source owner: <owner>` and carries its repair authority inside
+`## Authorization`. Capability evidence names a matching `Required read capability: <absolute-path>` or
+`Required executable: <name>` entry. Dependency evidence names a matching
+`Required dependency: <artifact-id> sha256:<sha256>` entry. A record may list multiple requirements on
+separate lines or as comma-separated values. Historical authority text and undeclared observations do not
+satisfy admission.
+
 ## Full context transfer
 
 1. Resolve the current goal and its owning review under `engineering:git-branching`, then its worktree
