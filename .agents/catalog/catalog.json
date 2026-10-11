@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:9ec012e7a7a63b7315817ee7101522412ae30d2470cb02e8aa30f53bb7788946",
+          "digest": "sha256:52c101f692183a973ed7e4ef7a93b6b24a0aa541bf9b05a49eba61746f16df44",
           "harness": {
             "marketplaces": [
               {
@@ -118,6 +118,9 @@
             "macos"
           ],
           "skills": [
+            "address-bug",
+            "address-debt",
+            "address-mistake",
             "address-review",
             "big-review",
             "big-review-all",
@@ -127,7 +130,7 @@
             "commit-push",
             "committing",
             "continue-roadmap",
-            "docs-and-debt",
+            "docs",
             "docs-review",
             "failing-tests",
             "failure-provenance",
@@ -169,11 +172,13 @@
             "sync",
             "sync-all",
             "sync-checkout",
-            "techdebt",
             "unmerged",
             "update-roadmap",
             "workboard",
-            "worktree"
+            "worktree",
+            "write-bug",
+            "write-debt",
+            "write-mistake"
           ],
           "dependencies": {
             "required": [
@@ -193,7 +198,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:1587d69b451cb0ae295dd7815e051b8220e3692c1b52bd3775ba47e2bfc2f97d",
+          "digest": "sha256:587149ab03805489edd1427070274c6b9bb1b9bdbddf5831dc9459e2076f6c49",
           "harness": {
             "marketplaces": [
               {
@@ -491,7 +496,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:7a7ce5c199853b42bd1c7fcd1aec0fe950d1aa089b07924a71a72cfd4ad23220",
+          "digest": "sha256:09baa871b274f64ca2065e2a02408e60feb7098fb828c4b993c01908cd35c26e",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
