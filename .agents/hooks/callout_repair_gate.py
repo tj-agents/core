@@ -272,7 +272,7 @@ def successful_result(value, tool_input, origin_worktree):
             continue
         if isinstance(receipt, dict) and receipt.get("event") == "agent-handoff-submitted":
             return source_owner_handoff(receipt, origin_worktree)
-    return source_owner_handoff(tool_input, origin_worktree)
+    return False
 
 
 def emit(event, context, deny=False):

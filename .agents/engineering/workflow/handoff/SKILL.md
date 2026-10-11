@@ -50,7 +50,7 @@ session continues its independent active task.
    L1–L6 lane, frontier tier, or non-Haiku model; never leave that choice to the CLI default.
    Record the lane and a one-line reason beside the next action in the goal.
    Never launch a second successor because startup is slow or acknowledgement is delayed.
-4. Stop owned-path writes before invoking the launcher. Verify the launch result. A definite failure
+4. Stop owned-path writes before invoking the launcher. Verify the launch result. A source-owner side-workstream launch succeeds only when the paired tool result contains the launcher's structured `agent-handoff-submitted` receipt for the distinct checkout and prepared prompt; a human-readable success line or the requested command is not evidence. Without that receipt, preserve the side-workstream as an unconfirmed safe fallback and never claim that it transferred. A definite failure
    before invocation leaves ownership here; an interrupted or ambiguous invocation requires reconciliation.
    Successful launcher submission proves launch, not that the successor has read the plan. Report that
    distinction and let the successor acknowledge in the goal. For critical execution, observe the receipt
