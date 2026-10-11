@@ -659,6 +659,17 @@ def resolved_skill(name, harness, following_alias=False):
     return None
 
 
+def bare_name(name):
+    """The name's bare part, or the whole string when it carries no plugin qualifier.
+
+    One home for the extraction every proof-matching and display call site needs, so a future
+    change to how it is derived cannot be applied at some call sites and missed at others -
+    exactly the kind of mismatch between what is displayed and what is proof-matched that
+    `invocable_name` below exists to prevent.
+    """
+    return name.rpartition(":")[2] or name
+
+
 def invocable_name(resolved_name, skill_path):
     """Use the installed plugin qualifier when a qualified route resolves elsewhere.
 
@@ -783,7 +794,7 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
                         tool_id = block.get("id")
                         name = (block.get("input") or {}).get("skill")
                         if tool_id and isinstance(name, str) and name:
-                            pending[tool_id] = name.rpartition(":")[2] or name
+                            pending[tool_id] = bare_name(name)
                     elif block_type == "tool_result":
                         tool_id = block.get("tool_use_id")
                         name = pending.pop(tool_id, None) if tool_id else None
@@ -1492,7 +1503,7 @@ def main():
                     resolved_names[name] = resolved_name
                     if harness == "codex" and descriptions[name] is not None:
                         codex_skills.append(
-                            (resolved_name.rpartition(":")[2] or resolved_name, skill, body)
+                            (bare_name(resolved_name), skill, body)
                         )
             if descriptions[name] is None:
                 missing.add(name)
@@ -1504,7 +1515,7 @@ def main():
     if not missing and outcomes is not None:
         for name in descriptions:
             resolved_name = resolved_names.get(name, name)
-            outcome = outcomes.get(resolved_name.rpartition(":")[2] or resolved_name)
+            outcome = outcomes.get(bare_name(resolved_name))
             if outcome is False:
                 rejected.add(name)
             elif outcome is not True:

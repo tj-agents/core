@@ -190,6 +190,29 @@ class RedRunGateTests(unittest.TestCase):
             )
         self.assertIn("  * replacement:failing-tests", lines)
 
+    def test_resolve_fallback_to_a_bare_name_still_requalifies_to_the_installed_plugin(self):
+        sys.path.insert(0, str(HOOKS))
+        self.addCleanup(sys.path.remove, str(HOOKS))
+        import red_run_gate
+
+        path = self.base / "cache" / "marketplace" / "replacement" / "1.0" / "skills" / "failing-tests" / "SKILL.md"
+        body = "---\nname: failing-tests\ndescription: Repair failed tests.\n---\n"
+
+        def fake_resolved_skill(name, harness, following_alias=False):
+            if name == "engineering:failing-tests":
+                return None
+            if name == "failing-tests":
+                return path, body, "failing-tests"
+            raise AssertionError(f"unexpected lookup: {name}")
+
+        with patch.object(
+            red_run_gate.skill_router, "resolved_skill", side_effect=fake_resolved_skill
+        ), patch.object(red_run_gate.skill_router, "plugin_of", return_value="replacement"):
+            resolved = red_run_gate.resolve(["engineering:failing-tests"], "claude")
+            lines = red_run_gate.skill_lines(["engineering:failing-tests"], resolved, "claude")
+
+        self.assertIn("  * replacement:failing-tests", lines)
+
 
 if __name__ == "__main__":
     unittest.main()
