@@ -12,7 +12,7 @@ Codex session metadata/response records and Claude project message records. It r
 never modifies profiles, launches a resume, or uploads history. Data in CODEX_HOME or CLAUDE_CONFIG_DIR
 is an external input, not an unshipped helper dependency. Unsupported/empty records are not invented.
 
-For Codex in the current directory:
+For Codex in the current directory, run the helper with `python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B "<skill-directory>/../../resources/machine/scripts/history.py" recent --host codex
