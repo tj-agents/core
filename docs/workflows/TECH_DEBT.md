@@ -1,5 +1,16 @@
 # Workflow runtime debt
 
+## Recovery and delivery prevention gaps
+
+The incidents and known causes are owned by [MISTAKES.md](../../MISTAKES.md), entries M001-M007.
+Existing workflow standards did not prevent repeated ownership, authorization and evidence mistakes
+in the 2026-10-11 sandbox recovery. Prevention work and a dedicated recording skill remain deferred.
+
+Resolve when the shared workflows and applicable host adapters verify same-goal execution selection,
+retained merge authority, supported continuation and reopening, accurate completion and recovery
+claims, and state reconciliation after failed mutations. Record each incident's observed resolution
+against its stable mistake ID. No untested CI-waiter defect or Claude runtime failure is established.
+
 ## Slice retirement checks the broader goal's completion
 
 The runtime's `checkpoint --state complete` calls the canonical goal's full completion check, even

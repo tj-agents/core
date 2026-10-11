@@ -22,7 +22,7 @@ rather than restating them here:
   [`SOURCE_LAYOUT.md`](https://github.com/tj-agents/core/blob/main/SOURCE_LAYOUT.md) in core,
   `kit:check` in a kit-layout repository.
 - **Shipped scripts and resources**: [`PACKAGING.md`](https://github.com/tj-agents/core/blob/main/PACKAGING.md).
-- **One rule, one home** for the prose inside a skill: `engineering:docs-and-debt`.
+- **One rule, one home** for the prose inside a skill: `engineering:docs`.
 
 ## Extend an owner before creating a skill
 

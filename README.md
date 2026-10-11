@@ -14,6 +14,10 @@ stay here; shared plans link to their source owners.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
+Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
+Recorded defects default to `BUGS.md` when a repository has no declared problem-register owner.
+`engineering:write-bug`, `write-mistake`, and `write-debt` share record semantics; their corresponding
+address workflows reuse the existing repair lifecycle.
 Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
 interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
 current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
