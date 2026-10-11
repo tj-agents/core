@@ -21,9 +21,19 @@ import hook_runtime
 @unittest.skipUnless(os.name == "nt", "Windows console window behavior")
 class HiddenCommandTests(unittest.TestCase):
     def test_hook_child_process_has_no_console_window(self):
-        with patch.object(hook_runtime.subprocess, "run", return_value=Mock(returncode=0)) as run:
+        process = Mock(_handle=1, returncode=0)
+        process.communicate.return_value = ("", "")
+        kernel = Mock()
+        kernel.AssignProcessToJobObject.return_value = True
+        job = (kernel, 1, Mock())
+        with patch.object(hook_runtime, "_windows_job", return_value=job), patch.object(
+            hook_runtime.subprocess, "Popen", return_value=process
+        ) as popen, patch.object(hook_runtime, "_resume_windows_process"):
             hook_runtime.run_command(["git", "status"])
-        self.assertEqual(subprocess.CREATE_NO_WINDOW, run.call_args.kwargs["creationflags"])
+        self.assertEqual(
+            subprocess.CREATE_NO_WINDOW | hook_runtime.CREATE_SUSPENDED,
+            popen.call_args.kwargs["creationflags"],
+        )
 
 
 SKILL_ROUTER = HOOK_ROOT / "skill_router.py"
@@ -363,6 +373,156 @@ class ClaimRetentionTests(unittest.TestCase):
 
         self.assertEqual(1, results.count(True))
         self.assertEqual(63, results.count(False))
+
+
+class CommandOwnershipTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+
+    def _tree_command(self, held_directory):
+        ready = self.root / "ready.txt"
+        child = "\n".join(
+            (
+                "import os",
+                "from pathlib import Path",
+                "import sys",
+                "import time",
+                "os.chdir(sys.argv[2])",
+                "Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8')",
+                "while True:",
+                "    time.sleep(1)",
+            )
+        )
+        parent = "\n".join(
+            (
+                "import subprocess",
+                "import sys",
+                "import time",
+                "subprocess.Popen([sys.executable, '-c', sys.argv[1], sys.argv[2], sys.argv[3]])",
+                "while True:",
+                "    time.sleep(1)",
+            )
+        )
+        return [sys.executable, "-c", parent, child, str(ready), str(held_directory)], ready
+
+    def _wait_for_dead_pid(self, pid):
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return True
+            time.sleep(0.02)
+        return False
+
+    def test_timeout_drains_handshaked_owned_tree_and_releases_working_directory(self):
+        held_directory = self.root / "space ü"
+        held_directory.mkdir()
+        command, ready = self._tree_command(held_directory)
+
+        with self.assertRaises(hook_runtime.CommandTimeout) as timed_out:
+            hook_runtime.run_command(
+                command,
+                timeout=1,
+                cwd=str(self.root),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertIn("exceeded 1s", str(timed_out.exception))
+        self.assertTrue(ready.exists())
+        if os.name != "nt":
+            self.assertTrue(self._wait_for_dead_pid(int(ready.read_text(encoding="utf-8"))))
+        held_directory.rmdir()
+
+    @unittest.skipUnless(os.name != "nt", "POSIX process-group isolation")
+    def test_timeout_leaves_unrelated_process_alive(self):
+        unrelated = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(10)"])
+        self.addCleanup(
+            lambda: unrelated.poll() is None and unrelated.kill()
+        )
+        command, _ = self._tree_command(self.root)
+
+        with self.assertRaises(hook_runtime.CommandTimeout):
+            hook_runtime.run_command(command, timeout=1, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self.assertIsNone(unrelated.poll())
+
+    def test_success_nonzero_check_input_cwd_env_and_text_output_are_preserved(self):
+        working_directory = self.root / "working"
+        working_directory.mkdir()
+        program = "\n".join(
+            (
+                "import os",
+                "from pathlib import Path",
+                "import sys",
+                "data = sys.stdin.read()",
+                "print(Path.cwd().name + ':' + os.environ['HOOK_RUNTIME_VALUE'] + ':' + data)",
+                "sys.exit(3 if '--nonzero' in sys.argv else 0)",
+            )
+        )
+        environment = dict(os.environ, HOOK_RUNTIME_VALUE="ready")
+
+        for _ in range(2):
+            completed = hook_runtime.run_command(
+                [sys.executable, "-c", program],
+                input="payload",
+                text=True,
+                capture_output=True,
+                cwd=str(working_directory),
+                env=environment,
+                check=True,
+            )
+            self.assertEqual("working:ready:payload\n", completed.stdout)
+        binary = hook_runtime.run_command(
+            [sys.executable, "-c", "import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())"],
+            input=b"payload",
+            capture_output=True,
+        )
+        self.assertEqual(b"payload", binary.stdout)
+        nonzero = hook_runtime.run_command(
+            [sys.executable, "-c", program, "--nonzero"],
+            capture_output=True,
+            text=True,
+            cwd=str(working_directory),
+            env=environment,
+        )
+        self.assertEqual(3, nonzero.returncode)
+        with self.assertRaises(subprocess.CalledProcessError):
+            hook_runtime.run_command(
+                [sys.executable, "-c", program, "--nonzero"],
+                capture_output=True,
+                text=True,
+                cwd=str(working_directory),
+                env=environment,
+                check=True,
+            )
+
+    @unittest.skipUnless(os.name == "nt", "Windows Job Object setup")
+    def test_assignment_failure_never_resumes_suspended_child(self):
+        process = Mock(_handle=1)
+        process.communicate.return_value = (b"", b"")
+        kernel = Mock()
+        kernel.AssignProcessToJobObject.return_value = False
+        kernel.TerminateJobObject.return_value = True
+        accounting = Mock(active_processes=0)
+        accounting_type = Mock(return_value=accounting)
+        kernel.QueryInformationJobObject.return_value = True
+        job = (kernel, 1, accounting_type)
+
+        with patch.object(hook_runtime, "_windows_job", return_value=job), patch.object(
+            hook_runtime.subprocess, "Popen", return_value=process
+        ) as popen, patch.object(hook_runtime, "_resume_windows_process") as resume:
+            with self.assertRaises(OSError):
+                hook_runtime.run_command(["git", "status"])
+
+        self.assertFalse(resume.called)
+        self.assertEqual(
+            subprocess.CREATE_NO_WINDOW | hook_runtime.CREATE_SUSPENDED,
+            popen.call_args.kwargs["creationflags"],
+        )
 
 
 if __name__ == "__main__":

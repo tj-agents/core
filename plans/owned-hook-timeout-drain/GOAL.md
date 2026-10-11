@@ -74,7 +74,9 @@ Both Windows and Linux CI must exercise their respective ownership branches, inc
 
 ## Execution and completion
 
-Current slice: the accepted Goal is promoted; source implementation has not started. The branch was prepared from the recorded base. The executable checkpoint and implementation sequence are in Next Steps.
+Current slice: `run_command` now starts POSIX commands in an invocation-owned session and Windows commands suspended in an invocation-owned kill-on-close Job Object. Timeout cleanup terminates and drains the owned tree before raising `CommandTimeout`; setup failures do not resume an unassigned Windows child. The regression suite uses a handshaked grandchild that keeps both a pipe and working directory open, verifies immediate directory release after timeout on this Windows checkout, and preserves ordinary text and bytes input/output, nonzero, check, cwd, env, and repeated-command behavior.
+
+Observed verification: `python .agents/hooks/tests/test_hook_runtime.py` passed 20 tests with one POSIX-only skip on 2026-10-11. `python .agents/hooks/tests/test_delivery_binding_gate.py` passed 38 tests, and `python .agents/hooks/tests/test_merge_review_gate.py` passed 81 tests with one skip. `python -m py_compile .agents/hooks/hook_runtime.py .agents/hooks/tests/test_hook_runtime.py` and `git diff --check` passed. `python -B scripts/update_catalog_digests.py`, `pwsh .agents/sync-generated.ps1`, `pwsh .agents/sync-generated.ps1 -Check`, and `python tests/test_harness_manifests.py` passed; regenerated catalog and package output remain uncommitted. The full authored slice measures 433 additions and 15 deletions from the recorded base, below the 1,000-line reassessment boundary. Windows and Linux CI remain required before delivery can claim both-host qualification.
 
 The parent owns frozen independent review, any required security/ownership scrutiny, exact-head Windows and Linux CI, ordinary merge, causal generated publication, and safe cleanup. No `--admin`, check bypass, installation, or unrelated PR adoption is authorized.
 
