@@ -2,6 +2,7 @@
 
 Generated from canonical `.agents/` definitions.
 
+- `address-debt` — workflow — `.agents/engineering/workflow/address-debt/SKILL.md`
 - `address-review` — workflow — `.agents/engineering/workflow/address-review/SKILL.md`
 - `big-review` — workflow — `.agents/engineering/workflow/big-review/SKILL.md`
 - `big-review-all` — workflow — `.agents/engineering/workflow/big-review-all/SKILL.md`
@@ -11,7 +12,7 @@ Generated from canonical `.agents/` definitions.
 - `commit-push` — utility — `.agents/engineering/utility/commit-push/SKILL.md`
 - `committing` — contract — `.agents/engineering/contract/committing/SKILL.md`
 - `continue-roadmap` — workflow — `.agents/engineering/workflow/continue-roadmap/SKILL.md`
-- `docs-and-debt` — convention — `.agents/engineering/convention/docs-and-debt/SKILL.md`
+- `docs` — convention — `.agents/engineering/convention/docs/SKILL.md`
 - `docs-review` — workflow — `.agents/engineering/workflow/docs-review/SKILL.md`
 - `failing-tests` — workflow — `.agents/engineering/workflow/failing-tests/SKILL.md`
 - `failure-provenance` — contract — `.agents/engineering/contract/failure-provenance/SKILL.md`
@@ -53,8 +54,8 @@ Generated from canonical `.agents/` definitions.
 - `sync` — utility — `.agents/engineering/utility/sync/SKILL.md`
 - `sync-all` — utility — `.agents/engineering/utility/sync-all/SKILL.md`
 - `sync-checkout` — operation — `.agents/engineering/operation/sync-checkout/SKILL.md`
-- `techdebt` — workflow — `.agents/engineering/workflow/techdebt/SKILL.md`
 - `unmerged` — utility — `.agents/engineering/utility/unmerged/SKILL.md`
 - `update-roadmap` — workflow — `.agents/engineering/workflow/update-roadmap/SKILL.md`
 - `workboard` — utility — `.agents/engineering/utility/workboard/SKILL.md`
 - `worktree` — utility — `.agents/engineering/utility/worktree/SKILL.md`
+- `write-debt` — convention — `.agents/engineering/convention/write-debt/SKILL.md`
