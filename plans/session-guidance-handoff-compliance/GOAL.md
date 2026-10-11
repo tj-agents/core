@@ -61,3 +61,4 @@ Done when: `engineering:self-repair` is the direct, shippable lifecycle route fo
 - Focused terminal-gate and host-adapter tests passed: `CalloutRepairGateTests.test_callout_blocks_automatic_feedback_and_terminal_stop`, `CalloutRepairGateTests.test_manifests_ship_only_supported_callout_events`, and `TaskWorkflowAcceptanceTests.test_task_skills_keep_one_canonical_body_and_thin_host_entries`.
 - Host coverage validation passed. Package synchronization reported 512 files from 76 shared definitions with no remaining changes.
 - The candidate was rebased onto `origin/main` at `0411b56134367ccfd42d9765e11ece5ea9f5aedf`; the focused validation set and generation checks passed again on the rebased head.
+- The stale source-layout skill count and session-context mutation expectation reported by the draft PR's CI were repaired; `tests.test_source_layout` and `tests.test_engineering_hooks` passed.
