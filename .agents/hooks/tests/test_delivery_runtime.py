@@ -75,6 +75,13 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
 
         self.assertEqual("auth", resolution["stopped_by"]["class"])
 
+    def test_repository_settings_are_never_an_exemptible_stop_class(self):
+        resolution = self.authorization.resolve(
+            self.policy(authorized_stop_classes=sorted(self.stop_paths)),
+            [".agents/settings.json"],
+        )
+        self.assertEqual("repository-settings", resolution["stopped_by"]["class"])
+
     def test_authorized_stop_class_contract_rejects_invalid_values(self):
         invalid = (
             ("non-list", "ci-workflow", "must be a list"),

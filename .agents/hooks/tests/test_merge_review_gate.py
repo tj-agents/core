@@ -447,6 +447,11 @@ class SecurityPatternTests(unittest.TestCase):
             ".github/workflows/ci.yml", gate.touches_security([".github/workflows/ci.yml"])
         )
 
+    def test_repository_settings_are_sensitive_without_any_repo_config(self):
+        self.assertEqual(
+            ".agents/settings.json", gate.touches_security([".agents/settings.json"])
+        )
+
     def test_credential_vocabulary_is_sensitive_without_any_repo_config(self):
         self.assertEqual("src/ApiKeyStore.cs", gate.touches_security(["src/ApiKeyStore.cs"]))
 
