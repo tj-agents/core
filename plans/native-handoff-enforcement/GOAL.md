@@ -6,11 +6,11 @@ This is a bounded standards-defect repair under `engineering:session-guidance`'s
 
 ## Scope
 
-When a user says that an agent mistake must never happen again, treat it as a standards-repair callout even if they do not repeat the words `standard`, `skill`, or `workflow`. The required repair remains a genuine native `engineering:handoff` side-workstream: a distinct worktree, a source-owner goal, a launcher invocation, and successful launcher evidence. An in-process worker, an answer, or an asserted handoff must not discharge it.
+When a user says that an agent mistake must never happen again, treat it as a standards-repair callout even if they do not repeat the words `standard`, `skill`, or `workflow`. The required repair remains a genuine native `engineering:handoff` side-workstream: a distinct worktree, a source-owner goal, a launcher invocation, and its paired structured receipt. An in-process worker, an answer, a bare success line, or an asserted handoff must not discharge it.
 
 ## Findings
 
-`callout_repair_gate.py` only recognizes a narrow mistake-plus-standards phrase. A direct repeat-prevention callout such as “this can never happen again” can therefore miss the callout gate. Its existing launcher validation also does not prove that the worktree differs from the originating checkout.
+`callout_repair_gate.py` only recognizes a narrow mistake-plus-standards phrase. A direct repeat-prevention callout such as “this can never happen again” can therefore miss the callout gate. Its existing launcher validation also does not prove that the worktree differs from the originating checkout and accepts a human-readable success line without the launcher's receipt.
 
 ## Execution
 
@@ -27,7 +27,7 @@ The plugin blocks a repeat-prevention callout from being treated as resolved unt
 
 ## Progress
 
-Implemented the callout gate repair. The gate now recognizes explicit repeat-prevention wording, records the originating checkout, and only releases after launcher evidence points to a distinct, Git-verifiable source-owner checkout. Focused repeat-prevention, same-checkout rejection, and native Codex transcript tests pass; `test_process_standards.py` also passes.
+Implemented the callout gate repair. The gate now recognizes explicit repeat-prevention wording, records the originating checkout, and only releases after a structured launcher receipt points to a distinct, Git-verifiable source-owner checkout. A bare success line is an unconfirmed safe fallback and cannot be claimed as a handoff. Focused repeat-prevention, same-checkout rejection, bare-confirmation rejection, successful receipt, and native Codex transcript tests pass; `test_process_standards.py` also passes.
 
 ## Next Steps
 
