@@ -99,6 +99,15 @@ it, and a guidance rule added there looks like a tech-debt change.
 - Step 5: `reviews/Refactor-SplitDocsAndDebt.md` was approved after five passes over the three-skill
   split; the merge into `engineering:docs` (Tommy's decision) is reviewed as a further incremental pass.
 
+## Final decision (2026-10-11)
+
+Tommy: no stubs. `docs-and-debt` and `techdebt` are deleted outright. The alias table maps
+`docs-and-debt` → `engineering:docs` and `techdebt` → `engineering:address-debt` (`base:` and
+`engineering:` forms); a route naming the old `techdebt` resolves through the alias once #197
+(`Fix/RenameAliasRouting`) carries renamed bare names through proof. The `docs` name is kept despite
+`anthropic-skills:docs`, also Tommy's decision; this repository always writes `engineering:docs`. Earlier
+decisions below about compatibility entries are superseded.
+
 ## Delivery
 
 - PR: https://github.com/tj-agents/core/pull/173, now based on `main`.
