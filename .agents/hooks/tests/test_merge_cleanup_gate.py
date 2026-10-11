@@ -377,6 +377,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         decision = json.loads(confirmed_stop.stdout)
         self.assertEqual("block", decision["decision"])
         self.assertIn("MERGE CLEANUP GATE", decision["reason"])
+        self.assertIn("do not force-close the host", decision["reason"])
         self.assertTrue(path.exists())
 
         self.edit_obligation(
