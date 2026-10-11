@@ -39,4 +39,11 @@ Original evidence owner for reading only: C:/Users/TommySeery/source/repos/tj-ag
 
 ## Next Steps
 
+Pickup acknowledged 2026-10-11 by Codex session 01a12aef-9dbc-7cb2-b5a6-b5ac56b71cf0, running codex-cli 0.163.0-alpha.1. Checkout and branch match the handoff; no deliverable changes existed at pickup. L3 causal diagnosis is delegated to the canonical lane worker, with this session retaining goal ownership.
+
+Scope: whole goal through repair, review, validation and terminal delivery.
+Current slice: bounded preflight recovery with security regression coverage.
+Remaining scope: causal diagnosis, implementation, independent review, Windows/Linux checks, PR and merge.
+Done when: the focused repair is reviewed and merged with required checks passing.
+
 Acknowledge pickup here with your identity and runtime version before deliverable writes. Load plan-execution and lanes, read repository conventions, and continue this bounded standards-source repair immediately. Diagnose the failed cache transition and assess the inconsistent launcher recovery paths. Use existing source-owner evidence and tests; do not repeat completed archive/runtime verification. Reproduce a focused causal regression with disposable caches or controlled mocks as appropriate, implement the smallest safe recovery, test failures still enforce authenticity/hook-trust/security, validate cross-platform code and deliver through repository gates. Keep this same goal current with actual evidence and next action. No routine continuation approval is required.
