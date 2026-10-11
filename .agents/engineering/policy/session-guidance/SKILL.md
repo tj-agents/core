@@ -14,6 +14,13 @@ with the project. The common maintained-plan contract is `base:plan-artifacts`. 
 continuation owner is `base:goal-continuation`; it selects `engineering:persistent-workflow` when
 an authorized task has a future decision that may outlive the current session.
 
+## Report the requested scope precisely
+
+When a user asks whether a named scope is complete, answer that scope first from observed evidence. Keep
+implementation or code-delivery status distinct from separate live acceptance, installation, monitoring, cleanup,
+or operational follow-up. Mention separate work only when it affects the named scope or the user asks for the
+overall outcome; do not qualify an implementation-status answer with unrelated post-merge chores.
+
 ## When the user calls out a mistake
 
 When the user calls out a mistake, before apologizing or drafting feedback, check whether a governing
