@@ -193,7 +193,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:6ee4f047f11f02610ad1c46e02e9cf5697d9f0396756772bb0e4e3dfce984c5f",
+          "digest": "sha256:113cfc9312da34d37a3ab9035159e8971e5702244ccb041b08a9194fd1a6f44d",
           "harness": {
             "marketplaces": [
               {
@@ -400,7 +400,47 @@
                     ]
                   ]
                 }
-              ]
+              ],
+              "auto_merge": {
+                "claude_allow": [
+                  "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
+                  "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
+                ],
+                "codex_prefix_rules": [
+                  {
+                    "pattern": [
+                      [
+                        "python",
+                        "python.exe",
+                        "python3",
+                        "py"
+                      ],
+                      "-B",
+                      "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                      "--root",
+                      "${PROJECT_ROOT}"
+                    ],
+                    "justification": "rechecks the declared opt-in, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+                    "match": [
+                      [
+                        "python",
+                        "-B",
+                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                        "--root",
+                        "${PROJECT_ROOT}"
+                      ]
+                    ],
+                    "not_match": [
+                      [
+                        "python",
+                        "-B",
+                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                        "--root"
+                      ]
+                    ]
+                  }
+                ]
+              }
             }
           }
         },
@@ -451,7 +491,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:dc760afd0c870ba91f41b30958524737f686afb9bf4f6191138df67e83fed88e",
+          "digest": "sha256:868965cd91924b82b47c46463660886c811d981749621fb0e4d72930e150b81f",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
