@@ -1,12 +1,12 @@
 ---
-name: docs-and-debt
-description: Keeping a repository's guidance corpus honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, tech debt recorded in the file owning the problem and deleted when fixed, and throwaway working markdown kept in the repo then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, finding the same rule in two places, logging tech debt, deciding to leave a problem unfixed, or creating a scratch analysis or handoff note.
+name: docs
+description: Keeping a repository's docs honest — one rule with exactly one owning document that everywhere else links to rather than restates, a doc living at the lowest node that fully contains its concern, a topic index mapping topic to owner, every instruction file reachable from something that actually loads it and checked by a hook, one line plus a diagnostic id where a machine can enforce the rule instead of prose re-arguing it, never naming violation sites in a rule doc because the citations rot, a rule sorted by the cost of missing it, and throwaway working markdown kept in the repository then deleted once it has served its purpose. Use when writing or editing any guidance doc, adding a rule, deciding where a rule belongs, finding the same rule in two places, or creating a scratch analysis, investigation prompt or handoff note.
 
 kind: convention
 domain: process
 ---
 
-# Docs and tech debt
+# Docs
 
 ## Describe the intended behavior
 
@@ -41,7 +41,7 @@ maintained.
 - **A doc is either imported or summarized, never both.** An import already loads the body, so a summary
   beside it is the second copy.
 - **Never name violation sites in a rule doc.** They get fixed and the citation rots — silently, because
-  nothing checks it. Violations belong in the tech-debt file that owns them.
+  nothing checks it. Violations belong in the tech-debt file that owns them, recorded under `write-debt`.
 - **Never cite a transient artifact** — a plan filename, a phase number, a ticket — from a durable doc. The
   reference is engineered to dangle.
 - **Check the code before writing the rule down.** Rules that teach what the codebase has already moved past
@@ -109,20 +109,6 @@ row to respect, and getting it wrong is worse than having no skill at all.
 | Generic, consulted while doing the work | a shared load-on-demand skill |
 | Project-specific and expensive to miss silently | that repo's always-loaded instructions |
 | Cross-project and always applicable | your global agent instructions |
-
-## Tech debt
-
-Record tech debt in the `TECH_DEBT.md` belonging to the area that **owns the problem**; if that area has none,
-create it there rather than adding the entry to a broader parent. **One entry per owning area** — two areas
-hitting the same underlying cause is two entries, not one in their shared parent, because they are fixed
-separately and are usually blocked by different things. **Once the debt is addressed, delete the entire
-entry** — a resolved entry retained as an archive is just another stale doc.
-
-**Everything you decide not to fix earns an entry** — a shortcut taken, and equally a defect, risk or rule
-violation you noticed and deliberately left alone. A shortcut is acceptable only where it is genuinely,
-provably the right call; "unrelated to what I was doing" is a perfectly good reason to leave a problem and no
-reason at all to leave it unwritten. Write it down as you make the decision, with the reasoning and an
-objective resolution condition — a problem only one agent ever saw is one nobody will fix.
 
 ## Throwaway working markdown
 
