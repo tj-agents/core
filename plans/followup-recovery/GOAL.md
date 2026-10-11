@@ -1,6 +1,6 @@
 # Recover authorized coordination before returning a manual fallback
 
-Status: source implementation complete; scoped local validation passed; commit and independent review next.
+Status: R1 corrected; both-host guidance packaging validation passed; fixing checkpoint and incremental review next.
 Date: 2026-10-11
 Branch: Fix/FollowupRecoveryOwnership
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-FollowupRecoveryOwnership
@@ -47,8 +47,13 @@ Owned candidate source: .agents/machine/utility/followup-codex/SKILL.md; .agents
 
 ## Next Steps
 
-1. Commit the stable candidate through a bounded L7 checkpoint worker. Implementation selects L4 and is complete; checkpoint selects L7 because paths and message are specified. Independent ordinary review selects L4, with a fresh security lens for recovery permissions if the frozen descriptor requires it.
-2. Independently review the immutable head, and open its ordinary draft GitHub PR for exact-head Windows/Linux CI. Local validation is complete; do not claim installed-host acceptance.
+Scope: whole recovery-contract repair through terminal delivery.
+Current slice: one focused recovery guidance/helper/permission correction.
+Remaining scope: fixing checkpoint, incremental review, PR CI, normal merge and causal generated publication.
+Done when: independent review and Windows/Linux CI pass, the PR is merged and its generated packages are verified.
+
+1. Commit the verified R1 correction through a bounded L7 worker; incrementally review from the full-pass watermark 59de0bd924559dcb48836754a1ed732254ed1202 using fresh independent contexts.
+2. Publish the stable candidate to this branch's ordinary draft GitHub PR and bind exact-head Windows/Linux CI monitoring.
 3. Resolve actionable review or CI findings, then perform normal authorized merge and verify causal generated publication. No profile installation is part of this goal.
 4. Report actual PR/head/merge/publication evidence to the parent; retain its independent settings goal and coordinate only this result. Maintain progress here through terminal delivery.
 
@@ -107,3 +112,9 @@ Owned candidate source: .agents/machine/utility/followup-codex/SKILL.md; .agents
   ]
 }
 ```
+
+## Reviews
+
+Full review at 59de0bd924559dcb48836754a1ed732254ed1202 found one deduplicated MEDIUM prompt-example defect. Native reviewer and fresh isolated workflow lens corroborated it; canonical work order is reviews/Fix-FollowupRecoveryOwnership.md. Specialist model unavailable for this account; declared fallback ran successfully. Serial L4 remediation corrected both canonical skills with an explicit blocker-specific recovery prompt; ordinary opening retains its default prompt. Required acknowledgment/release and child-writer reconciliation now appear in the invocation.
+
+R1 validation passed: generation/catalog checks, skill packaging, self-contained payload/adapter checks and documentation reachability (including AGENTS/CLAUDE pairs). Logs use the corresponding -r1 labels in workflow run followup-recovery. Runtime tests are reused because R1 changed only guidance.
