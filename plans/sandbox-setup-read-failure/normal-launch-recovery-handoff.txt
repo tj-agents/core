@@ -1,2 +1,2 @@
 cd C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SandboxSetupReadFailure
-Read @C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SandboxSetupReadFailure/plans/sandbox-setup-read-failure/GOAL.md and execute its ## Next Steps. Acknowledge pickup in that goal, verify the actual sandboxed read path first, and own the renewed normal-launch recovery through its recorded acceptance criteria.
+Read @C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SandboxSetupReadFailure/plans/sandbox-setup-read-failure/GOAL.md and execute its ## Next Steps.

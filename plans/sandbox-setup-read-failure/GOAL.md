@@ -43,8 +43,9 @@ all exited 0. Matching refresh records name the isolated fixed helper and report
 
 Current phase: L5 final documentation reconciliation, followed by L4 documentation review and
 L7 delivery. These are bounded follow-ups; no model switch is claimed. Tommy explicitly authorizes
-committing, publishing and merging this branch without further permission. Handoff-policy changes
-and a dedicated bugs/mistakes/debt system remain deferred.
+committing, publishing and merging this branch without further permission. Tommy subsequently
+authorized MISTAKES.md now; it and its README link are written. A dedicated recording skill and
+handoff-policy implementation remain deferred.
 
 PR: not opened
 Delivery slice: this existing branch, against main, containing only the recovery record and deferred
@@ -55,10 +56,13 @@ The previously failing scoped Git operation now passed in this same conversation
 `git commit` ran through normal automatic approval review with exit 0, producing checkpoint
 `5df3d81` (tool chunk `f3b519`). No approval, sandbox or hook control was changed. The cause of the
 old/fresh-host difference is not established; retained loaded configuration remains a hypothesis.
-The earlier HTTP 400 failures and unsuccessful continuation initialization below are historical.
+The approval-review HTTP 400 recurred during final review and blocked scoped native-review and
+GitHub CLI actions before execution. A documentation patch reported the same error: inspection
+confirmed the handoff pointer changed, while this goal's larger correction did not. The successful
+Git checkpoint proves that operation passed, not recovery of every later action in this running host.
 
-Next actions: checkpoint this updated observed state, synchronize once with main using the installed
-review preparation helper, complete a frozen documentation review, publish with plain Git/gh, then
+Next actions: finish the remaining documentation corrections, checkpoint them, review the delta
+from b6830f90c0e2320b0d375ea4d824c49b849bab0e, publish with plain Git/gh, then
 merge this documentation-only slice under `engineering:merge-docs` once its gates pass. Remain the
 foreground owner through delivery; initialize supported continuation if a delayed external result
 requires it. Report the actual PR and merge SHA. GitHub confirms configurable auto-merge PR #188
@@ -71,23 +75,23 @@ The observed failure is the automatic review API rejecting
 requested escalated process starts; Git therefore cannot write the external linked-worktree index.
 The initial recovery catalog changed only the investigation model's Responses compatibility, while
 the later normal-launch catalog covers the reviewer and other selected models. Fresh launch evidence
-shows that a benign elevated action passed. It does not establish successful Git delivery or recovery
-of this already-running host. A retained loaded configuration is a plausible explanation for the
+shows that a benign elevated action passed; a later scoped Git checkpoint also passed. These observations
+do not establish completed GitHub delivery or recovery of every action in this running host.
+A retained loaded configuration is a plausible explanation for the
 host difference; a universal merge failure or CI-waiter defect is not established.
 
-Retain the existing goal and merge authority. The next acceptance observation is the unchanged scoped
-Git checkpoint in a supported fresh normal host, followed by the authorized review, PR and merge.
+Retain the existing goal and merge authority. Remaining acceptance is corrected documentation,
+incremental review, successful plain Git/gh publication and the authorized merge at the reviewed head.
 Record actual approval and process results; do not substitute normal sandbox reads or bookkeeping for
 that end-to-end delivery observation. No control bypass or separate standards project is authorized.
 
 ## Incident documentation (2026-10-11)
 
-Tommy requested documenting the observed issues now, while deferring a dedicated bugs/mistakes/debt
-Markdown system. Existing `docs/workflows/TECH_DEBT.md` now records unnecessary same-goal handoff,
-missing continuation ownership, authorization/execution confusion, and ambiguous machine-versus-PR
-completion reports. Each entry distinguishes observed failures from untested CI-waiter behavior and
-states an objective resolution condition. The upstream sandbox runtime defect retains its existing
-machine debt owner; exact repair and approval-review failure evidence remain in this goal.
+Tommy subsequently authorized the root `MISTAKES.md` incident record now, with a dedicated skill
+deferred. Its seven entries identify the observed mistake, known cause, intended correction and
+resolution condition. `docs/workflows/TECH_DEBT.md` links to that owner and retains the deferred
+prevention work. The upstream sandbox runtime defect retains its existing machine debt owner;
+exact repair and approval-review failure evidence remain in this goal.
 
 Documentation phase: L5 tiny inline reconciliation; no new host, standards repair, recording system,
 PR or scheduler is started. User authority remains intact and the existing execution gate is unchanged.
@@ -95,7 +99,7 @@ PR or scheduler is started. User authority remains intact and the existing execu
 ## Continuation recovery attempt (2026-10-11)
 
 The earlier terminal report left delivery without an initialized continuation owner. This is recorded
-in `docs/workflows/TECH_DEBT.md` as "Blocked delivery was returned without a continuation owner".
+in `MISTAKES.md` as M003, with prevention work in `docs/workflows/TECH_DEBT.md`.
 The installed Codex `persistent-workflow` adapter and its shared `persistent-delivery` contract were
 loaded. There is no PR or CI run to bind yet; the runtime supports initialization before a PR exists.
 
@@ -114,9 +118,13 @@ observe the actual wake. Preserve this goal, branch, merge authority and deferre
 
 ## Status and next use
 
-Delivery pending: machine acceptance is verified and the scoped Git checkpoint now succeeds.
-The earlier parent/subagent HTTP 400 execution gate is cleared for the observed Git operation.
-Documentation review, PR publication and merge remain to be completed before the goal is terminal.
+Delivery pending: normal-launch sandbox reads and the earlier scoped Git checkpoint passed;
+automatic approval review subsequently reproduced the unsupported-metadata HTTP 400. Current
+scoped Git inspection and GitHub CLI PR lookup both passed on 2026-10-11; no PR exists yet.
+The frozen documentation review completed with three findings in
+`reviews/Fix-SandboxSetupReadFailure.md`; all three corrections are now present locally.
+Checkpoint, incremental review, PR publication and merge remain before the goal is terminal.
+No continuation owner or wake is registered; this foreground owner is continuing delivery.
 
 Verified phase: new ordinary PowerShell launches select the approved fixed runtime, and native
 sandboxed reads plus the tested scoped elevated action pass. Historical completed phase: the approved isolated runtime
@@ -131,6 +139,37 @@ unchanged. Profile selection now puts the approved side-by-side binary first in 
 
 The historical evidence below describes that earlier bounded verification. Its completion statements do
 not supersede the renewed Outcome, Scope and Next Steps above.
+
+## Host coverage
+
+This documentation slice records Codex Windows runtime recovery and shared workflow debt. It changes
+neither shared capability definitions nor host adapters. Deferred workflow-policy repair must assess
+both hosts through .agents shared source and the appropriate .codex/.claude adapters.
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": "plans/sandbox-setup-read-failure/GOAL.md and the upstream Codex sandbox/Responses client",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "The observed failures are in Codex; Claude runtime acceptance was not performed.",
+      "source": ".agents owns the shared workflow debt; no Claude runtime source defect was established.",
+      "mapping": ".claude adapters remain mapped to canonical .agents definitions; this slice changes only recovery records.",
+      "verification": {"level": "source", "result": "limited", "evidence": "The frozen candidate changes only documentation and recovery-plan artifacts; no Claude executable or adapter changed."},
+      "exception": {"constraint_evidence": "Reproductions name the Codex Windows sandbox helper and Responses metadata, with no equivalent Claude reproduction.", "supported_other_host_outcome": "Codex normal-launch sandbox reads passed; repository delivery is still limited by automatic approval review."}
+    },
+    {
+      "host": "codex",
+      "behavior": "Approved normal runtime/catalog selection restores sandbox reads; approval-review delivery acceptance remains incomplete.",
+      "source": "Machine-local Codex 0.163.0-alpha.1 and normal-launch-models.json, outside Git.",
+      "mapping": "Normal PowerShell profiles and global .codex/config.toml select the approved candidate; repository .codex adapters are unchanged.",
+      "verification": {"level": "installed", "result": "limited", "evidence": "Verifier 01a12b41-5760-76e0-b2aa-9245ecfaf273 observed three exit-0 reads and errors=[]; checkpoint 5df3d81 passed; later escalations failed with the metadata HTTP 400."},
+      "exception": {"constraint_evidence": "The current running host rejected native-review, GitHub CLI and goal-patch actions through automatic review; successful PR delivery was not observed.", "supported_other_host_outcome": "Claude source ownership is preserved; no Claude installed acceptance or equivalent failure is claimed."}
+    }
+  ]
+}
+```
 
 ## Prepared normal-launch activation (2026-10-11)
 
