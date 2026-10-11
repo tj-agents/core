@@ -2,7 +2,9 @@
 
 Generated from canonical `.agents/` definitions.
 
+- `address-bug` — workflow — `.agents/engineering/workflow/address-bug/SKILL.md`
 - `address-debt` — workflow — `.agents/engineering/workflow/address-debt/SKILL.md`
+- `address-mistake` — workflow — `.agents/engineering/workflow/address-mistake/SKILL.md`
 - `address-review` — workflow — `.agents/engineering/workflow/address-review/SKILL.md`
 - `big-review` — workflow — `.agents/engineering/workflow/big-review/SKILL.md`
 - `big-review-all` — workflow — `.agents/engineering/workflow/big-review-all/SKILL.md`
@@ -58,4 +60,6 @@ Generated from canonical `.agents/` definitions.
 - `update-roadmap` — workflow — `.agents/engineering/workflow/update-roadmap/SKILL.md`
 - `workboard` — utility — `.agents/engineering/utility/workboard/SKILL.md`
 - `worktree` — utility — `.agents/engineering/utility/worktree/SKILL.md`
+- `write-bug` — convention — `.agents/engineering/convention/write-bug/SKILL.md`
 - `write-debt` — convention — `.agents/engineering/convention/write-debt/SKILL.md`
+- `write-mistake` — convention — `.agents/engineering/convention/write-mistake/SKILL.md`

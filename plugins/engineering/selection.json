@@ -8,7 +8,9 @@
     "machine"
   ],
   "skills": [
+    "address-bug",
     "address-debt",
+    "address-mistake",
     "address-review",
     "big-review",
     "big-review-all",
@@ -64,6 +66,8 @@
     "update-roadmap",
     "workboard",
     "worktree",
-    "write-debt"
+    "write-bug",
+    "write-debt",
+    "write-mistake"
   ]
 }
