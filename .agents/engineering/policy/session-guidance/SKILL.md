@@ -49,6 +49,15 @@ Load a referenced skill when its stage is actually entered, never because a docu
 it. A procedure step, table row or route line says which skill owns that stage. Do not load the corpus
 transitively. Use the host's native skill invocation when available or read its advertised source file.
 
+## Record noticed problems
+
+When a bug, mistake, or deliberate debt is noticed or reported, record it under the relevant shared
+problem-record convention while the observation is available: `engineering:write-bug`,
+`engineering:write-mistake`, or `engineering:write-debt`. Reconcile an existing record and repair owner
+first; repeated evidence updates that record. Recording stays within the current authorization and grants
+no separate authority to repair, publish, dispatch, or schedule work. Use the addressing workflow only
+when repair is already authorized, and preserve the original task while the record is updated.
+
 ## Keep large changes reviewable
 
 Before implementing or expanding a large refactor or multi-concern change, apply
