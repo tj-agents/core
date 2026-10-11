@@ -96,12 +96,15 @@ A calling skill or workflow that ships its own resolved selection may still pass
 id at the call site.
 
 Launch with `scripts/launch_codex.py`, beside this file:
+Run it with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
 ```
-
-Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve model and effort, or `--model

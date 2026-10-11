@@ -9,7 +9,7 @@ domain: process
 # Build the guide folder
 
 This skill ships the guide builder; a repository vendors a copy and owns its content. Scaffold or
-refresh with:
+refresh it with `python` in Windows Git Bash or `python3` on Linux/macOS:
 
 ```bash
 python "<skill-directory>/scripts/scaffold.py" --repo <repository-root>
@@ -26,6 +26,7 @@ python "<skill-directory>/scripts/scaffold.py" --repo <repository-root>
   `git add --chmod=+x guide/open.sh`.
 
 Build and open the page with `guide/open.sh` from Git Bash; `--build-only` skips opening it. It needs
-Python 3.9+ as `python3` or `python` on PATH and fails with a clear message otherwise. The vendored
+Python 3.9+: use `python` in Windows Git Bash or `python3` on Linux/macOS. It fails with a clear message
+otherwise. The vendored
 `guide/README.md` documents the chapter layout, the excerpt directives and the annotation format for
 chapter authors; `engineering:guide` owns what the chapters say.
