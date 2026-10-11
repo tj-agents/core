@@ -10,6 +10,7 @@ route: infer
 
 Search first, then reopen only the chosen exact native id. The launcher verifies native resume support, preserves
 the recorded cwd, refreshes supported Codex startup standards and uses the native executable directly.
+Run the helper with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
 python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --prompt 'Continue the requested work.'
