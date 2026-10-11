@@ -125,6 +125,32 @@ class ContinuationTests(unittest.TestCase):
             time.sleep(0.05)
         self.fail("fixture did not reach expected subprocess boundary")
 
+    def native_root(self):
+        native = self.root / "native session"
+        native.mkdir()
+        subprocess.run(["git", "init", "-b", "native"], cwd=native, check=True, capture_output=True)
+        return native.resolve()
+
+    def test_associate_session_is_reciprocal_idempotent_and_token_bound(self):
+        native = self.native_root()
+        state = self.state()
+        state.update(state="working", foreground={"pid": os.getpid(),
+                     "identity": runtime.process_identity(os.getpid()), "token": "current-token"})
+        runtime.atomic_json(self.owner, state)
+        args = SimpleNamespace(owner=str(self.owner), token="current-token", session_id="native-session",
+                               session_cwd=str(native))
+        first = runtime.associate_session(args)
+        second = runtime.associate_session(args)
+        locator = runtime.session_locator(native, "native-session")
+        owner = runtime.read(self.owner)
+        self.assertEqual(first, second)
+        self.assertTrue(locator.is_file())
+        self.assertEqual(owner["session_association"], runtime.read(locator)["controller"])
+        self.assertNotIn("current-token", locator.read_text(encoding="utf-8"))
+        with self.assertRaisesRegex(runtime.Gate, "foreground-token-invalid"):
+            runtime.associate_session(SimpleNamespace(**{**vars(args), "token": "wrong-token"}))
+        self.assertEqual(owner["session_association"], runtime.read(self.owner)["session_association"])
+
     def test_unverified_complete_receipt_preserves_active_owner(self):
         state = self.state()
         state.update(launch_nonce="fixture", state="working", reason="headless-launch", next_action="Verify outcome")
