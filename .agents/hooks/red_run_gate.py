@@ -277,7 +277,14 @@ def has_jurisdiction(cwd):
 
 
 def resolve(names, harness):
-    """name -> (description, path), with a None description for a skill the harness cannot see."""
+    """name -> (description, path, resolved_name), with a None description for a skill the harness
+    cannot see.
+
+    `resolved_name` is the qualified name `resolved_skill` actually resolved - `name` itself, or an
+    alias target when `name` no longer resolves directly. Callers need it instead of the requested
+    `name` wherever a rename changed the bare name, or invocation guidance and proof would still
+    point at a name that no longer exists.
+    """
     resolved = {}
     for name in names:
         found = skill_router.resolved_skill(name, harness)
@@ -288,10 +295,10 @@ def resolve(names, harness):
             # the skill unqualified answers instead.
             found = skill_router.resolved_skill(name.rpartition(":")[2], harness)
         if found is None:
-            resolved[name] = (None, None)
+            resolved[name] = (None, None, name)
         else:
-            path, body = found
-            resolved[name] = (skill_router.description_of(body), path)
+            path, body, resolved_name = found
+            resolved[name] = (skill_router.description_of(body), path, resolved_name)
     return resolved
 
 
@@ -303,20 +310,23 @@ def unproven(names, resolved, data, harness):
     """
     codex_skills = []
     if harness == "codex":
-        for name, (description, path) in resolved.items():
+        for name, (description, path, resolved_name) in resolved.items():
             if description is None or path is None:
                 continue
             try:
                 body = Path(path).read_text(encoding="utf-8-sig")
             except OSError:
                 continue
-            codex_skills.append((name.rpartition(":")[2] or name, path, body))
+            codex_skills.append((resolved_name.rpartition(":")[2] or resolved_name, path, body))
     outcomes = skill_router.transcript_skill_outcomes(
         data.get("transcript_path") or data.get("transcriptPath"), codex_skills
     )
     if outcomes is None:
         return list(names)
-    return [name for name in names if outcomes.get(name.rpartition(":")[2] or name) is not True]
+    return [
+        name for name in names
+        if outcomes.get(resolved[name][2].rpartition(":")[2] or resolved[name][2]) is not True
+    ]
 
 
 def state_path(session_id):
@@ -349,8 +359,8 @@ def clear_state(session_id):
 def skill_lines(names, resolved, harness):
     lines = []
     for name in names:
-        description, path = resolved[name]
-        lines.append(f"  * {skill_router.invocable_name(name, path)}")
+        description, path, resolved_name = resolved[name]
+        lines.append(f"  * {skill_router.invocable_name(resolved_name, path)}")
         if description is None:
             lines.append(
                 f"      NOT INSTALLED FOR {harness.upper()} - no SKILL.md is available to the active"
@@ -450,7 +460,7 @@ def handle_stop(data):
 
     harness = harness_of(data)
     resolved = resolve(names, harness)
-    if resolved.get(OWNER_SKILL, (None, None))[0] is None:
+    if resolved.get(OWNER_SKILL, (None, None, None))[0] is None:
         # Nothing to load: blocking the turn on a skill this harness cannot see only wedges it.
         clear_state(session)
         return 0

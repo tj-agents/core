@@ -185,7 +185,7 @@ class RedRunGateTests(unittest.TestCase):
         with patch.object(red_run_gate.skill_router, "plugin_of", return_value="replacement"):
             lines = red_run_gate.skill_lines(
                 ["engineering:failing-tests"],
-                {"engineering:failing-tests": ("Repair failed tests.", path)},
+                {"engineering:failing-tests": ("Repair failed tests.", path, "engineering:failing-tests")},
                 "claude",
             )
         self.assertIn("  * replacement:failing-tests", lines)
