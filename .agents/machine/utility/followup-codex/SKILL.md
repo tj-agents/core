@@ -57,10 +57,9 @@ Report the returned status accurately:
   with the exact owner. Verify the native id, cwd,
   and selected profile. For a `machine:search-codex` inspection, run the shipped helper with `-B`, the
   `search --host codex` operation, and `--codex-history-root '<selected-profile>/sessions'`, then use
-  `machine:open-codex` only for the verified exact owner, with
-  `--prompt 'Observed follow-up blocker: <actual result>. Acknowledge or release your existing source
-  ownership, reconcile any child writer, and report coordination status before conflicting source writes.'`
-  A verified live owner cannot be resumed. Reconcile an unknown owner independently before
+  `machine:open-codex` only for the verified exact owner. Write its canonical private UTF-8 recovery
+  instruction file with the actual observed blocker, then pass `--prompt-path '<recovery-prompt-file>'`
+  without `--prompt`. A verified live owner cannot be resumed. Reconcile an unknown owner independently before
   `--confirm-closed`, and never treat that flag as source release. A successful reopen is launch evidence,
   not delivered follow-up, restored
   transport, or acknowledgment. Retain the current task. Only when all supported automated coordination

@@ -240,12 +240,32 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
             f"{root}/codex-skills/peer-cli/scripts/close.py",
         }, paths)
 
-    def test_recovery_permissions_limit_host_and_operation(self):
+    def test_recovery_permissions_declare_script_boundary_and_codex_prefix_inventory(self):
+        manifest = json.loads((ROOT / ".agents/plugins/harness/machine.json").read_text(encoding="utf-8"))
+        harness_permissions.validate_requires(manifest["requires"], "machine")
+        templates = [
+            entry for entry in manifest["requires"]["permissions"]["claude_allow"]
+            if "agent_recovery.py" in entry
+        ]
+        self.assertEqual(8, len(templates))
+        self.assertEqual({"Bash", "PowerShell"}, {entry.partition("(")[0] for entry in templates})
+        self.assertEqual({"python", "python3"}, {
+            entry.partition("(")[2].split(" ", 1)[0] for entry in templates
+        })
         claude_allow, codex_rules = self.rendered("machine")
         entries = [entry for entry in claude_allow if "agent_recovery.py" in entry]
-        self.assertEqual(32, len(entries))
-        self.assertTrue(all(entry.endswith("codex:*)") for entry in entries))
+        self.assertEqual(16, len(entries))
+        self.assertTrue(all(entry.endswith("agent_recovery.py:*)") for entry in entries))
         self.assertTrue(all(" -B " in entry for entry in entries))
+        root = self.PLUGIN_ROOT.replace("\\", "/")
+        paths = {
+            entry.partition(" -B ")[2].removesuffix(":*)").replace("\\", "/")
+            for entry in entries
+        }
+        self.assertEqual({
+            f"{root}/.agents/machine/scripts/agent_recovery.py",
+            f"{root}/resources/machine/scripts/agent_recovery.py",
+        }, paths)
         rules = [rule for rule in codex_rules if "agent_recovery.py" in json.dumps(rule)]
         self.assertEqual(1, len(rules))
         rule = rules[0]

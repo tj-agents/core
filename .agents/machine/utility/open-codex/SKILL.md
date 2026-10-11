@@ -18,10 +18,17 @@ Run the helper with `python` on Windows or `python3` on Linux/macOS:
 python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --codex-history-root '<selected-profile>/sessions' --prompt 'Continue the requested work.'
 ```
 
-For task recovery, replace the default `--prompt` with:
+For task recovery, write a private UTF-8 instruction file outside version control, then replace the default
+`--prompt` with `--prompt-path '<recovery-prompt-file>'`. Do not pass both arguments. The file contains:
+
+```text
+Observed follow-up blocker: <actual result>
+
+Acknowledge or release your existing source ownership. Reconcile any child writer. Report coordination status before conflicting source writes.
+```
 
 ```sh
---prompt 'Observed follow-up blocker: <actual result>. Acknowledge or release your existing source ownership, reconcile any child writer, and report coordination status before conflicting source writes.'
+python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --codex-history-root '<selected-profile>/sessions' --prompt-path '<recovery-prompt-file>'
 ```
 
 If status is unknown, reconcile it first. `--confirm-closed` is an explicit acknowledgement that no live writer
