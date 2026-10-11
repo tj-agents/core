@@ -87,3 +87,23 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Intended correction:** Reconcile actual state after failed or ambiguous mutations before reporting, retrying, rolling back or handing ownership to another agent.
 
 **Resolved when:** The workflow demonstrates accurate state reconciliation for complete, partial and unexecuted failures.
+
+## M008 - Legacy auto-merge preference reported as the completed settings interface
+
+**Kind:** mistake. **Observed/reported:** 2026-10-11. The originating session presented `delivery-authorization.json` as the requested generic configuration and claimed completion despite an unfinished configuration workstream; Tommy corrected the requirement to Core-owned `settings.json` containing a configuration object and clarified that Kit/template is independent. Cause of the completion claim: unknown. The existing implementation's conflicting `.agents/configuration.json` contract is confirmed by its goal and reader.
+
+**Impact and priority:** P2; the public interface and claimed ownership do not meet the requested arbitrary-consumer behavior.
+
+**Source owner:** tj-agents/core repository settings reader, consumers and public documentation.
+
+**State:** blocked. **Repair link:** [repository-settings goal](plans/repository-settings/GOAL.md), coordinated with the existing `Feature/RepositoryConfiguration` implementation; this incident starts no separate repair.
+
+**Reason / blocked_by:** conflict plus unavailable native coordination. Controller `01a122c4-e884-7402-a873-9fa7449e5c37` and child `/root/implement_repository_configuration` (`01a12ad1-ca57-78c1-ac1b-7900005a5db8`) own the uncommitted reader, consumers, schema, packaging, documentation and tests listed in their goal. The controller is recorded closed without durable source release; the supported follow-up endpoint returned unavailable with no send attempted.
+
+**Resolver and resume condition:** the existing controller acknowledges the corrected contract or explicitly releases those source paths, or Tommy explicitly reassigns ownership while preserving the existing uncommitted implementation.
+
+**Next action:** reconcile that owner and apply the settings contract to the single causal implementation.
+
+**Resolution condition:** public documentation and both shipped host consumers use one Core-owned settings interface; an unrelated disposable repository exercises guarded auto-merge with its existing authorized task and no copied interpretation or legacy-standing-policy boilerplate; Windows/Linux validation, independent review, normal merge and causal publication pass, and completion reports match the observed outcome.
+
+**Verification evidence:** the correction handoff, the existing owner goal and read-only dirty-source inspection, exact child/controller metadata, and the native follow-up result are recorded in the repair goal. No settings behavior, source delivery, consumer adoption or normal-profile activation has been verified.
