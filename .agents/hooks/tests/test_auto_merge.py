@@ -151,6 +151,32 @@ class AutoMergeTests(unittest.TestCase):
                     with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, "authorization"):
                         AUTO_MERGE.current_authorization(root, binding, {**value, "labels": [{"name": "hold"}]})
 
+    def test_current_authorization_uses_settings_with_an_exact_scoped_approval(self):
+        with tempfile.TemporaryDirectory(prefix="répository settings ") as raw:
+            root = Path(raw).resolve()
+            agents = root / ".agents"
+            agents.mkdir()
+            binding = self.binding(root)
+            (agents / "settings.json").write_text(
+                json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8"
+            )
+            approval = {
+                "repository": binding["repository"],
+                "pr_number": binding["pr_number"],
+                "worktree": str(root),
+                "branch": binding["branch"],
+                "mode": "auto",
+                "instruction": binding["merge_authorization"]["instruction"],
+                "source": "test scoped approval",
+            }
+            (agents / "persistent-workflow-binding.json").write_text(
+                json.dumps({"scoped_approval": approval}), encoding="utf-8"
+            )
+            value = {"files": [{"path": "README.md"}], "changedFiles": 1, "labels": []}
+            with patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=["README.md"]), \
+                    patch.object(AUTO_MERGE.workflow_ops, "git", return_value=binding["branch"]):
+                self.assertEqual(["README.md"], AUTO_MERGE.current_authorization(root, binding, value))
+
     def test_current_review_rejects_missing_stale_open_and_missing_security_evidence(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw).resolve()

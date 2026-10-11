@@ -1,26 +1,26 @@
 # Repository settings configuration owned by Core
 
-Status: blocked on existing source ownership; contract and verification preparation complete.
+Status: active; source ownership released, L4 implementation completed and focused validation passed; immutable checkpoint, independent review and exact-head CI are next.
 Date: 2026-10-11
 Branch: Fix/RepositorySettingsContract
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract
 Base: origin/main at 73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c
 Originating session: 01a12c10-0de6-7152-a9f2-9e5f374021f8
-Lane: L3 for ownership reconciliation and the bounded settings contract; re-route specified implementation to L4 and delivery to its appropriate lane.
+Lane: L4 implementation; contract and ownership decisions resolved, with meaningful tests catching the specified behavior. Independent security review selects L2; ordinary review selects L4; clerical delivery selects L7.
 
 ## Pickup and current evidence
 
 Picked up on 2026-10-11 by native Codex session `01a12ccb-c604-77f1-bb4c-cc8c5e21ead1`, recorded PID `18768`, in this exact worktree and branch. The handoff contains no transfer receipt. The first action was reading the existing implementation goal and inspecting its checkout read-only.
 
-Ownership reconciliation is L3 because the existing writer's native identity and release state are unresolved. Its goal still specifies `.agents/configuration.json`, exact envelope keys and a Kit follow-up. Read-only Git status confirms substantial uncommitted reader, resolver, hook, schema, documentation, tests and packaging changes. There is no verified release and no runtime path has been edited in this checkout.
+The original L3 ownership investigation found substantial preserved uncommitted reader, resolver, hook, schema, documentation, tests and packaging changes under the superseded configuration.json contract. Ownership is now resolved by the exact controller's durable release below; the L4 writer will reconcile this single causal patch against the newer correction branch.
 
-The implementation writer is native child `01a12ad1-ca57-78c1-ac1b-7900005a5db8`, task `/root/implement_repository_configuration`, whose session metadata identifies controller `01a122c4-e884-7402-a873-9fa7449e5c37` in `C:/Users/TommySeery/source/repos/tj-agents/rust/.worktrees/Fix-RustStandardDiscovery`. The registry and bounded recovery search report that controller closed. The child's recorded final response does not establish a release. Process closure is not durable source release.
+The original implementation writer is native child `01a12ad1-ca57-78c1-ac1b-7900005a5db8`, task `/root/implement_repository_configuration`, controlled by `01a122c4-e884-7402-a873-9fa7449e5c37`. Exact-session recovery resumed that controller, which contacted its existing child through native collaboration and recorded the child's explicit release to this successor.
 
 One supported `machine:followup-codex` attempt to that exact controller returned `unavailable`: the existing app-server proxy is unavailable or disconnected. No send was attempted, no receipt was created, and no daemon, replacement session or second implementation writer was started. The private UTF-8 message is in the current Windows temporary directory as `core-settings-contract-01a12ccb-message.txt`; the reserved receipt pathname `core-settings-contract-01a12ccb-followup.json` does not exist.
 
-The supported continuation owner was initialized at this checkout's `.agents/continuation/owner.json`, owner ID `2f1c1f446aebaa66d3a5a8ac`, and claimed by native PID `18768` with creation identity `134362265120029605`. Windows scheduler registration succeeded as `AgentStandards-Continuation-cedb7bc9e8d4a6c22d918d10a91a3f534c78f5d037bbc2cbeaddc01148acef03`; an explicit supported wake returned `working` while the foreground claim prevented a competing writer. These observations verify the scheduler path, not implementation or source release. The owner is checkpointed blocked and the scheduled wake removed at the ownership gate; do not claim unattended coordination with the closed controller.
+The supported continuation owner at this checkout's `.agents/continuation/owner.json`, owner ID `2f1c1f446aebaa66d3a5a8ac`, is actively claimed by native PID `18768` with creation identity `134362265120029605`. Earlier scheduler registration and an explicit supported wake verified the foreground lease prevented a competing writer. The earlier blocked checkpoint was reconciled to WORKING during recovery. Register a supported wake for delayed delivery and rebind head through the supported checkpoint when committing.
 
-No overlapping runtime, hook, schema or test paths were edited. The source and generated changes in the existing checkout remain preserved. Problem record: `MISTAKES.md#M008`.
+At admission, no overlapping source path was edited before release. The original checkout remains preserved; the released causal patch is now being corrected by the single L4 writer here. Problem record: `MISTAKES.md#M008`.
 
 ## Outcome and authorization
 
@@ -60,6 +60,12 @@ Read-only context:
 - Existing configuration ownership is reconciled, and a single causal implementation is reviewed, merged and causally published.
 - Completion reports the generic settings interface only after its actual behavior is verified. No Kit template or normal-profile installation is claimed.
 
+## Recovery after the user called out abandonment
+
+Tommy challenged the manual ownership blocker and instructed this session to resolve coordination without making him intervene. On 2026-10-11 this session invoked the shipped machine:open-codex helper for exact controller 01a122c4-e884-7402-a873-9fa7449e5c37 with a private prompt containing the correction and bounded source-release request. The helper returned success, and the native registry now identifies that same session alive under PID 1216. This verifies exact-session recovery; it is not delivery of the earlier follow-up or source release. Observe the existing Feature-RepositoryConfiguration goal for acknowledgment/release and continue the same settings outcome.
+
+The consumed followup-codex manual-only fallback was a contributing standards defect. One disjoint engineering:handoff side workstream was launched through the supported native launcher at C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-FollowupRecoveryOwnership/plans/followup-recovery/GOAL.md, branch Fix/FollowupRecoveryOwnership, lane L3. The launcher confirmed Codex 0.163.0-alpha.1 submission; the native registry identifies successor 01a12d05-0e36-7cd2-afac-1936aa63404b, PID 9104. The side successor owns only the existing follow-up/recovery standards and directly needed behavior tests, with no settings-source or original-controller coordination ownership. This session retains the original foreground lease and task. A submitted side session does not complete either goal.
+
 ## Prepared contract and verification cases
 
 The bounded contract preparation selects `<actual-checkout>/.agents/settings.json` as the host-neutral public interface. Neither `.claude/settings.json` nor `.codex/config.toml` owns this shared setting. The minimal document is `{"configuration":{"core":{"auto_merge":true}}}`. A root JSON object may contain unrelated settings; Core preserves them and reads only the configuration object. No mandatory new version field is imposed on unrelated settings. A missing configuration/core/auto_merge resolves false in a present settings file. Namespace objects remain extensible and opaque outside `core`; `core.auto_merge` is a strict boolean and unknown Core option names are rejected.
@@ -76,25 +82,51 @@ Verification after ownership reconciliation must cover:
 - Explicit hold labels, each stop class and stricter work-repository instructions; settings changes classified as authorization-sensitive and security-reviewed work.
 - Both generated Claude and Codex reader/resource mappings, real packaged machine consumer loading, focused/full Windows and Linux checks and causal post-merge publication. Local source tests alone establish no normal-profile activation or consumer adoption.
 
-## Ownership gate and next action
+## Reconciled release and execution slice
 
-Blocked action: any overlapping source implementation, migration of the existing uncommitted patch, PR or delivery for that causal implementation.
-`blocked_by`: conflict, with an unavailable coordination capability.
-Existing owner: controller `01a122c4-e884-7402-a873-9fa7449e5c37` and child `/root/implement_repository_configuration` (`01a12ad1-ca57-78c1-ac1b-7900005a5db8`).
-Owned paths: the source/test/packaging paths enumerated in `Feature-RepositoryConfiguration/plans/repository-configuration/GOAL.md`, including the configuration reader, delivery resolver/runtime, hooks, machine permission consumer, schema, docs and tests.
-Resolver: that controller or Tommy's explicit ownership reassignment after preserving its uncommitted implementation.
-Unblock action: the existing controller acknowledges this correction and checkpoints its updated causal implementation, or durably releases the listed paths and implementation for this goal. Restore its supported native endpoint only through an owner-supported recovery; do not create a replacement writer or silently infer release from a closed process.
-Observable resume condition: an acknowledgment/corrected owner goal or explicit source-release/reassignment record naming that exact implementation checkout and owned paths.
-Next execution action: reconcile the recorded release/result, apply this contract to the single existing causal implementation at L4, and run the arbitrary-repository scoped-approval case before the wider both-host Windows/Linux suite, review and authorized delivery.
+The existing source goal records "Source ownership release and superseded contract" at `2026-10-11T22:16:13Z`, naming this exact successor UUID and correction checkout. It records the child's explicit acknowledgment, releases the enumerated authored paths and unused leases, and preserves a SHA-256 inventory of the dirty implementation at source head `316e77345dffcd497476879cc0acc653ea383626`. The original controller retains no implementation writer and will not adopt this checkout. The old configuration.json and Kit instructions are explicitly superseded. This is durable source-release evidence; no user relay is required.
+
+One bounded L4 worker `/root/implement_settings` owns the released reader/resolver, consumers, schema, packaging, public docs and focused tests in this checkout. Parent retains this goal, problem records, review and delivery. The source checkout remains read-only and preserved. Apply tracked changes selectively against the current base, reuse new source files, and regenerate package output locally; never copy old generated output or commit `plugins/**`.
+
+Delivery slice: one atomic settings reader and its real engineering/machine consumers, guarded scoped-authority tests, schema/public contract and necessary resource mapping. Measure substantive source/test changes before the 1,000-line trigger and reassess scope before expansion. Catalog synchronization and planning records are measured separately. Independent review is against the focused-green immutable source commit, followed by exact-head Windows/Linux CI, normal merge and causal publication.
+
+## Current validation checkpoint
+
+The L4 writer completed and released its authored paths without committing. Parent independently read the saved terminal unittest summaries: reader 11 tests (2 privilege skips), delivery runtime 36, guarded auto-merge 10, delivery-binding gate 38, merge-review gate 82 (1 skip), machine consumer 28, harness manifests 14 and source layout 21. All eight scopes passed: 240 tests, 3 skips. Catalog refresh, manifest consistency, local generation and the final generated check passed. The substantive candidate is 517 changed lines, including runtime 243, tests 225 and docs/schema 49; catalog digest and generated output are measured separately.
+
+Initial test failures were confirmed in saved artifacts, repaired by adding the missing delivery_policy import and comparing the public ValueError boundary across dynamic module loads, then replaced by observed passing artifacts. The transient fake gh.cmd cleanup failure did not recur in the passing binding suite. M010 is reconciled. No candidate was committed from the misleading helper exit; full Windows/Linux verification remains owned by exact-head CI.
+
+## Delivery map
+
+- Runtime slice `Fix/RepositorySettingsContract`, base `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`; PR: not opened. Includes settings contract, active engineering/machine consumers, strict validation, scoped-task guard tests and resource mapping. Focused local checks and exact-head full Windows/Linux CI precede delivery. Measured substantive code/test/docs-schema delta: 517 changed lines; catalog 4 lines, generated output excluded.
+- Subsequent guidance slice `Docs/RepositorySettingsPreference`, from the then-current remote default after runtime publication; PR: not opened. Correct only the existing persistent-delivery skill's legacy-only preference explanation, which is a durable guidance change and must ship separately under git-branching. Expected substantive guidance delta below 100 lines plus required catalog digests. Reuse the retained goal, validate both generated host adapters and applicable harness/skill packaging, review as a shipped skill change and observe exact causal publication. No implementation API or consumer installation belongs to this second slice.
 
 ## Next Steps
 
-Blocked: Overlapping implementation and delivery of the preserved Feature/RepositoryConfiguration patch; this is a dependency/ownership gate, not missing merge permission.
-Blocked by: Controller 01a122c4-e884-7402-a873-9fa7449e5c37 and child /root/implement_repository_configuration (01a12ad1-ca57-78c1-ac1b-7900005a5db8) own the reader, consumers, hooks, schema, packaging and tests in C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-RepositoryConfiguration. The controller is recorded closed without durable path release, and its supported native follow-up endpoint is unavailable with no send attempted.
-Unblock action: The existing controller acknowledges and applies the corrected settings contract or durably releases its enumerated source paths; alternatively Tommy explicitly reassigns the preserved implementation. Preserve its uncommitted work in either case.
-Resume when: An observable corrected owner checkpoint, explicit source release or Tommy's reassignment identifies that exact checkout and implementation. Then reconcile the single causal patch and implement/verify the settings.json contract at L4 through the already authorized review, merge and publication boundary.
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/workflows/repository_configuration.py and shared engineering/machine preference consumers",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "Read repository settings and enforce guarded auto-merge with independent task authority",
+      "source": ".agents/workflows and .agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+      "mapping": ".agents/plugins/sources.json engineering workflows and machine sibling-reader resource for Claude payloads",
+      "verification": {"level": "planned", "result": "pending", "evidence": "Focused arbitrary-repository scoped-task tests, packaged machine loading, generated Claude parity and exact-head Windows/Linux CI"}
+    },
+    {
+      "host": "codex",
+      "behavior": "Read repository settings and enforce guarded auto-merge with independent task authority",
+      "source": ".agents/workflows and .agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+      "mapping": ".agents/plugins/sources.json engineering workflows and machine sibling-reader resource for Codex payloads",
+      "verification": {"level": "planned", "result": "pending", "evidence": "Focused arbitrary-repository scoped-task tests, packaged machine loading, generated Codex parity and exact-head Windows/Linux CI"}
+    }
+  ]
+}
+```
 
-1. Resolve the ownership gate above. The supported follow-up attempted no send. The fallback correction message was supplied in the session and retained privately; do not report it delivered or resend with a new receipt after an uncertain submission.
-2. Read the reconciled existing implementation checkpoint. Continue its single causal correction or, after verified release/reassignment, integrate its preserved work under this goal. Do not overwrite, reset or copy uncommitted source before that condition.
-3. Implement the prepared settings contract at L4, verify arbitrary consuming-repository behavior and both shipped hosts on Windows/Linux, independently review, open the owning PR, merge under the recorded authority and verify causal generated publication.
+1. Commit the focused-green authored candidate under L7 and immediately rebind and reclaim the existing continuation owner. Freeze independent review after one base synchronization; open the draft PR for exact-head Windows/Linux CI.
+2. Finish focused/full validation, immutable candidate and independent ordinary/security review; repair findings under the same owner.
+3. Open the owning PR, observe its exact-head Windows/Linux and both-host checks, merge under recorded authority and verify causal generated publication. Keep the continuation owner bound to each actual delivery head and delayed run.
 4. Keep this goal and M008 aligned with observed results. No Kit dependency, consumer installation or repository opt-in is part of this correction. Do not ask Tommy to repeat the contract or ordinary merge permission.
