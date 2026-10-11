@@ -22,6 +22,15 @@ import close as own_close
 
 
 class HostFallbackTests(unittest.TestCase):
+    def test_unregistered_attachment_refuses_an_unsafe_close(self):
+        host = session_close.register_session.ProcessInfo(10, 1, "codex.exe", 20.0)
+        with mock.patch.object(session_close.os, "getppid", return_value=10), \
+                mock.patch.object(session_close, "process_info", return_value=host), \
+                mock.patch.object(session_close.register_session, "read_host_names", return_value={"codex"}), \
+                mock.patch.object(session_close, "entries", return_value=[]):
+            with self.assertRaisesRegex(session_close.Refusal, "do not force-close the host"):
+                session_close.own_host_and_entry(Path.cwd())
+
     def test_unavailable_terminal_can_close_verified_host_without_wrapper(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
         for module in (own_close, finish):
