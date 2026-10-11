@@ -14,7 +14,9 @@ The user explicitly requested diagnosis and permanent repair of the missed termi
 
 - Cause established: `merge_cleanup_gate.py` implements `Stop` blocking, but the Codex engineering manifest invokes only `continuation_stop.py`; Claude invokes the cleanup gate too.
 - Isolated delivery branch: `Fix/CodexMergeCleanupStop`.
+- Codex now dispatches both stop gates; an unresolved verified registry attachment explicitly refuses an unsafe close and directs the native-host or handoff fallback.
+- Focused merge-cleanup and host-close fallback tests passed.
 
 ## Next action
 
-Validate the Codex Stop-hook repair; then review, publish, merge, regenerate, and confirm terminal cleanup protection.
+Review, publish, merge, regenerate, and confirm terminal cleanup protection.
