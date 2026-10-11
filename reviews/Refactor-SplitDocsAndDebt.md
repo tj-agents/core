@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `35ef630c3dc94c34cf5f04b2b8b59a80824363e8`  `(2026-10-09)`
+**Reviewed up to commit:** `7a029f73b963c12547bd59d7958673da40f042b5`  `(2026-10-09)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — code
@@ -354,3 +354,21 @@ files).
   (`Fix/RenameAliasRouting`) lands, so a consumer route naming `techdebt` fails until then. Reason: Tommy
   ruled out stubs; #197 is open and fixes the router, and no route table in this repository names
   `techdebt`.
+
+## Review pass — 2026-10-11 — incremental (base update)
+
+**Candidate base:** `191fd9c890a42c994b640583e2b2e633994a7d2c`
+**Candidate head:** `7a029f73b963c12547bd59d7958673da40f042b5`
+**Candidate branch:** `Refactor/SplitDocsAndDebt`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+A merge of `origin/main` (including #203, which repaired `main`'s verify-linux job) with no conflicts;
+`catalog.json` auto-merged its roster. No new reference to `docs-and-debt` or `techdebt` arrived. Verified:
+both Python suites (1062 and 1052 tests), generation `-Check`, tier payload, catalog and harness `--check`.
+
+### Findings
+
+None.
