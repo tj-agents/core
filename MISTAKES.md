@@ -135,3 +135,15 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Resolution condition:** every required focused scope has an observed passing terminal artifact, failed initial artifacts remain accurately classified, and review/CI claims bind to the real candidate.
 
 **Verification evidence:** saved final repository-settings-l4 artifacts report reader 11, delivery 36, guarded command 10, binding 38, merge-review gate 82, machine 28, harness manifests 14 and source layout 21 tests OK (240 tests; 3 skips). Parent independently read the terminal artifacts. Initial failures retain their failed classification. Generation and generated checks passed. No source candidate or PR was created from the ambiguous helper status.
+
+## M011 - Committing Core's generated catalog digests
+
+**Kind:** mistake. **Observed/reported:** 2026-10-12. The initial settings candidate committed engineering/machine catalog digest regeneration, and exact-head CI38183296901 rejected those two fields. **Cause:** confirmed candidate staging omitted Core's generated-path guard; the existing guard explicitly reserves digest publication for post-merge, so no absent standards rule is established.
+
+**Impact and priority:** P2; the draft PR failed CI, with no normal merge or publication attempted.
+
+**Source owner:** this repository-settings candidate preparation. **State:** in-progress. **Repair link:** plans/repository-settings/GOAL.md and PR208. **Next action:** restore only generated digest values to the merge-base baseline and verify the existing guard before replacement-head validation.
+
+**Resolution condition:** the committed runtime and later guidance slices contain no generated digest or package deltas, the generated-path guard and exact-head CI pass, and causal post-merge publication owns regeneration.
+
+**Verification evidence:** authoritative gh run view38183296901 failed-step logs name .agents/catalog/catalog.json digest of base-agents/engineering and base-agents/machine. scripts/check_generated_paths.py reads merge-base digest values and explicitly rejects these changes.
