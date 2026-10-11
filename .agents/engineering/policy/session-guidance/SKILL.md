@@ -78,8 +78,8 @@ diagnose, repair and focused verification loop. Do not weaken a check merely to 
 
 A terminal goal closes its own session as its final action, after its workflow's remaining steps and
 the completion report: run `machine:peer-cli`'s
-`finish.ps1` when `cleanup_proof.py` printed `removable` for this merged linked worktree,
-`close.ps1` for any other checkout. Stay open while the final message asks the user something or is
+`finish.py` when `cleanup_proof.py` printed `removable` for this merged linked worktree,
+`close.py` for any other checkout. Run them with `python3 -B` on Linux/macOS or `python -B` on Windows. Stay open while the final message asks the user something or is
 an answer that exists only in the transcript. A handoff predecessor follows `engineering:handoff`'s
 release instead.
 
@@ -100,5 +100,5 @@ publishing outside that repository, and destructive operations stay gated; expli
 hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
-entry. `engineering:docs-and-debt` defines the selected repository convention. Do not create a second
+entry. `engineering:write-debt` defines the selected repository convention. Do not create a second
 ledger for a standalone goal just to satisfy a repository-oriented procedure.

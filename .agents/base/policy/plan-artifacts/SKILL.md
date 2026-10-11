@@ -95,10 +95,11 @@ or `limited`, adds its full frozen `candidate_head`, and replaces the one moving
 work order. A `limited` result also records an `exception` object containing concrete
 `constraint_evidence` and the `supported_other_host_outcome`.
 
-Validate a plan before advancing it. The helper requires Python 3.9 or newer: use `python` on
-Windows and `python3` on Linux and macOS.
+Validate a plan before advancing it. The helper requires Python 3.9 or newer. Run the command as
+`python` on Windows or `python3` on Linux and macOS:
 
 ```text
+python3 -B "<skill-directory>/scripts/host_coverage.py" --stage plan --document <plan-path>  # Linux/macOS
 python -B "<skill-directory>/scripts/host_coverage.py" --stage plan --document <plan-path>
 ```
 
@@ -108,13 +109,17 @@ Source verification and installed-host acceptance remain distinct evidence.
 ## Context delivery
 
 The packaged SessionStart hook reads this file relative to its own script, including on startup, resume,
-and compaction. It emits context only. It requires Python 3.9 or newer available as `python` on PATH;
-the host reports a missing executable, and the helper reports an unreadable contract on stderr with a
-nonzero exit. Plugin installation does not prove hook trust or execution, particularly in Codex.
+and compaction. It emits context only. Its configured interpreter must be Python 3.9 or newer and available
+on PATH: Codex uses `python3` on Linux and macOS and `python` on Windows; Claude currently invokes `python`
+on all platforms. The host reports a missing executable, and the helper reports an unreadable contract on
+stderr with a nonzero exit. Plugin installation does not prove hook trust or execution, particularly in
+Codex.
 
-When hooks are unavailable, explicitly generate the same contract as a native instruction fragment:
+When hooks are unavailable, explicitly generate the same contract as a native instruction fragment.
+Use `python3` on Linux and macOS or `python` on Windows:
 
 ```text
+python3 -B "<skill-directory>/scripts/session-context.py" --instruction-fragment  # Linux/macOS
 python -B "<skill-directory>/scripts/session-context.py" --instruction-fragment
 ```
 

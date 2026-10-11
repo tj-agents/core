@@ -47,6 +47,8 @@ which repo gets which kind, emits the registry plus one table per kind into `.ag
 service repo is one `REGISTRY` row; the repo itself needs only the marketplace wiring in its
 `.claude/settings.json`.
 
+Run these repository commands with `python` on Windows or `python3` on Linux/macOS:
+
 ```
 python .agents/gen_skill_routes.py --emit-registry .agents/routes           # after editing REGISTRY
 python .agents/gen_skill_routes.py --emit-registry .agents/routes --check   # drift check

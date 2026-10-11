@@ -28,7 +28,7 @@
     "base:commit-push": "engineering:commit-push",
     "base:committing": "engineering:committing",
     "base:continue-roadmap": "engineering:continue-roadmap",
-    "base:docs-and-debt": "engineering:docs-and-debt",
+    "base:docs-and-debt": "engineering:docs",
     "base:docs-review": "engineering:docs-review",
     "base:failing-tests": "engineering:failing-tests",
     "base:failure-provenance": "engineering:failure-provenance",
@@ -68,10 +68,12 @@
     "base:sync": "engineering:sync",
     "base:sync-all": "engineering:sync-all",
     "base:sync-checkout": "engineering:sync-checkout",
-    "base:techdebt": "engineering:techdebt",
+    "base:techdebt": "engineering:address-debt",
     "base:unmerged": "engineering:unmerged",
     "base:update-roadmap": "engineering:update-roadmap",
-    "base:worktree": "engineering:worktree"
+    "base:worktree": "engineering:worktree",
+    "engineering:docs-and-debt": "engineering:docs",
+    "engineering:techdebt": "engineering:address-debt"
   },
   "policy": "Pinned 1.x profiles remain supported until deliberately migrated. No duplicate forwarding hooks."
 }

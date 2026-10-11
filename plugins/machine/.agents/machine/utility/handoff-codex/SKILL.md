@@ -44,9 +44,13 @@ A tab takes seconds to appear and a process listing is trivially misread — an 
 repository, which is worse than no handoff at all: they collide on the same files with neither aware of
 the other.
 
-If the launcher printed its confirmation, the handoff happened. Report it and stop. If it exited
-non-zero, say so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a
-second tab for the same request.
+If the launcher printed its confirmation, one handoff tab was submitted. For a bounded side-workstream
+handoff, retain the originating goal and foreground writer lease, then continue its next action in the
+same turn: the successful side handoff does not satisfy the originating goal's completion condition. A
+full-goal transfer follows `engineering:handoff`'s checkpoint, release and verified-pickup contract. An
+ordinary launcher-only request may report the submitted handoff as complete. If it exited non-zero, say
+so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a second tab for
+the same request.
 
 ## Model selection
 
@@ -92,12 +96,15 @@ A calling skill or workflow that ships its own resolved selection may still pass
 id at the call site.
 
 Launch with `scripts/launch_codex.py`, beside this file:
+Run it with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/launch_codex.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>'
 ```
-
-Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve model and effort, or `--model

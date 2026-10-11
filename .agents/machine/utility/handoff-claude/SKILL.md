@@ -42,9 +42,13 @@ A tab takes seconds to appear and a process listing is trivially misread — an 
 repository, which is worse than no handoff at all: they collide on the same files with neither aware of
 the other.
 
-If the launcher printed its confirmation, the handoff happened. Report it and stop. If it exited
-non-zero, say so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a
-second tab for the same handoff.
+If the launcher printed its confirmation, one handoff tab was submitted. For a bounded side-workstream
+handoff, retain the originating goal and foreground writer lease, then continue its next action in the
+same turn: the successful side handoff does not satisfy the originating goal's completion condition. A
+full-goal transfer follows `engineering:handoff`'s checkpoint, release and verified-pickup contract. An
+ordinary launcher-only request may report the submitted handoff as complete. If it exited non-zero, say
+so; do not retry blind — and never retry on exit code 3 specifically, where a retry risks a second tab for
+the same handoff.
 
 ## Model selection
 
@@ -106,12 +110,15 @@ Codex; it rejects L7
 and every Haiku family ID or alias before launch, and never trusts the hidden CLI default.
 
 Launch with `scripts/launch_claude.py`, beside this file:
+Run it with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>' --lane '<L1..L6>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>' --lane '<L1..L6>'
 ```
-
-Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve the model and, where the table
@@ -127,8 +134,8 @@ it with the npm/NVM `claude` shim, `claude.cmd`, `claude.ps1`, `node.exe`, or an
 command — the same launch paths that produced a degraded monochrome, non-interactive TUI for Codex.
 
 The terminal invocation and the environment scrub belong to `scripts/agent_cli.py` under
-`resources/machine/scripts`, shared with `open-claude` and `handoff-codex`. The terminal claude launcher
-(`claude-profile.ps1`) still uses the PowerShell `agent-cli.ps1` until its own Python port lands.
+`resources/machine/scripts`, shared with `open-claude`, `handoff-codex`, and the Python terminal profile
+launchers.
 
 This is an unmanaged handoff. Do not invoke Agent Workboard, pass Workboard tokens, bind the session to
 Workboard state, or imply that the new window will checkpoint workflow status.
