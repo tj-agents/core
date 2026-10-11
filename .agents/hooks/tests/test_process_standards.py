@@ -129,18 +129,24 @@ class ProcessStandardsTests(unittest.TestCase):
             instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
         )
 
-        self.assertTrue(section.startswith("When the user calls out a mistake, before apologizing"))
-        self.assertLess(section.index("before apologizing"), section.index("An apology"))
-        self.assertLess(section.index("Answer the user's direct question first"), section.index("If it did, launch"))
+        self.assertTrue(section.startswith("When the user calls out a mistake, answer the direct question first"))
         for phrase in (
-            "missing, ambiguous, contradictory, mispriced or unenforced",
-            "every consumed `tj-agents` plugin on both hosts",
-            "`engineering:handoff` in bounded side-workstream mode in the same turn",
-            "SendFeedback draft or local memory does not substitute",
+            "`engineering:self-repair`",
+            "required bounded source-repair handoff",
             "Existing user limits and scope gates still apply",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, section)
+
+        self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
+        for phrase in (
+            "consumed Core standard, skill, hook, workflow, or host enforcement",
+            "`engineering:handoff` in bounded side-workstream mode",
+            "native launcher reports successful submission",
+            "failed launcher is not a handoff",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self_repair)
 
     def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
         body = authored_skill("plan-execution").read_text(
