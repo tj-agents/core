@@ -7,7 +7,8 @@ domain: machine
 
 # Search conversation history
 
-Requires Python 3.9+ and the selected harness's local transcript data. Use the packaged read-only helper:
+Requires Python 3.9+ and the selected harness's local transcript data. Run the packaged read-only helper
+with `python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B "<skill-directory>/../../resources/machine/scripts/history.py" search --host codex --pattern "<literal term>"

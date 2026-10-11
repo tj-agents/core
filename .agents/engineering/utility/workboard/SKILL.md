@@ -71,6 +71,8 @@ plan named for the subject is finished, it says that rather than pretending none
 
 ## Gather
 
+Run this Bash command on Linux/macOS with `python3`, or on Windows through Git Bash with `python`:
+
 ```bash
 python - "${FILTER:-}" "${LIMIT:-20}" "${SCOPE:-auto}" <<'PY'
 import pathlib, re, sys, time
