@@ -48,7 +48,7 @@ def dependency_helper_directory():
 
 
 sys.path.insert(0, str(dependency_helper_directory()))
-from cleanup_dependency import EvidenceError, observe_open_prs
+from cleanup_dependency import (EvidenceError, canonical_github_repository, checkout_github_repository, github_repository_from_origin, observe_open_prs)
 
 
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
@@ -138,14 +138,14 @@ def obligation_for_worktree(worktree):
     return data if isinstance(data, dict) else None
 
 
-def resolve_pr(branch, repo, fixture, obligation):
+def resolve_pr(branch, repo, fixture, obligation, cwd=None):
     if fixture is not None:
         value = fixture.get("pr_for_branch")
         if value is None:
             raise Preserve(f"no PR recorded for branch {branch}; pass --pr explicitly")
         number = int(value)
     else:
-        result = gh(repo, "pr", "view", branch, "--json", "number")
+        result = gh(repo, "pr", "view", branch, "--json", "number", cwd=cwd)
         if result.returncode != 0:
             raise Preserve(f"gh pr view {branch} failed: {result.stderr.strip()}")
         try:
@@ -464,27 +464,34 @@ def validate_command_path(value, label):
 def validate_repo(repo):
     if repo is None:
         return None
-    if not isinstance(repo, str):
-        raise Preserve(f"repository {repo!r} cannot be emitted in a cleanup command")
-    value = repo.removeprefix("github.com/")
-    if value.count("/") != 1:
-        raise Preserve(f"repository {repo!r} cannot be emitted in a cleanup command")
-    owner, name = value.split("/", 1)
-    if not owner or not name or any(char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-" for char in owner + name):
-        raise Preserve(f"repository {repo!r} cannot be emitted in a cleanup command")
-    return "github.com/" + owner + "/" + name
+    try:
+        return canonical_github_repository(repo)
+    except EvidenceError as error:
+        raise Preserve(f"repository {repo!r} cannot be emitted in a cleanup command") from error
 
 
-def primary_github_repository(primary):
-    result = run_git(primary, "remote", "get-url", "origin")
+def primary_github_repository(primary, repo=None):
+    try:
+        return checkout_github_repository(primary, repo)
+    except EvidenceError as error:
+        raise Preserve(str(error)) from error
+
+
+def push_destination(primary, expected_repo):
+    result = run_git(primary, "remote", "get-url", "--push", "--all", "origin")
     if result.returncode != 0:
-        raise Preserve("primary origin is unavailable")
-    origin = result.stdout.strip()
-    prefixes = ("https://github.com/", "http://github.com/", "git@github.com:", "ssh://git@github.com/", "ssh://github.com/", "git://github.com/")
-    suffix = next((origin[len(prefix):] for prefix in prefixes if origin.startswith(prefix)), None)
-    if suffix is None:
-        raise Preserve("primary origin is not a GitHub repository")
-    return validate_repo("github.com/" + suffix.removesuffix(".git").rstrip("/"))
+        raise Preserve("primary push origin is unavailable")
+    destinations = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    if len(destinations) != 1:
+        raise Preserve("primary push origin has no unique destination")
+    destination = destinations.pop()
+    try:
+        actual = github_repository_from_origin(destination)
+    except EvidenceError as error:
+        raise Preserve("primary push origin is not a GitHub repository") from error
+    if actual.lower() != expected_repo.lower():
+        raise Preserve("primary push origin does not match the checkout origin")
+    return destination
 
 
 def remote_deletion_command(worktree, branch, head, pr, default, repo):
@@ -533,13 +540,14 @@ def run(args):
             raise Preserve("the default branch cannot be deleted")
         worktree = Path(worktree_value).resolve()
         obligation = obligation_for_worktree(worktree)
-        if pr is None:
-            pr = resolve_pr(branch, args.repo, fixture, obligation)
         primary, target, primary_branch_route = resolve_target(cwd, worktree_value, branch, head, default)
+        repo = args.repo if fixture is not None else primary_github_repository(primary, args.repo)
+        if pr is None:
+            pr = resolve_pr(branch, repo, fixture, obligation, cwd=primary)
         records = [] if primary_branch_route else status_entries(target)
-        merge_oid = require_merged(pr, head, args.repo, fixture)
+        merge_oid = require_merged(pr, head, repo, fixture, cwd=primary)
         require_contained(primary, default, merge_oid)
-        dependency_evidence = require_safe_dependencies(branch, args.repo, primary, fixture)
+        dependency_evidence = require_safe_dependencies(branch, repo, primary, fixture)
         dependencies = dependency_evidence["base"]
         if dependencies:
             verdict = "retained-dependency"
@@ -553,7 +561,7 @@ def run(args):
                         raise Preserve(f"set-aside failed for {target}: {error}") from error
                 else:
                     raise Preserve(f"{target} has uncommitted or untracked changes")
-            commands.append(remote_deletion_command(worktree, branch, head, pr, default, args.repo))
+            commands.append(remote_deletion_command(worktree, branch, head, pr, default, repo))
             if not primary_branch_route:
                 require_clean(target)
                 commands.append(f'git -C "{primary}" worktree remove -- "{target}"')
@@ -574,7 +582,7 @@ def run(args):
         "pr": pr,
         "merge_oid": merge_oid,
         "default": default,
-        "repo": args.repo,
+        "repo": repo if "repo" in locals() else args.repo,
         "verdict": verdict,
         "dependencies": dependencies,
         "dependency_evidence": dependency_evidence,
@@ -635,8 +643,27 @@ def removable_receipt(worktree, branch, head, pr, default, repo):
     return validate_command_path(recorded_primary, "primary"), recorded_default
 
 
-def remote_ref_matches(primary, branch, head):
-    result = run_git(primary, "ls-remote", "--refs", "origin", "refs/heads/" + branch)
+def record_remote_deleted(worktree, repo, branch, head, pr):
+    path = receipt_path(worktree)
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise Preserve(f"removable receipt is unavailable: {error}") from error
+    if not isinstance(receipt, dict) or receipt.get("verdict") != "removable":
+        raise Preserve("removable receipt is unavailable")
+    if any(receipt.get(key) != value for key, value in (("worktree", str(worktree)), ("repo", repo), ("branch", branch), ("head", head), ("pr", pr))):
+        raise Preserve("removable receipt no longer matches this cleanup")
+    receipt["remote_deleted"] = {
+        "repo": repo,
+        "branch": branch,
+        "head": head,
+        "pr": pr,
+        "recorded_at": time.time(),
+    }
+    save_receipt(path, receipt)
+
+def remote_ref_matches(primary, destination, branch, head):
+    result = run_git(primary, "ls-remote", "--refs", destination, "refs/heads/" + branch)
     if result.returncode != 0:
         raise Preserve(f"git ls-remote failed: {result.stderr.strip()}")
     output = result.stdout.strip()
@@ -668,26 +695,27 @@ def run_delete_remote(args):
         raise Preserve("removable receipt primary is not the actual primary checkout")
     if default_branch(primary) != default:
         raise Preserve("removable receipt default is not the current origin default")
-    origin_repo = primary_github_repository(primary)
-    if supplied_repo is not None and supplied_repo.lower() != origin_repo.lower():
-        raise Preserve("supplied repository does not match the primary origin")
+    origin_repo = primary_github_repository(primary, supplied_repo)
+    destination = push_destination(primary, origin_repo)
     merge_oid = require_merged(args.pr, args.head, origin_repo, None, cwd=primary)
     require_contained(primary, default, merge_oid)
     evidence = require_safe_dependencies(args.branch, origin_repo, primary, None)
     if evidence["base"]:
         raise Preserve(f"open PRs depend on branch {args.branch} as their base")
-    if not remote_ref_matches(primary, args.branch, args.head):
+    if not remote_ref_matches(primary, destination, args.branch, args.head):
+        record_remote_deleted(worktree, origin_repo, args.branch, args.head, args.pr)
         print("remote-deleted")
         return 0
     result = run_git(
         primary,
         "push",
         f"--force-with-lease=refs/heads/{args.branch}:{args.head}",
-        "origin",
+        destination,
         f":refs/heads/{args.branch}",
     )
     if result.returncode != 0:
         raise Preserve(f"git push remote deletion failed: {result.stderr.strip()}")
+    record_remote_deleted(worktree, origin_repo, args.branch, args.head, args.pr)
     print("remote-deleted")
     return 0
 
