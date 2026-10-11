@@ -124,7 +124,7 @@ class CleanupProofTests(unittest.TestCase):
     def fixture_path(self, name="fixture.json"):
         return self.root / name
 
-    def run_proof(self, primary, worktree, branch, head, pr, default="main", fixture=None, pass_default=True):
+    def run_proof(self, primary, worktree, branch, head, pr, default="main", fixture=None, pass_default=True, repo=None):
         env = dict(os.environ, AGENT_STATE_DIRECTORY=self.state.name)
         if fixture is not None:
             env["CLEANUP_PROOF_FORGE_FIXTURE"] = str(fixture)
@@ -135,6 +135,8 @@ class CleanupProofTests(unittest.TestCase):
         ]
         if pass_default:
             args += ["--default", default]
+        if repo is not None:
+            args += ["--repo", repo]
         return subprocess.run(args, cwd=str(primary), capture_output=True, text=True, env=env)
 
     def run_proof_bare(self, worktree, fixture=None):
@@ -169,8 +171,16 @@ class CleanupProofTests(unittest.TestCase):
             if isinstance(evidence, Exception)
             else mock.patch.object(CLEANUP_PROOF, "observe_open_prs", return_value=evidence)
         )
+        dependency = sys.modules["cleanup_dependency"]
+        original_run = subprocess.run
+
+        def run(command, *items, **kwargs):
+            if command[:3] == ["git", "-C", str(worktree.parent / "primary")] and command[3:] == ["remote", "get-url", "origin"]:
+                return subprocess.CompletedProcess(command, 0, "https://github.com/tj-agents/offline.git\n", "")
+            return original_run(command, *items, **kwargs)
+
         with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}):
-            with mock.patch.object(CLEANUP_PROOF, "primary_github_repository", return_value="github.com/tj-agents/offline"):
+            with mock.patch.object(dependency.subprocess, "run", side_effect=run):
                 with mock.patch.object(CLEANUP_PROOF, "push_destination", return_value="origin"):
                     with mock.patch.object(CLEANUP_PROOF, "pr_view", return_value=view):
                         with observer:
@@ -186,7 +196,7 @@ class CleanupProofTests(unittest.TestCase):
         merge_oid = squash_merge(primary, "feature")
         fixture = case_root / "fixture.json"
         write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
         self.assertEqual(0, result.returncode, result.stderr)
         lines = result.stdout.strip().splitlines()
         self.assertIn("--delete-remote", lines[1])
@@ -321,6 +331,43 @@ class CleanupProofTests(unittest.TestCase):
                 with self.assertRaises(CLEANUP_PROOF.Preserve):
                     CLEANUP_PROOF.push_destination(self.root, "github.com/tj-agents/offline")
 
+    def test_push_destination_rejects_matching_git_rewrite_before_remote_access(self):
+        primary = self.root / "primary"
+        primary.mkdir()
+        git(primary, "init", "-q")
+        git(primary, "remote", "add", "origin", "https://github.com/tj-agents/core.git")
+        original_run_git = CLEANUP_PROOF.run_git
+        calls = []
+
+        def run_git_with_rewrites(cwd, *args, **kwargs):
+            calls.append(args)
+            return original_run_git(
+                cwd,
+                "-c", "url.https://github.com/review-stage-one/.insteadOf=https://github.com/tj-agents/",
+                "-c", "url.https://github.com/review-stage-two/.insteadOf=https://github.com/review-stage-one/",
+                *args,
+                **kwargs,
+            )
+
+        with mock.patch.object(CLEANUP_PROOF, "run_git", side_effect=run_git_with_rewrites):
+            destination = CLEANUP_PROOF.run_git(primary, "remote", "get-url", "--push", "--all", "origin")
+            self.assertEqual("https://github.com/review-stage-one/core.git\n", destination.stdout)
+            rules = CLEANUP_PROOF.run_git(
+                primary, "config", "-z", "--get-regexp", r"^url\..*\.(insteadof|pushinsteadof)$",
+            )
+            self.assertEqual(0, rules.returncode)
+            self.assertIn("url.https://github.com/review-stage-one/.insteadof\n", rules.stdout)
+            self.assertIn("url.https://github.com/review-stage-two/.insteadof\n", rules.stdout)
+            calls.clear()
+            with self.assertRaises(CLEANUP_PROOF.Preserve):
+                CLEANUP_PROOF.push_destination(primary, "github.com/review-stage-one/core")
+        self.assertEqual(
+            [
+                ("remote", "get-url", "--push", "--all", "origin"),
+                ("config", "-z", "--get-regexp", r"^url\..*\.(insteadof|pushinsteadof)$"),
+            ],
+            calls,
+        )
     def test_dependency_queries_use_checkout_github_repository_despite_ambient_overrides(self):
         dependency = sys.modules["cleanup_dependency"]
         calls = []
@@ -362,7 +409,7 @@ class CleanupProofTests(unittest.TestCase):
 
         fixture = self.fixture_path()
         write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(result.stdout.startswith("removable"))
@@ -389,7 +436,7 @@ class CleanupProofTests(unittest.TestCase):
 
         fixture = self.fixture_path()
         write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(result.stdout.startswith("removable"))
@@ -402,7 +449,7 @@ class CleanupProofTests(unittest.TestCase):
 
         fixture = self.fixture_path()
         write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(result.stdout.startswith("removable"))
@@ -429,7 +476,7 @@ class CleanupProofTests(unittest.TestCase):
 
         fixture = self.fixture_path()
         write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(1, result.returncode)
         self.assertTrue(result.stdout.startswith("preserve:"))
@@ -450,7 +497,7 @@ class CleanupProofTests(unittest.TestCase):
 
         fixture = self.fixture_path()
         write_fixture(fixture, {"state": "MERGED", "headRefOid": "0" * 40, "mergeCommit": {"oid": merge_oid}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(1, result.returncode)
         self.assertTrue(result.stdout.startswith("preserve:"))
@@ -464,7 +511,7 @@ class CleanupProofTests(unittest.TestCase):
 
         fixture = self.fixture_path()
         write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": head}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(1, result.returncode)
         self.assertTrue(result.stdout.startswith("preserve:"))
@@ -481,7 +528,7 @@ class CleanupProofTests(unittest.TestCase):
             fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
             open_head_prs=[{"number": 99, "headRefName": "child", "headRefOid": "a" * 40}],
         )
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(1, result.returncode)
         self.assertTrue(result.stdout.startswith("preserve:"))
@@ -498,7 +545,7 @@ class CleanupProofTests(unittest.TestCase):
             fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}},
             open_base_prs=[{"number": 99, "headRefName": "child", "headRefOid": "a" * 40}],
         )
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(result.stdout.startswith("retained-dependency"))
@@ -579,7 +626,7 @@ class CleanupProofTests(unittest.TestCase):
             "open_base_prs": {"number": 99},
         }), encoding="utf-8")
 
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(1, result.returncode)
         self.assertTrue(result.stdout.startswith("preserve:"))
@@ -599,7 +646,7 @@ class CleanupProofTests(unittest.TestCase):
 
         fixture = self.fixture_path()
         write_fixture(fixture, {"state": "MERGED", "headRefOid": head, "mergeCommit": {"oid": merge_oid}})
-        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture)
+        result = self.run_proof(primary, worktree, "feature", head, 1, fixture=fixture, repo="github.com/tj-agents/offline")
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertTrue(result.stdout.startswith("removable"))
