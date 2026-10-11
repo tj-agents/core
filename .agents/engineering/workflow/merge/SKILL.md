@@ -268,7 +268,7 @@ closes this session's CLI and tab. The reaper's result and the cleanup reminder 
 next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude and is not
 evidence that the old directory can be deleted.
 
-- Only when `finish.py` is unavailable or its preflight fails: if the harness exposes its native host
+- Only when `finish.py` is unavailable or its preflight fails, including an unresolved verified registry attachment: if the harness exposes its native host
   command interface, invoke `/cd <primary-checkout>` there and continue only after the host confirms that
   the session is attached to the primary checkout.
 - Only when `finish.py` is unavailable or its preflight fails: if that interface is unavailable, invoke
