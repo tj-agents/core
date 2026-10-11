@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -13,6 +14,14 @@ CALLOUT = re.compile(
     r"\b(?:mistake|wrong|ignored|violated|failed to|keep doing|keep picking)\b|"
     r"\b(?:that|this|that's|that is|this is)\s+(?:is\s+)?(?:a\s+)?"
     r"(?:mistake|wrong|incorrect)\b",
+    re.I,
+)
+REPEAT_PREVENTION = re.compile(
+    r"\b(?:this|that|it|the same (?:thing|mistake)|you)\s+"
+    r"(?:can(?:not|'t)|must(?:\s+not|'nt)|should(?:\s+not|'nt))\s+"
+    r"(?:ever\s+)?(?:happen|occur|repeat)(?:\s+again)?\b|"
+    r"\bnever\s+(?:let|allow)\s+(?:this|that|it|the same (?:thing|mistake))\s+"
+    r"(?:happen|occur|repeat)\s+again\b",
     re.I,
 )
 STANDARDS_CONTEXT = re.compile(r"\b(?:standard|skill|hook|rule|plugin|handoff|workflow|lane|model)s?\b", re.I)
@@ -32,7 +41,7 @@ TAIL_BYTES = 1 << 20
 MESSAGE = (
     "CALLOUT REPAIR: answer the user's direct question first. Check the governing standard and "
     "if it caused or failed to prevent the mistake, launch engineering:handoff in bounded "
-    "side-workstream mode for the responsible source owner "
+    "side-workstream mode for the responsible source owner in an isolated checkout "
     "in this same turn. An apology, automatic SendFeedback, or memory update does not replace "
     "repair. A skill load, a promised launch, or a failed launcher is not launch evidence. "
     "Respect explicit user limits."
@@ -65,10 +74,38 @@ def load_state(session):
     return value if isinstance(value, dict) else {}
 
 
-def save_state(session, prompt, pending, resolved=False):
+def save_state(session, prompt, pending, resolved=False, origin_worktree=None):
     if not session:
         return
-    state_path(session).write_text(json.dumps({"prompt": prompt, "pending": pending, "resolved": resolved}), encoding="utf-8")
+    prior = load_state(session)
+    state = {"prompt": prompt, "pending": pending, "resolved": resolved}
+    if isinstance(origin_worktree, str) and origin_worktree:
+        state["origin_worktree"] = origin_worktree
+    elif isinstance(prior.get("origin_worktree"), str):
+        state["origin_worktree"] = prior["origin_worktree"]
+    state_path(session).write_text(json.dumps(state), encoding="utf-8")
+
+
+def callout_pending(prompt):
+    return bool((CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) or REPEAT_PREVENTION.search(prompt))
+
+
+def checkout_root(path):
+    resolved = Path(path).resolve()
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(resolved), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode:
+        return None
+    root = result.stdout.strip()
+    return Path(root).resolve() if root else None
 
 
 def transcript_records(path):
@@ -146,7 +183,7 @@ def launcher_call(value):
                 and re.search(r"-+PromptPath|-+prompt-path", text, re.I))
 
 
-def source_owner_handoff(value):
+def source_owner_handoff(value, origin_worktree):
     if isinstance(value, dict) and value.get("event") == "agent-handoff-submitted":
         paths = [value.get("worktree"), value.get("prompt_path")]
         if not all(isinstance(item, str) and item for item in paths):
@@ -160,6 +197,13 @@ def source_owner_handoff(value):
                 return False
             paths.append(next(item for item in match.groups()[1:] if item is not None).replace("\\\\", "\\"))
     workdir, prompt_path = map(Path, paths)
+    try:
+        worktree_root = checkout_root(workdir)
+        origin_root = checkout_root(origin_worktree) if origin_worktree else None
+        if not worktree_root or not origin_root or worktree_root == origin_root:
+            return False
+    except OSError:
+        return False
     if not prompt_path.is_absolute():
         prompt_path = workdir / prompt_path
     try:
@@ -177,7 +221,7 @@ def source_owner_handoff(value):
                 and re.search(r"standards[- ](?:defect|repair)|source[- ]owner repair", context, re.I))
 
 
-def launch_succeeded(records):
+def launch_succeeded(records, origin_worktree):
     pending = {}
     for record in records:
         value = message(record)
@@ -187,7 +231,7 @@ def launch_succeeded(records):
                 pending[value["call_id"]] = tool_input
         elif value.get("type") in ("custom_tool_call_output", "function_call_output"):
             tool_input = pending.pop(value.get("call_id"), None)
-            if tool_input is not None and successful_result(value, tool_input):
+            if tool_input is not None and successful_result(value, tool_input, origin_worktree):
                 return True
         content = value.get("content")
         if not isinstance(content, list):
@@ -200,12 +244,12 @@ def launch_succeeded(records):
                     pending[block["id"]] = block["input"]
             elif block.get("type") == "tool_result":
                 tool_input = pending.pop(block.get("tool_use_id"), None)
-                if tool_input is not None and successful_result(block, tool_input):
+                if tool_input is not None and successful_result(block, tool_input, origin_worktree):
                     return True
     return False
 
 
-def successful_result(value, tool_input):
+def successful_result(value, tool_input, origin_worktree):
     if value.get("is_error") or value.get("error"):
         return False
     parts = list(texts(value.get("content", value.get("output", ""))))
@@ -227,8 +271,8 @@ def successful_result(value, tool_input):
         except ValueError:
             continue
         if isinstance(receipt, dict) and receipt.get("event") == "agent-handoff-submitted":
-            return source_owner_handoff(receipt)
-    return source_owner_handoff(tool_input)
+            return source_owner_handoff(receipt, origin_worktree)
+    return source_owner_handoff(tool_input, origin_worktree)
 
 
 def emit(event, context, deny=False):
@@ -255,8 +299,8 @@ def main():
             return 0
         if isinstance(origin, dict) and origin.get("kind") not in (None, "human"):
             return 0
-        pending = bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) and not REPAIR_LIMIT.search(prompt)
-        save_state(session, prompt, pending)
+        pending = callout_pending(prompt) and not REPAIR_LIMIT.search(prompt)
+        save_state(session, prompt, pending, origin_worktree=data.get("cwd"))
         if pending:
             emit(event, MESSAGE)
         return 0
@@ -272,10 +316,11 @@ def main():
         return 0
     tool = str(data.get("tool_name", "")).lower().replace("_", "")
     feedback = tool.endswith("sendfeedback")
-    pending = bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) or (state.get("pending") and state.get("prompt") == prompt)
+    pending = callout_pending(prompt) or (state.get("pending") and state.get("prompt") == prompt)
     if not pending and not feedback:
         return 0
-    if launch_succeeded(records):
+    origin_worktree = state.get("origin_worktree") or data.get("cwd")
+    if launch_succeeded(records, origin_worktree):
         save_state(session, prompt, False, resolved=True)
         return 0
     if event == "PreToolUse":

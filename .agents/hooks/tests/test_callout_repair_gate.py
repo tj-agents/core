@@ -18,10 +18,12 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="callout gate ")
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
+        subprocess.run(["git", "init", str(self.base)], capture_output=True, text=True, check=True)
         self.session = str(uuid.uuid4())
         self.transcript = self.base / "transcript.jsonl"
         self.source = self.base / "source-owner"
         self.source.mkdir()
+        subprocess.run(["git", "init", str(self.source)], capture_output=True, text=True, check=True)
         self.goal = self.source / "GOAL.md"
         self.goal.write_text("# Repair\n\n## Authorization\n\nBounded standards-defect repair.\n", encoding="utf-8")
         self.prompt = self.base / "handoff.md"
@@ -122,6 +124,23 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.transcript.unlink()
         self.assertEqual({}, self.pretool())
         self.submit()
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+
+    def test_repeat_prevention_callout_requires_an_isolated_native_handoff(self):
+        self.submit("This can never happen again.")
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+        self.write_transcript(self.claude_launch())
+        self.assertEqual({}, self.pretool())
+
+    def test_source_owner_handoff_in_originating_checkout_does_not_release_repair(self):
+        goal = self.base / "GOAL.md"
+        goal.write_text("# Repair\n\n## Authorization\n\nBounded standards-defect repair.\n", encoding="utf-8")
+        prompt = self.base / "same-checkout-handoff.md"
+        prompt.write_text(f"cd {self.base}\nRead {goal} and execute its Next Steps.\n", encoding="utf-8")
+        command = (f"& 'plugin/launch-codex.ps1' -WorkingDirectory '{self.base}' "
+                   f"-PromptPath '{prompt}' -Lane L4")
+        self.submit()
+        self.write_transcript(self.claude_launch(command=command))
         self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
 
     def test_unrelated_launch_and_old_turn_launch_do_not_release_repair(self):
