@@ -24,7 +24,8 @@ validation plane.** Do not turn every worktree into an independent CI runner.
 
 ## Compact executable boundary
 
-Run every test, build, migration, generator, package, and remote-log command through the shared executable:
+Run every test, build, migration, generator, package, and remote-log command through the shared executable,
+using `python` on Windows or `python3` on Linux/macOS:
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> run --label <stable-label> -- <command> <arguments>

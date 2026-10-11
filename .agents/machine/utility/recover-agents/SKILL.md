@@ -14,7 +14,8 @@ request authorizes those resumes; clarify only when the relevant session or live
 
 Inventory both native histories first. The result groups the host, original checkout, title and exact native id.
 Use the current goal or PR state to identify relevant work, then select only its returned `host:id` values. Do not
-reopen every old session or infer unfinished work from a final transcript message.
+reopen every old session or infer unfinished work from a final transcript message. Run both commands below
+with `python` on Windows or `python3` on Linux/macOS.
 
 ```sh
 python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --checkout '<absolute-checkout>'
@@ -27,5 +28,5 @@ python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' rec
 ```
 
 Use `--codex-history-root '<profile>/sessions'` or `--claude-history-root '<profile>/projects'` for an alternate
-profile. On Windows use `python`; elsewhere use `python3`. Unknown live identity requires reconciliation before a
+profile. Unknown live identity requires reconciliation before a
 resume, and ambiguous terminal launch results must not be retried.

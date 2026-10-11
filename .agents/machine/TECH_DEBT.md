@@ -1,19 +1,5 @@
 # Tech debt — machine
 
-## codex-profile.ps1 gained new behaviour while still awaiting its port
-
-`Find-CodexPython` (the Windows-Store-stub-skipping interpreter search) and the `codex` function's call
-site that uses it were added directly to `codex-profile.ps1` to fix a real bug: `python3` was tried first
-on Windows, which is usually the Store alias stub, so the pre-launch standards refresh silently never ran.
-CODE_CONVENTIONS.md's Supported platforms section says not to add behaviour to an existing shipped
-PowerShell script awaiting its port -- port it, or add the behaviour to its Python replacement -- and
-plan step 4 (wiring the terminal start hooks for bash as well as PowerShell) is still unchecked. Fixing
-the bug without widening this PR's own scope into that unstarted port left the fix in the `.ps1` file.
-
-**Resolution condition.** Plan step 4 ports `codex-profile.ps1` (and `claude-profile.ps1`) to a
-Python-backed mechanism wired for bash as well as PowerShell; `Find-CodexPython`'s interpreter-search
-logic moves there with it, and this entry is deleted.
-
 ## The Codex plugin cache is not reconciled
 
 `~/.codex/plugins/cache/` accumulates orphaned plugin payloads exactly as the Claude cache did, and
@@ -75,7 +61,7 @@ uses a healthy supported runtime when available, and has regression coverage for
 
 ## Windows Terminal option values may be escaped for a parse they never get
 
-`agent_cli._launch_windows_terminal` (and `agent-cli.ps1`'s `Invoke-AgentTerminalTab`) pass every
+`agent_cli._launch_windows_terminal` passes every
 `wt.exe` argument through `terminal_argument`, including `--title` and `--startingDirectory`, which are
 Windows Terminal's own option values rather than the launched command's arguments. The escaping
 `terminal_argument` applies models the second argv parse the tab's command arguments get after Windows
