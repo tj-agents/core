@@ -23,7 +23,15 @@
                 "verbose",
                 "version",
                 "wordexp"
-            ]
+            ],
+            "variants": {
+                "debugger": "DEBUGGER",
+                "dump-po-strings": "TRANSLATABLE_STRINGS",
+                "dump-strings": "TRANSLATABLE_STRINGS",
+                "protected": "WORDEXP_OPTION",
+                "restricted": "RESTRICTED_SHELL",
+                "wordexp": "WORDEXP_OPTION"
+            }
         },
         {
             "id": "bash-long-value",
@@ -70,7 +78,17 @@
                 "verbose",
                 "vi",
                 "xtrace"
-            ]
+            ],
+            "variants": {
+                "braceexpand": "BRACE_EXPANSION",
+                "emacs": "READLINE",
+                "histexpand": "BANG_HISTORY",
+                "history": "HISTORY",
+                "monitor": "JOB_CONTROL",
+                "nolog": "HISTORY",
+                "notify": "JOB_CONTROL",
+                "vi": "READLINE"
+            }
         },
         {
             "id": "bash-o-cygwin",
@@ -150,6 +168,24 @@
                 "xpg_echo"
             ],
             "variants": {
+                "assoc_expand_once": "ARRAY_VARS",
+                "checkjobs": "JOB_CONTROL",
+                "cmdhist": "HISTORY",
+                "complete_fullquote": "READLINE",
+                "direxpand": "READLINE",
+                "dirspell": "READLINE",
+                "extdebug": "DEBUGGER",
+                "extglob": "EXTENDED_GLOB",
+                "force_fignore": "READLINE",
+                "histappend": "HISTORY",
+                "histreedit": "READLINE",
+                "histverify": "READLINE",
+                "hostcomplete": "READLINE",
+                "lithist": "HISTORY",
+                "no_empty_cmd_completion": "READLINE",
+                "progcomp": "PROGRAMMABLE_COMPLETION",
+                "progcomp_alias": "PROGRAMMABLE_COMPLETION && ALIAS",
+                "restricted_shell": "RESTRICTED_SHELL",
                 "syslog_history": "SYSLOG_HISTORY && SYSLOG_SHOPT"
             }
         },
