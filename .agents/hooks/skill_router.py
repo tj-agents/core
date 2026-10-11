@@ -616,7 +616,8 @@ def _readable_skill(bare, harness, wanted_plugin):
 
 
 def resolved_skill(name, harness, following_alias=False):
-    """The installed skill file and body, or ``None`` when it cannot be read.
+    """The installed skill file, its body, and the qualified name that actually resolved it, or
+    ``None`` when it cannot be read.
 
     The FIRST readable copy wins, deliberately: nearest delivery answers, and every later root holds a
     generated copy of the same bytes. A copy with no parsable `description:` is skipped rather than
@@ -628,6 +629,10 @@ def resolved_skill(name, harness, following_alias=False):
     root is walked first and silently hides the other - the same shadowing that once made
     one plugin's instructions resolve to another's. Unqualified still works for a skill with one
     home, which is every utility and every route that names only one side.
+
+    The third element is `name` itself when found directly, or the alias target when an alias was
+    followed - callers need this, not just the original route name, because a rename that changes the
+    bare name (not just the plugin) means the route's own name no longer names anything invocable.
     """
     wanted_plugin, _, bare = name.rpartition(":")
     discovery_error = None
@@ -637,7 +642,8 @@ def resolved_skill(name, harness, following_alias=False):
         discovery_error = error
         found = None
     if found is not None:
-        return found
+        skill, text = found
+        return skill, text, name
     current = None if following_alias else skill_aliases().get(name)
     if current:
         try:
@@ -653,13 +659,19 @@ def resolved_skill(name, harness, following_alias=False):
     return None
 
 
-def invocable_name(name, skill_path):
-    """Use the installed plugin qualifier when a qualified route resolves elsewhere."""
-    wanted_plugin, _, bare = name.rpartition(":")
+def invocable_name(resolved_name, skill_path):
+    """Use the installed plugin qualifier when a qualified route resolves elsewhere.
+
+    `resolved_name` is the name `resolved_skill` actually resolved - the route's own name, or an
+    alias target when the route's name no longer resolves directly - never the original route name
+    once an alias has changed the bare name, or this would tell the agent to invoke a name that no
+    longer exists.
+    """
+    wanted_plugin, _, bare = resolved_name.rpartition(":")
     if skill_path is None or not wanted_plugin:
-        return name
+        return resolved_name
     plugin = plugin_of(skill_path.parent.parent)
-    return f"{plugin}:{bare}" if plugin and plugin != wanted_plugin else name
+    return f"{plugin}:{bare}" if plugin and plugin != wanted_plugin else resolved_name
 
 
 def description_of(body):
@@ -1464,6 +1476,7 @@ def main():
 
     descriptions = {}
     resolved_paths = {}
+    resolved_names = {}
     codex_skills = []
     missing = set()
     for _, route in pending:
@@ -1473,11 +1486,14 @@ def main():
                 if resolved is None:
                     descriptions[name] = None
                 else:
-                    skill, body = resolved
+                    skill, body, resolved_name = resolved
                     descriptions[name] = description_of(body)
                     resolved_paths[name] = skill
+                    resolved_names[name] = resolved_name
                     if harness == "codex" and descriptions[name] is not None:
-                        codex_skills.append((name.rpartition(":")[2] or name, skill, body))
+                        codex_skills.append(
+                            (resolved_name.rpartition(":")[2] or resolved_name, skill, body)
+                        )
             if descriptions[name] is None:
                 missing.add(name)
 
@@ -1487,7 +1503,8 @@ def main():
     rejected, unproven = set(), set()
     if not missing and outcomes is not None:
         for name in descriptions:
-            outcome = outcomes.get(name.rpartition(":")[2] or name)
+            resolved_name = resolved_names.get(name, name)
+            outcome = outcomes.get(resolved_name.rpartition(":")[2] or resolved_name)
             if outcome is False:
                 rejected.add(name)
             elif outcome is not True:
@@ -1506,7 +1523,7 @@ def main():
         lines += [f"  {rel}", ""]
         for name in route.get("skills") or []:
             desc = descriptions[name]
-            lines.append(f"  * {invocable_name(name, resolved_paths.get(name))}")
+            lines.append(f"  * {invocable_name(resolved_names.get(name, name), resolved_paths.get(name))}")
             if name in missing:
                 lines.append(
                     f"      NOT INSTALLED FOR {harness.upper()} - no SKILL.md is available to the "

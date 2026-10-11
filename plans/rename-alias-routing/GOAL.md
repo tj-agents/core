@@ -50,7 +50,25 @@ rename needs such a stub.
 ## Next Steps
 
 Scope: whole goal through merge and cleanup.
-Current slice: steps 1–2.
+Current slice: step 5 (review and PR).
 Done when: the fix is merged to `main` and this worktree is cleaned up.
 
-Start at Completion expectation step 1.
+Steps 1-4 are done:
+- Added `test_an_alias_that_changes_the_bare_name_routes_through_the_new_name` to
+  `.agents/hooks/tests/test_skill_router.py` (both harnesses); confirmed it fails against the
+  pre-fix router and passes after the fix.
+- Fixed `resolved_skill()` in `.agents/hooks/skill_router.py` to return the qualified name it
+  actually resolved (the route's own name, or the alias target when the bare name changed), and
+  threaded that through `invocable_name()` and the proof-check in `main()` instead of the original
+  route name.
+- `red_run_gate.py` calls the same `skill_router` functions and had the identical bug (unpacked a
+  2-tuple, keyed proof on the original name); fixed `resolve()`, `unproven()`, and `skill_lines()`
+  there too, and updated the one test (`test_fallback_skill_is_named_by_its_installed_plugin`) that
+  constructed a `resolved` entry by hand.
+- `engineering:skill-authoring` needed no change; the router fix covers it.
+- Validated: both Python suites (`.agents/hooks/tests` and `tests`) green under `< /dev/null`,
+  `python -B scripts/update_catalog_digests.py`, `pwsh .agents/sync-generated.ps1` then `-Check`,
+  `scripts/sync_plugin_packages.py --check`, `scripts/sync_harness_manifests.py --check`. Catalog
+  digests and `plugins/*` are regenerated and left uncommitted in the working tree (not staged).
+
+Start at Completion expectation step 5: review, open the PR against `main`.
