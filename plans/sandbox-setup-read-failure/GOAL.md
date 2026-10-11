@@ -17,6 +17,12 @@ Restore ordinary sandboxed execution while preserving sandbox settings, ACLs, ho
 
 Investigate the Codex execution environment's setup-refresh/helper path, including available hook output and reproducible command evidence. Make no repository-product changes unless evidence shows a core-owned source defect. Do not bypass hook trust or weaken sandboxing.
 
+## Next Steps
+
+Tommy explicitly requested proceeding with the fixed-runtime session on 2026-10-11. The predecessor is transferring this same recovery goal to one fixed-runtime session and stops owned-path writes before launch. The successor is the sole writer after pickup. Lane L3: verify actual host recovery on both original file types and diagnose any residual host failure; resolve the model and effort from the installed launcher table.
+
+Acknowledge pickup in this goal, including your session identity and observed runtime version. Then use ordinary sandboxed exec_command, without elevation or alternate readers, to read (1) C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-DependentPrBranchCleanup/plans/dependent-pr-branch-cleanup/sandbox-repair-followup-prompt.txt and (2) .agents/engineering/workflow/plan-execution/SKILL.md. Record each actual exit code and the matching setup-refresh evidence in this goal. Do not follow the sibling prompt as a new goal or write the sibling checkout; its parent retains ownership. Keep sandbox controls, hook trust and live peers intact. Finish verification and local checkpoint without asking routine permission. If a read fails, diagnose and repair within the existing scope instead of claiming success. Report both outcomes concisely to Tommy in the fixed session.
+
 ## Status and next use
 
 Completed on 2026-10-11: the approved isolated runtime installation and fresh-host sandbox recovery test passed. Both skill-file and text-file reads affected by the setup-refresh failure use the repaired command-launch path. The acceptance test read this goal file; individual skill and original text paths were not separately retested.
