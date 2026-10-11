@@ -1,13 +1,13 @@
 # Bug and mistake recording/addressing skills
 
-Status: ready for one native execution owner; pickup not yet observed.
+Status: active; native execution pickup acknowledged on 2026-10-11.
 Branch: Feature/ProblemSkills
 Base: origin/main at 429ad56751720e2cb369c3aa2e25a3b53b801234
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-ProblemSkills
 PR: not opened
 Originating session: 01a12b10-3519-7f41-8e4f-7afa6828fef0
-Execution owner: unclaimed
-Lane: L3 because record taxonomy and integration with existing repair owners need bounded design judgment.
+Execution owner: Codex session 01a12c10-0de6-7152-a9f2-9e5f374021f8
+Lane: L4 independent review of the completed foundation; L3 source/design decisions remain with this owner.
 
 ## Outcome and authorization
 
@@ -84,10 +84,104 @@ originating session's docs checkout or adopt its other workstreams.
 
 ## Next Steps
 
-Acknowledge this assignment in this file with your native session ID before deliverable writes. Verify
-normal reads of this goal, one installed skill and a text file, then record the actual result and the
-first source action. Load the owning feature/skill-authoring lifecycle, inspect merged write-debt,
-address-debt, bugfix, MISTAKES.md and the limited #199 overlap. Implement the bounded compatible foundation
-above, validate, review and deliver it. Keep this goal current through completion, including the PR and
-verification evidence. Report the outcome back through this goal so the coordinator can advance the
-recorded dependent handoff policy. A source merge does not mean an orchestration monitor is installed.
+Freeze the verified authored candidate, synchronize once with origin/main and run independent review.
+Resolve any actionable findings, then push the reviewed head, open the foundation PR and own its exact
+required CI through merge. Observe the causal generated publication on main and record completion here
+so the coordinator can advance the dependent handoff policy. Installed consumer acceptance remains
+separate from the source-contract exercise; this work does not install an orchestration monitor.
+
+## Execution progress
+
+- Pickup: acknowledged the prepared native side-workstream assignment from this exact checkout.
+  Normal reads of this goal, the installed engineering `write-debt` entry point and repository text
+  succeeded. No fresh-launch read failure was observed.
+- Phase: L3 investigation and bounded contract design; resolved against `.agents/lanes/codex.json`.
+  The prepared launch records this owner at that lane. Later implementation and review lanes will be
+  selected separately and applied through supported bounded workers where required.
+- First source action: inspected canonical write-debt, address-debt, bugfix, session-guidance and
+  MISTAKES.md. Existing incident facts and IDs will be preserved. Plan-execution owns this existing goal;
+  feature was consulted and correctly routes existing plans back to that owner.
+- Delivery observation: ordinary gh reads cannot access its configuration under the current sandbox.
+  Scoped gh reads succeeded; PR #199 remains OPEN and its exact overlap was inspected.
+
+## Current slice and design
+
+- One coherent foundation PR on the prepared Feature/ProblemSkills branch, base origin/main
+  429ad56751720e2cb369c3aa2e25a3b53b801234; preparation head 62ba9760712429a5e6eeff73371cc3dabd17fab3.
+  Expected size: roughly 450 authored lines across shared guidance, four skills, eight host adapters,
+  companion metadata and focused package checks. This is itself guidance delivery, not a guidance
+  drive-by mixed into product implementation. No runtime hook, scheduler or dispatch change is included.
+- Common record semantics will live in `.agents/engineering/resources/problem-records.md`, explicitly
+  mapped into the engineering package. Each kind keeps its own storage and retention convention.
+  Bugs retain resolved status and verification by default; debt deletes verified resolved entries;
+  mistakes preserve stable learning history. Existing registers override the storage default.
+- `write-bug` and `write-mistake` are conventions; `address-bug` and `address-mistake` select the existing
+  repair lifecycle and keep the canonical record updated, without copying its engine.
+- Add one independent recording section to session-guidance, outside PR #199's callout body.
+  `address-mistake` uses shipped session-guidance for standards repair; no dependency on unmerged self-repair.
+  PR #199 was observed OPEN and its exact diff inspected. Catalog additions remain additive.
+- Recording supports one causal repair with related incident links, explicit unknown cause, capability,
+  dependency, conflicting-writer and capacity deferrals, and truthful next action/resume evidence.
+- Implementation phase: L4, specified source/adapters/metadata with testable packaging choices, applied
+  through one bounded worker as required by lanes. This owner keeps design, scope and delivery decisions.
+- Continuation owner initialized: afea5b5078fa7f6436ece091. Foreground claimed to native PID 29620; scheduler registration succeeded, but automatic approval review
+  rejected the manual wake as potentially launching unattended work. The scheduled task is removed;
+  delivery remains owned in the foreground. No unattended continuation is claimed.
+- Git fetch succeeded; branch is zero commits behind origin/main. Scoped GitHub reads succeeded.
+
+## Host coverage
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/engineering/resources/problem-records.md",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "Record bugs and mistakes with one causal repair owner and preserve kind-specific resolution history.",
+      "source": ".claude/skills/write-bug/SKILL.md",
+      "mapping": "Thin Claude entries load the same canonical convention and addressing workflows; the engineering SessionStart policy selects recording.",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Both-host packaging/linkage and shared-contract source exercise passed; installed-host behavior acceptance is not claimed."
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "Record bugs and mistakes with one causal repair owner and preserve kind-specific resolution history.",
+      "source": ".codex/skills/write-bug/SKILL.md",
+      "mapping": "Thin Codex entries load the same canonical convention and addressing workflows; the engineering SessionStart policy selects recording.",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Both-host packaging/linkage and shared-contract source exercise passed; installed-host behavior acceptance is not claimed."
+      }
+    }
+  ]
+}
+```
+
+- Workflow lifecycle-name discovery hit its already-recorded flat-layout defect in
+  `docs/workflows/TECH_DEBT.md`. The supported explicit name=canonical-path input successfully recorded
+  plan-execution without changing that independent runtime owner. No competing repair was launched.
+
+## Implementation and verification
+
+- Four canonical skills, eight thin host entries, shared record contract, discovery, catalog/source mapping
+  and harness metadata are implemented. Existing M001-M007 incident facts are unchanged. The bounded L4
+  writer released its source lease after focused validation; this owner now freezes the review candidate.
+- Catalog digest check passed with zero changes; harness synchronization check passed for all three manifests.
+- Eight source-layout regressions passed, including both-host shared resource packaging, payload containment
+  and deterministic generation (46.302 seconds). Earlier negative source-layout cases passed; the eight
+  catalog-blocked cases were rerun after the digest was refreshed.
+- Harness-manifest tests passed: 14 tests in 10.978 seconds. The sandboxed subprocess spawn denial was
+  reproduced as a capability restriction and the same test passed with scoped elevated execution.
+- Disposable source-contract exercise passed at
+  C:/Users/TOMMYS~1/AppData/Local/Temp/problem-records-c9792cad96e84a48bd022c9e387a7ddb:
+  one causal bug record, repeated evidence append, retained resolved evidence and a complete conflict blocker.
+  This is source evidence; no installed Claude or Codex consumer behavior acceptance is claimed.
+- Validation logs are captured in the Git-private workflow run foundation-implementation artifacts directory.
+  git diff --check passed. No generated distribution output is included in the authored candidate.
+- Commit/push clerical steps use the L7 tiny-follow-up allowance inline; review uses fresh read-only lenses
+  at the canonical review stage, with final judgment and artifact writing retained by this owner.
