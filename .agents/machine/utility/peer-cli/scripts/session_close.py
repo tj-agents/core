@@ -27,7 +27,7 @@ def dependency_helper_directory():
 
 
 sys.path.insert(0, str(dependency_helper_directory()))
-from cleanup_dependency import EvidenceError, observe_open_prs
+from cleanup_dependency import EvidenceError, checkout_github_repository, observe_open_prs
 
 
 RECEIPT_MAX_AGE_SECONDS = 3600.0
@@ -402,6 +402,10 @@ def fresh_removable_receipt(worktree):
         raise Refusal("the cleanup receipt is stale; run cleanup_proof.py again")
     target = Path(worktree).resolve()
     primary = Path(receipt["primary"]).resolve()
+    try:
+        checkout_github_repository(primary, receipt.get("repo"))
+    except EvidenceError as error:
+        raise Refusal("the cleanup receipt origin no longer matches") from error
     if path_key(receipt["worktree"]) != path_key(target):
         raise Refusal("the cleanup receipt target no longer matches this worktree")
     if target == primary:

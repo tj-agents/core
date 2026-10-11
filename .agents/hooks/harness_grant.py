@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 
 from hook_runtime import COMMAND_TIMEOUT_SECONDS, grant, is_trusted_checkout
-from cleanup_dependency import EvidenceError, observe_open_prs
+from cleanup_dependency import EvidenceError, checkout_github_repository, observe_open_prs
 
 SHELL_TOOLS = {"bash", "powershell"}
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
@@ -145,14 +145,17 @@ def remote_deletion_is_verified(receipt):
     age = time.time() - recorded_at
     return 0 <= age <= RECEIPT_FRESHNESS_SECONDS and isinstance(remote.get("repo"), str)
 
-def worktree_receipt_authorizes(worktree, branch, head):
+def worktree_receipt_authorizes(checkout, worktree, branch, head):
     receipt = receipt_for_worktree(worktree)
-    return (
-        is_fresh_removable(receipt)
-        and remote_deletion_is_verified(receipt)
-        and receipt.get("branch") == branch
-        and receipt.get("head") == head
-    )
+    if not (is_fresh_removable(receipt) and remote_deletion_is_verified(receipt)
+            and receipt.get("branch") == branch and receipt.get("head") == head
+            and receipt.get("primary") == str(Path(checkout).resolve())):
+        return False
+    try:
+        checkout_github_repository(checkout, receipt.get("repo"))
+    except EvidenceError:
+        return False
+    return True
 
 
 def dependencies_are_clear(checkout, branch):
@@ -176,9 +179,15 @@ def branch_receipt_authorizes(checkout, branch):
             receipt = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if isinstance(receipt, dict) and is_fresh_removable(receipt) and remote_deletion_is_verified(receipt) \
-                and receipt.get("branch") == branch and receipt.get("head") == head:
-            return True
+        if not (isinstance(receipt, dict) and is_fresh_removable(receipt)
+                and remote_deletion_is_verified(receipt) and receipt.get("branch") == branch
+                and receipt.get("head") == head and receipt.get("primary") == str(Path(checkout).resolve())):
+            continue
+        try:
+            checkout_github_repository(checkout, receipt.get("repo"))
+        except EvidenceError:
+            continue
+        return True
     return False
 
 
@@ -200,11 +209,11 @@ def remove_is_safe(checkout, raw_worktree, default):
     if entry is None:
         return False
     head, branch = entry
-    return (
-        branch is not None
-        and worktree_receipt_authorizes(target, branch, head)
-        and dependencies_are_clear(checkout, branch)
-    )
+    if not (branch is not None and worktree_receipt_authorizes(checkout, target, branch, head)
+            and dependencies_are_clear(checkout, branch)):
+        return False
+    current = linked_worktrees(checkout).get(target)
+    return current == (head, branch) and worktree_receipt_authorizes(checkout, target, branch, head)
 
 
 def branch_delete_is_safe(checkout, branch, flag, default):
@@ -212,7 +221,9 @@ def branch_delete_is_safe(checkout, branch, flag, default):
         return False
     if not git_succeeds(checkout, "show-ref", "--verify", "--quiet", "refs/heads/" + branch):
         return False
-    return branch_receipt_authorizes(checkout, branch) and dependencies_are_clear(checkout, branch)
+    if not branch_receipt_authorizes(checkout, branch) or not dependencies_are_clear(checkout, branch):
+        return False
+    return branch_receipt_authorizes(checkout, branch)
 
 
 def main():
