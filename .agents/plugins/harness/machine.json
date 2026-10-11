@@ -84,7 +84,23 @@
         "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
         "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)"
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py search --host codex:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py search --host codex:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py search --host codex:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py search --host codex:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py search --host codex:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py search --host codex:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py search --host codex:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py search --host codex:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py open --host codex:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py open --host codex:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py open --host codex:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py open --host codex:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py open --host codex:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py open --host codex:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py open --host codex:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py open --host codex:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -188,6 +204,70 @@
               "-B",
               "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/other.py",
               "off"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py"
+            ],
+            [
+              "search",
+              "open"
+            ],
+            "--host",
+            "codex"
+          ],
+          "justification": "machine:followup-codex recovery: inspect or reopen the exact Codex owner after no-send follow-up failure",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+              "search",
+              "--host",
+              "codex"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+              "open",
+              "--host",
+              "codex"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+              "search",
+              "--host",
+              "codex"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+              "search",
+              "--host",
+              "claude"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+              "recover",
+              "--host",
+              "codex"
             ]
           ]
         }
