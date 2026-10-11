@@ -109,10 +109,11 @@ Source verification and installed-host acceptance remain distinct evidence.
 ## Context delivery
 
 The packaged SessionStart hook reads this file relative to its own script, including on startup, resume,
-and compaction. It emits context only and requires Python 3.9 or newer, available as `python` on PATH on
-Windows, Linux and macOS. The host reports a missing executable, and the helper reports an unreadable
-contract on stderr with a nonzero exit. Plugin installation does not prove hook trust or execution,
-particularly in Codex.
+and compaction. It emits context only. Its configured interpreter must be Python 3.9 or newer and available
+on PATH: Codex uses `python3` on Linux and macOS and `python` on Windows; Claude currently invokes `python`
+on all platforms. The host reports a missing executable, and the helper reports an unreadable contract on
+stderr with a nonzero exit. Plugin installation does not prove hook trust or execution, particularly in
+Codex.
 
 When hooks are unavailable, explicitly generate the same contract as a native instruction fragment.
 Use `python3` on Linux and macOS or `python` on Windows:
