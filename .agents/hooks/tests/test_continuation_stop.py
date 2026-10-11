@@ -213,6 +213,22 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.object(continuation_stop, "binding_active", side_effect=RuntimeError("binding-head-changed")):
             self.assertIn("binding-head-changed", self.call())
 
+    def test_binding_active_compares_the_normalized_repository_key(self):
+        runtime = Mock()
+        runtime.binding_from_artifact.return_value = {
+            "repository": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "head": "a" * 40,
+        }
+        runtime.identity.return_value = {
+            "repo": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "head": "a" * 40,
+        }
+        self.assertTrue(continuation_stop.binding_active(runtime, self.root, {}))
+
     def test_foreign_owner_file_cannot_satisfy_this_worktree_obligation(self):
         self.write_owner(self.owner(worktree=str(self.root.parent / "other")))
         self.assertIn("owner-worktree-changed", self.call())
