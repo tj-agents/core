@@ -3,6 +3,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import posixpath
 import shutil
 import tempfile
 import unittest
@@ -52,7 +53,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(76, len(skills))
+        self.assertEqual(80, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
@@ -79,6 +80,29 @@ class SourceLayoutTests(unittest.TestCase):
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/goal-continuation/SKILL.md", output)
+
+    def test_problem_record_skills_and_shared_contract_ship_for_both_hosts(self):
+        _, output, skills, _ = SYNC.build(self.root)
+        canonical = {
+            "write-bug": "convention/write-bug",
+            "write-mistake": "convention/write-mistake",
+            "address-bug": "workflow/address-bug",
+            "address-mistake": "workflow/address-mistake",
+        }
+        resource = "plugins/engineering/.agents/engineering/resources/problem-records.md"
+        self.assertIn(resource, output)
+        for name, relative in canonical.items():
+            with self.subTest(skill=name):
+                self.assertEqual("engineering", skills[name]["plugin"])
+                for tree in ("skills", "codex-skills"):
+                    adapter = output[f"plugins/engineering/{tree}/{name}/SKILL.md"].decode("utf-8")
+                    self.assertIn(f"](../../.agents/engineering/{relative}/SKILL.md)", adapter)
+                canonical_path = f"plugins/engineering/.agents/engineering/{relative}/SKILL.md"
+                canonical_body = output[canonical_path].decode("utf-8")
+                link = "../../resources/problem-records.md"
+                self.assertIn(f"]({link})", canonical_body)
+                resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
+                self.assertEqual(resource, resolved)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
