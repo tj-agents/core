@@ -1,0 +1,2 @@
+cd C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-CodexPreflightRecovery
+Read @C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-CodexPreflightRecovery/plans/codex-preflight-recovery/GOAL.md and execute its ## Next Steps.
