@@ -89,6 +89,11 @@ Next execution action: reconcile the recorded release/result, apply this contrac
 
 ## Next Steps
 
+Blocked: Overlapping implementation and delivery of the preserved Feature/RepositoryConfiguration patch; this is a dependency/ownership gate, not missing merge permission.
+Blocked by: Controller 01a122c4-e884-7402-a873-9fa7449e5c37 and child /root/implement_repository_configuration (01a12ad1-ca57-78c1-ac1b-7900005a5db8) own the reader, consumers, hooks, schema, packaging and tests in C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-RepositoryConfiguration. The controller is recorded closed without durable path release, and its supported native follow-up endpoint is unavailable with no send attempted.
+Unblock action: The existing controller acknowledges and applies the corrected settings contract or durably releases its enumerated source paths; alternatively Tommy explicitly reassigns the preserved implementation. Preserve its uncommitted work in either case.
+Resume when: An observable corrected owner checkpoint, explicit source release or Tommy's reassignment identifies that exact checkout and implementation. Then reconcile the single causal patch and implement/verify the settings.json contract at L4 through the already authorized review, merge and publication boundary.
+
 1. Resolve the ownership gate above. The supported follow-up attempted no send. The fallback correction message was supplied in the session and retained privately; do not report it delivered or resend with a new receipt after an uncertain submission.
 2. Read the reconciled existing implementation checkpoint. Continue its single causal correction or, after verified release/reassignment, integrate its preserved work under this goal. Do not overwrite, reset or copy uncommitted source before that condition.
 3. Implement the prepared settings contract at L4, verify arbitrary consuming-repository behavior and both shipped hosts on Windows/Linux, independently review, open the owning PR, merge under the recorded authority and verify causal generated publication.
