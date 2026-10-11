@@ -57,7 +57,7 @@ class WorkflowAdoptionTests(unittest.TestCase):
                 with self.subTest(skill=name, token=token):
                     self.assertNotIn(token, body)
     def test_the_adopting_specialists_bind_to_the_versioned_bundle(self):
-        for name in ("bugfix", "techdebt"):
+        for name in ("bugfix", "address-debt"):
             with self.subTest(skill=name):
                 body = self.skills[name]
                 self.assertIn(".agents/workflows/contract/v2", body)
@@ -66,18 +66,18 @@ class WorkflowAdoptionTests(unittest.TestCase):
     def test_shared_diagnosis_and_debt_workflows_have_adopted_the_contract(self):
         adopters = self.adopters()
         self.assertIn("bugfix", adopters)
-        self.assertIn("techdebt", adopters)
+        self.assertIn("address-debt", adopters)
         self.assertEqual(set(), {"log-analyst", "test-impact-analyst"} - set(
             capability for capability in self.capabilities
             if capability in adopters["bugfix"]
         ))
         self.assertIn("exclusive", adopters["bugfix"])
         self.assertIn("writes remain serialized", adopters["bugfix"])
-        self.assertIn("mechanical-worker", adopters["techdebt"])
-        self.assertIn("plan-checkpoint", adopters["techdebt"])
+        self.assertIn("mechanical-worker", adopters["address-debt"])
+        self.assertIn("plan-checkpoint", adopters["address-debt"])
 
     def test_specialist_adoption_did_not_move_parent_authority(self):
-        for name in ("bugfix", "techdebt"):
+        for name in ("bugfix", "address-debt"):
             with self.subTest(skill=name):
                 body = self.skills[name]
                 self.assertIn("parent", body)
