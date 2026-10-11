@@ -110,12 +110,15 @@ Codex; it rejects L7
 and every Haiku family ID or alias before launch, and never trusts the hidden CLI default.
 
 Launch with `scripts/launch_claude.py`, beside this file:
+Run it with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>' --lane '<L1..L6>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/launch_claude.py' --working-directory '<absolute-checkout-path>' --prompt-path '<absolute-prompt-path>' --title '<short-title>' --lane '<L1..L6>'
 ```
-
-Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 Add `--lane '<L1..L6>'` (or `--frontier`) to have the launcher resolve the model and, where the table
@@ -131,8 +134,8 @@ it with the npm/NVM `claude` shim, `claude.cmd`, `claude.ps1`, `node.exe`, or an
 command — the same launch paths that produced a degraded monochrome, non-interactive TUI for Codex.
 
 The terminal invocation and the environment scrub belong to `scripts/agent_cli.py` under
-`resources/machine/scripts`, shared with `open-claude` and `handoff-codex`. The terminal claude launcher
-(`claude-profile.ps1`) still uses the PowerShell `agent-cli.ps1` until its own Python port lands.
+`resources/machine/scripts`, shared with `open-claude`, `handoff-codex`, and the Python terminal profile
+launchers.
 
 This is an unmanaged handoff. Do not invoke Agent Workboard, pass Workboard tokens, bind the session to
 Workboard state, or imply that the new window will checkpoint workflow status.

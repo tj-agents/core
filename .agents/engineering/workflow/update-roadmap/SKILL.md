@@ -22,7 +22,8 @@ the change.
    name — for cross-service impact.
 3. Inventory the default branch and every active worktree/PR that may own a plan under this roadmap. An
    active delivery branch owns its plan and ledger; the current default branch owns shared planning state
-   that has already landed. Run `python .agents/hooks/plan_graph.py --root <absolute-owner-worktree>` for
+   that has already landed. Run `python .agents/hooks/plan_graph.py --root <absolute-owner-worktree>` on Windows
+   or `python3` with the same arguments on Linux/macOS for
    each target owner and reconcile declared branch/worktree/PR metadata with Git and GitHub. Include
    reserved, blocked, delivery-gated, and in-flight plans. Never substitute an older copy from another
    checkout for the active owner's copy.

@@ -198,7 +198,7 @@ class ProcessStandardsTests(unittest.TestCase):
             codex,
         )
         self.assertIn("fresh headless `codex exec` context", codex)
-        self.assertIn("delivery-continuation.ps1", codex)
+        self.assertIn("delivery_continuation.py", codex)
         self.assertNotIn("Claude uses", remote)
         self.assertNotIn("Codex Desktop uses", remote)
         for skill in ("e2e-debug", "e2e-api-debug", "e2e-ui-debug", "integration-debug"):

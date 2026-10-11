@@ -53,7 +53,7 @@ class StandingMergeAuthorizationTests(unittest.TestCase):
                     self.policy(authorized_stop_classes=[name]), [path]
                 )
                 self.assertEqual(
-                    {"merge_authorization", "standing", "stopped_by"}, set(resolution)
+                    {"auto_merge", "merge_authorization", "standing", "stopped_by"}, set(resolution)
                 )
                 self.assertEqual("auto", resolution["merge_authorization"]["mode"])
                 self.assertIsNone(resolution["stopped_by"])
@@ -139,6 +139,17 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
 
         with self.assertRaisesRegex(DeliveryContractViolation, "another head"):
             self.router.validate_binding(self.binding)
+
+    def test_auto_merge_is_opt_in_and_strictly_boolean(self):
+        policy = {"standing_authorization": "auto", "instruction": "merge when green"}
+        self.assertFalse(StandingMergeAuthorization().resolve(policy, ["README.md"])["auto_merge"])
+        self.assertTrue(
+            StandingMergeAuthorization().resolve({**policy, "auto_merge": True}, ["README.md"])["auto_merge"]
+        )
+        for value in ("true", 1, None):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(DeliveryContractViolation, "boolean"):
+                    StandingMergeAuthorization().validate_policy({**policy, "auto_merge": value})
 
     def test_binding_rejects_a_pr_url_for_another_repository_or_number(self):
         self.binding["pr_url"] = "https://github.com/Concertable/other/pull/70"

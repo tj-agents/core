@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:7d574ac433118c4afffc4638b4b505b6039702bc35e427f1d9aa1e0fc3b7d9aa",
+          "digest": "sha256:cc1c790869040422d788d4cc10f777b168ea99f3d0f6fc435b8989e49c396b03",
           "harness": {
             "marketplaces": [
               {
@@ -193,7 +193,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:f5c4ead046e2abd118092912340a6707f36ee8808db39321f861b501bbbb0a31",
+          "digest": "sha256:801da0f6212f3910536e1d2c6a6eb99ff314b44b2ee149e9e667585eac89bef1",
           "harness": {
             "marketplaces": [
               {
@@ -223,6 +223,13 @@
               },
               {
                 "path": "hooks/compact_output_gate.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "hooks/continuation_stop.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -393,7 +400,47 @@
                     ]
                   ]
                 }
-              ]
+              ],
+              "auto_merge": {
+                "claude_allow": [
+                  "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
+                  "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
+                ],
+                "codex_prefix_rules": [
+                  {
+                    "pattern": [
+                      [
+                        "python",
+                        "python.exe",
+                        "python3",
+                        "py"
+                      ],
+                      "-B",
+                      "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                      "--root",
+                      "${PROJECT_ROOT}"
+                    ],
+                    "justification": "rechecks the declared opt-in, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+                    "match": [
+                      [
+                        "python",
+                        "-B",
+                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                        "--root",
+                        "${PROJECT_ROOT}"
+                      ]
+                    ],
+                    "not_match": [
+                      [
+                        "python",
+                        "-B",
+                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                        "--root"
+                      ]
+                    ]
+                  }
+                ]
+              }
             }
           }
         },
@@ -444,7 +491,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:94c1a70231537ba780e2743a652df689bf6b4628fa336e8a7b86672cb960b1b6",
+          "digest": "sha256:a0b524eab4c513db8b6b255426ee656ec0cef5ebdc781e9aee10d7604e16d747",
           "digest_excludes": [
             "catalog/catalog.json"
           ],

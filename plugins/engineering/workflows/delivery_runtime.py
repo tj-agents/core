@@ -2,6 +2,7 @@ import copy
 import json
 import re
 from pathlib import Path, PurePosixPath, PureWindowsPath
+import delivery_policy
 
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -27,8 +28,8 @@ AUTHORIZATION_KEYS = {
     "always_stop_paths",
     "hold_label",
     "authorized_stop_classes",
+    "auto_merge",
 }
-
 # Change classes whose risk neither the hard floor nor the selected end-to-end tier can observe, so a
 # green exact head and a clean review are not evidence about them. These hold in any repository; a
 # repo's own inventory goes in the table's `always_stop_paths`.
@@ -85,6 +86,7 @@ ARTIFACT_CARRIED = (
     "pending_evidence",
     "review",
     "merge_authorization",
+    "auto_merge",
     "completion_condition",
     "workflow_handoff",
     "last_state_token",
@@ -174,6 +176,8 @@ class StandingMergeAuthorization:
             raise DeliveryContractViolation(
                 "`authorized_stop_classes` requires auto or merge standing authorization"
             )
+        if "auto_merge" in policy and type(policy["auto_merge"]) is not bool:
+            raise DeliveryContractViolation("`auto_merge` must be a boolean when present")
         return policy
 
     def stop_patterns(self, policy):
@@ -190,31 +194,35 @@ class StandingMergeAuthorization:
     def resolve(self, policy, changed_paths, labels=()):
         self.validate_policy(policy)
         mode = policy["standing_authorization"]
+        auto_merge = policy.get("auto_merge", False)
         hold_label = policy.get("hold_label")
         if hold_label and hold_label in set(labels):
-            return self._stopped(mode, {"class": "hold-label", "label": hold_label})
+            return self._stopped(mode, auto_merge, {"class": "hold-label", "label": hold_label})
         for path in changed_paths:
             if not isinstance(path, str) or not path:
                 raise DeliveryContractViolation("changed path set contains a non-path entry")
             normalized = path.replace("\\", "/")
             for name, pattern in self.stop_patterns(policy):
                 if pattern.search(normalized):
-                    return self._stopped(mode, {"class": name, "path": normalized})
+                    return self._stopped(mode, auto_merge, {"class": name, "path": normalized})
         if mode == "absent":
             return {
                 "merge_authorization": {"mode": "absent", "instruction": None},
+                "auto_merge": auto_merge,
                 "standing": mode,
                 "stopped_by": None,
             }
         return {
             "merge_authorization": {"mode": mode, "instruction": policy["instruction"]},
+            "auto_merge": auto_merge,
             "standing": mode,
             "stopped_by": None,
         }
 
-    def _stopped(self, standing, reason):
+    def _stopped(self, standing, auto_merge, reason):
         return {
             "merge_authorization": {"mode": "absent", "instruction": None},
+            "auto_merge": auto_merge,
             "standing": standing,
             "stopped_by": reason,
         }
@@ -284,6 +292,8 @@ class PersistentDeliveryRouter:
             raise DeliveryContractViolation("absent merge authorization cannot carry an instruction")
         if authorization["mode"] != "absent" and not authorization["instruction"]:
             raise DeliveryContractViolation("merge authorization requires its recorded instruction")
+        if "auto_merge" in binding and type(binding["auto_merge"]) is not bool:
+            raise DeliveryContractViolation("auto-merge setting must be a boolean")
         if not isinstance(binding["completion_condition"], str) or not binding["completion_condition"]:
             raise DeliveryContractViolation("completion condition is required")
         if "workflow_handoff" in binding:

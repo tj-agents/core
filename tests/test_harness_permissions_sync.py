@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -359,6 +360,200 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertEqual(1, len(lines))
         self.assertIn("cleanup_proof.py", lines[0])
         self.assertNotIn("${PLUGIN_ROOT}", lines[0])
+
+    def test_guarded_auto_merge_permissions_bind_the_declared_project_root(self):
+        manifest = json.loads(
+            (ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
+        )
+        project = self.root / "declared project"
+        allow, rules = harness_permissions.render_permissions(
+            manifest["requires"]["permissions"], self.root / "engineering", project, True
+        )
+        wrapper = [entry for entry in allow if "auto_merge.py" in entry]
+        self.assertEqual(4, len(wrapper))
+        self.assertTrue(any(str(project) in entry for entry in wrapper))
+        self.assertTrue(any(str(project).replace("\\", "/") in entry for entry in wrapper))
+        wrapper_rules = [rule for rule in rules if "auto_merge.py" in json.dumps(rule)]
+        self.assertEqual(1, len(wrapper_rules))
+        self.assertIn(str(project).replace("/", "\\"), wrapper_rules[0]["pattern"][-1])
+
+    def test_enabled_project_grants_only_the_guarded_wrapper_and_disable_removes_it(self):
+        project = self.root / "project"
+        (project / ".agents").mkdir(parents=True)
+        policy = project / ".agents" / "delivery-authorization.json"
+        policy.write_text(json.dumps({"standing_authorization": "auto", "instruction": "merge", "auto_merge": True}), encoding="utf-8")
+        root = install_claude_plugin(self.claude_config, "engineering", "v1", [])
+        manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
+        (root / "harness.json").write_text(json.dumps(manifest), encoding="utf-8")
+        codex_root = install_codex_plugin(self.codex_home, "engineering", "v1")
+        (codex_root / "harness.json").write_text(json.dumps(manifest), encoding="utf-8")
+        self.write_settings({"permissions": {"allow": ["Bash(user-command)"]}})
+
+        with mock.patch.object(SYNC, "auto_merge_roots", return_value=({root}, {codex_root})):
+            SYNC.synchronize(self.environ, "apply", project)
+
+        enabled = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertIn("Bash(user-command)", enabled)
+        self.assertTrue(any("auto_merge.py" in entry and str(project) in entry for entry in enabled))
+        self.assertFalse(any("gh pr merge" in entry for entry in enabled))
+        self.assertIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+        policy.write_text(json.dumps({"standing_authorization": "auto", "instruction": "merge", "auto_merge": False}), encoding="utf-8")
+        SYNC.synchronize(self.environ, "apply", project)
+
+        disabled = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertIn("Bash(user-command)", disabled)
+        self.assertFalse(any("auto_merge.py" in entry for entry in disabled))
+        self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+        policy.unlink()
+        SYNC.synchronize(self.environ, "apply", project)
+        omitted = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertFalse(any("auto_merge.py" in entry for entry in omitted))
+
+    def test_engineering_shaped_untrusted_manifest_never_gets_auto_merge_permission(self):
+        project = self.root / "project"
+        (project / ".agents").mkdir(parents=True)
+        (project / ".agents" / "delivery-authorization.json").write_text(json.dumps({"standing_authorization": "auto", "instruction": "merge", "auto_merge": True}), encoding="utf-8")
+        root = install_codex_plugin(self.codex_home, "engineering", "v1")
+        manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
+        manifest["source_roots"] = ["other"]
+        (root / "harness.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        SYNC.synchronize(self.environ, "apply", project)
+
+        self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+    def test_invalid_policy_never_attempts_auto_merge_package_verification(self):
+        project = self.root / "project"
+        (project / ".agents").mkdir(parents=True)
+        policy = project / ".agents" / "delivery-authorization.json"
+        for value in (
+            {"auto_merge": True},
+            {"standing_authorization": "invalid", "instruction": "merge", "auto_merge": True},
+            {"standing_authorization": "auto", "instruction": "merge", "auto_merge": "true"},
+            {"standing_authorization": "auto", "instruction": "merge", "auto_merge": True, "unknown": True},
+        ):
+            with self.subTest(value=value):
+                policy.write_text(json.dumps(value), encoding="utf-8")
+                with mock.patch.object(SYNC, "machine_module") as module:
+                    self.assertEqual((set(), set()), SYNC.auto_merge_roots(self.environ, project, []))
+                module.assert_not_called()
+
+    def test_verified_package_requires_exact_core_and_exact_bytes(self):
+        root = self.root / "installed"
+        root.mkdir()
+        trust = mock.Mock()
+        trust.github_repository.return_value = ("tj-agents", "core")
+        trust.source_package.return_value = {"harness.json": b"published"}
+        trust.package_files.return_value = {"harness.json": b"published"}
+        plugin = {"marketplaceSource": {"source": "https://github.com/tj-agents/core.git"}}
+        self.assertTrue(SYNC.verified_engineering_package(root, plugin, trust, self.root, {}))
+        for repository, source, installed in (
+            (("other", "core"), {"harness.json": b"published"}, {"harness.json": b"published"}),
+            (("tj-agents", "core"), None, {"harness.json": b"published"}),
+            (("tj-agents", "core"), {"harness.json": b"published"}, {"harness.json": b"changed"}),
+        ):
+            with self.subTest(repository=repository, source=source, installed=installed):
+                trust.github_repository.return_value = repository
+                trust.source_package.return_value = source
+                trust.package_files.return_value = installed
+                self.assertFalse(SYNC.verified_engineering_package(root, plugin, trust, self.root, {}))
+
+    def test_codex_inventory_requires_an_enabled_installed_engineering_record(self):
+        project = self.root / "project"
+        project.mkdir()
+        root = self.codex_home / "plugins/cache/base-agents/engineering/2.1.16"
+        records = [
+            {"id": "engineering@base-agents", "installed": installed, "enabled": enabled,
+             "localVersion": "2.1.16", "source": {"type": "local", "path": str(self.root / "source")}}
+            for installed, enabled in ((True, True), (False, True), (True, False))
+        ]
+        server = mock.MagicMock()
+        server.__enter__.return_value = server
+        server.request.return_value = {"marketplaces": [{"name": "base-agents", "plugins": records}]}
+        trust = mock.Mock(AppServer=mock.Mock(return_value=server))
+        with mock.patch.object(SYNC, "codex_executable", return_value="codex"), \
+             mock.patch.object(SYNC, "verified_engineering_package", return_value=True) as verified:
+            self.assertEqual({root}, SYNC.codex_auto_merge_roots(self.environ, project, trust, {}))
+        self.assertEqual(1, verified.call_count)
+
+    def test_claude_inventory_requires_an_enabled_applicable_engineering_install(self):
+        project = self.root / "project"
+        project.mkdir()
+        checkout = self.root / "marketplace"
+        source = checkout / "plugins/engineering"
+        source.mkdir(parents=True)
+        (checkout / ".claude-plugin").mkdir(exist_ok=True)
+        (checkout / ".claude-plugin/marketplace.json").write_text(
+            json.dumps({"plugins": [{"name": "engineering", "source": "./plugins/engineering"}]}), encoding="utf-8"
+        )
+        root = self.claude_config / "plugins/cache/base-agents/engineering/2.1.16"
+        root.mkdir(parents=True)
+        registry_path = self.claude_config / "plugins/installed_plugins.json"
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.write_text(json.dumps({"plugins": {"engineering@base-agents": [{
+            "scope": "user", "version": "2.1.16", "installPath": str(root),
+        }]}}), encoding="utf-8")
+        known = self.claude_config / "plugins/known_marketplaces.json"
+        known.write_text(json.dumps({"base-agents": {"source": {"source": "github", "repo": "tj-agents/core"}, "installLocation": str(checkout)}}), encoding="utf-8")
+        install = SimpleNamespace(identity="engineering@base-agents", scope="user", version="2.1.16", project=None)
+        sync = mock.Mock()
+        sync.source_url.return_value = "https://github.com/tj-agents/core.git"
+        sync.read_json.side_effect = lambda path: json.loads(Path(path).read_text(encoding="utf-8"))
+        sync.enabled_plugins.return_value = {"engineering@base-agents"}
+        sync.installs.return_value = [install]
+        trust = mock.Mock()
+        trust.github_repository.return_value = ("tj-agents", "core")
+        with mock.patch.object(SYNC, "machine_module", return_value=sync), \
+             mock.patch.object(SYNC, "verified_engineering_package", return_value=True) as verified:
+            self.assertEqual({root}, SYNC.claude_auto_merge_roots(self.environ, project, trust, {}))
+        self.assertEqual(1, verified.call_count)
+        sync.installs.return_value = []
+        with mock.patch.object(SYNC, "machine_module", return_value=sync), \
+             mock.patch.object(SYNC, "verified_engineering_package") as unavailable:
+            self.assertEqual(set(), SYNC.claude_auto_merge_roots(self.environ, project, trust, {}))
+        unavailable.assert_not_called()
+
+    def test_unsafe_project_never_attempts_auto_merge_package_verification(self):
+        project = self.root / "unsafe$project"
+        (project / ".agents").mkdir(parents=True)
+        (project / ".agents" / "delivery-authorization.json").write_text(
+            json.dumps({"standing_authorization": "auto", "instruction": "merge", "auto_merge": True}), encoding="utf-8"
+        )
+        with mock.patch.object(SYNC, "machine_module") as module:
+            self.assertEqual((set(), set()), SYNC.auto_merge_roots(self.environ, project, []))
+        module.assert_not_called()
+
+    def test_host_skill_copies_find_only_their_own_machine_resources(self):
+        for host_directory in ("skills", "codex-skills"):
+            with self.subTest(host_directory=host_directory):
+                package = self.root / f"machine-{host_directory}"
+                script_dir = package / host_directory / "bootstrap-capabilities" / "scripts"
+                resource_dir = package / "resources" / "machine" / "scripts"
+                script_dir.mkdir(parents=True)
+                resource_dir.mkdir(parents=True, exist_ok=True)
+                (package / "harness.json").write_text("{}", encoding="utf-8")
+                shutil.copy2(SCRIPT, script_dir / "harness_permissions_sync.py")
+                shutil.copy2(SCRIPT.parent / "harness_permissions.py", script_dir / "harness_permissions.py")
+                for name in ("delivery_policy.py", "codex_hook_trust.py"):
+                    shutil.copy2(ROOT / ".agents/workflows/delivery_policy.py" if name == "delivery_policy.py" else ROOT / ".agents/machine/scripts/codex_hook_trust.py", resource_dir / name)
+                spec = importlib.util.spec_from_file_location(f"host_sync_{host_directory}", script_dir / "harness_permissions_sync.py")
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.assertEqual((resource_dir / "delivery_policy.py").resolve(), Path(module.policy_validator().__file__).resolve())
+                self.assertEqual((resource_dir / "codex_hook_trust.py").resolve(), Path(module.machine_module("codex_hook_trust.py").__file__).resolve())
+                missing = self.root / f"missing-{host_directory}"
+                missing_scripts = missing / host_directory / "bootstrap-capabilities" / "scripts"
+                missing_scripts.mkdir(parents=True)
+                (missing / "harness.json").write_text("{}", encoding="utf-8")
+                shutil.copy2(SCRIPT, missing_scripts / "harness_permissions_sync.py")
+                shutil.copy2(SCRIPT.parent / "harness_permissions.py", missing_scripts / "harness_permissions.py")
+                missing_spec = importlib.util.spec_from_file_location(f"missing_sync_{host_directory}", missing_scripts / "harness_permissions_sync.py")
+                missing_module = importlib.util.module_from_spec(missing_spec)
+                missing_spec.loader.exec_module(missing_module)
+                self.assertIsNone(missing_module.policy_validator())
+                self.assertIsNone(missing_module.machine_module("codex_hook_trust.py"))
 
     def test_codex_rules_file_loads_under_execpolicy_when_available(self):
         codex = shutil.which("codex")

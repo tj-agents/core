@@ -85,6 +85,14 @@ class HarnessManifestTests(unittest.TestCase):
             {"schema_version", "plugin", "source_roots", "requires"}, set(manifest)
         )
 
+    def test_engineering_workflow_payload_ships_the_guarded_auto_merge_wrapper(self):
+        sources = HARNESS.load(ROOT / ".agents/plugins/sources.json")["resources"]
+        self.assertIn(
+            {"plugin": "engineering", "source": ".agents/workflows", "destination": "workflows"},
+            sources,
+        )
+        self.assertTrue((ROOT / "plugins/engineering/workflows/auto_merge.py").is_file())
+
     def test_declared_hook_hosts_must_match_host_wiring(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
