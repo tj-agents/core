@@ -60,16 +60,16 @@ After 1a normal merge and causal publication, phase 1b owns PowerShell profiles 
     {
       "host": "claude",
       "behavior": "Validate the complete offline Unix profile oracle while retaining established old-facade compatibility behavior.",
-      "source": "Planned shared test fixtures/oracle and existing mapped consumers; phase-1a implementation has not started.",
+      "source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py, .agents/hooks/tests/fixtures/shell_option_profiles.json, and existing mapped consumers.",
       "mapping": "Existing .agents/plugins/harness/engineering.json maps shared consumers for Claude; preserve its package closure.",
-      "verification": {"level": "planned", "result": "pending", "evidence": "Unix-source oracle, compatibility tests, and supported closure checks remain pending on both Windows and Linux; implementation has not started."}
+      "verification": {"level": "source", "result": "limited", "evidence": "The shared offline oracle and established-facade compatibility tests pass locally on Windows. Linux and supported closure checks remain pending; no native activation is claimed."}
     },
     {
       "host": "codex",
       "behavior": "Validate the complete offline Unix profile oracle while retaining established old-facade compatibility behavior.",
-      "source": "Planned shared test fixtures/oracle and existing mapped consumers; phase-1a implementation has not started.",
+      "source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py, .agents/hooks/tests/fixtures/shell_option_profiles.json, and existing mapped consumers.",
       "mapping": "Existing .agents/plugins/harness/engineering.json maps shared consumers for Codex; preserve its package closure.",
-      "verification": {"level": "planned", "result": "pending", "evidence": "Unix-source oracle, compatibility tests, and supported closure checks remain pending on both Windows and Linux; implementation has not started."}
+      "verification": {"level": "source", "result": "limited", "evidence": "The shared offline oracle and established-facade compatibility tests pass locally on Windows. Linux and supported closure checks remain pending; no native activation is claimed."}
     }
   ]
 }
