@@ -1,6 +1,6 @@
 # Self-repair handoff priority and deferral
 
-Status: prepared to resume the existing native owner; renewed pickup not yet observed.
+Status: resumed by the existing native owner; priority/deferral design in progress.
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SessionGuidanceHandoffCompliance
 Branch: Fix/SessionGuidanceHandoffCompliance
 PR: https://github.com/tj-agents/core/pull/199
@@ -101,9 +101,12 @@ runtime slice. Do not claim a document wakes an agent or silently add a second p
 
 ## Next Steps
 
-Acknowledge the resumed assignment here with this same native session identity before source writes.
-Verify normal reads and the published problem skills, preserve existing review evidence, and reconcile
-current main with this PR's owned files and failed CI. Resolve the bounded design above, then implement,
+Pickup acknowledged on 2026-10-11 by native session `01a12ad4-3f5b-7c72-ad11-ea65007cdd0c`;
+`CODEX_THREAD_ID` matches the recorded owner. Normal sandboxed reads succeeded for this goal, the
+priority pointer and source files. The previous review work order is preserved. Fetched `origin/main`
+contains prerequisite publication `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c` and its problem-record contract.
+
+Reconcile current main with this PR's owned files and failed CI. Resolve the bounded design above, then implement,
 validate, review and deliver the priority/deferral behavior through the existing owning lifecycle.
 Keep this goal current with actual progress and the remaining action. Use a real supported continuation
 owner when a delayed result requires one; do not report unattended monitoring without runtime evidence.
