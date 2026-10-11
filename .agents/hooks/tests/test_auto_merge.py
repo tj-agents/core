@@ -176,6 +176,10 @@ class AutoMergeTests(unittest.TestCase):
             with patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=["README.md"]), \
                     patch.object(AUTO_MERGE.workflow_ops, "git", return_value=binding["branch"]):
                 self.assertEqual(["README.md"], AUTO_MERGE.current_authorization(root, binding, value))
+            with patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=[".AGENTS/SETTINGS.JSON"]), \
+                    patch.object(AUTO_MERGE.workflow_ops, "git", return_value=binding["branch"]):
+                with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, "authorization"):
+                    AUTO_MERGE.current_authorization(root, binding, value)
 
     def test_current_review_rejects_missing_stale_open_and_missing_security_evidence(self):
         with tempfile.TemporaryDirectory() as raw:

@@ -406,11 +406,34 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(any("auto_merge.py" in entry for entry in disabled))
         self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
 
-        settings.write_text("{", encoding="utf-8")
+        settings.write_text(json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8")
+        with mock.patch.object(SYNC, "auto_merge_roots", return_value=({root}, {codex_root})):
+            SYNC.synchronize(self.environ, "apply", project)
+
+        reenabled = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertTrue(any("auto_merge.py" in entry for entry in reenabled))
+        self.assertIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+        settings.write_text(
+            '{"configuration":{"core":{"auto_merge":false},"future":{"value":'
+            + "[" * 20_000
+            + "0"
+            + "]" * 20_000
+            + "}}}",
+            encoding="utf-8",
+        )
         SYNC.synchronize(self.environ, "apply", project)
 
         invalid = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
         self.assertFalse(any("auto_merge.py" in entry for entry in invalid))
+        self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+        settings.write_text("{", encoding="utf-8")
+        SYNC.synchronize(self.environ, "apply", project)
+
+        malformed = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertFalse(any("auto_merge.py" in entry for entry in malformed))
+        self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
 
         settings.unlink()
         SYNC.synchronize(self.environ, "apply", project)

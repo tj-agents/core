@@ -67,7 +67,7 @@ def load(root):
             parse_constant=_constant,
             parse_float=_float,
         )
-    except (OSError, UnicodeError, json.JSONDecodeError, ConfigurationViolation) as error:
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError, ConfigurationViolation) as error:
         raise ConfigurationViolation(f"settings could not be read: {error}") from error
     if not isinstance(parsed, dict):
         raise ConfigurationViolation("settings must be an object")

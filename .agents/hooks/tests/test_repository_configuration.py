@@ -88,6 +88,17 @@ class RepositoryConfigurationTests(unittest.TestCase):
                 with self.assertRaises(CONFIGURATION.ConfigurationViolation):
                     CONFIGURATION.load(self.root)
 
+    def test_reader_normalizes_deep_json_recursion_to_a_configuration_violation(self):
+        self.write(
+            '{"configuration":{"future":{"value":'
+            + "[" * 20_000
+            + "0"
+            + "]" * 20_000
+            + "}}}"
+        )
+        with self.assertRaises(CONFIGURATION.ConfigurationViolation):
+            CONFIGURATION.load(self.root)
+
     def test_directory_and_redirected_paths_are_invalid(self):
         path = self.agents / "settings.json"
         path.mkdir()

@@ -34,7 +34,7 @@ AUTHORIZATION_KEYS = {
 # green exact head and a clean review are not evidence about them. These hold in any repository; a
 # repo's own inventory goes in the table's `always_stop_paths`.
 STOP_CLASSES = (
-    ("repository-settings", re.compile(r"(?:^|/)\.agents/settings\.json$")),
+    ("repository-settings", re.compile(r"(?:^|/)\.agents/settings\.json$", re.IGNORECASE)),
     # First, and its own class rather than a chance hit on the `auth` pattern below: a diff that
     # edits who may merge unattended is the one diff that must never merge unattended.
     ("standing-authorization", re.compile(r"(?:^|/)delivery-authorization\.json$")),

@@ -1,6 +1,6 @@
-# Repository settings configuration owned by Core
+﻿# Repository settings configuration owned by Core
 
-Status: active; source ownership released, L4 implementation completed and focused validation passed; immutable checkpoint, independent review and exact-head CI are next.
+Status: active; PR208 owns committed candidate 531c793d285008f0bf8969eeed700b601b9326fe. Full independent review is complete with two reproduced settings-edge findings; the bounded L4 repairs are implemented and focused-green, ready for a stable corrected head, incremental review and replacement exact-head CI.
 Date: 2026-10-11
 Branch: Fix/RepositorySettingsContract
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract
@@ -98,8 +98,8 @@ Initial test failures were confirmed in saved artifacts, repaired by adding the 
 
 ## Delivery map
 
-- Runtime slice `Fix/RepositorySettingsContract`, base `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`; PR: not opened. Includes settings contract, active engineering/machine consumers, strict validation, scoped-task guard tests and resource mapping. Focused local checks and exact-head full Windows/Linux CI precede delivery. Measured substantive code/test/docs-schema delta: 517 changed lines; catalog 4 lines, generated output excluded.
-- Subsequent guidance slice `Docs/RepositorySettingsPreference`, from the then-current remote default after runtime publication; PR: not opened. Correct only the existing persistent-delivery skill's legacy-only preference explanation, which is a durable guidance change and must ship separately under git-branching. Expected substantive guidance delta below 100 lines plus required catalog digests. Reuse the retained goal, validate both generated host adapters and applicable harness/skill packaging, review as a shipped skill change and observe exact causal publication. No implementation API or consumer installation belongs to this second slice.
+- Runtime slice `Fix/RepositorySettingsContract`, base `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`; PR: 208 (draft). Includes settings contract, active engineering/machine consumers, strict validation, scoped-task guard tests and resource mapping. Focused local checks and exact-head full Windows/Linux CI precede delivery. Measured substantive code/test/docs-schema delta: 517 changed lines; catalog 4 lines, generated output excluded.
+- Subsequent guidance slice `Docs/RepositorySettingsPreference`, from the then-current remote default after runtime publication; PR: not opened. Correct only the existing persistent-delivery skill's legacy-only preference explanation, which is a durable guidance change and must ship separately under git-branching. Expected substantive guidance delta below 100 lines plus required harness wording; catalog digests remain generated and uncommitted. Reuse the retained goal, validate both generated host adapters and applicable harness/skill packaging, review as a shipped skill change and observe exact causal publication. No implementation API or consumer installation belongs to this second slice.
 
 ## Next Steps
 
@@ -126,7 +126,22 @@ Initial test failures were confirmed in saved artifacts, repaired by adding the 
 }
 ```
 
-1. Commit the focused-green authored candidate under L7 and immediately rebind and reclaim the existing continuation owner. Freeze independent review after one base synchronization; open the draft PR for exact-head Windows/Linux CI.
-2. Finish focused/full validation, immutable candidate and independent ordinary/security review; repair findings under the same owner.
-3. Open the owning PR, observe its exact-head Windows/Linux and both-host checks, merge under recorded authority and verify causal generated publication. Keep the continuation owner bound to each actual delivery head and delayed run.
-4. Keep this goal and M008 aligned with observed results. No Kit dependency, consumer installation or repository opt-in is part of this correction. Do not ask Tommy to repeat the contract or ordinary merge permission.
+1. Commit the verified settings-edge repairs, push the same PR208 branch, refresh its delivery binding, then rebind and reclaim the existing continuation owner at the full corrected head.
+2. Freeze an incremental review from completed watermark 531c793d285008f0bf8969eeed700b601b9326fe without another full-review synchronization. Complete independent ordinary/workflow/security review and observe the replacement head's Windows/Linux CI through one owned monitor.
+3. Reconcile the current base and review, ready PR208, perform the normal guarded merge under recorded authority, and verify the exact merge's causal generated publication.
+4. Deliver the existing persistent-delivery preference explanation separately from the updated main branch, with its required harness/catalog changes, review, CI and causal publication. Keep this same goal and source boundaries.
+5. Reconcile M008 and B001/B002 against observed delivery, complete closeout and the canonical continuation owner. No Kit dependency, consumer installation or repository opt-in belongs to this correction; no repeated user permission is needed.
+
+## Independent review repair checkpoint
+
+PR208 at head 531c793d285008f0bf8969eeed700b601b9326fe has a validated body, exact delivery binding and one reconnect-safe CI observer for run38183296901 attempt1. Native-general specialist capability was rejected by this host/account; the available bounded L4 parent fallback reviewed the same immutable candidate. Native-general and workflow reviews found no defects; independent L2 authorization/security review reproduced Windows casing classifier misses and deep-JSON stale conditional grants. Parent verified the defects and finalized reviews/Fix-RepositorySettingsContract.md as changes-requested at that frozen head. B001 and B002 record them under this same causal repair. One exclusive L4 writer addresses this tightly bounded settings-edge group, then parent commits/rebinds, incrementally reviews, and publishes one stable corrected head to the same PR. The observed first CI run does not establish replacement-head validation.
+
+## Verified settings-edge repair
+
+The exclusive L4 writer released all nine repaired source/test/catalog paths. Parent verified case-insensitive settings stop/security classification, the guarded-command uppercase settings regression, and normalization of decoder RecursionError to the public ValueError boundary. The strengthened machine regression first asserts active owned Claude and Codex wrapper grants, then applies deeply nested invalid present settings and asserts removal from both hosts. Saved focused terminal artifacts in repository-settings-review-fixes-001 report reader 12 (2 skips), runtime 36, guarded auto-merge 10, settings security patterns 10 and machine synchronization 28: 96 passing tests with 2 skips. The final generator check reports 527 files, 0 changed, 0 pruned. Earlier invalid unittest class selection and fixture seeding attempts failed and were replaced by these actual passing reruns; they are not counted as validation.
+
+The bounded repair changes 63 source/test lines plus 4 catalog digest lines; it adds no unrelated API or installation scope. B001/B002 remain in progress until independent incremental review, exact-head Windows/Linux CI and normal causal delivery meet their objective conditions.
+
+## CI generated-digest correction
+
+The owned observer reached terminal failure for run38183296901 at the original 531c793d285008f0bf8969eeed700b601b9326fe head. Authoritative failed-step logs identify only the PR generated-output guard: engineering/machine catalog digest changes are generated publication output and cannot be committed in Core PRs. Restore those digest values to the actual merge-base baseline, keep all runtime fixes, and require scripts/check_generated_paths.py to pass on the corrected committed candidate. The post-merge job updates digests. This is a candidate preparation error, not a permission gate or a reason to weaken CI. Remaining jobs and the replacement head must be observed independently.

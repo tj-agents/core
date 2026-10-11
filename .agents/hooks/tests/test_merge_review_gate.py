@@ -448,9 +448,9 @@ class SecurityPatternTests(unittest.TestCase):
         )
 
     def test_repository_settings_are_sensitive_without_any_repo_config(self):
-        self.assertEqual(
-            ".agents/settings.json", gate.touches_security([".agents/settings.json"])
-        )
+        for path in (".agents/settings.json", ".AGENTS/SETTINGS.JSON", ".Agents/Settings.Json"):
+            with self.subTest(path=path):
+                self.assertEqual(path, gate.touches_security([path]))
 
     def test_credential_vocabulary_is_sensitive_without_any_repo_config(self):
         self.assertEqual("src/ApiKeyStore.cs", gate.touches_security(["src/ApiKeyStore.cs"]))
