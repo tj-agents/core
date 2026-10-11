@@ -91,7 +91,7 @@ what still needs checking on Windows.
   `tests/delivery-continuation.tests.ps1` delegates to `tests/test_delivery_continuation.py`.
 - Verification: `pwsh .agents/sync-generated.ps1 -Check` passed (509 package files); the complete `tests/`
   suite passed 1,057 tests (18 skips), and complete `.agents/hooks/tests/` suite passed 1,048 tests
-  (4 skips), both with Python bytecode writes disabled. Generated plugin/catalog output was restored.
+  (4 skips), both with Python bytecode writes disabled on `3c93546`. Generated plugin/catalog output was restored.
   Workflow artifacts are under `.git/agent-workflow/runs/linux-platform-instructions/`.
 - Review: the first docs pass reviewed `b4e6f1020b4c1edcfea8e21d6dae2ba5ebdb8a5e` through
   `838990937acc9f1d39d9799471a8b6293e159183`; its Windows command and audit-count findings were fixed.
@@ -163,7 +163,7 @@ adopt unrelated automation to clear this administrator dependency. Both platform
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Audited 248 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. On synchronized head 8244d47, complete source suite passed 1,057 tests (18 skips), complete hook suite passed 1,048 tests (4 skips), and generated check found 509 package files current. Exact-head Windows/Linux CI remains required; installed-host adoption was not exercised."
+        "evidence": "Audited 248 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. On synchronized head 3c93546, complete source suite passed 1,057 tests (18 skips), complete hook suite passed 1,048 tests (4 skips), and generated check found 509 package files current. Exact-head Windows/Linux CI remains required; installed-host adoption was not exercised."
       }
     },
     {
@@ -174,7 +174,7 @@ adopt unrelated automation to clear this administrator dependency. Both platform
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Audited 248 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. On synchronized head 8244d47, complete source suite passed 1,057 tests (18 skips), complete hook suite passed 1,048 tests (4 skips), and generated check found 509 package files current. Exact-head Windows/Linux CI remains required; installed-host adoption was not exercised."
+        "evidence": "Audited 248 Markdown files across .agents, .claude and .codex. Python test counterparts cover ported runtimes; tests/delivery-continuation.tests.ps1 delegates to tests/test_delivery_continuation.py. On synchronized head 3c93546, complete source suite passed 1,057 tests (18 skips), complete hook suite passed 1,048 tests (4 skips), and generated check found 509 package files current. Exact-head Windows/Linux CI remains required; installed-host adoption was not exercised."
       }
     }
   ]
