@@ -388,6 +388,14 @@ def fresh_removable_receipt(worktree):
         if receipt.get("verdict") == "retained-dependency":
             raise Refusal("the cleanup receipt retains a dependent branch; use close.py")
         raise Refusal("the cleanup receipt is not removable")
+    remote = receipt.get("remote_deleted")
+    if (not isinstance(remote, dict)
+            or any(remote.get(key) != receipt.get(key) for key in ("repo", "branch", "head", "pr"))
+            or not nonempty_string(remote.get("repo"))
+            or not finite_positive(remote.get("recorded_at"))
+            or remote["recorded_at"] > now() + IDENTITY_TOLERANCE_SECONDS
+            or now() - remote["recorded_at"] > RECEIPT_MAX_AGE_SECONDS):
+        raise Refusal("the cleanup receipt has no verified remote deletion")
     if (not finite_positive(receipt.get("recorded_at")) or
             receipt["recorded_at"] > now() + IDENTITY_TOLERANCE_SECONDS or
             now() - receipt["recorded_at"] > RECEIPT_MAX_AGE_SECONDS):

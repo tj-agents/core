@@ -225,10 +225,15 @@ class ReceiptGrantTests(unittest.TestCase):
             "worktree": str(Path(worktree).resolve()),
             "branch": branch,
             "head": head,
+            "pr": 1,
+            "repo": "github.com/tj-agents/offline",
             "verdict": verdict,
             "recorded_at": time.time() - age_seconds,
+            "remote_deleted": {"repo": "github.com/tj-agents/offline", "branch": branch, "head": head, "pr": 1, "recorded_at": time.time() - age_seconds},
         }
-        (directory / f"{digest}.json").write_text(json.dumps(data), encoding="utf-8")
+        path = directory / f"{digest}.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
 
     def run_hook(self, command, tool="Bash", env=None):
         payload = {"tool_name": tool, "cwd": str(self.root), "tool_input": {"command": command}}
@@ -279,6 +284,18 @@ class ReceiptGrantTests(unittest.TestCase):
                     self.root, "squashed", "-D", "main",
                 ))
 
+    def test_a_receipt_without_remote_deletion_is_not_granted(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.pop("remote_deleted")
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+    def test_a_receipt_with_a_different_remote_repository_is_not_granted(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["remote_deleted"]["repo"] = "github.com/other/repository"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
     def test_a_stale_receipt_is_not_granted(self):
         self.write_receipt(self.squashed_tree, "squashed", self.head, age_seconds=60 * 60 + 1)
         self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))

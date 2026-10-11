@@ -147,14 +147,14 @@
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py --delete-remote:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py --delete-remote:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py --delete-remote:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py --delete-remote:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py --delete-remote:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py --delete-remote:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py --delete-remote:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py --delete-remote:*)"
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)"
       ],
       "codex_prefix_rules": [
         {
