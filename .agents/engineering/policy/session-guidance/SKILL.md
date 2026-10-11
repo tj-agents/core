@@ -16,15 +16,11 @@ an authorized task has a future decision that may outlive the current session.
 
 ## When the user calls out a mistake
 
-When the user calls out a mistake, before apologizing or drafting feedback, check whether a governing
-standard caused or failed to prevent the mistake. This includes a missing, ambiguous, contradictory,
-mispriced or unenforced standard across every
-consumed `tj-agents` plugin on both hosts. Answer the user's direct question first. If it did,
-launch `engineering:handoff` in bounded
-side-workstream mode in the same turn under the standing authorization, before the original task resumes.
-An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Existing
-user limits and scope gates still apply. Questions ask for reasoning: explain and defend recommendations with
-evidence, change them only for new evidence or a stated user decision, and say what changed.
+When the user calls out a mistake, answer the direct question first, then load and follow
+`engineering:self-repair`. It owns whether a consumed Core standard caused or failed to prevent the
+mistake, and the required bounded source-repair handoff. Existing user limits and scope gates still apply.
+Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
+evidence or a stated user decision, and say what changed.
 
 ## A task has an owning lifecycle — load it before the first edit
 
