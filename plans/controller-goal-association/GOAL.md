@@ -6,15 +6,17 @@ Implement reciprocal association between a native agent session and its canonica
 
 This is the Core-owned implementation plan for the accepted design in the [immutable shared design at Docs commit 0d74933ff0889251f6228c96d81b7553ed95a736](https://github.com/tj-agents/docs/blob/0d74933ff0889251f6228c96d81b7553ed95a736/plans/tj-agents-auto-merge/PLAN.md#selected-parent-continuation-prevention). That section contains the deciding mechanisms and detailed source examples. This Goal records executable scope and acceptance; it does not replace the shared design.
 
-Authorized scope is exactly these five Core source paths plus this Goal:
+Authorized scope is these seven Core source paths plus this Goal:
 
 - `.agents/workflows/continuation_runtime.py`
 - `.agents/hooks/continuation_stop.py`
 - `.agents/hooks/tests/test_continuation_runtime.py`
 - `.agents/hooks/tests/test_continuation_stop.py`
 - `.agents/engineering/workflow/persistent-workflow/SKILL.md`
+- `.agents/plugins/harness/engineering.json`
+- `tests/test_harness_manifests.py`
 
-Do not add a helper module or another source path. Do not edit owner state by hand, scan for an owner, introduce a daemon, transport, cache, manifest, configuration/authorization schema, native `/cd` interface or Linux scheduler adapter. The shared Docs parent remains owned by `/root`; a completed source slice never closes it.
+The existing shipped harness manifest and its inventory test are included because the skill introduces an `associate-session` command requiring an exact declaration for both hosts. Add only that operation's permission declaration and inventory coverage; retain the existing manifest and packaging. Do not add a helper module, new manifest or another source path. Do not edit owner state by hand, scan for an owner, introduce a daemon, transport, cache, configuration/authorization schema, native `/cd` interface or Linux scheduler adapter. The shared Docs parent remains owned by `/root`; a completed source slice never closes it.
 
 ## Authority and execution lifecycle
 
@@ -63,7 +65,7 @@ All cases use disposable owners and native directories. A rejection leaves owner
 
 ## Next Steps
 
-A fresh L4 implementation successor owns this side slice because shared ownership and hook ancestry need code-level judgment. Before deliverable writes, acknowledge transfer with the receipt helper and exact session identity above. First verify the checkout identity, inspect the missing association in the current runtime/Stop APIs, and record nonempty source evidence under `.agents/continuation`; then initialize and claim the supported continuation for this side Goal with finite defaults and the native process identity. Register and observe a supported wake before claiming unattended ownership. Do not create or change the Root global owner. Implement the five-path atomic slice, run focused Windows and Linux tests plus generation, obtain frozen independent review and both required CI checks, merge normally, publish generated output causally, complete the source Goal through the supported completion JSON/check path, and safely clean only this owned checkout. The parent prepares/begins/submits and observes the five-minute pickup; no duplicate launch. Handoff, acknowledgement, commit or merge alone does not complete the Goal.
+A fresh L4 implementation successor owns this side slice because shared ownership and hook ancestry need code-level judgment. Before deliverable writes, acknowledge transfer with the receipt helper and exact session identity above. First verify the checkout identity, inspect the missing association in the current runtime/Stop APIs, and record nonempty source evidence under `.agents/continuation`; then initialize and claim the supported continuation for this side Goal with finite defaults and the native process identity. Register and observe a supported wake before claiming unattended ownership. Do not create or change the Root global owner. Implement the seven-path atomic slice, including the exact installed-relative `python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py associate-session` declaration for both hosts and its inventory test; run focused Windows and Linux tests plus generation, obtain frozen independent review and both required CI checks, merge normally, publish generated output causally, complete the source Goal through the supported completion JSON/check path, and safely clean only this owned checkout. Reassess the actual size before growing past 1,000 substantive lines; preserve the atomic ownership and permission boundary. The parent prepares/begins/submits and observes the five-minute pickup; no duplicate launch. Handoff, acknowledgement, commit or merge alone does not complete the Goal.
 
 ```agent-host-coverage
 {
@@ -100,4 +102,4 @@ Execution authorization: implementation
 Transfer: required
 Receipt: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ControllerGoalAssociation/.agents/continuation/controller-association-transfer.json
 
-Readiness authorizes only the already approved five-path source boundary. It does not claim implementation, installed-profile activation or native acceptance.
+Readiness authorizes this source boundary, including the mandatory existing-manifest declaration and inventory test. It does not claim implementation, installed-profile activation or native acceptance.
