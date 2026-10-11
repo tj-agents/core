@@ -34,7 +34,45 @@ class OracleTests(unittest.TestCase):
 
     def test_bash_variants_keep_their_editions_and_conditions(self):
         by_id = {record["id"]: record for record in self.records}
-        self.assertEqual("SYSLOG_HISTORY && SYSLOG_SHOPT", by_id["bash-O:syslog_history"]["condition"])
+        expected = {
+            "bash-long:debugger": "DEBUGGER",
+            "bash-long:dump-po-strings": "TRANSLATABLE_STRINGS",
+            "bash-long:dump-strings": "TRANSLATABLE_STRINGS",
+            "bash-long:protected": "WORDEXP_OPTION",
+            "bash-long:restricted": "RESTRICTED_SHELL",
+            "bash-long:wordexp": "WORDEXP_OPTION",
+            "bash-o:braceexpand": "BRACE_EXPANSION",
+            "bash-o:emacs": "READLINE",
+            "bash-o:histexpand": "BANG_HISTORY",
+            "bash-o:history": "HISTORY",
+            "bash-o:monitor": "JOB_CONTROL",
+            "bash-o:nolog": "HISTORY",
+            "bash-o:notify": "JOB_CONTROL",
+            "bash-o:vi": "READLINE",
+            "bash-O:assoc_expand_once": "ARRAY_VARS",
+            "bash-O:checkjobs": "JOB_CONTROL",
+            "bash-O:cmdhist": "HISTORY",
+            "bash-O:complete_fullquote": "READLINE",
+            "bash-O:direxpand": "READLINE",
+            "bash-O:dirspell": "READLINE",
+            "bash-O:extdebug": "DEBUGGER",
+            "bash-O:extglob": "EXTENDED_GLOB",
+            "bash-O:force_fignore": "READLINE",
+            "bash-O:histappend": "HISTORY",
+            "bash-O:histreedit": "READLINE",
+            "bash-O:histverify": "READLINE",
+            "bash-O:hostcomplete": "READLINE",
+            "bash-O:lithist": "HISTORY",
+            "bash-O:no_empty_cmd_completion": "READLINE",
+            "bash-O:progcomp": "PROGRAMMABLE_COMPLETION",
+            "bash-O:progcomp_alias": "PROGRAMMABLE_COMPLETION && ALIAS",
+            "bash-O:restricted_shell": "RESTRICTED_SHELL",
+            "bash-O:syslog_history": "SYSLOG_HISTORY && SYSLOG_SHOPT",
+            "bash-o-cygwin:igncr": "__CYGWIN__",
+            "bash-O-cygwin:completion_strip_exe": "__CYGWIN__",
+        }
+        actual = {record_id: record["condition"] for record_id, record in by_id.items() if record.get("condition")}
+        self.assertEqual(expected, actual)
         self.assertEqual("__CYGWIN__", by_id["bash-o-cygwin:igncr"]["condition"])
         self.assertEqual("__CYGWIN__", by_id["bash-O-cygwin:completion_strip_exe"]["condition"])
         self.assertEqual("5.3.015", self.sources["sources"]["gfw-bash-5.3.015-cygwin"]["edition"])
@@ -58,6 +96,42 @@ class OracleTests(unittest.TestCase):
             oracle.validate(malformed, self.sources)
         malformed = copy.deepcopy(self.profiles)
         malformed["groups"][0]["names"].append("debug")
+        with self.assertRaises(ValueError):
+            oracle.validate(malformed, self.sources)
+        malformed = copy.deepcopy(self.profiles)
+        malformed["groups"][8]["id"] = "zsh-renamed"
+        with self.assertRaises(ValueError):
+            oracle.validate(malformed, self.sources)
+        malformed = copy.deepcopy(self.profiles)
+        split = copy.deepcopy(malformed["groups"][1])
+        malformed["groups"][1]["names"] = ["init-file"]
+        split["names"] = ["rcfile"]
+        malformed["groups"].append(split)
+        with self.assertRaises(ValueError):
+            oracle.validate(malformed, self.sources)
+        malformed = copy.deepcopy(self.profiles)
+        malformed["groups"][7]["source"] = "dash-0.5.13.5-options"
+        with self.assertRaises(ValueError):
+            oracle.validate(malformed, self.sources)
+        malformed_sources = copy.deepcopy(self.sources)
+        malformed_sources["sources"]["gnu-bash-5.2.37-shell"].pop("sha256")
+        with self.assertRaises(ValueError):
+            oracle.validate(self.profiles, malformed_sources)
+        for label, index, mutate in (
+            ("array id", 0, lambda group: group.__setitem__("id", [])),
+            ("nested names", 0, lambda group: group.__setitem__("names", [["debug"]])),
+            ("non-object map", 0, lambda group: group.__setitem__("map", [])),
+            ("invalid condition", 0, lambda group: group.__setitem__("condition", [])),
+            ("invalid variants", 0, lambda group: group.__setitem__("variants", [])),
+            ("letter group names", 9, lambda group: group.update(names=["wrong"], map={})),
+        ):
+            with self.subTest(label=label):
+                malformed = copy.deepcopy(self.profiles)
+                mutate(malformed["groups"][index])
+                with self.assertRaises(ValueError):
+                    oracle.validate(malformed, self.sources)
+        malformed = copy.deepcopy(self.profiles)
+        malformed["groups"][9]["map"]["0"] = 1
         with self.assertRaises(ValueError):
             oracle.validate(malformed, self.sources)
 
