@@ -1,12 +1,12 @@
 ---
 name: techdebt
-description: Take one tech-debt item all the way to a focused PR in its selected checkout — survey every TECH_DEBT.md, pick one high-value item, fix it with the long-term scalable solution, verify, delete the resolved entry, and open the PR. Use when working through tech debt or handling one self-contained tech-debt item end to end.
+description: Compatibility entry for existing callers of the renamed techdebt skill; remove after 2027-04-10. It owns no procedure and routes to engineering:address-debt; never select it for new work.
 
 kind: workflow
 domain: process
 ---
 
-# Working one tech-debt item — or a small bundle — to a PR
+# Tech debt
 
 Read and follow the [canonical shared definition](../../../.agents/engineering/workflow/techdebt/SKILL.md) in full.
 This entry point supplies only Codex discovery metadata; the shared procedure is authored once under `.agents/`.

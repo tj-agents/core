@@ -118,6 +118,7 @@
             "macos"
           ],
           "skills": [
+            "address-debt",
             "address-review",
             "big-review",
             "big-review-all",
@@ -127,6 +128,7 @@
             "commit-push",
             "committing",
             "continue-roadmap",
+            "docs",
             "docs-and-debt",
             "docs-review",
             "failing-tests",
@@ -173,7 +175,8 @@
             "unmerged",
             "update-roadmap",
             "workboard",
-            "worktree"
+            "worktree",
+            "write-debt"
           ],
           "dependencies": {
             "required": [
