@@ -597,6 +597,57 @@ class SkillRouterTests(unittest.TestCase):
 
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
 
+    def test_an_alias_that_changes_the_bare_name_routes_through_the_new_name(self):
+        new_skill = self.plugin / "skills" / "new"
+        new_skill.mkdir(parents=True)
+        (new_skill / "SKILL.md").write_text(
+            "---\nname: new\ndescription: Do the renamed thing.\n---\n\n# New\n", encoding="utf-8"
+        )
+        self.routes({"routes": [{"path": "^src/", "skills": ["engineering:old"]}]})
+        self.aliases({"engineering:old": "engineering:new"})
+
+        for harness in ("claude", "codex"):
+            with self.subTest(harness=harness):
+                session = str(uuid.uuid4())
+                payload = {
+                    "hook_event_name": "PreToolUse",
+                    "tool_use_id": str(uuid.uuid4()),
+                    "session_id": session,
+                    "cwd": str(self.repo),
+                    "tool_name": "Write",
+                    "tool_input": {"file_path": "src/item.py", "content": "value = 2\n"},
+                }
+                blocked = self.run_router(("--harness", harness), payload)
+                self.assertEqual(2, blocked.returncode, blocked.stdout + blocked.stderr)
+                self.assertIn("engineering:new", blocked.stderr)
+                self.assertNotIn("engineering:old", blocked.stderr)
+
+                if harness == "claude":
+                    transcript = self.base / "claude-transcript.jsonl"
+                    transcript.write_text("\n".join(json.dumps(entry) for entry in (
+                        {"message": {"content": [{"type": "tool_use", "name": "Skill", "id": "loaded",
+                                                   "input": {"skill": "engineering:new"}}]}},
+                        {"message": {"content": [{"type": "tool_result", "tool_use_id": "loaded",
+                                                   "content": "New loaded."}]}},
+                    )), encoding="utf-8")
+                else:
+                    body = (new_skill / "SKILL.md").read_text(encoding="utf-8")
+                    transcript = self.base / "codex-transcript.jsonl"
+                    transcript.write_text("\n".join(json.dumps(entry) for entry in (
+                        {"type": "response_item", "payload": {
+                            "type": "custom_tool_call", "name": "exec", "call_id": "read",
+                            "input": f"cat {new_skill / 'SKILL.md'}",
+                        }},
+                        {"type": "response_item", "payload": {
+                            "type": "custom_tool_call_output", "call_id": "read",
+                            "output": [{"type": "text", "text": "Script completed\n" + body}],
+                        }},
+                    )), encoding="utf-8")
+                payload["transcript_path"] = str(transcript)
+                payload["tool_use_id"] = str(uuid.uuid4())
+                allowed = self.run_router(("--harness", harness), payload)
+                self.assertEqual(0, allowed.returncode, allowed.stdout + allowed.stderr)
+
     def test_an_unreadable_alias_table_leaves_resolution_where_it_was(self):
         self.routes({"routes": [{"path": "^src/", "skills": ["engineering:feature"]}]})
         (self.plugin / "hooks" / "compatibility.json").write_text("{not json", encoding="utf-8")
