@@ -279,7 +279,10 @@ def own_host_and_entry(cwd=None):
         if len(recent) == 1:
             return recent[0]
         raise Refusal("multiple equally recent verified registry attachments match this host")
-    raise Refusal("cannot resolve a verified registry attachment for this host and current directory")
+    raise Refusal(
+        "cannot resolve a verified registry attachment for this host and current directory; "
+        "do not force-close the host"
+    )
 
 
 def same_session_process(left, right):
