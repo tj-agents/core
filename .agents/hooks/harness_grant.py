@@ -18,6 +18,7 @@ hook contract has no equivalent allow decision yet.
 
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -126,16 +127,29 @@ def is_fresh_removable(receipt):
     if receipt is None or receipt.get("verdict") != "removable":
         return False
     recorded_at = receipt.get("recorded_at")
-    if not isinstance(recorded_at, (int, float)):
+    if isinstance(recorded_at, bool) or not isinstance(recorded_at, (int, float)) or not math.isfinite(recorded_at):
         return False
     age = time.time() - recorded_at
     return 0 <= age <= RECEIPT_FRESHNESS_SECONDS
 
 
+def remote_deletion_is_verified(receipt):
+    remote = receipt.get("remote_deleted") if isinstance(receipt, dict) else None
+    if not isinstance(remote, dict):
+        return False
+    if any(remote.get(key) != receipt.get(key) for key in ("repo", "branch", "head", "pr")):
+        return False
+    recorded_at = remote.get("recorded_at")
+    if isinstance(recorded_at, bool) or not isinstance(recorded_at, (int, float)) or not math.isfinite(recorded_at):
+        return False
+    age = time.time() - recorded_at
+    return 0 <= age <= RECEIPT_FRESHNESS_SECONDS and isinstance(remote.get("repo"), str)
+
 def worktree_receipt_authorizes(worktree, branch, head):
     receipt = receipt_for_worktree(worktree)
     return (
         is_fresh_removable(receipt)
+        and remote_deletion_is_verified(receipt)
         and receipt.get("branch") == branch
         and receipt.get("head") == head
     )
@@ -162,7 +176,7 @@ def branch_receipt_authorizes(checkout, branch):
             receipt = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if isinstance(receipt, dict) and is_fresh_removable(receipt) \
+        if isinstance(receipt, dict) and is_fresh_removable(receipt) and remote_deletion_is_verified(receipt) \
                 and receipt.get("branch") == branch and receipt.get("head") == head:
             return True
     return False

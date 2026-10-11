@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 
 
@@ -33,6 +34,43 @@ def _fixture_records(fixture, key, relation):
         raise EvidenceError(f"forge fixture has no open {relation} PR evidence")
     return _validate_records(fixture[key], relation)
 
+
+def canonical_github_repository(repo):
+    if not isinstance(repo, str):
+        raise EvidenceError("GitHub repository identity is unavailable")
+    value = repo.removeprefix("github.com/")
+    if value.count("/") != 1:
+        raise EvidenceError("GitHub repository identity is unavailable")
+    owner, name = value.split("/", 1)
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", owner) or not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+        raise EvidenceError("GitHub repository identity is unavailable")
+    return "github.com/" + owner + "/" + name
+
+
+def github_repository_from_origin(origin):
+    if not isinstance(origin, str):
+        raise EvidenceError("checkout origin is not a GitHub repository")
+    prefixes = ("https://github.com/", "http://github.com/", "git@github.com:", "ssh://git@github.com/", "ssh://github.com/", "git://github.com/")
+    suffix = next((origin[len(prefix):] for prefix in prefixes if origin.startswith(prefix)), None)
+    if suffix is None:
+        raise EvidenceError("checkout origin is not a GitHub repository")
+    return canonical_github_repository(suffix.removesuffix(".git").rstrip("/"))
+
+
+def checkout_github_repository(cwd, repo=None):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(cwd), "remote", "get-url", "origin"], capture_output=True,
+            text=True, encoding="utf-8", errors="replace", timeout=FORGE_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise EvidenceError("checkout origin is unavailable") from error
+    if result.returncode != 0:
+        raise EvidenceError("checkout origin is unavailable")
+    actual = github_repository_from_origin(result.stdout.strip())
+    if repo is not None and canonical_github_repository(repo).lower() != actual.lower():
+        raise EvidenceError("supplied repository does not match checkout origin")
+    return actual
 
 def _query_records(branch, relation, repo, cwd):
     option = "--head" if relation == "head" else "--base"
@@ -72,7 +110,8 @@ def observe_open_prs(branch, repo=None, cwd=None, fixture=None):
             "head": _fixture_records(fixture, "open_head_prs", "head"),
             "base": _fixture_records(fixture, "open_base_prs", "base"),
         }
+    target = checkout_github_repository(cwd, repo)
     return {
-        "head": _query_records(branch, "head", repo, cwd),
-        "base": _query_records(branch, "base", repo, cwd),
+        "head": _query_records(branch, "head", target, cwd),
+        "base": _query_records(branch, "base", target, cwd),
     }

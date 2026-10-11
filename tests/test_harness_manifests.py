@@ -224,14 +224,14 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
     def test_cleanup_remote_delete_action_is_declared_for_both_hosts(self):
         claude_allow, codex_rules = self.rendered("engineering")
         root = self.PLUGIN_ROOT.replace("\\", "/")
-        entries = [entry.replace("\\", "/") for entry in claude_allow if "cleanup_proof.py --delete-remote:*" in entry]
+        entries = [entry.replace("\\", "/") for entry in claude_allow if "cleanup_proof.py:*" in entry]
         for interpreter in ("python", "python3"):
             for host in ("Bash", "PowerShell"):
                 for path in (
                     f"{root}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
                     f"{root}/skills/merge/scripts/cleanup_proof.py",
                 ):
-                    self.assertIn(f"{host}({interpreter} -B {path} --delete-remote:*)", entries)
+                    self.assertIn(f"{host}({interpreter} -B {path}:*)", entries)
         rules = [rule for rule in codex_rules if "cleanup_proof.py" in json.dumps(rule)]
         self.assertEqual(1, len(rules))
         matches = [[token.replace("\\", "/") for token in match] for match in rules[0]["match"]]

@@ -90,8 +90,9 @@ class FinishReaperProcessTests(unittest.TestCase):
             git(primary, "branch", "feature"); git(primary, "worktree", "add", "-q", str(worktree), "feature")
             (worktree / "feature").write_text("feature\n", encoding="utf-8"); git(worktree, "add", "."); git(worktree, "commit", "-q", "-m", "feature")
             head = git(worktree, "rev-parse", "HEAD"); git(primary, "checkout", "-q", "main"); git(primary, "merge", "-q", "--squash", "feature"); git(primary, "commit", "-q", "-m", "merged"); git(primary, "push", "-q", "origin", "main")
+            git(primary, "remote", "set-url", "origin", "https://github.com/tj-agents/offline.git")
             receipts = state / "merge-cleanup/receipts"; receipts.mkdir(parents=True)
-            (receipts / "receipt.json").write_text(json.dumps({"worktree": str(worktree), "primary": str(primary), "branch": "feature", "head": head, "default": "main", "verdict": "removable", "recorded_at": time.time()}), encoding="utf-8")
+            (receipts / "receipt.json").write_text(json.dumps({"worktree": str(worktree), "primary": str(primary), "branch": "feature", "head": head, "repo": "github.com/tj-agents/offline", "default": "main", "pr": 1, "verdict": "removable", "recorded_at": time.time(), "remote_deleted": {"repo": "github.com/tj-agents/offline", "branch": "feature", "head": head, "pr": 1, "recorded_at": time.time()}}), encoding="utf-8")
             obligation = state / "merge-cleanup/obligations/one.json"; obligation.parent.mkdir(parents=True); obligation.write_text(json.dumps({"worktree": str(worktree), "session_id": "ours"}), encoding="utf-8")
             host = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=worktree)
             started = self.process_started_at(host.pid)
@@ -219,6 +220,7 @@ class FinishReaperProcessTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(primary), "commit", "-q", "-m", "base"], check=True)
             subprocess.run(["git", "-C", str(primary), "push", "-q", "-u", "origin", "main"], check=True)
             subprocess.run(["git", "-C", str(primary), "remote", "set-head", "origin", "main"], check=True)
+            subprocess.run(["git", "-C", str(primary), "remote", "set-url", "origin", "https://github.com/tj-agents/offline.git"], check=True)
             subprocess.run(["git", "-C", str(primary), "branch", "feature"], check=True)
             subprocess.run(["git", "-C", str(primary), "worktree", "add", "-q", str(worktree), "feature"], check=True)
             head = git(worktree, "rev-parse", "HEAD")
@@ -226,8 +228,8 @@ class FinishReaperProcessTests(unittest.TestCase):
             receipt_directory.mkdir(parents=True)
             (receipt_directory / "receipt.json").write_text(json.dumps({
                 "worktree": str(worktree), "primary": str(primary), "branch": "feature",
-                "head": head, "default": "main", "verdict": "removable",
-                "recorded_at": time.time(),
+                "head": head, "repo": "github.com/tj-agents/offline", "default": "main", "pr": 1, "verdict": "removable",
+                "recorded_at": time.time(), "remote_deleted": {"repo": "github.com/tj-agents/offline", "branch": "feature", "head": head, "pr": 1, "recorded_at": time.time()},
             }), encoding="utf-8")
             obligation = state / "merge-cleanup/obligations/ours.json"
             obligation.parent.mkdir(parents=True)
@@ -330,7 +332,7 @@ class ReceiptSafetyTests(unittest.TestCase):
         session_close.git = self.original_git; session_close.now = self.original_now
 
     def receipt(self, **changes):
-        value = {"worktree": str(self.worktree), "primary": str(Path(self.temp.name) / "primary"), "branch": "branch", "head": "head", "default": "main", "verdict": "removable", "recorded_at": 999.0}
+        value = {"worktree": str(self.worktree), "primary": str(Path(self.temp.name) / "primary"), "branch": "branch", "head": "head", "pr": 1, "repo": "github.com/tj-agents/offline", "default": "main", "verdict": "removable", "recorded_at": 999.0, "remote_deleted": {"repo": "github.com/tj-agents/offline", "branch": "branch", "head": "head", "pr": 1, "recorded_at": 999.0}}
         value.update(changes)
         directory = Path(self.temp.name) / "merge-cleanup/receipts"; directory.mkdir(parents=True, exist_ok=True)
         (directory / "entry.json").write_text(json.dumps(value), encoding="utf-8")
@@ -520,6 +522,22 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
                 finish_reaper.final_preflight(args)
         git_call.assert_not_called()
 
+    def test_claimant_arriving_after_dependency_observation_blocks_removal(self):
+        args = SimpleNamespace(
+            worktree=str(self.worktree), head="head", primary="primary", branch="branch",
+            default="main", session_id="ours", host_pid=10, host_start=1.0,
+            result=str(Path(self.temp.name) / "result.json"),
+        )
+        receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
+        with mock.patch.object(finish_reaper.session_close, "fresh_removable_receipt", return_value=receipt), \
+                mock.patch.object(finish_reaper.session_close, "verified_exited", return_value=True), \
+                mock.patch.object(finish_reaper.session_close, "other_live_claimant", side_effect=[None, {"pid": 11}]) as claimant, \
+                mock.patch.object(finish_reaper.session_close, "dependencies_are_clear", return_value=True), \
+                mock.patch.object(finish_reaper.session_close, "git", return_value=(0, "", "")) as git_call:
+            with self.assertRaisesRegex(session_close.Refusal, "another verified"):
+                finish_reaper.remove_worktree_and_branch(args)
+        self.assertEqual(2, claimant.call_count)
+        self.assertFalse(any(call.args[1:3] == ("worktree", "remove") for call in git_call.call_args_list))
     def test_obligation_removal_requires_both_session_and_worktree(self):
         directory = Path(self.temp.name) / "merge-cleanup/obligations"
         directory.mkdir(parents=True)

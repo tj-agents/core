@@ -171,10 +171,11 @@ class CleanupProofTests(unittest.TestCase):
         )
         with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}):
             with mock.patch.object(CLEANUP_PROOF, "primary_github_repository", return_value="github.com/tj-agents/offline"):
-                with mock.patch.object(CLEANUP_PROOF, "pr_view", return_value=view):
-                    with observer:
-                        with mock.patch("sys.stdout", output):
-                            status = CLEANUP_PROOF.main(arguments)
+                with mock.patch.object(CLEANUP_PROOF, "push_destination", return_value="origin"):
+                    with mock.patch.object(CLEANUP_PROOF, "pr_view", return_value=view):
+                        with observer:
+                            with mock.patch("sys.stdout", output):
+                                status = CLEANUP_PROOF.main(arguments)
         return status, output.getvalue()
 
     def removable_remote_fixture(self):
@@ -218,6 +219,9 @@ class CleanupProofTests(unittest.TestCase):
 
         self.assertEqual(0, status, output)
         self.assertEqual("remote-deleted\n", output)
+        receipt = load_receipt(self.state.name, worktree)
+        self.assertEqual("github.com/tj-agents/offline", receipt["remote_deleted"]["repo"])
+        self.assertEqual(head, receipt["remote_deleted"]["head"])
         self.assertEqual(2, subprocess.run(
             ["git", "-C", str(primary), "ls-remote", "--exit-code", "origin", "refs/heads/feature"],
             capture_output=True, text=True,
@@ -309,6 +313,30 @@ class CleanupProofTests(unittest.TestCase):
         self.assertTrue(output.startswith("preserve:"))
         self.assertEqual(head, git(primary, "ls-remote", "origin", "refs/heads/feature").split()[0])
 
+    def test_push_destination_rejects_foreign_or_multiple_destinations(self):
+        for output in ("https://github.com/other/repository.git\n", "https://github.com/tj-agents/offline.git\nhttps://github.com/tj-agents/other.git\n"):
+            with self.subTest(output=output), mock.patch.object(
+                    CLEANUP_PROOF, "run_git", return_value=subprocess.CompletedProcess([], 0, output, ""),
+            ):
+                with self.assertRaises(CLEANUP_PROOF.Preserve):
+                    CLEANUP_PROOF.push_destination(self.root, "github.com/tj-agents/offline")
+
+    def test_dependency_queries_use_checkout_github_repository_despite_ambient_overrides(self):
+        dependency = sys.modules["cleanup_dependency"]
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            if command[3:6] == ["remote", "get-url", "origin"]:
+                return subprocess.CompletedProcess(command, 0, "git@github.com:tj-agents/offline.git\n", "")
+            return subprocess.CompletedProcess(command, 0, "[]", "")
+
+        with mock.patch.dict(os.environ, {"GH_REPO": "other/repository", "GH_HOST": "other.example"}), \
+                mock.patch.object(dependency.subprocess, "run", side_effect=run):
+            evidence = dependency.observe_open_prs("feature", cwd=self.root)
+        self.assertEqual({"head": [], "base": []}, evidence)
+        self.assertEqual("github.com/tj-agents/offline", calls[1][-1])
+        self.assertEqual("github.com/tj-agents/offline", calls[2][-1])
     def test_remote_delete_requires_the_exact_option_name(self):
         bare, primary, worktree, head, merge_oid = self.removable_remote_fixture()
 
