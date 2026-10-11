@@ -21,12 +21,15 @@ through an extra process and degrades it to a monochrome, non-interactive window
 which starts the native `claude` executable as the tab process.
 
 Resolve the exact directory the request concerns and do not substitute another checkout.
+Run the launcher with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/open_claude.py' --working-directory '<absolute-path>' --title '<short-title>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/open_claude.py' --working-directory '<absolute-path>' --title '<short-title>'
 ```
-
-Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
 - `--resume '<session-id>'` first resolves the exact saved session and its original directory, checks for a
