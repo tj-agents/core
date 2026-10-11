@@ -221,6 +221,31 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                     f"{plugin}: missing the host-entry codex-skills/ Codex path",
                 )
 
+    def test_cleanup_remote_delete_action_is_declared_for_both_hosts(self):
+        claude_allow, codex_rules = self.rendered("engineering")
+        root = self.PLUGIN_ROOT.replace("\\", "/")
+        entries = [entry.replace("\\", "/") for entry in claude_allow if "cleanup_proof.py:*" in entry]
+        for interpreter in ("python", "python3"):
+            for host in ("Bash", "PowerShell"):
+                for path in (
+                    f"{root}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+                    f"{root}/skills/merge/scripts/cleanup_proof.py",
+                ):
+                    self.assertIn(f"{host}({interpreter} -B {path}:*)", entries)
+        rules = [rule for rule in codex_rules if "cleanup_proof.py" in json.dumps(rule)]
+        self.assertEqual(1, len(rules))
+        matches = [[token.replace("\\", "/") for token in match] for match in rules[0]["match"]]
+        for interpreter, worktree in (("python", "C:/saved-worktree"), ("python3", "/tmp/saved-worktree")):
+            self.assertIn(
+                [
+                    interpreter, "-B",
+                    f"{root}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+                    "--delete-remote", "--worktree", worktree, "--branch", "saved-branch",
+                    "--head", "0123456789abcdef0123456789abcdef01234567", "--pr", "1", "--default", "main",
+                ],
+                matches,
+            )
+
     def test_close_permissions_are_exact_argument_free_commands(self):
         claude_allow, codex_rules = self.rendered("machine")
         entries = [entry for entry in claude_allow if "close.py" in entry]

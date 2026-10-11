@@ -17,6 +17,19 @@ from pathlib import Path
 import register_session
 
 
+def dependency_helper_directory():
+    source = Path(__file__).resolve()
+    for parent in source.parents:
+        for candidate in (parent, parent / "hooks", parent / ".agents" / "hooks"):
+            if (candidate / "cleanup_dependency.py").is_file():
+                return candidate
+    raise RuntimeError("cleanup dependency helper is unavailable")
+
+
+sys.path.insert(0, str(dependency_helper_directory()))
+from cleanup_dependency import EvidenceError, checkout_github_repository, observe_open_prs
+
+
 RECEIPT_MAX_AGE_SECONDS = 3600.0
 IDENTITY_TOLERANCE_SECONDS = 2.0
 SUBPROCESS_TIMEOUT_SECONDS = 20
@@ -375,13 +388,27 @@ def fresh_removable_receipt(worktree):
     if any(not nonempty_string(receipt.get(key)) for key in required if key != "recorded_at"):
         raise Refusal("the cleanup receipt is incomplete")
     if receipt.get("verdict") != "removable":
+        if receipt.get("verdict") == "retained-dependency":
+            raise Refusal("the cleanup receipt retains a dependent branch; use close.py")
         raise Refusal("the cleanup receipt is not removable")
+    remote = receipt.get("remote_deleted")
+    if (not isinstance(remote, dict)
+            or any(remote.get(key) != receipt.get(key) for key in ("repo", "branch", "head", "pr"))
+            or not nonempty_string(remote.get("repo"))
+            or not finite_positive(remote.get("recorded_at"))
+            or remote["recorded_at"] > now() + IDENTITY_TOLERANCE_SECONDS
+            or now() - remote["recorded_at"] > RECEIPT_MAX_AGE_SECONDS):
+        raise Refusal("the cleanup receipt has no verified remote deletion")
     if (not finite_positive(receipt.get("recorded_at")) or
             receipt["recorded_at"] > now() + IDENTITY_TOLERANCE_SECONDS or
             now() - receipt["recorded_at"] > RECEIPT_MAX_AGE_SECONDS):
         raise Refusal("the cleanup receipt is stale; run cleanup_proof.py again")
     target = Path(worktree).resolve()
     primary = Path(receipt["primary"]).resolve()
+    try:
+        checkout_github_repository(primary, receipt.get("repo"))
+    except EvidenceError as error:
+        raise Refusal("the cleanup receipt origin no longer matches") from error
     if path_key(receipt["worktree"]) != path_key(target):
         raise Refusal("the cleanup receipt target no longer matches this worktree")
     if target == primary:
@@ -402,6 +429,14 @@ def fresh_removable_receipt(worktree):
     if code or branch_code or head != receipt.get("head") or branch != receipt.get("branch"):
         raise Refusal("worktree HEAD/branch no longer match the cleanup receipt")
     return receipt
+
+
+def dependencies_are_clear(primary, branch):
+    try:
+        evidence = observe_open_prs(branch, cwd=primary)
+    except EvidenceError:
+        return False
+    return not evidence["head"] and not evidence["base"]
 
 
 def observer_path():
@@ -471,8 +506,12 @@ def current_windows_user(kwargs, timeout):
 def start_observer(arguments):
     staging = state_directory() / "merge-cleanup" / "observers" / uuid.uuid4().hex
     staging.mkdir(parents=True, exist_ok=False)
-    for name in ("finish_reaper.py", "session_close.py", "register_session.py"):
-        shutil.copy2(Path(__file__).with_name(name), staging / name)
+    sources = [Path(__file__).with_name(name) for name in (
+        "finish_reaper.py", "session_close.py", "register_session.py",
+    )]
+    sources.append(dependency_helper_directory() / "cleanup_dependency.py")
+    for source in sources:
+        shutil.copy2(source, staging / source.name)
     command = [sys.executable, str(staging / "finish_reaper.py"), *arguments]
     kwargs = {"cwd": str(state_directory()), "stdin": subprocess.DEVNULL,
               "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}

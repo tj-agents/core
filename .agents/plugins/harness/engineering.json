@@ -3,6 +3,7 @@
   "plugin": "base-agents/engineering",
   "source_roots": [
     ".agents/engineering",
+    ".agents/hooks/cleanup_dependency.py",
     ".agents/workflows"
   ],
   "requires": {
@@ -145,7 +146,15 @@
         "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -191,7 +200,7 @@
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
             ]
           ],
-          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
+          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal, and the receipt-bound --delete-remote action rechecks merge, dependency, remote-head, and lease evidence; retained sessions close through the required machine package",
           "match": [
             [
               "python",
@@ -202,6 +211,38 @@
               "python",
               "-B",
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+              "--delete-remote",
+              "--worktree",
+              "C:/saved-worktree",
+              "--branch",
+              "saved-branch",
+              "--head",
+              "0123456789abcdef0123456789abcdef01234567",
+              "--pr",
+              "1",
+              "--default",
+              "main"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+              "--delete-remote",
+              "--worktree",
+              "/tmp/saved-worktree",
+              "--branch",
+              "saved-branch",
+              "--head",
+              "0123456789abcdef0123456789abcdef01234567",
+              "--pr",
+              "1",
+              "--default",
+              "main"
             ]
           ],
           "not_match": [

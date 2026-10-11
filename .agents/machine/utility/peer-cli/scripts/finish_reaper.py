@@ -91,20 +91,32 @@ def branch_checked_out(primary, branch):
     return any(record["branch"] == "refs/heads/" + branch for record in records)
 
 
-def final_preflight(args):
-    worktree = Path(args.worktree)
-    receipt = session_close.fresh_removable_receipt(worktree)
+def cleanup_receipt(args):
+    receipt = session_close.fresh_removable_receipt(Path(args.worktree))
     if any(receipt.get(key) != getattr(args, key) for key in ("head", "primary", "branch", "default")):
         raise session_close.Refusal("cleanup receipt no longer matches the accepted cleanup target")
-    original_entry = {
+    return receipt
+
+
+def claimant_entry(args):
+    return {
         "session_id": args.session_id,
         "pid": args.host_pid,
         "pid_started_at": args.host_start,
     }
+
+
+def final_preflight(args):
+    worktree = Path(args.worktree)
+    cleanup_receipt(args)
+    original_entry = claimant_entry(args)
+
     if not session_close.verified_exited(args.host_pid, args.host_start):
         raise session_close.Refusal("original session host did not exit")
     if session_close.other_live_claimant(worktree, original_entry):
         raise session_close.Refusal("another verified live session claims this worktree")
+    if not session_close.dependencies_are_clear(Path(args.primary), args.branch):
+        raise session_close.Refusal("current open PR evidence does not permit cleanup")
     code, dirty, _ = session_close.git(worktree, "status", "--porcelain")
     if code or dirty:
         raise session_close.Refusal("worktree is no longer clean")
@@ -118,6 +130,9 @@ def remove_worktree_and_branch(args):
     worktree, primary = Path(args.worktree), Path(args.primary)
     if Path(str(args.result) + ".cancelled").exists():
         return "cancelled", {"error": "cleanup observer was cancelled"}
+    cleanup_receipt(args)
+    if session_close.other_live_claimant(worktree, claimant_entry(args)):
+        raise session_close.Refusal("another verified live session claims this worktree")
     code, _out, error = session_close.git(primary, "worktree", "remove", "--", str(worktree))
     if code and (worktree.exists() or registered(worktree, primary)):
         return "failed", {"error": "git worktree remove failed: " + error}

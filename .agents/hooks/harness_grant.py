@@ -4,11 +4,11 @@ Approves exactly the commands the merge procedures prescribe, and only in a repo
 origin is a trusted GitHub owner (`harness-trust.json` beside this file):
 
 - `git -C "<checkout>" merge --no-edit origin/<default>` from a branch other than the default;
-- `git -C "<checkout>" worktree remove -- "<worktree>"` for a linked worktree whose head is
-  already on `origin/<default>`, or whose exact worktree/branch has a fresh `cleanup_proof.py`
-  receipt;
-- `git -C "<checkout>" branch -d <branch>` for a branch already on `origin/<default>`, or `branch
-  -D <branch>` when a fresh matching receipt covers it instead.
+- `git -C "<checkout>" worktree remove -- "<worktree>"` for a linked worktree whose exact
+  worktree/branch has a fresh `cleanup_proof.py` receipt and has no current open HEAD users or BASE
+  dependents;
+- `git -C "<checkout>" branch -d <branch>` or `branch -D <branch>` when a fresh matching receipt
+  and a current open-PR observation both cover it.
 
 Each must be the whole command. A PreToolUse allow covers the entire tool call, so a compound
 command, an unquoted or relative path, or a `--force` never matches. Anything that does not match
@@ -18,6 +18,7 @@ hook contract has no equivalent allow decision yet.
 
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -26,6 +27,7 @@ import time
 from pathlib import Path
 
 from hook_runtime import COMMAND_TIMEOUT_SECONDS, grant, is_trusted_checkout
+from cleanup_dependency import EvidenceError, checkout_github_repository, observe_open_prs
 
 SHELL_TOOLS = {"bash", "powershell"}
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
@@ -85,10 +87,6 @@ def default_branch(checkout):
     return ref[len("origin/"):] if ref.startswith("origin/") else None
 
 
-def on_default(checkout, commit, default):
-    return git_succeeds(checkout, "merge-base", "--is-ancestor", commit, "origin/" + default)
-
-
 def linked_worktrees(checkout):
     """``{resolved path: (head, branch)}`` for every linked worktree, excluding the main one."""
     try:
@@ -129,19 +127,43 @@ def is_fresh_removable(receipt):
     if receipt is None or receipt.get("verdict") != "removable":
         return False
     recorded_at = receipt.get("recorded_at")
-    if not isinstance(recorded_at, (int, float)):
+    if isinstance(recorded_at, bool) or not isinstance(recorded_at, (int, float)) or not math.isfinite(recorded_at):
         return False
     age = time.time() - recorded_at
     return 0 <= age <= RECEIPT_FRESHNESS_SECONDS
 
 
-def worktree_receipt_authorizes(worktree, branch, head):
+def remote_deletion_is_verified(receipt):
+    remote = receipt.get("remote_deleted") if isinstance(receipt, dict) else None
+    if not isinstance(remote, dict):
+        return False
+    if any(remote.get(key) != receipt.get(key) for key in ("repo", "branch", "head", "pr")):
+        return False
+    recorded_at = remote.get("recorded_at")
+    if isinstance(recorded_at, bool) or not isinstance(recorded_at, (int, float)) or not math.isfinite(recorded_at):
+        return False
+    age = time.time() - recorded_at
+    return 0 <= age <= RECEIPT_FRESHNESS_SECONDS and isinstance(remote.get("repo"), str)
+
+def worktree_receipt_authorizes(checkout, worktree, branch, head):
     receipt = receipt_for_worktree(worktree)
-    return (
-        is_fresh_removable(receipt)
-        and receipt.get("branch") == branch
-        and receipt.get("head") == head
-    )
+    if not (is_fresh_removable(receipt) and remote_deletion_is_verified(receipt)
+            and receipt.get("branch") == branch and receipt.get("head") == head
+            and receipt.get("primary") == str(Path(checkout).resolve())):
+        return False
+    try:
+        checkout_github_repository(checkout, receipt.get("repo"))
+    except EvidenceError:
+        return False
+    return True
+
+
+def dependencies_are_clear(checkout, branch):
+    try:
+        evidence = observe_open_prs(branch, cwd=checkout)
+    except EvidenceError:
+        return False
+    return not evidence["head"] and not evidence["base"]
 
 
 def branch_receipt_authorizes(checkout, branch):
@@ -157,9 +179,15 @@ def branch_receipt_authorizes(checkout, branch):
             receipt = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if isinstance(receipt, dict) and is_fresh_removable(receipt) \
-                and receipt.get("branch") == branch and receipt.get("head") == head:
-            return True
+        if not (isinstance(receipt, dict) and is_fresh_removable(receipt)
+                and remote_deletion_is_verified(receipt) and receipt.get("branch") == branch
+                and receipt.get("head") == head and receipt.get("primary") == str(Path(checkout).resolve())):
+            continue
+        try:
+            checkout_github_repository(checkout, receipt.get("repo"))
+        except EvidenceError:
+            continue
+        return True
     return False
 
 
@@ -181,9 +209,11 @@ def remove_is_safe(checkout, raw_worktree, default):
     if entry is None:
         return False
     head, branch = entry
-    if on_default(checkout, head, default):
-        return True
-    return branch is not None and worktree_receipt_authorizes(target, branch, head)
+    if not (branch is not None and worktree_receipt_authorizes(checkout, target, branch, head)
+            and dependencies_are_clear(checkout, branch)):
+        return False
+    current = linked_worktrees(checkout).get(target)
+    return current == (head, branch) and worktree_receipt_authorizes(checkout, target, branch, head)
 
 
 def branch_delete_is_safe(checkout, branch, flag, default):
@@ -191,8 +221,8 @@ def branch_delete_is_safe(checkout, branch, flag, default):
         return False
     if not git_succeeds(checkout, "show-ref", "--verify", "--quiet", "refs/heads/" + branch):
         return False
-    if flag == "-d" and on_default(checkout, "refs/heads/" + branch, default):
-        return True
+    if not branch_receipt_authorizes(checkout, branch) or not dependencies_are_clear(checkout, branch):
+        return False
     return branch_receipt_authorizes(checkout, branch)
 
 
@@ -227,10 +257,10 @@ def main():
         reason = "harness-grant: syncing a feature branch with origin/" + default
     elif pattern is _REMOVE_RE:
         safe = remove_is_safe(checkout, match.group("worktree"), default)
-        reason = "harness-grant: removing a worktree merged into origin/" + default + " or covered by a cleanup receipt"
+        reason = "harness-grant: removing a worktree covered by a fresh cleanup receipt and dependency observation"
     else:
         safe = branch_delete_is_safe(checkout, match.group("branch"), match.group("flag"), default)
-        reason = "harness-grant: deleting a branch merged into origin/" + default + " or covered by a cleanup receipt"
+        reason = "harness-grant: deleting a branch covered by a fresh cleanup receipt and dependency observation"
 
     if safe:
         grant(reason + " in a trusted repository.")

@@ -6,6 +6,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -14,12 +15,26 @@ HOOK = HOOKS / "harness_grant.py"
 sys.path.insert(0, str(HOOKS))
 
 import hook_runtime  # noqa: E402
+import harness_grant  # noqa: E402
 
 
 def run_git(cwd, *args):
     return subprocess.run(
         ["git", "-C", str(cwd), *args], capture_output=True, text=True, check=True
     ).stdout.strip()
+
+
+def invalid_gh(root):
+    directory = root / "invalid-gh"
+    directory.mkdir()
+    if os.name == "nt":
+        command = directory / "gh.cmd"
+        command.write_text("@echo off\r\necho not-json\r\n", encoding="utf-8")
+    else:
+        command = directory / "gh"
+        command.write_text("#!/bin/sh\nprintf 'not-json\\n'\n", encoding="utf-8")
+        command.chmod(0o755)
+    return directory
 
 
 class TrustTests(unittest.TestCase):
@@ -85,6 +100,7 @@ class HarnessGrantTests(unittest.TestCase):
         run_git(self.root, "checkout", "-q", "unmerged")
         run_git(self.root, "commit", "-q", "--allow-empty", "-m", "not on main")
         run_git(self.root, "checkout", "-q", "-b", "feature")
+        self.env = dict(os.environ, PATH=str(invalid_gh(base)) + os.pathsep + os.environ.get("PATH", ""))
         self.merged_tree = base / "merged-tree"
         self.unmerged_tree = base / "unmerged-tree"
         run_git(self.root, "worktree", "add", "-q", "--detach", str(self.merged_tree), "merged")
@@ -96,7 +112,7 @@ class HarnessGrantTests(unittest.TestCase):
             payload["turn_id"] = "t1"
         return subprocess.run(
             [sys.executable, str(HOOK)], input=json.dumps(payload), capture_output=True, text=True,
-            env=env,
+            env=self.env if env is None else env,
         )
 
     def assert_granted(self, command, **kwargs):
@@ -146,8 +162,8 @@ class HarnessGrantTests(unittest.TestCase):
     def test_codex_is_not_granted(self):
         self.assert_not_granted(self.git_c("merge --no-edit origin/main"), codex=True)
 
-    def test_removing_a_merged_linked_worktree_is_granted(self):
-        self.assert_granted(self.git_c('worktree remove -- "' + str(self.merged_tree) + '"'))
+    def test_removing_a_merged_linked_worktree_without_current_evidence_is_not_granted(self):
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.merged_tree) + '"'))
 
     def test_removing_an_unmerged_worktree_is_not_granted(self):
         self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.unmerged_tree) + '"'))
@@ -158,8 +174,8 @@ class HarnessGrantTests(unittest.TestCase):
             self.git_c('worktree remove --force -- "' + str(self.merged_tree) + '"')
         )
 
-    def test_deleting_a_merged_branch_is_granted(self):
-        self.assert_granted(self.git_c("branch -d merged"))
+    def test_deleting_a_merged_branch_without_current_evidence_is_not_granted(self):
+        self.assert_not_granted(self.git_c("branch -d merged"))
 
     def test_deleting_an_unmerged_default_or_missing_branch_is_not_granted(self):
         self.assert_not_granted(self.git_c("branch -d unmerged"))
@@ -199,6 +215,7 @@ class ReceiptGrantTests(unittest.TestCase):
         self.state = tempfile.TemporaryDirectory()
         self.addCleanup(self.state.cleanup)
         self.env = dict(os.environ, AGENT_STATE_DIRECTORY=self.state.name)
+        self.env["PATH"] = str(invalid_gh(base)) + os.pathsep + os.environ.get("PATH", "")
 
     def write_receipt(self, worktree, branch, head, verdict="removable", age_seconds=0):
         directory = Path(self.state.name) / "merge-cleanup" / "receipts"
@@ -208,10 +225,16 @@ class ReceiptGrantTests(unittest.TestCase):
             "worktree": str(Path(worktree).resolve()),
             "branch": branch,
             "head": head,
+            "pr": 1,
+            "primary": str(self.root),
+            "repo": "github.com/tj-agents/sample",
             "verdict": verdict,
             "recorded_at": time.time() - age_seconds,
+            "remote_deleted": {"repo": "github.com/tj-agents/sample", "branch": branch, "head": head, "pr": 1, "recorded_at": time.time() - age_seconds},
         }
-        (directory / f"{digest}.json").write_text(json.dumps(data), encoding="utf-8")
+        path = directory / f"{digest}.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
 
     def run_hook(self, command, tool="Bash", env=None):
         payload = {"tool_name": tool, "cwd": str(self.root), "tool_input": {"command": command}}
@@ -234,15 +257,96 @@ class ReceiptGrantTests(unittest.TestCase):
     def git_c(self, rest):
         return 'git -C "' + str(self.root) + '" ' + rest
 
-    def test_removing_a_worktree_with_a_fresh_matching_receipt_is_granted(self):
+    def test_removing_a_worktree_with_a_fresh_matching_receipt_without_current_evidence_is_not_granted(self):
         self.write_receipt(self.squashed_tree, "squashed", self.head)
-        self.assert_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
 
-    def test_deleting_with_d_or_capital_d_is_granted_by_a_fresh_matching_receipt(self):
+    def test_deleting_with_d_or_capital_d_without_current_evidence_is_not_granted(self):
         self.write_receipt(self.squashed_tree, "squashed", self.head)
-        self.assert_granted(self.git_c("branch -d squashed"))
-        self.assert_granted(self.git_c("branch -D squashed"))
+        self.assert_not_granted(self.git_c("branch -d squashed"))
+        self.assert_not_granted(self.git_c("branch -D squashed"))
 
+    def test_fresh_receipt_requires_current_empty_head_and_base_evidence(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head)
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", return_value={"head": [], "base": []},
+        ):
+            self.assertTrue(harness_grant.branch_delete_is_safe(
+                self.root, "squashed", "-D", "main",
+            ))
+        for evidence in (
+                {"head": [{"number": 3}], "base": []},
+                {"head": [], "base": [{"number": 4}]},
+        ):
+            with self.subTest(evidence=evidence), mock.patch.dict(
+                    os.environ, {"AGENT_STATE_DIRECTORY": self.state.name},
+            ), mock.patch.object(harness_grant, "observe_open_prs", return_value=evidence):
+                self.assertFalse(harness_grant.branch_delete_is_safe(
+                    self.root, "squashed", "-D", "main",
+                ))
+
+    def test_foreign_receipt_repository_refuses_branch_delete(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["repo"] = data["remote_deleted"]["repo"] = "github.com/other/repository"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", return_value={"head": [], "base": []},
+        ):
+            self.assertFalse(harness_grant.branch_delete_is_safe(self.root, "squashed", "-D", "main"))
+
+    def test_foreign_receipt_primary_refuses_branch_delete(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["primary"] = str(self.squashed_tree)
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", return_value={"head": [], "base": []},
+        ):
+            self.assertFalse(harness_grant.branch_delete_is_safe(self.root, "squashed", "-D", "main"))
+
+    def test_branch_advance_during_observation_refuses_delete(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head)
+
+        def observe(*_args, **_kwargs):
+            run_git(self.root, "update-ref", "refs/heads/squashed", "refs/heads/main")
+            return {"head": [], "base": []}
+
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", side_effect=observe,
+        ):
+            self.assertFalse(harness_grant.branch_delete_is_safe(self.root, "squashed", "-D", "main"))
+
+    def test_worktree_switch_during_observation_refuses_remove(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head)
+        original = harness_grant.linked_worktrees
+        calls = 0
+
+        def linked(checkout):
+            nonlocal calls
+            calls += 1
+            records = original(checkout)
+            if calls > 1:
+                records[Path(self.squashed_tree).resolve()] = (self.head, "main")
+            return records
+
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", return_value={"head": [], "base": []},
+        ), mock.patch.object(harness_grant, "linked_worktrees", side_effect=linked):
+            self.assertFalse(harness_grant.remove_is_safe(self.root, str(self.squashed_tree), "main"))
+
+    def test_a_receipt_without_remote_deletion_is_not_granted(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.pop("remote_deleted")
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
+    def test_a_receipt_with_a_different_remote_repository_is_not_granted(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["remote_deleted"]["repo"] = "github.com/other/repository"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))
     def test_a_stale_receipt_is_not_granted(self):
         self.write_receipt(self.squashed_tree, "squashed", self.head, age_seconds=60 * 60 + 1)
         self.assert_not_granted(self.git_c('worktree remove -- "' + str(self.squashed_tree) + '"'))

@@ -3,6 +3,7 @@
   "plugin": "base-agents/machine",
   "source_roots": [
     ".agents/catalog/catalog.schema.json",
+    ".agents/hooks/cleanup_dependency.py",
     ".agents/machine"
   ],
   "requires": {
