@@ -10,7 +10,7 @@ This is a standing `engineering:session-guidance` standards-defect repair. It is
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SessionGuidanceHandoffCompliance
 Branch: Fix/SessionGuidanceHandoffCompliance
-Base: 86e9b1dedfdf5ab16f52c0e8da05d7d61343dee1
+Base: 0411b56134367ccfd42d9765e11ece5ea9f5aedf
 
 Own the new canonical `engineering:self-repair` workflow and its plain host adapters, `session-guidance` routing, `.agents/plugins/manifests/codex/engineering-hooks.json`, the directly focused callout-gate tests, required generated catalog metadata, and this goal. Preserve all other live worktrees and do not modify the cancelled native-handoff receipt repair.
 
@@ -60,3 +60,4 @@ Done when: `engineering:self-repair` is the direct, shippable lifecycle route fo
 - `test_process_standards.py` passed all 23 tests, including the routed self-repair callout contract.
 - Focused terminal-gate and host-adapter tests passed: `CalloutRepairGateTests.test_callout_blocks_automatic_feedback_and_terminal_stop`, `CalloutRepairGateTests.test_manifests_ship_only_supported_callout_events`, and `TaskWorkflowAcceptanceTests.test_task_skills_keep_one_canonical_body_and_thin_host_entries`.
 - Host coverage validation passed. Package synchronization reported 512 files from 76 shared definitions with no remaining changes.
+- The candidate was rebased onto `origin/main` at `0411b56134367ccfd42d9765e11ece5ea9f5aedf`; the focused validation set and generation checks passed again on the rebased head.
