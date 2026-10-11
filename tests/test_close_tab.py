@@ -36,7 +36,8 @@ class CloseTabTests(unittest.TestCase):
                  "title": "same", "terminal": identity}
         target = {"title": "same", "identity": {"kind": "windows-terminal",
                   "automation_id": "tab-2"}}
-        with mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
                 mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
                 mock.patch.object(close_tab.session_close, "liveness", return_value=False), \
                 mock.patch.object(close_tab, "close_actual") as closer:
@@ -86,7 +87,8 @@ class CloseTabTests(unittest.TestCase):
             "identity": {"kind": "windows-terminal", "automation_id": "tab-2"},
             "actual": True,
         }
-        with mock.patch.object(close_tab, "windows_inventory", side_effect=([target], [])), \
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", side_effect=([target], [])), \
                 mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
                 mock.patch.object(close_tab.session_close, "liveness", return_value=False), \
                 mock.patch.object(close_tab, "run", return_value=completed()):
