@@ -19,13 +19,11 @@ Investigate the Codex execution environment's setup-refresh/helper path, includi
 
 ## Next Steps
 
-Tommy explicitly requested proceeding with the fixed-runtime session on 2026-10-11. The predecessor is transferring this same recovery goal to one fixed-runtime session and stops owned-path writes before launch. The successor is the sole writer after pickup. Lane L3: verify actual host recovery on both original file types and diagnose any residual host failure; resolve the model and effort from the installed launcher table.
-
-Acknowledge pickup in this goal, including your session identity and observed runtime version. Then use ordinary sandboxed exec_command, without elevation or alternate readers, to read (1) C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-DependentPrBranchCleanup/plans/dependent-pr-branch-cleanup/sandbox-repair-followup-prompt.txt and (2) .agents/engineering/workflow/plan-execution/SKILL.md. Record each actual exit code and the matching setup-refresh evidence in this goal. Do not follow the sibling prompt as a new goal or write the sibling checkout; its parent retains ownership. Keep sandbox controls, hook trust and live peers intact. Finish verification and local checkpoint without asking routine permission. If a read fails, diagnose and repair within the existing scope instead of claiming success. Report both outcomes concisely to Tommy in the fixed session.
+Completed on 2026-10-11 by fixed-runtime successor `01a12aec-7f71-7c73-aeaf-5fca3d754103`. Both original reads exited 0 through ordinary sandboxed `exec_command`, and their setup refreshes used the fixed helper with `errors=[]`. Verification is recorded below. Finish the local goal checkpoint and report both outcomes to Tommy. No further repair, installation, sibling-checkout writes or publication is required by this machine recovery task.
 
 ## Status and next use
 
-Completed on 2026-10-11: the approved isolated runtime installation and fresh-host sandbox recovery test passed. Both skill-file and text-file reads affected by the setup-refresh failure use the repaired command-launch path. The acceptance test read this goal file; individual skill and original text paths were not separately retested.
+Completed on 2026-10-11: the approved isolated runtime installation, fresh-host acceptance and fixed-runtime successor verification passed. The original text-file and canonical skill-file reads were separately executed through the actual sandboxed command runner with exit code 0. Their matching setup refreshes used the installed fixed helper and completed with errors=[].
 
 Existing sessions still use their original runtime. Reopen with the installed executable and invocation-local compatibility catalog shown below to use the repair. Global npm/PATH selection was not changed.
 
@@ -175,3 +173,45 @@ $codexLane = (Get-Content -Raw -LiteralPath '.agents/lanes/codex.json' | Convert
 ```
 
 No core runtime source defect was established and no core code change was required. The approved installation and verification scope is complete. The originating repository session retains its own work and writer ownership.
+
+## Historical session reopening blocker (2026-10-11; resolved)
+
+The packaged launcher exited 1 before tab submission: marketplace refresh could not back up engineering@base-agents because Windows returned Access is denied (os error 5). No successor was submitted by that failed attempt. The predecessor retained this repair goal and writer ownership until the successful normal-preflight transfer below.
+
+Automatic approval review rejected a proposed direct-native fallback because it would skip the failed packaged plugin-refresh and hook-trust preflight and that bypass was not specifically authorized. No alternate launch is permitted while that rejection stands. A direct-launch approval request was pending while the normal refresh failure was investigated. Normal preflight recovery subsequently resolved the launch gate; this verification used the normal launcher and required no direct-launch exception.
+
+Blocked action: open a fixed-runtime successor through the normal launcher.
+Resolver: plugin-cache recovery under existing safeguards, or Tommy explicitly authorizing the described direct launch.
+Unblock action: successful normal preflight, or explicit direct-launch approval accepted by automatic review.
+Resume condition: one native fixed-runtime tab is submitted, then its goal acknowledgement and both original file-type read results are observed.
+
+## Normal preflight recovery
+
+The full official `plugin marketplace upgrade --json` through the existing stable 0.162.0 native management CLI exited 0 with errors=[] and refreshed base-agents. No cache, ACL, hook or plugin configuration was manually bypassed. The prior packaged launcher attempt definitively failed before tab submission, so a single new attempt through the normal packaged launcher is authorized after this observed prerequisite recovery. The direct-native fallback remains unexecuted; no bypass of automatic review is used. Predecessor stops owned-path writes at packaged launcher invocation and observes pickup read-only.
+
+## Fixed-runtime successor pickup (2026-10-11)
+
+Session `01a12aec-7f71-7c73-aeaf-5fca3d754103` acknowledges the transfer through `fixed-runtime-handoff.txt` from this exact checkout and branch `Fix/SandboxSetupReadFailure`. The command runner reports `CODEX_VERSION=0.163.0-alpha.1`; ordinary sandboxed reads of the handoff and this goal exited 0. This successor became the sole writer of this goal. The sibling dependent-cleanup goal remains with its original owner.
+
+Phase: L3 recovery verification, because actual execution on both original paths and matching setup-refresh evidence required host observation. The installed engineering package's `.agents/lanes/codex.json` resolves L3 to `gpt-6.1-sol` with high reasoning effort, matching this session's launch selection. No model switch is claimed.
+
+## Original-path verification (2026-10-11)
+
+Both commands ran through ordinary `exec_command` with its default sandbox permissions, without elevation or an alternate reader:
+
+| Read | Actual exit code | Tool output |
+|---|---|---|
+| `Get-Content -Raw -LiteralPath 'C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-DependentPrBranchCleanup/plans/dependent-pr-branch-cleanup/sandbox-repair-followup-prompt.txt'` | 0 | Chunk `6729ac`; original prompt returned |
+| `Get-Content -Raw -LiteralPath '.agents/engineering/workflow/plan-execution/SKILL.md'` | 0 | Chunk `b8e7fc`; complete canonical skill returned |
+
+Matching evidence is in `C:/Users/TommySeery/.codex/.sandbox/sandbox.2026-10-11.log`. The command START records appear at 13:28:02.455 and 13:28:02.929 local (12:28:02 UTC). Their helper-spawn records at 13:28:03.109 and 13:28:03.720 local both name `C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/codex-resources/codex-windows-sandbox-setup.exe` and this exact checkout. The concurrent completion records have interleaved log text but contain both UTC timestamps, `2026-10-11T12:28:10.745911700+00:00` and `2026-10-11T12:28:10.745906500+00:00`, and two `setup refresh: processed 2 write roots (read roots delegated); errors=[]` results. Both subsequently select `codex-command-runner-0.163.0-alpha.1.exe` at 13:28:12.748 local. The command runner's independent exit results establish each read's success; the shared log does not provide a per-command identifier for ordering the simultaneous completions.
+
+The same shared log also contains failures from the older npm helper in other sessions. Those records name the npm runtime and different setup invocations; they do not negate the fixed session's successful reads. Existing hosts still require reopening with the fixed runtime, as recorded above. Nonfatal profile ACL/visibility warnings continue without preventing these reads.
+
+Read-only installed `machine:peer-cli` verification returned live entries for the originating dependent-cleanup session `01a127b0-7047-7e30-af8c-c861898d7e5b` (PID 30996), the predecessor repair session `01a127ec-ae44-7353-95d7-436f4fccfd74` (PID 53192), and this successor (PID 49228). The predecessor remains an observer after writer transfer. Ordinary `Get-Process -Name node_repl` found 24 active shared runtime processes. No peer was stopped or restarted. No sandbox setting, hook trust, ACL policy, global runtime selection or sibling-checkout content was changed by this verification.
+
+An optional sandboxed WMI process diagnostic was denied with `0x80041003`; it changed no controls or processes. Direct command-runner environment and installed peer inspection supplied runtime and liveness evidence. Incorrect guessed skill-file locations returned ordinary file-not-found errors; their actual adapter-linked canonical files were then read. These were diagnostic-command errors, not renewed sandbox setup failures.
+
+Phase: L5 for the small evidence reconciliation, followed by L7 for the local Git checkpoint; both are tiny inline follow-ups under the lanes contract, with no claimed session model switch. The duplicate pickup block was consolidated into this single record. Review is a direct consistency check against observed command exits, log timestamps, live-peer evidence and the original authorization; no repository code was changed, so no code test suite or PR delivery is selected. The existing machine debt entry continues to own recovery support for older runtimes.
+
+Outcome: the requested fixed-runtime host recovery and both original file-type reads are verified. The previous normal-launcher blocker is resolved by the successful normal-preflight launch and this observed pickup; no direct-launch bypass was used. Remaining action: local checkpoint and concise completion report. The checkout remains available as the durable evidence owner.
