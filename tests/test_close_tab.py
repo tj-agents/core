@@ -276,7 +276,7 @@ class CloseTabTests(unittest.TestCase):
         with mock.patch.object(close_tab, "target_liveness", return_value=False), \
                 mock.patch.object(close_tab, "run", return_value=completed()) as closer:
             close_tab.close_actual(target)
-        self.assertEqual(closer.call_args.args[0][-2:], ["-t", "%1"])
+        self.assertEqual(closer.call_args_list[0].args[0][-2:], ["-t", "%1"])
 
     def test_host_must_descend_from_terminal_root(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
@@ -330,7 +330,7 @@ class CloseTabTests(unittest.TestCase):
                 mock.patch.object(close_tab, "run", return_value=completed()) as runner, \
                 mock.patch.object(close_tab.os, "kill") as killer:
             close_tab.close_actual(target, force=True)
-        self.assertEqual(runner.call_args.args[0][-2:], ["-t", "%1"])
+        self.assertEqual(runner.call_args_list[0].args[0][-2:], ["-t", "%1"])
         killer.assert_not_called()
 
     def test_explicit_title_force_keeps_direct_actual_tab_authorization(self):
