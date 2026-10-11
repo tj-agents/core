@@ -144,6 +144,9 @@ class ProcessStandardsTests(unittest.TestCase):
             "`engineering:handoff` in bounded side-workstream mode",
             "native launcher reports successful submission",
             "failed launcher is not a handoff",
+            "monitoring-only",
+            "Monitoring does not grant delivery authority",
+            "never authorizes taking over an unrelated pending delivery",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self_repair)

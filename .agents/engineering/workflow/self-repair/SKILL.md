@@ -39,6 +39,18 @@ claim that the repair was handed off, do not create a second successor, and do n
 silently discharge the active repair obligation. Resume the original task only where its next action is
 independent of the unlaunched repair.
 
+## Preserve existing delivery ownership
+
+When the user asks to wait for or monitor an existing pull request or delivery, treat that request as
+monitoring-only. Resolve and observe the existing delivery identity without changing its worktree, branch,
+binding, head, review, queue state, or merge state. Do not take it over, rebase it, push to it, arm or
+cancel auto-merge, or merge it merely because its work overlaps the source repair.
+
+Monitoring does not grant delivery authority. A change of delivery owner or merge state requires explicit
+delivery authority for that exact delivery plus its existing ownership transfer procedure. Standing
+auto-merge authorization applies only after the resolved delivery owner has reached its own review and
+check gates; it never authorizes taking over an unrelated pending delivery.
+
 ## Completion
 
 The callout response is complete only after the bounded source repair has a verified native launch or a

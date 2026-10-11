@@ -17,13 +17,14 @@ Own the new canonical `engineering:self-repair` workflow and its plain host adap
 ## Next Steps
 
 Scope: deliver the narrow shared enforcement repair to merged default-branch state.
-Lane: L4, a specified host-runtime enforcement change with focused behavioral coverage.
+Lane: L7 for the local checkpoint; return to L4 for review and any repair.
 
-1. Prove the existing Codex wiring omits the gate at `Stop` while Claude wires it, and preserve that evidence in the regression test.
-2. Create the independent canonical `engineering:self-repair` workflow and both plain host adapters. It owns direct user-callout/Core-defect diagnosis and the required real bounded handoff. Route `session-guidance` to it instead of duplicating its body.
-3. Add the callout gate to Codex's existing Stop dispatch so a pending callout cannot terminate before a verified source-owner launch. Keep the existing user-prompt and pre-tool behavior unchanged.
-4. Extend focused tests for both manifests and direct stop evaluation, validate generated synchronization/catalog state, review the frozen candidate, then commit, open, monitor, and merge the source PR under standing authority.
-5. After merge, observe the causal generated publication and run the normal terminal worktree cleanup. Record either that terminal evidence or a typed external gate here.
+1. Commit the validated authored source, adapters, manifest, tests, catalog metadata, and this goal; exclude generated `plugins/` output.
+2. Review the frozen candidate at L4 and resolve any finding.
+3. Preserve existing delivery ownership: a wait/monitor request stays observational and cannot silently take over, rebase, push, arm/cancel auto-merge, or merge a pending delivery. Require explicit authority and the existing ownership transfer procedure before those delivery-state changes.
+4. Open and monitor the source PR under standing authority once review is green.
+5. Merge once review and required CI are green.
+6. After merge, observe the causal generated publication and run the normal terminal worktree cleanup. Record either that terminal evidence or a typed external gate here.
 
 ## Completion
 
