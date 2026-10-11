@@ -280,10 +280,14 @@ def resolve(names, harness):
     """name -> (description, path, resolved_name), with a None description for a skill the harness
     cannot see.
 
-    `resolved_name` is the qualified name `resolved_skill` actually resolved - `name` itself, or an
-    alias target when `name` no longer resolves directly. Callers need it instead of the requested
-    `name` wherever a rename changed the bare name, or invocation guidance and proof would still
-    point at a name that no longer exists.
+    `resolved_name` is the qualified name to use for invocation guidance and proof - `name` itself
+    whenever the bare part did not change, or an alias target when it did. It is NOT simply
+    whatever `resolved_skill` was called with: the unqualified-fallback branch below calls it with
+    a bare name to survive an uninstalled marketplace, and if that bare result were used directly,
+    `invocable_name` would see no qualifier to requalify from and stop naming the plugin that
+    actually ships the file. Comparing bare parts tells the one case that actually renamed the
+    skill (follow `resolved_name`) apart from the one that only found it a different way
+    (keep `name`, so its qualifier still drives `invocable_name`).
     """
     resolved = {}
     for name in names:
@@ -298,6 +302,8 @@ def resolve(names, harness):
             resolved[name] = (None, None, name)
         else:
             path, body, resolved_name = found
+            if skill_router.bare_name(resolved_name) == skill_router.bare_name(name):
+                resolved_name = name
             resolved[name] = (skill_router.description_of(body), path, resolved_name)
     return resolved
 
@@ -317,7 +323,7 @@ def unproven(names, resolved, data, harness):
                 body = Path(path).read_text(encoding="utf-8-sig")
             except OSError:
                 continue
-            codex_skills.append((resolved_name.rpartition(":")[2] or resolved_name, path, body))
+            codex_skills.append((skill_router.bare_name(resolved_name), path, body))
     outcomes = skill_router.transcript_skill_outcomes(
         data.get("transcript_path") or data.get("transcriptPath"), codex_skills
     )
@@ -325,7 +331,7 @@ def unproven(names, resolved, data, harness):
         return list(names)
     return [
         name for name in names
-        if outcomes.get(resolved[name][2].rpartition(":")[2] or resolved[name][2]) is not True
+        if outcomes.get(skill_router.bare_name(resolved[name][2])) is not True
     ]
 
 
