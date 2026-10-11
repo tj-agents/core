@@ -485,6 +485,18 @@ def push_destination(primary, expected_repo):
     if len(destinations) != 1:
         raise Preserve("primary push origin has no unique destination")
     destination = destinations.pop()
+    rules = run_git(primary, "config", "-z", "--get-regexp", r"^url\..*\.(insteadof|pushinsteadof)$")
+    if rules.returncode not in (0, 1):
+        raise Preserve("Git URL rewrite rules are unavailable")
+    if rules.returncode == 0:
+        for record in rules.stdout.split("\0"):
+            if not record:
+                continue
+            fields = record.split("\n")
+            if len(fields) != 2 or not fields[0] or not fields[1] or not fields[0].startswith("url."):
+                raise Preserve("Git URL rewrite rules are malformed")
+            if destination.startswith(fields[1]):
+                raise Preserve("primary push origin is subject to a Git URL rewrite")
     try:
         actual = github_repository_from_origin(destination)
     except EvidenceError as error:

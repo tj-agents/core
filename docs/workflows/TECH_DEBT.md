@@ -60,3 +60,9 @@ review of a changed `SKILL.md` is not required to load `engineering:skill-author
 Resolve when a route can apply at review time alone, without opting the repository into write-time routing
 or the red-run gate, and core routes authored `SKILL.md` paths to `engineering:skill-authoring` through it,
 with a test that `review-prepare` names the skill for such a path.
+
+## Small repairs repeat full validation locally and in CI
+
+Implementation workflows can keep rerunning broad local suites and unrelated process fixtures before the same full suite runs in CI. The dependent-PR cleanup repair spent repeated local attempts on Windows observer startup while its focused guard regressions had passed.
+
+Resolve when a small repair defaults to one or two local checks tied to the changed behavior, publishes one stable candidate, and leaves the full platform matrix to CI. A failure should trigger targeted diagnosis and only the affected check after a relevant correction; unchanged passing suites should not be repeated. Workflow selection and recovery must enforce this boundary, preserve actual CI outcomes, and prove that slow unrelated local fixtures do not delay publication.

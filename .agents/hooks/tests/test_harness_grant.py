@@ -226,10 +226,11 @@ class ReceiptGrantTests(unittest.TestCase):
             "branch": branch,
             "head": head,
             "pr": 1,
-            "repo": "github.com/tj-agents/offline",
+            "primary": str(self.root),
+            "repo": "github.com/tj-agents/sample",
             "verdict": verdict,
             "recorded_at": time.time() - age_seconds,
-            "remote_deleted": {"repo": "github.com/tj-agents/offline", "branch": branch, "head": head, "pr": 1, "recorded_at": time.time() - age_seconds},
+            "remote_deleted": {"repo": "github.com/tj-agents/sample", "branch": branch, "head": head, "pr": 1, "recorded_at": time.time() - age_seconds},
         }
         path = directory / f"{digest}.json"
         path.write_text(json.dumps(data), encoding="utf-8")
@@ -283,6 +284,56 @@ class ReceiptGrantTests(unittest.TestCase):
                 self.assertFalse(harness_grant.branch_delete_is_safe(
                     self.root, "squashed", "-D", "main",
                 ))
+
+    def test_foreign_receipt_repository_refuses_branch_delete(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["repo"] = data["remote_deleted"]["repo"] = "github.com/other/repository"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", return_value={"head": [], "base": []},
+        ):
+            self.assertFalse(harness_grant.branch_delete_is_safe(self.root, "squashed", "-D", "main"))
+
+    def test_foreign_receipt_primary_refuses_branch_delete(self):
+        path = self.write_receipt(self.squashed_tree, "squashed", self.head)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["primary"] = str(self.squashed_tree)
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", return_value={"head": [], "base": []},
+        ):
+            self.assertFalse(harness_grant.branch_delete_is_safe(self.root, "squashed", "-D", "main"))
+
+    def test_branch_advance_during_observation_refuses_delete(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head)
+
+        def observe(*_args, **_kwargs):
+            run_git(self.root, "update-ref", "refs/heads/squashed", "refs/heads/main")
+            return {"head": [], "base": []}
+
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", side_effect=observe,
+        ):
+            self.assertFalse(harness_grant.branch_delete_is_safe(self.root, "squashed", "-D", "main"))
+
+    def test_worktree_switch_during_observation_refuses_remove(self):
+        self.write_receipt(self.squashed_tree, "squashed", self.head)
+        original = harness_grant.linked_worktrees
+        calls = 0
+
+        def linked(checkout):
+            nonlocal calls
+            calls += 1
+            records = original(checkout)
+            if calls > 1:
+                records[Path(self.squashed_tree).resolve()] = (self.head, "main")
+            return records
+
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": self.state.name}), mock.patch.object(
+                harness_grant, "observe_open_prs", return_value={"head": [], "base": []},
+        ), mock.patch.object(harness_grant, "linked_worktrees", side_effect=linked):
+            self.assertFalse(harness_grant.remove_is_safe(self.root, str(self.squashed_tree), "main"))
 
     def test_a_receipt_without_remote_deletion_is_not_granted(self):
         path = self.write_receipt(self.squashed_tree, "squashed", self.head)
