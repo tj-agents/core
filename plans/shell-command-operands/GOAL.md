@@ -10,9 +10,9 @@ Use the [immutable published design](https://github.com/tj-agents/docs/blob/0d74
 
 ## Current checkout and ownership
 
-Work only in Core checkout `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ShellCommandOperands`, branch `Fix/ShellCommandOracle`, at `a7d91c0e4b37c456b4119512ffae2b773ae148a1`. It is behind current `origin/main`; do not change its base. Preserve the old `7e8b650f721b3c872446f9205922efe685be81b1` candidate, frozen reviews, and stashes `1f6d7365409f259710ae9873ceebdbef041cbfcb` / `f51170a6a0982c976f727495dd6b7d03bb386962`.
+Work in Core checkout `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ShellCommandOperands`, branch `Fix/ShellCommandOracle`, now at source commit `7b7f08c3009c53909df9c334f354ca47820bf2d2`, originally based on `a7d91c0e4b37c456b4119512ffae2b773ae148a1`. Preserve that original base as provenance; Root is authorized one clean fetch and merge of `origin/main` after writer release and before frozen review. The five owned paths are the four oracle fixture/test files below plus this Goal; the source commit has 744 additions and 4 deletions (748 changed lines). Preserve the old `7e8b650f721b3c872446f9205922efe685be81b1` candidate, frozen reviews, and stashes `1f6d7365409f259710ae9873ceebdbef041cbfcb` / `f51170a6a0982c976f727495dd6b7d03bb386962`.
 
-The previous L4 writer released without edits. Primary-source recovery is complete; Root checkpoints this Goal before one L4 phase-1a dispatch. Supplementary audit `.agents/continuation/shell-primary-source-recovery.json` has SHA-256 `e02ba2c9f94d3c144e88db4821343e044a79c290e37d651566410de3c906d55a`; all execution-critical source facts are recorded here.
+The initial L4 writer released without edits. Primary-source recovery is complete, and the phase-1a implementation writer has now released after committing the five-path source slice. Focused oracle (7) and credential (23) cases passed; catalog, harness, generation check, and diff check passed. Linux exact-head CI and native activation remain pending. Supplementary audit `.agents/continuation/shell-primary-source-recovery.json` has SHA-256 `e02ba2c9f94d3c144e88db4821343e044a79c290e37d651566410de3c906d55a`; all execution-critical source facts are recorded here.
 
 Phase 1a owns only these four files plus Goal: `.agents/hooks/tests/fixtures/shell_option_profiles.json`, `.agents/hooks/tests/fixtures/shell_profile_sources.json`, `.agents/hooks/tests/fixtures/shell_profile_oracle.py`, `.agents/hooks/tests/test_shell_profile_oracle.py`, and `plans/shell-command-operands/GOAL.md`. Do not create `shell_extraction_cases.json`, add PowerShell descriptors, change production runtime/native wiring/consumers, or alter the existing `.agents/plugins/harness/engineering.json` Claude/Codex mapping.
 
@@ -46,7 +46,7 @@ The two recorded pwsh 7.6 parser hashes `a7fc6b5c391bb8cbd06b78edd6e3b9867f3b89c
 
 Phase 1a passes when all 394 Unix rows/variants have primary provenance, oracle completeness and compatibility tests pass on Windows and Linux, and catalog/generation/harness checks pass with derived output uncommitted. Use `python` on Windows and `python3` on Linux/macOS. Exercise counts, stable IDs, groups, source editions, Bash conditional/vendor variants, exact dash `privileged` (no `priv` alias), zsh names/signed maps, malformed records, and supported raw-command/`-c` facade behavior. No 1a fixture or test may fetch sources; source tests do not establish native activation.
 
-The 1a writer owns only the four paths listed above plus this Goal. Verify checkout identity, implement Unix fixtures/self-tests, run focused and supported closure checks, and measure the readable diff before 1,000 changed lines. If the Unix-only slice reaches the trigger, stop for parent boundary assessment; do not add 1b data or compress records. Parent reviews before any PR; do not push/open a PR or claim implementation/tests started before writer acknowledgement.
+The 1a writer owns only the four paths listed above plus this Goal. The writer verified checkout identity, implemented Unix fixtures/self-tests, ran focused and supported closure checks, and measured the readable diff at 748 changed lines, below the 1,000-line trigger. If the Unix-only slice reaches the trigger, stop for parent boundary assessment; do not add 1b data or compress records. Parent reviews before any PR; do not push or open a PR before parent review.
 
 After 1a normal merge and causal publication, phase 1b owns PowerShell profiles and the 80-case oracle but no parser changes. After 1b publication, phase 2 atomically updates `.agents/hooks/git_auth_scope_gate.py` and its tests plus `test_delivery_binding_gate.py`, `test_merge_cleanup_gate.py`, and new `test_shell_command_operands.py`; run all cases against the public facade, preserve `str`/`None`/`SystemExit(2)`, and qualify credential/body/cleanup consumers. Keep the accepted algorithm and `7e8` checkpoint. Native wiring follows phase 2 review, exact-head Windows/Linux/guard CI, normal merge and causal publication.
 
@@ -62,14 +62,14 @@ After 1a normal merge and causal publication, phase 1b owns PowerShell profiles 
       "behavior": "Validate the complete offline Unix profile oracle while retaining established old-facade compatibility behavior.",
       "source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py, .agents/hooks/tests/fixtures/shell_option_profiles.json, and existing mapped consumers.",
       "mapping": "Existing .agents/plugins/harness/engineering.json maps shared consumers for Claude; preserve its package closure.",
-      "verification": {"level": "source", "result": "limited", "evidence": "The shared offline oracle and established-facade compatibility tests pass locally on Windows. Linux and supported closure checks remain pending; no native activation is claimed."}
+      "verification": {"level": "source", "result": "limited", "evidence": "Phase-1a source commit 7b7f08c3009c53909df9c334f354ca47820bf2d2 contains the Unix offline oracle and established-facade compatibility checks. Focused oracle (7) and credential (23) cases plus catalog, harness, generation, and diff checks passed locally; Linux exact-head CI and native activation remain pending."}
     },
     {
       "host": "codex",
       "behavior": "Validate the complete offline Unix profile oracle while retaining established old-facade compatibility behavior.",
       "source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py, .agents/hooks/tests/fixtures/shell_option_profiles.json, and existing mapped consumers.",
       "mapping": "Existing .agents/plugins/harness/engineering.json maps shared consumers for Codex; preserve its package closure.",
-      "verification": {"level": "source", "result": "limited", "evidence": "The shared offline oracle and established-facade compatibility tests pass locally on Windows. Linux and supported closure checks remain pending; no native activation is claimed."}
+      "verification": {"level": "source", "result": "limited", "evidence": "Phase-1a source commit 7b7f08c3009c53909df9c334f354ca47820bf2d2 contains the Unix offline oracle and established-facade compatibility checks. Focused oracle (7) and credential (23) cases plus catalog, harness, generation, and diff checks passed locally; Linux exact-head CI and native activation remain pending."}
     }
   ]
 }
@@ -77,8 +77,8 @@ After 1a normal merge and causal publication, phase 1b owns PowerShell profiles 
 
 ## Execution readiness
 
-Verdict: ready; execution authorization: implementation; critical native-owner transfer: not required; receipt: none. Root checkpoints this Goal before dispatching the single phase-1a writer.
+Verdict: source implemented; review pending. The phase-1a writer released at source commit `7b7f08c3009c53909df9c334f354ca47820bf2d2`; no PR or push is claimed. Linux exact-head CI and native activation remain pending.
 
 ## Next Steps
 
-Root checkpoints this corrected Goal, then dispatches one L4 phase-1a writer. After normal merge and causal publication, phase 1b may begin; phase 2 remains blocked until phase 1b is also published. The parent retains the full rollout and all delivery decisions.
+After writer release, Root performs one clean fetch/merge of `origin/main`, then frozen review, exact-head CI, normal merge, and causal publication. Linux CI and native activation remain pending. Phase 1b may begin only after normal merge and causal publication; phase 2 remains blocked until phase 1b is also published. The parent retains the full rollout and all delivery decisions.
