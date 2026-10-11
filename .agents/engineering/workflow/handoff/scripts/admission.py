@@ -173,7 +173,45 @@ def declared_assets(goal_text: str) -> set[str]:
     return values
 
 
-def evidence_is_observed(evidence: Any, disposition: dict[str, Any]) -> str | None:
+def declared_requirements(goal_text: str, label: str) -> set[str]:
+    values = set()
+    for match in re.finditer(rf"(?im)^{re.escape(label)}:\s*(.+)$", goal_text):
+        values.update(item.strip() for item in match.group(1).split(",") if item.strip())
+    return values
+
+
+def authorization_section(goal_text: str) -> str | None:
+    match = re.search(r"(?ms)^## Authorization\s*$\n(?P<body>.*?)(?=^## |\Z)", goal_text)
+    return match.group("body") if match else None
+
+
+def declared_source_owner(goal_text: str) -> str | None:
+    owners = declared_requirements(goal_text, "Source owner")
+    return next(iter(owners)) if len(owners) == 1 else None
+
+
+def linked_owner_goal(owner: Any, backlink: str) -> tuple[str | None, str | None]:
+    if not isinstance(owner, dict) or not all(
+        nonempty(owner.get(field)) for field in ("session_id", "harness", "worktree", "goal")
+    ):
+        return None, "occupied owner is incomplete"
+    if not absolute_path(owner.get("worktree")) or not absolute_path(owner.get("goal")):
+        return None, "occupied owner paths must be absolute"
+    try:
+        goal_text = Path(owner["goal"]).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None, "occupied owner goal is unreadable"
+    acknowledgement = rf"(?m)^Native owner:\s*{re.escape(owner['session_id'])}\s*$"
+    if backlink not in goal_text or re.search(acknowledgement, goal_text) is None:
+        return None, "occupied owner goal lacks its exact acknowledgement"
+    return goal_text, None
+
+
+def owner_identity(owner: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
+    return tuple(owner.get(field) for field in ("session_id", "harness", "worktree", "goal"))
+
+
+def evidence_is_observed(evidence: Any, disposition: dict[str, Any], goal_text: str) -> str | None:
     if not isinstance(evidence, dict):
         return "evidence is required"
     kind = evidence.get("kind")
@@ -198,6 +236,8 @@ def evidence_is_observed(evidence: Any, disposition: dict[str, Any]) -> str | No
         target = absolute_path(evidence.get("target"))
         if target is None or not nonempty(evidence.get("operation")) or not nonempty(evidence.get("error")):
             return "read failure evidence is incomplete"
+        if str(target) not in declared_requirements(goal_text, "Required read capability"):
+            return "read target is not a declared repair prerequisite"
         try:
             target.read_bytes()
         except OSError:
@@ -207,12 +247,17 @@ def evidence_is_observed(evidence: Any, disposition: dict[str, Any]) -> str | No
         executable = evidence.get("executable")
         if not nonempty(executable):
             return "executable failure evidence is incomplete"
+        if executable not in declared_requirements(goal_text, "Required executable"):
+            return "executable is not a declared repair prerequisite"
         if shutil.which(executable) is not None:
             return "executable is now available"
     elif kind == "dependency-artifact":
         required = evidence.get("required_sha256")
         if not nonempty(evidence.get("artifact_id")) or not nonempty(required):
             return "dependency artifact evidence is incomplete"
+        requirement = f"{evidence['artifact_id']} sha256:{required}"
+        if requirement not in declared_requirements(goal_text, "Required dependency"):
+            return "dependency is not a declared repair prerequisite"
         if actual == required:
             return "dependency artifact now satisfies the required fingerprint"
     else:
@@ -266,8 +311,11 @@ def validate(
     except (OSError, UnicodeError):
         return {"valid": False, "reason": "repair goal is unreadable"}
     backlink = f"Problem record: {record}#{record_id}"
-    if backlink not in goal_text or AUTHORIZATION.search(goal_text) is None:
+    authorization = authorization_section(goal_text)
+    if backlink not in goal_text or authorization is None or AUTHORIZATION.search(authorization) is None:
         return {"valid": False, "reason": "repair goal lacks the required problem-record backlink or authority"}
+    if disposition["source_owner"] != declared_source_owner(goal_text):
+        return {"valid": False, "reason": "repair goal does not declare the exact source owner"}
     choice = disposition.get("disposition")
     if choice not in DISPOSITIONS:
         return {"valid": False, "reason": "unsupported disposition"}
@@ -276,18 +324,10 @@ def validate(
             return {"valid": False, "reason": "deferred disposition lacks a supported blocker"}
         if disposition.get("blocked_by") in {"conflict", "capacity"}:
             owner = disposition.get("owner")
-            if not isinstance(owner, dict) or not all(
-                nonempty(owner.get(field)) for field in ("session_id", "harness", "worktree", "goal")
-            ):
-                return {"valid": False, "reason": "conflict or capacity disposition lacks an occupied owner"}
-            if not absolute_path(owner.get("worktree")) or not absolute_path(owner.get("goal")):
-                return {"valid": False, "reason": "occupied owner paths must be absolute"}
-            try:
-                owner_goal = Path(owner["goal"]).read_text(encoding="utf-8")
-            except (OSError, UnicodeError):
-                return {"valid": False, "reason": "occupied owner goal is unreadable"}
-            if backlink not in owner_goal or f"Native owner: {owner['session_id']}" not in owner_goal:
-                return {"valid": False, "reason": "occupied owner goal lacks its exact acknowledgement"}
+            owner_goal, owner_error = linked_owner_goal(owner, backlink)
+            if owner_error:
+                return {"valid": False, "reason": owner_error}
+            assert isinstance(owner, dict) and owner_goal is not None
             if disposition.get("blocked_by") == "conflict" and not (
                 declared_assets(goal_text) & declared_assets(owner_goal)
             ):
@@ -300,8 +340,12 @@ def validate(
                 owner_ids = [item.get("session_id") for item in owners if isinstance(item, dict)]
                 if len(owners) < int(budget_match.group(1)) or len(owner_ids) != len(set(owner_ids)):
                     return {"valid": False, "reason": "capacity owners do not exhaust the declared budget"}
-                if any(not isinstance(item, dict) or registry_owner(item)[0] is None for item in owners):
-                    return {"valid": False, "reason": "capacity owners are not currently registered"}
+                if not any(isinstance(item, dict) and owner_identity(item) == owner_identity(owner) for item in owners):
+                    return {"valid": False, "reason": "capacity owners do not include the primary owner"}
+                for occupied in owners:
+                    occupied_goal, occupied_error = linked_owner_goal(occupied, backlink)
+                    if occupied_error or occupied_goal is None or registry_owner(occupied)[0] is None:
+                        return {"valid": False, "reason": "capacity owners lack linked native acknowledgement"}
     else:
         owner = disposition.get("owner")
         if not isinstance(owner, dict) or not all(nonempty(owner.get(field)) for field in ("session_id", "harness", "worktree", "goal")):
@@ -310,15 +354,12 @@ def validate(
             return {"valid": False, "reason": "existing owner paths must be absolute"}
         if owner.get("session_id") == session_id or Path(owner["goal"]) != goal:
             return {"valid": False, "reason": "existing owner must be the distinct linked repair owner"}
-        try:
-            owner_goal = Path(owner["goal"]).read_text(encoding="utf-8")
-        except (OSError, UnicodeError):
-            return {"valid": False, "reason": "existing owner goal is unreadable"}
-        if backlink not in owner_goal or f"Native owner: {owner['session_id']}" not in owner_goal:
-            return {"valid": False, "reason": "existing owner goal lacks the problem-record backlink"}
+        owner_goal, owner_error = linked_owner_goal(owner, backlink)
+        if owner_error:
+            return {"valid": False, "reason": owner_error}
         if not isinstance(disposition["evidence"], dict) or disposition["evidence"].get("kind") not in {"native-observer", "owner-recovery"}:
             return {"valid": False, "reason": "existing owner requires native registry evidence"}
-    evidence_error = evidence_is_observed(disposition["evidence"], disposition)
+    evidence_error = evidence_is_observed(disposition["evidence"], disposition, goal_text)
     if evidence_error:
         return {"valid": False, "reason": evidence_error}
     return {
