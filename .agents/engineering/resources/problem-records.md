@@ -31,6 +31,14 @@ For a `blocked` or `deferred` entry, also record the reason, `blocked_by` as `ca
 other writer and the paths or record it owns. These fields keep an outstanding record actionable without
 claiming that a document starts a job.
 
+## Historical entries
+
+Keep existing facts, identifiers, statuses, and learning history intact. New records use the complete
+shape above. Before updating or addressing an older entry, reconcile the common fields from observed
+evidence before proceeding. A missing cause or source owner remains explicitly `unknown`, with investigation
+as the next action; never invent either field to modernize a record. Declared equivalent historic states
+remain valid.
+
 ## Location and retention
 
 Use a repository-declared problem owner or an existing shared typed register when one exists. Otherwise,
