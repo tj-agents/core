@@ -100,5 +100,5 @@ publishing outside that repository, and destructive operations stay gated; expli
 hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
-entry. `engineering:docs-and-debt` defines the selected repository convention. Do not create a second
+entry. `engineering:write-debt` defines the selected repository convention. Do not create a second
 ledger for a standalone goal just to satisfy a repository-oriented procedure.
