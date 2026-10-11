@@ -235,7 +235,8 @@ git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
 Compare the recorded target checkout in the delivery binding with the resolved primary checkout and the
-current host attachment before invoking either cleanup path below. When the target is the primary checkout,
+current host attachment before invoking either cleanup path below. Read `machine:peer-cli`'s self-session
+execution requirements first. When the target is the primary checkout,
 or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
 and branch deletion in the current session.
 

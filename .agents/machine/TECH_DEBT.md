@@ -1,5 +1,32 @@
 # Tech debt — machine
 
+## Codex close and finish still need acceptance from a registered sandboxed CLI
+
+On 2026-10-11, `close.py` refused the native Codex 0.162.1 session titled
+`Linux port: Step 10` with `cannot resolve a verified registry attachment for this host and current
+directory`. Its transcript identifies its source as `cli`. Outside the sandbox, its parent chain reaches
+the native Codex process and kitty; inside the command sandbox, the visible chain ends at PID 1,
+`codex-linux-sandbox`. A missing native process inside that namespace does not establish that the CLI
+was never launched.
+
+`session_close.own_host_and_entry` resolves ownership through process ancestry and matches the visible
+PID and start time to the registry. It has no supported bridge to the host identity outside the sandbox.
+This session initially had no registry entry; the separate installation/adoption gap is recorded in
+[plugin debt](../plugins/TECH_DEBT.md#repository-skills-can-be-available-without-core-lifecycle-hooks).
+The active profile was subsequently repaired with the native installer, 13 authenticated hook trust
+updates, and the shipped SessionStart recorder. With the verified registry entry present, the same
+attachment check succeeds outside the sandbox and refuses inside it. Both missing registration and
+namespace visibility therefore affected this incident. Host-side execution is now specified by
+`machine:peer-cli`, but actual terminal closure and finish cleanup were not performed during the active
+task and remain unverified for this execution path.
+
+**Resolution condition.** A freshly launched native Codex session with the machine plugin enabled
+records a verified attachment, and its supported close/finish path resolves that same host from normal
+sandboxed execution or an explicit host-side mechanism. Verify actual terminal closure and finish
+cleanup on Linux and Windows while retaining PID/start-time and terminal identity checks. Missing
+registration must be reported as an incomplete attachment, rather than successful closure or evidence
+that no native CLI exists.
+
 ## The Codex plugin cache is not reconciled
 
 `~/.codex/plugins/cache/` accumulates orphaned plugin payloads exactly as the Claude cache did, and

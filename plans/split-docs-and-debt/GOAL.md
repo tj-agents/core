@@ -98,6 +98,11 @@ it, and a guidance rule added there looks like a tech-debt change.
   payload, catalog and harness `--check`, `docs_reachability.py`, packaging tests.
 - Step 5: `reviews/Refactor-SplitDocsAndDebt.md` was approved after five passes over the three-skill
   split; the merge into `engineering:docs` (Tommy's decision) is reviewed as a further incremental pass.
+- Delivery reconciliation (2026-10-11): merged `origin/main` at `1406d04c` into this branch, retaining
+  PR #204's peer-session-close guidance and its machine/plugin debt records while preserving the split's
+  three final owners. Both Python suites, packaging, generator, catalog, harness, tier-payload, and
+  docs-reachability checks passed on the reconciled tree. Generated output was restored after validation;
+  the next gate is an incremental review of this merge before pushing the exact candidate.
 
 ## Final decision (2026-10-11)
 

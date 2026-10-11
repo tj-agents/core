@@ -1,5 +1,55 @@
 # Plugin host integration debt
 
+## Repository skills can be available without core lifecycle hooks
+
+On 2026-10-11, the active native Codex 0.162.1 profile exposed core skills from this repository's
+`.codex/skills` adapters, but native `plugin list --json` listed only OpenAI remote plugins. No core
+machine package was installed, and the current CLI session had no entry in the machine session registry.
+Skill discovery therefore did not establish installation of the machine SessionStart hook required by
+`close.py`. The historical startup hook outcome was not recovered; the current installation and missing
+registration were directly inspected.
+
+The current profile was repaired with native installation of the three core packages, authenticated
+trust for 13 hook definitions, and the shipped session recorder. This establishes the current CLI's
+attachment; it does not supply automatic installation or prove fresh-session hook execution.
+
+`codex_marketplace_sync.sync_codex_standards` refreshes already enabled Git plugins and can succeed with
+none selected. `handoff-codex` checks that refresh and submits a terminal launch but does not establish
+core dependency installation or a registered successor attachment. Installing the merged work plugin
+does not itself supply this mechanism: [work PR #1](https://github.com/tj-agents/work/pull/1) merged on
+2026-10-10, but its published manifests declare skills without lifecycle hooks, and its
+[README](https://github.com/tj-agents/work/blob/main/README.md) delegates repository-local installation
+of work, base and machine together to the employer plugin. That procedure does not establish automatic
+machine adoption in this core checkout.
+The work PR explicitly excluded normal-profile migration and its related rollout from delivery.
+[Shared marketplace registration PR #3](https://github.com/tj-agents/marketplace/pull/3) and
+[employer integration PR #6](https://github.com/tj-agents/infonetica/pull/6) were still open during this
+inspection. Merged producer source did not establish consumer installation or injection.
+
+**Resolution condition.** The owning installation/bootstrap flow resolves and installs the required
+core runtime capabilities into the exact launching profile and repository scope. A fresh native session
+must demonstrate enabled/trusted lifecycle hooks and a registry receipt bound to its session, host
+PID/start time, checkout and terminal. Repository skill discovery and launcher submission remain
+insufficient acceptance evidence. Verify dependency adoption for both personal and employer repository
+paths on Codex and Claude without silently broadening employer scope.
+
+## Consolidate core packaging and marketplace names as core@agents
+
+Tommy requested on 2026-10-11 that this repository publish one `core@agents` plugin containing its core
+capabilities, with consistent identities such as `cpp@agents` for stack owners. The published core
+manifests still use the `base-agents` marketplace and separate `base`, `engineering` and `machine`
+packages. The [central marketplace](https://github.com/tj-agents/marketplace/blob/main/.claude-plugin/marketplace.json)
+is named `tj-agents` and also lists those three packages separately. The inspected Claude profile still
+uses `engineering@base-agents` and `cpp@cpp-agents`. Repository names have changed without completing
+the requested package and installed-profile identity migration.
+
+**Resolution condition.** Agree the cross-repository migration in `tj-agents/docs`, implement one core
+distribution in this repository, and publish the consistent `agents` marketplace. Update generated
+manifests, capability catalogs/locks, dependency declarations, bootstrap, launchers, hook trust and
+installed-profile migration together. Verify fresh installation and upgrades from the existing names
+on both hosts and platforms, preserving canonical authored ownership below `.agents`. Retire the old
+identities once migration is proven; this debt record does not authorize changes in other repositories.
+
 ## Continuation Stop enforcement still needs installed-host acceptance
 
 Codex and Claude expose Stop events that can keep an unfinished execution active. The shared
