@@ -52,7 +52,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(75, len(skills))
+        self.assertEqual(76, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
@@ -336,15 +336,15 @@ class SourceLayoutTests(unittest.TestCase):
             SYNC.build(self.root)
 
     def test_public_names_equal_without_hyphens_fail_generation(self):
-        source = self.root / ".agents/engineering/workflow/techdebt"
-        near_miss = self.root / ".agents/engineering/workflow/tech-debt"
+        source = self.root / ".agents/engineering/workflow/address-debt"
+        near_miss = self.root / ".agents/engineering/workflow/addressdebt"
         shutil.copytree(source, near_miss)
         skill = near_miss / "SKILL.md"
         skill.write_text(
-            skill.read_text(encoding="utf-8").replace("name: techdebt", "name: tech-debt"),
+            skill.read_text(encoding="utf-8").replace("name: address-debt", "name: addressdebt"),
             encoding="utf-8",
         )
-        with self.assertRaisesRegex(ValueError, "differ only by hyphens: tech-debt, techdebt"):
+        with self.assertRaisesRegex(ValueError, "differ only by hyphens: address-debt, addressdebt"):
             SYNC.build(self.root)
 
     def test_resources_and_generated_roots_cannot_escape_ownership(self):
