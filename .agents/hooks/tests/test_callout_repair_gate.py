@@ -18,10 +18,12 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="callout gate ")
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
+        subprocess.run(["git", "init", str(self.base)], capture_output=True, text=True, check=True)
         self.session = str(uuid.uuid4())
         self.transcript = self.base / "transcript.jsonl"
         self.source = self.base / "source-owner"
         self.source.mkdir()
+        subprocess.run(["git", "init", str(self.source)], capture_output=True, text=True, check=True)
         self.goal = self.source / "GOAL.md"
         self.goal.write_text("# Repair\n\n## Authorization\n\nBounded standards-defect repair.\n", encoding="utf-8")
         self.prompt = self.base / "handoff.md"
@@ -50,7 +52,11 @@ class CalloutRepairGateTests(unittest.TestCase):
     def write_transcript(self, records):
         self.transcript.write_text("\n".join(json.dumps(item) for item in records), encoding="utf-8")
 
-    def claude_launch(self, successful=True, tool="Bash", command=None):
+    def claude_launch(self, successful=True, tool="Bash", command=None, receipt=True):
+        output = "Launched codex-cli 0.154.0 from codex.exe on selected lane"
+        if receipt:
+            output += "\n" + json.dumps({"event": "agent-handoff-submitted",
+                                             "worktree": str(self.source), "prompt_path": str(self.prompt)})
         return [
             {"type": "user", "message": {"role": "user", "content": PROMPT}},
             {"type": "assistant", "message": {"role": "assistant", "content": [
@@ -59,7 +65,7 @@ class CalloutRepairGateTests(unittest.TestCase):
             ]}},
             {"type": "user", "message": {"role": "user", "content": [
                 {"type": "tool_result", "tool_use_id": "launch", "is_error": not successful,
-                 "content": "Launched codex-cli 0.154.0 from codex.exe on selected lane"},
+                 "content": output},
             ]}},
         ]
 
@@ -114,6 +120,11 @@ class CalloutRepairGateTests(unittest.TestCase):
                 self.write_transcript(records)
                 self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
 
+    def test_bare_launcher_confirmation_does_not_claim_a_handoff(self):
+        self.submit()
+        self.write_transcript(self.claude_launch(receipt=False))
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+
     def test_successful_claude_source_owner_launch_releases_feedback_and_stop(self):
         self.submit()
         self.write_transcript(self.claude_launch())
@@ -122,6 +133,27 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.transcript.unlink()
         self.assertEqual({}, self.pretool())
         self.submit()
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+
+    def test_repeat_prevention_callout_requires_an_isolated_native_handoff(self):
+        self.submit("This can never happen again.")
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+        self.write_transcript(self.claude_launch())
+        self.assertEqual({}, self.pretool())
+
+    def test_source_owner_handoff_in_originating_checkout_does_not_release_repair(self):
+        goal = self.base / "GOAL.md"
+        goal.write_text("# Repair\n\n## Authorization\n\nBounded standards-defect repair.\n", encoding="utf-8")
+        prompt = self.base / "same-checkout-handoff.md"
+        prompt.write_text(f"cd {self.base}\nRead {goal} and execute its Next Steps.\n", encoding="utf-8")
+        command = (f"& 'plugin/launch-codex.ps1' -WorkingDirectory '{self.base}' "
+                   f"-PromptPath '{prompt}' -Lane L4")
+        self.submit()
+        records = self.claude_launch(command=command, receipt=False)
+        records[-1]["message"]["content"][0]["content"] += "\n" + json.dumps({
+            "event": "agent-handoff-submitted", "worktree": str(self.base), "prompt_path": str(prompt)
+        })
+        self.write_transcript(records)
         self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
 
     def test_unrelated_launch_and_old_turn_launch_do_not_release_repair(self):
@@ -143,7 +175,9 @@ class CalloutRepairGateTests(unittest.TestCase):
             {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
                 "call_id": "launch", "input": self.command}},
             {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "launch",
-                "output": [{"type": "text", "text": "Script completed\nLaunched codex-cli 0.154.0 on L4"}]}},
+                "output": [{"type": "text", "text": "Script completed\nLaunched codex-cli 0.154.0 on L4\n" + json.dumps({
+                    "event": "agent-handoff-submitted", "worktree": str(self.source), "prompt_path": str(self.prompt)
+                })}]}},
         ])
         self.assertEqual({}, self.pretool("mcp__host__send_feedback"))
 
