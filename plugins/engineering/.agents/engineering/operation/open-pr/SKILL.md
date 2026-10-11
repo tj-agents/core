@@ -117,6 +117,8 @@ is already complete, reviewed, and exact-head-CI-ready.
 After every create or body edit, fetch and validate the authoritative body before binding or reporting,
 including when the head and existing binding are unchanged:
 
+For the Python workflow helper examples below, use `python` on Windows or `python3` on Linux/macOS:
+
 ```bash
 python <workflow-ops> --root <delivery-checkout> --workflow-run-id pr-body-<n> pr-body-check --pr <owning-url>
 ```

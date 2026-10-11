@@ -84,7 +84,8 @@ host execution establishes host acceptance.
    contains transport evidence only. Set an explicit pickup observation budget in the goal, honoring
    tighter user limits; absent a user limit, allow five minutes of bounded read-only observations.
    Planning-only, prompt-only and inline work creates no receipt.
-2. Run the helper from the owning checkout, using its absolute path for every command:
+2. Run the helper from the owning checkout, using its absolute path for every command. Use `python` on
+   Windows and `python3` on Linux/macOS:
 
    ```text
    python -B <skill-directory>/scripts/transfer.py prepare --goal <absolute-goal> --worktree <absolute-checkout> --receipt <absolute-receipt> --predecessor <current-session-identity> --harness codex

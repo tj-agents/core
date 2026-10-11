@@ -13,7 +13,8 @@ plan owns the defect, use that plan's execution workflow. If the request starts 
 integration/E2E tier, use its narrower debug workflow; return here only when that workflow identifies a
 product defect whose repair is not already owned.
 
-Resolve one owning lifecycle skill and only the technical skills directly routed by the changed paths. Use
+Resolve one owning lifecycle skill and only the technical skills directly routed by the changed paths. Run
+the command as `python` on Windows or `python3` on Linux/macOS. Use
 `python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id> skills --lifecycle bugfix --changed-path <path>` to record
 their identities and content hashes, and reuse that record while those hashes remain unchanged. Use the
 shared `inspect` operation once for routine repository state instead of reconstructing it through separate

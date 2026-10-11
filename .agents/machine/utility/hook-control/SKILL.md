@@ -10,6 +10,7 @@ route: infer
 
 Use this utility when hook execution must be stopped before any hook bootstrap runs. It changes only the
 canonical `features.hooks` setting and records the exact previous value in an owned adjacent snapshot.
+Run its commands with `python` on Windows or `python3` on Linux/macOS.
 
 ```sh
 python -B '<skill-directory>/scripts/hook_control.py' status --scope global

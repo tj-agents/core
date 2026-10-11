@@ -42,6 +42,8 @@ procedure that goes stale in the repo that renames one.
 
 Immediately before every merge attempt, fetch the current PR body and require nonempty What and Why:
 
+Run the Python workflow helpers below with `python` on Windows or `python3` on Linux/macOS:
+
 ```bash
 python <workflow-ops> --root <absolute-worktree> --workflow-run-id pr-body-<n> pr-body-check --pr <pr-url>
 ```
@@ -122,7 +124,8 @@ required review and checks. A green persistent-delivery action alone does not ov
 ### 3. Wait for the PR's own checks to reach a terminal state, then verify green
 
 Wait until no check is pending through the reconnect-safe monitor from
-`engineering:remote-validation`, then confirm the terminal state with one direct read:
+`engineering:remote-validation`, then confirm the terminal state with one direct read. Use `python` on
+Windows or `python3` on Linux/macOS:
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> monitor --kind pr --id <n> --head <remote-head>
@@ -186,7 +189,7 @@ different head.
 its four terminal states resolves, reporting automatically with no reprompt. It **never retries and never
 toggles.** Read all five signals every observation, and the bare state into its own variable — a joined string
 never matches `MERGED`, which is how a wait times out instead of reporting a merge that already happened.
-Bind the recorded PR and remote head before waiting:
+Bind the recorded PR and remote head before waiting. Use `python` on Windows or `python3` on Linux/macOS:
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> monitor --kind pr --id <n> --head <remote-head>
@@ -309,7 +312,8 @@ if (Test-Path -LiteralPath $worktreeHelper -PathType Leaf) {
 Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout helper path is absent, do not
 skip cleanup. Apply the same gates with native Git from the primary checkout:
 
-1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py`; from
+1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py` on
+   Windows or `python3 -B <skill-directory>/scripts/cleanup_proof.py` on Linux/macOS; from
    elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It supports the
    primary branch-only route only with an explicit saved branch and head. It refuses a detached or mismatched
    target, a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
@@ -410,8 +414,8 @@ each create a checkpoint. Never create a commit merely to make the ledger agree 
 ## Report
 
 Every goal completion and plan closeout requires exactly one fenced `completion` record. A missing or
-invalid record is incomplete. Run a fresh completion check before claiming the requested user outcome or
-deleting its goal:
+invalid record is incomplete. Run a fresh completion check with `python` on Windows or `python3` on
+Linux/macOS before claiming the requested user outcome or deleting its goal:
 
 ```bash
 python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree> --bound-repository <owner/repo> --bound-pr <n> --bound-head <forty-character-head>
