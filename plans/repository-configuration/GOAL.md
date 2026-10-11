@@ -95,3 +95,66 @@ After implementation, release to Root for exact review before any PR. Delivery r
 ## Current rollout ownership and reconciliation
 
 Root's parent rollout remains active. The prior configuration source checkout and its ownership are preserved; this new branch is an isolated authorized follow-on, not adoption of the former owner. Latest read-only native evidence reports association owner state WAITING, foreground and child null, deadline `1791803662.918` (approximately October 12), and launches/failures zero. The actual native Codex metadata reports SID `01a12aa7-5b58-7312-9400-ef710762147f`, PID `5896`, creation identity `134361905721115133`, while the active transfer receipt still names heartbeat SID `01a12745-ab05-7d12-8a0c-0d6bfc04ee41`; receipt identity is unverified. Its owner checkpoint is paused pending an owner-supported correction to the catalog-sync scope: catalog digest synchronization is required by the existing authorized manifest/source lifecycle, although the current seven-path boundary omits `.agents/catalog/catalog.json`. Root must not adopt or self-repair the association Goal or receipt. The current app-server session cannot perform the supported native follow-up; no retry, replacement launch, daemon, or send was performed. Preserve these gates until the owner corrects the scope and native reconciliation is available.
+
+## Source ownership release and superseded contract
+
+Reconciled: 2026-10-11T22:16:13Z. Source status: released for correction; implementation/delivery is incomplete.
+
+Tommy's owner-recovery instruction supersedes the unmerged `.agents/configuration.json` design above. The current interface is Core-owned, host-neutral `.agents/settings.json` containing a `configuration` object, preserving unrelated settings and marketplace namespaces. It must support an existing authorized scoped task without copied per-repository Core explanations or a mandatory legacy standing declaration. Kit/template is independent and is not a configuration prerequisite. Preserve current reviews, required checks, all stop classes, explicit holds and stricter work-repository instructions.
+
+Root controller `01a122c4-e884-7402-a873-9fa7449e5c37` recovered the existing child `/root/implement_repository_configuration` (native `01a12ad1-ca57-78c1-ac1b-7900005a5db8`) through native collaboration. The child explicitly acknowledged RELEASE to successor `01a12ccb-c604-77f1-bb4c-cc8c5e21ead1` and stated that it retains no active writer ownership. This release is based on that acknowledgment and this controller's source authority; process closure, launcher submission and elapsed time are not release evidence.
+
+Released checkout: `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-RepositoryConfiguration`. Branch: `Feature/RepositoryConfiguration`. Preserved implementation base/head before this Goal-only checkpoint: `316e77345dffcd497476879cc0acc653ea383626`. Successor: native correction owner `01a12ccb-c604-77f1-bb4c-cc8c5e21ead1` in `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract`, branch `Fix/RepositorySettingsContract`, owning [the repository-settings correction Goal](C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract/plans/repository-settings/GOAL.md). That Goal resides in the successor checkout; its exact absolute path is `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract/plans/repository-settings/GOAL.md`.
+
+The following preserved dirty paths are released for that one causal correction. Authored edits remain uncommitted. Generated output remains uncommitted and must not enter a Source PR. SHA-256 values below identify the exact bytes preserved at release.
+
+| Kind | Status | Released path | SHA-256 |
+|---|---|---|---|
+| authored | ` M` | `.agents/catalog/catalog.json` | `207ab35fce5924ff07012ffe841b1da16c8a4ec1ecfbe4f1b44bbf6490e9b63a` |
+| authored | ` M` | `.agents/engineering/policy/persistent-delivery/SKILL.md` | `ec7931bbc784a9e6c4bacf8d1ebee5bdb385c45f525022f5237a6265fc34c4a6` |
+| authored | ` M` | `.agents/hooks/delivery_binding_gate.py` | `119e175c35ebfbec408b32049be09c9529ced29e1a802b02161b0468d6ae2669` |
+| authored | ` M` | `.agents/hooks/merge_review_gate.py` | `440b2f905235a0596675aad0fc8928e3b9f2013f3134247e39b8912af0384db4` |
+| authored | ` M` | `.agents/hooks/tests/test_delivery_runtime.py` | `a81a5a0c715cbd4e8a65a193106ae54ccccced98627d7323735a920932990478` |
+| authored | ` M` | `.agents/hooks/tests/test_merge_review_gate.py` | `8b68cc4c2a569c8361da008746317214b5ec13d096de6d451106d1c3a4cdd335` |
+| authored | ` M` | `.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py` | `570422ada35737a7d022fb94a569baf163680399b07dba1aa79b5042ad2c2b68` |
+| authored | ` M` | `.agents/plugins/sources.json` | `0a4a5a1ba91c3994db2a14ce02bcb287dfe16472b08b1fbb5e9c4091098ca790` |
+| authored | ` M` | `.agents/workflows/delivery_policy.py` | `b3f98cf64fc6fc4b6c10ed385affe3caa6c805355c87a84fcbfba8ae799b87eb` |
+| authored | ` M` | `.agents/workflows/delivery_runtime.py` | `cf1d00aa4d8d5dbc1ffc03019efc43cd6e7761f4145a1d19ee02946f585ee3eb` |
+| authored | ` M` | `.agents/workflows/workflow_ops.py` | `6121e2eaa200d7365f6345f56ce4f65b892b8003bf502b530141fcc9e8b435b5` |
+| authored | ` M` | `README.md` | `ca3e4ad251606eae468aa112b33f58d51ea7aca6e601539a07052f91a4d81b9c` |
+| generated | ` M` | `plugins/engineering/.agents/engineering/policy/persistent-delivery/SKILL.md` | `ec7931bbc784a9e6c4bacf8d1ebee5bdb385c45f525022f5237a6265fc34c4a6` |
+| generated | ` M` | `plugins/engineering/hooks/codex.json` | `b73d6f7fc732e2e8215be57f93606bd27fbc4e92cc2aac07d40322c5910299d1` |
+| generated | ` M` | `plugins/engineering/hooks/delivery_binding_gate.py` | `119e175c35ebfbec408b32049be09c9529ced29e1a802b02161b0468d6ae2669` |
+| generated | ` M` | `plugins/engineering/hooks/merge_review_gate.py` | `440b2f905235a0596675aad0fc8928e3b9f2013f3134247e39b8912af0384db4` |
+| generated | ` M` | `plugins/engineering/workflows/delivery_policy.py` | `b3f98cf64fc6fc4b6c10ed385affe3caa6c805355c87a84fcbfba8ae799b87eb` |
+| generated | ` M` | `plugins/engineering/workflows/delivery_runtime.py` | `cf1d00aa4d8d5dbc1ffc03019efc43cd6e7761f4145a1d19ee02946f585ee3eb` |
+| generated | ` M` | `plugins/engineering/workflows/workflow_ops.py` | `6121e2eaa200d7365f6345f56ce4f65b892b8003bf502b530141fcc9e8b435b5` |
+| generated | ` M` | `plugins/machine/.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py` | `570422ada35737a7d022fb94a569baf163680399b07dba1aa79b5042ad2c2b68` |
+| generated | ` M` | `plugins/machine/catalog/catalog.json` | `59a5b3c2b7468657f6e573c8eac991ff15af41479f13cf5d44356a3d47f366d6` |
+| generated | ` M` | `plugins/machine/codex-skills/bootstrap-capabilities/scripts/harness_permissions_sync.py` | `570422ada35737a7d022fb94a569baf163680399b07dba1aa79b5042ad2c2b68` |
+| generated | ` M` | `plugins/machine/hooks/codex.json` | `810f00653cfc0d41ab30dd32490189ce1f721585520b6dd4e3e17707688eff96` |
+| generated | ` M` | `plugins/machine/resources/machine/scripts/delivery_policy.py` | `b3f98cf64fc6fc4b6c10ed385affe3caa6c805355c87a84fcbfba8ae799b87eb` |
+| generated | ` M` | `plugins/machine/skills/bootstrap-capabilities/scripts/harness_permissions_sync.py` | `570422ada35737a7d022fb94a569baf163680399b07dba1aa79b5042ad2c2b68` |
+| authored | ` M` | `tests/test_harness_permissions_sync.py` | `4b288b36ce00b7b4573f8612a9882239b2317782e0b5cd6e55848e773c0522ce` |
+| authored | `??` | `.agents/hooks/tests/test_repository_configuration.py` | `37a5336c0fa6a6d38ef519e615e46cd3c6db99406b8597709a3bec019e56dd87` |
+| authored | `??` | `.agents/schemas/repository-configuration.schema.json` | `0e1717dd62dc812869bebbb9832d3205876ab5f573820030ea935accc87d925b` |
+| authored | `??` | `.agents/workflows/repository_configuration.py` | `814f22016e750e935e5de05b4c70fbd32c6befd66b18ddc04622ca344f3d94c4` |
+| authored | `??` | `docs/workflows/REPOSITORY_CONFIGURATION.md` | `ccff003d7317c540a7f5aa2e39179ff7fce99e601bec09eea0bad6498e38f460` |
+| generated | `??` | `plugins/engineering/workflows/repository_configuration.py` | `814f22016e750e935e5de05b4c70fbd32c6befd66b18ddc04622ca344f3d94c4` |
+| generated | `??` | `plugins/machine/resources/machine/scripts/repository_configuration.py` | `814f22016e750e935e5de05b4c70fbd32c6befd66b18ddc04622ca344f3d94c4` |
+
+The original writer's unused path leases are also released; their contents were not changed by this implementation:
+
+- `.agents/hooks/tests/test_delivery_binding_gate.py`
+- `.agents/hooks/tests/test_auto_merge.py`
+- `tests/test_harness_manifests.py`
+- `tests/test_source_layout.py`
+- `.agents/plugins/harness/machine.json`
+- `.agents/plugins/harness/engineering.json`
+- `plans/repository-configuration/GOAL.md`
+
+Historical focused source checks were observed passing before supersession. The historical full-discovery cell42/session60020 emitted errors without a captured terminal summary; its liveness, final outcome and failure provenance are unresolved. No complete full-suite pass, Linux CI, review, PR, merge, causal publication or installed activation is claimed. Do not restart or infer success from the old session identity.
+
+No implementation file was reset, stashed, discarded, overwritten or cleaned up during coordination. No new implementation owner, profile installation, correction-checkout edit or duplicate causal repair was launched. The parent rollout remains separately owned by Root; only this configuration source lease transfers.
+
+Current next action: the successor reads this release and preserves/reconciles the single existing patch under its settings Goal, then implements the corrected contract at L4, proves arbitrary-repository scoped-task behavior, completes both-host Windows/Linux checks and independent review, and performs authorized normal merge plus causal generated publication. Earlier readiness, configuration.json and Kit-dependency instructions are historical and are superseded by this section. Root will not resume the released implementation or adopt the successor checkout.
