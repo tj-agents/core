@@ -14,11 +14,13 @@ stay here; shared plans link to their source owners.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
-Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Python 3.9+ must be
-available as `python` on PATH. Codex skips new or changed plugin hooks until they are reviewed and trusted
-in `/hooks`; a fresh missing-marketplace write probe is required before claiming enforcement. The host
-coverage limit is tracked in `.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents
-a generated native-instruction fallback.
+Packaged SessionStart hooks deliver context and PreToolUse hooks gate routed writes. Their Python 3.9+
+interpreter follows the host manifest: Codex uses `python3` on Linux/macOS and `python` on Windows; Claude's
+current manifest uses `python` on all platforms. Keep the configured executable on PATH. Codex skips new or
+changed plugin hooks until they are reviewed and trusted in `/hooks`; a fresh missing-marketplace write
+probe is required before claiming enforcement. The host coverage limit is tracked in
+`.agents/plugins/TECH_DEBT.md`. The `base:agent-files` skill documents a generated native-instruction
+fallback.
 Codex hook commands retain an integrity-checked copy of their trusted plugin package in `PLUGIN_DATA`.
 An active session can keep running its original hook scripts when a marketplace refresh removes the old
 cache directory. A changed hook definition still requires Codex trust review before it runs.
@@ -48,6 +50,25 @@ The split packages form the **2.1.16** release candidate. Existing 1.x consumers
 three packages. `base` remains the common behavior package, while `engineering` and `machine` stay
 separate owners; all three install by default so `base:cd` always has its handoff workflow and launcher
 closure.
+
+## Repository auto-merge
+
+An engineering-enabled repository can opt into guarded agent auto-merge in its existing
+`.agents/delivery-authorization.json`:
+
+```json
+{
+  "standing_authorization": "auto",
+  "instruction": "Merge green reviewed PRs",
+  "auto_merge": true
+}
+```
+
+Set `"auto_merge": false`, or omit it, to disable the capability. This setting only permits the guarded
+workflow command to request GitHub auto-merge; it does not authorize a merge. Standing or scoped merge
+authority, every stop class and hold label, exact-head checks, current independent review, security review,
+and checkout identity must still pass. The guarded workflow rechecks the declaration at execution time, so
+disabling it after a delivery binding prevents arming auto-merge.
 
 ## Layout
 
@@ -118,10 +139,10 @@ Claude Code:
 ```
 
 Claude loads installed plugins at session start and `/plugin marketplace update` refreshes only the
-catalog. Typing `claude` in PowerShell, `open-claude`, `handoff-claude` and session recovery run
+catalog. Typing `claude` in Bash on Linux or PowerShell on Windows/Linux, `open-claude`, `handoff-claude` and session recovery run
 `.agents/machine/scripts/claude_standards_sync.py` first, so a session started through them loads the
 latest registered commit of every plugin the directory enables. The machine plugin's SessionStart hook
-adds one marked block to both PowerShell profiles that loads its own `claude` wrapper, so the wrapper
+adds one marked block to the supported terminal profiles that resolves its own `claude` wrapper, so the wrapper
 updates with the plugin and no checkout is pulled; set `BASE_AGENTS_CLAUDE_PROFILE=off` to opt out.
 From a core checkout, run it directly:
 
@@ -139,12 +160,12 @@ codex plugin add engineering@base-agents
 codex plugin add machine@base-agents
 ```
 
-Typing `codex` in PowerShell and using `handoff-codex` refresh configured Git marketplaces and
+Typing `codex` in Bash on Linux or PowerShell on Windows/Linux and using `handoff-codex` refreshes configured Git marketplaces and
 enabled plugins before Codex loads them. The launcher then records native Codex hook trust only for
 enabled plugins sourced from GitHub's `tj-agents` organisation, after checking the installed package
 against its unchanged Git source. Other publishers and user/project hooks retain normal trust review.
 Set `BASE_AGENTS_CODEX_HOOK_TRUST=off` to keep manual review for all hooks. The machine plugin's SessionStart hook adds a marked block
-to both PowerShell profiles. That block resolves the active installed machine package, so later
+to the supported terminal profiles. That block resolves the active installed machine package at invocation time, so later
 terminals load its `codex` wrapper without pulling this checkout. The first session after installing
 the package wires the profiles; open a new terminal to use the wrapper. Set
 `BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. A project pinned to a release continues to

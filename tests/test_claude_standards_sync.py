@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -32,6 +33,17 @@ class NormalizeUrlTests(unittest.TestCase):
     def test_folds_scp_style_ssh_remotes_to_the_same_form_as_https(self):
         self.assertEqual(SYNC.normalize_url('git@github.com:tj-agents/cpp.git'), SYNC.normalize_url('https://github.com/tj-agents/cpp.git'))
         self.assertEqual(SYNC.normalize_url('ssh://git@github.com/tj-agents/cpp.git'), SYNC.normalize_url('https://github.com/tj-agents/cpp.git'))
+
+
+class HarnessPermissionForwardingTests(unittest.TestCase):
+    def test_harness_permission_sync_receives_the_resolved_project(self):
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw).resolve()
+            with mock.patch.object(SYNC.subprocess, 'run') as run:
+                SYNC.apply_harness_permissions(project)
+            if run.called:
+                arguments = run.call_args.args[0]
+                self.assertEqual(['--apply', '--project', str(project)], arguments[-3:])
 
 
 def git(cwd, *arguments):

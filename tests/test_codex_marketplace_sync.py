@@ -38,7 +38,7 @@ class FakeCodex:
         if executable == sys.executable:
             # apply_harness_permissions() also calls through sys.executable, in the sync's own `finally`
             # -- recorded separately so it never gets mistaken for the hook-trust call it runs alongside.
-            script = arguments[1] if len(arguments) > 1 else ''
+            script = next((argument for argument in arguments if argument.endswith('.py')), '')
             if script.endswith('harness_permissions_sync.py'):
                 self.harness_permission_calls.append((argv, cwd))
                 return completed(argv, 0, stdout='')
@@ -101,8 +101,8 @@ class SyncCodexStandardsTests(unittest.TestCase):
         SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
         (argv, cwd) = fake.trust_calls[0]
         self.assertEqual(argv[0], sys.executable)
-        self.assertEqual(argv[1], '-B')
-        self.assertEqual(argv[3:], ['--codex', 'Invoke-FakeCodex', '--project', str(self.project.resolve())])
+        self.assertEqual(argv[1:3], ['-I', '-B'])
+        self.assertEqual(argv[4:], ['--codex', 'Invoke-FakeCodex', '--project', str(self.project.resolve())])
         self.assertEqual(cwd, self.project.resolve())
 
     def test_the_hook_trust_helpers_stderr_reaches_the_user(self):
@@ -127,7 +127,7 @@ class SyncCodexStandardsTests(unittest.TestCase):
         fake = FakeCodex()
         SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
         (argv, _cwd) = fake.trust_calls[0]
-        snapshot = Path(argv[2])
+        snapshot = Path(argv[3])
         self.assertNotEqual(snapshot, ROOT / '.agents/machine/scripts/codex_hook_trust.py')
         # The snapshot lived in a temporary directory that is cleaned up once the sync returns.
         self.assertFalse(snapshot.exists())
@@ -316,9 +316,9 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.assertEqual(len(fake.harness_permission_calls), 1)
         argv, _cwd = fake.harness_permission_calls[0]
         self.assertEqual(argv[0], sys.executable)
-        self.assertEqual(argv[1], '-B')
-        self.assertTrue(argv[2].endswith('harness_permissions_sync.py'))
-        self.assertEqual(argv[3], '--apply')
+        self.assertEqual(argv[1:3], ['-I', '-B'])
+        self.assertTrue(argv[3].endswith('harness_permissions_sync.py'))
+        self.assertEqual(argv[4], '--apply')
 
     def test_harness_permissions_still_converge_after_a_sync_error(self):
         # The ps1 original ran this from a `finally`, so a raised SyncError must not skip it.
@@ -332,7 +332,7 @@ class SyncCodexStandardsTests(unittest.TestCase):
 
         def failing_run(argv, cwd=None, **kwargs):
             executable, *arguments = argv
-            script = arguments[1] if executable == sys.executable and len(arguments) > 1 else ''
+            script = next((argument for argument in arguments if argument.endswith('.py')), '') if executable == sys.executable else ''
             if script.endswith('harness_permissions_sync.py'):
                 raise OSError('no python on this machine')
             return fake.run(argv, cwd=cwd, **kwargs)
@@ -371,9 +371,9 @@ class ApplyHarnessPermissionsTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         (argv,), kwargs = calls[0]
         self.assertEqual(argv[0], sys.executable)
-        self.assertEqual(argv[1], '-B')
-        self.assertTrue(argv[2].endswith('harness_permissions_sync.py'))
-        self.assertEqual(argv[3], '--apply')
+        self.assertEqual(argv[1:3], ['-I', '-B'])
+        self.assertTrue(argv[3].endswith('harness_permissions_sync.py'))
+        self.assertEqual(argv[4], '--apply')
         self.assertEqual(kwargs.get('stdin'), SYNC.subprocess.DEVNULL)
         self.assertEqual(kwargs.get('timeout'), 30)
 

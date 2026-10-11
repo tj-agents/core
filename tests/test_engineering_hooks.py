@@ -363,6 +363,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertNotIn("functions", codex_router["matcher"])
         self.assertFalse(any("skill_router.py" in command for command in commands(codex, "PreToolUse")))
         self.assertFalse(any("red_run_gate.py" in command for event in codex["hooks"] for command in commands(codex, event)))
+        self.assertTrue(any("merge_cleanup_gate.py" in command for command in commands(codex, "Stop")))
+        self.assertTrue(any("hook_dispatch.py" in command for command in commands(codex, "Stop")))
         self.assertTrue(any("skill_router.py" in command for command in commands(base_claude, "PreToolUse")))
         self.assertFalse(any("skill_router.py" in command for command in commands(claude, "PreToolUse")))
         for event in ("PostToolUse", "PostToolUseFailure", "Stop"):
