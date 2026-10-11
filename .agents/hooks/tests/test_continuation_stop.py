@@ -184,6 +184,20 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.object(continuation_stop, "read_receipt", return_value=self.receipt()):
             self.assertIn("continuation owner", continuation_stop.outcome(payload))
 
+    def test_bounded_side_handoff_blocks_stop_until_the_parent_has_an_owner(self):
+        scratch = Path(self.temp.name) / "side-handoff-receipt"
+        scratch.mkdir()
+        prompt = "Hand off this separate workstream and retain the current goal in this session."
+        payload = json.dumps({"hook_event_name": "UserPromptSubmit", "cwd": str(self.root),
+                              "session_id": self.session, "prompt": prompt})
+        with patch.object(workflow_route.tempfile, "gettempdir", return_value=str(scratch)), \
+             patch.object(sys, "stdin", io.StringIO(payload)), patch.object(sys, "stdout", io.StringIO()):
+            self.assertEqual(0, workflow_route.main())
+            receipt = workflow_route.read_receipt(self.session)
+        self.assertTrue(receipt["execution_obligation"])
+        with patch.object(continuation_stop, "read_receipt", return_value=receipt):
+            self.assertIn("Initialize persistent-workflow", continuation_stop.outcome(self.payload()))
+
     def test_invalid_owner_artifacts_block_unrouted_stop(self):
         path = self.root / ".agents/continuation/owner.json"
         path.parent.mkdir(parents=True)
