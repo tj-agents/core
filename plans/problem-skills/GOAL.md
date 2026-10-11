@@ -84,8 +84,8 @@ originating session's docs checkout or adopt its other workstreams.
 
 ## Next Steps
 
-Freeze the verified authored candidate, synchronize once with origin/main and run independent review.
-Resolve any actionable findings, then push the reviewed head, open the foundation PR and own its exact
+The initial frozen review found one historical-entry compatibility gap; resolve it and review the delta.
+Then push the reviewed head, open the foundation PR and own its exact
 required CI through merge. Observe the causal generated publication on main and record completion here
 so the coordinator can advance the dependent handoff policy. Installed consumer acceptance remains
 separate from the source-contract exercise; this work does not install an orchestration monitor.
@@ -185,3 +185,24 @@ separate from the source-contract exercise; this work does not install an orches
   git diff --check passed. No generated distribution output is included in the authored candidate.
 - Commit/push clerical steps use the L7 tiny-follow-up allowance inline; review uses fresh read-only lenses
   at the canonical review stage, with final judgment and artifact writing retained by this owner.
+
+## Review and remediation
+
+- First candidate: dcbe1a335fbdc7b4cb661a0235858207e9f634c8 against
+  429ad56751720e2cb369c3aa2e25a3b53b801234. One pre-review synchronization observed zero behind.
+- Native Codex review completed without actionable regressions and independently passed all 21
+  source-layout tests, catalog and harness checks. Captured native-review log is in this workflow's
+  Git-private artifacts. Applicable tier gate returned no stack conventions; agent file pairing passed.
+- A fresh bounded workflow lens identified R001: common required fields need a compatible historical-entry
+  rule. Its primary review specialist was unavailable on this account; the declared equivalent fallback
+  ran against the same immutable bundle. Corrected result identities/citations were validated under v2.
+- Canonical work order: reviews/Feature-ProblemSkills.md. Initial judgment changes-requested; R001 is the
+  sole finding. Parent verified it against the frozen record contract and preserved M001-M007 observations.
+- L4 exclusive remediation changes only the shared contract and engineering digest. Existing entry facts
+  remain; common fields are reconciled from evidence when the incident is updated or addressed, with
+  explicit unknowns and an investigation next action. A fresh incremental review must cover that commit.
+- Both-host source coverage check passed at the first frozen head. Installed-host behavior is not claimed.
+
+- Remediation packaging linkage test passed, catalog check reports zero changes and harness check passes all
+  three manifests. The L4 writer released its lease; git diff --check passed. The fixed candidate is ready
+  for a fresh incremental watermark before publication.
