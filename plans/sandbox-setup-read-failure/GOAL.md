@@ -41,35 +41,28 @@ selects the approved isolated runtime. Ordinary sandboxed reads of this goal, th
 `.agents/engineering/workflow/plan-execution/SKILL.md` and the original sibling-checkout text prompt
 all exited 0. Matching refresh records name the isolated fixed helper and report `errors=[]`.
 
-Current phase: L3 approval-review execution recovery; current owner already runs the selected
-investigation lane. The existing P1 repair remains open through successful authorized delivery. Tommy explicitly requested
-finishing and merging this branch on 2026-10-11. Keep the handoff-policy repair deferred and keep its
-entry in `docs/workflows/TECH_DEBT.md`; Tommy withdrew the placement concern. The acceptance evidence
-is complete and archived. No further machine installation or merge permission is needed.
+Current phase: L5 final documentation reconciliation, followed by L4 documentation review and
+L7 delivery. These are bounded follow-ups; no model switch is claimed. Tommy explicitly authorizes
+committing, publishing and merging this branch without further permission. Handoff-policy changes
+and a dedicated bugs/mistakes/debt system remain deferred.
 
-Remaining authorized actions:
+PR: not opened
+Delivery slice: this existing branch, against main, containing only the recovery record and deferred
+workflow debt. No core runtime code changed; the applied runtime/profile/catalog repair is local
+machine state outside Git. Exclude all untracked machine-specific scripts, logs and JSON from the PR.
 
-1. Reopen this existing goal through the repaired ordinary Codex profile, retaining this checkout and
-   branch. This running host still has the old loaded approval-review model catalog. Its scoped
-   `git add` fails automatic review with HTTP 400 for unsupported Responses metadata before the command
-   starts. A captured native child with explicit normal CODEX_HOME also failed before worker startup:
-   app-server initialization returned Access is denied. No new worker or terminal was launched.
-2. Inspect existing staged paths; checkpoint only `docs/workflows/TECH_DEBT.md` and this goal. Exclude
-   untracked machine-specific scripts, logs, catalog and acceptance JSON. Run `git diff --check` and
-   verify the delivery diff against `origin/main...HEAD`, since this checkout predates newer main code.
-3. Complete the docs review under the owning lifecycle, publish this existing branch with plain Git/gh,
-   and merge through `engineering:merge-docs` once its gates pass. Report the actual PR and merge SHA.
-   The machine fix itself is already applied; this PR lands its recovery record and deferred debt.
+The previously failing scoped Git operation now passed in this same conversation. `git add` and
+`git commit` ran through normal automatic approval review with exit 0, producing checkpoint
+`5df3d81` (tool chunk `f3b519`). No approval, sandbox or hook control was changed. The cause of the
+old/fresh-host difference is not established; retained loaded configuration remains a hypothesis.
+The earlier HTTP 400 failures and unsuccessful continuation initialization below are historical.
 
-Current blocker: the old host cannot execute Git writes outside this checkout because its automatic
-reviewer rejects the request payload. Resolver: a fresh normal host using the already verified catalog.
-Observable resume condition: the unchanged scoped Git operation passes its automatic reviewer.
-Do not disable review, weaken the sandbox, or start the deferred standards project to work around this.
-No supported unattended delivery owner is initialized and no merge has occurred for this branch.
-Bounded in-session subagent `recovery_checkpoint` independently confirmed the same approval-review
-HTTP 400 before Git execution. Its whitespace check passed, the staged list was empty, and it made
-no changes. User merge authorization is sufficient; the unresolved gate is host execution, not consent.
-Configurable auto-merge PR #188 is already merged and `origin/main` contains `auto_merge: true`.
+Next actions: checkpoint this updated observed state, synchronize once with main using the installed
+review preparation helper, complete a frozen documentation review, publish with plain Git/gh, then
+merge this documentation-only slice under `engineering:merge-docs` once its gates pass. Remain the
+foreground owner through delivery; initialize supported continuation if a delayed external result
+requires it. Report the actual PR and merge SHA. GitHub confirms configurable auto-merge PR #188
+is already merged and main declares `auto_merge: true`.
 
 ## Approval-review P1 clarification (2026-10-11)
 
@@ -121,11 +114,9 @@ observe the actual wake. Preserve this goal, branch, merge authority and deferre
 
 ## Status and next use
 
-Open P1 execution repair: fresh normal-launch sandbox reads and a benign elevated action passed, but
-this parent and its bounded subagent still receive the reviewer's HTTP 400 before Git execution. No
-Git checkpoint, PR creation or merge has succeeded for this branch. Fresh-host Git delivery must be
-observed before the whole goal can be declared complete. Do not generalize this failure to all hosts
-or GitHub's auto-merge service; their failure has not been established.
+Delivery pending: machine acceptance is verified and the scoped Git checkpoint now succeeds.
+The earlier parent/subagent HTTP 400 execution gate is cleared for the observed Git operation.
+Documentation review, PR publication and merge remain to be completed before the goal is terminal.
 
 Verified phase: new ordinary PowerShell launches select the approved fixed runtime, and native
 sandboxed reads plus the tested scoped elevated action pass. Historical completed phase: the approved isolated runtime
