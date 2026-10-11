@@ -130,13 +130,56 @@ decisions below about compatibility entries are superseded.
   `Fix/RenameAliasRouting`, goal `plans/rename-alias-routing/GOAL.md`, Claude at lane L4. It will message
   this session when merged, so `techdebt` can become an alias if #173 is still open.
 
+## Transfer checkpoint — 2026-10-11
+
+Tommy explicitly requested a Codex handoff to finish and merge this split, then stop for the day.
+Claude predecessor: `9c9d6521-ab19-404a-85b9-56f63635ff4c`, kitty tab `Split docs-and-debt`, window 4.
+Its transcript ended at the monthly usage limit after the PR-check watcher succeeded at 14:20 UTC;
+its visible terminal is idle. Do not resume that Claude writer while the Codex successor owns this goal.
+Ownership transfers to one native Codex successor in this exact worktree. The transferring session
+will make no further deliverable writes after launcher submission.
+
+Observed delivery state: PR https://github.com/tj-agents/core/pull/173 is OPEN, base `main`, head
+`a12811eb4dce4e9383ab2fedcbdd8ba1c6f737d3`; guard, verify-linux and verify-windows all succeeded.
+The worktree is clean. Review watermark is `7a029f73b963c12547bd59d7958673da40f042b5`;
+the following commit records that review. Claude reported 1062 + 1052 tests and all generation checks
+passing. Review and CI evidence must be checked against the actual delivery candidate.
+
+Main has since received PR #204 and generated commit `1406d04c`. It added core-adoption debt,
+self-session host-side execution guidance in peer-cli and a merge pointer, and already removed the
+stale Linux-plan link from CODE_CONVENTIONS.md. Preserve those changes when synchronizing; the separate
+Linux-link docs PR mentioned in the old Next Steps is no longer needed. This does not add automatic
+plugin installation or change close.py runtime behavior.
+
+PR #197 (RenameAliasRouting) remains OPEN. The existing review records its dependency as an accepted
+finding under Tommy's no-stubs decision. Read that disposition and current source before delivery;
+do not silently merge another owner's PR or reintroduce compatibility stubs.
+
+Handoff lane: L4 — the split design is settled; remaining work includes ordinary integration/review
+judgment and validated delivery. Native Codex profile now has base, engineering and machine installed,
+with 13 hooks enabled/trusted and this predecessor registered. Fresh successor registration still needs
+observation; launcher submission alone does not prove it.
+
 ## Next Steps
 
-Scope: whole goal through merge and cleanup.
-Current slice: validate the rebuilt branch, review it, force-push, retarget #173 to `main`, then merge
-through `engineering:merge` and finish Step 5 cleanup of this worktree.
-After the merge, fix the dangling `plans/linux-port/LINUX_PORT_PLAN.md` link in `main`'s `CODE_CONVENTIONS.md`
-(the closed Linux-port goal deleted it; `docs_reachability.py` fails on it) in its own docs PR.
-Done when: the split is merged to `main` and this worktree is cleaned up.
+Scope: finish this existing goal through PR #173 merge and linked-worktree cleanup; do not take on
+core installation automation, marketplace naming, or unrelated workstreams.
 
-Continue at Completion expectation step 4 on the rebuilt branch.
+1. Acknowledge Codex pickup in this goal with your native session identity before deliverable changes.
+   Inspect the clean branch, PR #173, canonical review and current base. Read the applicable repository
+   and merge/review instructions. Preserve Tommy's final decision: `engineering:docs`,
+   `engineering:write-debt`, `engineering:address-debt`, and no docs-and-debt/techdebt stubs.
+2. Follow the merge workflow's synchronization and review policy for the newer main changes. Preserve
+   PR #204's guidance/debt and migrate any newly introduced references to the split owners if required.
+   Complete any necessary focused validation and incremental review, commit/push coherently, and prove
+   the exact PR head is the intended candidate. Keep generated plugins uncommitted.
+3. When the actual candidate's gates pass, merge PR #173 through the authorized repository merge path.
+   Tommy has explicitly authorized merge; do not stop to ask again. If a real delivery gate cannot be
+   resolved within this scope, record its concrete resolver/resume condition and report it honestly.
+4. Confirm the merge and generated package publication, then finish Step 5 cleanup for this linked
+   worktree using the supported host-side path when process namespaces hide the native CLI. Retain
+   PID/start-time and exact terminal identity checks. Remove the canonical review only after merge.
+   Report the merged PR and cleanup outcome. Do not initiate unrelated work or broad machine shutdown.
+
+Done when: PR #173 is merged to main and this delivery worktree/session cleanup is verified, or a
+concrete unresolved delivery gate is recorded with the exact resumption condition.
