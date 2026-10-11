@@ -34,44 +34,271 @@ installation/use of the isolated candidate or routine in-scope source edits. No 
 
 ## Next Steps
 
-Renewed 2026-10-11 by Tommy: fix the read blocker first and hand it off. Coordinator
-01a12b10-3519-7f41-8e4f-7afa6828fef0 verified the prior repair sessions are no longer live and is preparing
-one successor in this same checkout. No continuation owner.json exists here. This coordinator owns only
-dispatch preparation until submission; the acknowledged successor becomes the sole repair writer.
+Pickup acknowledged on 2026-10-11 by session `01a12b23-e6a0-7c53-b069-3b2267bd12d1`,
+through `normal-launch-recovery-handoff.txt`, from this exact checkout and branch. This session is the
+sole repair writer. `CODEX_VERSION` and `codex --version` both report `0.163.0-alpha.1`; command lookup
+selects the approved isolated runtime. Ordinary sandboxed reads of this goal, the canonical
+`.agents/engineering/workflow/plan-execution/SKILL.md` and the original sibling-checkout text prompt
+all exited 0. Matching refresh records name the isolated fixed helper and report `errors=[]`.
 
-1. Record pickup with the new session identity and actual runtime version. Run an ordinary sandboxed
-   command immediately to establish whether the selected fixed runtime still works; read this goal and
-   the original skill/text paths. No repeated archive investigation unless integrity evidence changed.
-2. Resolve the ordinary launch path and explain why it still selects a broken runtime. Compare actual
-   executable/version and invocation settings with the successful fixed path recorded below. The parent
-   reproduced `helper_unknown_error: setup refresh had errors` today before PowerShell started.
-3. Repair the causal owned selection/recovery gap or prepare the exact required machine-change gate.
-   Preserve any partial work in the existing preflight-recovery checkout and avoid duplicate ownership.
-4. Validate through a normal fresh native worker using the intended ordinary entry point, not merely a
-   direct executable probe or an elevated read. Record selection evidence plus skill/text command exits.
-5. Complete any causal source change through focused tests, review and authorized delivery; retain a clear
-   adoption result. Do not stop merely because one isolated verification succeeded. Do not create unrelated
-   repair tabs; record independent findings against their existing owner for later orchestration.
+Current phase: L3 approval-review execution recovery; current owner already runs the selected
+investigation lane. The existing P1 repair remains open through successful authorized delivery. Tommy explicitly requested
+finishing and merging this branch on 2026-10-11. Keep the handoff-policy repair deferred and keep its
+entry in `docs/workflows/TECH_DEBT.md`; Tommy withdrew the placement concern. The acceptance evidence
+is complete and archived. No further machine installation or merge permission is needed.
 
-Lane: L3, because runtime selection/adoption and the smallest causal repair still require investigation.
-Use the installed lane table; route later implementation/review to the appropriate lane. Tommy prefers
-fast mode if the supported launcher can express it, but explicitly said not to delay this repair for it.
-The currently inspected launcher has no fast option; this dispatch does not claim fast mode.
+Remaining authorized actions:
 
-Done when: supported ordinary launches select a verified working runtime, fresh ordinary sandboxed reads
-of a goal, skill and text prompt pass, and the recovered worker proceeds. Any installation, loaded-session
-restart or adoption gap must retain an owner and concrete next action rather than being reported done.
+1. Reopen this existing goal through the repaired ordinary Codex profile, retaining this checkout and
+   branch. This running host still has the old loaded approval-review model catalog. Its scoped
+   `git add` fails automatic review with HTTP 400 for unsupported Responses metadata before the command
+   starts. A captured native child with explicit normal CODEX_HOME also failed before worker startup:
+   app-server initialization returned Access is denied. No new worker or terminal was launched.
+2. Inspect existing staged paths; checkpoint only `docs/workflows/TECH_DEBT.md` and this goal. Exclude
+   untracked machine-specific scripts, logs, catalog and acceptance JSON. Run `git diff --check` and
+   verify the delivery diff against `origin/main...HEAD`, since this checkout predates newer main code.
+3. Complete the docs review under the owning lifecycle, publish this existing branch with plain Git/gh,
+   and merge through `engineering:merge-docs` once its gates pass. Report the actual PR and merge SHA.
+   The machine fix itself is already applied; this PR lands its recovery record and deferred debt.
+
+Current blocker: the old host cannot execute Git writes outside this checkout because its automatic
+reviewer rejects the request payload. Resolver: a fresh normal host using the already verified catalog.
+Observable resume condition: the unchanged scoped Git operation passes its automatic reviewer.
+Do not disable review, weaken the sandbox, or start the deferred standards project to work around this.
+No supported unattended delivery owner is initialized and no merge has occurred for this branch.
+Bounded in-session subagent `recovery_checkpoint` independently confirmed the same approval-review
+HTTP 400 before Git execution. Its whitespace check passed, the staged list was empty, and it made
+no changes. User merge authorization is sufficient; the unresolved gate is host execution, not consent.
+Configurable auto-merge PR #188 is already merged and `origin/main` contains `auto_merge: true`.
+
+## Approval-review P1 clarification (2026-10-11)
+
+The observed failure is the automatic review API rejecting
+`input[1].internal_chat_message_metadata_passthrough.content_item_metadata`. Review fails before the
+requested escalated process starts; Git therefore cannot write the external linked-worktree index.
+The initial recovery catalog changed only the investigation model's Responses compatibility, while
+the later normal-launch catalog covers the reviewer and other selected models. Fresh launch evidence
+shows that a benign elevated action passed. It does not establish successful Git delivery or recovery
+of this already-running host. A retained loaded configuration is a plausible explanation for the
+host difference; a universal merge failure or CI-waiter defect is not established.
+
+Retain the existing goal and merge authority. The next acceptance observation is the unchanged scoped
+Git checkpoint in a supported fresh normal host, followed by the authorized review, PR and merge.
+Record actual approval and process results; do not substitute normal sandbox reads or bookkeeping for
+that end-to-end delivery observation. No control bypass or separate standards project is authorized.
+
+## Incident documentation (2026-10-11)
+
+Tommy requested documenting the observed issues now, while deferring a dedicated bugs/mistakes/debt
+Markdown system. Existing `docs/workflows/TECH_DEBT.md` now records unnecessary same-goal handoff,
+missing continuation ownership, authorization/execution confusion, and ambiguous machine-versus-PR
+completion reports. Each entry distinguishes observed failures from untested CI-waiter behavior and
+states an objective resolution condition. The upstream sandbox runtime defect retains its existing
+machine debt owner; exact repair and approval-review failure evidence remain in this goal.
+
+Documentation phase: L5 tiny inline reconciliation; no new host, standards repair, recording system,
+PR or scheduler is started. User authority remains intact and the existing execution gate is unchanged.
+
+## Continuation recovery attempt (2026-10-11)
+
+The earlier terminal report left delivery without an initialized continuation owner. This is recorded
+in `docs/workflows/TECH_DEBT.md` as "Blocked delivery was returned without a continuation owner".
+The installed Codex `persistent-workflow` adapter and its shared `persistent-delivery` contract were
+loaded. There is no PR or CI run to bind yet; the runtime supports initialization before a PR exists.
+
+Actual installed `continuation_runtime.py init`, targeting this same canonical goal and the existing
+commit/review/publish/merge authorization, returned exit 1: Permission denied writing the canonical
+`.agents/continuation/owner.lock`. A normal scoped escalation then failed automatic approval review
+before process launch with the same unsupported Responses metadata HTTP 400. No owner was initialized,
+so foreground claim and scheduler registration were not attempted. No background waiter is running;
+CI-waiter runtime behavior has not been tested or declared broken.
+
+Blocked action: initialize and claim this goal's supported continuation, register its normal Windows
+scheduler adapter with the verified fixed native executable, and observe a wake before yielding.
+Resolver: a fresh normal host whose automatic reviewer can authorize the unchanged canonical state
+write. Resume condition: successful initialization and foreground claim; then register, yield and
+observe the actual wake. Preserve this goal, branch, merge authority and deferred standards scope.
 
 ## Status and next use
 
-Active again for normal-launch recovery. Historical completed phase: the approved isolated runtime
+Open P1 execution repair: fresh normal-launch sandbox reads and a benign elevated action passed, but
+this parent and its bounded subagent still receive the reviewer's HTTP 400 before Git execution. No
+Git checkpoint, PR creation or merge has succeeded for this branch. Fresh-host Git delivery must be
+observed before the whole goal can be declared complete. Do not generalize this failure to all hosts
+or GitHub's auto-merge service; their failure has not been established.
+
+Verified phase: new ordinary PowerShell launches select the approved fixed runtime, and native
+sandboxed reads plus the tested scoped elevated action pass. Historical completed phase: the approved isolated runtime
 installation and fixed-runtime successor verification passed on 2026-10-11. Both original file reads
 exited 0 and matching setup refreshes completed with errors=[].
 
-Existing sessions still use their original runtime. Reopen with the installed executable and invocation-local compatibility catalog shown below to use the repair. Global npm/PATH selection was not changed.
+Already running hosts keep their original executable. New PowerShell sessions use the repaired normal
+profile and global catalog setting without invocation-specific runtime or catalog overrides. The
+dependent-cleanup owner retains its separate goal and uses this ordinary entry point for its next
+reopen; this repair does not kill or adopt that session. Registry PATH and the npm installation remain
+unchanged. Profile selection now puts the approved side-by-side binary first in new PowerShell sessions.
 
 The historical evidence below describes that earlier bounded verification. Its completion statements do
 not supersede the renewed Outcome, Scope and Next Steps above.
+
+## Prepared normal-launch activation (2026-10-11)
+
+The change below is now approved and applied. Task-local preview exited 0 after validating every
+original hash, preserving all other TOML settings and preparing ten catalog entries. Scoped normal
+escalation then ran `activate_normal_launch.py --home C:/Users/TommySeery --apply` with exit 0.
+The exact backup is
+`C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/repair-evidence/normal-launch-activation-20261011T135434290168Z`.
+Config still declares `approval_policy="on-request"`, `approvals_reviewer="auto_review"` and
+`sandbox_mode="workspace-write"`. No review, sandbox or hook control was disabled. The new normal
+catalog exists; the old invocation catalog remains intact. Fresh native validation is active.
+`launch_normal_validation.ps1` ran in a new profile-loaded Windows PowerShell process after removing
+the inherited fixed-runtime PATH entry. It verified the normal profile and application lookup select
+the approved fixed executable. The installed packaged launcher completed its normal preflight and
+exited 0, submitting exactly one native verifier on L3. Submission output is
+`normal-launch-submission.log`; it is launch evidence, not acceptance yet.
+
+Verification phase: L3, because fresh normal-profile selection and native approval-review acceptance
+still require actual observation. One verifier may write only `normal-launch-verification.json`; this
+parent remains sole repair/goal writer. The task-local launcher first strips inherited fixed-runtime
+PATH selection, loads a real new PowerShell profile and verifies the normal terminal adapter, then
+invokes the installed packaged handoff launcher once. No second tab is permitted after submission.
+
+The installed machine 2.1.16 `resources/machine/scripts/agent_cli.py` discovers native PATH entries,
+npm payloads beside the PATH shim and Windows desktop caches. It does not scan the isolated runtime
+directory. Its current resolver selects the fixed runtime because this successor's invocation PATH
+already includes its `bin` directory. Today's ordinary-launch setup records at 14:23:39, 14:23:45 and
+14:24:05 local instead name the npm helper below `AppData/Local/nvm/v20.19.5`. That package is not
+readable from this sandbox, so its version was not freshly re-probed; historical 0.162.0 evidence is
+preserved above. No new causal core source defect is established. The independent preflight-recovery
+goal and existing runtime-health debt retain their source ownership.
+
+The saved global model and automatic approval reviewer both have `use_responses_lite=true` in the
+installed invocation catalog; only the investigation model and one older model have it false. Automatic
+approval review reproduced HTTP 400 for `internal_chat_message_metadata_passthrough.content_item_metadata`.
+Turning off unsupported Responses metadata must cover the reviewer as well as normal model selection;
+automatic review itself remains enabled. Compatibility for those additional models is proposed, not yet
+verified. The tool reported an approval-review failure on acknowledgement edits, but a subsequent Git
+diff independently proves the edits were written; neither successful approval nor a rollback is claimed.
+
+Exact activation, subject to Tommy's approval:
+
+1. Preserve byte-for-byte backups of both profiles and `.codex/config.toml`. Recheck their hashes below;
+   if another owner changes them, reconcile the delta before applying anything.
+2. Immediately before the existing base-agents Codex launcher block at line 157 in both
+   `C:/Users/TommySeery/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` and
+   `C:/Users/TommySeery/Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1`, insert:
+
+   ```powershell
+   $env:Path = 'C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/bin;' + $env:Path
+   ```
+
+   This affects new PowerShell process environments and preserves the installed normal launcher.
+   The registry PATH and existing processes are not edited. Profile inspection found no existing
+   assignment to `$env:Path` in either file.
+3. Create `C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/normal-launch-models.json`
+   from the existing `responses-compatible-models.json`: preserve every field and model entry, changing
+   only each entry's `use_responses_lite` to `false`. Write UTF-8 JSON. Do not overwrite an unexpected
+   existing target. The previously approved invocation catalog remains intact.
+4. Add this top-level setting to `C:/Users/TommySeery/.codex/config.toml`, before any TOML table:
+
+   ```toml
+   model_catalog_json = "C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/normal-launch-models.json"
+   ```
+
+   Preserve the chosen model, effort, approval reviewer, sandbox and all other settings.
+5. In one new PowerShell session with its normal profile, verify application lookup and the installed
+   resolver both select the fixed native runtime. Launch one native worker through the packaged normal
+   handoff launcher with its real plugin-refresh and hook-trust preflight. The verifier owns no repair
+   writes. Observe its actual default-sandbox command exits for this goal, the canonical skill and the
+   original text prompt, plus matching fixed-helper `errors=[]` records. It must also complete a benign
+   review-requiring action under `auto_review` in a disposable directory; shell reads alone do not prove
+   this additional compatibility repair. Verify the configured default model can start as well.
+6. After success, record normal adoption and the worker's next action here. On failure, restore the
+   exact profile/config backups and remove only the newly created catalog, retaining the evidence.
+   Keep the repair open with the actual next action; never disable or bypass review, sandbox or trust.
+
+Pre-change SHA-256 snapshots:
+
+| File | SHA-256 |
+|---|---|
+| PowerShell profile | `9db2eff35f03bdbe6c3cc965797379a7d82a2f45db31fdc2821b61ed7663e40e` |
+| WindowsPowerShell profile | `f787b9561618515dc6b94e2bf9afb893ce6856e47c592bdc45e0bb897f724130` |
+| Codex config | `bb9685fe9fdc002e5dab711823e9f4a8b242c3cd86d518ece508922e3064368c` |
+| Existing invocation catalog | `c155e273fe97a8cd2fa24bac75482a264fdab658d7061d770aeebdaf2a114620` |
+
+Approved action: activate default fixed-runtime selection and broaden model/reviewer compatibility.
+Execution gate resolved: machine writes passed normal scoped escalation. The fresh native automatic
+review action also exited 0 with the unchanged reviewer. Earlier HTTP 400 and permission errors remain
+historical evidence; no permission or review bypass was used.
+
+Read-only peer inspection found this successor and the renewed dependent-cleanup worker live, with all
+prior sandbox-repair and preflight-recovery sessions stopped. Three shared node runtime processes remain
+active. No peer was stopped by this repair. The preflight-recovery checkout is preserved and clean.
+No repository runtime code changed; source tests and a code PR would not establish machine adoption.
+
+## Normal-launch completion (2026-10-11)
+
+Native verifier `01a12b41-5760-76e0-b2aa-9245ecfaf273`, launched once through the packaged normal
+launcher after a fresh PowerShell profile, reports `0.163.0-alpha.1`. All required ordinary sandboxed
+reads exited 0: this goal (chunk `ca794e`), the canonical plan-execution skill (chunk `8fc1ec`) and the
+original dependent-cleanup text prompt (chunk `21d520`). Its benign scoped elevated read passed the
+automatic reviewer with exit 0 (chunk `67f503`), with `approval_policy=on-request`,
+`approvals_reviewer=auto_review` and `sandbox_mode=workspace-write` unchanged.
+
+The matching setup interval is 2026-10-11T13:58:15.179Z through 13:58:20.297Z. Helper records name the
+approved isolated `codex-windows-sandbox-setup.exe`; refresh results contain `errors=[]`. Concurrent
+commands share the log window, so their individual tool exits establish each read result. Four shared
+node runtime processes remained active across the verifier's two observations; it issued no process
+control action. Its recorded evidence has `verified=true` and `failures=[]`.
+
+A separate normal-profile configured-default-model probe started native thread
+`01a12b43-3ab9-72f0-ae40-1121482bd56e`, returned exactly `DEFAULT_MODEL_READY` and exited 0. No model,
+catalog, approval or sandbox override was passed to that probe. The investigation model, configured
+default model and automatic reviewer are actually verified; availability of every other model is not
+claimed merely because the catalog has ten entries.
+
+Persistent acceptance evidence and task-local tooling are archived at
+`C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/repair-evidence/normal-launch-adoption-20261011T135434Z`.
+That directory owns `normal-launch-verification.json`, `normal-launch-submission.log`,
+`default-model-probe.log` and `default-model-response.txt`. Machine-specific state stays outside Git.
+The separate activation backup above supplies exact rollback bytes. Do not rerun the original
+activation script on changed files; its hashes intentionally fail after activation.
+
+GitHub directly confirms PR #188 is merged at `8a2c87945c3665ba68ca012e1d045e42a22db1ec`; the remote
+default declaration enables `auto_merge: true` under green required checks and independent review.
+This older evidence checkout lacks the new declaration field. No source repair PR was created for
+machine activation, and no further merge permission was requested after Tommy's instruction.
+
+Acceptance review: reconcile the independent native evidence, normal-launch log, default-model probe,
+preserved settings and actual approved machine edits. All renewed acceptance criteria pass. The
+pre-existing core preflight-recovery goal and runtime-health debt retain their own resolution
+conditions; their broader source work was neither duplicated nor claimed complete here.
+
+Terminal cleanup observation: the completed verifier's canonical peer close refused
+`Windows Terminal target is absent or ambiguous`. Actual-tab inventory returned only registry rows
+with `actual=false`, including both this parent and that verifier. No process was killed to bypass the
+refusal. Terminal cleanup requires the machine host to expose a uniquely matched actual attachment;
+its observable resume condition is a verified actual tab for the recorded session. The recovery
+acceptance and evidence are complete independently of this terminal-UI limitation. This checkout is
+retained as the durable goal owner; no worktree cleanup or deletion is authorized by the machine fix.
+
+Checkpoint observation: this already-running parent's automatic reviewer still rejects unsupported
+Responses metadata. The fresh normal-launch reviewer passed; existing hosts retain their original
+loaded model catalog until reopening. The exact two-file Git checkpoint was not executed: automatic approval review rejected its payload
+before process launch. A captured normal PowerShell child was prevented by this sandbox's script
+execution policy; a captured native child could not resolve its home under the sandbox identity.
+Neither child started a worker or changed approval controls. These local checkpoint attempts do not
+invalidate the successful fresh normal-host acceptance. Resolver: reopen through the repaired ordinary
+profile; resume condition: that host's automatic reviewer accepts the unchanged two-file checkpoint.
+No further task or independent terminal is launched under Tommy's explicit scope restriction.
+
+## Deferred handoff mistake (2026-10-11)
+
+Tommy explicitly limited this session to completing the blocking sandbox repair and recording the
+unnecessary verifier handoff as debt. No standards repair, successor or MISTAKES.md system is started.
+The owning entry is `docs/workflows/TECH_DEBT.md`, under "Same-goal verification was launched as a
+handoff". It records the captured-child/subagent alternative and an objective resolution condition.
+Phase: L5 small documentation reconciliation, followed by L7 local checkpoint; tiny inline follow-ups.
 
 ## Cause and owner
 
