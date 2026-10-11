@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `74b0305dd6afd42e24d661b0ebb4c948dd5da542`  `(2026-10-09)`
+**Reviewed up to commit:** `35ef630c3dc94c34cf5f04b2b8b59a80824363e8`  `(2026-10-09)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-09 — code
@@ -315,3 +315,42 @@ Native layer: Claude Code built-in `code-review` skill (low) over the fix commit
 ### Findings
 
 None.
+
+## Review pass — 2026-10-11 — full (rebuilt on `main`, no stubs)
+
+The branch was unstacked from #168 and rebuilt on `main` as two commits; earlier passes reviewed the stacked
+history kept on `backup/SplitDocsAndDebt-stacked`.
+
+**Candidate base:** `38550a7258b6819df139300ae340088babc6098f`
+**Candidate head:** `35ef630c3dc94c34cf5f04b2b8b59a80824363e8`
+**Candidate branch:** `Refactor/SplitDocsAndDebt`
+**Candidate scope:** `all`
+**Work-order path:** `reviews/Refactor-SplitDocsAndDebt.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Claude Code built-in `code-review` skill, medium over the rebuild commit and low over the
+stub-removal commit. Tommy then decided: keep the `docs` name, and no stubs.
+
+Dropped at synthesis: bundling the two debt entries (they record problems this work found, in their owning
+files).
+
+### Findings
+
+- [x] **RB1 — MEDIUM — test-impact** — `.agents/hooks/tests/test_process_standards.py`
+  The routing-entry test was lost in the rebuild. Fix: moot — Tommy removed both stubs, so there is no
+  routing entry to test.
+- [wontfix] **RB2 — LOW — naming** — `.agents/engineering/convention/docs/SKILL.md`
+  `docs` matches `anthropic-skills:docs`, which `engineering:skill-authoring` says to avoid. Reason: Tommy
+  chose to keep `docs`; every reference here is the qualified `engineering:docs`.
+- [x] **RB3 — LOW — correctness** — `.agents/engineering/TECH_DEBT.md`
+  The `techdebt` removal steps missed the hyphen near-miss test fixture. Fix: moot — the stub and its debt
+  entry are gone, and the fixture now uses `address-debt`.
+- [x] **RB4 — LOW — convention** — compatibility entry bodies and host entry points
+  Stubs named replacements without links and their host entries claimed a procedure. Fix: moot — stubs
+  removed.
+- [wontfix] **RB5 — LOW — correctness** — `.agents/plugins/compatibility.json`
+  `techdebt` aliases to a different bare name, which the router cannot prove until #197
+  (`Fix/RenameAliasRouting`) lands, so a consumer route naming `techdebt` fails until then. Reason: Tommy
+  ruled out stubs; #197 is open and fixes the router, and no route table in this repository names
+  `techdebt`.
