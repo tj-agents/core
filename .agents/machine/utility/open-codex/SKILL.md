@@ -18,6 +18,12 @@ Run the helper with `python` on Windows or `python3` on Linux/macOS:
 python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' open --host codex --id '<native-id>' --codex-history-root '<selected-profile>/sessions' --prompt 'Continue the requested work.'
 ```
 
+For task recovery, replace the default `--prompt` with:
+
+```sh
+--prompt 'Observed follow-up blocker: <actual result>. Acknowledge or release your existing source ownership, reconcile any child writer, and report coordination status before conflicting source writes.'
+```
+
 If status is unknown, reconcile it first. `--confirm-closed` is an explicit acknowledgement that no live writer
 exists, not evidence that the source owner released its work. A verified live session cannot be resumed. For
 task recovery, state the actual coordination blocker and ask the exact owner to acknowledge or release its work
