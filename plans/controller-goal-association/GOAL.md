@@ -103,3 +103,15 @@ Transfer: required
 Receipt: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ControllerGoalAssociation/.agents/continuation/controller-association-transfer.json
 
 Readiness authorizes this source boundary, including the mandatory existing-manifest declaration and inventory test. It does not claim implementation, installed-profile activation or native acceptance.
+
+## Current checkpoint
+
+Status: implementation is locally in progress; focused continuation discovery completed after correcting the unittest discovery invocation.
+
+Blocked action: synchronize `.agents/catalog/catalog.json` and generated plugin output after the required engineering harness permission declaration.
+
+Blocked by: the Goal's seven-source-path limit excludes the catalog, and the execution policy rejected the catalog write as an unauthorized scope expansion.
+
+Unblock action: explicitly authorize updating `.agents/catalog/catalog.json` as the required companion to the changed shipped harness manifest.
+
+Resume when: the catalog synchronization is authorized, then rerun generation, manifest validation, and the focused test suite.
