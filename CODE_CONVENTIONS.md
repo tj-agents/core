@@ -31,9 +31,8 @@ incomplete.
   shipped behaviour. The one exception is behaviour that exists only on Windows, such as Windows
   Terminal UI Automation. Run it through Windows' built-in `powershell.exe`, called from a Python entry
   point that has its own Linux path.
-- Existing shipped PowerShell scripts are being ported; see
-  [`plans/linux-port/LINUX_PORT_PLAN.md`](plans/linux-port/LINUX_PORT_PLAN.md). Do not add behaviour
-  to one. Port it, or add the behaviour to its Python replacement. Until a skill is ported, its SKILL.md
+- Do not add behaviour to an existing shipped PowerShell script. Port it, or add the behaviour to its
+  Python replacement. Until a skill is ported, its SKILL.md
   states that it is Windows-only, and its Windows commands are not presented as universal.
 - Skill and workflow instructions name the interpreter per platform: `python3` on Linux and macOS,
   `python` on Windows, where `python3` is usually the Microsoft Store alias stub. Never tell an agent
