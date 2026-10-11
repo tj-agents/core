@@ -293,6 +293,63 @@ class CompactRunTests(RepositoryFixture):
                 ops.run_root(self.root, "run-1")
 
 
+class DeliveryBindContextTests(RepositoryFixture):
+    def test_context_uses_one_git_invocation_for_a_linked_worktree_with_spaces_and_non_ascii(self):
+        linked = self.root.parent / "linked worktree café"
+        subprocess.run(
+            ["git", "-C", str(self.root), "worktree", "add", "-q", "-b", "Feature/linked", str(linked)],
+            check=True,
+        )
+        original = ops.run_process
+        calls = []
+
+        def run(arguments, root, **kwargs):
+            if arguments[0] == "git":
+                calls.append(arguments)
+            return original(arguments, root, **kwargs)
+
+        with mock.patch.object(ops, "run_process", side_effect=run):
+            context = ops._delivery_bind_context(linked)
+
+        self.assertEqual(linked.resolve(), context.root)
+        self.assertEqual(
+            Path(self.git("rev-parse", "--path-format=absolute", "--git-common-dir")).resolve(),
+            context.common_git_directory,
+        )
+        self.assertEqual(
+            [["git", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"]],
+            calls,
+        )
+
+    def test_context_rejects_malformed_or_nonabsolute_git_records(self):
+        for output in ("only-one\n", "relative\nrelative-common\n", "one\ntwo\nthree\n"):
+            with self.subTest(output=output), mock.patch.object(
+                ops, "run_process", return_value=subprocess.CompletedProcess([], 0, output, "")
+            ):
+                with self.assertRaisesRegex(ops.WorkflowOperationError, "delivery binding repository context"):
+                    ops._delivery_bind_context(self.root)
+
+    def test_context_cannot_redirect_another_checkout(self):
+        context = ops._delivery_bind_context(self.root)
+        other = self.root.parent / "other"
+        other.mkdir()
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "does not match"):
+            ops.run_root(other, "run-1", context)
+
+    def test_context_revalidates_containment_before_telemetry(self):
+        context = ops._delivery_bind_context(self.root)
+        ops.run_root(self.root, "run-1", context)
+        state = ops.state_root(self.root, context)
+        original_redirect = ops.is_redirect
+        with mock.patch.object(
+            ops,
+            "is_redirect",
+            side_effect=lambda path: Path(path) == state or original_redirect(path),
+        ):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "redirected"):
+                ops.append_event(self.root, "run-1", {"kind": "operation"}, context)
+
+
 class InspectionAndSkillTests(RepositoryFixture):
     def test_inspection_consolidates_repository_identity(self):
         result = ops.inspect_repository(self.root, "run-1")

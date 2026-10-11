@@ -155,6 +155,11 @@
       "destination": "workflows"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/workflows/delivery_policy.py",
+      "destination": "resources/machine/scripts/delivery_policy.py"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
       "destination": "workflows/host_coverage.py"

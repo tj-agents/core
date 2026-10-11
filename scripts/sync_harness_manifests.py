@@ -80,18 +80,24 @@ def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requ
     if requires["hooks"] != expected_hooks(root, config, plugin):
         raise ValueError(f"{plugin}: declared hooks disagree with both host manifests")
     permissions = requires["permissions"]
-    if set(permissions) != {"claude_allow", "codex_prefix_rules"}:
+    if set(permissions) not in ({"claude_allow", "codex_prefix_rules"}, {"claude_allow", "codex_prefix_rules", "auto_merge"}):
         raise ValueError(f"{plugin}: invalid permissions declaration")
-    if len(permissions["claude_allow"]) != len(set(permissions["claude_allow"])):
-        raise ValueError(f"{plugin}: duplicate Claude permission")
-    for command in permissions["claude_allow"]:
-        if re.match(r"^PowerShell\(&\s+\*\\", command, re.IGNORECASE):
-            raise ValueError(f"{plugin}: wildcard script path in Claude permission: {command}")
-    for rule in permissions["codex_prefix_rules"]:
-        if set(rule) != {"pattern", "justification", "match", "not_match"}:
-            raise ValueError(f"{plugin}: invalid Codex prefix rule")
-        if not all(rule.get(field) for field in ("pattern", "justification", "match", "not_match")):
-            raise ValueError(f"{plugin}: Codex prefix rules require pattern, justification and examples")
+    scopes = [permissions]
+    if "auto_merge" in permissions:
+        if not isinstance(permissions["auto_merge"], dict) or set(permissions["auto_merge"]) != {"claude_allow", "codex_prefix_rules"}:
+            raise ValueError(f"{plugin}: invalid auto-merge permissions declaration")
+        scopes.append(permissions["auto_merge"])
+    for scope in scopes:
+        if len(scope["claude_allow"]) != len(set(scope["claude_allow"])):
+            raise ValueError(f"{plugin}: duplicate Claude permission")
+        for command in scope["claude_allow"]:
+            if re.match(r"^PowerShell\(&\s+\*\\", command, re.IGNORECASE):
+                raise ValueError(f"{plugin}: wildcard script path in Claude permission: {command}")
+        for rule in scope["codex_prefix_rules"]:
+            if set(rule) != {"pattern", "justification", "match", "not_match"}:
+                raise ValueError(f"{plugin}: invalid Codex prefix rule")
+            if not all(rule.get(field) for field in ("pattern", "justification", "match", "not_match")):
+                raise ValueError(f"{plugin}: Codex prefix rules require pattern, justification and examples")
 
 
 def synchronize(root: Path, check: bool) -> dict[str, dict]:
