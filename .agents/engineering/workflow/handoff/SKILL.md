@@ -28,6 +28,39 @@ does not require repetitive permission. Prompt-only requests remain prompt-only.
 unavailable or fails, preserve the side-workstream task and report that fact honestly while the original
 session continues its independent active task.
 
+## Admit work before dispatch
+
+Resolve an existing canonical repair owner, exact native session, goal, worktree, and launch attempt
+before a new handoff. Reuse an in-flight owner. Reopen a verified closed context through its supported
+open skill. An unknown identity, ambiguous launch, or pending attempt keeps the existing reservation for
+reconciliation and never permits a second writer.
+
+Check authority, supported capabilities, concrete dependency evidence, conflicting owners and paths, and
+the goal's explicitly declared local writer budget before ranking work. Do not infer capacity from a
+machine-wide process count. Rank only eligible independent work by P0 through P3, then authorized work
+unblocked, then age. A dependency is reconsidered on a supported foreground action or existing supported
+continuation after its observed fingerprint changes; no record or skill creates a scheduler or dispatches
+work by itself.
+
+When work cannot run, use `engineering:write-bug`, `engineering:write-mistake`, or
+`engineering:write-debt` to update its canonical record. A deferred or existing-owner disposition releases
+only the current callout response when a current-turn successful
+`scripts/admission.py check` has revalidated its unique
+`agent-handoff-disposition` fence. The selected entry records its stable identifier, state, current
+session/callout/prompt digest, source owner, repair goal authority and backlink, concrete reason, resolver,
+resume condition, next action, and observed evidence. A deferred entry also records
+`blocked_by` as `capability`, `dependency`, `conflict`, or `capacity`; an existing owner records its
+exact native identity, worktree, goal, process identity, and lease evidence. Missing, stale, unrelated, or
+hash-only evidence leaves the original obligation pending.
+
+```agent-handoff-disposition
+{"schema_version":1,"record_id":"B014","kind":"bug","state":"deferred","callout":{"session_id":"<session>","callout_id":"<nonce>","prompt_sha256":"<digest>"},"source_owner":"engineering/handoff","repair_goal":"<absolute-goal>","disposition":"deferred","reason":"<concrete-obstacle>","blocked_by":"capability","resolver":"<owner>","resume_condition":"<observable-condition>","next_action":"<action>","evidence":{"kind":"read-failure","path":"<absolute-observation>","sha256":"<sha256>","target":"<unreadable-target>","operation":"read","error":"<observed-error>"}}
+```
+
+Run `python <skill-directory>/scripts/admission.py check --record <absolute-register> --id B014
+--session <session> --prompt-sha256 <digest> --callout-id <nonce>` in the current turn. The successful
+result is a locator only; the gate rereads the selected entry and its evidence before releasing that turn.
+
 ## Full context transfer
 
 1. Resolve the current goal and its owning review under `engineering:git-branching`, then its worktree
