@@ -29,6 +29,8 @@ class HandoffAdmissionTests(unittest.TestCase):
         self.record_id = "B014"
         self.goal.write_text(
             ("# Repair\\n\\n## Authorization\\n\\nstandards-defect repair\\n\\n"
+            "Source owner: engineering/handoff\\n"
+            f"Required read capability: {self.target}\\n"
             f"Problem record: {self.record}#{self.record_id}\\n").replace("\\n", "\n"),
             encoding="utf-8",
         )
@@ -110,6 +112,70 @@ class HandoffAdmissionTests(unittest.TestCase):
         self.target.write_text("available", encoding="utf-8")
         self.assertFalse(self.check()["valid"])
 
+    def test_evidence_requires_declared_prerequisite_source_owner_and_authorization(self):
+        self.write_record(self.disposition())
+        self.assertTrue(self.check()["valid"])
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace(str(self.target), str(self.base / "unrelated")),
+            encoding="utf-8",
+        )
+        self.assertFalse(self.check()["valid"])
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace(str(self.base / "unrelated"), str(self.target)),
+            encoding="utf-8",
+        )
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace("engineering/handoff", "engineering/other"),
+            encoding="utf-8",
+        )
+        self.assertFalse(self.check()["valid"])
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace("engineering/other", "engineering/handoff"),
+            encoding="utf-8",
+        )
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace(
+                "standards-defect repair", "review product code"
+            ) + "\n## History\n\nstandards-defect repair\n",
+            encoding="utf-8",
+        )
+        self.assertFalse(self.check()["valid"])
+
+    def test_declared_executable_and_dependency_prerequisites_admit_current_evidence(self):
+        executable = "missing-handoff-executable"
+        value = self.disposition()
+        value["evidence"] = {
+            "kind": "executable-failure",
+            "path": str(self.evidence),
+            "sha256": hashlib.sha256(self.evidence.read_bytes()).hexdigest(),
+            "executable": executable,
+        }
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace(
+                f"Required read capability: {self.target}", f"Required executable: {executable}"
+            ),
+            encoding="utf-8",
+        )
+        self.write_record(value)
+        self.assertTrue(self.check()["valid"])
+        required = "0" * 64
+        value["blocked_by"] = "dependency"
+        value["evidence"] = {
+            "kind": "dependency-artifact",
+            "path": str(self.evidence),
+            "sha256": hashlib.sha256(self.evidence.read_bytes()).hexdigest(),
+            "artifact_id": "handoff-policy",
+            "required_sha256": required,
+        }
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace(
+                f"Required executable: {executable}", f"Required dependency: handoff-policy sha256:{required}"
+            ),
+            encoding="utf-8",
+        )
+        self.write_record(value)
+        self.assertTrue(self.check()["valid"])
+
     def test_wrong_blocker_evidence_kind_fails_closed(self):
         value = self.disposition("dependency")
         self.write_record(value)
@@ -186,6 +252,27 @@ class HandoffAdmissionTests(unittest.TestCase):
         self.write_record(value)
         self.assertTrue(self.check()["valid"])
         value["occupied_owners"] = [owner, owner]
+        self.write_record(value)
+        self.assertFalse(self.check()["valid"])
+        unrelated_goal = self.base / "unrelated-goal.md"
+        unrelated_goal.write_text("Native owner: unrelated-session\n", encoding="utf-8")
+        unrelated = {
+            "session_id": "unrelated-session",
+            "harness": "codex",
+            "worktree": str(self.base),
+            "goal": str(unrelated_goal),
+        }
+        unrelated_registry = registry / "unrelated.json"
+        unrelated_registry.write_text(json.dumps({
+            "session_id": "unrelated-session", "host": "codex", "cwd": str(self.base),
+            "pid": os.getpid(), "pid_started_at": process_started_at(os.getpid()),
+            "started_at": "2026-10-11T20:00:00Z",
+        }), encoding="utf-8")
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace("Writer budget: 1", "Writer budget: 2"),
+            encoding="utf-8",
+        )
+        value["occupied_owners"] = [owner, unrelated]
         self.write_record(value)
         self.assertFalse(self.check()["valid"])
 

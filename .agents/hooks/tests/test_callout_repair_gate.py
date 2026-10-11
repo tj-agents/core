@@ -72,9 +72,12 @@ class CalloutRepairGateTests(unittest.TestCase):
         )
         record = self.base / "BUGS.md"
         evidence = self.base / "missing-read.txt"
+        target = self.base / "unavailable"
         evidence.write_text("required read failed", encoding="utf-8")
         self.goal.write_text(
             ("# Repair\\n\\n## Authorization\\n\\nBounded standards-defect repair.\\n\\n"
+            "Source owner: engineering/handoff\\n"
+            f"Required read capability: {target}\\n"
             f"Problem record: {record}#B014\\n").replace("\\n", "\n"),
             encoding="utf-8",
         )
@@ -100,7 +103,7 @@ class CalloutRepairGateTests(unittest.TestCase):
                 "kind": "read-failure",
                 "path": str(evidence),
                 "sha256": hashlib.sha256(evidence.read_bytes()).hexdigest(),
-                "target": str(self.base / "unavailable"),
+                "target": str(target),
                 "operation": "read",
                 "error": "missing",
             },

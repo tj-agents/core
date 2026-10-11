@@ -1,6 +1,6 @@
 # Self-repair handoff priority and deferral
 
-Status: bounded priority/deferral implementation and focused verification complete; independent review next.
+Status: both HIGH linkage findings remediated; focused and package validation passed; commit and incremental review are next.
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SessionGuidanceHandoffCompliance
 Branch: Fix/SessionGuidanceHandoffCompliance
 PR: https://github.com/tj-agents/core/pull/199
@@ -138,8 +138,27 @@ Pickup acknowledged on 2026-10-11 by native session `01a12ad4-3f5b-7c72-ad11-ea6
 priority pointer and source files. The previous review work order is preserved. Fetched `origin/main`
 contains prerequisite publication `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c` and its problem-record contract.
 
-Finish the focused source/process integration checks, commit the stable authored candidate, synchronize
-its actual base once before independent review, and deliver through PR #199.
+Candidate `259e02268c9e9c94ccf65e29b3a3f6faf525e9c3` is committed. The full source review is frozen
+against `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`; one synchronization found zero commits behind.
+The canonical work order is `reviews/Fix-SessionGuidanceHandoffCompliance.md`. Its completed workflow
+lens has two parent-validated HIGH findings: capacity counts unrelated owners, and deferral evidence is
+not bound to declared prerequisites, the exact source owner and the Authorization section.
+
+The native reviewer produced no result within 15 minutes. The read-only L4 fallback was interrupted
+before complete coverage and returned failed. Parent native-general fallback completed on the same frozen
+descriptor and bundle with no additional findings. The canonical work order is complete at `259e022` with
+the two HIGH findings retained; it must return through an incremental review watermark after remediation.
+
+Both findings now have positive and negative linkage coverage. The 10 focused admission tests, 15 callout
+gate tests, generated-tree check, shipped-skill packaging test, catalog digest tests, and isolated
+source-layout suite passed. The live source-layout fixture cannot copy the supervisor-held continuation
+locks, so it was rerun from an identical source snapshot excluding only `.agents/continuation` runtime state.
+
+Commit the remediation and review work order, then run fresh incremental review. Push the stable reviewed
+head to existing PR #199, bind its exact delivery identity, verify Windows/Linux CI, and complete merge,
+causal publication and cleanup under the existing authority. No new candidate was pushed or merged during
+this review. Resume the same continuation owner after foreground yield; do not create another owner or
+adopt PR #196. Do not start another unbounded native review.
 Keep this goal current with actual progress and the remaining action. Use a real supported continuation
 owner when a delayed result requires one; do not report unattended monitoring without runtime evidence.
 The source-level evidence below covers this candidate; live hook adoption is not claimed.
