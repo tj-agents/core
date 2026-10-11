@@ -28,6 +28,7 @@ tests; absent, all calls use the real `gh` CLI.
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -376,13 +377,14 @@ def load_fixture():
         raise Preserve(f"forge fixture unreadable: {error}") from error
 
 
-def gh(repo, *args):
+def gh(repo, *args, cwd=None):
     command = ["gh", *args]
     if repo:
         command += ["--repo", repo]
     try:
         return subprocess.run(
-            command, capture_output=True, text=True, timeout=FORGE_TIMEOUT_SECONDS,
+            command, cwd=str(cwd) if cwd is not None else None, capture_output=True, text=True,
+            timeout=FORGE_TIMEOUT_SECONDS,
         )
     except FileNotFoundError as error:
         raise Preserve("the gh CLI is required") from error
@@ -390,10 +392,10 @@ def gh(repo, *args):
         raise Preserve(f"gh {' '.join(args)} failed: {error}") from error
 
 
-def pr_view(pr, repo, fixture):
+def pr_view(pr, repo, fixture, cwd=None):
     if fixture is not None:
         return fixture.get("pr_view")
-    result = gh(repo, "pr", "view", str(pr), "--json", "state,headRefOid,mergeCommit")
+    result = gh(repo, "pr", "view", str(pr), "--json", "state,headRefOid,mergeCommit", cwd=cwd)
     if result.returncode != 0:
         raise Preserve(f"gh pr view {pr} failed: {result.stderr.strip()}")
     try:
@@ -402,8 +404,8 @@ def pr_view(pr, repo, fixture):
         raise Preserve(f"gh pr view {pr} returned invalid JSON: {error}") from error
 
 
-def require_merged(pr, head, repo, fixture):
-    view = pr_view(pr, repo, fixture)
+def require_merged(pr, head, repo, fixture, cwd=None):
+    view = pr_view(pr, repo, fixture, cwd=cwd)
     if not isinstance(view, dict):
         raise Preserve(f"PR #{pr} query returned nothing")
     if view.get("state") != "MERGED":
@@ -442,9 +444,64 @@ def branch_deletion_command(primary, branch, default):
 
 
 def validate_branch(branch):
-    if not isinstance(branch, str) or not branch or any(
+    if not isinstance(branch, str) or not branch or branch.startswith("-") or any(
             char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-" for char in branch):
         raise Preserve(f"branch {branch!r} cannot be emitted in a cleanup command")
+
+
+def validate_head(head):
+    if not isinstance(head, str) or len(head) not in (40, 64) or any(char not in "0123456789abcdef" for char in head):
+        raise Preserve(f"head {head!r} cannot be used for remote cleanup")
+
+
+def validate_command_path(value, label):
+    path = Path(value)
+    if not path.is_absolute() or any(not (char.isalnum() or char in "._-/\\: ") for char in str(path)):
+        raise Preserve(f"{label} {value!r} cannot be emitted in a cleanup command")
+    return path.resolve()
+
+
+def validate_repo(repo):
+    if repo is None:
+        return None
+    if not isinstance(repo, str):
+        raise Preserve(f"repository {repo!r} cannot be emitted in a cleanup command")
+    value = repo.removeprefix("github.com/")
+    if value.count("/") != 1:
+        raise Preserve(f"repository {repo!r} cannot be emitted in a cleanup command")
+    owner, name = value.split("/", 1)
+    if not owner or not name or any(char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-" for char in owner + name):
+        raise Preserve(f"repository {repo!r} cannot be emitted in a cleanup command")
+    return "github.com/" + owner + "/" + name
+
+
+def primary_github_repository(primary):
+    result = run_git(primary, "remote", "get-url", "origin")
+    if result.returncode != 0:
+        raise Preserve("primary origin is unavailable")
+    origin = result.stdout.strip()
+    prefixes = ("https://github.com/", "http://github.com/", "git@github.com:", "ssh://git@github.com/", "ssh://github.com/", "git://github.com/")
+    suffix = next((origin[len(prefix):] for prefix in prefixes if origin.startswith(prefix)), None)
+    if suffix is None:
+        raise Preserve("primary origin is not a GitHub repository")
+    return validate_repo("github.com/" + suffix.removesuffix(".git").rstrip("/"))
+
+
+def remote_deletion_command(worktree, branch, head, pr, default, repo):
+    validate_command_path(worktree, "worktree")
+    validate_branch(branch)
+    validate_head(head)
+    validate_branch(default)
+    validate_repo(repo)
+    script = validate_command_path(Path(__file__).resolve(), "cleanup proof script")
+    interpreter = "python" if os.name == "nt" else "python3"
+    command = (
+        f'{interpreter} -B "{script}" --delete-remote '
+        f'--worktree "{worktree}" --branch {branch} --head {head} --pr {pr} --default {default}'
+    )
+    if repo:
+        command += f" --repo {repo}"
+    return command
 
 
 def run(args):
@@ -496,13 +553,11 @@ def run(args):
                         raise Preserve(f"set-aside failed for {target}: {error}") from error
                 else:
                     raise Preserve(f"{target} has uncommitted or untracked changes")
+            commands.append(remote_deletion_command(worktree, branch, head, pr, default, args.repo))
             if not primary_branch_route:
                 require_clean(target)
                 commands.append(f'git -C "{primary}" worktree remove -- "{target}"')
-            commands.extend([
-                branch_deletion_command(primary, branch, default),
-                f'git -C "{primary}" push origin --delete {branch}',
-            ])
+            commands.append(branch_deletion_command(primary, branch, default))
     except Preserve as error:
         verdict = "preserve"
         reason = error.reason
@@ -519,6 +574,7 @@ def run(args):
         "pr": pr,
         "merge_oid": merge_oid,
         "default": default,
+        "repo": args.repo,
         "verdict": verdict,
         "dependencies": dependencies,
         "dependency_evidence": dependency_evidence,
@@ -540,20 +596,118 @@ def run(args):
     return 1
 
 
+def removable_receipt(worktree, branch, head, pr, default, repo):
+    path = receipt_path(worktree)
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise Preserve(f"removable receipt is unavailable: {error}") from error
+    if not isinstance(receipt, dict) or receipt.get("verdict") != "removable":
+        raise Preserve("removable receipt is unavailable")
+    recorded_at = receipt.get("recorded_at")
+    if isinstance(recorded_at, bool) or not isinstance(recorded_at, (int, float)) or not math.isfinite(recorded_at):
+        raise Preserve("removable receipt has no valid timestamp")
+    age = time.time() - recorded_at
+    if age < 0 or age > 3600:
+        raise Preserve("removable receipt is stale")
+    expected = {
+        "worktree": str(worktree),
+        "branch": branch,
+        "head": head,
+        "pr": pr,
+    }
+    for field, value in expected.items():
+        if receipt.get(field) != value:
+            raise Preserve(f"removable receipt {field} does not match this cleanup")
+    recorded_default = receipt.get("default")
+    if not isinstance(recorded_default, str):
+        raise Preserve("removable receipt default is unavailable")
+    validate_branch(recorded_default)
+    if default is not None and default != recorded_default:
+        raise Preserve("removable receipt default does not match this cleanup")
+    if repo is not None:
+        recorded_repo = receipt.get("repo")
+        if not isinstance(recorded_repo, str) or validate_repo(recorded_repo).lower() != validate_repo(repo).lower():
+            raise Preserve("removable receipt repository does not match this cleanup")
+    recorded_primary = receipt.get("primary")
+    if not isinstance(recorded_primary, str):
+        raise Preserve("removable receipt primary is unavailable")
+    return validate_command_path(recorded_primary, "primary"), recorded_default
+
+
+def remote_ref_matches(primary, branch, head):
+    result = run_git(primary, "ls-remote", "--refs", "origin", "refs/heads/" + branch)
+    if result.returncode != 0:
+        raise Preserve(f"git ls-remote failed: {result.stderr.strip()}")
+    output = result.stdout.strip()
+    if not output:
+        return False
+    lines = output.splitlines()
+    if len(lines) != 1:
+        raise Preserve("git ls-remote returned malformed branch evidence")
+    fields = lines[0].split("\t")
+    if fields != [head, "refs/heads/" + branch]:
+        raise Preserve("remote branch does not match the saved head")
+    return True
+
+
+def run_delete_remote(args):
+    if FORGE_FIXTURE_ENV in os.environ:
+        raise Preserve("forge fixtures cannot authorize remote deletion")
+    if args.worktree is None or args.branch is None or args.head is None or args.pr is None:
+        raise Preserve("remote deletion requires saved worktree, branch, head, and PR")
+    worktree = validate_command_path(args.worktree, "worktree")
+    validate_branch(args.branch)
+    validate_head(args.head)
+    supplied_repo = validate_repo(args.repo)
+    primary, default = removable_receipt(worktree, args.branch, args.head, args.pr, args.default, args.repo)
+    if args.branch == default:
+        raise Preserve("the default branch cannot be deleted")
+    entries = list_worktrees(primary)
+    if not entries or entries[0]["path"] != primary:
+        raise Preserve("removable receipt primary is not the actual primary checkout")
+    if default_branch(primary) != default:
+        raise Preserve("removable receipt default is not the current origin default")
+    origin_repo = primary_github_repository(primary)
+    if supplied_repo is not None and supplied_repo.lower() != origin_repo.lower():
+        raise Preserve("supplied repository does not match the primary origin")
+    merge_oid = require_merged(args.pr, args.head, origin_repo, None, cwd=primary)
+    require_contained(primary, default, merge_oid)
+    evidence = require_safe_dependencies(args.branch, origin_repo, primary, None)
+    if evidence["base"]:
+        raise Preserve(f"open PRs depend on branch {args.branch} as their base")
+    if not remote_ref_matches(primary, args.branch, args.head):
+        print("remote-deleted")
+        return 0
+    result = run_git(
+        primary,
+        "push",
+        f"--force-with-lease=refs/heads/{args.branch}:{args.head}",
+        "origin",
+        f":refs/heads/{args.branch}",
+    )
+    if result.returncode != 0:
+        raise Preserve(f"git push remote deletion failed: {result.stderr.strip()}")
+    print("remote-deleted")
+    return 0
+
+
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument("--worktree")
     parser.add_argument("--branch")
     parser.add_argument("--head")
     parser.add_argument("--pr", type=int)
     parser.add_argument("--default")
     parser.add_argument("--repo")
+    parser.add_argument("--delete-remote", action="store_true")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     try:
-        return run(parse_args(argv))
+        args = parse_args(argv)
+        return run_delete_remote(args) if args.delete_remote else run(args)
     except Preserve as error:
         print(f"preserve: {error.reason}")
         return 1
