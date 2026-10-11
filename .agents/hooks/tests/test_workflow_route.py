@@ -60,16 +60,25 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_hook(self, prompt, event="UserPromptSubmit"):
+    def run_hook(self, prompt, event="UserPromptSubmit", session=None, environment=None, script=SCRIPT):
         return subprocess.run(
-            [sys.executable, "-B", str(SCRIPT)],
+            [sys.executable, "-B", str(script)],
             input=json.dumps({"hook_event_name": event, "cwd": str(self.cwd), "prompt": prompt,
-                              "session_id": str(uuid.uuid4())}),
+                              "session_id": session or str(uuid.uuid4())}),
             capture_output=True,
             text=True,
             encoding="utf-8",
+            env=environment,
             timeout=20,
         )
+
+    def receipt(self, scratch, session):
+        path = (
+            Path(scratch)
+            / "agents-workflow-route"
+            / (hashlib.sha256(session.encode("utf-8")).hexdigest() + ".json")
+        )
+        return json.loads(path.read_text(encoding="utf-8"))
 
     def test_active_goal_and_execution_prompt_load_the_full_canonical_workflow(self):
         self.write_goal()
@@ -142,6 +151,32 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
                 result = self.run_hook(prompt)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertIn("engineering:handoff automatically selected", result.stdout)
+
+    def test_bounded_side_handoff_retains_the_execution_obligation(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            environment = dict(os.environ, TEMP=scratch, TMP=scratch, TMPDIR=scratch)
+            scripts = (SCRIPT, ROOT / "plugins/engineering/hooks/workflow_route.py")
+            for script in scripts:
+                with self.subTest(script=script):
+                    session = str(uuid.uuid4())
+                    result = self.run_hook(
+                        "Hand off this separate workstream and retain the current goal in this session.",
+                        session=session,
+                        environment=environment,
+                        script=script,
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertIn("engineering:handoff automatically selected", result.stdout)
+                    self.assertTrue(self.receipt(scratch, session)["execution_obligation"])
+                    full_transfer = str(uuid.uuid4())
+                    result = self.run_hook(
+                        "Hand this off to another Codex session.",
+                        session=full_transfer,
+                        environment=environment,
+                        script=script,
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertNotIn("execution_obligation", self.receipt(scratch, full_transfer))
 
     def test_handoff_questions_and_negation_do_not_launch(self):
         for prompt in (
@@ -388,6 +423,17 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
         delivered = self.run_hook("UserPromptSubmit", prompt=self.PROMPT)
         self.assertIn("engineering:plan-execution automatically selected", delivered["additionalContext"])
         self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
+
+    def test_recovered_bounded_side_handoff_retains_the_execution_obligation(self):
+        self.write_transcript(
+            "Hand off this separate workstream and retain the current goal in this session."
+        )
+        recovered = self.run_hook("PreToolUse", tool_name="Read")
+        self.assertIn("engineering:handoff automatically selected", recovered["additionalContext"])
+        receipt = self.scratch / "agents-workflow-route" / (
+            hashlib.sha256(self.session.encode("utf-8")).hexdigest() + ".json"
+        )
+        self.assertTrue(json.loads(receipt.read_text(encoding="utf-8"))["execution_obligation"])
 
     def test_the_prompt_id_receipt_decides_delivery_before_timestamps(self):
         self.write_transcript(self.PROMPT)
