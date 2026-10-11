@@ -36,7 +36,8 @@ class CloseTabTests(unittest.TestCase):
                  "title": "same", "terminal": identity}
         target = {"title": "same", "identity": {"kind": "windows-terminal",
                   "automation_id": "tab-2"}}
-        with mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
                 mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
                 mock.patch.object(close_tab.session_close, "liveness", return_value=False), \
                 mock.patch.object(close_tab, "close_actual") as closer:
@@ -51,6 +52,70 @@ class CloseTabTests(unittest.TestCase):
                 with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
                     close_tab.close_stale_entry({"title": "same", "terminal": recorded})
                 closer.assert_not_called()
+
+    def test_stale_windows_close_refuses_when_the_exact_tab_remains_visible(self):
+        entry = {
+            "session_id": "stale",
+            "pid": 10,
+            "pid_started_at": 1.0,
+            "title": "old tab",
+            "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"},
+        }
+        target = {
+            "title": "old tab",
+            "identity": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "actual": True,
+        }
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+                mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
+                mock.patch.object(close_tab.session_close, "liveness", return_value=False), \
+                mock.patch.object(close_tab, "run", return_value=completed()), \
+                mock.patch.object(close_tab.time, "sleep"):
+            with self.assertRaisesRegex(close_tab.TerminalRefusal, "did not confirm"):
+                close_tab.close_stale_entry(entry)
+
+    def test_stale_windows_close_accepts_an_inventory_that_confirms_tab_absence(self):
+        entry = {
+            "session_id": "stale",
+            "pid": 10,
+            "pid_started_at": 1.0,
+            "title": "old tab",
+            "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"},
+        }
+        target = {
+            "title": "old tab",
+            "identity": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "actual": True,
+        }
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", side_effect=([target], [])), \
+                mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("stale"), entry)]), \
+                mock.patch.object(close_tab.session_close, "liveness", return_value=False), \
+                mock.patch.object(close_tab, "run", return_value=completed()):
+            close_tab.close_stale_entry(entry)
+
+    def test_live_windows_close_refuses_when_the_exact_tab_remains_visible(self):
+        entry = {
+            "session_id": "live",
+            "pid": 10,
+            "pid_started_at": 1.0,
+            "title": "live tab",
+            "terminal": {"kind": "windows-terminal", "automation_id": "tab-2"},
+        }
+        target = {
+            "title": "live tab",
+            "identity": {"kind": "windows-terminal", "automation_id": "tab-2"},
+            "actual": True,
+        }
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+                mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("live"), entry)]), \
+                mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                mock.patch.object(close_tab, "run", return_value=completed()), \
+                mock.patch.object(close_tab.time, "sleep"):
+            with self.assertRaisesRegex(close_tab.TerminalRefusal, "did not confirm"):
+                close_tab.close_entry(entry)
 
     def test_stale_windows_title_fallback_refuses_native_successor_with_changed_title(self):
         stale = {"session_id": "old", "title": "old title",
@@ -214,7 +279,7 @@ class CloseTabTests(unittest.TestCase):
         with mock.patch.object(close_tab, "target_liveness", return_value=False), \
                 mock.patch.object(close_tab, "run", return_value=completed()) as closer:
             close_tab.close_actual(target)
-        self.assertEqual(closer.call_args.args[0][-2:], ["-t", "%1"])
+        self.assertEqual(closer.call_args_list[0].args[0][-2:], ["-t", "%1"])
 
     def test_host_must_descend_from_terminal_root(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
@@ -268,7 +333,7 @@ class CloseTabTests(unittest.TestCase):
                 mock.patch.object(close_tab, "run", return_value=completed()) as runner, \
                 mock.patch.object(close_tab.os, "kill") as killer:
             close_tab.close_actual(target, force=True)
-        self.assertEqual(runner.call_args.args[0][-2:], ["-t", "%1"])
+        self.assertEqual(runner.call_args_list[0].args[0][-2:], ["-t", "%1"])
         killer.assert_not_called()
 
     def test_explicit_title_force_keeps_direct_actual_tab_authorization(self):

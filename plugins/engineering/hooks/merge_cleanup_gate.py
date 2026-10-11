@@ -172,6 +172,8 @@ MESSAGE = (
     "and `{python} -B <machine:peer-cli skill-directory>/scripts/finish.py`, exactly, with no arguments: it closes this CLI and removes the worktree. "
     "For a primary or retained checkout, run the argument-free sibling `close.py` after the report; "
     "it verifies session exit and retains the checkout. Elsewhere, follow `engineering:merge` Step 5.\n"
+    "- If `finish.py` or `close.py` cannot resolve a verified registry attachment, do not force-close the host. "
+    "Use Step 5's native-host or handoff fallback to retain verified cleanup ownership.\n"
     "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
     "`{python} \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
     "This repeats every 10 minutes until cleanup completes, a handoff launcher transfers it, "

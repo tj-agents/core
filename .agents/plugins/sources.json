@@ -115,6 +115,11 @@
       "destination": ".agents/lanes"
     },
     {
+      "plugin": "engineering",
+      "source": ".agents/engineering/resources/problem-records.md",
+      "destination": ".agents/engineering/resources/problem-records.md"
+    },
+    {
       "plugin": "machine",
       "source": ".agents/hooks/hook_dispatch.py",
       "destination": "hooks/hook_dispatch.py"

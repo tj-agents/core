@@ -74,6 +74,11 @@ ACTIVE_WORK = re.compile(
     r"\b(?:active|current|original|main|primary)\s+(?:goal|task|work(?:stream)?)\b",
     re.IGNORECASE,
 )
+RETAIN_ORIGINAL_WORK = re.compile(
+    r"\b(?:keep|retain|continue)\s+(?:the\s+)?(?:active|current|original|main|primary)\s+"
+    r"(?:goal|task|work(?:stream)?)\b",
+    re.IGNORECASE,
+)
 HANDOFF_ACTION = re.compile(
     r"\b(?:hand\s*off|delegate|dispatch|launch|invoke|do\s+(?:a\s+)?handoff)\b[^.!?\n]{0,80}"
     r"\b(?:side\s+(?:task|thing|work(?:stream)?)|separate\s+(?:task|workstream)|"
@@ -166,6 +171,25 @@ def selects_handoff(prompt: str, cwd: Path) -> bool:
         SIDE_WORKSTREAM.search(prompt) is not None
         and HANDOFF_ACTION.search(prompt) is not None
         and (active_goal(cwd) or ACTIVE_WORK.search(prompt) is not None)
+    )
+
+
+def retains_original_work(prompt: str, cwd: Path) -> bool:
+    evidence = authorization_evidence(prompt)
+    return selects_handoff(evidence, cwd) and (
+        SIDE_WORKSTREAM.search(evidence) is not None
+        or RETAIN_ORIGINAL_WORK.search(evidence) is not None
+    )
+
+
+def preserves_execution_obligation(context: str | None, prompt: str, cwd: Path) -> bool:
+    if not context:
+        return False
+    if "engineering:plan-execution automatically selected" in context:
+        return True
+    return (
+        "engineering:handoff automatically selected" in context
+        and retains_original_work(prompt, cwd)
     )
 
 
@@ -384,7 +408,7 @@ def recover(data: dict) -> str | None:
         session,
         prompt_id,
         Path(cwd).resolve(),
-        bool(context and "engineering:plan-execution automatically selected" in context),
+        preserves_execution_obligation(context, prompt, Path(cwd).resolve()),
         bool(context and "engineering:plan-authoring automatically selected" in context) or direct_control(prompt) in {"pause", "cancel", "stop"},
         prompt,
         direct_control(prompt) in {"resume", "continue"},
@@ -435,7 +459,7 @@ def main() -> int:
             session,
             data.get("prompt_id"),
             Path(cwd_value).resolve(),
-            bool(context and "engineering:plan-execution automatically selected" in context),
+            preserves_execution_obligation(context, prompt, Path(cwd_value).resolve()),
             bool(context and "engineering:plan-authoring automatically selected" in context) or direct_control(prompt) in {"pause", "cancel", "stop"},
             prompt,
             direct_control(prompt) in {"resume", "continue"},
