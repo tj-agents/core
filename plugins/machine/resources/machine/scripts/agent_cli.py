@@ -1,9 +1,8 @@
 """Shared launch primitives for the native agent CLIs, on Windows and POSIX.
 
 Imported by open-claude, handoff-claude and handoff-codex so the environment scrub, executable discovery,
-standards sync, lane lookup and terminal argument escaping have one owner. The terminal claude launcher
-(claude-profile.ps1) still uses the PowerShell agent-cli.ps1 until its own Python port lands. Not runnable
-on its own.
+standards sync, lane lookup and terminal argument escaping have one owner. The terminal profile launchers
+reuse its standards sync implementation. Not runnable on its own.
 """
 
 import glob
@@ -273,7 +272,7 @@ def sync_claude_standards(working_directory, claude=None, out=print):
     if script is None:
         out('standards: claude_standards_sync.py was not found; this session loads the installed plugins')
         return
-    arguments = [sys.executable, '-B', str(script), '--project', str(working_directory)]
+    arguments = [sys.executable, '-I', '-B', str(script), '--project', str(working_directory)]
     if claude:
         arguments += ['--claude', str(claude)]
     try:

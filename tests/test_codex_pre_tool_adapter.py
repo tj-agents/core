@@ -113,14 +113,26 @@ class CodexPreToolAdapter(unittest.TestCase):
             f"subprocess.Popen([sys.executable, '-c', {child_code!r}])\n",
             timeout=2,
         )
+        deadline = time.monotonic() + 5
         stdout, stderr = process.communicate(b"{}", timeout=5)
         self.assertEqual(process.returncode, 0, stderr)
         self.assertIn("output collection", self.decision(stdout))
         self.assertTrue(pid_file.exists())
+        pid = int(pid_file.read_text())
+        if os.name != "nt":
+            status = Path(f"/proc/{pid}/stat")
+            while True:
+                try:
+                    state = status.read_text().rsplit(")", 1)[1].split()[0]
+                except FileNotFoundError:
+                    break
+                if state == "Z":
+                    break
+                self.assertLess(time.monotonic(), deadline, f"grandchild remains in state {state}")
+                time.sleep(.02)
         previous = heartbeat.read_text()
         time.sleep(.15)
         self.assertEqual(heartbeat.read_text(), previous)
-        pid = int(pid_file.read_text())
         if os.name == "nt":
             kernel = ctypes.WinDLL("kernel32", use_last_error=True)
             kernel.OpenProcess.argtypes = [ctypes.c_uint, ctypes.c_int, ctypes.c_uint]
@@ -133,8 +145,6 @@ class CodexPreToolAdapter(unittest.TestCase):
                 self.assertTrue(kernel.GetExitCodeProcess(handle, ctypes.byref(exit_code)))
                 kernel.CloseHandle(handle)
                 self.assertNotEqual(exit_code.value, 259)
-        elif Path(f"/proc/{pid}/stat").exists():
-            self.assertEqual(Path(f"/proc/{pid}/stat").read_text().split()[2], "Z")
 
     def test_exit_two_and_crashes_remain_denials(self):
         for source, reason in (

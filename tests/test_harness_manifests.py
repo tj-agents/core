@@ -20,7 +20,7 @@ PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scr
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
-INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.ps1"), ("machine", "close.ps1"))
+INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.py"), ("machine", "close.py"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
 
 
@@ -84,6 +84,14 @@ class HarnessManifestTests(unittest.TestCase):
         self.assertEqual(
             {"schema_version", "plugin", "source_roots", "requires"}, set(manifest)
         )
+
+    def test_engineering_workflow_payload_ships_the_guarded_auto_merge_wrapper(self):
+        sources = HARNESS.load(ROOT / ".agents/plugins/sources.json")["resources"]
+        self.assertIn(
+            {"plugin": "engineering", "source": ".agents/workflows", "destination": "workflows"},
+            sources,
+        )
+        self.assertTrue((ROOT / "plugins/engineering/workflows/auto_merge.py").is_file())
 
     def test_declared_hook_hosts_must_match_host_wiring(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -215,20 +223,21 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
 
     def test_close_permissions_are_exact_argument_free_commands(self):
         claude_allow, codex_rules = self.rendered("machine")
-        entries = [entry for entry in claude_allow if "close.ps1" in entry]
-        self.assertEqual(8, len(entries))
+        entries = [entry for entry in claude_allow if "close.py" in entry]
+        self.assertEqual(16, len(entries))
         for entry in entries:
-            self.assertTrue(entry.replace("\\", "/").endswith("/close.ps1)"), entry)
+            self.assertTrue(entry.replace("\\", "/").endswith("/close.py)"), entry)
             self.assertNotIn("*", entry)
-        rules = [rule for rule in codex_rules if "close.ps1" in json.dumps(rule)]
+            self.assertRegex(entry, r"(?:python|python3) -B ")
+        rules = [rule for rule in codex_rules if "close.py" in json.dumps(rule)]
         self.assertEqual(1, len(rules))
-        self.assertEqual(6, len(rules[0]["pattern"]))
+        self.assertEqual(3, len(rules[0]["pattern"]))
         root = self.PLUGIN_ROOT.replace("\\", "/")
         paths = {path.replace("\\", "/") for path in rules[0]["pattern"][-1]}
         self.assertEqual({
-            f"{root}/.agents/machine/utility/peer-cli/scripts/close.ps1",
-            f"{root}/skills/peer-cli/scripts/close.ps1",
-            f"{root}/codex-skills/peer-cli/scripts/close.ps1",
+            f"{root}/.agents/machine/utility/peer-cli/scripts/close.py",
+            f"{root}/skills/peer-cli/scripts/close.py",
+            f"{root}/codex-skills/peer-cli/scripts/close.py",
         }, paths)
 
     def test_rendered_codex_rules_load_under_execpolicy_when_available(self):

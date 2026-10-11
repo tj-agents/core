@@ -402,25 +402,5 @@ class HookControlTests(unittest.TestCase):
         failed_handle.close.assert_called_once_with()
         self.assertEqual(attempts, 2)
 
-    @unittest.skipUnless(sys.platform == 'win32', 'PowerShell profile wrapper is Windows-only')
-    def test_codex_hooks_profile_wrapper_uses_source_utility(self):
-        home = self.root / 'wrapper-home'
-        script = self.root / 'invoke-hook-control.ps1'
-        profile = ROOT / '.agents/machine/scripts/codex-profile.ps1'
-        script.write_text(
-            f". '{profile}'\n"
-            "codex-hooks off --scope global --codex-home $args[0]\n"
-            "codex-hooks status --scope global --codex-home $args[0]\n"
-            "codex-hooks on --scope global --codex-home $args[0]\n",
-            encoding='utf-8')
-        completed = subprocess.run(
-            ['pwsh', '-NoProfile', '-File', str(script), str(home)],
-            capture_output=True, text=True, check=False)
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn('"action": "off"', completed.stdout)
-        self.assertIn('"action": "on"', completed.stdout)
-        self.assertFalse((home / 'config.toml').exists())
-
-
 if __name__ == '__main__':
     unittest.main()

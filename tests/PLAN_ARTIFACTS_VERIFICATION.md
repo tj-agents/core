@@ -12,7 +12,7 @@ This is verification evidence, not a second migration plan. The workspace-level
   both packaged roots, resource closure, identical canonical bodies, startup/resume/compact/clear
   fixtures, an unrelated directory with spaces, actual Git Bash command execution, no adapter file
   mutations, absent/malformed/invalid-UTF-8 contract diagnostics, and digest-marked fallback generation.
-- `tests/skill-packaging.tests.ps1` and `tests/handoff-launchers.tests.ps1`: pass.
+- `tests/skill-packaging.tests.ps1` and the cross-platform terminal-profile Python tests: pass.
 - Initial PR CI exposed a test assertion comparing a Windows short temp-path alias with the helper's
   resolved long path. The assertion now resolves the expected path; the focused suite passes locally.
   Exact-head CI verifies the runner-specific case. No helper behavior or test was disabled.
@@ -139,7 +139,7 @@ Run from the implementation checkout:
 pwsh -NoProfile -File .agents/sync-generated.ps1 -Check
 python -B -m unittest discover -s tests -p test_plan_artifacts.py -v
 pwsh -NoProfile -File tests/skill-packaging.tests.ps1
-pwsh -NoProfile -File tests/handoff-launchers.tests.ps1
+python3 -B -m unittest discover -s tests -p 'test_terminal_profile*.py' -v
 claude plugin validate --strict ./plugins/base
 ```
 

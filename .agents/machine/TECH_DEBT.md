@@ -1,18 +1,31 @@
 # Tech debt — machine
 
-## codex-profile.ps1 gained new behaviour while still awaiting its port
+## Codex close and finish still need acceptance from a registered sandboxed CLI
 
-`Find-CodexPython` (the Windows-Store-stub-skipping interpreter search) and the `codex` function's call
-site that uses it were added directly to `codex-profile.ps1` to fix a real bug: `python3` was tried first
-on Windows, which is usually the Store alias stub, so the pre-launch standards refresh silently never ran.
-CODE_CONVENTIONS.md's Supported platforms section says not to add behaviour to an existing shipped
-PowerShell script awaiting its port -- port it, or add the behaviour to its Python replacement -- and
-plan step 4 (wiring the terminal start hooks for bash as well as PowerShell) is still unchecked. Fixing
-the bug without widening this PR's own scope into that unstarted port left the fix in the `.ps1` file.
+On 2026-10-11, `close.py` refused the native Codex 0.162.1 session titled
+`Linux port: Step 10` with `cannot resolve a verified registry attachment for this host and current
+directory`. Its transcript identifies its source as `cli`. Outside the sandbox, its parent chain reaches
+the native Codex process and kitty; inside the command sandbox, the visible chain ends at PID 1,
+`codex-linux-sandbox`. A missing native process inside that namespace does not establish that the CLI
+was never launched.
 
-**Resolution condition.** Plan step 4 ports `codex-profile.ps1` (and `claude-profile.ps1`) to a
-Python-backed mechanism wired for bash as well as PowerShell; `Find-CodexPython`'s interpreter-search
-logic moves there with it, and this entry is deleted.
+`session_close.own_host_and_entry` resolves ownership through process ancestry and matches the visible
+PID and start time to the registry. It has no supported bridge to the host identity outside the sandbox.
+This session initially had no registry entry; the separate installation/adoption gap is recorded in
+[plugin debt](../plugins/TECH_DEBT.md#repository-skills-can-be-available-without-core-lifecycle-hooks).
+The active profile was subsequently repaired with the native installer, 13 authenticated hook trust
+updates, and the shipped SessionStart recorder. With the verified registry entry present, the same
+attachment check succeeds outside the sandbox and refuses inside it. Both missing registration and
+namespace visibility therefore affected this incident. Host-side execution is now specified by
+`machine:peer-cli`, but actual terminal closure and finish cleanup were not performed during the active
+task and remain unverified for this execution path.
+
+**Resolution condition.** A freshly launched native Codex session with the machine plugin enabled
+records a verified attachment, and its supported close/finish path resolves that same host from normal
+sandboxed execution or an explicit host-side mechanism. Verify actual terminal closure and finish
+cleanup on Linux and Windows while retaining PID/start-time and terminal identity checks. Missing
+registration must be reported as an incomplete attachment, rather than successful closure or evidence
+that no native CLI exists.
 
 ## The Codex plugin cache is not reconciled
 
@@ -75,7 +88,7 @@ uses a healthy supported runtime when available, and has regression coverage for
 
 ## Windows Terminal option values may be escaped for a parse they never get
 
-`agent_cli._launch_windows_terminal` (and `agent-cli.ps1`'s `Invoke-AgentTerminalTab`) pass every
+`agent_cli._launch_windows_terminal` passes every
 `wt.exe` argument through `terminal_argument`, including `--title` and `--startingDirectory`, which are
 Windows Terminal's own option values rather than the launched command's arguments. The escaping
 `terminal_argument` applies models the second argv parse the tab's command arguments get after Windows
@@ -127,21 +140,36 @@ Resolve when the sync runs under one overall deadline that stops its whole proce
 both Windows and POSIX, reports a `standards:` line and then launches, with a test that a hung
 grandchild cannot hold the launch past that deadline.
 
-## finish.ps1 trusts the starting directory for attachment
-
-Run without arguments, `finish.ps1` treats the worktree containing its starting directory as its own and
-refuses only when another live registered session sits there. A session can therefore `cd` into another
-merged worktree and finish it. The receipt gates (merged at exactly that head, clean tree, no open PR) mean
-nothing unmerged is lost, but an unregistered session still attached there would lose its directory.
-
-**Resolution condition.** Every live CLI is registered with its current directory (the host reports cwd
-changes, or the registry records them), so attachment can be proven from the registry alone.
-
 ## A shared parent shell can keep the worktree locked after finish
 
-`finish.ps1` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started
+`finish.py` stops a parent shell only when it is this session's dedicated wrapper. When the CLI was started
 by hand from a long-lived shell whose current directory is inside the worktree, that shell survives, Windows
 keeps the directory locked, and the reaper records a failed removal; the cleanup reminder then surfaces it.
 
 **Resolution condition.** The reaper can read another process's current directory, or the host records it,
 so finish can tell a shell that pins the worktree from one that does not.
+
+## Platform-specific machine integrations lack an explicit source boundary
+
+Windows-only installers, shell profiles and terminal integration currently sit beside shared machine
+code. As Linux integration grows, explicit `.windows` and `.linux` adapter directories would make
+platform ownership easier to find. Shared Python implementations and capability definitions retain
+their canonical home in `.agents`; platform folders should contain only OS-specific integration.
+
+**Resolution condition.** Document the platform adapter layout in `SOURCE_LAYOUT.md`, move the
+OS-specific integration into its owning directories, and update installation, packaging and imports
+with Windows and Linux verification. Keep this structural change separate from the functional Linux
+port so each delivery remains reviewable.
+
+## Repository-config tests fail intermittently under concurrent suites
+
+On 2026-10-10 a full `.agents/hooks/tests` run failed six `test_repo_config` cases with
+`Root is not the exact Git checkout: /tmp/tmp…` while two other sessions ran the suites on the same machine.
+The file passed alone and on two immediate reruns, and in eight earlier full runs that day.
+`bootstrap-capabilities`' `repo_config.preflight_paths` raises that error when a parent of the root holds
+`.git` (`/tmp` or `/` for these roots) or when `git rev-parse --show-toplevel` disagrees with the root. Which
+one fired, and what caused it, was not identified.
+
+Resolve when the failing branch is identified from a reproduction (for example, logging both checks under
+two concurrent full suites), its cause is fixed or isolated, and two full suites run concurrently on one
+machine pass.
