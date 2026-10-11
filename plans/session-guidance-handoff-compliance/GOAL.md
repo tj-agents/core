@@ -1,14 +1,13 @@
 # Self-repair handoff priority and deferral
 
-Status: resumed by the existing native owner; priority/deferral design in progress.
+Status: bounded priority/deferral implementation and focused verification complete; independent review next.
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-SessionGuidanceHandoffCompliance
 Branch: Fix/SessionGuidanceHandoffCompliance
 PR: https://github.com/tj-agents/core/pull/199
 Native owner: 01a12ad4-3f5b-7c72-ad11-ea65007cdd0c
 Coordinator: 01a12b10-3519-7f41-8e4f-7afa6828fef0
 Updated: 2026-10-11
-Lane: L3 for bounded design of validated deferred dispositions and existing-hook integration;
-route specified implementation/review to L4 once those choices are resolved.
+Lane: L4 implementation complete; L4 independent review next, then L7 delivery operations.
 
 ## Outcome and authority
 
@@ -99,6 +98,39 @@ runtime slice. Do not claim a document wakes an agent or silently add a second p
   If a PR-sized split is needed, use sequential slices with one owner and a proper dependency; do not
   resurrect or duplicate the unfinished #199 delivery. Keep runtime-wide proposals out of this change.
 
+## Selected bounded design and delivery slice
+
+Keep the decision with `engineering:handoff`: one skill-local Python admission helper, explicitly mapped
+into engineering's hook resources, serves both hosts. No new skill, machine-wide scheduler or capacity
+service is introduced. The optional machine-readable disposition stays inside its canonical problem entry;
+the published problem-record contract and write skills remain the record owners.
+
+The current callout receives a per-prompt nonce. Only a paired successful admission-check invocation can
+identify a record for the gate, which rereads its linkage and current evidence. Matching hashes establish
+bytes, not factual claims; bounded capability/dependency observations and verified native ownership must
+support the disposition. Accept verified existing ownership or an actionable recorded deferral for the
+current response while preserving the repair obligation. Unknown identity or ambiguous launch reserves
+the existing attempt. Filter for eligibility before priority, unblocking value and age.
+
+Reevaluate dependency changes through an explicit foreground check or an already supported continuation.
+No document is represented as an automatic wake. Capacity evidence is limited to an explicitly declared
+local budget and verified occupied owners. Native history, goal linkage and exclusion evidence are separate
+from a claim of meaningful progress.
+
+PR #199 remains the owning review. Its base is reconciled with published prerequisite `73f1fbc`; merge
+checkpoint `54e08c5` preserves the existing source work and main's generated digests. Old CI run
+`38139935559` failed the digest guard and two Linux tab-close fixtures; the digest is reconciled and main
+contains the independently landed fixture fixes. The atomic slice includes shared admission, policy,
+both-host gate integration, packaging and their focused tests. Splitting the policy from enforcement would
+leave an exposed contradictory intermediate behavior. Target fewer than 800 substantive added lines;
+measure again before review and assess a split if the candidate exceeds the branching threshold.
+
+The continuation owner is initialized at `.agents/continuation/owner.json` and claimed by verified native
+PID `30148`. Its old-head delivery binding was released as superseded; bind the next stable PR head before
+monitoring. Scheduled Task `AgentStandards-Continuation-ff2ad4f1dc6319ace691dd23311c7b7e6cc430276e194683b581f82fac5c399f`
+is registered. An explicit supported wake returned `working` while the foreground lease stayed with this
+native owner and no headless child was launched.
+
 ## Next Steps
 
 Pickup acknowledged on 2026-10-11 by native session `01a12ad4-3f5b-7c72-ad11-ea65007cdd0c`;
@@ -106,13 +138,13 @@ Pickup acknowledged on 2026-10-11 by native session `01a12ad4-3f5b-7c72-ad11-ea6
 priority pointer and source files. The previous review work order is preserved. Fetched `origin/main`
 contains prerequisite publication `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c` and its problem-record contract.
 
-Reconcile current main with this PR's owned files and failed CI. Resolve the bounded design above, then implement,
-validate, review and deliver the priority/deferral behavior through the existing owning lifecycle.
+Finish the focused source/process integration checks, commit the stable authored candidate, synchronize
+its actual base once before independent review, and deliver through PR #199.
 Keep this goal current with actual progress and the remaining action. Use a real supported continuation
 owner when a delayed result requires one; do not report unattended monitoring without runtime evidence.
-The previous evidence below is historical and must be refreshed for the changed acceptance criteria.
+The source-level evidence below covers this candidate; live hook adoption is not claimed.
 
-## Previous-slice host coverage (revalidate the changed behavior)
+## Host coverage
 
 ```agent-host-coverage
 {
@@ -121,23 +153,45 @@ The previous evidence below is historical and must be refreshed for the changed 
   "hosts": [
     {
       "host": "claude",
-      "behavior": "A pending Core-callout repair remains blocked at Stop until a verified standards-defect handoff launch exists.",
+      "behavior": "A pending Core-callout repair remains blocked until a verified launch, distinct native repair owner, or current typed deferred disposition exists.",
       "source": ".agents/plugins/manifests/claude/engineering-hooks.json",
-      "mapping": "Claude already dispatches the shared callout gate at Stop.",
+      "mapping": "Claude dispatches the shared callout gate at Stop; the gate imports the packaged handoff admission evaluator.",
       "verification": {"level": "source", "result": "passed", "evidence": "CalloutRepairGateTests.test_callout_blocks_automatic_feedback_and_terminal_stop exercises the shared Stop gate; test_manifests_ship_only_supported_callout_events verifies the existing Claude Stop dispatch."}
     },
     {
       "host": "codex",
-      "behavior": "A pending Core-callout repair cannot end the Codex turn until a verified standards-defect handoff launch exists.",
+      "behavior": "A pending Core-callout repair cannot end the Codex turn without a verified launch, distinct native repair owner, or current typed deferred disposition.",
       "source": ".agents/plugins/manifests/codex/engineering-hooks.json",
-      "mapping": "Codex Stop dispatch will invoke the shared callout gate alongside its existing terminal gates.",
+      "mapping": "Codex Stop dispatch invokes the same shared gate and packaged admission evaluator as Claude.",
       "verification": {"level": "source", "result": "passed", "evidence": "CalloutRepairGateTests.test_callout_blocks_automatic_feedback_and_terminal_stop exercises the shared Stop gate; test_manifests_ship_only_supported_callout_events requires the Codex Stop dispatch to ship it."}
     }
   ]
 }
 ```
 
-## Previous-slice verification
+## Current verification and slice assessment
+
+- Focused admission tests: 8 passed, including current PID start identity, distinct native repair reuse,
+  positive unique capacity occupancy, both-goal conflict overlap, stale/forged evidence rejection,
+  eligibility ranking and once-per-fingerprint dependency transition.
+- Callout-gate tests: 15 passed, including both hosts, current nonce/paired-check receipt requirements,
+  explicit limits, invalid launches, and typed deferral that does not cache a resolved obligation.
+- Generation and package invariants passed: 532 files from 81 canonical definitions, tier payloads,
+  generated-tree currency, catalog digests and all three harness declarations. The packaged evaluator's
+  `check --help` ran successfully. Generated files and catalog digests remain excluded from the commit.
+- The first 34-test source integration run preceded regeneration and failed with eight catalog-drift
+  errors. The same 34 tests passed after regeneration. The process-contract suite passed after replacing
+  the superseded launch-only assertion with launch/reuse/validated-deferral and authority requirements.
+- The added ownership/conflict regressions exceeded the initial 800-added-line target. Keep the scope
+  frozen. Splitting the shared evaluator from policy/gate cutover would ship either unused admission
+  machinery or a gate that still forces blocked work to launch. Splitting host wiring would preserve
+  contradictory host outcomes. Runtime-wide capacity, scheduling and native receipt changes stay excluded.
+  Full candidate against origin/main: 18 authored files, 877 added/33 deleted runtime-test-metadata lines,
+  135 added/18 deleted guidance lines, and 202 added/3 deleted working-doc lines. This is the explicit
+  frozen-scope exception at the roughly 1,000 substantive-line assessment trigger, for the rejected atomic
+  split boundaries above. Required Windows/Linux CI validates the entire cutover.
+
+## Historical verification (superseded source-only slice)
 
 - `test_process_standards.py` passed all 23 tests, including the routed self-repair callout contract.
 - Focused terminal-gate and host-adapter tests passed: `CalloutRepairGateTests.test_callout_blocks_automatic_feedback_and_terminal_stop`, `CalloutRepairGateTests.test_manifests_ship_only_supported_callout_events`, and `TaskWorkflowAcceptanceTests.test_task_skills_keep_one_canonical_body_and_thin_host_entries`.

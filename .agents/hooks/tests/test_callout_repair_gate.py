@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -59,16 +60,79 @@ class CalloutRepairGateTests(unittest.TestCase):
             ]}},
             {"type": "user", "message": {"role": "user", "content": [
                 {"type": "tool_result", "tool_use_id": "launch", "is_error": not successful,
-                 "content": "Launched codex-cli 0.154.0 from codex.exe on selected lane"},
+                 "content": [{"type": "text", "text": "Launched codex-cli 0.154.0 from codex.exe on selected lane"}]},
             ]}},
         ]
+
+    def deferred_check(self):
+        state = json.loads(
+            (self.base / f"callout-repair-{hashlib.sha256(self.session.encode()).hexdigest()[:20]}.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        record = self.base / "BUGS.md"
+        evidence = self.base / "missing-read.txt"
+        evidence.write_text("required read failed", encoding="utf-8")
+        self.goal.write_text(
+            ("# Repair\\n\\n## Authorization\\n\\nBounded standards-defect repair.\\n\\n"
+            f"Problem record: {record}#B014\\n").replace("\\n", "\n"),
+            encoding="utf-8",
+        )
+        value = {
+            "schema_version": 1,
+            "record_id": "B014",
+            "kind": "bug",
+            "state": "deferred",
+            "callout": {
+                "session_id": self.session,
+                "callout_id": state["callout_id"],
+                "prompt_sha256": hashlib.sha256(PROMPT.encode()).hexdigest(),
+            },
+            "source_owner": "engineering/handoff",
+            "repair_goal": str(self.goal),
+            "disposition": "deferred",
+            "reason": "the dependency cannot be read",
+            "blocked_by": "capability",
+            "resolver": "environment owner",
+            "resume_condition": "the dependency is readable",
+            "next_action": "recheck the dependency",
+            "evidence": {
+                "kind": "read-failure",
+                "path": str(evidence),
+                "sha256": hashlib.sha256(evidence.read_bytes()).hexdigest(),
+                "target": str(self.base / "unavailable"),
+                "operation": "read",
+                "error": "missing",
+            },
+        }
+        fence = chr(96) * 3
+        record.write_text(
+            (fence + "agent-handoff-disposition\\n" + json.dumps(value) + "\\n" + fence + "\\n").replace(
+                "\\n", "\n"
+            ),
+            encoding="utf-8",
+        )
+        command = (
+            f"python '{ROOT / '.agents/engineering/workflow/handoff/scripts/admission.py'}' check "
+            f"--record '{record}' --id B014 --session '{self.session}' "
+            f"--prompt-sha256 '{value['callout']['prompt_sha256']}' --callout-id '{state['callout_id']}'"
+        )
+        output = subprocess.run(
+            [sys.executable, "-B", str(ROOT / ".agents/engineering/workflow/handoff/scripts/admission.py"), "check",
+             "--record", str(record), "--id", "B014", "--session", self.session,
+             "--prompt-sha256", value["callout"]["prompt_sha256"], "--callout-id", state["callout_id"]],
+            capture_output=True, text=True, encoding="utf-8", timeout=15,
+            env=dict(os.environ, TMP=self.temp.name, TEMP=self.temp.name, TMPDIR=self.temp.name),
+            check=True,
+        ).stdout
+        return command, output
 
     def test_callout_blocks_automatic_feedback_and_terminal_stop(self):
         context = self.submit()["hookSpecificOutput"]["additionalContext"]
         self.assertIn("answer the user's direct question first", context)
         denied = self.pretool()["hookSpecificOutput"]
         self.assertEqual("deny", denied["permissionDecision"])
-        self.assertIn("source owner", denied["permissionDecisionReason"])
+        self.assertIn("typed disposition", denied["permissionDecisionReason"])
         stopped = self.run_hook("Stop", transcript_path=str(self.transcript))
         self.assertEqual("block", stopped["decision"])
 
@@ -147,6 +211,31 @@ class CalloutRepairGateTests(unittest.TestCase):
         ])
         self.assertEqual({}, self.pretool("mcp__host__send_feedback"))
 
+    def test_current_typed_deferred_disposition_releases_only_the_current_claude_turn(self):
+        self.submit()
+        command, output = self.deferred_check()
+        records = self.claude_launch(command=command)
+        records[-1]["message"]["content"][0]["content"][0]["text"] = output
+        self.write_transcript(records)
+        self.assertEqual({}, self.pretool())
+        self.submit()
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+
+    def test_typed_disposition_requires_the_current_codex_callout_nonce(self):
+        self.submit(turn_id="turn")
+        command, output = self.deferred_check()
+        self.write_transcript([
+            {"type": "response_item", "payload": {"type": "message", "role": "user",
+                "content": [{"type": "input_text", "text": PROMPT}]}},
+            {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
+                "call_id": "admission", "input": command}},
+            {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "admission",
+                "output": [{"type": "text", "text": output}]}},
+        ])
+        self.assertEqual({}, self.pretool("mcp__host__send_feedback"))
+        self.submit(turn_id="new-turn")
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+
     def test_codex_failed_output_and_analysis_are_not_success_or_answer(self):
         self.submit(turn_id="turn")
         records = [
@@ -166,11 +255,13 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.submit()
         records = self.claude_launch(command="& 'plugin/launch-codex.ps1' -WorkingDirectory $owner -PromptPath $prompt")
         result = records[-1]["message"]["content"][0]
-        result["content"] += "\n" + json.dumps({"event": "agent-handoff-submitted",
+        result["content"][0]["text"] += "\n" + json.dumps({"event": "agent-handoff-submitted",
             "worktree": str(self.source), "prompt_path": str(self.prompt)})
         self.write_transcript(records)
         self.assertEqual({}, self.pretool())
-        result["content"] = json.dumps({"output": result["content"], "exit_code": 0})
+        result["content"] = [{"type": "text", "text": json.dumps(
+            {"output": result["content"][0]["text"], "exit_code": 0}
+        )}]
         self.write_transcript(records)
         self.assertEqual({}, self.pretool())
 

@@ -117,8 +117,12 @@ class ProcessStandardsTests(unittest.TestCase):
             "A defect in a consumed standards package or its source repository is the exception: "
             "a stale or broken standard",
             "and so is a standard that caused or failed to prevent a mistake",
-            "in the same turn, after answering the user's direct question and before the current task resumes, without asking",
-            "announcing a later or separate fix instead of launching is a violation",
+            "`engineering:self-repair` in the same turn, after answering the user's direct question and before the "
+            "current task resumes, without asking",
+            "reuses an exact owner or closed context where supported, and launches only an admitted runnable",
+            "a concrete obstacle stays in the canonical record with its resolver and resume condition",
+            "This rule is the standing authorization: it covers implementing, testing, opening the PR and merging",
+            "explicit user limits still hold",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
