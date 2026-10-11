@@ -12,13 +12,12 @@ goes on his clipboard.
 
 ## How
 
-Write the exact text to a UTF-8 file in the scratchpad, then:
+Write the exact text to a UTF-8 file in the scratchpad, then run the command with `python3` on Linux/macOS
+or `python` on Windows:
 
 ```sh
 python3 '<skill-directory>/scripts/copy_draft.py' --path '<absolute-path-to-file>'
 ```
-
-On Windows, use `python` instead of `python3` if `python3` is not on PATH.
 
 `copy_draft.py` sits beside this file, the same way `handoff-claude` carries its launcher.
 
