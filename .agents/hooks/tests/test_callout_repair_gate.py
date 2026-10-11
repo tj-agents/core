@@ -63,7 +63,7 @@ class CalloutRepairGateTests(unittest.TestCase):
             ]}},
         ]
 
-    def test_callout_blocks_automatic_feedback_and_claude_stop(self):
+    def test_callout_blocks_automatic_feedback_and_terminal_stop(self):
         context = self.submit()["hookSpecificOutput"]["additionalContext"]
         self.assertIn("answer the user's direct question first", context)
         denied = self.pretool()["hookSpecificOutput"]
@@ -187,10 +187,7 @@ class CalloutRepairGateTests(unittest.TestCase):
             manifest = json.loads((ROOT / f".agents/plugins/manifests/{host}/engineering-hooks.json").read_text())
             for event in ("UserPromptSubmit", "PreToolUse"):
                 self.assertIn("callout_repair_gate.py", json.dumps(manifest["hooks"][event]))
-            if host == "claude":
-                self.assertIn("callout_repair_gate.py", json.dumps(manifest["hooks"]["Stop"]))
-            else:
-                self.assertNotIn("callout_repair_gate.py", json.dumps(manifest["hooks"].get("Stop", [])))
+            self.assertIn("callout_repair_gate.py", json.dumps(manifest["hooks"]["Stop"]))
 
 
 if __name__ == "__main__":
