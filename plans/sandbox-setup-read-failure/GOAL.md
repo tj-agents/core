@@ -11,21 +11,67 @@ installed engineering package's `.agents/lanes/codex.json`: `gpt-6.1-sol`, high 
 
 ## Outcome
 
-Restore ordinary sandboxed execution while preserving sandbox settings, ACLs, hook trust and live peers, or reach a concrete external installation gate with the exact official fixed candidate and verification prepared. The renewed request owns repair completion; the previous diagnosis alone is not recovery.
+Restore ordinary sandboxed execution through the supported normal CLI launch path, so a fresh worker can
+read its goal, a canonical skill and a text prompt and continue its task. Preserve sandbox settings, ACLs,
+hook trust and live peers. The earlier isolated-runtime verification is useful evidence, but it does not
+establish adoption by ordinary launches. The renewed 2026-10-11 request prioritizes this as a P1 capability
+blocker and explicitly requests one native handoff before the broader orchestration work.
 
 ## Scope
 
-Investigate the Codex execution environment's setup-refresh/helper path, including available hook output and reproducible command evidence. Make no repository-product changes unless evidence shows a core-owned source defect. Do not bypass hook trust or weaken sandboxing.
+Reconcile the already proven upstream runtime repair with current ordinary-launch selection and recover
+the supported path. Reuse completed diagnosis and installed runtime evidence. Source changes are within
+scope when they causally repair core's runtime selection/recovery; include required tests, catalog and
+manifest companions, focused review and delivery under the repository's standing authority. Reconcile
+the preserved Fix/CodexPreflightRecovery work before editing overlapping preflight paths. Do not implement
+orchestration, lane redesign, unrelated cleanup or a new self-improvement system in this repair.
+
+The prior approval installed a side-by-side runtime, preserving global PATH and profile selection. Do not
+invent authorization for a different installation or bypass. If restoring the ordinary path requires a
+separate machine/profile approval, first prepare the exact reversible change and its validation, record
+the real remaining gate, and continue independent source repair. Do not ask again for already approved
+installation/use of the isolated candidate or routine in-scope source edits. No sandbox/hook bypass.
 
 ## Next Steps
 
-Completed on 2026-10-11 by fixed-runtime successor `01a12aec-7f71-7c73-aeaf-5fca3d754103`. Both original reads exited 0 through ordinary sandboxed `exec_command`, and their setup refreshes used the fixed helper with `errors=[]`. Verification is recorded below. Finish the local goal checkpoint and report both outcomes to Tommy. No further repair, installation, sibling-checkout writes or publication is required by this machine recovery task.
+Renewed 2026-10-11 by Tommy: fix the read blocker first and hand it off. Coordinator
+01a12b10-3519-7f41-8e4f-7afa6828fef0 verified the prior repair sessions are no longer live and is preparing
+one successor in this same checkout. No continuation owner.json exists here. This coordinator owns only
+dispatch preparation until submission; the acknowledged successor becomes the sole repair writer.
+
+1. Record pickup with the new session identity and actual runtime version. Run an ordinary sandboxed
+   command immediately to establish whether the selected fixed runtime still works; read this goal and
+   the original skill/text paths. No repeated archive investigation unless integrity evidence changed.
+2. Resolve the ordinary launch path and explain why it still selects a broken runtime. Compare actual
+   executable/version and invocation settings with the successful fixed path recorded below. The parent
+   reproduced `helper_unknown_error: setup refresh had errors` today before PowerShell started.
+3. Repair the causal owned selection/recovery gap or prepare the exact required machine-change gate.
+   Preserve any partial work in the existing preflight-recovery checkout and avoid duplicate ownership.
+4. Validate through a normal fresh native worker using the intended ordinary entry point, not merely a
+   direct executable probe or an elevated read. Record selection evidence plus skill/text command exits.
+5. Complete any causal source change through focused tests, review and authorized delivery; retain a clear
+   adoption result. Do not stop merely because one isolated verification succeeded. Do not create unrelated
+   repair tabs; record independent findings against their existing owner for later orchestration.
+
+Lane: L3, because runtime selection/adoption and the smallest causal repair still require investigation.
+Use the installed lane table; route later implementation/review to the appropriate lane. Tommy prefers
+fast mode if the supported launcher can express it, but explicitly said not to delay this repair for it.
+The currently inspected launcher has no fast option; this dispatch does not claim fast mode.
+
+Done when: supported ordinary launches select a verified working runtime, fresh ordinary sandboxed reads
+of a goal, skill and text prompt pass, and the recovered worker proceeds. Any installation, loaded-session
+restart or adoption gap must retain an owner and concrete next action rather than being reported done.
 
 ## Status and next use
 
-Completed on 2026-10-11: the approved isolated runtime installation, fresh-host acceptance and fixed-runtime successor verification passed. The original text-file and canonical skill-file reads were separately executed through the actual sandboxed command runner with exit code 0. Their matching setup refreshes used the installed fixed helper and completed with errors=[].
+Active again for normal-launch recovery. Historical completed phase: the approved isolated runtime
+installation and fixed-runtime successor verification passed on 2026-10-11. Both original file reads
+exited 0 and matching setup refreshes completed with errors=[].
 
 Existing sessions still use their original runtime. Reopen with the installed executable and invocation-local compatibility catalog shown below to use the repair. Global npm/PATH selection was not changed.
+
+The historical evidence below describes that earlier bounded verification. Its completion statements do
+not supersede the renewed Outcome, Scope and Next Steps above.
 
 ## Cause and owner
 
