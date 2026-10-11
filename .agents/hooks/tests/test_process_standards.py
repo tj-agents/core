@@ -290,8 +290,8 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(per_pr_reading=per_pr_reading):
                 self.assertNotIn(per_pr_reading, corpus)
 
-    def test_techdebt_uses_mode_specific_isolation_and_picks_fast(self):
-        body = authored_skill("techdebt").read_text(encoding="utf-8")
+    def test_address_debt_uses_mode_specific_isolation_and_picks_fast(self):
+        body = authored_skill("address-debt").read_text(encoding="utf-8")
         flat = " ".join(body.split())
 
         self.assertIn("Single-repo mode:** survey the repository", flat)
