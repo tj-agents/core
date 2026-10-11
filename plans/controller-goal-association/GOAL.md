@@ -106,12 +106,6 @@ Readiness authorizes this source boundary, including the mandatory existing-mani
 
 ## Current checkpoint
 
-Status: implementation is locally in progress; focused continuation discovery completed after correcting the unittest discovery invocation.
+Status: the authorized source slice is committed at `168b87d8607bbc756ce2c9ff37faa251d729a877`; focused continuation and harness-manifest validation passed after catalog synchronization and local generation.
 
-Blocked action: synchronize `.agents/catalog/catalog.json` and generated plugin output after the required engineering harness permission declaration.
-
-Blocked by: the Goal's seven-source-path limit excludes the catalog, and the execution policy rejected the catalog write as an unauthorized scope expansion.
-
-Unblock action: explicitly authorize updating `.agents/catalog/catalog.json` as the required companion to the changed shipped harness manifest.
-
-Resume when: the catalog synchronization is authorized, then rerun generation, manifest validation, and the focused test suite.
+Next action: obtain the required frozen independent review and Windows/Linux CI evidence for that exact commit before normal delivery steps.
