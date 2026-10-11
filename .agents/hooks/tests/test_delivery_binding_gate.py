@@ -553,6 +553,13 @@ class GateSubprocessTests(unittest.TestCase):
     def test_disable_auto_remains_allowed(self):
         self.assertEqual(0, self.run_hook(command="gh pr merge 42 --disable-auto", event="PreToolUse").returncode)
 
+    def test_unknown_launcher_option_refuses_before_body_binding(self):
+        result = self.run_hook(
+            tool_input={"command": ["bash", "--future-option", "-c", CREATE + " --title t"]}
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertIn("SHELL EXTRACTION GATE", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

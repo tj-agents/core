@@ -136,6 +136,13 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual([], self.obligation_files())
 
+    def test_unknown_launcher_option_refuses_before_cleanup_handling(self):
+        result = self.run_hook(
+            self.payload(["bash", "--future-option", "-c", "gh pr merge 3 --squash"])
+        )
+        self.assertEqual(2, result.returncode)
+        self.assertIn("SHELL EXTRACTION GATE", result.stderr)
+
     def test_grace_selection_direct_vs_queued(self):
         direct = {"merge_mode": "direct"}
         queued = {"merge_mode": "queued"}
