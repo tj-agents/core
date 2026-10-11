@@ -1,6 +1,6 @@
 # Recover authorized coordination before returning a manual fallback
 
-Status: R1 corrected; both-host guidance packaging validation passed; fixing checkpoint and incremental review next.
+Status: R2 and R3 corrected and validated; stable replacement checkpoint/review next for existing PR 207.
 Date: 2026-10-11
 Branch: Fix/FollowupRecoveryOwnership
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-FollowupRecoveryOwnership
@@ -17,7 +17,7 @@ Investigation selects L3 because eligibility and receipt semantics need reconcil
 and independent review select L4 through bounded lane workers once the correction is specified.
 One slice covers the existing followup-codex/open-codex guidance and any required machine harness
 declaration and no-send helper advice. The source/test slice is 153 additions and 20 deletions across six files; no recovery launcher or transport behavior changed.
-PR: not opened. Verification: existing receipt and recovery tests, source generation, packaging/harness
+PR: https://github.com/tj-agents/core/pull/207; exact head 36d7374d81cf4620a11c41b7bb31e15b046b8711. Verification: existing receipt and recovery tests, source generation, packaging/harness
 checks, and exact-head Windows/Linux CI before normal merge and causal generated publication.
 
 ## Outcome and authority
@@ -49,13 +49,13 @@ Owned candidate source: .agents/machine/utility/followup-codex/SKILL.md; .agents
 
 Scope: whole recovery-contract repair through terminal delivery.
 Current slice: one focused recovery guidance/helper/permission correction.
-Remaining scope: fixing checkpoint, incremental review, PR CI, normal merge and causal generated publication.
+Remaining scope: R3 validation, stable replacement checkpoint/review/CI, normal merge and causal generated publication.
 Done when: independent review and Windows/Linux CI pass, the PR is merged and its generated packages are verified.
 
-1. Commit the verified R1 correction through a bounded L7 worker; incrementally review from the full-pass watermark 59de0bd924559dcb48836754a1ed732254ed1202 using fresh independent contexts.
-2. Publish the stable candidate to this branch's ordinary draft GitHub PR and bind exact-head Windows/Linux CI monitoring.
-3. Resolve actionable review or CI findings, then perform normal authorized merge and verify causal generated publication. No profile installation is part of this goal.
-4. Report actual PR/head/merge/publication evidence to the parent; retain its independent settings goal and coordinate only this result. Maintain progress here through terminal delivery.
+1. Commit the verified coupled R2/R3 correction through the bounded L7 checkpoint worker, then independently review the fixing delta from watermark 36d7374d81cf4620a11c41b7bb31e15b046b8711. Both host declarations are source-verified; no consumer installation is claimed.
+2. Reuse captured successful local evidence: 18 recovery, 15 harness and 38 repo-config tests, plus generation/catalog/declaration/packaging/adapter/docs checks. Preserve the Claude script trust boundary and Codex initial command prefix; neither is semantic parsing enforcement. Parent-owned validators remain unchanged.
+3. Push to existing PR 207, refresh delivery/continuation binding and own exact-head Windows/Linux CI through one monitor. Resolve actionable findings; normal merge requires review and checks green.
+4. Verify causal generated publication and report actual PR/head/merge/publication evidence to the parent. Retain its settings goal; no installation or destructive cleanup.
 
 ## Investigation evidence and decision
 
@@ -118,3 +118,11 @@ Done when: independent review and Windows/Linux CI pass, the PR is merged and it
 Full review at 59de0bd924559dcb48836754a1ed732254ed1202 found one deduplicated MEDIUM prompt-example defect. Native reviewer and fresh isolated workflow lens corroborated it; canonical work order is reviews/Fix-FollowupRecoveryOwnership.md. Specialist model unavailable for this account; declared fallback ran successfully. Serial L4 remediation corrected both canonical skills with an explicit blocker-specific recovery prompt; ordinary opening retains its default prompt. Required acknowledgment/release and child-writer reconciliation now appear in the invocation.
 
 R1 validation passed: generation/catalog checks, skill packaging, self-contained payload/adapter checks and documentation reachability (including AGENTS/CLAUDE pairs). Logs use the corresponding -r1 labels in workflow run followup-recovery. Runtime tests are reused because R1 changed only guidance.
+
+Publication evidence: git push/fetch and PR creation/head verification exited 0; local, remote and draft PR heads all equal 36d7374d81cf4620a11c41b7bb31e15b046b8711. Existing continuation owner was explicitly rebound to PR 207 and immediately reclaimed by the same foreground PID. Current token lives only in runtime state.
+
+Current repair: incremental native review found R2 (dynamic shell prompt quoting); use existing private UTF-8 prompt-file input. Linux CI found R3 (Claude allow rule shape rejected by unchanged consumer validator); fix canonical manifest and meaningful consumer-validation coverage only. Fresh CI diagnosis owns evidence; one serialized L4 writer owns repairs. Do not edit parent-owned settings readers, delivery policy or hook consumers.
+
+R2 accepted: both canonical skills use private UTF-8 recovery instruction and existing --prompt-path. Captured 18 recovery tests passed, including a real prompt-file adapter test with spaces/non-ASCII/apostrophes/shell syntax. Latest examined baseline run 38170019843 executed both platform jobs successfully; consumer validator/CI invocation unchanged, proving R3 is introduced by this manifest shape rather than an environment or timing problem.
+
+R3 accepted and verified: 8 raw/16 rendered Claude exact-script prefixes; Codex prefixes unchanged. The complete machine requires record passes the shared consumer validator. Captured 38 repo-config regression tests and 15 harness tests pass, as do affected -r3 generation/catalog/declaration/packaging/adapter/docs checks. The failure no longer occurs in its local consumer scope; exact-head remote platform validation remains mandatory.
