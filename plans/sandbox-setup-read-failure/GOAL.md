@@ -17,9 +17,11 @@ Restore ordinary sandboxed execution while preserving sandbox settings, ACLs, ho
 
 Investigate the Codex execution environment's setup-refresh/helper path, including available hook output and reproducible command evidence. Make no repository-product changes unless evidence shows a core-owned source defect. Do not bypass hook trust or weaken sandboxing.
 
-## Next Steps
+## Status and next use
 
-The renewed follow-up authorizes causal diagnosis and repair of any established core launcher selection or recovery defect, with tests and repository delivery gates. Runtime installation or replacement remains a separate machine approval gate. Prepare the exact official fixed Windows x64 package, validate source inclusion and package integrity, and establish whether any installed candidate can already supply recovery before requesting that approval.
+Completed on 2026-10-11: the approved isolated runtime installation and fresh-host sandbox recovery test passed. Both skill-file and text-file reads affected by the setup-refresh failure use the repaired command-launch path. The acceptance test read this goal file; individual skill and original text paths were not separately retested.
+
+Existing sessions still use their original runtime. Reopen with the installed executable and invocation-local compatibility catalog shown below to use the repair. Global npm/PATH selection was not changed.
 
 ## Cause and owner
 
@@ -80,21 +82,11 @@ The directory check exists in
 [0.163.0-alpha.1](https://github.com/openai/codex/blob/rust-v0.163.0-alpha.1/codex-rs/windows-sandbox-rs/src/acl.rs#L530).
 These are content checks; a higher version or newer release date alone does not prove inclusion.
 
-## Safe repair route and remaining gate
+## Recovery boundary
 
-- Resolver: the machine owner selects an official Codex runtime containing PR #51822, or OpenAI
-  backports the fix into the desired stable channel. Verify the selected package's source includes
-  the directory-only guard before installation; 0.162.1 alone does not supply it.
-- Blocked action: restore ordinary sandboxed execution in the current host. The renewed goal authorizes
-  causal core repair and prepared recovery, but installation still requires the separate machine decision.
-- Concrete unblock action: authorize and install a verified official build containing the fix, then
-  restart the affected Codex sessions so they use that build's setup helper.
-- Observable resume condition: the ordinary sandboxed `Get-Content -Raw` above exits 0 while runtime
-  processes remain active, with a successful setup refresh for the same attempt.
-- Next action after that condition: resume the originating session's repository work under its
-  existing authorization.
+Tommy approved the isolated official candidate installation with "yeah go?" on 2026-10-11. Installation and actual fresh-host acceptance are complete. No installation approval remains pending. Existing hosts cannot hot-swap their running binary; their next session must explicitly select the installed runtime.
 
-No sandbox settings, hook trust, installed runtime binaries, ACLs, or active processes have been modified. No host repair is claimed.
+No sandbox settings, ACL policy, hook trust or existing runtime binaries were manually changed. No peer process was terminated by this repair.
 
 ## Renewed ownership and progress
 
@@ -115,7 +107,7 @@ The installed candidate inventory is complete: npm `0.162.0`, desktop `0.148.0-a
 
 - Release: [OpenAI Codex 0.163.0-alpha.1](https://github.com/openai/codex/releases/tag/rust-v0.163.0-alpha.1), a prerelease rather than stable.
 - Platform package: `@openai/codex@0.163.0-alpha.1-win32-x64`, selected by the official top-level `@openai/codex@0.163.0-alpha.1` manifest.
-- Archive: `C:/Users/TOMMYS~1/AppData/Local/Temp/codex-sandbox-repair-sG4Nyj/codex-0.163.0-alpha.1-win32-x64.tgz`. All 47 regular-file/directory entries have been staged; nothing is installed or added to PATH.
+- Archive: `C:/Users/TOMMYS~1/AppData/Local/Temp/codex-sandbox-repair-sG4Nyj/codex-0.163.0-alpha.1-win32-x64.tgz`. All 47 regular-file/directory entries were staged before approval; the vendor runtime is now installed at the approved isolated path, without changing PATH.
 - Archive SHA-256: `59486e550eba4ffe7bcaed01e5925c97fba59345a590896b884a72c85b9b62ac`.
 - Registry SHA-512 integrity matched, and both npm registry ECDSA signatures verified against the registry key `SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U`.
 - The published SLSA subject digest matches the same package bytes. Its DSSE signature verifies with the bundled certificate naming OpenAI's `rust-release.yml` workflow and `rust-v0.163.0-alpha.1` tag. Independent Sigstore certificate-chain/transparency-log verification was not performed; this is not claimed as complete Sigstore verification.
@@ -124,11 +116,11 @@ The installed candidate inventory is complete: npm `0.162.0`, desktop `0.148.0-a
 - Native CLI SHA-256: `3ac95e7bbb5f51d9fcda76d013a04e22456bd67eafde88eb04feafd71590933f`. Setup helper SHA-256: `2e9d81d128494f8499d6de27cca354aa94dcd1a17314ed35f29c79c6ecd78932`.
 - Full verification record: `C:/Users/TOMMYS~1/AppData/Local/Temp/codex-sandbox-repair-sG4Nyj/verification.json`. Downloaded runtime payloads and machine-specific verification state remain outside Git.
 
-## Machine approval gate and recovery verification
+## Approved machine action and recovery verification
 
-Blocked action: install and activate the verified fixed runtime. Resolver: Tommy.
+The installation approval gate was resolved by Tommy's "yeah go?" on 2026-10-11.
 
-The pending approval question proposes a side-by-side installation at `C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1`; that path does not currently exist. Approval permits copying the complete authenticated vendor runtime there and using its native `bin/codex.exe` for a fresh repair verification session. The global npm runtime, desktop caches, existing PATH, sandbox configuration, ACL policy, hook trust and live peer processes remain preserved. Do not overwrite an unexpectedly existing target.
+The approved proposal selected a side-by-side installation at `C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1`; that path was absent before installation. Approval permits copying the complete authenticated vendor runtime there and using its native `bin/codex.exe` for a fresh repair verification session. The global npm runtime, desktop caches, existing PATH, sandbox configuration, ACL policy, hook trust and live peer processes remain preserved. Do not overwrite an unexpectedly existing target.
 
 After approval, recheck archive/binary integrity, install the complete vendor payload at that exact path, verify `--version`, and select it for this repair using an invocation-scoped PATH and launcher minimum `0.163.0-alpha.1`. Perform any actual session transfer through the installed `engineering:handoff` workflow, with verified pickup and one writer; do not infer success from launcher submission. Preserve normal hook trust; do not use bypass or sandbox-disabling flags.
 
@@ -140,6 +132,40 @@ Get-Content -Raw -LiteralPath 'plans/sandbox-setup-read-failure/GOAL.md'
 
 It must exit 0 while the shared `node_repl.exe` processes remain active. Capture the matching setup-refresh log showing the fixed helper path and `errors=[]`, and verify that the parent and other peer sessions remain live. A standalone `codex sandbox` probe can provide supplementary evidence but does not replace success through the actual host command runner.
 
-Observable resume condition: Tommy approves the isolated installation; then execute that action and its acceptance test. A choice to wait for stable preserves this gate until a stable release's immutable source is verified to include PR #51822. No timed-out or unanswered question supplies approval.
+Approval, installation and fresh-host acceptance are complete under the existing sandbox settings.
 
-The goal remains at a human authorization gate. No unattended writer or wake has been registered: this gate requires a user decision, and the continuation contract treats that as a terminal wait rather than authorizing installation. The current foreground session retains this checkpoint. No successful sandbox recovery is claimed.
+The current foreground session remains sole writer. No unattended writer or wake has been registered. Recovery acceptance passed with observed ordinary command-runner success.
+
+
+## Approved installation progress (2026-10-11)
+
+Authority: Tommy's "yeah go?" approves the previously proposed side-by-side alpha installation and recovery test. This revokes the pending installation gate for the named candidate and path; it does not authorize replacing the global runtime, modifying desktop caches, changing global PATH, disabling sandboxing or bypassing hook trust.
+
+Lane selection: installation is L5 (the archive, target and copy operation are already specified), performed as a small inline follow-up; recovery verification is L3 (actual host acceptance remains unresolved). Canonical lane resolution is unchanged. No in-session model switch is claimed.
+
+The first ordinary shell read on resumption failed before process creation. The staged archive was rechecked and installed at the approved path; Git confirmed the same checkout and branch.
+
+Installation evidence: `C:/Users/TOMMYS~1/AppData/Local/Temp/codex-sandbox-repair-sG4Nyj/installation.json` records 45 vendor files installed at the approved exact path and verified byte-for-byte against the authenticated archive. The installed native binary `--version` returned `codex-cli 0.163.0-alpha.1` with exit 0. No existing runtime or global PATH was replaced.
+
+The optional standalone `codex sandbox --cd ...` probe exited 2 before executing a command because this build requires an explicit permission profile or sandbox-state JSON; the saved user configuration uses legacy `sandbox_mode="workspace-write"`. No profile was invented and no sandbox control changed. The recovery test therefore proceeds through a fresh actual `codex exec` host using the unchanged saved configuration. The fresh child is read-only; it has no goal or repository writer ownership.
+
+The first fresh fixed-runtime host started thread `01a12aa2-8990-73b0-97be-825c103620b1` but exited 1 before any tool execution: the Responses backend rejected `input[1].internal_chat_message_metadata_passthrough.content_item_metadata` (HTTP 400). No sandbox acceptance is claimed from that launch. Startup also logged upstream system-skill directory sharing/access errors; no local directory, ACL or trust was manually altered to address them.
+
+Recovery diagnosis remains L3. Immutable upstream `client.rs` strips content-item metadata when `ModelInfo.use_responses_lite` is false. This account's selected model cache advertises it as true. Upstream exposes `model_catalog_json` as an authoritative process-local catalog using `StaticModelsManager`; it preserves auth filtering. A supported invocation-scoped catalog at `C:/Users/TOMMYS~1/AppData/Local/Temp/codex-sandbox-repair-sG4Nyj/responses-compatible-models.json` copies the existing catalog and changes only the selected model's `use_responses_lite` to false for ordinary Responses compatibility. Sandbox, approval, node tool review metadata, hooks, TLS, auth and global configuration are unchanged. The focused retest uses that official override and preserves original failed-launch evidence.
+
+## Completed recovery acceptance (2026-10-11)
+
+Fresh fixed-runtime thread `01a12aa5-e595-7542-934c-bad2fc45f33e` ran ordinary sandboxed PowerShell `Get-Content -Raw -LiteralPath 'plans/sandbox-setup-read-failure/GOAL.md'` with exit code 0. The native host also exited 0. The matching sandbox log records the installed `0.163.0-alpha.1/codex-resources/codex-windows-sandbox-setup.exe` and `setup refresh: processed 2 write roots (read roots delegated); errors=[]` at 2026-10-11T11:08:23.527575100 UTC.
+
+The parent dependent-cleanup session and this repair session remained live; 20 pre-existing shared node runtime processes remained active. No process termination or restart was issued by the repair. Other peers can change independently, so unchanged status for every peer is not claimed.
+
+The invocation-local compatibility catalog is saved at `C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/responses-compatible-models.json`. It changes only the selected model's Responses compatibility flag. Persistent verification, installation, acceptance summary and successful setup excerpt are in that runtime's `repair-evidence/` directory. The alpha's initial API-metadata failure was resolved for the tested invocation; global configuration remains unchanged.
+
+From this checkout, open the fixed runtime with:
+
+```powershell
+$codexLane = (Get-Content -Raw -LiteralPath '.agents/lanes/codex.json' | ConvertFrom-Json).lanes.L3
+& 'C:\Users\TommySeery\.local\share\codex\runtimes\0.163.0-alpha.1\bin\codex.exe' --model $codexLane.model --config ('model_reasoning_effort=' + $codexLane.reasoning_effort) --config 'model_catalog_json="C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/responses-compatible-models.json"' --cd 'C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-SandboxSetupReadFailure'
+```
+
+No core runtime source defect was established and no core code change was required. The approved installation and verification scope is complete. The originating repository session retains its own work and writer ownership.
