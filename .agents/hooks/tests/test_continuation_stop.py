@@ -233,7 +233,7 @@ class ContinuationStopTests(unittest.TestCase):
             "repository": "tj-agents/core",
             "worktree": str(self.root.resolve()),
             "branch": "Fix/Example",
-            "head": "a" * 40,
+            "remote_head_sha": "a" * 40,
         }
         runtime.identity.return_value = {
             "repo": "tj-agents/core",
@@ -242,6 +242,34 @@ class ContinuationStopTests(unittest.TestCase):
             "head": "a" * 40,
         }
         self.assertTrue(continuation_stop.binding_active(runtime, self.root, {}))
+
+    def test_binding_active_compares_the_artifact_head_alias(self):
+        runtime = continuation_stop.module("continuation_runtime", continuation_stop.workflow_root())
+        root = self.root.resolve()
+        current = runtime.identity(root)
+        artifact = {
+            "repo": current["repo"],
+            "pr": 1,
+            "pr_url": f"https://github.com/{current['repo']}/pull/1",
+            "worktree": current["worktree"],
+            "branch": current["branch"],
+            "head": current["head"],
+            "pending_evidence": [],
+            "review": {
+                "work_order": "reviews/example.md",
+                "work_order_order": ["native-general"],
+                "reviewed_sha": None,
+            },
+            "merge_authorization": {"mode": "absent", "instruction": None},
+            "completion_condition": "PR is merged or reaches a human decision",
+        }
+
+        self.assertTrue(continuation_stop.binding_active(runtime, root, artifact))
+
+        artifact["head"] = "f" * 40
+
+        with self.assertRaisesRegex(RuntimeError, "binding-head-changed"):
+            continuation_stop.binding_active(runtime, root, artifact)
 
     def test_foreign_owner_file_cannot_satisfy_this_worktree_obligation(self):
         self.write_owner(self.owner(worktree=str(self.root.parent / "other")))
