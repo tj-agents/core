@@ -102,6 +102,10 @@ limited to plan, ledger, review-observation, or problem-record status/evidence, 
 meaningful documentation deliverables, and code or security fixes still use normal delivery gates. Never create or push an
 observation-only, ledger-only, review-only, or checkpoint-transport commit before that checkpoint.
 
+For a linked source cleanup, preserve its exact merged `HEAD` and follow `engineering:committing` before moving
+the canonical goal or taking a terminal checkpoint. Its retained owner records `Plan retirement: pending` and
+carries retirement into its next substantive publication.
+
 If a push fails, diagnose the cause and retain the exact known heads. Update the ledger only when the failure
 creates a genuine blocker or context-ending state; do not push the record of the failure.
 

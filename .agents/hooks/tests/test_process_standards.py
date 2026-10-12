@@ -498,10 +498,8 @@ class ProcessStandardsTests(unittest.TestCase):
 
         for owner, body in dependents.items():
             with self.subTest(owner=owner):
-                self.assertIn("source candidate is frozen", body)
-                self.assertIn("must not advance its `HEAD`", body)
                 self.assertIn("`engineering:committing`", body)
-                self.assertIn("terminal local checkpoint", body)
+                self.assertIn("Plan retirement: pending", body)
 
         self.assertIn(
             "Uncommitted executable changes, or local ahead of remote",
@@ -513,6 +511,22 @@ class ProcessStandardsTests(unittest.TestCase):
         )
         self.assertNotIn("close-out PR landed", dependents["merge"])
         self.assertNotIn("land the plan close-out", dependents["merge"])
+
+        for phrase in (
+            "preserve its exact merged `HEAD`",
+            "terminal receipt against the canonical goal at its original path",
+            "Keep it there through its fresh completion check",
+            "Plan retirement: pending",
+            "next substantive publication",
+            "pure closeout PR",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, committing + " " + dependents["plans"] + " " + dependents["merge"])
+
+        self.assertIn("sets uncommitted leftovers aside", dependents["merge"])
+        self.assertIn("Verify the cleanup receipt's set-aside archive", dependents["merge"])
+        self.assertIn("final cleanup to `finish.py`", dependents["merge"])
+        self.assertIn("otherwise the verified set-aside archive is the durable record", dependents["merge"])
 
         harness = json.loads(
             (self.root / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
