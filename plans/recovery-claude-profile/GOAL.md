@@ -51,7 +51,7 @@ Fix direction: match only an actual `git worktree add` (any spelling the gate al
 ## Current progress
 
 - 2026-10-12: D1 and D2 are implemented in `.agents/machine/scripts/agent_recovery.py`. Default Claude profiles now clear inherited `CLAUDE_CONFIG_DIR`; alternate profiles still set it. Resume success now requires a newer matching SessionStart registry entry, otherwise the receipt becomes `ambiguous` and the command reports a launch timeout.
-- Focused source verification passed: `python -m unittest tests/test_agent_recovery.py` — 21 tests.
+- Focused source verification passed: `python -m unittest tests/test_agent_recovery.py tests/test_open_claude.py` — 49 tests with 1 expected platform skip.
 - The repository workflow audit could inspect this checkout but could not resolve the canonical `plan-execution` skill body; its source defect is recorded as B008 in `BUGS.md`. Execution continues through the documented native fallback.
 
 ```agent-host-coverage
