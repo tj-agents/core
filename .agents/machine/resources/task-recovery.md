@@ -15,6 +15,12 @@ evidence in both that file and any required tool approval justification:
 - the exact-owner and one-writer state, including every child writer that must acknowledge, release, or be
   reconciled before conflicting work.
 
+Use the current host tool's per-call approval field for this evidence. For Codex `exec_command` requests that
+require `sandbox_permissions=require_escalated`, put the task evidence in the `justification` argument. A static
+permission-rule justification and a prompt-file path do not transmit the per-task evidence. Never assume the
+reviewer reads the private file. If a host exposes no supported field, retain the true gate, name the missing
+capability, and use no workaround.
+
 A Goal path alone, or an assertion that work is "authorized", is not enough. State the task-specific
 evidence that lets the reviewer assess the requested action. Do not claim approval that the evidence does
 not establish.
