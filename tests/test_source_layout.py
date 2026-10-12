@@ -39,10 +39,13 @@ class SourceLayoutTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         for name in (".agents", ".codex", ".claude"):
+            patterns = ["__pycache__", "*.pyc"]
+            if name == ".agents":
+                patterns.append("continuation")
             shutil.copytree(
                 ROOT / name,
                 self.root / name,
-                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                ignore=shutil.ignore_patterns(*patterns),
             )
 
     def config(self, edit):
@@ -53,7 +56,7 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(80, len(skills))
+        self.assertEqual(81, len(skills))
         self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
@@ -80,6 +83,7 @@ class SourceLayoutTests(unittest.TestCase):
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/goal-continuation/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/idea-initialization/SKILL.md", output)
 
     def test_problem_record_skills_and_shared_contract_ship_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
@@ -138,6 +142,7 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         for relative in (
             "plugins/base/skills/agent-files/scripts/session-context.py",
+            "plugins/base/skills/idea-initialization/scripts/session-context.py",
             "plugins/base/skills/plan-artifacts/scripts/session-context.py",
             "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/skills/handoff-codex/scripts/launch_codex.py",
