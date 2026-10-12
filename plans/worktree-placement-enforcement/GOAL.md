@@ -1,6 +1,6 @@
 # Worktree placement enforcement
 
-Status: review remediation and CI inventory repair verified; stable replacement commit, incremental review and exact-head CI next.
+Status: conflict resolution complete and 3b57 gate repair verified; final incremental review and CI next.
 
 ## Authority and ownership
 
@@ -10,7 +10,7 @@ Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-Worktre
 Branch: Fix/WorktreePlacementEnforcement
 Base: origin/main at 376df0ced5283a4ee4247d07feb10e8671b64475, refreshed before implementation.
 PR: https://github.com/tj-agents/core/pull/220 (draft). Initial reviewed head: d1837ee308af71b76ffc833219bb8d6ff51c15a2; the exact current delivery head and runs are held in the existing runtime binding and owner.
-Bug: BUGS.md B006
+Bug: BUGS.md B007
 
 ## Pickup and cause
 
@@ -57,10 +57,10 @@ Current slice: regenerate and checkpoint the verified source/test repairs, then 
 Remaining scope: isolated review, exact-head Windows/Linux CI, plain GitHub PR merge and causal generated-distribution verification.
 Done when: the reviewed enforcement source is merged, required CI and causal regeneration pass, generated both-host packages carry the hook, and actual installed/native limitations are recorded accurately.
 
-1. Candidate d1837ee is committed and pushed with ten authored paths; generated packages and digests were excluded. Keep this frozen candidate until review or CI proves a needed fix.
+1. Repair commits d1837ee and 3b57620 are preserved. Imported fresh-main conflict repair retains fixture-maintenance B006 and records placement as B007; run final generation/check before publication.
 2. Run the canonical isolated review from its frozen descriptor. Resolve findings within this same slice and use incremental review for later commits.
 3. Publish one stable draft PR, bind its exact head and monitor its checks through the existing continuation. Mark ready and use guarded authorized merge after review and CI pass.
-4. Observe only this merge's causal regeneration; verify shipped source, dependencies and both host hook manifests. Record completion and resolve B006 with actual evidence, without claiming installation into an unrelated profile.
+4. Observe only this merge's causal regeneration; verify shipped source, dependencies and both host hook manifests. Record completion and resolve B007 with actual evidence, without claiming installation into an unrelated profile.
 
 ## Agent-host coverage
 
