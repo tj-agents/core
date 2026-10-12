@@ -31,6 +31,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
                     self.assertEqual(hook["timeout"] - budget, 3)
         self.assertCountEqual(names, [
             "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
+            "worktree_placement_gate.py",
             "forge_poll_gate.py", "compact_output_gate.py", "delivery_binding_gate.py",
             "merge_cleanup_gate.py", "callout_repair_gate.py",
         ])

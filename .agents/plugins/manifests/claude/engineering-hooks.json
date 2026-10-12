@@ -57,6 +57,7 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_placement_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py@Bash|PowerShell",
