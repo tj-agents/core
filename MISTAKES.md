@@ -87,3 +87,63 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Intended correction:** Reconcile actual state after failed or ambiguous mutations before reporting, retrying, rolling back or handing ownership to another agent.
 
 **Resolved when:** The workflow demonstrates accurate state reconciliation for complete, partial and unexecuted failures.
+
+## M008 - Legacy auto-merge preference reported as the completed settings interface
+
+**Kind:** mistake. **Observed/reported:** 2026-10-11. The originating session presented `delivery-authorization.json` as the requested generic configuration and claimed completion despite an unfinished configuration workstream; Tommy corrected the requirement to Core-owned `settings.json` containing a configuration object and clarified that Kit/template is independent. Cause of the completion claim: unknown. The existing implementation's conflicting `.agents/configuration.json` contract is confirmed by its goal and reader.
+
+**Impact and priority:** P2; the public interface and claimed ownership do not meet the requested arbitrary-consumer behavior.
+
+**Source owner:** tj-agents/core repository settings reader, consumers and public documentation.
+
+**State:** in-progress. **Repair link:** [repository-settings goal](plans/repository-settings/GOAL.md), continuing the released `Feature/RepositoryConfiguration` implementation as one causal repair.
+
+**Ownership evidence:** exact controller `01a122c4-e884-7402-a873-9fa7449e5c37` was recovered and contacted its existing child through native collaboration. The original source goal records the child's explicit release to this successor at `2026-10-11T22:16:13Z`, preserving dirty source and its SHA-256 inventory. Source coordination is resolved.
+
+**Next action:** the bounded L4 writer integrates the released patch and applies the settings contract, followed by validation, independent review and authorized delivery.
+
+**Resolution condition:** public documentation and both shipped host consumers use one Core-owned settings interface; an unrelated disposable repository exercises guarded auto-merge with its existing authorized task and no copied interpretation or legacy-standing-policy boilerplate; Windows/Linux validation, independent review, normal merge and causal publication pass, and completion reports match the observed outcome.
+
+**Verification evidence:** the correction handoff, the existing owner goal and read-only dirty-source inspection, exact child/controller metadata, and the native follow-up result are recorded in the repair goal. No settings behavior, source delivery, consumer adoption or normal-profile activation has been verified.
+
+## M009 - Treating unavailable follow-up as the end of authorized coordination
+
+**Kind:** mistake. **Observed/reported:** 2026-10-11. This settings session identified the existing source controller, received unavailable/no-send-attempted from the supported follow-up helper, and returned a manual source-release obligation to Tommy while the exact-session open-codex recovery utility was available. Tommy called out that implementation remained unfinished and coordination had been offloaded to him.
+
+**Impact and priority:** P2; the authorized settings correction was stalled without exhausting supported automated recovery.
+
+**Source owner:** tj-agents/core machine follow-up/recovery standards. **Cause:** confirmed incomplete manual-only fallback guidance in followup-codex, combined with this agent failing to attempt exact-owner recovery. The endpoint infrastructure failure's cause remains unknown.
+
+**State:** in-progress. **Repair link:** C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-FollowupRecoveryOwnership/plans/followup-recovery/GOAL.md, branch Fix/FollowupRecoveryOwnership, launched native successor 01a12d05-0e36-7cd2-afac-1936aa63404b. The original settings outcome remains owned by plans/repository-settings/GOAL.md and this native session.
+
+**Next action:** the side successor repairs eligible automated recovery before manual fallback while this parent verifies source release from the recovered exact controller and resumes the settings implementation.
+
+**Resolution condition:** the standards repair is reviewed, both-host Windows/Linux validated, merged and causally published, and recovery demonstrates preserved exact identity, one writer, truthful acknowledgment/release evidence and continued ownership of the original outcome.
+
+**Verification evidence:** exact open-codex recovery succeeded for controller 01a122c4-e884-7402-a873-9fa7449e5c37, now registered alive at PID 1216; one disjoint side-workstream launcher confirmed submission, now registered alive at PID 9104. The original controller recorded explicit source release at 2026-10-11T22:16:13Z; the settings writer is implementing that preserved patch. Settings and side standards delivery remain incomplete.
+
+## M010 - Helper exit status mistaken for a focused-test verdict
+
+**Kind:** mistake. **Observed/reported:** 2026-10-11. The implementation worker reported six compact validation calls as exit zero while their saved unittest logs contained failures. Parent and writer inspected the actual artifacts before creating a candidate and corrected the interpretation. **Cause:** confirmed reliance on the helper/transport exit rather than the recorded subprocess/test result; the existing validation contract already requires validating each returned result, so no missing standards rule is established.
+
+**Impact and priority:** P2; an unverified candidate could have been mislabeled passing, but none was committed or delivered from that status.
+
+**Source owner:** this repository-settings execution and its test-evidence reconciliation. **State:** resolved. **Repair link:** [repository-settings goal](plans/repository-settings/GOAL.md); no separate causal repair.
+
+**Correction:** the import and dynamic exception assertion were repaired. Parent read every replacement test summary before freezing; helper status is no longer treated as a verdict.
+
+**Resolution condition:** every required focused scope has an observed passing terminal artifact, failed initial artifacts remain accurately classified, and review/CI claims bind to the real candidate.
+
+**Verification evidence:** saved final repository-settings-l4 artifacts report reader 11, delivery 36, guarded command 10, binding 38, merge-review gate 82, machine 28, harness manifests 14 and source layout 21 tests OK (240 tests; 3 skips). Parent independently read the terminal artifacts. Initial failures retain their failed classification. Generation and generated checks passed. No source candidate or PR was created from the ambiguous helper status.
+
+## M011 - Committing Core's generated catalog digests
+
+**Kind:** mistake. **Observed/reported:** 2026-10-12. The initial settings candidate committed engineering/machine catalog digest regeneration, and exact-head CI38183296901 rejected those two fields. **Cause:** confirmed candidate staging omitted Core's generated-path guard; the existing guard explicitly reserves digest publication for post-merge, so no absent standards rule is established.
+
+**Impact and priority:** P2; the draft PR failed CI, with no normal merge or publication attempted.
+
+**Source owner:** this repository-settings candidate preparation. **State:** in-progress. **Repair link:** plans/repository-settings/GOAL.md and PR208. **Next action:** restore only generated digest values to the merge-base baseline and verify the existing guard before replacement-head validation.
+
+**Resolution condition:** the committed runtime and later guidance slices contain no generated digest or package deltas, the generated-path guard and exact-head CI pass, and causal post-merge publication owns regeneration.
+
+**Verification evidence:** authoritative gh run view38183296901 failed-step logs name .agents/catalog/catalog.json digest of base-agents/engineering and base-agents/machine. scripts/check_generated_paths.py reads merge-base digest values and explicitly rejects these changes.
