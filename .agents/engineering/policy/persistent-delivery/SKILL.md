@@ -83,7 +83,7 @@ The auto-merge preference comes from `.agents/settings.json` in the actual check
 `configuration.core.auto_merge`, separately from delivery authority. When that file is present, it is
 authoritative: `false` or an omitted `configuration`, `core` or `auto_merge` disables auto-merge and never
 falls back to the legacy declaration, and malformed present settings fail closed. Only when the settings
-file is wholly absent may the validated published legacy declaration's `auto_merge: true` enable the
+file is wholly absent may the validated legacy declaration's `auto_merge: true` enable the
 preference; omitted legacy `auto_merge` means `false`. The settings file itself is always a non-exemptible
 stop. After the normal green exact-head, independent-review and merge-authorization decision, invoke only
 the packaged guarded command:
