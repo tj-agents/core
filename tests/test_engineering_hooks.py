@@ -147,9 +147,9 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertEqual(0, prompt.returncode, prompt.stderr)
                 self.assertIn("auto_approve_design=false", self.additional_context(prompt))
 
-            with self.subTest(host=host, setting="enabled"):
+            with self.subTest(host=host, setting="nested-all-enabled"):
                 settings.write_text(
-                    json.dumps({"configuration": {"core": {"auto_approve_design": True}}}),
+                    json.dumps({"configuration": {"core": {"auto_approve": {"all": True}}}}),
                     encoding="utf-8",
                 )
                 prompt = self.run_user_prompt_submit(
@@ -159,17 +159,33 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 prompt_context = self.additional_context(prompt)
                 self.assertIn("auto_approve_design=true", prompt_context)
                 self.assertIn(str(settings), prompt_context)
+                self.assertIn("configuration.core.auto_approve.all", prompt_context)
 
-            with self.subTest(host=host, setting="disabled-next-prompt"):
+            with self.subTest(host=host, setting="nested-design-disabled-next-prompt"):
                 settings.write_text(
-                    json.dumps({"configuration": {"core": {"auto_approve_design": False}}}),
+                    json.dumps({"configuration": {
+                        "core": {"auto_approve": {"all": True, "design": False}}
+                    }}),
                     encoding="utf-8",
                 )
                 prompt = self.run_user_prompt_submit(
                     host, "Continue the authorized task.", project
                 )
                 self.assertEqual(0, prompt.returncode, prompt.stderr)
-                self.assertIn("auto_approve_design=false", self.additional_context(prompt))
+                prompt_context = self.additional_context(prompt)
+                self.assertIn("auto_approve_design=false", prompt_context)
+                self.assertIn("configuration.core.auto_approve.design", prompt_context)
+
+            with self.subTest(host=host, setting="legacy-enabled"):
+                settings.write_text(
+                    json.dumps({"configuration": {"core": {"auto_approve_design": True}}}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                self.assertIn("auto_approve_design=true", self.additional_context(prompt))
 
             with self.subTest(host=host, setting="invalid"):
                 settings.write_text(
