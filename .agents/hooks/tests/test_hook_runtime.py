@@ -501,28 +501,92 @@ class CommandOwnershipTests(unittest.TestCase):
             )
 
     @unittest.skipUnless(os.name == "nt", "Windows Job Object setup")
-    def test_assignment_failure_never_resumes_suspended_child(self):
-        process = Mock(_handle=1)
-        process.communicate.return_value = (b"", b"")
-        kernel = Mock()
-        kernel.AssignProcessToJobObject.return_value = False
-        kernel.TerminateJobObject.return_value = True
-        accounting = Mock(active_processes=0)
-        accounting_type = Mock(return_value=accounting)
-        kernel.QueryInformationJobObject.return_value = True
-        job = (kernel, 1, accounting_type)
+    def test_assignment_failure_terminates_actual_suspended_child(self):
+        marker = self.root / "resumed.txt"
+        process = None
+        original_job = hook_runtime._windows_job
+        original_popen = subprocess.Popen
 
-        with patch.object(hook_runtime, "_windows_job", return_value=job), patch.object(
-            hook_runtime.subprocess, "Popen", return_value=process
-        ) as popen, patch.object(hook_runtime, "_resume_windows_process") as resume:
-            with self.assertRaises(OSError):
-                hook_runtime.run_command(["git", "status"])
+        def failed_assignment_job():
+            kernel, handle, accounting_type = original_job()
+            failed_kernel = Mock()
+            failed_kernel.AssignProcessToJobObject.return_value = False
+            failed_kernel.CloseHandle.side_effect = kernel.CloseHandle
+            return failed_kernel, handle, accounting_type
 
-        self.assertFalse(resume.called)
-        self.assertEqual(
-            subprocess.CREATE_NO_WINDOW | hook_runtime.CREATE_SUSPENDED,
-            popen.call_args.kwargs["creationflags"],
-        )
+        def capture_popen(*args, **kwargs):
+            nonlocal process
+            process = original_popen(*args, **kwargs)
+            return process
+
+        with patch.object(hook_runtime, "_windows_job", side_effect=failed_assignment_job), patch.object(
+            hook_runtime.subprocess, "Popen", side_effect=capture_popen
+        ):
+            with self.assertRaisesRegex(OSError, "cannot assign owned command to job"):
+                hook_runtime.run_command(
+                    [
+                        sys.executable,
+                        "-c",
+                        "from pathlib import Path; Path(__import__('sys').argv[1]).touch()",
+                        str(marker),
+                    ],
+                    capture_output=True,
+                )
+
+        self.assertIsNotNone(process)
+        self.assertIsNotNone(process.poll())
+        self.assertFalse(marker.exists())
+        self.assertTrue(process.stdout.closed)
+        self.assertTrue(process.stderr.closed)
+
+    @unittest.skipUnless(os.name == "nt", "Windows Job Object setup")
+    def test_zero_startup_budget_raises_command_timeout_after_drain(self):
+        process = None
+        original_popen = subprocess.Popen
+
+        def capture_popen(*args, **kwargs):
+            nonlocal process
+            process = original_popen(*args, **kwargs)
+            return process
+
+        with patch.object(hook_runtime.subprocess, "Popen", side_effect=capture_popen):
+            with self.assertRaises(hook_runtime.CommandTimeout) as timed_out:
+                hook_runtime.run_command(
+                    [sys.executable, "-c", "import time; time.sleep(10)"],
+                    timeout=0,
+                    capture_output=True,
+                )
+
+        self.assertIn("exceeded 0s", str(timed_out.exception))
+        self.assertIsNotNone(process)
+        self.assertIsNotNone(process.poll())
+        self.assertTrue(process.stdout.closed)
+        self.assertTrue(process.stderr.closed)
+
+    @unittest.skipUnless(os.name == "nt", "Windows Job Object setup")
+    def test_startup_overrun_raises_command_timeout_after_drain(self):
+        process = None
+        original_popen = subprocess.Popen
+
+        def capture_popen(*args, **kwargs):
+            nonlocal process
+            process = original_popen(*args, **kwargs)
+            time.sleep(0.15)
+            return process
+
+        with patch.object(hook_runtime.subprocess, "Popen", side_effect=capture_popen):
+            with self.assertRaises(hook_runtime.CommandTimeout) as timed_out:
+                hook_runtime.run_command(
+                    [sys.executable, "-c", "import time; time.sleep(10)"],
+                    timeout=0.05,
+                    capture_output=True,
+                )
+
+        self.assertIn("exceeded 0.05s", str(timed_out.exception))
+        self.assertIsNotNone(process)
+        self.assertIsNotNone(process.poll())
+        self.assertTrue(process.stdout.closed)
+        self.assertTrue(process.stderr.closed)
 
 
 if __name__ == "__main__":
