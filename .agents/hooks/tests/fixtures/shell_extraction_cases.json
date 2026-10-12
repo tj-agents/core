@@ -1,0 +1,664 @@
+{
+  "schema_version": 1,
+  "stage": "1b.2",
+  "source_rules": {
+    "bash-grammar": {
+      "sources": [
+        "gnu-bash-5.2.37-shell",
+        "gnu-bash-5.2.37-flags",
+        "gnu-bash-5.2.37-set",
+        "gnu-bash-5.2.37-shopt"
+      ],
+      "location": "shell.c parse_long_options/parse_shell_options; flags.c; set.def o_options; shopt.def"
+    },
+    "dash-grammar": {
+      "sources": [
+        "dash-0.5.13.5-options",
+        "debian-dash-0.5.12-2"
+      ],
+      "location": "options/processargs; exact optnames; Debian privileged and mystring strcmp"
+    },
+    "zsh-grammar": {
+      "sources": [
+        "zsh-5.9-init",
+        "zsh-5.9-options"
+      ],
+      "location": "parseopts; optlookupc/optlookup/emulate; signed native/sh/ksh maps"
+    },
+    "sh-reduction": {
+      "sources": [
+        "gnu-bash-5.2.37-shell",
+        "dash-0.5.13.5-options",
+        "debian-dash-0.5.12-2",
+        "zsh-5.9-init",
+        "zsh-5.9-options"
+      ],
+      "location": "accepted declared-family reduction plus each primary option grammar"
+    },
+    "pwsh-grammar": {
+      "sources": [
+        "pwsh-7.6.0-parser",
+        "pwsh-7.5-cli-doc"
+      ],
+      "location": "ordered MatchSwitch/GetSwitchKey/ParseCommand/ParseFile and dated CLI documentation"
+    },
+    "windows-grammar": {
+      "sources": [
+        "windows-powershell-5.1-cli-doc",
+        "pwsh-7.6.0-parser"
+      ],
+      "location": "documented5.1 File/Command/Version; common prefixes only accepted compatibility inference"
+    }
+  },
+  "cases": [
+    {
+      "id": "shell-case-001",
+      "argv": [
+        "bash",
+        "+help",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-002",
+      "argv": [
+        "bash",
+        "+e",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-003",
+      "argv": [
+        "bash",
+        "-c",
+        "-e",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-004",
+      "argv": [
+        "bash",
+        "-c",
+        "--",
+        "gh pr merge 1",
+        "zero",
+        "gh pr merge 2"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-005",
+      "argv": [
+        "bash",
+        "-oc",
+        "posix",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-006",
+      "argv": [
+        "bash",
+        "-Oc",
+        "extglob",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-007",
+      "argv": [
+        "bash",
+        "-ooec",
+        "errexit",
+        "nounset",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-008",
+      "argv": [
+        "bash",
+        "--rcfile",
+        "-c",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "one_operand",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-009",
+      "argv": [
+        "bash",
+        "-n",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "bash-grammar"
+    },
+    {
+      "id": "shell-case-010",
+      "argv": [
+        "dash",
+        "-p",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "dash-grammar"
+    },
+    {
+      "id": "shell-case-012",
+      "argv": [
+        "dash",
+        "-cI",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 2,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "dash-grammar"
+    },
+    {
+      "id": "shell-case-013",
+      "argv": [
+        "dash",
+        "+oc",
+        "errexit",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "dash-grammar"
+    },
+    {
+      "id": "shell-case-014",
+      "argv": [
+        "dash",
+        "-c",
+        "-e",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "dash-grammar"
+    },
+    {
+      "id": "shell-case-015",
+      "argv": [
+        "zsh",
+        "--no-rcs",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-016",
+      "argv": [
+        "zsh",
+        "-cb",
+        "gh pr merge 1",
+        "-Command",
+        "ARG"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 2,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-017",
+      "argv": [
+        "zsh",
+        "-Oc",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 2,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-018",
+      "argv": [
+        "zsh",
+        "-coerrexit",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 2,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-019",
+      "argv": [
+        "zsh",
+        "--sh-word-split",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-020",
+      "argv": [
+        "zsh",
+        "--sh-option-letters",
+        "-b",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "one_operand",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-021",
+      "argv": [
+        "zsh",
+        "--emulate",
+        "sh",
+        "-e",
+        "-b",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 6,
+        "remainder_mode": "one_operand",
+        "boundary_index": 5,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-022",
+      "argv": [
+        "zsh",
+        "--emulate",
+        "sh",
+        "-bc",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "one_operand",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "zsh-grammar"
+    },
+    {
+      "id": "shell-case-023",
+      "argv": [
+        "sh",
+        "-p",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "sh-reduction"
+    },
+    {
+      "id": "shell-case-024",
+      "argv": [
+        "sh",
+        "-c",
+        "--",
+        "gh pr merge 1",
+        "zero",
+        "-UnknownTrailing"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "one_operand",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "sh-reduction"
+    },
+    {
+      "id": "shell-case-025",
+      "argv": [
+        "pwsh",
+        "-NoProf",
+        "-Com",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "pwsh-grammar"
+    },
+    {
+      "id": "shell-case-026",
+      "argv": [
+        "pwsh",
+        "-ExecutionPol",
+        "Bypass",
+        "-Command",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "pwsh-grammar"
+    },
+    {
+      "id": "shell-case-027",
+      "argv": [
+        "pwsh",
+        "/NoProf",
+        "/Com",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "pwsh-grammar"
+    },
+    {
+      "id": "shell-case-028",
+      "argv": [
+        "pwsh",
+        "--NoProf",
+        "--Com",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "pwsh-grammar"
+    },
+    {
+      "id": "shell-case-029",
+      "argv": [
+        "powershell",
+        "-NoProf",
+        "-Com",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 3,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 2,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "windows-grammar"
+    },
+    {
+      "id": "shell-case-030",
+      "argv": [
+        "powershell",
+        "-Version",
+        "5.1",
+        "-Command",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "windows-grammar"
+    },
+    {
+      "id": "shell-case-031",
+      "argv": [
+        "powershell",
+        "/V",
+        "5.1",
+        "/C",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "windows-grammar"
+    },
+    {
+      "id": "shell-case-032",
+      "argv": [
+        "pwsh",
+        "-WorkingDir",
+        "-c",
+        "-Command",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "joined_remainder",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "pwsh-grammar"
+    },
+    {
+      "id": "shell-case-033",
+      "argv": [
+        "pwsh",
+        "-CWA",
+        "gh pr merge 1",
+        "-FutureOption",
+        "gh pr merge 2"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 2,
+        "remainder_mode": "one_operand",
+        "boundary_index": 1,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "pwsh-grammar"
+    },
+    {
+      "id": "shell-case-068",
+      "argv": [
+        "dash",
+        "-o",
+        "privileged",
+        "-c",
+        "gh pr merge 1"
+      ],
+      "expected": {
+        "outcome": "literal",
+        "kind": "literal",
+        "operand_index": 4,
+        "remainder_mode": "one_operand",
+        "boundary_index": 3,
+        "text": "gh pr merge 1"
+      },
+      "source_rule": "dash-grammar"
+    }
+  ]
+}

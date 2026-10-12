@@ -219,6 +219,72 @@ class OracleTests(unittest.TestCase):
                     oracle.validate(self.profiles, malformed_sources)
 
 
+class LiteralCaseOracleTests(unittest.TestCase):
+    def setUp(self):
+        _, self.sources = oracle.load_oracle()
+        self.fixture = oracle.load_case_oracle()
+        self.cases = oracle.validate_case_oracle(self.fixture, self.sources)
+
+    def test_fixed_literal_corpus_has_recorded_identity_and_selection(self):
+        self.assertEqual(1, self.fixture["schema_version"])
+        self.assertEqual("1b.2", self.fixture["stage"])
+        self.assertEqual(oracle.EXPECTED_LITERAL_CASE_IDS, tuple(case["id"] for case in self.cases))
+        self.assertEqual(33, len(self.cases))
+        self.assertEqual(oracle.EXPECTED_LITERAL_CASES_SHA256, oracle.cases_sha256(self.cases))
+        by_id = {case["id"]: case for case in self.cases}
+        self.assertNotIn("shell-case-011", by_id)
+        self.assertEqual("privileged", by_id["shell-case-068"]["argv"][2])
+        self.assertEqual(4, by_id["shell-case-068"]["expected"]["operand_index"])
+        for case in self.cases:
+            with self.subTest(case_id=case["id"]):
+                expected = case["expected"]
+                if expected["remainder_mode"] == "one_operand":
+                    actual = case["argv"][expected["operand_index"]]
+                else:
+                    actual = " ".join(case["argv"][expected["operand_index"]:])
+                self.assertEqual(expected["text"], actual)
+
+    def test_malformed_literal_copies_are_rejected(self):
+        for label, mutate in (
+            ("changed argv", lambda fixture: fixture["cases"][0]["argv"].__setitem__(3, "other")),
+            ("changed expected", lambda fixture: fixture["cases"][0]["expected"].__setitem__("text", "other")),
+            ("missing ID", lambda fixture: fixture["cases"].pop()),
+            ("renamed ID", lambda fixture: fixture["cases"][0].__setitem__("id", "shell-case-999")),
+            ("duplicate ID", lambda fixture: fixture["cases"].__setitem__(1, copy.deepcopy(fixture["cases"][0]))),
+            ("reordered IDs", lambda fixture: fixture["cases"].reverse()),
+            ("unknown rule", lambda fixture: fixture["cases"][0].__setitem__("source_rule", "unknown")),
+            ("wrong stage", lambda fixture: fixture.__setitem__("stage", "1b.3")),
+        ):
+            with self.subTest(label=label):
+                malformed = copy.deepcopy(self.fixture)
+                mutate(malformed)
+                with self.assertRaises(ValueError):
+                    oracle.validate_case_oracle(malformed, self.sources)
+        template = self.cases[0]
+        for invalid_index in (True, "3", -1, len(template["argv"])):
+            with self.subTest(invalid_index=invalid_index):
+                malformed = copy.deepcopy(template)
+                malformed["expected"]["operand_index"] = invalid_index
+                with self.assertRaises(ValueError):
+                    oracle._validate_literal_case(malformed, self.fixture["source_rules"])
+        malformed = copy.deepcopy(template)
+        malformed["expected"]["boundary_index"] = True
+        with self.assertRaises(ValueError):
+            oracle._validate_literal_case(malformed, self.fixture["source_rules"])
+        consumed_value = copy.deepcopy(next(case for case in self.cases if case["id"] == "shell-case-026"))
+        consumed_value["expected"]["operand_index"] = 2
+        with self.assertRaises(ValueError):
+            oracle._validate_literal_case(consumed_value, self.fixture["source_rules"])
+        cwa = copy.deepcopy(next(case for case in self.cases if case["id"] == "shell-case-033"))
+        cwa["expected"]["remainder_mode"] = "joined_remainder"
+        with self.assertRaises(ValueError):
+            oracle._validate_literal_case(cwa, self.fixture["source_rules"])
+        command = copy.deepcopy(next(case for case in self.cases if case["id"] == "shell-case-025"))
+        command["argv"].append("gh pr merge 2")
+        with self.assertRaises(ValueError):
+            oracle._validate_literal_case(command, self.fixture["source_rules"])
+
+
 class ExistingFacadeCompatibilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

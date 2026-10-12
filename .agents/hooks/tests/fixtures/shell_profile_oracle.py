@@ -1,5 +1,6 @@
 """Offline loader and schema checks for shell option fixtures."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -7,6 +8,58 @@ from pathlib import Path
 FIXTURES = Path(__file__).parent
 PROFILE_PATH = FIXTURES / "shell_option_profiles.json"
 SOURCE_PATH = FIXTURES / "shell_profile_sources.json"
+CASE_PATH = FIXTURES / "shell_extraction_cases.json"
+EXPECTED_CASE_SCHEMA_VERSION = 1
+EXPECTED_CASE_STAGE = "1b.2"
+EXPECTED_LITERAL_CASE_IDS = (
+    "shell-case-001", "shell-case-002", "shell-case-003", "shell-case-004",
+    "shell-case-005", "shell-case-006", "shell-case-007", "shell-case-008",
+    "shell-case-009", "shell-case-010", "shell-case-012", "shell-case-013",
+    "shell-case-014", "shell-case-015", "shell-case-016", "shell-case-017",
+    "shell-case-018", "shell-case-019", "shell-case-020", "shell-case-021",
+    "shell-case-022", "shell-case-023", "shell-case-024", "shell-case-025",
+    "shell-case-026", "shell-case-027", "shell-case-028", "shell-case-029",
+    "shell-case-030", "shell-case-031", "shell-case-032", "shell-case-033",
+    "shell-case-068",
+)
+EXPECTED_LITERAL_CASES_SHA256 = "eacfcde596a9d74a88db8871a82bc977f23e0ce580d48971c095d2369bcbcd98"
+EXPECTED_CASE_SOURCE_RULES = {
+    "bash-grammar": {
+        "sources": [
+            "gnu-bash-5.2.37-shell",
+            "gnu-bash-5.2.37-flags",
+            "gnu-bash-5.2.37-set",
+            "gnu-bash-5.2.37-shopt",
+        ],
+        "location": "shell.c parse_long_options/parse_shell_options; flags.c; set.def o_options; shopt.def",
+    },
+    "dash-grammar": {
+        "sources": ["dash-0.5.13.5-options", "debian-dash-0.5.12-2"],
+        "location": "options/processargs; exact optnames; Debian privileged and mystring strcmp",
+    },
+    "zsh-grammar": {
+        "sources": ["zsh-5.9-init", "zsh-5.9-options"],
+        "location": "parseopts; optlookupc/optlookup/emulate; signed native/sh/ksh maps",
+    },
+    "sh-reduction": {
+        "sources": [
+            "gnu-bash-5.2.37-shell",
+            "dash-0.5.13.5-options",
+            "debian-dash-0.5.12-2",
+            "zsh-5.9-init",
+            "zsh-5.9-options",
+        ],
+        "location": "accepted declared-family reduction plus each primary option grammar",
+    },
+    "pwsh-grammar": {
+        "sources": ["pwsh-7.6.0-parser", "pwsh-7.5-cli-doc"],
+        "location": "ordered MatchSwitch/GetSwitchKey/ParseCommand/ParseFile and dated CLI documentation",
+    },
+    "windows-grammar": {
+        "sources": ["windows-powershell-5.1-cli-doc", "pwsh-7.6.0-parser"],
+        "location": "documented5.1 File/Command/Version; common prefixes only accepted compatibility inference",
+    },
+}
 EXPECTED_COUNTS = {
     "bash": 105,
     "dash": 19,
@@ -235,6 +288,91 @@ def load_json(path):
 
 def load_oracle():
     return load_json(PROFILE_PATH), load_json(SOURCE_PATH)
+
+
+def load_case_oracle():
+    return load_json(CASE_PATH)
+
+
+def cases_sha256(cases):
+    encoded = json.dumps(cases, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _validate_literal_case(case, source_rules):
+    if not isinstance(case, dict) or set(case) != {"id", "argv", "expected", "source_rule"}:
+        raise ValueError("shell extraction case is invalid")
+    if not isinstance(case["id"], str) or not case["id"]:
+        raise ValueError("shell extraction case is invalid")
+    if not isinstance(case["argv"], list) or not case["argv"] or any(
+        not isinstance(value, str) or not value for value in case["argv"]
+    ):
+        raise ValueError("shell extraction argv is invalid")
+    if case["source_rule"] not in source_rules:
+        raise ValueError("shell extraction source rule is invalid")
+    expected = case["expected"]
+    required = {
+        "outcome",
+        "kind",
+        "operand_index",
+        "remainder_mode",
+        "boundary_index",
+        "text",
+    }
+    if not isinstance(expected, dict) or set(expected) != required:
+        raise ValueError("shell extraction expected value is invalid")
+    if expected["outcome"] != "literal" or expected["kind"] != "literal":
+        raise ValueError("shell extraction expected value is invalid")
+    if expected["remainder_mode"] not in {"one_operand", "joined_remainder"}:
+        raise ValueError("shell extraction expected value is invalid")
+    if not isinstance(expected["text"], str):
+        raise ValueError("shell extraction expected value is invalid")
+    operand_index = expected["operand_index"]
+    boundary_index = expected["boundary_index"]
+    if (
+        type(operand_index) is not int
+        or type(boundary_index) is not int
+        or operand_index < 0
+        or boundary_index < 0
+        or operand_index >= len(case["argv"])
+        or boundary_index >= len(case["argv"])
+        or boundary_index >= operand_index
+    ):
+        raise ValueError("shell extraction index is invalid")
+    if expected["remainder_mode"] == "one_operand":
+        text = case["argv"][operand_index]
+    else:
+        text = " ".join(case["argv"][operand_index:])
+    if expected["text"] != text:
+        raise ValueError("shell extraction expected text is invalid")
+
+
+def validate_case_oracle(case_fixture, source_data):
+    required = {"schema_version", "stage", "source_rules", "cases"}
+    if not isinstance(case_fixture, dict) or set(case_fixture) != required:
+        raise ValueError("shell extraction fixture is invalid")
+    if type(case_fixture["schema_version"]) is not int or case_fixture["schema_version"] != EXPECTED_CASE_SCHEMA_VERSION:
+        raise ValueError("shell extraction schema is invalid")
+    if case_fixture["stage"] != EXPECTED_CASE_STAGE:
+        raise ValueError("shell extraction stage is invalid")
+    if case_fixture["source_rules"] != EXPECTED_CASE_SOURCE_RULES:
+        raise ValueError("shell extraction source rules are invalid")
+    sources = source_data.get("sources") if isinstance(source_data, dict) else None
+    if not isinstance(sources, dict):
+        raise ValueError("shell extraction sources are invalid")
+    for rule in case_fixture["source_rules"].values():
+        if any(source not in sources for source in rule["sources"]):
+            raise ValueError("shell extraction source rules are invalid")
+    cases = case_fixture["cases"]
+    if not isinstance(cases, list) or tuple(case.get("id") for case in cases if isinstance(case, dict)) != EXPECTED_LITERAL_CASE_IDS:
+        raise ValueError("shell extraction case IDs are invalid")
+    if len(cases) != len(EXPECTED_LITERAL_CASE_IDS):
+        raise ValueError("shell extraction case IDs are invalid")
+    if cases_sha256(cases) != EXPECTED_LITERAL_CASES_SHA256:
+        raise ValueError("shell extraction cases are invalid")
+    for case in cases:
+        _validate_literal_case(case, case_fixture["source_rules"])
+    return cases
 
 
 def _powershell_group(profiles):
