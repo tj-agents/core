@@ -233,7 +233,7 @@ class ContinuationStopTests(unittest.TestCase):
             "repository": "tj-agents/core",
             "worktree": str(self.root.resolve()),
             "branch": "Fix/Example",
-            "head": "a" * 40,
+            "remote_head_sha": "a" * 40,
         }
         runtime.identity.return_value = {
             "repo": "tj-agents/core",
@@ -242,6 +242,23 @@ class ContinuationStopTests(unittest.TestCase):
             "head": "a" * 40,
         }
         self.assertTrue(continuation_stop.binding_active(runtime, self.root, {}))
+
+    def test_binding_active_rejects_a_different_bound_head(self):
+        runtime = Mock()
+        runtime.binding_from_artifact.return_value = {
+            "repository": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "remote_head_sha": "a" * 40,
+        }
+        runtime.identity.return_value = {
+            "repo": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "head": "b" * 40,
+        }
+        with self.assertRaisesRegex(RuntimeError, "binding-head-changed"):
+            continuation_stop.binding_active(runtime, self.root, {})
 
     def test_foreign_owner_file_cannot_satisfy_this_worktree_obligation(self):
         self.write_owner(self.owner(worktree=str(self.root.parent / "other")))
@@ -445,6 +462,28 @@ class ContinuationStopTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("block", json.loads(result.stdout)["decision"])
         self.assertIn("persistent-workflow", json.loads(result.stdout)["reason"])
+
+    def test_binding_active_reads_the_head_through_real_artifact_normalization(self):
+        workflows = continuation_stop.workflow_root()
+        if str(workflows) not in sys.path:
+            sys.path.insert(0, str(workflows))
+        runtime = continuation_stop.module("continuation_runtime", workflows)
+        root = self.root.resolve()
+        current = runtime.identity(root)
+        artifact = {
+            "repo": current["repo"], "pr": 42, "pr_url": f"https://github.com/{current['repo']}/pull/42",
+            "branch": current["branch"], "worktree": current["worktree"], "head": current["head"],
+            "pending_evidence": [], "review": {"work_order": "review", "work_order_order": ["review"], "reviewed_sha": None},
+            "merge_authorization": {"mode": "absent", "instruction": None}, "completion_condition": "Boundary recorded",
+        }
+        path = root / runtime.BINDING_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(artifact), encoding="utf-8")
+        self.assertTrue(continuation_stop.binding_active(runtime, root))
+        subprocess.run(["git", "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q",
+                        "--allow-empty", "-m", "advance"], cwd=root, check=True)
+        with self.assertRaisesRegex(RuntimeError, "binding-head-changed"):
+            continuation_stop.binding_active(runtime, root)
 
 
 
