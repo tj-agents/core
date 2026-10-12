@@ -199,6 +199,16 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                 self.assertEqual(1, len(matching_rules), f"{plugin}: expected exactly one Codex rule for {script}")
 
     def test_associate_session_runtime_command_is_declared_for_both_hosts(self):
+        manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
+        harness_permissions.validate_requires(manifest["requires"], "engineering")
+        for shell in ("Bash", "PowerShell"):
+            with self.subTest(shell=shell):
+                invalid = deepcopy(manifest["requires"])
+                invalid["permissions"]["claude_allow"] = [
+                    f"{shell}(python -B ${{PLUGIN_ROOT}}/workflows/continuation_runtime.py --other *)"
+                ]
+                with self.assertRaisesRegex(RuntimeError, "script arguments require"):
+                    harness_permissions.validate_requires(invalid, "engineering")
         claude_allow, codex_rules = self.rendered("engineering")
         claude_allow = [entry.replace("\\", "/") for entry in claude_allow]
         command = f"{self.PLUGIN_ROOT.replace('\\', '/')}/workflows/continuation_runtime.py associate-session"
