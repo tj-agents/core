@@ -47,7 +47,10 @@ class RecoveryTests(unittest.TestCase):
     def register_session(self, host, session):
         path = RECOVERY._registry_root() / f"{session}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"host": host, "session_id": session, "started_at": time.time() + 1}), encoding="utf-8")
+        entry = {"session_id": session, "started_at": time.time() + 1}
+        if host is not None:
+            entry["host"] = host
+        path.write_text(json.dumps(entry), encoding="utf-8")
 
     def test_search_reads_archive_and_filters_non_cli_helper(self):
         self.write_codex()
@@ -273,6 +276,15 @@ Observed blocker: no send was attempted."""
                 RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True, cli=cli)
         receipt = RECOVERY._receipt("claude", "claude_id", RECOVERY._profile("claude", projects))
         self.assertEqual(json.loads(receipt.read_text(encoding="utf-8"))["state"], "ambiguous")
+
+    def test_open_session_accepts_registration_without_host_identity(self):
+        profile = self.root / "alternate profile"
+        projects = profile / "projects"
+        self.write_claude(projects)
+        cli = mock.Mock()
+        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
+        cli.open_claude_tab.side_effect = lambda *_args: self.register_session(None, "claude_id")
+        RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True, cli=cli)
 
     def test_packaged_resource_loads_peer_process_helper(self):
         path = ROOT / "plugins/machine/resources/machine/scripts/agent_recovery.py"

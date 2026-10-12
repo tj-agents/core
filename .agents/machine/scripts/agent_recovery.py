@@ -308,7 +308,7 @@ def _registered_after_launch(host, session_id, receipt):
     started_at = entry.get("started_at") if entry else None
     return (
         entry is not None
-        and entry.get("host") == host
+        and entry.get("host") in (None, host)
         and _fingerprint(entry) != launch.get("registry_fingerprint")
         and not isinstance(started_at, bool)
         and isinstance(started_at, (int, float))
