@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -26,27 +27,206 @@ COMMAND_TIMEOUT_SECONDS = 5
 # A forge read crosses the network; both hosts cap each hook at 15s, so this has to leave the hook
 # room to report the timeout rather than being killed mid-report.
 NETWORK_COMMAND_TIMEOUT_SECONDS = 10
+TEARDOWN_TIMEOUT_SECONDS = 1
+CREATE_SUSPENDED = 0x00000004
 
 
 class CommandTimeout(RuntimeError):
     """A hook's child process outlived its ceiling."""
 
 
-def run_command(command, timeout=COMMAND_TIMEOUT_SECONDS, **kwargs):
-    """``subprocess.run`` that cannot hang.
+def _windows_job():
+    import ctypes
+    from ctypes import wintypes
 
-    Every hook runs inside a harness timeout that reports nothing about which child stalled, so an
-    unbounded call surfaces as the whole session pausing. A git call blocked on another worktree's
-    index lock is the shape that actually happens. Raising names the command instead.
-    """
-    kwargs.setdefault("check", False)
-    if os.name == "nt":
-        kwargs.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
+    class Basic(ctypes.Structure):
+        _fields_ = [
+            ("process_time", ctypes.c_int64),
+            ("job_time", ctypes.c_int64),
+            ("flags", wintypes.DWORD),
+            ("min_working", ctypes.c_size_t),
+            ("max_working", ctypes.c_size_t),
+            ("active_limit", wintypes.DWORD),
+            ("affinity", ctypes.c_size_t),
+            ("priority", wintypes.DWORD),
+            ("scheduling", wintypes.DWORD),
+        ]
+
+    class IO(ctypes.Structure):
+        _fields_ = [
+            (name, ctypes.c_uint64)
+            for name in (
+                "read_ops",
+                "write_ops",
+                "other_ops",
+                "read_bytes",
+                "write_bytes",
+                "other_bytes",
+            )
+        ]
+
+    class Extended(ctypes.Structure):
+        _fields_ = [
+            ("basic", Basic),
+            ("io", IO),
+            ("process_memory", ctypes.c_size_t),
+            ("job_memory", ctypes.c_size_t),
+            ("peak_process", ctypes.c_size_t),
+            ("peak_job", ctypes.c_size_t),
+        ]
+
+    class Accounting(ctypes.Structure):
+        _fields_ = [
+            ("total_user", ctypes.c_int64),
+            ("total_kernel", ctypes.c_int64),
+            ("period_user", ctypes.c_int64),
+            ("period_kernel", ctypes.c_int64),
+            ("page_faults", wintypes.DWORD),
+            ("total_processes", wintypes.DWORD),
+            ("active_processes", wintypes.DWORD),
+            ("terminated_processes", wintypes.DWORD),
+        ]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+    kernel.CreateJobObjectW.restype = ctypes.c_void_p
+    kernel.SetInformationJobObject.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    kernel.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    kernel.AssignProcessToJobObject.restype = wintypes.BOOL
+    kernel.TerminateJobObject.argtypes = [ctypes.c_void_p, wintypes.UINT]
+    kernel.TerminateJobObject.restype = wintypes.BOOL
+    kernel.QueryInformationJobObject.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p]
+    kernel.QueryInformationJobObject.restype = wintypes.BOOL
+    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel.CloseHandle.restype = wintypes.BOOL
+    handle = kernel.CreateJobObjectW(None, None)
+    if not handle:
+        raise OSError("owned command job unavailable")
+    limits = Extended()
+    limits.basic.flags = 0x2000
+    if not kernel.SetInformationJobObject(handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+        kernel.CloseHandle(handle)
+        raise OSError("owned command job limits unavailable")
+    return kernel, handle, Accounting
+
+
+def _resume_windows_process(process):
+    import ctypes
+
+    ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
+    ntdll.NtResumeProcess.argtypes = [ctypes.c_void_p]
+    ntdll.NtResumeProcess.restype = ctypes.c_long
+    if ntdll.NtResumeProcess(int(process._handle)) != 0:
+        raise OSError("cannot resume owned command")
+
+
+def _rendered_command(command):
+    return command if isinstance(command, str) else " ".join(str(part) for part in command)
+
+
+def _drain_owned_process(process, job):
+    import ctypes
+
+    deadline = time.monotonic() + TEARDOWN_TIMEOUT_SECONDS
+    if job is not None:
+        kernel, handle, accounting_type = job
+        if not kernel.TerminateJobObject(handle, 1):
+            raise OSError("cannot terminate owned command job")
+        while True:
+            accounting = accounting_type()
+            if not kernel.QueryInformationJobObject(
+                handle, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None
+            ):
+                raise OSError("cannot inspect owned command job")
+            if accounting.active_processes == 0:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError("owned command job did not drain")
+            time.sleep(0.01)
+    elif os.name == "nt":
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            pass
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
     try:
-        return subprocess.run(command, timeout=timeout, **kwargs)
-    except subprocess.TimeoutExpired:
-        rendered = command if isinstance(command, str) else " ".join(str(part) for part in command)
-        raise CommandTimeout(f"`{rendered}` exceeded {timeout}s") from None
+        process.communicate(timeout=max(0.01, deadline - time.monotonic()))
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError("owned command pipes did not drain") from error
+    if job is None and os.name != "nt":
+        while True:
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError("owned command group did not drain")
+            time.sleep(0.01)
+
+
+def run_command(command, timeout=COMMAND_TIMEOUT_SECONDS, **kwargs):
+    """Run a hook command within an invocation-owned process tree."""
+    deadline = time.monotonic() + timeout
+    check = kwargs.pop("check", False)
+    capture_output = kwargs.pop("capture_output", False)
+    input_data = kwargs.pop("input", None)
+    if capture_output:
+        if "stdout" in kwargs or "stderr" in kwargs:
+            raise ValueError("stdout and stderr arguments may not be used with capture_output")
+        kwargs["stdout"] = subprocess.PIPE
+        kwargs["stderr"] = subprocess.PIPE
+    if input_data is not None:
+        if "stdin" in kwargs:
+            raise ValueError("stdin and input arguments may not both be used")
+        kwargs["stdin"] = subprocess.PIPE
+
+    job = None
+    process = None
+    job_assigned = False
+    drained = False
+    try:
+        if os.name == "nt":
+            job = _windows_job()
+            flags = kwargs.pop("creationflags", subprocess.CREATE_NO_WINDOW)
+            process = subprocess.Popen(
+                command, creationflags=flags | CREATE_SUSPENDED, **kwargs
+            )
+            kernel, handle, _ = job
+            if not kernel.AssignProcessToJobObject(handle, int(process._handle)):
+                raise OSError("cannot assign owned command to job")
+            job_assigned = True
+            _resume_windows_process(process)
+        else:
+            kwargs["start_new_session"] = True
+            process = subprocess.Popen(command, **kwargs)
+
+        try:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            stdout, stderr = process.communicate(input_data, timeout=remaining)
+        except subprocess.TimeoutExpired:
+            _drain_owned_process(process, job)
+            drained = True
+            raise CommandTimeout(f"`{_rendered_command(command)}` exceeded {timeout}s") from None
+        completed = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+        if check:
+            completed.check_returncode()
+        return completed
+    except BaseException:
+        if process is not None and not drained:
+            try:
+                _drain_owned_process(process, job if job_assigned else None)
+            except BaseException:
+                pass
+        raise
+    finally:
+        if job is not None:
+            job[0].CloseHandle(job[1])
 
 
 def declared_plugin_root(hook_file):
