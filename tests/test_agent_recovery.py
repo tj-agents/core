@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -42,6 +43,14 @@ class RecoveryTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"type": "user", "sessionId": session, "cwd": str(self.cwd),
                                     "message": {"content": [{"type": "text", "text": "Claude recovery title"}]}}), encoding="utf-8")
+
+    def register_session(self, host, session):
+        path = RECOVERY._registry_root() / f"{session}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {"session_id": session, "started_at": time.time() + 1}
+        if host is not None:
+            entry["host"] = host
+        path.write_text(json.dumps(entry), encoding="utf-8")
 
     def test_search_reads_archive_and_filters_non_cli_helper(self):
         self.write_codex()
@@ -127,6 +136,7 @@ class RecoveryTests(unittest.TestCase):
         cli = mock.Mock()
         cli.resolve_tab_directory.side_effect = lambda value: Path(value)
         cli.resolve_codex_executable.return_value = ("native-codex", {})
+        cli.launch_tab.side_effect = lambda *_args, **_kwargs: self.register_session("codex", "exact_id")
         real_load = RECOVERY._load
         with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)), \
              mock.patch.object(RECOVERY, "_verify_codex_resume"), \
@@ -160,6 +170,7 @@ class RecoveryTests(unittest.TestCase):
              mock.patch.object(RECOVERY, "_verify_codex_resume"), \
              mock.patch.object(RECOVERY, "_sync_codex"), \
              contextlib.redirect_stdout(io.StringIO()):
+            launch.side_effect = lambda *_args, **_kwargs: self.register_session("codex", "exact_id")
             code = RECOVERY.main([
                 "open", "--host", "codex", "--id", "exact_id", "--confirm-closed",
                 "--codex-history-root", str(self.root / "sessions"), "--prompt-path", str(prompt),
@@ -194,6 +205,7 @@ Observed blocker: no send was attempted."""
         original = prompt.read_bytes()
         cli = RECOVERY._load("agent_cli")
         with mock.patch.object(cli, "open_claude_tab") as launch:
+            launch.side_effect = lambda *_args, **_kwargs: self.register_session("claude", "claude_id")
             RECOVERY.open_session(
                 "claude",
                 "claude_id",
@@ -220,12 +232,59 @@ Observed blocker: no send was attempted."""
         cli = mock.Mock()
         cli.resolve_tab_directory.side_effect = lambda value: Path(value)
         seen = []
-        cli.open_claude_tab.side_effect = lambda *args: seen.append(__import__("os").environ.get("CLAUDE_CONFIG_DIR"))
+        def launch(*_args):
+            seen.append(__import__("os").environ.get("CLAUDE_CONFIG_DIR"))
+            self.register_session("claude", "claude_id")
+        cli.open_claude_tab.side_effect = launch
         real_load = RECOVERY._load
         with mock.patch.dict("os.environ", {"CLAUDE_CONFIG_DIR": "wrong profile"}, clear=False), \
              mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)):
             RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True)
         self.assertEqual(seen, [RECOVERY._profile("claude", projects)])
+
+    def test_default_claude_profile_clears_inherited_configuration_for_resume(self):
+        projects = self.root / ".claude" / "projects"
+        self.write_claude(projects)
+        cli = mock.Mock()
+        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
+        seen = []
+        def launch(*_args):
+            seen.append(os.environ.get("CLAUDE_CONFIG_DIR"))
+            self.register_session("claude", "claude_id")
+        cli.open_claude_tab.side_effect = launch
+        real_load = RECOVERY._load
+        with mock.patch.object(RECOVERY.Path, "home", return_value=self.root), \
+             mock.patch.dict("os.environ", {"CLAUDE_CONFIG_DIR": "wrong profile"}, clear=False), \
+             mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)):
+            RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True)
+        self.assertEqual(seen, [None])
+
+    def test_open_session_reports_unregistered_launch_as_ambiguous(self):
+        profile = self.root / "alternate profile"
+        projects = profile / "projects"
+        self.write_claude(projects)
+        registry = RECOVERY._registry_root() / "claude_id.json"
+        registry.parent.mkdir(parents=True, exist_ok=True)
+        registry.write_text(
+            json.dumps({"host": "claude", "session_id": "claude_id", "started_at": time.time() - 1}),
+            encoding="utf-8",
+        )
+        cli = RECOVERY._load("agent_cli")
+        with mock.patch.object(cli, "open_claude_tab"), \
+             mock.patch.object(RECOVERY, "REGISTRATION_TIMEOUT_SECONDS", 0):
+            with self.assertRaises(cli.LaunchTimeout):
+                RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True, cli=cli)
+        receipt = RECOVERY._receipt("claude", "claude_id", RECOVERY._profile("claude", projects))
+        self.assertEqual(json.loads(receipt.read_text(encoding="utf-8"))["state"], "ambiguous")
+
+    def test_open_session_accepts_registration_without_host_identity(self):
+        profile = self.root / "alternate profile"
+        projects = profile / "projects"
+        self.write_claude(projects)
+        cli = mock.Mock()
+        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
+        cli.open_claude_tab.side_effect = lambda *_args: self.register_session(None, "claude_id")
+        RECOVERY.open_session("claude", "claude_id", roots={"claude": projects}, confirm_closed=True, cli=cli)
 
     def test_packaged_resource_loads_peer_process_helper(self):
         path = ROOT / "plugins/machine/resources/machine/scripts/agent_recovery.py"

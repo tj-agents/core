@@ -100,3 +100,15 @@
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
 **Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+
+## B008 - Workflow skill audit cannot resolve canonical lifecycle sources
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; `workflow_ops.py skills --lifecycle plan-execution` failed with `skill body does not exist: .agents/skills/plan-execution/SKILL.md` while the canonical lifecycle source is present at `.agents/engineering/workflow/plan-execution/SKILL.md`. **Cause:** confirmed skill-audit source resolution targets a path that this repository does not provide.
+
+**Impact and priority:** P2; plan execution cannot create its required skill-identity audit and must use the native fallback despite the workflow runtime otherwise being available.
+
+**Source owner:** tj-agents/core workflow runtime skill routing. **State:** open. **Repair link:** BUGS.md#B008. **Next action:** reconcile the runtime's skill-source resolution with canonical `.agents` ownership and add a regression.
+
+**Resolution condition:** a plan-execution skill audit resolves the canonical lifecycle source and records its identity without a fallback, with focused coverage for the current repository layout.
+
+**Verification evidence:** the exact command on branch `Fix/RecoveryClaudeProfile` returned the missing `.agents/skills/plan-execution/SKILL.md` path after the repository inspection succeeded.
