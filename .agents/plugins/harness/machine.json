@@ -217,7 +217,7 @@
             "--host",
             "codex"
           ],
-          "justification": "machine:followup-codex recovery: preserve task-specific authority evidence and authorized scope, limits, holds, and remaining gates while inspecting or reopening the exact Codex owner after no-send follow-up failure",
+          "justification": "Permits exact-session recovery tooling; callers follow the shared task-recovery contract when preparing private instructions and any per-call approval justification.",
           "match": [
             [
               "python3",

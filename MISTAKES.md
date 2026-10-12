@@ -89,3 +89,19 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Intended correction:** Reconcile actual state after failed or ambiguous mutations before reporting, retrying, rolling back or handing ownership to another agent.
 
 **Resolved when:** The workflow demonstrates accurate state reconciliation for complete, partial and unexecuted failures.
+
+## M008 ? Published machine digest left stale after an authored source correction
+
+**Status:** In progress. **Observed:** 2026-10-12. **Scope:** Core checkpoint and publishing process; observed on Codex.
+
+**Mistake:** I staged a generated `base-agents/machine` digest after the recovery-context source change, leaving PR210's source guard unable to reproduce the required published digest.
+
+**Why:** I treated generated catalog output as a source correction instead of preserving the staged digest from the reviewed base while updating the authored embedded harness metadata.
+
+**Impact:** P2 CI blockage. The source owner is this Core checkpoint and publishing process. The repair is PR210 on `Fix/RecoveryAuthorizationContext`.
+
+**Next action:** Run the exact corrected-head source guard and CI.
+
+**Verification:** `6118696b1a4f2779-pr210-guard-reproduction.log` records the actual guard failure.
+
+**Resolved when:** The source guard is clean and exact reviewed-head Windows and Linux CI are green.
