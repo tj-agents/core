@@ -249,7 +249,7 @@ class ContinuationStopTests(unittest.TestCase):
             "repository": "tj-agents/core",
             "worktree": str(self.root.resolve()),
             "branch": "Fix/Example",
-            "head": "a" * 40,
+            "remote_head_sha": "a" * 40,
         }
         runtime.identity.return_value = {
             "repo": "tj-agents/core",
@@ -258,6 +258,23 @@ class ContinuationStopTests(unittest.TestCase):
             "head": "a" * 40,
         }
         self.assertTrue(continuation_stop.binding_active(runtime, self.root, {}))
+
+    def test_binding_active_rejects_a_different_bound_head(self):
+        runtime = Mock()
+        runtime.binding_from_artifact.return_value = {
+            "repository": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "remote_head_sha": "a" * 40,
+        }
+        runtime.identity.return_value = {
+            "repo": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "head": "b" * 40,
+        }
+        with self.assertRaisesRegex(RuntimeError, "binding-head-changed"):
+            continuation_stop.binding_active(runtime, self.root, {})
 
     def test_foreign_owner_file_cannot_satisfy_this_worktree_obligation(self):
         self.write_owner(self.owner(worktree=str(self.root.parent / "other")))

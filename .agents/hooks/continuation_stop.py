@@ -171,7 +171,8 @@ def binding_active(runtime, root, artifact=None):
         expected = (
             str(Path(binding["worktree"]).resolve())
             if key == "worktree"
-            else binding.get("repository") if key == "repo" else binding.get(key)
+            else binding.get("repository") if key == "repo"
+            else binding.get("remote_head_sha") if key == "head" else binding.get(key)
         )
         if expected != current[key]:
             raise RuntimeError(f"binding-{key}-changed")
