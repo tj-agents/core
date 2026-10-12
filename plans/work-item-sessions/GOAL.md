@@ -227,6 +227,26 @@ Trigger: a PC crash killed ~20 sessions. The registry (`~/.agents-state/cli-sess
 - Not cloud now: a native session id resumes only on the machine holding its transcript, every hook would gain a network call and a secret, and work-item state already syncs through Git and GitHub. Termboard (milestone 1 uses rusqlite, milestone 5 is native recover) adopts or imports this schema; libSQL/Turso embedded replicas are the sync path if cross-machine visibility is wanted before then.
 - Defect folded in: `agent_recovery.py recover --select` marked `claude:c27c07bf` `launched` at 21:34 while the session never re-registered (registry pid unchanged); launch success must require a fresh SessionStart registration.
 
+### S1 rework specification
+
+Observed 2026-10-12: `claude --resume <id>` keeps the native id (this session re-registered as `c27c07bf` with a new pid), so a resumed session is detectable by a fresh `started_at` on the same id.
+
+- `.agents/machine/scripts/session_store.py` (new, stdlib only): the single storage module. `~/.agents-state/sessions.db` (honouring `AGENT_STATE_DIRECTORY`), WAL, `busy_timeout` 5000 ms, `PRAGMA user_version = 1`. Tables:
+  - `sessions(handle PK '<host>:<id>', host, session_id, machine, profile, title, cwd, repo, branch, head, work_item → work_items.key, role ('owner' | 'bounded: <scope>'), pid, pid_started_at, started_at, last_activity_at, turn_state ('working'|'awaiting_input'), ended_at, end_reason ('finished'|'closed'|'handed_off'), predecessor, successor)`. Rows are never deleted.
+  - `work_items(key PK '<repo>:<feature>/<item>', repo, feature, item, status ('proposed'|'active'|'blocked'|'paused'|'delivery-gated'|'done'), branch, pr, updated_at)`.
+  - `repo` is the `origin` remote normalised to `owner/name`, else the absolute `git-common-dir`.
+- Hook entry `session_store.py hook <session-start|prompt|stop|session-end> --host claude|codex` reads the hook payload from stdin and always exits 0 within its budget. SessionStart is called from `register_session.py` after its existing JSON registry write (that registry stays; `agent_recovery.liveness` reads it). SessionStart upserts and clears `ended_at`/`end_reason`, because a resumed session is alive again. UserPromptSubmit sets `working`. Stop sets `awaiting_input` and refreshes cwd/branch/head. Claude SessionEnd sets `ended_at` and keeps an earlier reason, else `closed`. Start and Stop attach an unset work item when exactly one non-`done` work item in the same repo records the current branch.
+- Wiring: Claude `machine-hooks.json` gains UserPromptSubmit, Stop and SessionEnd. Codex gains UserPromptSubmit and Stop; it has no SessionEnd, so a hand-closed Codex tab reads as interrupted.
+- `work_item_sessions.py` is rewritten over the store, and all `ACTIVE_SESSIONS.md` code is removed. Commands:
+  - `claim <feature>/<item> --host H [--role] [--predecessor]` creates the item (`active`, current branch) when absent and enforces one live owner. A predecessor's ownership transfers with `handed_off` and `successor` set.
+  - `status <feature>/<item>` and `find --worktree` are read-only.
+  - `resume` picks the single not-ended owner, refuses foreign/stale/live, and goes through `open_session`.
+  - `interrupted [--resume HANDLE…]` lists not-ended rows whose pid is dead, grouped by work item with the last turn state, and resumes only listed handles.
+  - `end --reason` and `item <feature>/<item> --status [--pr]` record session ends and work-item status.
+- `finish.py` and `close.py` record `finished`/`closed` for their own session before closing it, best-effort.
+- `agent_recovery.open_session` reports success only after the resumed session registers again (`started_at` after the launch). Otherwise the receipt is `ambiguous` and the CLI exits 3, never retried.
+- `work-item-sessions.md` and the `recover-agents` text describe the store, `claim`, `status`/`resume` and `interrupted`. The Codex auto-approve rule covers `status`, `find`, `interrupted` and `resume`. Catalog `digest` values are never committed.
+
 ## Current progress
 
 - 2026-10-12, Claude session `claude:c27c07bf-a274-466a-a10e-10ef96f36841`: investigation complete; design, migration map and slices recorded above.
