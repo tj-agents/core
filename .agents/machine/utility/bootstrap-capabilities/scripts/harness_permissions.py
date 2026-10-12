@@ -35,12 +35,27 @@ def _require_rule_field(value: Any, label: str) -> None:
 
 
 def _has_unbounded_script_arguments(command: str) -> bool:
-    if not command.startswith("Bash(") or not command.endswith(")"):
+    if not command.startswith(("Bash(", "PowerShell(")) or not command.endswith(")"):
         return False
     if PROJECT_ROOT_TOKEN in command:
         return False
-    tokens = command[len("Bash("):-1].split()
-    return any(token.lower().endswith(SCRIPT_SUFFIXES) for token in tokens[:-1])
+    tokens = command[command.index("(") + 1:-1].split()
+    script_indexes = [
+        index for index, token in enumerate(tokens)
+        if token.lower().endswith(SCRIPT_SUFFIXES)
+    ]
+    if not script_indexes:
+        return False
+    script_index = script_indexes[-1]
+    arguments = tokens[script_index + 1:]
+    if not arguments:
+        return False
+    return not (
+        len(arguments) == 2
+        and arguments[-1] == "*"
+        and not arguments[0].startswith("-")
+        and not any(character in arguments[0] for character in "*?[]")
+    )
 
 
 def validate_requires(requires: dict, label: str) -> None:
