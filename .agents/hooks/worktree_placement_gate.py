@@ -53,6 +53,29 @@ def executable_shell_kind(value):
     return None
 
 
+def normalized_extraction_input(tool_input):
+    if not isinstance(tool_input, dict):
+        return tool_input
+    normalized = tool_input.copy()
+    for container, key in ((normalized, "command"), (normalized, "cmd"), (normalized, "script"), (normalized, "input")):
+        value = container.get(key)
+        if isinstance(value, list) and value:
+            kind = executable_shell_kind(value[0])
+            if kind:
+                container[key] = [kind, *value[1:]]
+    action = tool_input.get("action")
+    if isinstance(action, dict):
+        normalized_action = action.copy()
+        for key in ("command", "cmd"):
+            value = normalized_action.get(key)
+            if isinstance(value, list) and value:
+                kind = executable_shell_kind(value[0])
+                if kind:
+                    normalized_action[key] = [kind, *value[1:]]
+        normalized["action"] = normalized_action
+    return normalized
+
+
 def shell_kind(tool_name, tool_input):
     name = str(tool_name).casefold()
     if name == "powershell":
@@ -69,6 +92,14 @@ def shell_kind(tool_name, tool_input):
             kind = executable_shell_kind(value[0])
             if kind:
                 return kind
+    action = tool_input.get("action") if isinstance(tool_input, dict) else None
+    if isinstance(action, dict):
+        for key in ("command", "cmd"):
+            value = action.get(key)
+            if isinstance(value, list) and value:
+                kind = executable_shell_kind(value[0])
+                if kind:
+                    return kind
     return "powershell" if os.name == "nt" else "bash"
 
 
@@ -436,7 +467,7 @@ def main():
     try:
         data = json.load(sys.stdin)
         tool_input = data.get("tool_input") or {}
-        command = extract_command(data.get("tool_name", ""), tool_input)
+        command = extract_command(data.get("tool_name", ""), normalized_extraction_input(tool_input))
         if not command:
             return 0
         kind = shell_kind(data.get("tool_name", ""), tool_input)
