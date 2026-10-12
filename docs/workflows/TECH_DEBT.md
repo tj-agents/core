@@ -25,31 +25,6 @@
 - **Verification evidence:** Core source tests cover strict settings resolution and package-context delivery;
   installed-host acceptance remains pending.
 
-## Plan workflow fixtures can race detached Git maintenance
-
-- **Kind:** debt.
-- **Observed:** 2026-10-12; causal CI run 38266381371 attempt 1 failed on Linux with `Errno 39` deleting
-  `admin/.git`; the same tree passed on attempt 2, and reviewed PR head 110d0bc5 is identical to merge
-  5f876750.
-- **Cause:** detached Git maintenance is strongly indicated by four bounded TRACE2 child starts; the exact
-  failed writer was not observed. Fixture `tests/test_check_generated_paths.py` already disables automatic
-  GC and maintenance for a similar cleanup race.
-- **Impact and priority:** intermittent PlanWorkflowHarness acceptance setup/cleanup failure; P2.
-- **Source owner:** core `PlanWorkflowHarness` test fixture.
-- **State:** blocked.
-- **blocked_by:** capability; the supported native handoff requires normal-profile refresh and permission
-  convergence, excluded by the current authorization.
-- **Repair link:** branch `Fix/PlanFixtureMaintenanceRace`; canonical B006 side-goal record is in that
-  branch's `plans/plan-fixture-maintenance-race/GOAL.md`.
-- **Resolver:** machine handoff capability owner, or explicit authority for the required profile install.
-- **Resume when:** a supported successor can launch without profile changes.
-- **Next action:** set repository-local `gc.auto=0` and `maintenance.auto=false` before the first fixture
-  commit; add a TRACE2 regression through `pr-slice-rollover`.
-- **Resolution condition:** the independent repair is reviewed and merged, required Windows/Linux checks
-  pass, teardown succeeds, and the bounded lifecycle trace starts no detached maintenance child.
-- **Verification evidence:** four bounded TRACE2 child starts and the analogous existing fixture guards
-  support the cause; causal CI attempt 2 passed. The repair has not been made.
-
 ## Recovery and delivery prevention gaps
 
 The incidents and known causes are owned by [MISTAKES.md](../../MISTAKES.md), entries M001-M007.
