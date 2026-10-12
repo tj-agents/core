@@ -1,10 +1,10 @@
 ﻿# Repository settings configuration owned by Core
 
-Status: active; runtime PR208 is merged and causally published. Guidance PR213 completed its two bounded prose corrections, now integrates origin/main3aa2ba1ee22cc8ea23373c8e0a69b4044bdd60aa, and awaits fresh incremental review and exact-head CI before normal merge/publication and final closeout.
+Status: active; runtime PR208 is merged and causally published. Guidance PR213 completed its two bounded prose corrections, now integrates current origin/main7fed153b078c60fa69b6db4b50ab03c0b3f5d025, and awaits fresh incremental review and exact-head CI before normal merge/publication and final closeout.
 Date: 2026-10-12
 Branch: Docs/RepositorySettingsPreference
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract
-Base: origin/main at 3aa2ba1ee22cc8ea23373c8e0a69b4044bdd60aa; runtime source base73f1 retained in delivery history
+Base: origin/main at 7fed153b078c60fa69b6db4b50ab03c0b3f5d025; runtime source base73f1 retained in delivery history
 Originating session: 01a12c10-0de6-7152-a9f2-9e5f374021f8
 Lane: L4 implementation; contract and ownership decisions resolved, with meaningful tests catching the specified behavior. Independent security review selects L2; ordinary review selects L4; clerical delivery selects L7.
 
@@ -309,3 +309,8 @@ Parent reconciled delivered B001/B002/B003 and M008 against actual runtime sourc
 Independent frozen-head documentation review at05c96df92fc579fcf32a21554e114a6c9e454588 retained ACC001 (remove ambiguous published requirement from local legacy-file wording) and DANG001 (resolved M009 repair link becomes durable PR207 instead of a disposable sibling-worktree goal). Parent verified the actual local legacy-file reader and record evidence; one exclusive L5 mechanical writer applied both prose corrections. This candidate integrates origin/main3aa2ba1ee22cc8ea23373c8e0a69b4044bdd60aa. Fresh incremental review and replacement exact-head CI remain pending; current merge remains behind those gates. No runtime or permission behavior is changed.
 
 Integration verification: ledger IDs are unique and no conflict markers remain; main B004/M012 and this task's resolved B001/B002/B003/M013 evidence are preserved. Manifest consistency passed3 declarations. The sandbox-only manifest test attempt had3 PowerShell launch permission errors; the actual authorized elevated rerun passed all15 tests in16.759s. A clerical dispatch was cancelled before it launched the retry; parent completed this narrow verification directly after its lease release. Commit this prepared integration, verify the committed generated-path guard and push one stable candidate before exact-head review/CI.
+
+
+## Second current-main integration
+
+PR210 landed while guidance PR213 was still being prepared. The exact main 7fed153b078c60fa69b6db4b50ab03c0b3f5d025 is integrated; main B005 and the added M011 related evidence survive alongside this task's resolved records and M013. Main recovery source, harness, resource mappings and generated publication are inherited without authored changes. Parent verified unique ledger IDs, no conflict markers, exact unchanged own B001/B002/B003/M008/M009/M010/M013 and main B004/B005/M012 sections. Actual elevated manifest validation passed15 tests in16.515s; consistency checked3 declarations. The bounded writer released partial resolution before delivery; parent completed the narrow checkpoint and verification. Fresh incremental review from05 and exact-head CI remain required before the guarded ordinary merge.
