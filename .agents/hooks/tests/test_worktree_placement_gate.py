@@ -57,8 +57,10 @@ class WorktreePlacementGateTests(unittest.TestCase):
         checkout.mkdir(parents=True, exist_ok=True)
         self.git(checkout, "init")
 
-    def invoke(self, command, *, codex=False, codex_argv=True, tool_name=None, environment=None, shell=None):
-        tool_input = {"command": ["bash", "-lc", command]} if codex and codex_argv else {"command": command}
+    def invoke(self, command, *, codex=False, codex_argv=True, command_argv=None, tool_name=None, environment=None, shell=None):
+        tool_input = {"command": command_argv} if command_argv is not None else (
+            {"command": ["bash", "-lc", command]} if codex and codex_argv else {"command": command}
+        )
         if shell is not None:
             tool_input["shell"] = shell
         payload = {
@@ -285,9 +287,9 @@ class WorktreePlacementGateTests(unittest.TestCase):
         self.assertIn("GIT_COMMON_DIR is active", result.stderr)
 
     def test_post_recognition_failures_block(self):
-        destination = self.repo / ".worktrees" / "feature-test"
+        destination = self.base / "post-recognition-sibling"
         payload = {
-            "tool_name": "Bash",
+            "tool_name": "PowerShell" if os.name == "nt" else "Bash",
             "tool_input": {"command": self.add_command(destination)},
             "session_id": uuid.uuid4().hex,
             "tool_use_id": uuid.uuid4().hex,
@@ -299,10 +301,13 @@ class WorktreePlacementGateTests(unittest.TestCase):
             with self.subTest(replacement=replacement), \
                     mock.patch.object(gate, "common_root", replacement["common_root"]), \
                     mock.patch.object(gate, "claim_invocation", replacement["claim_invocation"]), \
+                    mock.patch.dict(os.environ, {}, clear=True), \
                     mock.patch("sys.stdin", io.StringIO(json.dumps(payload))), \
                     mock.patch("sys.stderr", io.StringIO()) as stderr:
                 self.assertEqual(2, gate.main())
                 self.assertIn("WORKTREE PLACEMENT GATE", stderr.getvalue())
+            replacement["common_root"].assert_called_once_with(str(self.repo))
+            replacement["claim_invocation"].assert_called_once()
 
     def test_blocks_native_creation_in_active_bash_and_powershell_substitutions(self):
         sibling = self.base / "substitution-sibling"
@@ -331,6 +336,22 @@ class WorktreePlacementGateTests(unittest.TestCase):
             codex_argv=False,
             tool_name="exec_command",
             shell=shell,
+        )
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("command substitution", result.stderr)
+
+    def test_detects_codex_exec_command_bash_argv_path_without_explicit_shell(self):
+        sibling = self.base / "codex-argv-substitution-sibling"
+        native = f'git -C "{self.repo}" worktree add -b codex-argv-substitution-sibling -- "{sibling}"'
+        command = f"echo `{native}`"
+
+        result = self.invoke(
+            command,
+            codex=True,
+            codex_argv=False,
+            command_argv=[r"C:\Program Files\Git\bin\bash.exe", "-lc", command],
+            tool_name="exec_command",
         )
 
         self.assertEqual(2, result.returncode)
