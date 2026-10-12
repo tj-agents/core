@@ -20,8 +20,9 @@
   key.
 - **Next action:** update the affected convention contract and verify the selected installed Claude and Codex
   paths.
-- **Resolution condition:** affected convention workflows honor `configuration.core.auto_approve_design` for
-  authorized routine choices, and both installed host paths are accepted.
+- **Resolution condition:** affected convention workflows honor the effective design value from
+  `configuration.core.auto_approve` (`design` overrides `all`, with the flat alias supported only when
+  the nested object is absent) for authorized routine choices, and both installed host paths are accepted.
 - **Verification evidence:** Core source tests cover strict settings resolution and package-context delivery;
   installed-host acceptance remains pending.
 
