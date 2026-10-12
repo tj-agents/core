@@ -30,3 +30,10 @@ python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' rec
 Use `--codex-history-root '<profile>/sessions'` or `--claude-history-root '<profile>/projects'` for an alternate
 profile. Unknown live identity requires reconciliation before a
 resume, and ambiguous terminal launch results must not be retried.
+
+## Continue a work item
+
+When asked to continue a work item, run `work_item_sessions.py status '<work-item-directory>'`, then
+`resume` on the same directory: one `owner` row resumes that exact session; several rows require an
+explicit `--handle`; no rows means start a new owner from the work item README's `## Next Steps`. See
+[`work-item-sessions.md`](../../resources/work-item-sessions.md) for the registry format and commands.

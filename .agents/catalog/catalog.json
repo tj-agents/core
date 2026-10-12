@@ -503,7 +503,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:2d374887463d7e0d279b24ab55bff40e06c5c299d58bffd9d74c2ba9597471ed",
+          "digest": "sha256:21694542e15fa0ac3d524c18562927f820a6db27925b4c19695fe7ed3eb56779",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -594,7 +594,15 @@
                 "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)"
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -762,6 +770,58 @@
                       "recover",
                       "--host",
                       "codex"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                    ],
+                    [
+                      "status",
+                      "resume"
+                    ]
+                  ],
+                  "justification": "machine:recover-agents 'Continue a work item': status is read-only and resume only reopens the exact recorded session through the shared agent_recovery guard, which refuses a live or unknown session.",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "status"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "resume"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                      "status"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "record"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "remove"
                     ]
                   ]
                 }

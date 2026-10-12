@@ -94,7 +94,15 @@
         "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)"
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -262,6 +270,58 @@
               "recover",
               "--host",
               "codex"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+            ],
+            [
+              "status",
+              "resume"
+            ]
+          ],
+          "justification": "machine:recover-agents 'Continue a work item': status is read-only and resume only reopens the exact recorded session through the shared agent_recovery guard, which refuses a live or unknown session.",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+              "status"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "resume"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+              "status"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+              "record"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+              "remove"
             ]
           ]
         }
