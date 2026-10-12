@@ -99,6 +99,11 @@ def parse_revisions(values: list[str]) -> dict[str, str]:
     return revisions
 
 
+def write_catalog(path: Path, catalog: dict) -> None:
+    with path.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(catalog, indent=2) + "\n")
+
+
 def update(root: Path, source_values: list[str], revision_values: list[str], check: bool) -> None:
     catalog_path = root / ".agents/catalog/catalog.json"
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
@@ -119,7 +124,7 @@ def update(root: Path, source_values: list[str], revision_values: list[str], che
     if check and stale_harnesses:
         raise ValueError("Stale catalog harnesses: " + ", ".join(stale_harnesses))
     if not check and stale_harnesses:
-        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+        write_catalog(catalog_path, catalog)
     _, output, _, _ = SYNC.build(root, validate_catalog_digests=False)
     changed: list[str] = []
     for release in catalog["releases"]:
@@ -153,7 +158,7 @@ def update(root: Path, source_values: list[str], revision_values: list[str], che
     if check and changed:
         raise ValueError("Stale catalog digests: " + ", ".join(changed))
     if not check:
-        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+        write_catalog(catalog_path, catalog)
     action = "Checked" if check else "Updated"
     print(f"{action} catalog digests; {len(changed)} changed.")
 

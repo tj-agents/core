@@ -306,6 +306,19 @@ class ContinuationTests(unittest.TestCase):
                             "--reason", "Waiting on CI", "--next-action", "Read CI", env=broken)
         self.assertEqual((released["state"], released["foreground"]), ("waiting", None))
 
+    def test_heartbeat_requires_the_recorded_checkout_root(self):
+        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+        token = claimed["foreground"]["token"]
+        before = self.state()
+        (self.root / ".git").rename(self.root / ".git-moved")
+        try:
+            for operation in ("heartbeat", "yield"):
+                denied = self.cli(operation, "--owner", str(self.owner), "--token", token, code=2)
+                self.assertEqual(denied["reason"], "canonical-worktree-root-required")
+                self.assertEqual(self.state(), before)
+        finally:
+            (self.root / ".git-moved").rename(self.root / ".git")
+
     def test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground(self):
         for harness in ("claude", "codex"):
             with self.subTest(harness=harness):
