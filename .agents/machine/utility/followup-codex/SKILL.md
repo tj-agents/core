@@ -54,14 +54,10 @@ Report the returned status accurately:
   receipt. A missing queue entry, successful CLI exit, or timeout is not delivery evidence.
 - `unavailable` or `rejected` (exit 2): report the reason. When the helper confirms no send was attempted
   and no receipt exists, first assess whether the already authorized task permits supported coordination
-  with the exact owner. Verify the native id, cwd,
-  and selected profile. For a `machine:search-codex` inspection, run the shipped helper with `-B`, the
-  `search --host codex` operation, and `--codex-history-root '<selected-profile>/sessions'`, then use
-  `machine:open-codex` only for the verified exact owner. Write its canonical private UTF-8 recovery
-  instruction file with the actual observed blocker, then pass `--prompt-path '<recovery-prompt-file>'`
-  without `--prompt`. A verified live owner cannot be resumed. Reconcile an unknown owner independently before
-  `--confirm-closed`, and never treat that flag as source release. A successful reopen is launch evidence,
-  not delivered follow-up, restored
+  with the exact owner. Verify the native id, cwd, and selected profile. Follow the shared
+  [task recovery context](../../resources/task-recovery.md), then use `machine:open-codex` only for the
+  verified exact owner. A verified live owner cannot be resumed. Reconcile an unknown owner independently before
+  `--confirm-closed`, and never treat that flag as source release. A successful reopen is launch evidence, not delivered follow-up, restored
   transport, or acknowledgment. Retain the current task. Only when all supported automated coordination
   paths are unavailable or ineligible, report the blocker and provide the authorized message for the user to paste. If a receipt
   already exists for a different message or target, or

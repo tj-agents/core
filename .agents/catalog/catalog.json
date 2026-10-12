@@ -496,7 +496,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:b34df2b3608a6466bcf121cf96264229c1b4cd30f1cceaf950cba45395d1ce13",
+          "digest": "sha256:b4a40336c80270255af7617ca9cfc5848a62e73fceafc72c23f52c50c36c2afd",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -712,7 +712,7 @@
                     "--host",
                     "codex"
                   ],
-                  "justification": "machine:followup-codex recovery: inspect or reopen the exact Codex owner after no-send follow-up failure",
+                  "justification": "machine:followup-codex recovery: preserve task-specific authority evidence and authorized scope, limits, holds, and remaining gates while inspecting or reopening the exact Codex owner after no-send follow-up failure",
                   "match": [
                     [
                       "python3",

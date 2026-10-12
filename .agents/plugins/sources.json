@@ -131,6 +131,11 @@
     },
     {
       "plugin": "machine",
+      "source": ".agents/machine/resources/task-recovery.md",
+      "destination": ".agents/machine/resources/task-recovery.md"
+    },
+    {
+      "plugin": "machine",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
     },

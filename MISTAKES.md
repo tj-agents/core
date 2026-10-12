@@ -28,6 +28,8 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Resolved when:** An authorized task recovers from an execution failure and reaches its reviewed merge without repeated consent requests, while genuine holds and permission checks remain effective.
 
+**2026-10-12 related evidence:** Exact-owner recovery rejected before launch when the caller supplied a goal and asserted existing authority without its wording/provenance or a tool-approval justification. The bounded repair is on branch `Fix/RecoveryAuthorizationContext`. It carries concrete task authority and preserves real approval gates; this source repair alone does not establish M002's broader resolution condition. M005 and its prior PR207 repair remain distinct.
+
 ## M003 ? Returning blocked delivery without an active continuation owner
 
 **Status:** Open. **Observed:** 2026-10-11. **Scope:** goal continuation; observed on Codex.
