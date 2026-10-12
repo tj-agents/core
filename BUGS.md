@@ -93,10 +93,10 @@
 
 **Impact and priority:** P2; new worktrees spread outside repository-owned layout.
 
-**Source owner:** tj-agents/core engineering shared hooks and both host wiring. **State:** in-progress. **Repair link:** plans/worktree-placement-enforcement/GOAL.md, branch Fix/WorktreePlacementEnforcement. The allocator and migration remain owned by Feature/RepositoryOwnedLayout.
+**Source owner:** tj-agents/core engineering shared hooks and both host wiring. **State:** resolved. **Repair link:** [PR #220](https://github.com/tj-agents/core/pull/220). The allocator and migration remain owned by Feature/RepositoryOwnedLayout.
 
-**Next action:** qualify the shared native-Git creation gate without copying the allocator or moving active checkouts.
+**Next action:** none; the objective repair and delivery condition is verified.
 
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
-**Verification evidence:** refreshed base 376df0ced5283a4ee4247d07feb10e8671b64475 still has no placement gate or allocator. A filtered native creation statement was observed at 2026-10-08T16:19:37.087Z; no raw transcript ships. Installed native-host acceptance remains unverified.
+**Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
