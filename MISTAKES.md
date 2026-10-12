@@ -114,7 +114,7 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Source owner:** tj-agents/core machine follow-up/recovery standards. **Cause:** confirmed incomplete manual-only fallback guidance in followup-codex, combined with this agent failing to attempt exact-owner recovery. The endpoint infrastructure failure's cause remains unknown.
 
-**State:** resolved. **Repair link:** C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-FollowupRecoveryOwnership/plans/followup-recovery/GOAL.md, branch Fix/FollowupRecoveryOwnership, launched native successor 01a12d05-0e36-7cd2-afac-1936aa63404b. The original settings outcome remains owned by plans/repository-settings/GOAL.md and this native session.
+**State:** resolved. **Repair link:** PR207, merged source9954043c5d7b34c59e70cc1df193e370c3f759b6. The original settings runtime was delivered by PR208.
 
 **Next action:** none; standards source repair and original source coordination are verified. This parent continues the separate settings delivery.
 
