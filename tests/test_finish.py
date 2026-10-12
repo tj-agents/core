@@ -31,17 +31,44 @@ class HostFallbackTests(unittest.TestCase):
             with self.assertRaisesRegex(session_close.Refusal, "do not force-close the host"):
                 session_close.own_host_and_entry(Path.cwd())
 
-    def test_unavailable_terminal_can_close_verified_host_without_wrapper(self):
+    def test_terminal_refusal_can_close_verified_host_without_wrapper(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
-        for module in (own_close, finish):
-            with self.subTest(module=module.__name__), \
-                    mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
-                    mock.patch.object(session_close, "verified_live", return_value=True), \
-                    mock.patch.object(module.close_tab, "close_entry",
-                                      side_effect=module.close_tab.TerminalUnavailable("unavailable")), \
-                    mock.patch.object(module.os, "kill") as killer:
-                module.close_host(entry)
-                killer.assert_called_once_with(30, module.signal.SIGTERM)
+        for refusal in (
+                own_close.close_tab.TerminalUnavailable("unavailable"),
+                own_close.close_tab.TerminalRefusal("Windows Terminal target is absent or ambiguous"),
+        ):
+            for module in (own_close, finish):
+                with self.subTest(module=module.__name__, refusal=type(refusal).__name__), \
+                     mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                     mock.patch.object(session_close, "verified_live", return_value=True), \
+                     mock.patch.object(module.close_tab, "close_entry",
+                                       side_effect=refusal), \
+                     mock.patch.object(module.os, "kill") as killer:
+                    module.close_host(entry)
+                    killer.assert_called_once_with(30, module.signal.SIGTERM)
+
+    def test_windows_terminal_absent_or_ambiguous_target_can_close_verified_host(self):
+        entry = {
+            "pid": 30,
+            "pid_started_at": 3.0,
+            "title": "own",
+            "terminal": {"kind": "windows-terminal", "automation_id": "tab-1"},
+        }
+        target = {
+            "title": "own",
+            "identity": {"kind": "windows-terminal", "automation_id": "tab-1"},
+        }
+        for inventory in ([], [target, target]):
+            for module in (own_close, finish):
+                with self.subTest(module=module.__name__, inventory=inventory), \
+                        mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                        mock.patch.object(session_close, "verified_live", return_value=True), \
+                        mock.patch.object(module.close_tab.session_close, "liveness", return_value=True), \
+                        mock.patch.object(module.close_tab, "is_windows", return_value=True), \
+                        mock.patch.object(module.close_tab, "windows_inventory", return_value=inventory), \
+                        mock.patch.object(module.os, "kill") as killer:
+                    module.close_host(entry)
+                    killer.assert_called_once_with(30, module.signal.SIGTERM)
 
     def test_fallback_rechecks_host_after_terminal_inspection(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
@@ -50,11 +77,42 @@ class HostFallbackTests(unittest.TestCase):
                     mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
                     mock.patch.object(session_close, "verified_live", side_effect=[True, False]), \
                     mock.patch.object(module.close_tab, "close_entry",
-                                      side_effect=module.close_tab.TerminalUnavailable("unavailable")), \
+                                      side_effect=module.close_tab.TerminalRefusal("ambiguous")), \
                     mock.patch.object(module.os, "kill") as killer:
                 with self.assertRaisesRegex(session_close.Refusal, "identity changed"):
                     module.close_host(entry)
                 killer.assert_not_called()
+
+    def test_unknown_host_refuses_before_terminal_close_or_signal(self):
+        entry = {"pid": 30, "pid_started_at": 3.0}
+        for module in (own_close, finish):
+            with self.subTest(module=module.__name__), \
+                    mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                    mock.patch.object(session_close, "verified_live", return_value=False), \
+                    mock.patch.object(module.close_tab, "close_entry") as closer, \
+                    mock.patch.object(module.os, "kill") as killer:
+                with self.assertRaisesRegex(session_close.Refusal, "identity changed before close"):
+                    module.close_host(entry)
+                closer.assert_not_called()
+                killer.assert_not_called()
+
+    def test_terminal_refusal_signals_only_a_verified_wrapper(self):
+        entry = {"pid": 30, "pid_started_at": 3.0}
+        wrapper = {"pid": 20, "started_at": 2.0}
+        for wrapper_live, expected in ((True, [30, 20]), (False, [30])):
+            for module in (own_close, finish):
+                with self.subTest(module=module.__name__, wrapper_live=wrapper_live), \
+                        mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                        mock.patch.object(session_close, "verified_live",
+                                          side_effect=[True, True, wrapper_live]), \
+                        mock.patch.object(module.close_tab, "close_entry",
+                                          side_effect=module.close_tab.TerminalRefusal("absent")), \
+                        mock.patch.object(module.os, "kill") as killer:
+                    module.close_host(entry, wrapper)
+                    self.assertEqual(
+                        [mock.call(pid, module.signal.SIGTERM) for pid in expected],
+                        killer.call_args_list,
+                    )
 
 
 def git(cwd, *args):
@@ -138,7 +196,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 os.environ,
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_CLI_HOST_NAMES=host_name,
-                AGENT_FINISH_CLOSE_MODE="process",
+                AGENT_FINISH_CLOSE_MODE="",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
             )
             host = subprocess.Popen([
@@ -214,7 +272,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 os.environ,
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_CLI_HOST_NAMES=host_name,
-                AGENT_FINISH_CLOSE_MODE="process",
+                AGENT_FINISH_CLOSE_MODE="",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
             )
             host = subprocess.Popen([
