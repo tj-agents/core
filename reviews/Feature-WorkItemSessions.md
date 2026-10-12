@@ -4,7 +4,7 @@
 > findings directly and report what changed. Tick each `[x]` as you land it. Pause only for a genuinely
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
-**Review status:** `complete`
+**Review status:** `in-progress`
 **Reviewed up to commit:** `afa69fa55a938cde389e56d171db21fac8877660`  `(2026-10-12)`
 **Judgment:** `changes-requested`
 
@@ -56,3 +56,30 @@ Native layer: Claude Code `code-review` skill (medium). Lens: `workflow` (`revie
   The doc says `Profile` is compared against the reading machine; only `Machine` is compared and `Profile`
   locates history on resume. Split the bullet.
   Fixed: Machine and Profile bullets split; Profile only locates history on resume.
+
+## Review pass — 2026-10-12 — incremental
+
+**Candidate base:** `afa69fa55a938cde389e56d171db21fac8877660`
+**Candidate head:** `5c13ab4e7ddca02f36ef5722302011dd6ff2cdd4`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:ab292007ea8fb141ead4411236cb6f4d587d6fd8cffc86ba4640b5f746e0fa46` `(5 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\1jNF5kys_vwuYr4h3iMEwz\S4rwcCQdvEobnlDrjcf1RI`
+**Candidate bundle identity:** `sha256:e7656c7f4ed62ba5b28c30ff58943b65e911306bf02fa109a905ae10ffa72abc`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code `code-review` skill (medium). Lens: `workflow` (`review-lens`). R1–R6 dispositions verified against the delta.
+
+### Findings
+
+- [x] **R7 — LOW — native** — `tests/test_work_item_sessions.py:247`
+  `test_concurrent_records_keep_every_row` wraps `_record_locked` in the lock itself instead of driving
+  `record()`, so removing the lock from `record()` would still pass. Drive the threads through `WIS.record`.
+  Fixed: threads call `WIS.record` with per-thread session ids and a slowed `load`; verified the test fails
+  with the lock removed from `record()` and passes with it.
+- [x] **R8 — LOW — workflow** — `.agents/machine/utility/recover-agents/SKILL.md:37`
+  "with no owner or no rows, pass `--handle`" offers `--handle` for the no-rows case, where `resume` raises
+  before reading it. Split the two conditions.
+  Fixed: rows without a single owner need `--handle`; no rows start a new owner.
