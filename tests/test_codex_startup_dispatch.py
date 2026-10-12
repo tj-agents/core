@@ -16,6 +16,7 @@ EXPECTED = {
         ('hooks/tier_gate.py', ['--session-context']),
         ('.agents/base/policy/agent-files/scripts/session-context.py', []),
         ('.agents/base/policy/goal-continuation/scripts/session-context.py', []),
+        ('.agents/base/policy/idea-initialization/scripts/session-context.py', []),
     ]),
     'engineering': (15, 12, [
         ('.agents/engineering/policy/session-guidance/scripts/session-context.py', []),
