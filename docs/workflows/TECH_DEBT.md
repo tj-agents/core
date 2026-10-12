@@ -35,7 +35,27 @@ in the 2026-10-11 sandbox recovery. Prevention work and a dedicated recording sk
 Resolve when the shared workflows and applicable host adapters verify same-goal execution selection,
 retained merge authority, supported continuation and reopening, accurate completion and recovery
 claims, and state reconciliation after failed mutations. Record each incident's observed resolution
-against its stable mistake ID. No untested CI-waiter defect or Claude runtime failure is established.
+against its stable mistake ID. D002 records the later observed CI-waiter gap.
+
+## D002 — Pending CI can be left with no launched background waiter
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; after opening Core PR #230, the guard passed while Windows and Linux
+  checks remained pending. The owner ended without launching a background CI waiter, a persistent-delivery
+  continuation, or another background agent to own the exact PR head.
+- **Impact and priority:** an authorized delivery can be stranded after local work completes; P1 because
+  the user must rediscover the pending PR and resume its merge path.
+- **Source owner:** Core engineering continuation and remote-delivery workflows.
+- **State:** open.
+- **Repair link:** [M003](../../MISTAKES.md#M003).
+- **Next action:** make the delivery lifecycle launch and verify a background CI waiter when exact-head CI
+  is pending, or persist a typed gate naming the resolver and observable resume condition.
+- **Resolution condition:** a test-covered PR delivery with pending exact-head CI launches an active,
+  verified background waiter or agent that owns the PR through terminal CI and the next delivery action;
+  no foreground owner may return while neither a registered background owner nor a typed gate exists.
+- **Verification evidence:** PR #230 on `Fix/ContinuationStopBindingHead` was open at
+  `2173ae76ab0fd1e042ae0f414c95dc1f67ff5fcb` with `verify-windows` and `verify-linux` pending; no
+  background CI waiter, continuation, or background agent had been launched before the session returned.
 
 ## Slice retirement checks the broader goal's completion
 
