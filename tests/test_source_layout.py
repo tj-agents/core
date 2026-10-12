@@ -104,6 +104,28 @@ class SourceLayoutTests(unittest.TestCase):
                 resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
                 self.assertEqual(resource, resolved)
 
+    def test_task_recovery_contract_ships_for_both_hosts(self):
+        _, output, skills, _ = SYNC.build(self.root)
+        canonical = {
+            "open-codex": "utility/open-codex",
+            "open-claude": "utility/open-claude",
+            "followup-codex": "utility/followup-codex",
+        }
+        resource = "plugins/machine/.agents/machine/resources/task-recovery.md"
+        self.assertIn(resource, output)
+        for name, relative in canonical.items():
+            with self.subTest(skill=name):
+                self.assertEqual("machine", skills[name]["plugin"])
+                for tree in ("skills", "codex-skills"):
+                    adapter = output[f"plugins/machine/{tree}/{name}/SKILL.md"].decode("utf-8")
+                    self.assertIn(f"](../../.agents/machine/{relative}/SKILL.md)", adapter)
+                canonical_path = f"plugins/machine/.agents/machine/{relative}/SKILL.md"
+                canonical_body = output[canonical_path].decode("utf-8")
+                link = "../../resources/task-recovery.md"
+                self.assertIn(f"]({link})", canonical_body)
+                resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
+                self.assertEqual(resource, resolved)
+
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
             manifest_root = self.root / f".agents/plugins/manifests/{host}"

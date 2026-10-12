@@ -28,6 +28,8 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Resolved when:** An authorized task recovers from an execution failure and reaches its reviewed merge without repeated consent requests, while genuine holds and permission checks remain effective.
 
+**2026-10-12 related evidence:** Exact-owner recovery rejected before launch when the caller supplied a goal and asserted existing authority without its wording/provenance or a tool-approval justification. The bounded repair is on branch `Fix/RecoveryAuthorizationContext`. It carries concrete task authority and preserves real approval gates; this source repair alone does not establish M002's broader resolution condition. M005 and its prior PR207 repair remain distinct.
+
 ## M003 ? Returning blocked delivery without an active continuation owner
 
 **Status:** Open. **Observed:** 2026-10-11. **Scope:** goal continuation; observed on Codex.
@@ -147,6 +149,10 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Resolution condition:** the committed runtime and later guidance slices contain no generated digest or package deltas, the generated-path guard and exact-head CI pass, and causal post-merge publication owns regeneration.
 
 **Verification evidence:** authoritative gh run view38183296901 failed-step logs name .agents/catalog/catalog.json digest of base-agents/engineering and base-agents/machine. scripts/check_generated_paths.py reads merge-base digest values and explicitly rejects these changes.
+
+**2026-10-12 related evidence:** PR210 on `Fix/RecoveryAuthorizationContext` reproduced the same generated-digest mistake at run38189190964: verify-windows and verify-linux succeeded, while the source guard failed on the `base-agents/machine` digest. Commit `f63538d` restored the reviewed digest and retained the authored embedded harness metadata.
+
+**PR210 prevention and next action:** The focused corrected-head source guard passed with artifact `78dd200ee7badf43-corrected-source-guard.log`; complete final review and corrected-head CI without adopting other workstreams' delivery state.
 
 ## M012 - Unverified delayed CLI closure after completed delivery
 
