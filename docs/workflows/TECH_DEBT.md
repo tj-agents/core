@@ -57,6 +57,24 @@ against its stable mistake ID. D002 records the later observed CI-waiter gap.
   `2173ae76ab0fd1e042ae0f414c95dc1f67ff5fcb` with `verify-windows` and `verify-linux` pending; no
   background CI waiter, continuation, or background agent had been launched before the session returned.
 
+## D003 — Incident records are routed through ordinary PR delivery
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; this session put the mistake and debt records for its own workflow
+  failure into PR #231 instead of committing them directly to `main`, adding an unnecessary review/CI wait
+  before the shared record was available.
+- **Impact and priority:** P2; a corrective record can remain unsynchronized while its source failure is
+  already known, and it creates avoidable background delivery work.
+- **Source owner:** Core problem-record and delivery conventions.
+- **State:** open.
+- **Repair link:** [M014](../../MISTAKES.md#M014).
+- **Next action:** make `write-mistake`, `write-debt`, and the callout-repair path commit and push incident
+  records directly to `main`, while keeping ordinary implementation changes on their normal delivery path.
+- **Resolution condition:** a new incident record is committed directly to `main` without a PR, and both
+  host-delivered conventions make that direct-main route explicit for mistake and debt records.
+- **Verification evidence:** PR #231 was opened solely to carry D002 and M014 before Tommy corrected the
+  delivery route.
+
 ## Slice retirement checks the broader goal's completion
 
 The runtime's `checkpoint --state complete` calls the canonical goal's full completion check, even
