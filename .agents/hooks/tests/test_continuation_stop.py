@@ -315,6 +315,16 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.object(continuation_stop, "read_receipt", return_value={"worktree": str(native), "prompt": "status"}):
             self.assertIn("association-controller-identity-changed", continuation_stop.outcome(payload))
 
+    def test_new_claim_invalidates_the_old_association_generation(self):
+        native, runtime = self.associated_native()
+        owner = continuation_stop.read_json(self.root / ".agents/continuation/owner.json", required=True)
+        owner["foreground"] = {"pid": os.getpid(), "identity": runtime.process_identity(os.getpid()),
+                               "token": "replacement-token"}
+        self.write_owner(owner)
+        payload = {"hook_event_name": "Stop", "cwd": str(native), "session_id": "native-session"}
+        with patch.object(continuation_stop, "read_receipt", return_value={"worktree": str(native), "prompt": "status"}):
+            self.assertIn("association-foreground-generation-changed", continuation_stop.outcome(payload))
+
     def test_read_only_questions_do_not_create_or_resume_an_execution_obligation(self):
         scratch = Path(self.temp.name) / "receipt-questions"
         scratch.mkdir()
