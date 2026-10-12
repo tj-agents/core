@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import delivery_runtime
 import delivery_policy
 import workflow_runtime
+import skill_sources
 from pr_body import validate_pr_body
 
 
@@ -725,6 +726,7 @@ def expected_identity(value, path_bytes):
         "tree_archive_sha256": value["tree_archive_sha256"],
         "tree_content_sha256": value["tree_content_sha256"],
         "rules": value["rules"],
+        "installed_rules": value.get("installed_rules", []),
     }
 
 
@@ -894,7 +896,7 @@ def review_host_check(root, workflow_run_id, descriptor_path, work_order):
     return result
 
 
-def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
+def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, host=None):
     cleanup_review_bundles(root)
     sync = synchronize_for_review(root, base_ref) if synchronize else None
     base = git(root, "merge-base", base_ref, head_ref)
@@ -922,10 +924,26 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         skills, route_violations = route_findings(locations["tree"], paths)
         agent_paths = coverage_requirement(paths)
         rules = []
+        installed_rules = []
+        inventory = None
         for name in skills:
-            path = locations["tree"] / ".agents" / "skills" / name / "SKILL.md"
-            if path.is_file():
-                rules.append({"name": name, "path": str(path.relative_to(locations["tree"])).replace("\\", "/"), "sha256": sha256_file(path)})
+            if ":" in name and inventory is None:
+                if host is None:
+                    raise WorkflowOperationError("installed routes require --host")
+                try:
+                    inventory = skill_sources._router().native_plugin_inventory(host, root)
+                except Exception as error:
+                    raise WorkflowOperationError(str(error)) from error
+            try:
+                record = skill_sources.resolve_skill(
+                    name, root, locations["tree"], host, inventory
+                )
+            except skill_sources.SkillSourceError as error:
+                raise WorkflowOperationError(str(error)) from error
+            if record["source_type"] == "installed_plugin":
+                installed_rules.append(record)
+            else:
+                rules.append({"name": name, "path": record["path"], "sha256": record["sha256"]})
         descriptor = {
             "schema_version": SCHEMA_VERSION,
             "operation": "review-prepare",
@@ -945,6 +963,8 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
             "path_digest": path_digest,
             "patch_sha256": hashlib.sha256(patch).hexdigest(),
             "rules": rules,
+            "installed_rules": installed_rules,
+            "skill_resolution_context": ({"host": host, "project_root": str(root)} if installed_rules else None),
             "routed_skills": skills,
             "route_violations": route_violations,
             "lenses": select_review_lenses(paths),
@@ -954,6 +974,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
                 "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],
                 "repository_paths": paths,
                 "rule_identities": rules,
+                "installed_rule_identities": installed_rules,
             },
             "synchronization": sync,
             "created_at": utc_now(),
@@ -975,6 +996,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
             "tree_archive_sha256": descriptor["tree_archive_sha256"],
             "tree_content_sha256": tree_sha256,
             "rules": rules,
+            "installed_rules": installed_rules,
         }
         descriptor["bundle"] = {
             "directory": str(locations["directory"]),
@@ -1014,6 +1036,18 @@ def load_descriptor(root, workflow_run_id, path):
         raise WorkflowOperationError("review descriptor identity does not match its contents")
     if value["repository"] != repository_slug(root):
         raise WorkflowOperationError("review descriptor belongs to a different repository")
+    installed_routes = [name for name in value.get("routed_skills", []) if ":" in name]
+    installed_rules = value.get("installed_rules", [])
+    context = value.get("skill_resolution_context")
+    if installed_routes and not installed_rules:
+        raise WorkflowOperationError("installed routes require pinned installed rules; start a fresh review run")
+    if installed_rules:
+        if not isinstance(context, dict) or context.get("host") not in {"codex", "claude"}:
+            raise WorkflowOperationError("installed rules require a pinned host context")
+        try:
+            skill_sources.validate_pinned_installed_rules(installed_rules, context["host"], root)
+        except (KeyError, skill_sources.SkillSourceError) as error:
+            raise WorkflowOperationError(str(error)) from error
     bundle = value["bundle"]
     bundle_fields = ("directory", "patch", "paths", "tree", "tree_archive", "identity", "identity_sha256")
     if not isinstance(bundle, dict) or any(not isinstance(bundle.get(field), str) or not bundle[field] for field in bundle_fields):
@@ -1507,43 +1541,44 @@ def monitor_remote_owned(root, workflow_run_id, target_kind, poll_seconds, timeo
     return result
 
 
-def skill_identities(root, workflow_run_id, lifecycle, technical, changed_paths=()):
+def skill_identities(root, workflow_run_id, lifecycle, technical, changed_paths=(), host=None, descriptor=None):
     if not lifecycle:
         raise WorkflowOperationError("exactly one lifecycle skill is required")
-    expected = set(routed_skills(root, changed_paths)) if changed_paths else set()
+    frozen = load_descriptor(root, workflow_run_id, descriptor) if descriptor else None
+    expected = set(frozen["routed_skills"]) if frozen else (set(routed_skills(root, changed_paths)) if changed_paths else set())
     supplied = {item.split("=", 1)[0] for item in technical}
     if supplied and supplied != expected:
         raise WorkflowOperationError(
             f"technical skill identities differ from direct routes: expected {sorted(expected)}, received {sorted(supplied)}"
         )
+    if frozen and changed_paths:
+        supplied_paths = set(changed_paths)
+        if supplied_paths != set(frozen["paths"]):
+            raise WorkflowOperationError("changed paths contradict the frozen review descriptor")
     technical = list(technical) if technical else sorted(expected)
     entries = [("lifecycle", lifecycle), *(("technical", item) for item in technical)]
     records = []
+    pinned = {item["name"]: item for item in (frozen or {}).get("installed_rules", [])}
+    body_root = Path(frozen["bundle"]["tree"]) if frozen else root
     for kind, entry in entries:
-        if "=" in entry:
-            name, raw_path = entry.split("=", 1)
+        name = entry.split("=", 1)[0]
+        if name in pinned:
+            record = dict(pinned[name])
         else:
-            name = entry
-            raw_path = f".agents/skills/{name}/SKILL.md"
-        relative = Path(raw_path)
-        if relative.is_absolute() or ".." in relative.parts:
-            raise WorkflowOperationError("skill paths must stay inside the repository")
-        path = (root / relative).resolve()
-        ancestor = path
-        for _ in relative.parts:
-            ancestor = ancestor.parent
-        if not ancestor.exists() or not os.path.samefile(root, ancestor):
-            raise WorkflowOperationError("skill paths must stay inside the repository")
-        if not path.is_file():
-            raise WorkflowOperationError(f"skill body does not exist: {raw_path}")
-        records.append({"kind": kind, "name": name, "path": relative.as_posix(), "sha256": sha256_file(path)})
+            try:
+                record = skill_sources.resolve_skill(entry, root, body_root, host)
+            except skill_sources.SkillSourceError as error:
+                raise WorkflowOperationError(str(error)) from error
+        record["kind"] = kind
+        record["name"] = name
+        records.append(record)
     if len({record["name"] for record in records}) != len(records):
         raise WorkflowOperationError("skill identities must be unique")
     path = run_root(root, workflow_run_id) / "skills.json"
     previous = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"skills": []}
-    known = {(item["kind"], item["name"], item["path"], item["sha256"]) for item in previous["skills"]}
+    known = {skill_sources.identity_key(item) for item in previous["skills"]}
     for record in records:
-        record["action"] = "cached" if (record["kind"], record["name"], record["path"], record["sha256"]) in known else "load"
+        record["action"] = "cached" if skill_sources.identity_key(record) in known else "load"
     stored = {"schema_version": SCHEMA_VERSION, "workflow_run_id": workflow_run_id, "skills": [{key: value for key, value in record.items() if key != "action"} for record in records]}
     atomic_json(path, stored)
     append_event(root, workflow_run_id, {"kind": "skills", "loads": sum(item["action"] == "load" for item in records), "cached": sum(item["action"] == "cached" for item in records)})
@@ -2179,6 +2214,7 @@ def parser():
     review.add_argument("--base", default="origin/main")
     review.add_argument("--head", default="HEAD")
     review.add_argument("--synchronize", action="store_true")
+    review.add_argument("--host", choices=("codex", "claude"))
 
     host_check = commands.add_parser("review-host-check")
     host_check.add_argument("--descriptor", required=True)
@@ -2201,6 +2237,8 @@ def parser():
     skills.add_argument("--lifecycle", required=True)
     skills.add_argument("--technical", action="append", default=[])
     skills.add_argument("--changed-path", action="append", default=[])
+    skills.add_argument("--host", choices=("codex", "claude"))
+    skills.add_argument("--descriptor")
 
     usage = commands.add_parser("telemetry")
     usage.add_argument("--transcript", required=True)
@@ -2260,7 +2298,7 @@ def main(argv=None):
     elif arguments.operation == "inspect":
         result = inspect_repository(root, arguments.workflow_run_id)
     elif arguments.operation == "review-prepare":
-        result = review_prepare(root, arguments.workflow_run_id, arguments.base, arguments.head, arguments.synchronize)
+        result = review_prepare(root, arguments.workflow_run_id, arguments.base, arguments.head, arguments.synchronize, arguments.host)
     elif arguments.operation == "review-host-check":
         result = review_host_check(root, arguments.workflow_run_id, arguments.descriptor, arguments.work_order)
     elif arguments.operation == "review-reconcile":
@@ -2268,7 +2306,7 @@ def main(argv=None):
     elif arguments.operation == "monitor":
         result = monitor_remote(root, arguments.workflow_run_id, arguments.kind, arguments.id, arguments.head, arguments.workflow, arguments.attempt, arguments.poll_seconds, arguments.timeout_seconds)
     elif arguments.operation == "skills":
-        result = skill_identities(root, arguments.workflow_run_id, arguments.lifecycle, arguments.technical, arguments.changed_path)
+        result = skill_identities(root, arguments.workflow_run_id, arguments.lifecycle, arguments.technical, arguments.changed_path, arguments.host, arguments.descriptor)
     elif arguments.operation == "telemetry":
         result = telemetry(root, arguments.workflow_run_id, arguments.transcript, arguments.host, arguments.offline_gap_seconds)
     elif arguments.operation == "delivery-preflight":

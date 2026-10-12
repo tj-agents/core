@@ -155,8 +155,8 @@ class NativePluginDiscoveryError(Exception):
         super().__init__(f"{harness} plugin inventory failed: {detail}")
 
 
-@functools.lru_cache(maxsize=2)
-def _native_install_roots(harness):
+@functools.lru_cache(maxsize=8)
+def _native_plugin_inventory(harness, project_root):
     binary = shutil.which(harness)
     if binary is None:
         return NativePluginDiscoveryError(harness, "CLI executable is unavailable")
@@ -164,6 +164,7 @@ def _native_install_roots(harness):
         result = subprocess.run(
             [binary, "plugin", "list", "--json"], capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=8, check=False,
+            cwd=project_root,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         if result.returncode != 0:
@@ -183,6 +184,27 @@ def _native_install_roots(harness):
         plugins = data
     if not isinstance(plugins, list):
         return NativePluginDiscoveryError(harness, "CLI returned an invalid roster")
+    if any(not isinstance(plugin, dict) for plugin in plugins):
+        return NativePluginDiscoveryError(harness, "CLI returned an invalid roster entry")
+    return tuple(plugins)
+
+
+def native_plugin_inventory(harness, project_root=None):
+    if harness not in LINKED_SKILL_ROOTS:
+        raise NativePluginDiscoveryError(harness, "unsupported harness")
+    root = Path(project_root or Path.cwd()).resolve()
+    inventory = _native_plugin_inventory(harness, str(root))
+    if isinstance(inventory, NativePluginDiscoveryError):
+        raise inventory
+    return [dict(item) for item in inventory]
+
+
+@functools.lru_cache(maxsize=8)
+def _native_install_roots(harness, project_root=None):
+    try:
+        plugins = native_plugin_inventory(harness, project_root)
+    except NativePluginDiscoveryError as error:
+        return error
     roots = []
     for plugin in plugins:
         if not isinstance(plugin, dict) or not plugin.get("enabled"):
@@ -202,8 +224,8 @@ def _native_install_roots(harness):
     return tuple(roots)
 
 
-def native_install_roots(harness):
-    roots = _native_install_roots(harness)
+def native_install_roots(harness, project_root=None):
+    roots = _native_install_roots(harness, str(Path(project_root).resolve()) if project_root else None)
     if isinstance(roots, NativePluginDiscoveryError):
         raise roots
     return roots
