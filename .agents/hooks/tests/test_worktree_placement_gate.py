@@ -57,14 +57,17 @@ class WorktreePlacementGateTests(unittest.TestCase):
         checkout.mkdir(parents=True, exist_ok=True)
         self.git(checkout, "init")
 
-    def invoke(self, command, *, codex=False, tool_name=None, environment=None):
+    def invoke(self, command, *, codex=False, codex_argv=True, tool_name=None, environment=None, shell=None):
+        tool_input = {"command": ["bash", "-lc", command]} if codex and codex_argv else {"command": command}
+        if shell is not None:
+            tool_input["shell"] = shell
         payload = {
             "hook_event_name": "PreToolUse",
             "session_id": f"worktree-placement-{uuid.uuid4().hex}",
             "tool_use_id": uuid.uuid4().hex,
             "tool_name": tool_name or ("shell" if codex else "Bash"),
             "cwd": str(self.repo),
-            "tool_input": {"command": ["bash", "-lc", command]} if codex else {"command": command},
+            "tool_input": tool_input,
         }
         if codex:
             payload["turn_id"] = uuid.uuid4().hex
@@ -105,6 +108,30 @@ class WorktreePlacementGateTests(unittest.TestCase):
         result = subprocess.run(
             command,
             shell=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            cwd=self.repo,
+            env=environment,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def run_powershell(self, command):
+        if os.name != "nt":
+            self.skipTest("requires Windows PowerShell")
+        executable = shutil.which("powershell") or shutil.which("powershell.exe")
+        if executable is None:
+            self.skipTest("Windows PowerShell is unavailable")
+        environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+        environment.update(
+            GIT_CONFIG_GLOBAL=str(self.git_config),
+            GIT_CONFIG_SYSTEM=str(self.git_config),
+            GIT_CONFIG_NOSYSTEM="1",
+            GIT_TEMPLATE_DIR=str(self.git_template),
+        )
+        result = subprocess.run(
+            [executable, "-NoProfile", "-NonInteractive", "-Command", command],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -179,6 +206,22 @@ class WorktreePlacementGateTests(unittest.TestCase):
 
         self.assert_blocked(self.add_command(destination), "flattened")
 
+    def test_blocks_a_powershell_sibling_command_with_a_trailing_checkout_backslash(self):
+        if os.name != "nt":
+            self.skipTest("requires Windows paths")
+        executable = shutil.which("git") or "git"
+        sibling = self.base / "trailing-sibling"
+        checkout = str(self.repo) + "\\"
+        command = (
+            f"& '{executable}' -C '{checkout}' worktree add -b 'trailing-sibling' -- '{sibling}'"
+        )
+
+        result = self.invoke(command, tool_name="PowerShell")
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("direct child", result.stderr)
+        self.run_powershell(command)
+
     def test_blocks_a_symlinked_worktree_root_that_escapes_the_repository(self):
         escaped = self.base / "escaped"
         escaped.mkdir()
@@ -210,6 +253,26 @@ class WorktreePlacementGateTests(unittest.TestCase):
 
         self.assert_blocked(self.add_command(destination, checkout=non_repository), "could not prove")
 
+    def test_blocks_a_file_named_worktrees(self):
+        worktrees = self.repo / ".worktrees"
+        worktrees.rmdir()
+        worktrees.write_text("not a directory", encoding="utf-8")
+        destination = worktrees / "feature-test"
+
+        self.assert_blocked(self.add_command(destination), "real directory")
+
+    def test_allows_a_missing_worktrees_directory_when_git_accepts_it(self):
+        worktrees = self.repo / ".worktrees"
+        worktrees.rmdir()
+        destination = worktrees / "feature-test"
+        command = self.add_command(destination)
+
+        result = self.invoke(command)
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.run_shell(command)
+        self.assertTrue((destination / ".git").exists())
+
     def test_blocks_active_inherited_git_repository_routing(self):
         destination = self.repo / ".worktrees" / "feature-test"
 
@@ -240,6 +303,57 @@ class WorktreePlacementGateTests(unittest.TestCase):
                     mock.patch("sys.stderr", io.StringIO()) as stderr:
                 self.assertEqual(2, gate.main())
                 self.assertIn("WORKTREE PLACEMENT GATE", stderr.getvalue())
+
+    def test_blocks_native_creation_in_active_bash_and_powershell_substitutions(self):
+        sibling = self.base / "substitution-sibling"
+        native = f'git -C "{self.repo}" worktree add -b substitution-sibling -- "{sibling}"'
+        cases = (
+            (f"echo $({native})", True),
+            (f"echo $(echo $({native}))", True),
+            (f"echo `{native}`", True),
+            (f"Write-Output $({native})", False),
+        )
+        for command, codex in cases:
+            with self.subTest(command=command):
+                result = self.invoke(command, codex=codex, tool_name=None if codex else "PowerShell")
+                self.assertEqual(2, result.returncode)
+                self.assertIn("command substitution", result.stderr)
+
+    def test_detects_codex_exec_command_bash_shells(self):
+        sibling = self.base / "codex-substitution-sibling"
+        native = f'git -C "{self.repo}" worktree add -b codex-substitution-sibling -- "{sibling}"'
+        command = f"echo `{native}`"
+        shell = None if os.name != "nt" else r"C:\Program Files\Git\bin\bash.exe"
+
+        result = self.invoke(
+            command,
+            codex=True,
+            codex_argv=False,
+            tool_name="exec_command",
+            shell=shell,
+        )
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("command substitution", result.stderr)
+
+    def test_explicit_shell_selects_before_command_list_heuristics(self):
+        self.assertEqual(
+            "bash",
+            gate.shell_kind("exec_command", {"shell": "/bin/bash", "command": ["pwsh", "-c", "echo ok"]}),
+        )
+        self.assertEqual(
+            "powershell",
+            gate.shell_kind("exec_command", {"shell": r"C:\Program Files\PowerShell\7\pwsh.exe", "command": ["bash", "-c", "echo ok"]}),
+        )
+
+    def test_allows_single_quoted_literal_native_creation_text(self):
+        sibling = self.base / "literal-sibling"
+        native = f'git -C "{self.repo}" worktree add -b literal-sibling -- "{sibling}"'
+
+        for command, codex in ((f"echo '{native}'", True), (f"Write-Output '{native}'", False)):
+            with self.subTest(command=command):
+                result = self.invoke(command, codex=codex, tool_name=None if codex else "PowerShell")
+                self.assertEqual(0, result.returncode, result.stderr)
 
     def test_leaves_non_creation_commands_prose_and_file_writes_alone(self):
         commands = (

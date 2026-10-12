@@ -42,7 +42,30 @@ def normalize(command):
     return CONTINUATION.sub(" ", command).strip()
 
 
-def shell_segments(command):
+def shell_kind(tool_name, tool_input):
+    name = str(tool_name).casefold()
+    if name == "powershell":
+        return "powershell"
+    if name == "bash":
+        return "bash"
+    shell = tool_input.get("shell") if isinstance(tool_input, dict) else None
+    if isinstance(shell, str):
+        executable = shell.replace("\\", "/").rsplit("/", 1)[-1].casefold()
+        if executable in {"bash", "bash.exe", "sh", "sh.exe", "zsh", "zsh.exe", "dash", "dash.exe"}:
+            return "bash"
+        if executable in {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}:
+            return "powershell"
+    for value in (tool_input or {}).values() if isinstance(tool_input, dict) else ():
+        if isinstance(value, list) and value:
+            executable = str(value[0]).replace("\\", "/").rsplit("/", 1)[-1].casefold()
+            if executable in {"bash", "sh", "zsh", "dash"}:
+                return "bash"
+            if executable in {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}:
+                return "powershell"
+    return "powershell" if os.name == "nt" else "bash"
+
+
+def shell_segments(command, kind):
     text = normalize(command)
     if text.startswith("&"):
         text = text[1:].lstrip()
@@ -55,10 +78,12 @@ def shell_segments(command):
             escaped = False
             continue
         if quote == "'":
-            if character == quote:
+            if character == quote and kind == "powershell" and index + 1 < len(text) and text[index + 1] == quote:
+                escaped = True
+            elif character == quote:
                 quote = None
             continue
-        if character in ("\\", "`"):
+        if (kind == "bash" and character == "\\") or (kind == "powershell" and character == "`"):
             escaped = True
             continue
         if quote:
@@ -76,6 +101,101 @@ def shell_segments(command):
     if text[start:].strip():
         segments.append(text[start:].strip())
     return segments
+
+
+def substitution_end(text, index, kind):
+    depth = 1
+    quote = None
+    escaped = False
+    while index < len(text):
+        character = text[index]
+        if escaped:
+            escaped = False
+        elif quote == "'":
+            if character == quote and kind == "powershell" and index + 1 < len(text) and text[index + 1] == quote:
+                index += 1
+            elif character == quote:
+                quote = None
+        elif (kind == "bash" and character == "\\") or (kind == "powershell" and character == "`"):
+            escaped = True
+        elif quote:
+            if character == quote:
+                quote = None
+        elif character in ("'", '"'):
+            quote = character
+        elif character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return None
+
+
+def substitution_creations(command, kind):
+    text = normalize(command)
+    creations = []
+    index = 0
+    quote = None
+    escaped = False
+    while index < len(text):
+        character = text[index]
+        if escaped:
+            escaped = False
+            index += 1
+            continue
+        if quote == "'":
+            if character == quote and kind == "powershell" and index + 1 < len(text) and text[index + 1] == quote:
+                index += 2
+                continue
+            if character == quote:
+                quote = None
+            index += 1
+            continue
+        if (kind == "bash" and character == "\\") or (kind == "powershell" and character == "`"):
+            escaped = True
+            index += 1
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            elif character == "$" and index + 1 < len(text) and text[index + 1] == "(":
+                end = substitution_end(text, index + 2, kind)
+                if end is not None:
+                    content = text[index + 2:end]
+                    creations.extend(creation_segments(content, kind))
+                    creations.extend(substitution_creations(content, kind))
+                    index = end + 1
+                    continue
+            elif kind == "bash" and character == "`":
+                end = text.find("`", index + 1)
+                if end != -1:
+                    content = text[index + 1:end]
+                    creations.extend(creation_segments(content, kind))
+                    creations.extend(substitution_creations(content, kind))
+                    index = end + 1
+                    continue
+            index += 1
+            continue
+        if character in ("'", '"'):
+            quote = character
+        elif character == "$" and index + 1 < len(text) and text[index + 1] == "(":
+            end = substitution_end(text, index + 2, kind)
+            if end is not None:
+                content = text[index + 2:end]
+                creations.extend(creation_segments(content, kind))
+                creations.extend(substitution_creations(content, kind))
+                index = end
+        elif kind == "bash" and character == "`":
+            end = text.find("`", index + 1)
+            if end != -1:
+                content = text[index + 1:end]
+                creations.extend(creation_segments(content, kind))
+                creations.extend(substitution_creations(content, kind))
+                index = end
+        index += 1
+    return creations
 
 
 def unquote(value):
@@ -218,6 +338,18 @@ def parse_creation(segment):
     return "creation", (checkout, destination, requested_branch)
 
 
+def creation_segments(command, kind):
+    segments = shell_segments(command, kind)
+    if segments is None:
+        return [("invalid", None)] if re.search(r"\bgit(?:\.exe)?\b.*\bworktree\s+add\b", command, re.I | re.S) else []
+    creations = []
+    for segment in segments:
+        parsed = parse_creation(segment)
+        if parsed[0] is not None:
+            creations.append(parsed)
+    return creations
+
+
 def git_environment():
     return {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
 
@@ -273,6 +405,8 @@ def placement_reason(checkout, destination, requested_branch):
         if root is None:
             return "Git could not prove the checkout's common repository root."
         expected = root / ".worktrees"
+        if expected.exists() and not expected.is_dir():
+            return "the repository's .worktrees root must be a real directory."
         resolved_expected = expected.resolve()
         resolved_root = root.resolve()
         if expected.exists() and (
@@ -294,17 +428,20 @@ def placement_reason(checkout, destination, requested_branch):
 def main():
     try:
         data = json.load(sys.stdin)
-        command = extract_command(data.get("tool_name", ""), data.get("tool_input") or {})
+        tool_input = data.get("tool_input") or {}
+        command = extract_command(data.get("tool_name", ""), tool_input)
         if not command:
             return 0
-        segments = shell_segments(command)
+        kind = shell_kind(data.get("tool_name", ""), tool_input)
+        segments = shell_segments(command, kind)
+        substitutions = substitution_creations(command, kind)
         if segments is None:
-            return 0
-        creations = []
-        for segment in segments:
-            kind, parsed = parse_creation(segment)
-            if kind is not None:
-                creations.append((kind, parsed))
+            if substitutions:
+                creations = substitutions
+            else:
+                return 0
+        else:
+            creations = creation_segments(command, kind) + substitutions
         if not creations:
             return 0
     except Exception:
@@ -313,6 +450,8 @@ def main():
         routing_variable = inherited_git_routing()
         if routing_variable:
             reason = f"{routing_variable} is active, so Git repository routing cannot be proven safely."
+        elif substitutions:
+            reason = "worktree creation must not be hidden in a shell command substitution."
         elif len(segments) != 1 or len(creations) != 1:
             reason = "worktree creation must not be hidden in a compound shell command."
         elif creations[0][0] != "creation":
