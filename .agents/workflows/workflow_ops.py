@@ -2006,15 +2006,15 @@ def standing_authorization(root, changed_paths, labels):
         policy = delivery_policy.load_legacy_policy(root)
     except delivery_policy.PolicyViolation as error:
         raise WorkflowOperationError(str(error)) from error
-    if policy is None:
-        resolution = delivery_runtime.StandingMergeAuthorization().resolve(
-            {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
-            changed_paths, labels, root,
-        )
-        if resolution["stopped_by"] is None:
-            resolution["stopped_by"] = {"class": "no-recorded-authorization"}
-        return resolution
     try:
+        if policy is None:
+            resolution = delivery_runtime.StandingMergeAuthorization().resolve(
+                {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
+                changed_paths, labels, root,
+            )
+            if resolution["stopped_by"] is None:
+                resolution["stopped_by"] = {"class": "no-recorded-authorization"}
+            return resolution
         return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels, root)
     except delivery_runtime.DeliveryContractViolation as error:
         raise WorkflowOperationError(str(error)) from error

@@ -1,6 +1,6 @@
 ﻿# Repository settings configuration owned by Core
 
-Status: active; PR208 owns committed candidate 531c793d285008f0bf8969eeed700b601b9326fe. Full independent review is complete with two reproduced settings-edge findings; the bounded L4 repairs are implemented and focused-green, ready for a stable corrected head, incremental review and replacement exact-head CI.
+Status: active; PR208 owns committed candidate 531c793d285008f0bf8969eeed700b601b9326fe. Full independent review is complete with two reproduced settings-edge findings; classifier/parser repairs are pushed at178ba775bcddb68124d32a7e921b30902a62944b, with fresh incremental review and CI owned. B003 and required same-change harness alignment are implemented, parent-verified focused-green, and ready for one stable checkpoint followed by final incremental review/CI.
 Date: 2026-10-11
 Branch: Fix/RepositorySettingsContract
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract
@@ -145,3 +145,17 @@ The bounded repair changes 63 source/test lines plus 4 catalog digest lines; it 
 ## CI generated-digest correction
 
 The owned observer reached terminal failure for run38183296901 at the original 531c793d285008f0bf8969eeed700b601b9326fe head. Authoritative failed-step logs identify only the PR generated-output guard: engineering/machine catalog digest changes are generated publication output and cannot be committed in Core PRs. Restore those digest values to the actual merge-base baseline, keep all runtime fixes, and require scripts/check_generated_paths.py to pass on the corrected committed candidate. The post-merge job updates digests. This is a candidate preparation error, not a permission gate or a reason to weaken CI. Remaining jobs and the replacement head must be observed independently.
+
+## No-legacy invalid-settings consumer repair
+
+Fresh independent security review verified the classifier/parser repairs, then distinguished an existing initial-candidate error boundary outside that incremental delta. Parent reproduced it: workflow_ops.standing_authorization translates DeliveryContractViolation only when the legacy policy exists; the arbitrary repository path calls resolve outside that try. Invalid settings still deny merge, but the guarded command lacks its controlled diagnostic. B003 records this same authorized settings outcome; normalize the shared consumer boundary and prove malformed/deep invalid settings through actual guarded-command main with zero merge calls. This is an ordinary bounded repair, not an ownership or permission gate. Preserve completed review identities and review the new committed delta before final-head CI/merge.
+
+## Completed first incremental review
+
+Range531c793d285008f0bf8969eeed700b601b9326fe..178ba775bcddb68124d32a7e921b30902a62944b completed with zero new changed-line findings. Canonical reviews/Fix-RepositorySettingsContract.md now has watermark178ba and clean completed incremental judgment; original full-pass changes-requested judgment and R001/R002 identities remain intact. Fresh native-general, workflow and L2 security evidence was reconciled, including rejection/correction of a wrong review-base-versus-PR-base guard claim and unretained test claims. Parent verified the strengthened machine artifact; L2 independently ran 11 bounded frozen regressions. Current-base reconciliation is exact and unchanged. The same exclusive L4 writer now owns only workflow_ops.py and test_auto_merge.py for B003; no new PR, source owner, permission gate or normal-profile operation is introduced.
+
+## Verified final consumer and harness repair
+
+B003's real guarded-command main regression failed before the source change with exactly two absent-policy errors (malformed/deep settings), then passed after both resolve paths shared the existing WorkflowOperationError translation. Parent inspected the stronger diagnostic assertion and terminal artifacts in repository-settings-b003: auto-merge11, delivery-binding38, harness manifests14 (63 tests passed), plus manifest consistency checked3 declarations. The source writer released all five paths without committing. The measured repair is79 changed lines, including necessary authored catalog harness wording; no digest or generated package change is included.
+
+The engineering harness now describes the validated repository settings preference, and the machine harness declares the two canonical shared reader/resolver dependencies already embedded by the source mappings. Catalog mirrors only the authored engineering justification and preserves merge-base generated digests. This satisfies required same-change shipped harness alignment; no permission command, installation or skill body is added here. Exact-head CI38184988930 at reviewed178ba775bcddb68124d32a7e921b30902a62944b completed successfully; that success is retained as its own evidence and does not validate the forthcoming final head.

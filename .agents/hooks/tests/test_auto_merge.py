@@ -1,7 +1,9 @@
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
@@ -180,6 +182,59 @@ class AutoMergeTests(unittest.TestCase):
                     patch.object(AUTO_MERGE.workflow_ops, "git", return_value=binding["branch"]):
                 with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, "authorization"):
                     AUTO_MERGE.current_authorization(root, binding, value)
+
+    def test_main_controls_invalid_settings_for_absent_and_legacy_authorization(self):
+        with tempfile.TemporaryDirectory(prefix="repository settings ") as raw:
+            root = Path(raw).resolve()
+            agents = root / ".agents"
+            agents.mkdir()
+            binding = self.binding(root)
+            value = {
+                "number": binding["pr_number"],
+                "headRefName": binding["branch"],
+                "headRefOid": HEAD,
+                "state": "OPEN",
+                "isDraft": False,
+                "mergeStateStatus": "CLEAN",
+                "statusCheckRollup": [{"status": "COMPLETED", "conclusion": "SUCCESS"}],
+                "files": [{"path": "README.md"}],
+                "changedFiles": 1,
+                "labels": [],
+            }
+            invalid_settings = {
+                "malformed": "{",
+                "deep": (
+                    '{"configuration":{"core":{"auto_merge":false},"opaque":'
+                    + "[" * 20_000 + "0" + "]" * 20_000 + "}}"
+                ),
+            }
+            policy_path = agents / "delivery-authorization.json"
+            for policy in (None, {"standing_authorization": "auto", "instruction": "merge when green", "auto_merge": True}):
+                with self.subTest(policy=policy is not None):
+                    if policy is None:
+                        policy_path.unlink(missing_ok=True)
+                    else:
+                        policy_path.write_text(json.dumps(policy), encoding="utf-8")
+                    for name, contents in invalid_settings.items():
+                        with self.subTest(settings=name):
+                            (agents / "settings.json").write_text(contents, encoding="utf-8")
+                            stderr = io.StringIO()
+                            with (
+                                patch.object(AUTO_MERGE, "read_binding", return_value=binding),
+                                patch.object(AUTO_MERGE, "exact_local_identity"),
+                                patch.object(AUTO_MERGE.workflow_ops, "pull_request_state", return_value=value),
+                                patch.object(AUTO_MERGE.workflow_ops, "changed_paths", return_value=["README.md"]),
+                                patch.object(AUTO_MERGE.workflow_ops, "run_process") as run_process,
+                                redirect_stderr(stderr),
+                            ):
+                                result = AUTO_MERGE.main(["auto_merge.py", "--root", str(root)])
+                            self.assertEqual(2, result)
+                            self.assertIn("auto-merge:", stderr.getvalue())
+                            self.assertIn("settings could not be read", stderr.getvalue())
+                            self.assertFalse(any(
+                                call.args[0][:3] == ["gh", "pr", "merge"]
+                                for call in run_process.call_args_list
+                            ))
 
     def test_current_review_rejects_missing_stale_open_and_missing_security_evidence(self):
         with tempfile.TemporaryDirectory() as raw:
