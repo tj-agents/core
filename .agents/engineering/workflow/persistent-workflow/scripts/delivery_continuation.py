@@ -379,5 +379,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (scheduler.SchedulerError, OSError, ValueError, subprocess.SubprocessError) as error:
-        print(json.dumps({"state": "blocked", "reason": str(error)}))
+        print(json.dumps({"outcome": "failed", "reason": str(error)}))
         raise SystemExit(2)
