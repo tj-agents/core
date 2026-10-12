@@ -29,8 +29,44 @@ class OracleTests(unittest.TestCase):
 
     def test_complete_source_backed_unix_matrix(self):
         self.assertEqual(oracle.EXPECTED_COUNTS, oracle.count_records(self.records))
-        self.assertEqual(394, len(self.records))
+        self.assertEqual(436, len(self.records))
         self.assertTrue({record["source"] for record in self.records}.issubset(self.sources["sources"]))
+
+    def test_powershell_descriptor_prefixes_aliases_and_windows_projection(self):
+        group = next(group for group in self.profiles["groups"] if group["id"] == "powershell-descriptors")
+        descriptors = group["descriptors"]
+        records = {record["id"]: record for record in self.records if record["shell"] == "powershell"}
+        self.assertEqual(42, len(records))
+        self.assertEqual({f"pwsh:{descriptor['name']}" for descriptor in descriptors}, set(records))
+        self.assertEqual(["!UNIX"], records["pwsh:v2socketservermode"]["condition"])
+        self.assertEqual(["DEBUG"], records["pwsh:isswait"]["condition"])
+        self.assertEqual("outputformat", records["pwsh:of"]["canonical_name"])
+        self.assertEqual("outputformat", records["pwsh:of"]["enum"])
+        self.assertEqual("encodedcommand", records["pwsh:ec"]["canonical_name"])
+        self.assertEqual("opaque", records["pwsh:ec"]["action"])
+        for descriptor in descriptors:
+            for length in range(len(descriptor["minimum_prefix"]), len(descriptor["name"]) + 1):
+                supplied = descriptor["name"][:length]
+                expected = next(
+                    candidate
+                    for candidate in descriptors
+                    if len(supplied) >= len(candidate["minimum_prefix"])
+                    and candidate["name"].casefold().startswith(supplied.casefold())
+                )
+                with self.subTest(supplied=supplied):
+                    self.assertEqual(expected["name"], oracle.resolve_powershell_prefix(self.profiles, supplied)["name"])
+        self.assertIsNone(oracle.resolve_powershell_prefix(self.profiles, "n"))
+        self.assertIsNone(oracle.resolve_powershell_prefix(self.profiles, "configurationfil"))
+        self.assertEqual("interactive", oracle.resolve_powershell_prefix(self.profiles, "i")["name"])
+        windows = list(oracle.iter_powershell_descriptors(self.profiles, "windows"))
+        windows_by_name = {descriptor["name"]: descriptor for descriptor in windows}
+        self.assertEqual(901, records["pwsh:version"]["source_line"])
+        self.assertEqual("windows-powershell-5.1-cli-doc", windows_by_name["version"]["source"])
+        self.assertEqual(1, windows_by_name["version"]["arity"])
+        self.assertNotIn("source_line", windows_by_name["version"])
+        self.assertEqual("psconsolefile", windows[-1]["name"])
+        self.assertNotIn("cwa", windows_by_name)
+        self.assertNotIn("socketservermode", windows_by_name)
 
     def test_bash_variants_keep_their_editions_and_conditions(self):
         by_id = {record["id"]: record for record in self.records}
@@ -71,7 +107,11 @@ class OracleTests(unittest.TestCase):
             "bash-o-cygwin:igncr": "__CYGWIN__",
             "bash-O-cygwin:completion_strip_exe": "__CYGWIN__",
         }
-        actual = {record_id: record["condition"] for record_id, record in by_id.items() if record.get("condition")}
+        actual = {
+            record_id: record["condition"]
+            for record_id, record in by_id.items()
+            if record["shell"] != "powershell" and record.get("condition")
+        }
         self.assertEqual(expected, actual)
         self.assertEqual("__CYGWIN__", by_id["bash-o-cygwin:igncr"]["condition"])
         self.assertEqual("__CYGWIN__", by_id["bash-O-cygwin:completion_strip_exe"]["condition"])
@@ -147,6 +187,36 @@ class OracleTests(unittest.TestCase):
         malformed["groups"][9]["map"]["0"] = 1
         with self.assertRaises(ValueError):
             oracle.validate(malformed, self.sources)
+        powershell_index = next(index for index, group in enumerate(self.profiles["groups"]) if group["id"] == "powershell-descriptors")
+        for label, mutate in (
+            ("missing descriptor", lambda group: group["descriptors"].pop()),
+            ("reordered descriptor", lambda group: group["descriptors"].reverse()),
+            ("lost condition", lambda group: group["conditions"].pop("isswait")),
+            ("incorrect condition", lambda group: group["conditions"].__setitem__("token", ["UNIX"])),
+            ("incorrect alias", lambda group: group["aliases"].__setitem__("ec", "command")),
+            ("bad arity", lambda group: group["descriptors"][20].__setitem__("arity", 1)),
+            ("bad action", lambda group: group["descriptors"][22].__setitem__("action", "continue")),
+            ("wrong source location", lambda group: group["source_lines"].__setitem__("command", 1055)),
+            ("missing immutable documentation metadata", lambda group: group["windows_extra"][0].pop("source")),
+        ):
+            with self.subTest(label=label):
+                malformed = copy.deepcopy(self.profiles)
+                mutate(malformed["groups"][powershell_index])
+                with self.assertRaises(ValueError):
+                    oracle.validate(malformed, self.sources)
+        for label, source_id, mutate in (
+            ("wrong parser provenance", "pwsh-7.6.0-parser", lambda source: source.__setitem__("provenance", "verified")),
+            ("lost normalized hash", "pwsh-7.6.0-parser", lambda source: source.pop("normalized_lf_sha256")),
+            ("collapsed raw and normalized hashes", "pwsh-7.6.0-parser", lambda source: source.__setitem__("normalized_lf_sha256", source["sha256"])),
+            ("falsely asserted parser revision", "pwsh-7.6.0-parser", lambda source: source.__setitem__("revision", "f" * 40)),
+            ("missing immutable documentation metadata", "pwsh-7.5-cli-doc", lambda source: source.pop("revision")),
+            ("wrong documentation locations", "windows-powershell-5.1-cli-doc", lambda source: source["locations"][0].__setitem__(0, 26)),
+        ):
+            with self.subTest(label=label):
+                malformed_sources = copy.deepcopy(self.sources)
+                mutate(malformed_sources["sources"][source_id])
+                with self.assertRaises(ValueError):
+                    oracle.validate(self.profiles, malformed_sources)
 
 
 class ExistingFacadeCompatibilityTests(unittest.TestCase):
