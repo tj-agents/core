@@ -138,10 +138,20 @@ class RecoveryTests(unittest.TestCase):
                                                 ["resume", "exact_id", "Continue the requested work."], clear=("TERM",),
                                                 force={"CODEX_HOME": RECOVERY._profile("codex", self.root / "sessions")})
 
-    def test_open_main_uses_real_prompt_file_adapter_without_rewriting_private_recovery_instruction(self):
+    def test_open_main_preserves_codex_task_recovery_authority_and_limits_file(self):
         self.write_codex()
         prompt = self.root / "recovery prompt é ' $().txt"
         content = "Observed follow-up blocker: proxy said 'unavailable'; $(retry) & <none>."
+        content = "\n".join((
+            content,
+            "Canonical Goal: C:/private/GOAL.md",
+            "Actual authorization: User authorized exact-owner recovery.",
+            "Provenance: recorded user request.",
+            "Authorized scope: inspect and reopen the exact owner.",
+            "Limits: no settings changes.",
+            "Holds: approval review remains a gate.",
+            "Remaining gates: verify owner identity.",
+        ))
         prompt.write_text(content, encoding="utf-8")
         original = prompt.read_bytes()
         cli = RECOVERY._load("agent_cli")
@@ -158,6 +168,44 @@ class RecoveryTests(unittest.TestCase):
         arguments = launch.call_args.args[3]
         self.assertEqual("resume", arguments[0])
         self.assertEqual("exact_id", arguments[1])
+        self.assertEqual(
+            f"Read the file at {prompt.resolve()} and follow its instructions, working from the current directory.",
+            arguments[2],
+        )
+        self.assertNotIn(content, arguments)
+        self.assertEqual(original, prompt.read_bytes())
+
+    def test_open_session_preserves_claude_task_recovery_authority_and_limits_file(self):
+        profile = self.root / "alternate profile"
+        projects = profile / "projects"
+        self.write_claude(projects)
+        prompt = self.root / "claude recovery authority.txt"
+        content = """Host: claude
+Native session ID: claude_id
+Canonical Goal: C:/private/GOAL.md
+Actual authorization: User authorized exact-owner recovery.
+Provenance: recorded user request.
+Authorized scope: inspect and reopen the exact owner.
+Limits: no settings changes.
+Holds: approval review remains a gate.
+Remaining gates: verify owner identity.
+Observed blocker: no send was attempted."""
+        prompt.write_text(content, encoding="utf-8")
+        original = prompt.read_bytes()
+        cli = RECOVERY._load("agent_cli")
+        with mock.patch.object(cli, "open_claude_tab") as launch:
+            RECOVERY.open_session(
+                "claude",
+                "claude_id",
+                prompt=None,
+                roots={"claude": projects},
+                confirm_closed=True,
+                prompt_path=prompt,
+                cli=cli,
+            )
+        arguments = launch.call_args.args[2]
+        self.assertEqual("--resume", arguments[0])
+        self.assertEqual("claude_id", arguments[1])
         self.assertEqual(
             f"Read the file at {prompt.resolve()} and follow its instructions, working from the current directory.",
             arguments[2],

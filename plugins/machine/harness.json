@@ -219,7 +219,7 @@
             "--host",
             "codex"
           ],
-          "justification": "machine:followup-codex recovery: inspect or reopen the exact Codex owner after no-send follow-up failure",
+          "justification": "Permits exact-session recovery tooling; callers follow the shared task-recovery contract when preparing private instructions and any per-call approval justification.",
           "match": [
             [
               "python3",
