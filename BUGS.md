@@ -110,3 +110,15 @@
 **Resolution condition:** a merge naming another repository never binds cleanup to the cwd checkout; a focused test covers it and exact-head CI passes.
 
 **Verification evidence:** the Stop hook message quoted above, while marketplace PR 6's own worktree had already been removed and github-actions PR 1 was open.
+
+## B010 - `peer-cli` finish exits before closing when its cleanup observer does not start
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; after `skills/merge/scripts/cleanup_proof.py` printed `removable` for `tj-agents/github-actions/.worktrees/Feature-Conventions`, running `python -B …/machine/utility/peer-cli/scripts/finish.py` with no arguments from that worktree on Windows exited 2 with "finish: cleanup observer did not confirm startup". The session stayed open and the worktree was not removed. **Cause:** unknown.
+
+**Impact and priority:** P2; a completed goal cannot close its own session or remove its merged worktree, so cleanup falls back to the user.
+
+**Source owner:** tj-agents/core machine `peer-cli` finish/observer. **State:** open. **Repair link:** none. **Next action:** reproduce on Windows from a merged linked worktree inside a Claude Code session and capture the observer's startup diagnostics.
+
+**Resolution condition:** `finish.py` closes the verified host session and removes the merged worktree from that setup, under a focused test.
+
+**Verification evidence:** the exit status and message above; the worktree and session were still present afterwards.
