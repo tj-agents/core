@@ -12,7 +12,7 @@
 - **State:** deferred.
 - **Reason:** each convention owner must adopt the shared setting in its own contract.
 - **blocked_by:** dependency.
-- **Repair link:** [current Core goal](../../plans/convention-approval-configuration/GOAL.md),
+- **Repair link:** [Core repair PR #219](https://github.com/tj-agents/core/pull/219),
   [repo-declared-config rollout owner](../../plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md), and
   [dotnet D001](https://github.com/tj-agents/dotnet/blob/main/docs/TECH_DEBT.md#d001-honor-configured-design-approval-across-agent-hosts).
 - **Resolver:** each affected stack source and consuming repository owner.
