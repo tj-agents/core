@@ -1,10 +1,10 @@
 ﻿# Repository settings configuration owned by Core
 
-Status: active; final runtime source317489e3390ec2b554850b3d178b41d822e7c4d7 is committed and pushed to PR208. Final focused repair passed63 tests; fresh incremental review178ba..317489 and exact-head CI38186384207 are owned. Ownership is resolved, continuation WORKING, no user gate.
-Date: 2026-10-11
-Branch: Fix/RepositorySettingsContract
+Status: active; runtime PR208 merged and causally published, all exact source/main checks successful. Guidance slice Docs/RepositorySettingsPreference now reuses this checkout from published maincbe97265fcd8267493c24d18f74a5a0a26b872c9, with its fresh supported owner claimed by the same native parent. Implement the bounded existing policy/harness/catalog wording, then independently review and deliver it before final closeout.
+Date: 2026-10-12
+Branch: Docs/RepositorySettingsPreference
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract
-Base: origin/main at 73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c
+Base: origin/main at cbe97265fcd8267493c24d18f74a5a0a26b872c9; runtime source base73f1 retained in delivery history
 Originating session: 01a12c10-0de6-7152-a9f2-9e5f374021f8
 Lane: L4 implementation; contract and ownership decisions resolved, with meaningful tests catching the specified behavior. Independent security review selects L2; ordinary review selects L4; clerical delivery selects L7.
 
@@ -98,7 +98,7 @@ Initial test failures were confirmed in saved artifacts, repaired by adding the 
 
 ## Delivery map
 
-- Runtime slice `Fix/RepositorySettingsContract`, base `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`; PR: 208 (draft). Includes settings contract, active engineering/machine consumers, strict validation, scoped-task guard tests and resource mapping. Focused local checks and exact-head full Windows/Linux CI precede delivery. Measured substantive code/test/docs-schema delta: 517 changed lines; catalog 4 lines, generated output excluded.
+- Runtime slice `Fix/RepositorySettingsContract`, base `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`; PR: 208 (MERGED; causal publication verified). Includes settings contract, active engineering/machine consumers, strict validation, scoped-task guard tests and resource mapping. Focused local checks and exact-head full Windows/Linux CI precede delivery. Measured substantive code/test/docs-schema delta: 517 changed lines; catalog 4 lines, generated output excluded.
 - Subsequent guidance slice `Docs/RepositorySettingsPreference`, from the then-current remote default after runtime publication; PR: not opened. Correct only the existing persistent-delivery skill's legacy-only preference explanation, which is a durable guidance change and must ship separately under git-branching. Expected substantive guidance delta below 100 lines plus required harness wording; catalog digests remain generated and uncommitted. Reuse the retained goal, validate both generated host adapters and applicable harness/skill packaging, review as a shipped skill change and observe exact causal publication. No implementation API or consumer installation belongs to this second slice.
 
 ## Next Steps
@@ -113,24 +113,32 @@ Initial test failures were confirmed in saved artifacts, repaired by adding the 
       "behavior": "Read repository settings and enforce guarded auto-merge with independent task authority",
       "source": ".agents/workflows and .agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
       "mapping": ".agents/plugins/sources.json engineering workflows and machine sibling-reader resource for Claude payloads",
-      "verification": {"level": "planned", "result": "pending", "evidence": "Focused arbitrary-repository scoped-task tests, packaged machine loading, generated Claude parity and exact-head Windows/Linux CI"}
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Focused arbitrary-repository scoped-task and active-grant revocation tests, exact-head Windows/Linux ci38187755625, causal main ci38189303890, and published byte parity atcbe97265fcd8267493c24d18f74a5a0a26b872c9. No consumer installation or normal-profile adoption claimed."
+      }
     },
     {
       "host": "codex",
       "behavior": "Read repository settings and enforce guarded auto-merge with independent task authority",
       "source": ".agents/workflows and .agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
       "mapping": ".agents/plugins/sources.json engineering workflows and machine sibling-reader resource for Codex payloads",
-      "verification": {"level": "planned", "result": "pending", "evidence": "Focused arbitrary-repository scoped-task tests, packaged machine loading, generated Codex parity and exact-head Windows/Linux CI"}
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Focused arbitrary-repository scoped-task and active-grant revocation tests, exact-head Windows/Linux ci38187755625, causal main ci38189303890, and published byte parity atcbe97265fcd8267493c24d18f74a5a0a26b872c9. No consumer installation or normal-profile adoption claimed."
+      }
     }
   ]
 }
 ```
 
-1. Complete the owned final incremental review178ba775bcddb68124d32a7e921b30902a62944b..317489e3390ec2b554850b3d178b41d822e7c4d7; final code is committed, pushed and bound to the WORKING continuation owner.
-2. Reconcile fresh native-general/workflow/security evidence and observe final exact-head CI38186384207 through its existing monitor.
-3. Reconcile the current base and review, ready PR208, perform the normal guarded merge under recorded authority, and verify the exact merge's causal generated publication.
-4. Deliver the existing persistent-delivery preference explanation separately from the updated main branch, with its required harness/catalog changes, review, CI and causal publication. Keep this same goal and source boundaries.
-5. Reconcile M008 and B001/B002 against observed delivery, complete closeout and the canonical continuation owner. No Kit dependency, consumer installation or repository opt-in belongs to this correction; no repeated user permission is needed.
+1. Runtime PR208 review, exact Windows/Linux CI, guarded merge and causal publication are complete; its delivery binding and scheduler were removed and its terminal continuation directory archived outside Git.
+2. Implement the separately mapped existing persistent-delivery preference explanation on this guidance branch, with required authored harness/catalog wording only; parent owns this goal and problem records.
+3. Validate generation/packaging and manifest consistency, commit one stable guidance candidate, open/bind its own PR, independently docs-review the frozen head and own exact CI.
+4. Perform its normal guarded merge and observe the exact causal generated publication; then retire that slice owner and start the final docs-only closeout from updated main.
+5. Reconcile M008/B001/B002/B003 from observed runtime delivery and M011 from both runtime/guidance guards and publication. Freshly verify final completion before deleting this goal in closeout. No Kit dependency, consumer installation or repository opt-in is authorized or required.
 
 ## Independent review repair checkpoint
 
@@ -169,3 +177,129 @@ Integration phase selects L4 for specified, testable preservation of both author
 
 
 Integration writer released after a conflict-free no-commit merge of currentmainbdb6391 into reviewed317489. Parent inspected actual terminal artifacts in repository-settings-base-integration-001: harness15 and guarded auto-merge11 tests passed (26 total), plus3 manifest declarations. Parent inspected the indexed comparison against currentmain: catalog contains only authored engineering settings-preference wording, machine harness adds the two settings dependencies, and no plugins output differs. Preserve the legitimate generated main content during merge; no manual generated-output staging or digest rewrite is needed. Commit this material merge plus the goal checkpoint, push PR208, refresh its workflow handoff binding, and supported-rebind/claim the same owner before replacement review/CI.
+
+
+## Runtime merged; causal publication owned
+
+The guarded ordinary merge completed PR208 at source head0f98144fceff5040f6050413e036d26f1cf98ea8; forge state confirms MERGED at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d, 2026-10-12T00:46:32Z. Independent native-general, workflow and authorization/security reviews of317489..0f9814 are complete with no new findings; the canonical final judgment is approved. The first merge attempt exposed the incorrectly written clean judgment token, which the existing gate rejects; the local parent record was corrected to approved without changing reviewed source or bypassing the guard. The existing review-lifecycle contract already requires that final token; no missing standard is established. Exact-head CI38187755625 guard, Windows and Linux succeeded. Owned monitor repository-settings-publication-001 observes exact causal push run38189303890 attempt1 at the merge SHA. Verify its regeneration and actual bot publication before retiring this slice owner and entering the separately mapped guidance slice.
+
+
+## Verified runtime publication and next owner
+
+Exact causal main ci38189303890 completed SUCCESS at mergea1a8d051e65e15d639a7a0fb0fc343c7b89fd72d: Linux114618404412, Windows114618404696 and regeneration114618404712 succeeded; main-only guard skipped as designed. Remote maincbe97265fcd8267493c24d18f74a5a0a26b872c9 has the exact merge as its sole parent and the subject Regenerate packages for a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d. Parent byte-compared the published engineering reader/resolver, machine sibling reader/resolver and both Claude/Codex machine consumer payloads against canonical sources; all six matched. This proves shipped source parity, not installation or consumer adoption.
+
+This completion record is for the runtime delivery condition only. The broader canonical goal stays active for the separately mapped guidance slice and final closeout. Retire and archive the runtime owner through persistent-delivery, reuse this checkout on Docs/RepositorySettingsPreference from updated remote main, initialize/claim/register a fresh slice owner against this same goal, and re-resolve its independent PR/head/check/review binding. Guidance implementation selects L5: already-decided edits to the existing policy and required authored harness/catalog wording. Documentation review selects L4; clerical checkpoints select L7.
+
+```completion
+{
+  "outcome": "Runtime settings delivery is complete; the same canonical goal is active for the separately mapped guidance slice and final closeout.",
+  "acceptance": [
+    {
+      "id": "interface",
+      "criterion": "One Core-owned repository settings interface preserves unrelated settings",
+      "evidence": [
+        {
+          "source": "docs/workflows/REPOSITORY_CONFIGURATION.md and .agents/workflows/repository_configuration.py",
+          "result": "Actual-checkout .agents/settings.json reads configuration.core.auto_merge; strict Core option validation and opaque unrelated settings are verified."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "semantics",
+      "criterion": "True, false, omitted, absent and invalid settings are freshly interpreted",
+      "evidence": [
+        {
+          "source": "Focused reader/runtime/guarded-command/machine artifacts in shared repository-settings runs",
+          "result": "Fresh-read, authoritative false/omission, wholly absent validated legacy fallback, malformed/deep rejection and both-host active-grant revocation passed."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "consumer",
+      "criterion": "An unrelated consuming checkout uses existing task authority without copied interpretation",
+      "evidence": [
+        {
+          "source": "Guarded auto-merge scoped-task disposable fixture and final Windows/Linux CI38187755625",
+          "result": "Arbitrary space/Unicode repository with settings preference, no legacy standing table, and existing exact scoped task approval exercises guarded merge; holds/reviews/checks/stops remain."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "hosts",
+      "criterion": "Claude and Codex share the shipped guarded reader and consumers",
+      "evidence": [
+        {
+          "source": "Published maincbe97265fcd8267493c24d18f74a5a0a26b872c9",
+          "result": "Six engineering/machine source-to-payload byte comparisons passed, including both host machine consumer copies."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "ownership",
+      "criterion": "Original source owner released one preserved causal implementation",
+      "evidence": [
+        {
+          "source": "Original Feature-RepositoryConfiguration goal release2026-10-11T22:16:13Z",
+          "result": "Exact controller recovered and contacted its existing child; explicit release to this successor preserved source and one writer."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "review-validation",
+      "criterion": "Corrected exact source head passes independent review and both platforms",
+      "evidence": [
+        {
+          "source": "reviews/Fix-RepositorySettingsContract.md and ci38187755625",
+          "result": "Approved reviewed watermark0f98144fceff5040f6050413e036d26f1cf98ea8; resolved R001/R002, no new incremental findings; guard and Windows/Linux successful."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "delivery",
+      "criterion": "Runtime PR merged normally and its exact causal package publication succeeded",
+      "evidence": [
+        {
+          "source": "PR208 and ci38189303890/job114618404712",
+          "result": "MERGED head0f98144fceff5040f6050413e036d26f1cf98ea8 at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; exact causal main run and bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9 verified."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "guidance",
+      "criterion": "Existing persistent-delivery instructions match the published settings semantics and ship to both hosts",
+      "evidence": [],
+      "owner": "native parent01a12ccb-c604-77f1-bb4c-cc8c5e21ead1",
+      "next_action": "Implement, validate, independently review and normally deliver Docs/RepositorySettingsPreference with exact causal publication."
+    }
+  ],
+  "deliveries": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 208,
+      "head": "0f98144fceff5040f6050413e036d26f1cf98ea8"
+    }
+  ],
+  "open_tasks": []
+}
+```
+
+
+## Guidance implementation verified
+
+The exclusive L5 writer settings_guidance_writer released exactly the existing persistent-delivery policy, engineering harness and authored catalog mirror. The substantive guidance delta is17 changed lines; no commands, permission rules, API, host entry-point body, consumer installation or generated digest fields are authored. Parent inspected the three-file diff and all seven terminal validation logs under C:/Users/TommySeery/AppData/Local/Temp/Fix-RepositorySettingsContract-validation: manifest3 declarations, harness15 tests OK, skill packaging PASS, both-host generation and check527 files with0 changed on final captured runs. Earlier generation refreshed4 local package files; generated output stays outside the committed PR. All3 catalog digest fields were restored from published HEADcbe97265fcd8267493c24d18f74a5a0a26b872c9, retaining the authored justification. Initial unprivileged runs were sandbox-denied and are not counted as successful; authorized elevated validation succeeded.
+
+Parent reconciled delivered B001/B002/B003 and M008 against actual runtime source/platform/review/merge/publication proof, resolved M009 from its independently owned published recovery repair, and retained M012 for the corrected review judgment token. M011 remains owned until guidance committed guard, exact CI and causal publication meet its condition. Checkpoint this stable six-path authored/record candidate on the guidance branch through L7 clerical delivery, then docs-review its immutable head with fresh L4 native-general and relevant documentation lenses.
