@@ -143,6 +143,11 @@ def _drain_owned_process(process, job):
             if time.monotonic() >= deadline:
                 raise RuntimeError("owned command job did not drain")
             time.sleep(0.01)
+    elif os.name == "nt":
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            pass
     else:
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -152,7 +157,7 @@ def _drain_owned_process(process, job):
         process.communicate(timeout=max(0.01, deadline - time.monotonic()))
     except subprocess.TimeoutExpired as error:
         raise RuntimeError("owned command pipes did not drain") from error
-    if job is None:
+    if job is None and os.name != "nt":
         while True:
             try:
                 os.killpg(process.pid, 0)
@@ -181,6 +186,7 @@ def run_command(command, timeout=COMMAND_TIMEOUT_SECONDS, **kwargs):
 
     job = None
     process = None
+    job_assigned = False
     drained = False
     try:
         if os.name == "nt":
@@ -192,15 +198,16 @@ def run_command(command, timeout=COMMAND_TIMEOUT_SECONDS, **kwargs):
             kernel, handle, _ = job
             if not kernel.AssignProcessToJobObject(handle, int(process._handle)):
                 raise OSError("cannot assign owned command to job")
+            job_assigned = True
             _resume_windows_process(process)
         else:
             kwargs["start_new_session"] = True
             process = subprocess.Popen(command, **kwargs)
 
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise subprocess.TimeoutExpired(command, timeout)
         try:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
             stdout, stderr = process.communicate(input_data, timeout=remaining)
         except subprocess.TimeoutExpired:
             _drain_owned_process(process, job)
@@ -213,7 +220,7 @@ def run_command(command, timeout=COMMAND_TIMEOUT_SECONDS, **kwargs):
     except BaseException:
         if process is not None and not drained:
             try:
-                _drain_owned_process(process, job)
+                _drain_owned_process(process, job if job_assigned else None)
             except BaseException:
                 pass
         raise

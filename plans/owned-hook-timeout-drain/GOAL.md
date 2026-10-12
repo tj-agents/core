@@ -43,23 +43,31 @@ Both Windows and Linux CI must exercise their respective ownership branches, inc
     {
       "host": "claude",
       "behavior": "The shared run_command wrapper owns and drains only its command tree before reporting a deadline timeout.",
-      "source": ".agents/hooks/hook_runtime.py",
-      "mapping": "The canonical shared hook runtime is included in the Claude base package payload.",
+      "source": ".agents/hooks/hook_runtime.py and .agents/hooks/tests/test_hook_runtime.py",
+      "mapping": ".agents/plugins/sources.json maps the shared runtime into base and engineering Claude payloads.",
       "verification": {
-        "level": "planned",
-        "result": "pending",
-        "evidence": "Implementation and Windows/Linux CI have not run."
+        "level": "source",
+        "result": "limited",
+        "evidence": "Captured local Windows runtime 22 with one POSIX-only skip, delivery binding 38, merge review 81 with one skip, catalog 2, harness 14, compilation, and generation check passed. Real Windows regressions prove failed assignment leaves the suspended child unresumed and dead with closed pipes, and zero and delayed positive startup overruns return CommandTimeout after drainage. Linux exact-head CI and normal-profile activation remain pending."
+      },
+      "exception": {
+        "constraint_evidence": "Local source execution covers the Windows ownership branch only; no exact-head Linux execution or installed native-host activation has occurred.",
+        "supported_other_host_outcome": "Claude and Codex share this runtime and require the same exact-head Linux CI and native activation evidence; neither normal profile is claimed active."
       }
     },
     {
       "host": "codex",
       "behavior": "The shared run_command wrapper owns and drains only its command tree before reporting a deadline timeout.",
-      "source": ".agents/hooks/hook_runtime.py",
-      "mapping": "The canonical shared hook runtime is included in the Codex base package payload.",
+      "source": ".agents/hooks/hook_runtime.py and .agents/hooks/tests/test_hook_runtime.py",
+      "mapping": ".agents/plugins/sources.json maps the shared runtime into base and engineering Codex payloads.",
       "verification": {
-        "level": "planned",
-        "result": "pending",
-        "evidence": "Implementation and Windows/Linux CI have not run."
+        "level": "source",
+        "result": "limited",
+        "evidence": "Captured local Windows runtime 22 with one POSIX-only skip, delivery binding 38, merge review 81 with one skip, catalog 2, harness 14, compilation, and generation check passed. Real Windows regressions prove failed assignment leaves the suspended child unresumed and dead with closed pipes, and zero and delayed positive startup overruns return CommandTimeout after drainage. Linux exact-head CI and normal-profile activation remain pending."
+      },
+      "exception": {
+        "constraint_evidence": "Local source execution covers the Windows ownership branch only; no exact-head Linux execution or installed native-host activation has occurred.",
+        "supported_other_host_outcome": "Claude and Codex share this runtime and require the same exact-head Linux CI and native activation evidence; neither normal profile is claimed active."
       }
     }
   ]
@@ -75,9 +83,9 @@ Both Windows and Linux CI must exercise their respective ownership branches, inc
 
 ## Execution and completion
 
-Current slice: `run_command` now starts POSIX commands in an invocation-owned session and Windows commands suspended in an invocation-owned kill-on-close Job Object. Timeout cleanup terminates and drains the owned tree before raising `CommandTimeout`; setup failures do not resume an unassigned Windows child. The regression suite uses a handshaked grandchild that keeps both a pipe and working directory open, verifies immediate directory release after timeout on this Windows checkout, and preserves ordinary text and bytes input/output, nonzero, check, cwd, env, and repeated-command behavior.
+Current slice: `run_command` now starts POSIX commands in an invocation-owned session and Windows commands suspended in an invocation-owned kill-on-close Job Object. Timeout cleanup terminates and drains the owned tree before raising `CommandTimeout`. A failed Windows Job assignment directly terminates, waits for, and drains the still-suspended unassigned child within the same teardown budget, then preserves the assignment error. The startup remaining-budget check shares the `CommandTimeout` conversion and drains once. The regression suite uses a handshaked grandchild that keeps both a pipe and working directory open, verifies immediate directory release after timeout on this Windows checkout, and preserves ordinary text and bytes input/output, nonzero, check, cwd, env, and repeated-command behavior.
 
-Observed verification: `python .agents/hooks/tests/test_hook_runtime.py` passed 20 tests with one POSIX-only skip on 2026-10-11. `python .agents/hooks/tests/test_delivery_binding_gate.py` passed 38 tests, and `python .agents/hooks/tests/test_merge_review_gate.py` passed 81 tests with one skip. `python -m py_compile .agents/hooks/hook_runtime.py .agents/hooks/tests/test_hook_runtime.py` and `git diff --check` passed. `python -B scripts/update_catalog_digests.py`, `pwsh .agents/sync-generated.ps1`, `pwsh .agents/sync-generated.ps1 -Check`, and `python tests/test_harness_manifests.py` passed. The authored catalog companion changes only the base and engineering package digests for this shared hook source; its CRLF-only generator rewrite was normalized back to repository LF. Generated package output remains uncommitted. The full authored slice measures 435 additions and 17 deletions from the recorded base, below the 1,000-line reassessment boundary. Windows and Linux CI remain required before delivery can claim both-host qualification.
+Observed verification: captured Windows-local `python -B .agents/hooks/tests/test_hook_runtime.py` passed 22 tests with one POSIX-only skip on 2026-10-12. The three added real Windows cases prove that failed Job assignment leaves the child unresumed, terminates the actual child, and closes its pipes; that zero startup budget returns `CommandTimeout` after drainage; and that a 0.05-second budget with a controlled 0.15-second `Popen` delay returns `CommandTimeout` after drainage. Captured `python -B .agents/hooks/tests/test_delivery_binding_gate.py` passed 38 tests, `python -B .agents/hooks/tests/test_merge_review_gate.py` passed 81 tests with one skip, `python -B tests/test_catalog_digests.py` passed 2 tests, and `python -B tests/test_harness_manifests.py` passed 14 tests. Captured `python -B -m py_compile .agents/hooks/hook_runtime.py .agents/hooks/tests/test_hook_runtime.py`, `python -B scripts/update_catalog_digests.py`, `pwsh .agents/sync-generated.ps1`, and `pwsh .agents/sync-generated.ps1 -Check` passed. The authored catalog companion changes only the base and engineering package digests for this shared hook source; generated package output remains uncommitted. Windows local source proof is current; exact-head Linux CI and native Claude/Codex activation remain pending before delivery can claim both-host qualification.
 
 The parent owns frozen independent review, any required security/ownership scrutiny, exact-head Windows and Linux CI, ordinary merge, causal generated publication, and safe cleanup. No `--admin`, check bypass, installation, or unrelated PR adoption is authorized.
 
