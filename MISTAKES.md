@@ -147,3 +147,14 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Resolution condition:** the committed runtime and later guidance slices contain no generated digest or package deltas, the generated-path guard and exact-head CI pass, and causal post-merge publication owns regeneration.
 
 **Verification evidence:** authoritative gh run view38183296901 failed-step logs name .agents/catalog/catalog.json digest of base-agents/engineering and base-agents/machine. scripts/check_generated_paths.py reads merge-base digest values and explicitly rejects these changes.
+
+## M012 - Unverified delayed CLI closure after completed delivery
+
+- Kind: mistake. Observed/reported: 2026-10-12; predecessor ended its report after delegating delayed self-close and did not reconcile the nonzero command/observer cancellation.
+- Cause: confirmed unobserved final action; no valid basis to equate a delayed worker promise with completed session exit.
+- Impact/priority: P2; completed CLI remained live and Tommy had to call out unfinished closure.
+- Source owner: engineering session-guidance terminal lifecycle and machine peer-cli runtime. State: in-progress.
+- Repair link: B004, plans/verified-self-close/GOAL.md; one causal repair owner.
+- Next action: repair the verified self-close failure and retain accountable closure evidence/reporting.
+- Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
+- Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.
