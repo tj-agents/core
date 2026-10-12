@@ -35,3 +35,27 @@
 **Resolution condition:** malformed and deeply nested present settings with and without a legacy policy return the guarded command's controlled failure status/diagnostic, invoke no merge command, and pass focused regression, independent incremental review and exact-head Windows/Linux CI before causal delivery.
 
 **Verification evidence:** fresh security lens compared immutable531 and178ba; both malformed no-policy cases escape DeliveryContractViolation and invoke zero merge commands. Parent independently called the actual standing_authorization in disposable repositories: absent legacy yields DeliveryContractViolation/public_workflow_error=False, valid legacy yields WorkflowOperationError/public_workflow_error=True. The new regression failed before with exactly two absent-policy errors and the final artifact passed11 tests, including malformed/deep inputs with both policy states, controlled settings diagnostic and zero merge commands. Delivery-binding38 and harness14 tests plus declaration consistency also passed; parent read the actual terminal artifacts.
+
+## B004 - Stop rejects a matching delivery binding as head-changed
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; the active controller association owner and delivery binding both named `93803964be31d8283fe2f9e79ef12ad02ed3f9e2`, yet Stop emitted `binding-head-changed`. **Cause:** confirmed: `continuation_stop.binding_active` compared the normalized delivery binding's absent `head` key rather than its canonical `remote_head_sha` key.
+
+**Impact and priority:** P1; an active, correctly bound continuation cannot finish a turn and repeatedly reports a false reconciliation gate.
+
+**Source owner:** tj-agents/core continuation Stop hook. **State:** in-progress. **Repair link:** plans/controller-goal-association/GOAL.md and PR209. **Next action:** commit the canonical-field correction, obtain a fresh frozen review, and rerun exact-head CI.
+
+**Resolution condition:** Stop accepts an identity-matching delivery artifact containing `remote_head_sha`, rejects a genuinely different SHA, and the repair passes focused tests, independent review and exact-head Windows/Linux CI.
+
+**Verification evidence:** direct invocation of `binding_active` raised `binding-head-changed` before the repair despite matching local and artifact SHAs. The focused Stop suite now covers both matching and divergent `remote_head_sha` values and passes.
+
+## B004 - Stop rejects a matching delivery binding as head-changed
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; the active controller association owner and delivery binding both named `93803964be31d8283fe2f9e79ef12ad02ed3f9e2`, yet Stop emitted `binding-head-changed`. **Cause:** confirmed: `continuation_stop.binding_active` compared the normalized delivery binding's absent `head` key rather than its canonical `remote_head_sha` key.
+
+**Impact and priority:** P1; an active, correctly bound continuation cannot finish a turn and repeatedly reports a false reconciliation gate.
+
+**Source owner:** tj-agents/core continuation Stop hook. **State:** in-progress. **Repair link:** plans/controller-goal-association/GOAL.md and PR209. **Next action:** commit the canonical-field correction, obtain a fresh frozen review, and rerun exact-head CI.
+
+**Resolution condition:** Stop accepts an identity-matching delivery artifact containing `remote_head_sha`, rejects a genuinely different SHA, and the repair passes focused tests, independent review and exact-head Windows/Linux CI.
+
+**Verification evidence:** direct invocation of `binding_active` raised `binding-head-changed` before the repair despite matching local and artifact SHAs. The focused Stop suite now covers both matching and divergent `remote_head_sha` values and passes.
