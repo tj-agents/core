@@ -59,6 +59,10 @@ and terminal local checkpoint. This exception is limited to plan, ledger, review
 status/evidence, so executable agent instructions (`SKILL.md`, hooks, manifests, schemas, code or test selection),
 independently meaningful documentation deliverables, and code or security fixes still use normal delivery gates.
 
+When the source is a linked worktree slated for cleanup, preserve the exact merged `HEAD` and follow
+`engineering:committing` before moving the canonical goal or retiring the record. Name the retained owner and
+`Plan retirement: pending`; do not retire the record from the cleanup-bound source.
+
 ## One causal repair
 
 One causal repair has one canonical repair record. Related incident or debt entries keep their own records

@@ -1,5 +1,5 @@
 # Prevent inert closeout work from restarting delivery
-Status: narrow repair implemented on 2026-10-12; focused verification and both-host package checks passed; immutable candidate checkpoint next.
+Status: original repair checkpointed and independently reviewed on 2026-10-12; one cleanup-order finding is under bounded repair before final publication.
 ## Outcome
 Diagnose and repair the core-owned workflow gap that allowed an agent to plan a bookkeeping-only push and another full CI/review cycle after the final executable scaffold candidate was green. Preserve meaningful code validation and security review.
 ## Authorization
@@ -52,3 +52,7 @@ Pickup acknowledged in the named worktree on branch Fix/InertCloseoutCadence at 
 Checkpoint the verified substantive candidate, synchronize once and freeze its review. Run independent native and required security review, resolve findings, publish one reviewed candidate and own exact-head CI through authorized merge and causal regeneration. Preserve this goal for the parent; do not install updated plugins.
 
 Focused evidence: process standards24, completion12 and preserved auto-merge11 tests passed; harness declaration validation and manifest tests passed. The new completion regression accepts locally updated evidence only against the freshly fetched unchanged merged identity; changed heads and unmerged delivery still fail. A policy-test wrapping/encoding assertion was corrected and the suite reran green. Source-layout/package suite passed, including both-host shared-resource shipment and canonical adapter mapping; generated output remains excluded from the candidate. Canonical lifecycle identity was recorded using the helper's supported explicit name=source-path form because its legacy default .agents/skills path does not exist in this source layout.
+
+Review checkpoint: frozen d42cae4caf1e8cd3dcfa7686362e8334777ef7b1 completed with one deduplicated HIGH finding (R1): terminal local records must survive linked-worktree cleanup without advancing its merged source head. Native declared specialist was unsupported by the account; declared L4 fallback completed, independently corroborating the workflow lens. Address-review owns the bounded guidance/cleanup regression repair, then incremental review and one final exact-head publication. No source candidate has been pushed.
+
+R1 repair verification: completion12 passed; process choreography and goal-scoped merge authorization reruns2 passed; existing cleanup-proof set-aside/removal regression1 passed. Earlier local reruns hit host MemoryError and Git fork/spawn exhaustion; focused reruns recovered without source/test weakening. The repair keeps every continuation completion at its original goal path, preserves source HEAD through cleanup, and records retained pending retirement for the next substantive publication. Final repair checkpoint and incremental review next.

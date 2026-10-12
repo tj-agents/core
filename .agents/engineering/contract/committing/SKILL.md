@@ -26,6 +26,17 @@ manifests, schemas, code or test selection), independently meaningful documentat
 security fixes remain ordinary work: commit and deliver them through their normal review, exact-head, CI, and
 authorization gates.
 
+### Cleanup-bound source deliveries
+
+When a linked source worktree is due for cleanup, preserve its exact merged `HEAD`: never create a terminal
+checkpoint on that source branch. Every active continuation owner finishes its terminal receipt against the
+canonical goal at its original path before that goal is moved or deleted. Keep it there through its fresh
+completion check and every active continuation owner's terminal receipt. Only after both pass, preserve or
+transfer the goal and late closeout state outside the cleanup target, naming the `Plan retirement: pending`
+owner; otherwise the cleanup proof's verified set-aside receipt is the durable record. The retained owner, or the
+next substantive change it owns, may then take the terminal local checkpoint and retire the plan; carry pending
+retirement into that substantive publication without opening a pure closeout PR or discarding the record.
+
 ## "I've left it uncommitted so you can look first" is the anti-pattern, not the courtesy
 
 - **Review runs off commits.** A review diffs the branch against its base; work sitting in the working tree
