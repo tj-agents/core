@@ -145,6 +145,34 @@ class SkillRouterTests(unittest.TestCase):
             self.assertEqual((other,), module.native_install_roots("claude"))
             run.assert_called_once()
 
+    def test_raw_native_inventory_is_keyed_by_the_original_project_cwd(self):
+        module = self.load_router()
+        other = self.base / "other consumer"
+        inventory = [{"enabled": True, "id": "engineering@example", "installPath": str(self.plugin)}]
+        with patch.object(module.shutil, "which", return_value="claude"), patch.object(
+            module.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps(inventory))
+        ) as run:
+            self.assertEqual(inventory, module.native_plugin_inventory("claude", self.repo))
+            self.assertEqual(inventory, module.native_plugin_inventory("claude", self.repo))
+            self.assertEqual(inventory, module.native_plugin_inventory("claude", other))
+            self.assertEqual(2, run.call_count)
+            self.assertEqual(str(self.repo.resolve()), run.call_args_list[0].kwargs["cwd"])
+            self.assertEqual(str(other.resolve()), run.call_args_list[1].kwargs["cwd"])
+
+    def test_raw_native_inventory_is_keyed_by_the_original_project_cwd(self):
+        module = self.load_router()
+        other = self.base / "other consumer"
+        inventory = [{"enabled": True, "id": "engineering@example", "installPath": str(self.plugin)}]
+        with patch.object(module.shutil, "which", return_value="claude"), patch.object(
+            module.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps(inventory))
+        ) as run:
+            self.assertEqual(inventory, module.native_plugin_inventory("claude", self.repo))
+            self.assertEqual(inventory, module.native_plugin_inventory("claude", self.repo))
+            self.assertEqual(inventory, module.native_plugin_inventory("claude", other))
+            self.assertEqual(2, run.call_count)
+            self.assertEqual(str(self.repo.resolve()), run.call_args_list[0].kwargs["cwd"])
+            self.assertEqual(str(other.resolve()), run.call_args_list[1].kwargs["cwd"])
+
     def test_own_and_linked_skills_resolve_without_native_discovery(self):
         module = self.load_router()
         linked = self.base / "home" / ".agents" / "skills" / "linked"
