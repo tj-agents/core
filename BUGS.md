@@ -76,13 +76,13 @@
 ## B006 - Plan workflow fixture teardown races detached Git maintenance
 
 - Kind: bug. Observed/reported: 2026-10-12; causal CI run 38266381371 attempt 1 failed on Linux with `Errno 39` deleting the fixture's `admin/.git`; attempt 2 passed. Reviewed PR head 110d0bc5 and merge 5f876750 have identical trees.
-- Cause: detached Git maintenance is strongly indicated by four bounded TRACE2 child starts, but the exact failed writer was not observed. Existing `tests/test_check_generated_paths.py` disables automatic GC and maintenance for a similar cleanup race.
+- Cause: unknown; detached Git maintenance is the leading hypothesis supported by four bounded TRACE2 child starts, but the exact failed writer was not observed. Existing `tests/test_check_generated_paths.py` disables automatic GC and maintenance for a similar cleanup race.
 - Impact/priority: P2; intermittent PlanWorkflowHarness acceptance setup/cleanup failure.
 - Source owner: tj-agents/core PlanWorkflowHarness test fixture. State: blocked.
-- Repair link: branch `Fix/PlanFixtureMaintenanceRace`; canonical goal `plans/plan-fixture-maintenance-race/GOAL.md` in that branch. Local checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-PlanFixtureMaintenanceRace/plans/plan-fixture-maintenance-race/GOAL.md.
+- Repair link: branch `Fix/PlanFixtureMaintenanceRace`; canonical goal `plans/plan-fixture-maintenance-race/GOAL.md` in that branch.
 - blocked_by: capability; the supported native handoff requires normal-profile refresh and permission convergence, excluded by current authorization.
 - Resolver: machine handoff capability owner, or explicit authority for the required profile installation.
-- Resume when: a supported successor can launch without profile changes.
+- Resume when: a supported successor can launch without profile changes, or Tommy explicitly authorizes the required profile and permission changes.
 - Next action: set repository-local `gc.auto=0` and `maintenance.auto=false` before the first fixture commit; add a TRACE2 regression through `pr-slice-rollover`.
 - Resolution condition: the independent repair is reviewed and merged, required Windows/Linux checks pass, teardown succeeds, and the bounded lifecycle trace starts no detached maintenance child.
 - Verification evidence: four bounded TRACE2 child starts and the analogous existing fixture guards support the inferred cause; causal CI attempt 2 passed. The repair has not been made.
