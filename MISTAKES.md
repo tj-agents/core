@@ -98,15 +98,15 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Source owner:** tj-agents/core repository settings reader, consumers and public documentation.
 
-**State:** in-progress. **Repair link:** [repository-settings goal](plans/repository-settings/GOAL.md), continuing the released `Feature/RepositoryConfiguration` implementation as one causal repair.
+**State:** resolved. **Repair link:** PR208, continuing the released `Feature/RepositoryConfiguration` implementation as one causal repair.
 
 **Ownership evidence:** exact controller `01a122c4-e884-7402-a873-9fa7449e5c37` was recovered and contacted its existing child through native collaboration. The original source goal records the child's explicit release to this successor at `2026-10-11T22:16:13Z`, preserving dirty source and its SHA-256 inventory. Source coordination is resolved.
 
-**Next action:** the bounded L4 writer integrates the released patch and applies the settings contract, followed by validation, independent review and authorized delivery.
+**Next action:** none; the requested generic settings behavior is verified and delivered.
 
 **Resolution condition:** public documentation and both shipped host consumers use one Core-owned settings interface; an unrelated disposable repository exercises guarded auto-merge with its existing authorized task and no copied interpretation or legacy-standing-policy boilerplate; Windows/Linux validation, independent review, normal merge and causal publication pass, and completion reports match the observed outcome.
 
-**Verification evidence:** the correction handoff, the existing owner goal and read-only dirty-source inspection, exact child/controller metadata, and the native follow-up result are recorded in the repair goal. No settings behavior, source delivery, consumer adoption or normal-profile activation has been verified.
+**Verification evidence:** the correction handoff, the existing owner goal and read-only dirty-source inspection, exact child/controller metadata, and the native follow-up result are recorded in the repair goal. Settings behavior and source delivery are now verified. Final reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8 passed guard and Windows/Linux CI38187755625 and independent incremental review. PR208 merged normally at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d; causal main ci38189303890 and regeneration114618404712 succeeded and published exact-parent bot commitcbe97265fcd8267493c24d18f74a5a0a26b872c9. Parent verified canonical/published engineering and both-host machine payload byte parity. Consumer adoption and normal-profile activation are neither claimed nor required.
 
 ## M009 - Treating unavailable follow-up as the end of authorized coordination
 
@@ -116,13 +116,13 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Source owner:** tj-agents/core machine follow-up/recovery standards. **Cause:** confirmed incomplete manual-only fallback guidance in followup-codex, combined with this agent failing to attempt exact-owner recovery. The endpoint infrastructure failure's cause remains unknown.
 
-**State:** in-progress. **Repair link:** C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-FollowupRecoveryOwnership/plans/followup-recovery/GOAL.md, branch Fix/FollowupRecoveryOwnership, launched native successor 01a12d05-0e36-7cd2-afac-1936aa63404b. The original settings outcome remains owned by plans/repository-settings/GOAL.md and this native session.
+**State:** resolved. **Repair link:** PR207, merged source9954043c5d7b34c59e70cc1df193e370c3f759b6. The original settings runtime was delivered by PR208.
 
-**Next action:** the side successor repairs eligible automated recovery before manual fallback while this parent verifies source release from the recovered exact controller and resumes the settings implementation.
+**Next action:** none; standards source repair and original source coordination are verified. This parent continues the separate settings delivery.
 
 **Resolution condition:** the standards repair is reviewed, both-host Windows/Linux validated, merged and causally published, and recovery demonstrates preserved exact identity, one writer, truthful acknowledgment/release evidence and continued ownership of the original outcome.
 
-**Verification evidence:** exact open-codex recovery succeeded for controller 01a122c4-e884-7402-a873-9fa7449e5c37, now registered alive at PID 1216; one disjoint side-workstream launcher confirmed submission, now registered alive at PID 9104. The original controller recorded explicit source release at 2026-10-11T22:16:13Z; the settings writer is implementing that preserved patch. Settings and side standards delivery remain incomplete.
+**Verification evidence:** exact controller recovery and its child release at 2026-10-11T22:16:13Z preserved source identity and one writer; PR208 has now merged the corrected settings source. The disjoint recovery successor completed independent review and Windows/Linux CI38184328113 at9954043c5d7b34c59e70cc1df193e370c3f759b6; PR207 merged atcb7626a35cba664c80cfc987c270129b9e54f3a8. Causal ci38185434091 regeneration job114606626192 succeeded and published mainbdb63914c03e6d5d62dcac7edb556d5a79c90b85 with that exact merge parent and regeneration subject. Its durable goal records fresh completion ready=true, owner complete, scheduler and delivery binding removed. Parent read that record; unavailable native send was not claimed as acknowledgment. Its separately owned self-close investigation is outside this causal repair.
 
 ## M010 - Helper exit status mistaken for a focused-test verdict
 
@@ -130,7 +130,7 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Impact and priority:** P2; an unverified candidate could have been mislabeled passing, but none was committed or delivered from that status.
 
-**Source owner:** this repository-settings execution and its test-evidence reconciliation. **State:** resolved. **Repair link:** [repository-settings goal](plans/repository-settings/GOAL.md); no separate causal repair.
+**Source owner:** this repository-settings execution and its test-evidence reconciliation. **State:** resolved. **Repair link:** PR208; no separate causal repair.
 
 **Correction:** the import and dynamic exception assertion were repaired. Parent read every replacement test summary before freezing; helper status is no longer treated as a verdict.
 
@@ -153,6 +153,18 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **2026-10-12 related evidence:** PR210 on `Fix/RecoveryAuthorizationContext` reproduced the same generated-digest mistake at run38189190964: verify-windows and verify-linux succeeded, while the source guard failed on the `base-agents/machine` digest. Commit `f63538d` restored the reviewed digest and retained the authored embedded harness metadata.
 
 **PR210 prevention and next action:** The focused corrected-head source guard passed with artifact `78dd200ee7badf43-corrected-source-guard.log`; complete final review and corrected-head CI without adopting other workstreams' delivery state.
+
+## M013 - Completed review used an unsupported final judgment token
+
+**Kind:** mistake. **Observed/reported:** 2026-10-12; the guarded merge rejected PR208 with review work order is incomplete although all independent lenses had completed. **Cause:** confirmed parent synthesis wrote clean instead of the review-lifecycle approved final judgment token; the existing merge-review gate accepts approved or changes-requested. No missing standards rule is established.
+
+**Impact and priority:** P3; one authorized merge attempt was rejected safely, with no source change or gate bypass.
+
+**Source owner:** this repository-settings parent review synthesis. **State:** resolved. **Repair link:** PR208, reviewed head0f98144fceff5040f6050413e036d26f1cf98ea8. **Next action:** none.
+
+**Resolution condition:** canonical final judgment agrees with the existing work-order contract and the guarded merge accepts the same independently reviewed source.
+
+**Verification evidence:** local final judgment was corrected to approved while retaining historical pass judgments and resolved findings. Fresh PR body validation passed, the guarded merge returned success, and forge confirmed PR208 MERGED at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d on 2026-10-12T00:46:32Z.
 
 ## M012 - Unverified delayed CLI closure after completed delivery
 
