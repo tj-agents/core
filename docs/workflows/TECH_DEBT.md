@@ -1,5 +1,42 @@
 # Workflow runtime debt
 
+## D001 — Configured routine design approval requires stack adoption
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; a stack convention procedure reserved a routine decision despite the
+  user's already-authorized scaffold work.
+- **Impact and priority:** affected stack consumers can ask repeat approval questions; P2 because no merge,
+  publication, permission, or active production harm is involved.
+- **Source owner:** the affected stack source and its consuming repository; Core owns the shared setting and
+  both-host context delivery.
+- **State:** deferred.
+- **Reason:** each convention owner must adopt the shared setting in its own contract.
+- **blocked_by:** dependency.
+- **Repair link:** [Core repair PR #219](https://github.com/tj-agents/core/pull/219),
+  [repo-declared-config rollout owner](../../plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md), and
+  [dotnet D001](https://github.com/tj-agents/dotnet/blob/main/docs/TECH_DEBT.md#d001-honor-configured-design-approval-across-agent-hosts).
+- **Resolver:** each affected stack source and consuming repository owner.
+- **Resume when:** a stack owner schedules adoption after selecting a Core release that understands the new
+  key.
+- **Next action:** update the affected convention contract and verify the selected installed Claude and Codex
+  paths.
+- **Resolution condition:** affected convention workflows honor the effective design value from
+  `configuration.core.auto_approve` (`design` overrides `all`, with the flat alias supported only when
+  the nested object is absent) for authorized routine choices, and both installed host paths are accepted.
+- **Verification evidence:** Core source tests cover strict settings resolution and package-context delivery;
+  installed-host acceptance remains pending.
+
+## Recovery and delivery prevention gaps
+
+The incidents and known causes are owned by [MISTAKES.md](../../MISTAKES.md), entries M001-M007.
+Existing workflow standards did not prevent repeated ownership, authorization and evidence mistakes
+in the 2026-10-11 sandbox recovery. Prevention work and a dedicated recording skill remain deferred.
+
+Resolve when the shared workflows and applicable host adapters verify same-goal execution selection,
+retained merge authority, supported continuation and reopening, accurate completion and recovery
+claims, and state reconciliation after failed mutations. Record each incident's observed resolution
+against its stable mistake ID. No untested CI-waiter defect or Claude runtime failure is established.
+
 ## Slice retirement checks the broader goal's completion
 
 The runtime's `checkpoint --state complete` calls the canonical goal's full completion check, even
@@ -48,3 +85,15 @@ result event, so after a failed or rejected merge it nags once every 10 minutes 
 
 **Resolution condition.** Codex publishes a tool-result or failure event that hooks can consume; wire the
 gate's failure handler to it and delete the obligation when the merge reports no success.
+
+## Review routing requires the write-time opt-in
+
+`review-prepare` names the skills a review owes only through `.agents/skill-routes.json`, and carrying that
+table also opts the repository into the write-time router and the red-run gate. The router blocks every
+write while any routed skill is unresolved or plugin discovery fails. Core therefore carries no table, so a
+review of a changed `SKILL.md` is not required to load `engineering:skill-authoring`; the description and
+`AGENTS.md` are its only discovery.
+
+Resolve when a route can apply at review time alone, without opting the repository into write-time routing
+or the red-run gate, and core routes authored `SKILL.md` paths to `engineering:skill-authoring` through it,
+with a test that `review-prepare` names the skill for such a path.

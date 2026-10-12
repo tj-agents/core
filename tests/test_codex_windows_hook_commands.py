@@ -31,6 +31,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
                     self.assertEqual(hook["timeout"] - budget, 3)
         self.assertCountEqual(names, [
             "skill_router.py", "tier_gate.py", "git_auth_scope_gate.py",
+            "worktree_placement_gate.py",
             "forge_poll_gate.py", "compact_output_gate.py", "delivery_binding_gate.py",
             "merge_cleanup_gate.py", "callout_repair_gate.py",
         ])
@@ -69,6 +70,7 @@ class CodexWindowsHookCommands(unittest.TestCase):
             manifest = json.loads((plugin / "hooks" / "codex.json").read_text(encoding="utf-8"))
             command = manifest["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
             expanded = command.replace("${PLUGIN_ROOT}", str(plugin))
+            self.assertTrue(expanded.startswith("python -I -B -c \""))
             payload = {
                 "cwd": str(repo),
                 "tool_name": "apply_patch",

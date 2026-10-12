@@ -17,6 +17,8 @@ keeps the current owner and leaves the returned actions open.
 
 Run the same read-only check before a foreground terminal report:
 
+Run the Python helpers with `python` on Windows or `python3` on Linux/macOS:
+
 ```bash
 python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
 ```
@@ -69,7 +71,8 @@ authority; this workflow does not create a competing plan or permission.
 Use the packaged `<engineering-package-root>/workflows/continuation_runtime.py` module from an installed
 package, resolving the package root from the installed host skill entry, or its source counterpart
 `.agents/workflows/continuation_runtime.py` in a checkout. Initialize the durable owner with the canonical
-goal path, completion condition, exact authorized actions, authority record and current harness:
+goal path, completion condition, exact authorized actions, authority record and current harness. Run it with
+`python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B "<engineering-package-root>/workflows/continuation_runtime.py" init --root ROOT --goal GOALPATH --completion TEXT --actions ACTION [ACTION ...] --authority TEXT --harness codex|claude
@@ -86,8 +89,8 @@ missing files and directories are rejected. Keep the goal in place. The owner re
 per-worktree path above. On `canonical-owner-path-required`, retry `init --root ROOT` with `--owner`
 omitted. This recoverable invocation error does not establish that the runtime is unavailable.
 
-The runtime supports `status --owner OWNER` and `wake --owner OWNER`. Its lower-level `claim` operation
-requires an explicit positive `--pid PID`; it never chooses a tool-shell parent. PID must identify the
+The runtime supports `status --owner OWNER` and `wake --owner OWNER`. After initialization, the current
+foreground session claims the owner with `claim --owner OWNER --pid PID`; PID must identify that
 long-lived session, not a short-lived tool shell. The returned `foreground.token` is required by
 `heartbeat`, `yield`, and `checkpoint`. Renew the lease with `heartbeat` while actively working. Yield with
 a reason and next action before waiting so the scheduled writer can take the lease. Checkpoint only a real
@@ -105,34 +108,25 @@ not call owner checkpoint itself. Continue to honor the canonical goal and autho
 The runtime lease coordinates its own writers; it does not gate arbitrary host writes or replace the
 harness's permission controls.
 
-The Windows adapter is shipped beside each host's `persistent-workflow` entry at
-`<skill-directory>/scripts/delivery-continuation.ps1`. It resolves the current process ancestry to the
-nearest exact `codex.exe` or `claude.exe`, rejects another nearest host, and passes that live host PID to the
-runtime. When initialization did not already pin a native host executable, the adapter captures the matching
-host's existing absolute `.exe` path with the PID; it rejects wrappers, missing paths, and another executable
-name. Use this sequence after `init` succeeds:
+The cross-platform adapter is shipped beside each host's `persistent-workflow` entry at
+`<skill-directory>/scripts/delivery_continuation.py`. Initialize and claim the foreground
+owner before `register`; the adapter supports `register`, `remove`, `list`, and `wake`. The Python runtime
+supports `status` and `wake` against `--owner OWNER`. Remove only at a terminal result. Yield the foreground
+lease before waiting. Do not register another task for an
+existing owner or claim unattended progress before the host and scheduler report success. Other platforms
+must use an implemented runtime adapter; if none is available, state the limitation and continue
+independent authorized work in the current session.
 
-```powershell
-$owner = Join-Path $worktree '.agents/continuation/owner.json'
-$claim = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$skillDirectory/scripts/delivery-continuation.ps1" claim -OwnerPath $owner | ConvertFrom-Json
-$token = $claim.foreground.token
-& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$skillDirectory/scripts/delivery-continuation.ps1" register -OwnerPath $owner
-& python -B "$packageRoot/workflows/continuation_runtime.py" heartbeat --owner $owner --token $token
-& python -B "$packageRoot/workflows/continuation_runtime.py" yield --owner $owner --token $token --reason 'Waiting for delivery evidence' --next-action 'Observe the bound delivery'
-& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$skillDirectory/scripts/delivery-continuation.ps1" wake -OwnerPath $owner
-```
+On Linux, registration requires a reachable `systemctl --user` manager and creates a receipt-owned systemd
+user oneshot service and timer. On Windows it requires inbox Windows PowerShell's ScheduledTasks capability.
+Neither path changes lingering or login policy: a Linux user timer runs only while the existing user manager
+runs. Use `python3` on Linux/macOS and `python` on Windows. Pin the native host executable explicitly when
+registering; for example, use `python3 -B "<skill-directory>/scripts/delivery_continuation.py" register --owner OWNER --host-executable /absolute/path/to/codex`
+on Linux/macOS, or `python -B "<skill-directory>\\scripts\\delivery_continuation.py" register --owner OWNER --host-executable C:\\absolute\\path\\to\\codex.exe`
+on Windows. Use `--dry-run` to inspect a proposed registration without changing scheduler or receipt files.
 
-Keep the returned JSON and its actual `foreground.token` for every heartbeat and yield. The adapter supports
-`claim`, `register`, `remove`, `list`, and `wake`; `claim` needs no scheduler capability. The Python runtime
-also directly supports `claim --owner OWNER --pid PID --host-executable EXE` when an adapter has already
-resolved a trustworthy host PID and matching native executable, plus `status` and `wake` against `--owner
-OWNER`. Remove only at a terminal result. Do not register another task for an existing owner or claim
-unattended progress before the host and scheduler report success.
-Other platforms must use an implemented runtime adapter; if none is available, state the limitation and
-continue independent authorized work in the current session.
-
-Establish durable continuation through successful initialization, adapter foreground claim, scheduler
-registration, yield, and an observed wake. Child execution resolves L4 model and effort from the packaged canonical lane table.
+Establish durable continuation through successful initialization, foreground claim, scheduler registration
+and an observed wake. Child execution resolves L4 model and effort from the packaged canonical lane table.
 The runtime owner remains bound to one worktree and branch; its receipt permits a head rebind within that
 identity. To move a longer goal to the next slice, follow the foreground owner transition in
 `persistent-delivery`, preserve the old receipts and maintain one active writer. Completing this runtime
