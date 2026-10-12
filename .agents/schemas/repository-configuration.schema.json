@@ -5,6 +5,24 @@
     "configuration": {
       "type": "object",
       "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"},
+      "properties": {
+        "core": {
+          "type": "object",
+          "properties": {
+            "auto_merge": {"type": "boolean"},
+            "auto_approve": {
+              "type": "object",
+              "properties": {
+                "all": {"type": "boolean"},
+                "design": {"type": "boolean"}
+              },
+              "additionalProperties": false
+            },
+            "auto_approve_design": {"type": "boolean", "deprecated": true}
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": {"type": "object"}
     }
   }

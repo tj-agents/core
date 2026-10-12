@@ -75,16 +75,27 @@ time, so disabling it after a delivery binding prevents arming auto-merge. See
 
 ## Repository routine design approval
 
-`configuration.core.auto_approve_design` is separately `false` when absent:
+`configuration.core.auto_approve` is separately `false` for every supported routine category when
+absent. Its only currently supported category is `design`, including routine convention choices. A
+design-only opt-in is:
 
 ```json
-{"configuration":{"core":{"auto_approve_design":true}}}
+{"configuration":{"core":{"auto_approve":{"design":true}}}}
 ```
 
-When it is `true`, an agent may make and record routine design or convention choices within work already
-authorized by the user. It does not override an explicit user reservation, task scope, stricter repository
-rule, or any merge, publication, installation, or permission gate. Select a core release that understands
-this key before enabling it; older strict readers reject unknown core settings. Source verification does not
+An all-categories opt-in is:
+
+```json
+{"configuration":{"core":{"auto_approve":{"all":true}}}}
+```
+
+An explicit `design` value overrides `all`, and omitted members default to `false`. The legacy
+`configuration.core.auto_approve_design` boolean remains available only when `auto_approve` is absent;
+an empty `auto_approve` object is authoritative and disables design approval. When enabled, an agent may
+make and record routine design or convention choices within work already authorized by the user. It does
+not override an explicit user reservation, task scope, stricter repository rule, or any merge,
+publication, installation, or permission gate. Select a core release that understands the nested setting
+before enabling it; older strict readers reject unknown core settings. Source verification does not
 establish installed-host trust or acceptance.
 
 ## Layout

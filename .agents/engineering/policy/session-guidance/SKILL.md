@@ -45,8 +45,10 @@ delegating. An explicit user choice of Claude may keep non-frontier work local; 
 
 ## Repository routine-decision delegation
 
-When the actual repository checkout sets `configuration.core.auto_approve_design` to `true` in
-`.agents/settings.json`, proceed with routine design and convention choices, including the recording
+Read routine delegation from the actual checkout's `.agents/settings.json`. Within
+`configuration.core.auto_approve`, an explicit `design` overrides `all`, including false. The flat
+`configuration.core.auto_approve_design` alias applies only when the nested object is absent. When
+the effective design value is true, proceed with routine design and convention choices, including the recording
 needed by work the user already authorized. Explain and record the rationale. Planning-only work remains
 planning-only. An explicit user decision reservation, task scope, or stricter repository rule still
 controls. A procedural gate added by an agent does not reserve a decision for the user. This setting grants

@@ -4,7 +4,8 @@
   "source_roots": [
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
-    ".agents/workflows"
+    ".agents/workflows",
+    ".agents/workflows/repository_configuration.py"
   ],
   "requires": {
     "marketplaces": [
@@ -133,6 +134,13 @@
       },
       {
         "path": "hooks/worktree_cleanup_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/worktree_placement_gate.py",
         "hosts": [
           "claude",
           "codex"

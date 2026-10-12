@@ -1,0 +1,2 @@
+cd C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-WorktreePlacementEnforcement
+Read C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-WorktreePlacementEnforcement/plans/worktree-placement-enforcement/GOAL.md and execute its Next Steps as the sole bounded workstream owner. The originating session retains the user's investigation. Do not adopt or rewrite the existing repository-layout goal. Acknowledge pickup before deliverable edits and complete this goal under its recorded standing standards-repair authority.
