@@ -207,16 +207,19 @@ A work-item README is `plans/features/<f>/work-items/<w>/README.md`; it is both 
 2. `ACTIVE_SESSIONS.md` uses one `## <handle>` section per session with `- Field:` lines.
 3. Runtime first: S1, S2, then the S3 convention switch.
 4. Termboard supersedes the Markdown registry once it covers the daily loop (D6).
+5. After the 2026-10-12 crash: the session registry is a local hook-written SQLite store, not `ACTIVE_SESSIONS.md` ("fine for now"); cloud sync is the long-term vision, not part of this work. See the redesign section.
+6. The registry is one central local database, `~/.agents-state/sessions.db`, written by hooks. It holds session state and work-item status, so status never lives in a branch's Markdown: no `ACTIVE_SESSIONS.md`, and no `Status:` field in work-item READMEs, which keep only purpose, design and decisions. SQLite, not Postgres or SQL Server: no server process, and each machine works on separate work. Cloud sync is a later step behind the same storage module.
 
 ```agent-host-coverage
 {"schema_version":1,"shared_source":".agents/machine/scripts/work_item_sessions.py","hosts":[{"host":"claude","behavior":"Record, report and resume the exact Claude session recorded for a work item through the guarded open-claude path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources consumed by machine:recover-agents and machine:open-claude --resume.","verification":{"level":"planned","result":"pending","evidence":"S1 unit tests for parse, validation, status and resume delegation with a Claude row and CLAUDE_CODE_SESSION_ID."}},{"host":"codex","behavior":"Record, report and resume the exact Codex session recorded for a work item through the guarded open-codex path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources consumed by machine:recover-agents and machine:open-codex.","verification":{"level":"planned","result":"pending","evidence":"S1 unit tests for parse, validation, status and resume delegation with a Codex row and CODEX_THREAD_ID."}}]}
 ```
 
-## Proposed redesign: hook-written SQLite session store (2026-10-12, pending Tommy's decision)
+## Redesign: hook-written SQLite session store (approved 2026-10-12)
 
 Trigger: a PC crash killed ~20 sessions. The registry (`~/.agents-state/cli-sessions/*.json`, 381 entries) records start only, so every session now reads `closed` and finished work is indistinguishable from interrupted work. Tommy rejected a Markdown session registry and asked for a database, with a cloud DB and Termboard as the long-term vision.
 
-- Store: `~/.agents-state/sessions.db`, SQLite in WAL mode via stdlib `sqlite3` (Windows and Linux, no dependency). Replaces `ACTIVE_SESSIONS.md` in S1; the work-item README layout (D1) stays as the human documentation.
+- Store: `~/.agents-state/sessions.db`, SQLite in WAL mode via stdlib `sqlite3` (Windows and Linux, no dependency), behind one storage module so cloud sync can replace the backend later. Replaces `ACTIVE_SESSIONS.md` in S1; the work-item README layout (D1) stays as the human documentation.
+- Work-item status lives in the same database (decision 6). D1's `Status:` header and S2's `Status:` checks are superseded; where the delivery fields and `## Next Steps` live is re-specified before S2 starts.
 - One `sessions` row per `host:session_id`, never deleted: machine, cwd, branch, work item (resolved from the branch against `plans/features/*/work-items/*/README.md` `Branch:`, or set by an explicit `claim`), PR, title, pid and pid start time, `started_at`, `last_activity_at`, `turn_state` (`working`/`awaiting_input`), `ended_at`, `end_reason` (`finished`/`closed`/`handed_off`), successor.
 - Written by hooks, not agents: SessionStart upserts (extends `register_session.py`), UserPromptSubmit sets `working`, Stop sets `awaiting_input` and refreshes branch/work item, Claude SessionEnd sets `ended_at`; `finish.py`, `close.py` and handoff set the end reason. Codex has no SessionEnd hook here (manifests: SessionStart, UserPromptSubmit, Stop, PreToolUse), so a hand-closed Codex tab reads as interrupted: a harmless false positive.
 - Tommy's two flags: not finished = `ended_at IS NULL`; worked on right now = `turn_state = 'working'` and the recorded pid alive. Liveness is computed at read time, never trusted from storage.
@@ -228,13 +231,16 @@ Trigger: a PC crash killed ~20 sessions. The registry (`~/.agents-state/cli-sess
 
 - 2026-10-12, Claude session `claude:c27c07bf-a274-466a-a10e-10ef96f36841`: investigation complete; design, migration map and slices recorded above.
 - S1 implemented in this commit: `.agents/machine/scripts/work_item_sessions.py`, `tests/test_work_item_sessions.py` (24 tests), `.agents/machine/resources/work-item-sessions.md`, the `recover-agents` "Continue a work item" section, machine harness permissions (Codex scoped to `status`/`resume`), sources mapping and catalog digest. Windows: `test_work_item_sessions`, `test_agent_recovery`, `test_harness_manifests`, `test_catalog_digests`, `test_harness_permissions_sync`, `test_open_claude` — 115 passed, 1 pre-existing symlink skip; `sync-generated.ps1 -Check` passes after a throwaway regeneration (`plugins/` restored). Linux, review and PR outstanding.
-- Persistent-workflow owner initialized and claimed; scheduler registration was denied by the permission classifier as unauthorized persistence, so the owner is checkpointed `blocked` (`host-capability-or-permission-unavailable`) pending Tommy's approval. Foreground work continues.
+- Persistent-workflow owner initialized and claimed; scheduler registration was denied by the permission classifier as unauthorized persistence, so the owner is checkpointed `blocked` (`host-capability-or-permission-unavailable`). Foreground work continues.
+- Review: `reviews/Feature-WorkItemSessions.md`, approved at `d03b34d` after R1–R8 were fixed (one HIGH: committed rows became permanently stale). PR [#228](https://github.com/tj-agents/core/pull/228) opened as a draft at `07c6777`; `b4c89fe` restored the generated machine catalog digest the `guard` job rejects. That digest commit is not yet covered by the review watermark. The ACTIVE_SESSIONS store is now superseded by decision 6.
+- Side workstream: a standards defect in `.agents/hooks/worktree_placement_gate.py` (heredoc lines that fail `shlex` are classed as invalid worktree creations) is recorded with replay evidence in `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-WorktreeGateHeredocFalsePositive\plans\worktree-gate-heredoc-false-positive\GOAL.md`. Its Codex launch was denied by the permission classifier over `--bypass-hook-trust`.
+- 2026-10-12 ~21:27: the PC crashed (resource exhaustion: Python "can't start new thread", Git Bash fork failures) and interrupted this session. Recovery session `claude:cec3b609-c328-4482-b813-3c35719a8032` recorded the SQLite redesign in `ffb9a62`; Tommy approved it (decisions 5 and 6).
 
 ## Next Steps
 
-Review the S1 candidate on `Feature/WorkItemSessions` through `engineering:review`, validate it on Linux, open its PR through `engineering:open-pr`, and deliver through `engineering:merge`. Then start S2 from the updated remote default.
+Rework S1 on PR #228 in place for decision 5: replace the `ACTIVE_SESSIONS.md` store in `work_item_sessions.py` with `~/.agents-state/sessions.db`, add the SessionStart/UserPromptSubmit/Stop/SessionEnd writes, end reasons from `finish.py`/`close.py`/handoff, and `recover-agents --interrupted`; keep the work-item README layout. First reconcile the continuation owner and delivery binding: the head moved past `07c6777` (owner still records `d03b34d`) through commits from recovery session `claude:cec3b609-c328-4482-b813-3c35719a8032`. Then review, validate on Linux and deliver through `engineering:merge`, and start S2 from the updated remote default.
 
 - Scope: whole plan through all remaining phases and terminal delivery.
-- Current slice: S1 session registry helper and recover-agents entry.
+- Current slice: S1 session store (SQLite), hooks and interrupted-session recovery.
 - Remaining scope: S2–S5 in Core; consumer migrations under their own goals.
 - Done when: the progress ledger is removed from Core with no dangling references, and every recorded consumer migration has landed.
