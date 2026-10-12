@@ -4,7 +4,8 @@
   "source_roots": [
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
-    ".agents/workflows"
+    ".agents/workflows",
+    ".agents/workflows/repository_configuration.py"
   ],
   "requires": {
     "marketplaces": [
