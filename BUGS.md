@@ -100,3 +100,23 @@
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
 **Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+
+## B011 - Stop holds a released foreground turn on a scheduled headless writer
+
+**Kind:** bug. **Observed/reported:** 2026-10-12. After tj-agents/kit PR9 merged and v1.4.0 released, the foreground yielded its lease. The approved scheduler and an observed wake owned the follow-up PR10 through one native headless writer. Stop still injected "The canonical continuation has a headless writer; wait for its receipt before ending this turn." **Cause:** confirmed. `continuation_stop.outcome` blocked on any `owner.child`, even when it accepted the same released-lease owner in `waiting` state with scheduler and wake proof.
+
+**Impact and priority:** P2. A completed milestone report could not end its turn for up to the 900-second child timeout, and the user was confused about an already merged release. No ownership or completion gate was bypassed.
+
+**Source owner:** tj-agents/core engineering shared Stop hook, shipped to both hosts. **State:** in-progress. **Repair link:** [PR229](https://github.com/tj-agents/core/pull/229), [goal](plans/headless-continuation-turn-release/GOAL.md), branch Fix/HeadlessContinuationTurnRelease. If PR209 lands, its association path still rejects an associated working owner without a foreground lease before this branch; PR209 owns that reconciliation.
+
+**Next action:** merge PR229 through the merge queue once its exact-head CI and review are green.
+
+**Resolution condition:** a released-lease `working` owner whose child process identity matches exactly, and whose scheduler receipt and observed wake verify, allows Stop on both hosts. Every other case still blocks:
+
+- A live writer missing scheduler or wake proof waits for its receipt.
+- An exited or reused writer waits when that proof holds, and reconciles when it does not.
+- Unknown or malformed writer records, and foreground or stale-obligation cases, block for reconciliation.
+
+Focused regressions, independent review and exact-head CI pass before normal merge.
+
+**Verification evidence:** against the original hook, the first regressions failed 14 subtests, including all 8 positive Claude/Codex payload cases. Review findings STOP1 and STOP2 each added a regression that fails on its predecessor head. At 6b6e291 the file has 34 tests. Its 7 headless tests pass locally on Windows, and CI run 38317477446 passed `verify-linux`.
