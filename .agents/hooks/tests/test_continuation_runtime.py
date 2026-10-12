@@ -494,6 +494,8 @@ class ContinuationTests(unittest.TestCase):
         self.git("commit", "--allow-empty", "-m", "External replacement")
         blocked = self.wake()
         self.assertEqual(blocked["reason"], "owner-head-changed")
+        blocked["reason"] = "ci-repair-misclassified"
+        runtime.atomic_json(self.owner, blocked)
         rebind = self.root / "rebind.json"
         rebind.write_text(json.dumps({"old": old, "new": dict(old, head=self.git("rev-parse", "HEAD"))}))
         result = self.cli("reconcile", "--owner", str(self.owner), "--rebind", str(rebind),
@@ -521,6 +523,11 @@ class ContinuationTests(unittest.TestCase):
             runtime.operate(self.owner, state, args)
         self.assertEqual(state, before)
         state.update(state="waiting", reason="foreground-yielded", child=None)
+        before = json.loads(json.dumps(state))
+        with self.assertRaisesRegex(runtime.Gate, "owner-reconciliation-not-required"):
+            runtime.operate(self.owner, state, args)
+        self.assertEqual(state, before)
+        state.update(state="blocked", reason="ci-repair-misclassified")
         before = json.loads(json.dumps(state))
         with self.assertRaisesRegex(runtime.Gate, "owner-reconciliation-not-required"):
             runtime.operate(self.owner, state, args)

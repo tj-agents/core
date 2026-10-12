@@ -642,7 +642,7 @@ def operate(path, state, args):
                                "token": uuid.uuid4().hex}
         transition(state, "working", "foreground-owned", state["next_action"])
     elif operation == "reconcile":
-        if state["state"] != "blocked" or state.get("reason") != "owner-head-changed":
+        if state["state"] != "blocked" or identity(Path(state["worktree"]))["head"] == state["head"]:
             raise Gate("owner-reconciliation-not-required")
         if state.get("foreground") is not None:
             raise Gate("owner-reconciliation-foreground-active")
