@@ -1,6 +1,6 @@
 ﻿# Repository settings configuration owned by Core
 
-Status: active; PR208 owns committed candidate 531c793d285008f0bf8969eeed700b601b9326fe. Full independent review is complete with two reproduced settings-edge findings; classifier/parser repairs are pushed at178ba775bcddb68124d32a7e921b30902a62944b, with fresh incremental review and CI owned. B003 and required same-change harness alignment are implemented, parent-verified focused-green, and ready for one stable checkpoint followed by final incremental review/CI.
+Status: active; final runtime source317489e3390ec2b554850b3d178b41d822e7c4d7 is committed and pushed to PR208. Final focused repair passed63 tests; fresh incremental review178ba..317489 and exact-head CI38186384207 are owned. Ownership is resolved, continuation WORKING, no user gate.
 Date: 2026-10-11
 Branch: Fix/RepositorySettingsContract
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract
@@ -126,8 +126,8 @@ Initial test failures were confirmed in saved artifacts, repaired by adding the 
 }
 ```
 
-1. Commit the verified settings-edge repairs, push the same PR208 branch, refresh its delivery binding, then rebind and reclaim the existing continuation owner at the full corrected head.
-2. Freeze an incremental review from completed watermark 531c793d285008f0bf8969eeed700b601b9326fe without another full-review synchronization. Complete independent ordinary/workflow/security review and observe the replacement head's Windows/Linux CI through one owned monitor.
+1. Complete the owned final incremental review178ba775bcddb68124d32a7e921b30902a62944b..317489e3390ec2b554850b3d178b41d822e7c4d7; final code is committed, pushed and bound to the WORKING continuation owner.
+2. Reconcile fresh native-general/workflow/security evidence and observe final exact-head CI38186384207 through its existing monitor.
 3. Reconcile the current base and review, ready PR208, perform the normal guarded merge under recorded authority, and verify the exact merge's causal generated publication.
 4. Deliver the existing persistent-delivery preference explanation separately from the updated main branch, with its required harness/catalog changes, review, CI and causal publication. Keep this same goal and source boundaries.
 5. Reconcile M008 and B001/B002 against observed delivery, complete closeout and the canonical continuation owner. No Kit dependency, consumer installation or repository opt-in belongs to this correction; no repeated user permission is needed.
@@ -159,3 +159,13 @@ Range531c793d285008f0bf8969eeed700b601b9326fe..178ba775bcddb68124d32a7e921b30902
 B003's real guarded-command main regression failed before the source change with exactly two absent-policy errors (malformed/deep settings), then passed after both resolve paths shared the existing WorkflowOperationError translation. Parent inspected the stronger diagnostic assertion and terminal artifacts in repository-settings-b003: auto-merge11, delivery-binding38, harness manifests14 (63 tests passed), plus manifest consistency checked3 declarations. The source writer released all five paths without committing. The measured repair is79 changed lines, including necessary authored catalog harness wording; no digest or generated package change is included.
 
 The engineering harness now describes the validated repository settings preference, and the machine harness declares the two canonical shared reader/resolver dependencies already embedded by the source mappings. Catalog mirrors only the authored engineering justification and preserves merge-base generated digests. This satisfies required same-change shipped harness alignment; no permission command, installation or skill body is added here. Exact-head CI38184988930 at reviewed178ba775bcddb68124d32a7e921b30902a62944b completed successfully; that success is retained as its own evidence and does not validate the forthcoming final head.
+
+
+## Final-head CI and relevant main movement
+
+Final independent incremental review178ba..317489 is complete/clean with no new findings and validated both-host coverage. Owned exact-head CI38186384207 reached terminal success on Windows and Linux. Current-base reconciliation found relevant movement to bdb63914c03e6d5d62dcac7edb556d5a79c90b85: the separately owned coordination repair PR207 merged atcb7626a35cba664c80cfc987c270129b9e54f3a8 and generated its machine publication. Its machine harness, catalog and manifest tests overlap this settings candidate. Integrate that current main without discarding either repair, run focused manifest/guarded-consumer checks, checkpoint/push/rebind the same PR208, and incrementally review the integration from completed317489 before replacement-head CI/normal merge. The old exact-head green result remains evidence only for317489. No external or ownership gate exists.
+
+Integration phase selects L4 for specified, testable preservation of both authored harness changes; parent retains goal/review/records/delivery. This is source integration of already landed current main, not adoption of PR207 or its future consequences.
+
+
+Integration writer released after a conflict-free no-commit merge of currentmainbdb6391 into reviewed317489. Parent inspected actual terminal artifacts in repository-settings-base-integration-001: harness15 and guarded auto-merge11 tests passed (26 total), plus3 manifest declarations. Parent inspected the indexed comparison against currentmain: catalog contains only authored engineering settings-preference wording, machine harness adds the two settings dependencies, and no plugins output differs. Preserve the legitimate generated main content during merge; no manual generated-output staging or digest rewrite is needed. Commit this material merge plus the goal checkpoint, push PR208, refresh its workflow handoff binding, and supported-rebind/claim the same owner before replacement review/CI.
