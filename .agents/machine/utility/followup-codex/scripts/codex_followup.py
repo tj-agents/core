@@ -313,7 +313,10 @@ def main(argv=None):
             )
         else:
             status, next_action = 'unavailable', (
-                'No send was attempted. Provide the message for the user to paste into the target session.'
+                'No send was attempted. Assess available supported automated coordination, including '
+                'authorized exact-owner recovery through machine:open-codex; verify the exact native id, '
+                'cwd, and Codex profile. If automated coordination is unavailable or ineligible, report the '
+                'blocker and provide the message for the user to paste.'
             )
         if isinstance(error, Rejected):
             status = 'rejected'
