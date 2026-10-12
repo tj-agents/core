@@ -7,6 +7,7 @@ from merge_review_gate import canonical_merge_target_dir, is_codex_invocation, m
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workflows"))
 from delivery_runtime import DeliveryContractViolation, StandingMergeAuthorization
+import delivery_policy
 from pr_body import validate_pr_body
 
 from hook_runtime import (
@@ -137,13 +138,11 @@ def authoritative_body(root, pr, repo=None):
 
 
 def auto_merge_enabled(root):
-    path = root / CONFIG_FILE
     try:
-        policy = json.loads(path.read_text(encoding="utf-8"))
-        StandingMergeAuthorization().validate_policy(policy)
+        policy = delivery_policy.load_legacy_policy(root)
+        return delivery_policy.auto_merge_preference(root, policy)
     except (OSError, ValueError, DeliveryContractViolation):
         return False
-    return policy.get("auto_merge", False) is True
 
 
 def auto_merge_wrapper(root):
