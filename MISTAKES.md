@@ -1,4 +1,4 @@
-﻿# Mistakes
+# Mistakes
 
 This is core's incident record. Entries describe the observed mistake, its cause where known, and the intended correction. They are proposals for later repair, not additional operating instructions. `engineering:write-mistake` records incidents and `engineering:address-mistake` reconciles an authorized correction while retaining this learning history.
 
