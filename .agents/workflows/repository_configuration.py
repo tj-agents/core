@@ -7,6 +7,7 @@ from pathlib import Path
 
 SETTINGS_PATH = Path(".agents") / "settings.json"
 NAMESPACE_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
+CORE_KEYS = frozenset({"auto_merge", "auto_approve_design"})
 
 
 class ConfigurationViolation(ValueError):
@@ -82,18 +83,37 @@ def load(root):
     return configuration
 
 
-def auto_merge(root, legacy_policy):
+def core(root):
     configuration = load(root)
     if configuration is None:
-        return legacy_policy is not None and legacy_policy.get("auto_merge") is True
-    core = configuration.get("core")
-    if core is None:
-        return False
-    unknown = set(core) - {"auto_merge"}
+        return None
+    value = configuration.get("core", {})
+    unknown = set(value) - CORE_KEYS
     if unknown:
         raise ConfigurationViolation(f"core settings have unknown keys {sorted(unknown)!r}")
-    if "auto_merge" not in core:
-        return False
-    if type(core["auto_merge"]) is not bool:
-        raise ConfigurationViolation("core auto_merge must be a boolean")
-    return core["auto_merge"]
+    for key in CORE_KEYS:
+        if key in value and type(value[key]) is not bool:
+            raise ConfigurationViolation(f"core {key} must be a boolean")
+    return value
+
+
+def auto_merge(root, legacy_policy):
+    settings = core(root)
+    if settings is None:
+        return legacy_policy is not None and legacy_policy.get("auto_merge") is True
+    return settings.get("auto_merge", False)
+
+
+def auto_approve_design(root):
+    settings = core(root)
+    return False if settings is None else settings.get("auto_approve_design", False)
+
+
+def auto_approve_design_provenance(root):
+    settings = core(root)
+    path = Path(root) / SETTINGS_PATH
+    if settings is None:
+        return False, f"no settings file at {path}"
+    if "auto_approve_design" not in settings:
+        return False, f"auto_approve_design absent from {path}"
+    return settings["auto_approve_design"], f"configuration.core.auto_approve_design at {path}"

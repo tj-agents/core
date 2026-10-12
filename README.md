@@ -57,8 +57,7 @@ closure.
 
 ## Repository auto-merge
 
-An engineering-enabled repository opts into guarded agent auto-merge in
-`.agents/settings.json`:
+An engineering-enabled repository opts into guarded agent auto-merge in `.agents/settings.json`:
 
 ```json
 {"configuration":{"core":{"auto_merge":true}}}
@@ -70,6 +69,20 @@ or scoped merge authority, every stop class and hold label, exact-head checks, c
 security review, and checkout identity must still pass. The guarded workflow rereads settings at execution
 time, so disabling it after a delivery binding prevents arming auto-merge. See
 [repository settings](docs/workflows/REPOSITORY_CONFIGURATION.md) for the complete contract.
+
+## Repository routine design approval
+
+`configuration.core.auto_approve_design` is separately `false` when absent:
+
+```json
+{"configuration":{"core":{"auto_approve_design":true}}}
+```
+
+When it is `true`, an agent may make and record routine design or convention choices within work already
+authorized by the user. It does not override an explicit user reservation, task scope, stricter repository
+rule, or any merge, publication, installation, or permission gate. Select a core release that understands
+this key before enabling it; older strict readers reject unknown core settings. Source verification does not
+establish installed-host trust or acceptance.
 
 ## Layout
 

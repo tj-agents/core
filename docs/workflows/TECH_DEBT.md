@@ -1,5 +1,30 @@
 # Workflow runtime debt
 
+## D001 — Configured routine design approval requires stack adoption
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; a stack convention procedure reserved a routine decision despite the
+  user's already-authorized scaffold work.
+- **Impact and priority:** affected stack consumers can ask repeat approval questions; P2 because no merge,
+  publication, permission, or active production harm is involved.
+- **Source owner:** the affected stack source and its consuming repository; Core owns the shared setting and
+  both-host context delivery.
+- **State:** deferred.
+- **Reason:** each convention owner must adopt the shared setting in its own contract.
+- **blocked_by:** dependency.
+- **Repair link:** [current Core goal](../../plans/convention-approval-configuration/GOAL.md),
+  [repo-declared-config rollout owner](../../plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md), and
+  [dotnet D001](https://github.com/tj-agents/dotnet/blob/main/docs/TECH_DEBT.md#d001-honor-configured-design-approval-across-agent-hosts).
+- **Resolver:** each affected stack source and consuming repository owner.
+- **Resume when:** a stack owner schedules adoption after selecting a Core release that understands the new
+  key.
+- **Next action:** update the affected convention contract and verify the selected installed Claude and Codex
+  paths.
+- **Resolution condition:** affected convention workflows honor `configuration.core.auto_approve_design` for
+  authorized routine choices, and both installed host paths are accepted.
+- **Verification evidence:** Core source tests cover strict settings resolution and package-context delivery;
+  installed-host acceptance remains pending.
+
 ## Recovery and delivery prevention gaps
 
 The incidents and known causes are owned by [MISTAKES.md](../../MISTAKES.md), entries M001-M007.
