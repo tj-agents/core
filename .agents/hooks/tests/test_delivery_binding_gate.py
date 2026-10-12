@@ -545,7 +545,10 @@ class GateSubprocessTests(unittest.TestCase):
         self.assertIn("auto_merge is not enabled", result.stderr)
 
     def test_direct_auto_merge_is_directed_to_the_guarded_wrapper_when_enabled(self):
-        self.write_policy(auto_merge=True)
+        (self.repo / ".agents" / "settings.json").write_text(
+            json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8"
+        )
+        (self.repo / ".agents" / "delivery-authorization.json").unlink()
         result = self.run_hook(command="gh pr merge 42 --auto", event="PreToolUse")
         self.assertEqual(2, result.returncode)
         self.assertIn("auto_merge.py --root", result.stderr)
