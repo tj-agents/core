@@ -542,6 +542,22 @@ class ContinuationTests(unittest.TestCase):
                           "--authority", "test", "--harness", "codex", "--actions", "test", code=2)
         self.assertTrue(result["reason"].startswith("canonical-goal-file-required:"))
 
+    def test_expired_owner_requires_an_explicit_finite_renewal(self):
+        state = self.state()
+        state["deadline"] = time.time() - 1
+        runtime.atomic_json(self.owner, state)
+        blocked = self.wake()
+        before = {key: blocked[key] for key in ("owner_id", "launches", "failures", "max_launches", "max_failures")}
+        result = self.cli("renew", "--owner", str(self.owner), "--deadline-hours", "1",
+                          "--reason", "User renewed finite authority", "--next-action", "resume delivery")
+        self.assertEqual(result["state"], "waiting")
+        self.assertEqual(result["reason"], "User renewed finite authority")
+        self.assertGreater(result["deadline"], time.time())
+        self.assertEqual({key: result[key] for key in before}, before)
+        self.assertEqual(self.cli("renew", "--owner", str(self.owner), "--deadline-hours", "1",
+                                  "--reason", "duplicate", "--next-action", "resume", code=2)["reason"],
+                         "owner-renewal-not-required")
+
     def test_absolute_external_goal_survives_claim_yield_repair_and_wake(self):
         with tempfile.TemporaryDirectory() as external:
             goal = Path(external).resolve() / "canonical goal.md"
