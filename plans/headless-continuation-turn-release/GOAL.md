@@ -34,11 +34,11 @@ Use meaningful disposable regression tests that expose the current obstruction, 
 
 `continuation_runtime.launch` runs inside a scheduler `wake`: it sets `state=working`, `foreground=None`, records the supervisor as `child={pid, identity}`, and blocks up to `timeout_seconds` (900 s default) for the receipt. Persistent-workflow's contract is init, claim, register, observed wake, and then yield so the scheduled writer can take over. `continuation_stop.outcome` let a released-lease `waiting` owner stop once `scheduler_ready` and `observed_wake` held. But it blocked unconditionally on any `owner.child` (old line 239), so a foreground whose lease was released could not end a turn while the scheduler-launched writer ran. The supervised child itself was already exempt through `supervised()`.
 
-Fix: a `child` record releases Stop only when the owner is `working`, the child's live process identity exactly matches the record (`unknown`, missing, reused or exited identities are rejected), and the same scheduler receipt and observed-wake proof required for `waiting` hold. A live writer without that durable proof still waits for its receipt. An unverified writer gets a reconcile block. Foreground-lease, stale-obligation, completion and blocker gates run before this branch and are unchanged.
+Fix: a `child` record releases Stop only when the owner is `working`, the child's live process identity exactly matches the record (`unknown`, missing, reused or exited identities are rejected), and the same scheduler receipt and observed-wake proof required for `waiting` hold. A live writer without that durable proof still waits for its receipt, and so does a well-formed writer that has exited or whose pid was reused, because the supervisor's checkpoint save or the next wake recovers that owner. A malformed or unverifiable record, or a child outside `working`, gets a reconcile block. Foreground-lease, stale-obligation, completion and blocker gates run before this branch and are unchanged.
 
 Owner reconciliation: PR218 (foreign foreground order) and PR226 (binding head key) touch other lines of the hook and do not overlap. PR209 adds an association path that treats an associated `working` owner without a foreground lease as `association-foreground-lease-missing` before this branch. If PR209 lands, an associated session with a proven headless writer would still be blocked there. That is PR209's reconciliation to make; it is recorded under B011. Defect record: BUGS.md B011 (B008–B010 are taken by origin/Fix/HookDeliveryIdentity).
 
-Known limitation: the runtime writes the `wake` event only after the wake operation returns. During the very first scheduler wake's launch there is therefore no observed wake yet, and Stop still waits for that first receipt. The contract names an observed wake as durable proof, so this was not widened.
+Known limitation: the runtime writes the `wake` event only after the wake operation returns. A wake that finds a live foreground lease returns early and still records the event, so the contract's order (observed wake before yield) normally supplies the proof. Only a foreground that yields before any wake was observed waits for the first launch's receipt. The contract names an observed wake as durable proof, so this was not widened.
 
 ## Progress
 
@@ -49,10 +49,15 @@ Known limitation: the runtime writes the `wake` event only after the wake operat
 - No harness manifest change: no new hook, file or permission. Catalog digests are left to the post-merge job (`check_generated_paths.py` passes); harness and tier checks pass locally.
 - Independent read-only review of 1d0b42d (engineering:review-lens): no high or medium findings. Low 1: owner.json is per worktree, so another session in the same worktree shares the gate; this predates the change and the `waiting` gate behaves the same way. Low 2: a wake process that crashes mid-launch leaves a dead child, which gets a reconcile block until the next wake self-heals it, as acceptance intends. Neither needs a change.
 
+- 2026-10-12 PC crash at about 21:27; resumed by the same Claude session (d4163684), the only live recorded session in this checkout. PR229 is open at a6b12c630f23e93ab06a37e0ac6eefad4ddc429f, and exact-head CI run 38310601445 passed guard, verify-linux and verify-windows. The PR body check passed. The canonical review (`reviews/Fix-HeadlessContinuationTurnRelease.md`, local merge-gate artifact, untracked) is in progress over c91b60c..a6b12c6.
+- The installed Stop hook blocks this session with `binding-head-changed` although the binding head equals HEAD. That is B008: `binding_from_artifact` renames `head` to `remote_head_sha`. PR226 owns the repair, so it is not adopted here. The block is false until PR226 is installed.
+- Canonical review pass over c91b60c..a6b12c6 completed `changes-requested`. Native `code-review` (medium) raised STOP1 LOW: an exited or reused writer got the reconcile message during the supervisor's checkpoint window. The `workflow` lens candidates were dropped with reasons, and `review-host-check` passed. The STOP1 fix splits `headless_writer_record` validity from liveness and adds `test_ended_headless_writer_waits_for_its_receipt`, which fails 2 subtests on a6b12c6 and passes with the fix. The focused `-k headless` run passed 6 tests.
+
 ## Next Steps
 
-1. Open the owning PR, monitor its required CI to terminal, merge normally under standing authority; leave generated `plugins/*` uncommitted.
-2. Record delivery evidence here and in B011, then finish only this side session.
+1. Push the STOP1 fix to PR229, run the incremental review from watermark a6b12c6, and monitor exact-head CI to terminal.
+2. Enqueue PR229 through the merge queue under standing authority; leave generated `plugins/*` uncommitted.
+3. Record delivery evidence here and in B011, release the delivery binding, then finish only this side session.
 
 ```agent-host-coverage
 {
