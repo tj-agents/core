@@ -36,6 +36,20 @@ class RepositoryConfigurationTests(unittest.TestCase):
 
     def test_absent_settings_fall_back_to_a_valid_legacy_preference(self):
         self.assertTrue(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertFalse(CONFIGURATION.auto_approve_design(self.root))
+
+    def test_design_approval_is_independent_of_legacy_auto_merge(self):
+        enabled, provenance = CONFIGURATION.auto_approve_design_provenance(self.root)
+        self.assertFalse(enabled)
+        self.assertIn("no settings file", provenance)
+
+        self.write({"configuration": {"core": {"auto_approve_design": True}}})
+        self.assertTrue(CONFIGURATION.auto_approve_design(self.root))
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
+
+        enabled, provenance = CONFIGURATION.auto_approve_design_provenance(self.root)
+        self.assertTrue(enabled)
+        self.assertIn("configuration.core.auto_approve_design", provenance)
 
     def test_present_settings_are_authoritative_and_preserve_other_namespaces(self):
         path = self.write({
@@ -66,11 +80,38 @@ class RepositoryConfigurationTests(unittest.TestCase):
         self.assertFalse(delivery_policy.auto_merge_preference(self.root, policy))
 
     def test_core_settings_are_strict(self):
-        for core in ({"auto_merge": "true"}, {"auto_merge": 1}, {"unknown": True}):
+        for core in (
+            {"auto_merge": "true"},
+            {"auto_merge": 1},
+            {"auto_approve_design": "true"},
+            {"auto_approve_design": 1},
+            {"unknown": True},
+        ):
             with self.subTest(core=core):
                 self.write({"configuration": {"core": core}})
                 with self.assertRaises(ValueError):
                     delivery_policy.auto_merge_preference(self.root, self.policy)
+                with self.assertRaises(ValueError):
+                    CONFIGURATION.auto_approve_design(self.root)
+
+    def test_core_capabilities_coexist_without_affecting_foreign_namespaces(self):
+        self.write({
+            "configuration": {
+                "core": {"auto_merge": True, "auto_approve_design": False},
+                "foreign": {"enabled": "future"},
+            }
+        })
+        self.assertTrue(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertFalse(CONFIGURATION.auto_approve_design(self.root))
+
+        self.write({
+            "configuration": {
+                "core": {"auto_merge": False, "auto_approve_design": True},
+                "foreign": {"enabled": "future"},
+            }
+        })
+        self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
+        self.assertTrue(CONFIGURATION.auto_approve_design(self.root))
 
     def test_reader_rejects_malformed_duplicate_nonfinite_and_invalid_namespaces(self):
         invalid = (
