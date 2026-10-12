@@ -511,7 +511,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:2d374887463d7e0d279b24ab55bff40e06c5c299d58bffd9d74c2ba9597471ed",
+          "digest": "sha256:1ec024a9aa641e4348518c41db64b961c863ce81a5e2a0ec9b33512f760086d3",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -567,6 +567,13 @@
               },
               {
                 "path": "resources/machine/scripts/reap_orphans.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": "resources/machine/scripts/session_store.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -794,16 +801,30 @@
                     ],
                     [
                       "status",
+                      "find",
+                      "interrupted",
                       "resume"
                     ]
                   ],
-                  "justification": "machine:recover-agents 'Continue a work item': status is read-only and resume only reopens the exact recorded session through the shared agent_recovery guard, which refuses a live or unknown session.",
+                  "justification": "machine:recover-agents 'Continue a work item': status/find/interrupted are read-only and resume only reopens the exact recorded session through the shared agent_recovery guard, which refuses a live, foreign, stale or unknown session.",
                   "match": [
                     [
                       "python3",
                       "-B",
                       "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
                       "status"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "find"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "interrupted"
                     ],
                     [
                       "python",
@@ -823,13 +844,19 @@
                       "python3",
                       "-B",
                       "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "record"
+                      "claim"
                     ],
                     [
                       "python3",
                       "-B",
                       "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "remove"
+                      "end"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "item"
                     ]
                   ]
                 }

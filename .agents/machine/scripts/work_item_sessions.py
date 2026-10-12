@@ -1,36 +1,39 @@
 #!/usr/bin/env python3
+"""Claim, inspect and resume work-item sessions recorded in the central session store."""
+
 import argparse
-import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path
 import re
 import socket
 import subprocess
 import sys
-import tempfile
-from datetime import datetime, timezone
-from urllib.parse import urlparse
 
 HERE = Path(__file__).resolve().parent
-HEADER = "# Active sessions"
-FIELDS = (
-    "Role", "State", "Machine", "Profile", "Title", "Worktree", "Branch",
-    "PR", "Head", "Predecessor", "Successor", "Verified", "Resume",
-)
-FIELD_LINE = re.compile(r"^- ([A-Za-z]+): (.*)$")
-HEAD_RE = re.compile(r"^[0-9a-f]{40}$")
-VERIFIED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
-GIT_TIMEOUT = 15
+WORK_ITEM_RE = re.compile(r"^(?P<feature>[a-z0-9]+(?:-[a-z0-9]+)*)/(?P<item>[a-z0-9]+(?:-[a-z0-9]+)*)$")
+WORK_ITEM_STATUSES = ("proposed", "active", "blocked", "paused", "delivery-gated", "done")
+END_REASONS = ("finished", "closed", "handed_off")
+HEAD_CHECK_TIMEOUT = 5
 
+_SESSION_STORE = None
 _AGENT_RECOVERY = None
+_REGISTER_SESSION = None
 
 
-class SessionError(ValueError):
-    def __init__(self, errors):
-        self.errors = list(errors)
-        super().__init__("; ".join(self.errors))
+def _session_store():
+    global _SESSION_STORE
+    if _SESSION_STORE is not None:
+        return _SESSION_STORE
+    candidate = HERE / "session_store.py"
+    if candidate.is_file():
+        spec = importlib.util.spec_from_file_location("work_item_sessions_session_store", candidate)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _SESSION_STORE = module
+        return module
+    raise RuntimeError(f"The shared session_store.py helper was not found relative to {HERE}.")
 
 
 def _agent_recovery():
@@ -47,208 +50,36 @@ def _agent_recovery():
     raise RuntimeError(f"The shared agent_recovery.py helper was not found relative to {HERE}.")
 
 
-def _valid_handle(value):
-    host, separator, session_id = value.partition(":")
-    if not separator or host not in ("claude", "codex") or not session_id:
-        return False
-    return bool(_agent_recovery().SESSION_ID.fullmatch(session_id))
-
-
-def _resume_command(host, session_id):
-    if host == "claude":
-        return f"`machine:open-claude --resume {session_id}`"
-    if host == "codex":
-        return f"`machine:open-codex --id {session_id}`"
-    raise ValueError(f"Unsupported host: {host}")
-
-
-def _is_absolute_path(value):
-    return PureWindowsPath(value).is_absolute() or PurePosixPath(value).is_absolute()
-
-
-def _valid_https_url(value):
-    parsed = urlparse(value)
-    return parsed.scheme == "https" and bool(parsed.netloc)
-
-
-def _now_iso():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def sessions_path(work_item_dir):
-    return Path(work_item_dir) / "ACTIVE_SESSIONS.md"
-
-
-def _split_sections(text):
-    lines = text.split("\n")
-    errors = []
-    index = 0
-    while index < len(lines) and lines[index].strip() == "":
-        index += 1
-    if index >= len(lines) or lines[index].rstrip("\r") != HEADER:
-        errors.append(f"file must start with '{HEADER}'")
-        return [], errors
-    index += 1
-    sections = []
-    current_handle = None
-    current_pairs = None
-    for line_number in range(index, len(lines)):
-        line = lines[line_number].rstrip("\r")
-        if line.startswith("## "):
-            if current_handle is not None:
-                sections.append((current_handle, current_pairs))
-            current_handle = line[3:].strip()
-            current_pairs = []
-        elif line.strip() == "":
-            continue
-        else:
-            match = FIELD_LINE.match(line)
-            if not match:
-                errors.append(f"line {line_number + 1}: malformed line: {line!r}")
-                continue
-            if current_handle is None:
-                errors.append(f"line {line_number + 1}: field line before any session heading")
-                continue
-            current_pairs.append((match.group(1), match.group(2)))
-    if current_handle is not None:
-        sections.append((current_handle, current_pairs))
-    return sections, errors
-
-
-def _dedupe_fields(handle, pairs):
-    errors = []
-    fields = {}
-    for name, value in pairs:
-        if name not in FIELDS:
-            errors.append(f"{handle}: unknown field {name!r}")
-            continue
-        if name in fields:
-            errors.append(f"{handle}: duplicate field {name!r}")
-            continue
-        fields[name] = value
-    return fields, errors
-
-
-def parse(text):
-    sections, errors = _split_sections(text)
-    records = []
-    for handle, pairs in sections:
-        fields, field_errors = _dedupe_fields(handle, pairs)
-        errors.extend(field_errors)
-        records.append((handle, fields))
-    return records, errors
-
-
-def validate(records):
-    errors = []
-    seen = set()
-    owners = []
-    for handle, fields in records:
-        if not _valid_handle(handle):
-            errors.append(f"invalid session handle: {handle!r}")
-        if handle in seen:
-            errors.append(f"duplicate session handle: {handle!r}")
-        seen.add(handle)
-        missing = [name for name in FIELDS if name not in fields]
-        unknown = [name for name in fields if name not in FIELDS]
-        empty = [name for name in FIELDS if name in fields and not fields[name].strip()]
-        for name in missing:
-            errors.append(f"{handle}: missing field {name!r}")
-        for name in unknown:
-            errors.append(f"{handle}: unknown field {name!r}")
-        for name in empty:
-            errors.append(f"{handle}: empty field {name!r}")
-        if missing or unknown or empty:
-            continue
-        role = fields["Role"]
-        if role != "owner" and not (role.startswith("bounded: ") and role[len("bounded: "):].strip()):
-            errors.append(f"{handle}: invalid Role {role!r}")
-        elif role == "owner":
-            owners.append(handle)
-        if fields["State"] not in ("active", "handing-off"):
-            errors.append(f"{handle}: invalid State {fields['State']!r}")
-        if not _is_absolute_path(fields["Worktree"]):
-            errors.append(f"{handle}: Worktree must be absolute: {fields['Worktree']!r}")
-        pr = fields["PR"]
-        if pr != "not opened" and not _valid_https_url(pr):
-            errors.append(f"{handle}: invalid PR {pr!r}")
-        if not HEAD_RE.match(fields["Head"]):
-            errors.append(f"{handle}: invalid Head {fields['Head']!r}")
-        for name in ("Predecessor", "Successor"):
-            value = fields[name]
-            if value != "none" and not _valid_handle(value):
-                errors.append(f"{handle}: invalid {name} {value!r}")
-        if not VERIFIED_RE.match(fields["Verified"]):
-            errors.append(f"{handle}: invalid Verified {fields['Verified']!r}")
-        if _valid_handle(handle):
-            host, _, session_id = handle.partition(":")
-            if fields["Resume"] != _resume_command(host, session_id):
-                errors.append(f"{handle}: invalid Resume {fields['Resume']!r}")
-    if len(owners) > 1:
-        errors.append("multiple owner rows: " + ", ".join(owners))
-    return errors
-
-
-def render(sessions):
-    lines = [HEADER, ""]
-    for index, (handle, fields) in enumerate(sessions):
-        lines.append(f"## {handle}")
-        lines.extend(f"- {name}: {fields[name]}" for name in FIELDS)
-        if index != len(sessions) - 1:
-            lines.append("")
-    return "\n".join(lines) + "\n"
-
-
-def validate_text(text):
-    records, errors = parse(text)
-    errors = list(errors) + validate(records)
-    handles = [handle for handle, _ in records]
-    return not errors, errors, handles
-
-
-def load(work_item_dir):
-    path = sessions_path(work_item_dir)
-    if not path.is_file():
-        return []
-    text = path.read_text(encoding="utf-8")
-    valid, errors, _ = validate_text(text)
-    if not valid:
-        raise SessionError(errors)
-    records, _ = parse(text)
-    return [(handle, {name: fields[name] for name in FIELDS}) for handle, fields in records]
-
-
-def write(work_item_dir, sessions):
-    path = sessions_path(work_item_dir)
-    if not sessions:
+def _register_session():
+    global _REGISTER_SESSION
+    if _REGISTER_SESSION is not None:
+        return _REGISTER_SESSION
+    peer = HERE.parent / "utility/peer-cli/scripts/register_session.py"
+    packaged = tuple(
+        HERE.parents[2] / layout / "peer-cli/scripts/register_session.py" for layout in ("skills", "codex-skills")
+    ) if len(HERE.parents) > 2 else ()
+    for path in (peer, *packaged):
         if path.is_file():
-            path.unlink()
-        return
-    path.write_bytes(render(sessions).encode("utf-8"))
+            spec = importlib.util.spec_from_file_location("work_item_sessions_register_session", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            _REGISTER_SESSION = module
+            return module
+    raise RuntimeError(f"The shared register_session.py helper was not found relative to {HERE}.")
 
 
-def _git(cwd, *args):
-    try:
-        return subprocess.run(
-            ["git", "-C", str(cwd), *args],
-            capture_output=True, encoding="utf-8", timeout=GIT_TIMEOUT, shell=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
+def _parse_work_item(value):
+    match = WORK_ITEM_RE.fullmatch(value)
+    if not match:
+        raise ValueError(f"invalid work item {value!r}; expected <feature>/<item> in lowercase kebab-case")
+    return match.group("feature"), match.group("item")
 
 
-def _run_git(cwd, *args):
-    completed = _git(cwd, *args)
-    if completed is None or completed.returncode != 0:
-        return None
-    return completed.stdout.strip()
-
-
-def _head_contains(checkout, recorded):
-    completed = _git(checkout, "merge-base", "--is-ancestor", recorded, "HEAD")
-    if completed is None or completed.returncode not in (0, 1):
-        return None
-    return completed.returncode == 0
+def _require_repo(cwd):
+    repo = _session_store().repo_identity(cwd)
+    if not repo:
+        raise ValueError(f"could not determine a git repository identity from {cwd}")
+    return repo
 
 
 def _current_session_id(host):
@@ -256,241 +87,311 @@ def _current_session_id(host):
     return os.environ.get(variable)
 
 
-def _profile_dir(host):
-    if host == "claude":
-        value = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
-    else:
-        value = os.environ.get("CODEX_HOME") or str(Path.home() / ".codex")
-    return str(Path(value))
-
-
-def stale_reasons(fields):
-    worktree = Path(fields["Worktree"])
-    if not worktree.is_dir():
-        return ["worktree-missing"]
-    reasons = []
-    branch = _run_git(worktree, "branch", "--show-current")
-    if branch is None:
-        reasons.append("branch-unknown")
-    elif branch != fields["Branch"]:
-        reasons.append("branch-mismatch")
-    contains = _head_contains(worktree, fields["Head"])
-    if contains is None:
-        reasons.append("head-unknown")
-    elif not contains:
-        reasons.append("head-diverged")
-    return reasons
-
-
-def cmd_validate(work_item_dir):
-    path = sessions_path(work_item_dir)
-    if not path.is_file():
-        return {"valid": True, "errors": [], "sessions": []}
-    valid, errors, handles = validate_text(path.read_text(encoding="utf-8"))
-    return {"valid": valid, "errors": errors, "sessions": handles}
-
-
-def cmd_status(work_item_dir):
-    result = cmd_validate(work_item_dir)
-    if not result["valid"]:
-        return result
-    records = load(work_item_dir)
-    recovery = _agent_recovery()
-    machine = socket.gethostname()
-    rows = []
-    for handle, fields in records:
-        host, _, session_id = handle.partition(":")
-        foreign = fields["Machine"].casefold() != machine.casefold()
-        if foreign:
-            liveness = "foreign"
-            stale = []
-        else:
-            liveness = recovery.liveness({"host": host, "session": session_id})
-            stale = stale_reasons(fields)
-        rows.append({
-            "handle": handle, "role": fields["Role"], "state": fields["State"],
-            "liveness": liveness, "stale": stale, "resume": fields["Resume"],
-        })
-    return {"valid": True, "errors": [], "sessions": rows}
-
-
-def cmd_find(worktree, roots):
-    target = os.path.normcase(os.path.abspath(str(worktree)))
-    matches = []
-    invalid = []
-    for root in roots:
-        for path in sorted(Path(root).glob("plans/features/*/work-items/*/ACTIVE_SESSIONS.md")):
-            work_item_dir = path.parent
-            try:
-                records = load(work_item_dir)
-            except SessionError as error:
-                invalid.append({"path": str(path), "errors": error.errors})
-                continue
-            feature = work_item_dir.parent.parent.name
-            item = work_item_dir.name
-            for handle, fields in records:
-                if os.path.normcase(os.path.abspath(fields["Worktree"])) == target:
-                    matches.append({
-                        "work_item": f"{feature}/{item}", "path": str(path),
-                        "handle": handle, "role": fields["Role"],
-                    })
-    return {"matches": matches, "invalid": invalid}
-
-
-def resume(work_item_dir, handle=None, prompt=None, prompt_path=None, title=None):
-    records = load(work_item_dir)
-    if not records:
-        raise ValueError("no recorded session; start a new owner from the work item README's ## Next Steps")
-    if handle:
-        matched = [record for record in records if record[0] == handle]
-        if not matched:
-            raise ValueError(f"no recorded session with handle {handle!r}")
-        selected = matched[0]
-    else:
-        owners = [record for record in records if record[1]["Role"] == "owner"]
-        if len(owners) != 1:
-            raise ValueError("specify --handle; recorded sessions: " + ", ".join(record[0] for record in records))
-        selected = owners[0]
-    selected_handle, fields = selected
-    host, _, session_id = selected_handle.partition(":")
-    machine = socket.gethostname()
-    if fields["Machine"].casefold() != machine.casefold():
-        raise ValueError(f"{selected_handle}: recorded on a different machine; reconcile before resuming")
-    reasons = stale_reasons(fields)
-    if reasons:
-        raise ValueError(f"{selected_handle}: stale ({', '.join(reasons)}); reconcile before resuming")
-    recovery = _agent_recovery()
-    roots = {host: Path(fields["Profile"]) / ("projects" if host == "claude" else "sessions")}
-    if prompt_path:
-        return recovery.open_session(host, session_id, prompt=None, title=title, roots=roots, prompt_path=prompt_path)
-    return recovery.open_session(
-        host, session_id, prompt=prompt or "Continue the requested work.", title=title, roots=roots,
-    )
-
-
-def _registry_lock(work_item_dir):
-    key = os.path.normcase(str(sessions_path(work_item_dir).resolve()))
-    directory = Path(tempfile.gettempdir()) / "work-item-sessions"
-    directory.mkdir(parents=True, exist_ok=True)
-    return _agent_recovery()._claim_lock(directory / f"{hashlib.sha256(key.encode('utf-8')).hexdigest()}.md")
-
-
-def record(work_item_dir, host, role, state=None, title=None, pr=None, predecessor=None, successor=None, cwd=None):
+def _require_session_id(host):
     session_id = _current_session_id(host)
     if not session_id or not _agent_recovery().SESSION_ID.fullmatch(session_id):
         variable = "CODEX_THREAD_ID" if host == "codex" else "CLAUDE_CODE_SESSION_ID"
         raise ValueError(f"missing or invalid session id in {variable}")
-    cwd = Path(cwd) if cwd is not None else Path.cwd()
-    toplevel = _run_git(cwd, "rev-parse", "--show-toplevel")
-    if toplevel is None:
-        raise ValueError(f"could not determine a git worktree from {cwd}")
-    worktree = str(Path(toplevel).resolve())
-    branch = _run_git(worktree, "branch", "--show-current")
-    head = _run_git(worktree, "rev-parse", "HEAD")
-    if branch is None or head is None:
-        raise ValueError(f"could not determine the branch or HEAD of {worktree}")
-    if not branch:
-        raise ValueError(f"{worktree} is on a detached HEAD; check out the delivery branch before recording")
-    with _registry_lock(work_item_dir):
-        return _record_locked(work_item_dir, host, session_id, role, state, title, pr, predecessor, successor,
-                              worktree, branch, head)
+    return session_id
 
 
-def _record_locked(work_item_dir, host, session_id, role, state, title, pr, predecessor, successor, worktree,
-                   branch, head):
-    handle = f"{host}:{session_id}"
-    records = load(work_item_dir)
-    existing = dict(records)
-    current = existing.get(handle, {})
+def _path_key(value):
+    try:
+        return os.path.normcase(str(Path(value).resolve()))
+    except OSError:
+        return os.path.normcase(str(value))
 
-    other_owner = next((h for h, f in records if h != handle and f["Role"] == "owner"), None)
-    if role == "owner" and other_owner is not None:
-        if not (predecessor and other_owner == predecessor and existing[other_owner]["State"] == "handing-off"):
-            raise ValueError(f"{other_owner} already owns this work item; hand off before taking ownership")
 
-    removed = None
-    if predecessor and predecessor in existing and existing[predecessor].get("State") == "handing-off":
-        removed = predecessor
+def _head_is_ancestor(worktree, head):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(worktree), "merge-base", "--is-ancestor", head, "HEAD"],
+            capture_output=True, timeout=HEAD_CHECK_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode not in (0, 1):
+        return None
+    return result.returncode == 0
 
-    fields = {
-        "Role": role,
-        "State": state or "active",
-        "Machine": socket.gethostname(),
-        "Profile": _profile_dir(host),
-        "Title": title or os.environ.get("AGENT_CLI_TAB_TITLE") or "none",
-        "Worktree": worktree,
-        "Branch": branch,
-        "PR": pr or current.get("PR", "not opened"),
-        "Head": head,
-        "Predecessor": predecessor or current.get("Predecessor", "none"),
-        "Successor": successor or current.get("Successor", "none"),
-        "Verified": _now_iso(),
-        "Resume": _resume_command(host, session_id),
+
+def _worktree_status(row):
+    worktree = row.get("cwd")
+    if not worktree or not Path(worktree).is_dir():
+        return "stale"
+    branch = _session_store()._git(worktree, "branch", "--show-current")
+    if branch is None:
+        return "unknown"
+    if branch != row.get("branch"):
+        return "stale"
+    head = row.get("head")
+    if not head:
+        return "unknown"
+    contains = _head_is_ancestor(worktree, head)
+    if contains is None:
+        return "unknown"
+    return "live" if contains else "stale"
+
+
+def _read_time_status(row, machine):
+    if row.get("ended_at") is not None:
+        return "closed"
+    if (row.get("machine") or "").casefold() != machine.casefold():
+        return "foreign"
+    liveness = _agent_recovery().liveness({"host": row["host"], "session": row["session_id"]})
+    if liveness != "live":
+        return liveness
+    return _worktree_status(row)
+
+
+def _pid_is_dead(pid, pid_started_at):
+    if not isinstance(pid, int) or pid_started_at is None:
+        return False
+    try:
+        process = _register_session().build_process_lookup()(pid)
+    except Exception:
+        return False
+    if process is None:
+        return True
+    started = getattr(process, "started_at", None)
+    if started is None:
+        return False
+    return started != pid_started_at
+
+
+def _resume_roots(row):
+    host = row["host"]
+    subdirectory = "projects" if host == "claude" else "sessions"
+    return {host: Path(row["profile"]) / subdirectory}
+
+
+def cmd_claim(work_item, host, role=None, predecessor=None, cwd=None):
+    store = _session_store()
+    cwd = cwd or Path.cwd()
+    feature, item = _parse_work_item(work_item)
+    repo = _require_repo(cwd)
+    key = store.work_item_key(repo, feature, item)
+    session_id = _require_session_id(host)
+    handle = store.session_handle(host, session_id)
+    role = role or "owner"
+    branch, _head = store.current_branch_and_head(cwd)
+    connection = store.connect()
+    try:
+        store.ensure_session(connection, host, session_id, cwd)
+        if store.get_work_item(connection, key) is None:
+            store.upsert_work_item(connection, key, repo, feature, item, status="active", branch=branch)
+        result = {"handle": handle, "work_item": f"{feature}/{item}"}
+        if role == "owner":
+            others = [row for row in store.live_owners(connection, key) if row["handle"] != handle]
+            if others:
+                other = others[0]
+                if predecessor and predecessor == other["handle"]:
+                    store.transfer_ownership(connection, predecessor, handle, key, role=role)
+                    result["removed"] = predecessor
+                    return result
+                raise ValueError(f"{other['handle']} already owns this work item; hand off before taking ownership")
+        store.set_session_ownership(connection, handle, role, key, predecessor=predecessor)
+        return result
+    finally:
+        connection.close()
+
+
+def cmd_status(work_item, cwd=None):
+    store = _session_store()
+    feature, item = _parse_work_item(work_item)
+    repo = _require_repo(cwd or Path.cwd())
+    key = store.work_item_key(repo, feature, item)
+    connection = store.connect()
+    try:
+        item_row = store.get_work_item(connection, key)
+        rows = store.sessions_for_work_item(connection, key)
+    finally:
+        connection.close()
+    machine = socket.gethostname()
+    sessions = [
+        {
+            "handle": row["handle"],
+            "role": row["role"],
+            "turn_state": row["turn_state"],
+            "ended": row["ended_at"] is not None,
+            "status": _read_time_status(row, machine),
+        }
+        for row in rows
+    ]
+    return {
+        "work_item": f"{feature}/{item}",
+        "status": item_row["status"] if item_row else None,
+        "sessions": sessions,
     }
 
-    new_records = [(h, f) for h, f in records if h != handle and h != removed]
-    new_records.append((handle, fields))
 
-    errors = validate(new_records)
-    if errors:
-        raise ValueError("would produce an invalid file: " + "; ".join(errors))
-    write(work_item_dir, new_records)
-    return {"handle": handle, "removed": removed}
+def cmd_find(worktree):
+    store = _session_store()
+    target = _path_key(worktree)
+    connection = store.connect()
+    try:
+        rows = connection.execute("SELECT * FROM sessions WHERE work_item IS NOT NULL").fetchall()
+        matches = []
+        for row in rows:
+            if row["cwd"] and _path_key(row["cwd"]) == target:
+                item_row = store.get_work_item(connection, row["work_item"])
+                if item_row:
+                    matches.append({
+                        "work_item": f"{item_row['feature']}/{item_row['item']}",
+                        "handle": row["handle"],
+                        "role": row["role"],
+                    })
+    finally:
+        connection.close()
+    return {"matches": matches}
 
 
-def remove(work_item_dir, handle=None, host=None):
-    if handle is None:
-        if not host:
-            raise ValueError("either --handle or --host is required")
-        session_id = _current_session_id(host)
-        if not session_id:
-            raise ValueError(f"no current session id for host {host!r}; specify --handle")
-        handle = f"{host}:{session_id}"
-    with _registry_lock(work_item_dir):
-        records = load(work_item_dir)
-        remaining = [(h, f) for h, f in records if h != handle]
-        if len(remaining) == len(records):
+def cmd_resume(work_item, handle=None, cwd=None, prompt=None, prompt_path=None, title=None):
+    store = _session_store()
+    feature, item = _parse_work_item(work_item)
+    repo = _require_repo(cwd or Path.cwd())
+    key = store.work_item_key(repo, feature, item)
+    connection = store.connect()
+    try:
+        rows = store.sessions_for_work_item(connection, key)
+    finally:
+        connection.close()
+    if not rows:
+        raise ValueError("no recorded session; start a new owner from the work item README's ## Next Steps")
+    if handle:
+        matched = [row for row in rows if row["handle"] == handle]
+        if not matched:
             raise ValueError(f"no recorded session with handle {handle!r}")
-        write(work_item_dir, remaining)
-    return {"removed": handle}
+        selected = matched[0]
+    else:
+        owners = [row for row in rows if row["role"] == "owner" and row["ended_at"] is None]
+        if len(owners) != 1:
+            raise ValueError("specify --handle; recorded sessions: " + ", ".join(row["handle"] for row in rows))
+        selected = owners[0]
+    machine = socket.gethostname()
+    status = _read_time_status(selected, machine)
+    if status != "closed":
+        raise ValueError(f"{selected['handle']}: {status}; reconcile before resuming")
+    recovery = _agent_recovery()
+    roots = _resume_roots(selected)
+    if prompt_path:
+        return recovery.open_session(
+            selected["host"], selected["session_id"], prompt=None, title=title, roots=roots, prompt_path=prompt_path,
+        )
+    return recovery.open_session(
+        selected["host"], selected["session_id"], prompt=prompt or "Continue the requested work.",
+        title=title, roots=roots,
+    )
+
+
+def cmd_interrupted(resume_handles=None, cwd=None):
+    store = _session_store()
+    repo = _require_repo(cwd or Path.cwd())
+    connection = store.connect()
+    try:
+        candidates = store.interrupted_candidates(connection, repo=repo)
+        item_names = {}
+        for row in candidates:
+            if row["work_item"] and row["work_item"] not in item_names:
+                item_row = store.get_work_item(connection, row["work_item"])
+                item_names[row["work_item"]] = f"{item_row['feature']}/{item_row['item']}" if item_row else row["work_item"]
+    finally:
+        connection.close()
+    machine = socket.gethostname()
+    dead = [
+        row for row in candidates
+        if (row.get("machine") or "").casefold() == machine.casefold()
+        and _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
+    ]
+    grouped = {}
+    for row in dead:
+        label = item_names.get(row["work_item"], "(unclaimed)")
+        grouped.setdefault(label, []).append({"handle": row["handle"], "turn_state": row["turn_state"]})
+    result = {"interrupted": grouped}
+    if resume_handles:
+        by_handle = {row["handle"]: row for row in dead}
+        for handle in resume_handles:
+            if handle not in by_handle:
+                raise ValueError(f"{handle!r} is not a listed interrupted session")
+        recovery = _agent_recovery()
+        resumed = []
+        for handle in resume_handles:
+            row = by_handle[handle]
+            resumed.append(recovery.open_session(
+                row["host"], row["session_id"], prompt="Continue the requested work.", roots=_resume_roots(row),
+            ))
+        result["resumed"] = resumed
+    return result
+
+
+def cmd_end(host, reason, successor=None):
+    store = _session_store()
+    session_id = _require_session_id(host)
+    handle = store.session_handle(host, session_id)
+    connection = store.connect()
+    try:
+        store.end_session(connection, handle, reason, successor=successor)
+    finally:
+        connection.close()
+    return {"handle": handle, "reason": reason}
+
+
+def cmd_item(work_item, status, pr=None, cwd=None):
+    store = _session_store()
+    feature, item = _parse_work_item(work_item)
+    cwd = cwd or Path.cwd()
+    repo = _require_repo(cwd)
+    key = store.work_item_key(repo, feature, item)
+    connection = store.connect()
+    try:
+        if store.get_work_item(connection, key) is None:
+            branch, _head = store.current_branch_and_head(cwd)
+            store.upsert_work_item(connection, key, repo, feature, item, status=status, branch=branch, pr=pr)
+        else:
+            store.set_work_item_status(connection, key, status, pr=pr)
+    finally:
+        connection.close()
+    return {"work_item": f"{feature}/{item}", "status": status}
 
 
 def _build_parser():
-    parser = argparse.ArgumentParser(description="Parse, validate and maintain a work item's ACTIVE_SESSIONS.md.")
+    parser = argparse.ArgumentParser(
+        description="Claim, inspect and resume work-item sessions recorded in the central session store.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    validate_parser = subparsers.add_parser("validate")
-    validate_parser.add_argument("work_item_dir")
+    claim_parser = subparsers.add_parser("claim")
+    claim_parser.add_argument("work_item")
+    claim_parser.add_argument("--host", required=True, choices=("claude", "codex"))
+    claim_parser.add_argument("--role", default="owner")
+    claim_parser.add_argument("--predecessor")
 
     status_parser = subparsers.add_parser("status")
-    status_parser.add_argument("work_item_dir")
+    status_parser.add_argument("work_item")
 
     find_parser = subparsers.add_parser("find")
     find_parser.add_argument("--worktree", required=True)
-    find_parser.add_argument("--root", dest="roots", action="append", default=[])
 
     resume_parser = subparsers.add_parser("resume")
-    resume_parser.add_argument("work_item_dir")
+    resume_parser.add_argument("work_item")
     resume_parser.add_argument("--handle")
     prompt_group = resume_parser.add_mutually_exclusive_group()
     prompt_group.add_argument("--prompt")
     prompt_group.add_argument("--prompt-path")
     resume_parser.add_argument("--title")
 
-    record_parser = subparsers.add_parser("record")
-    record_parser.add_argument("work_item_dir")
-    record_parser.add_argument("--host", required=True, choices=("claude", "codex"))
-    record_parser.add_argument("--role", required=True)
-    record_parser.add_argument("--state", choices=("active", "handing-off"))
-    record_parser.add_argument("--title")
-    record_parser.add_argument("--pr")
-    record_parser.add_argument("--predecessor")
-    record_parser.add_argument("--successor")
+    interrupted_parser = subparsers.add_parser("interrupted")
+    interrupted_parser.add_argument("--resume", dest="resume_handles", action="append", default=[])
 
-    remove_parser = subparsers.add_parser("remove")
-    remove_parser.add_argument("work_item_dir")
-    remove_parser.add_argument("--handle")
-    remove_parser.add_argument("--host", choices=("claude", "codex"))
+    end_parser = subparsers.add_parser("end")
+    end_parser.add_argument("--host", required=True, choices=("claude", "codex"))
+    end_parser.add_argument("--reason", required=True, choices=END_REASONS)
+    end_parser.add_argument("--successor")
+
+    item_parser = subparsers.add_parser("item")
+    item_parser.add_argument("work_item")
+    item_parser.add_argument("--status", required=True, choices=WORK_ITEM_STATUSES)
+    item_parser.add_argument("--pr")
 
     return parser
 
@@ -498,39 +399,30 @@ def _build_parser():
 def main(argv=None):
     args = _build_parser().parse_args(argv)
     try:
-        if args.command == "validate":
-            result = cmd_validate(args.work_item_dir)
-            ok = result["valid"]
+        if args.command == "claim":
+            result = cmd_claim(args.work_item, args.host, role=args.role, predecessor=args.predecessor)
         elif args.command == "status":
-            result = cmd_status(args.work_item_dir)
-            ok = result["valid"]
+            result = cmd_status(args.work_item)
         elif args.command == "find":
-            if not args.roots:
-                raise ValueError("at least one --root is required")
-            result = cmd_find(args.worktree, args.roots)
-            ok = True
+            result = cmd_find(args.worktree)
         elif args.command == "resume":
-            result = resume(
-                args.work_item_dir, handle=args.handle, prompt=args.prompt,
+            result = cmd_resume(
+                args.work_item, handle=args.handle, prompt=args.prompt,
                 prompt_path=args.prompt_path, title=args.title,
             )
-            ok = True
-        elif args.command == "record":
-            result = record(
-                args.work_item_dir, args.host, args.role, state=args.state, title=args.title,
-                pr=args.pr, predecessor=args.predecessor, successor=args.successor,
-            )
-            ok = True
-        elif args.command == "remove":
-            result = remove(args.work_item_dir, handle=args.handle, host=args.host)
-            ok = True
+        elif args.command == "interrupted":
+            result = cmd_interrupted(resume_handles=args.resume_handles)
+        elif args.command == "end":
+            result = cmd_end(args.host, args.reason, successor=args.successor)
+        elif args.command == "item":
+            result = cmd_item(args.work_item, args.status, pr=args.pr)
         else:
             raise ValueError(f"Unknown command: {args.command}")
     except (ValueError, RuntimeError) as exc:
         print(json.dumps({"error": str(exc)}))
         return 1
-    print(json.dumps(result))
-    return 0 if ok else 1
+    print(json.dumps(result, default=str))
+    return 0
 
 
 if __name__ == "__main__":

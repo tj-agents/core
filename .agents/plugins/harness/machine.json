@@ -63,6 +63,13 @@
           "claude",
           "codex"
         ]
+      },
+      {
+        "path": "resources/machine/scripts/session_store.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
       }
     ],
     "permissions": {
@@ -286,16 +293,30 @@
             ],
             [
               "status",
+              "find",
+              "interrupted",
               "resume"
             ]
           ],
-          "justification": "machine:recover-agents 'Continue a work item': status is read-only and resume only reopens the exact recorded session through the shared agent_recovery guard, which refuses a live or unknown session.",
+          "justification": "machine:recover-agents 'Continue a work item': status/find/interrupted are read-only and resume only reopens the exact recorded session through the shared agent_recovery guard, which refuses a live, foreign, stale or unknown session.",
           "match": [
             [
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
               "status"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "find"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+              "interrupted"
             ],
             [
               "python",
@@ -315,13 +336,19 @@
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-              "record"
+              "claim"
             ],
             [
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-              "remove"
+              "end"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+              "item"
             ]
           ]
         }

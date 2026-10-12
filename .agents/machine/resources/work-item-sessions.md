@@ -1,72 +1,56 @@
-# Work item session registry
+# Work item session store
 
-Interim durable record of active native Claude/Codex sessions per work item, until Termboard supersedes
-it. Location: `plans/features/<feature>/work-items/<work-item>/ACTIVE_SESSIONS.md`. Absence means no
-recorded session for that work item.
+Central local record of every native Claude/Codex session and work-item status, written by hooks.
+Location: `~/.agents-state/sessions.db` (honouring `AGENT_STATE_DIRECTORY`), SQLite in WAL mode. No
+`ACTIVE_SESSIONS.md` and no `Status:` field in work-item READMEs; status lives in the database.
 
-## Format
+## Tables
 
-```markdown
-# Active sessions
+- `sessions`: one row per `<host>:<native-session-id>` handle, never deleted. Columns: host,
+  session_id, machine, profile, title, cwd, repo, branch, head, work_item, role (`owner` or
+  `bounded: <scope>`), pid, pid_started_at, started_at, last_activity_at, turn_state
+  (`working`/`awaiting_input`), ended_at, end_reason (`finished`/`closed`/`handed_off`), predecessor,
+  successor.
+- `work_items`: one row per `<repo>:<feature>/<item>` key. Columns: repo, feature, item, status
+  (`proposed`/`active`/`blocked`/`paused`/`delivery-gated`/`done`), branch, pr, updated_at.
+- `repo` is the `origin` remote normalised to `owner/name`, else the absolute `git-common-dir`.
 
-## codex:01a12aa7-5b58-7312-9400-ef710762147f
-- Role: owner
-- State: active
-- Machine: <hostname>
-- Profile: <absolute config dir>
-- Title: <tab title or none>
-- Worktree: <absolute path>
-- Branch: <branch>
-- PR: <https URL, or not opened>
-- Head: <40 lowercase hex>
-- Predecessor: <handle, or none>
-- Successor: <handle, or none>
-- Verified: <UTC ISO-8601 ending in Z, e.g. 2026-10-12T19:30:00Z>
-- Resume: `machine:open-codex --id <id>`
-```
+## Hook lifecycle
 
-One `## <handle>` section per session, `<host>:<native-session-id>`, host `claude` or `codex`. Handles are
-unique; exactly the 13 fields above, each once, in any order, no unknown fields.
-
-- `Role`: `owner` (at most one per work item, the delivery-branch writer) or `bounded: <scope>` for a
-  concurrent agent with a disjoint scope.
-- `State`: `active` or `handing-off`. Liveness is never stored.
-- `Machine`: `socket.gethostname()`, compared case-insensitively against the reading machine.
-- `Profile`: the host's config directory (`CLAUDE_CONFIG_DIR` or `~/.claude`; `CODEX_HOME` or `~/.codex`),
-  used to locate the session's history when resuming.
-- `Worktree`/`Branch`/`Head`: the recording session's absolute git worktree, current branch and HEAD.
-  Later commits on that branch keep the row current; only a HEAD that no longer contains `Head` is stale.
-- `PR`: an `https://` URL or `not opened`.
-- `Predecessor`/`Successor`: a valid handle or `none`.
-- `Resume`: exactly `` `machine:open-claude --resume <id>` `` or `` `machine:open-codex --id <id>` ``.
-
-## Lifecycle
-
-Record a row on taking ownership (plan pickup, handoff acknowledgement, or a bounded lease). Refresh
-`Head`/`PR`/`Verified` only at material checkpoints, in the same substantive commit as the work-item
-README update. Handoff: the predecessor sets `State: handing-off` before launch; the successor records its
-row with `Predecessor:` set, which removes the predecessor's row. Remove a row once that session's work is
-terminal, in the commit that records the outcome. The file is deleted when its last row is removed.
+SessionStart (called in-process from `register_session.py`, after its existing registry write) upserts
+the row and clears `ended_at`/`end_reason`, because a resumed session is alive again. UserPromptSubmit
+sets `turn_state: working`. Stop sets `turn_state: awaiting_input` and refreshes cwd/branch/head. Claude
+SessionEnd sets `ended_at` and keeps an earlier end reason, else `closed`. Codex has no SessionEnd hook,
+so a hand-closed Codex tab reads as interrupted. Start and Stop attach an unclaimed session to a work item
+when exactly one non-`done` work item in the same repo records the current branch. `finish.py`/`close.py`
+best-effort record `finished`/`closed` for their own session before closing it.
 
 ## Read-time status
 
-Computed, never written: `live`/`closed`/`unknown` from `agent_recovery.liveness`, `foreign` when `Machine`
-differs from the reading machine, and `stale` (`worktree-missing`, `branch-mismatch`, `head-diverged`, or `branch-unknown`/`head-unknown`)
-when git cannot confirm the recorded worktree. `unknown`, `stale` and `foreign` authorize nothing: no resume, no
-new writer and no worktree deletion until the row is reconciled. The helper never confirms a session closed;
-reconcile an `unknown` session through `machine:open-claude`/`machine:open-codex` with the user's explicit
-`--confirm-closed`.
+Computed, never trusted from storage: `live`/`closed`/`unknown` from `agent_recovery.liveness`,
+`foreign` when the recorded machine differs, `stale` when the worktree is missing, its branch differs,
+or its recorded HEAD is not an ancestor of the worktree's current HEAD. `unknown`, `stale`, `foreign` and
+`live` never authorize a resume.
 
-## Helper
+## Commands
 
-`work_item_sessions.py` parses, validates, reports status, finds a work item by worktree, resumes the
-recorded session through the guarded `agent_recovery.open_session`, and records/removes the current
-session's row. Run it with `python` on Windows or `python3` on Linux/macOS:
+`work_item_sessions.py` is the only CLI over the store. Run it with `python` on Windows or `python3` on
+Linux/macOS:
 
 ```sh
-python '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' status '<work-item-directory>'
-python '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' resume '<work-item-directory>'
+python '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' status '<feature>/<item>'
+python '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py' resume '<feature>/<item>'
 ```
 
-Subcommands: `validate`, `status`, `find --worktree <dir> --root <repo-root>...`, `resume [--handle H]`,
-`record --host claude|codex --role <owner|bounded: scope>`, `remove [--handle H] [--host H]`.
+- `claim <feature>/<item> --host claude|codex [--role owner|"bounded: <scope>"] [--predecessor <handle>]`:
+  creates the work item (`active`, current branch) when absent; refuses a second live owner unless
+  `--predecessor` names the live owner's handle, which hands its ownership off.
+- `status <feature>/<item>`: read-only; reports each session's role, turn state and computed status.
+- `find --worktree <absolute-path>`: read-only; reports the work item and handle recorded for that path.
+- `resume <feature>/<item> [--handle <handle>]`: without `--handle`, resumes the single not-ended owner;
+  refuses foreign, stale, live or unknown sessions, then calls `agent_recovery.open_session`.
+- `interrupted [--resume <handle>...]`: lists not-ended sessions whose recorded pid is dead, grouped by
+  work item with their last turn state; resumes only the listed handles.
+- `end --host claude|codex --reason finished|closed|handed_off [--successor <handle>]`: records the
+  current session's end reason.
+- `item <feature>/<item> --status <status> [--pr <url>]`: records work-item status.
