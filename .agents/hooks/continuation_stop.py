@@ -168,7 +168,11 @@ def binding_active(runtime, root, artifact=None):
     runtime.PersistentDeliveryRouter().validate_binding(binding)
     current = runtime.identity(root)
     for key in ("repo", "worktree", "branch", "head"):
-        expected = str(Path(binding["worktree"]).resolve()) if key == "worktree" else binding.get(key)
+        expected = (
+            str(Path(binding["worktree"]).resolve())
+            if key == "worktree"
+            else binding.get("repository") if key == "repo" else binding.get(key)
+        )
         if expected != current[key]:
             raise RuntimeError(f"binding-{key}-changed")
     return True
