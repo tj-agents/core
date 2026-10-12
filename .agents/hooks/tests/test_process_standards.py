@@ -524,7 +524,7 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn(phrase, committing + " " + dependents["plans"] + " " + dependents["merge"])
 
         self.assertIn("sets uncommitted leftovers aside", dependents["merge"])
-        self.assertIn("Verify the cleanup receipt's set-aside archive", dependents["merge"])
+        self.assertIn("When the cleanup receipt names a set-aside archive, verify it before `finish.py`", dependents["merge"])
         self.assertIn("final cleanup to `finish.py`", dependents["merge"])
         self.assertIn("otherwise the verified set-aside archive is the durable record", dependents["merge"])
 

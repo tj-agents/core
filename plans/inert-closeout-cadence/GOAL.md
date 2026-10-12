@@ -1,5 +1,5 @@
 # Prevent inert closeout work from restarting delivery
-Status: original repair checkpointed and independently reviewed on 2026-10-12; one cleanup-order finding is under bounded repair before final publication.
+Status: repair committed as dbdb04540c68eddeb32536fd54edafbc057d6118; final incremental review resumed on 2026-10-13 after PC reboot, then push/open PR as Tommy requested.
 ## Outcome
 Diagnose and repair the core-owned workflow gap that allowed an agent to plan a bookkeeping-only push and another full CI/review cycle after the final executable scaffold candidate was green. Preserve meaningful code validation and security review.
 ## Authorization
@@ -56,3 +56,9 @@ Focused evidence: process standards24, completion12 and preserved auto-merge11 t
 Review checkpoint: frozen d42cae4caf1e8cd3dcfa7686362e8334777ef7b1 completed with one deduplicated HIGH finding (R1): terminal local records must survive linked-worktree cleanup without advancing its merged source head. Native declared specialist was unsupported by the account; declared L4 fallback completed, independently corroborating the workflow lens. Address-review owns the bounded guidance/cleanup regression repair, then incremental review and one final exact-head publication. No source candidate has been pushed.
 
 R1 repair verification: completion12 passed; process choreography and goal-scoped merge authorization reruns2 passed; existing cleanup-proof set-aside/removal regression1 passed. Earlier local reruns hit host MemoryError and Git fork/spawn exhaustion; focused reruns recovered without source/test weakening. The repair keeps every continuation completion at its original goal path, preserves source HEAD through cleanup, and records retained pending retirement for the next substantive publication. Final repair checkpoint and incremental review next.
+
+Restart pickup2026-10-13: source head remains dbdb045, working source is clean, and the saved incremental bundle reproduces its patch/bundle hashes. Tommy limits this machine to7 agent sessions and prohibits extra CLI sessions. Review therefore uses the shared native-general in-harness fallback and a fresh workflow/contract lens, with no CLI launch or installations. Existing continuation owner still names its pre-repair head and cannot be claimed after reboot (owner-head-changed); no wake was ever registered. This foreground retains the same canonical goal and completes independent authorized review/publication without claiming unattended operation.
+
+Final incremental review found R2: cleanup archive verification was unconditional even when a clean worktree produces no archive. Tiny inline repair makes verification conditional on the receipt naming one, with the process invariant updated. Fresh focused choreography and clean/no-archive cleanup checks precede its checkpoint; no extra CLI sessions or repeated full CI.
+
+R2 focused evidence: updated choreography1 and clean/no-archive cleanup2 pass. Conditional archive guidance and its assertion are ready for one source checkpoint and a narrow in-harness review. Prior source/package evidence remains valid; full Windows/Linux CI waits for final publication.
