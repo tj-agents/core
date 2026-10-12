@@ -61,6 +61,6 @@ Safe self-host exit remains available when actual terminal identity is unavailab
 
 ## Problem records
 
-Bug: BUGS.md#B001
-Mistake: MISTAKES.md#M008
+Bug: BUGS.md#B004
+Mistake: MISTAKES.md#M012
 Existing owning machine debt: .agents/machine/TECH_DEBT.md#codex-close-and-finish-still-need-acceptance-from-a-registered-sandboxed-cli
