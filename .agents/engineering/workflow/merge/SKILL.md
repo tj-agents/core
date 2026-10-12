@@ -312,9 +312,9 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    When plan closeout is pending, finish every active continuation owner's terminal receipt against the canonical
    goal at its original path before moving or deleting it. Then preserve or transfer the goal and `Plan
    retirement: pending` owner outside the target; otherwise the verified set-aside archive is the durable record.
-   Keep the exact merged `HEAD`; do not create a terminal checkpoint on the source branch. Verify the cleanup
-   receipt's set-aside archive before `finish.py` removes the target, then leave final cleanup to `finish.py` and
-   its reaper.
+   Keep the exact merged `HEAD`; do not create a terminal checkpoint on the source branch. When the cleanup
+   receipt names a set-aside archive, verify it before `finish.py` removes the target. Leave final cleanup to
+   `finish.py` and its reaper.
 2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
