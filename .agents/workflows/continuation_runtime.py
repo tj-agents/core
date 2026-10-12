@@ -615,7 +615,7 @@ def main(argv=None):
     if path != expected or path.parent.resolve() != expected.parent:
         raise Gate("canonical-owner-path-required: omit --owner and use --root to select .agents/continuation/owner.json")
     if args.operation in {"heartbeat", "yield"}:
-        if Path(read(path)["worktree"]).resolve() != root:
+        if Path(read(path)["worktree"]).resolve() != root or not (root / ".git").exists():
             raise Gate("canonical-worktree-root-required")
     elif Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
         raise Gate("canonical-worktree-root-required")

@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -30,3 +31,11 @@ class CatalogVersionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CatalogWriteTests(unittest.TestCase):
+    def test_catalog_is_written_with_lf_line_endings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "catalog.json"
+            CATALOG.write_catalog(path, {"releases": [{"plugins": []}]})
+            self.assertNotIn(b"\r", path.read_bytes())
