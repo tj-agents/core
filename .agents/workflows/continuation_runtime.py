@@ -27,7 +27,8 @@ def command(args, root, timeout=30):
     result = subprocess.run(args, cwd=root, capture_output=True, text=True,
                             encoding="utf-8", errors="replace", timeout=timeout)
     if result.returncode:
-        raise RuntimeError(f"{args[0]} exited {result.returncode}")
+        detail = (result.stderr.strip().splitlines() or [""])[-1]
+        raise RuntimeError(f"{args[0]} exited {result.returncode}" + (f": {detail}" if detail else ""))
     return result.stdout.strip()
 
 
@@ -451,9 +452,9 @@ def wake(path, state, args):
         return
     lease = state.get("foreground")
     if lease and alive(lease):
-        if time.time() - lease["activity"] <= state["lease_seconds"]:
-            return
-        raise Gate("stale-live-foreground-reconciliation")
+        if time.time() - lease["activity"] > state["lease_seconds"]:
+            transition(state, "working", "foreground-lease-stale", state["next_action"])
+        return
     state["foreground"] = None
     binding = check_identity(state)
     evidence = observe(state, binding, args.observer_command)
@@ -613,7 +614,10 @@ def main(argv=None):
     expected = root / ".agents/continuation/owner.json"
     if path != expected or path.parent.resolve() != expected.parent:
         raise Gate("canonical-owner-path-required: omit --owner and use --root to select .agents/continuation/owner.json")
-    if Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
+    if args.operation in {"heartbeat", "yield"}:
+        if Path(read(path)["worktree"]).resolve() != root or not (root / ".git").exists():
+            raise Gate("canonical-worktree-root-required")
+    elif Path(git(root, "rev-parse", "--show-toplevel")).resolve() != root:
         raise Gate("canonical-worktree-root-required")
     if args.operation == "status":
         print(json.dumps(read(path), sort_keys=True))
@@ -633,5 +637,5 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except (Gate, OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
-        print(json.dumps({"state": "blocked", "reason": str(error)}))
+        print(json.dumps({"outcome": "failed", "reason": str(error)}))
         sys.exit(2)
