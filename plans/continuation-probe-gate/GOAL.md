@@ -54,7 +54,10 @@ Related PRs: PR226 and PR218 change only continuation_stop.py binding/foreign-fo
 ```
 ## Progress
 - Focused runtime and Stop suites: 65 of 66 passed with the new regressions; the failure was B009 (`test_recover_final_launch_receipt_before_budget_gate`), which passed 3 isolated reruns. Catalog digest refreshed.
-- Next: commit candidate, independent review, push, open PR, one final required CI, merge, observe causal generated output.
+- Candidate committed as eab0686.
+- Side defect found while committing: `worktree_placement_gate.py` `parse_creation` treats any untokenizable segment as an invalid creation, so a compound PowerShell here-string commit mentioning "worktree" is blocked. Side workstream goal prepared at `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-WorktreeGateTokenizeFailure/plans/worktree-gate-tokenize-failure/GOAL.md` (branch Fix/WorktreeGateTokenizeFailure from c91b60c). The Codex L4 launch was interrupted by the 21:27 PC crash; no Codex session ever referenced that checkout. The relaunch after the crash was denied by the auto-mode classifier for `--bypass-hook-trust`, so no successor exists. Resolver: Tommy. Unblock: allow the launcher command or launch it manually. Resume when: a session acknowledges pickup in that goal.
+- 2026-10-12 crash recovery: reconciled; branch local-only at eab0686, no PR, no CI; this session is the only writer in this checkout.
+- Next: independent review, push, open PR, one final required CI, merge, observe causal generated output.
 ## Acceptance
 Reproduce actual Git128/runtime classification through focused tests. Recoverable internal failures preserve the owner and independent authorized progress; genuinely blocked actions carry correct resolver/unblock/resume evidence. Real runtime/Stop regression proves no malformed blocked owner; both-host source coverage as applicable. Source fix reviewed, final required CI green, merged and causal generated output observed. Do not install it into the parent's profile.
 ## Next Steps
