@@ -18,6 +18,8 @@ SESSION_ID = re.compile(r"(?!-)[A-Za-z0-9_-]+\Z")
 LOCKS = {}
 LOCKS_GUARD = threading.Lock()
 MODULES = {}
+REGISTRATION_TIMEOUT_SECONDS = 10.0
+REGISTRATION_POLL_SECONDS = 0.1
 
 
 def _load(name):
@@ -83,6 +85,23 @@ def liveness(item, process_lookup=None):
 
 def _profile(host, root):
     return os.path.normcase(str(Path(root).parent.resolve()))
+
+
+@contextmanager
+def _claude_profile(profile):
+    previous = os.environ.get("CLAUDE_CONFIG_DIR")
+    default_profile = os.path.normcase(str((Path.home() / ".claude").resolve()))
+    if os.path.normcase(profile) == default_profile:
+        os.environ.pop("CLAUDE_CONFIG_DIR", None)
+    else:
+        os.environ["CLAUDE_CONFIG_DIR"] = profile
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("CLAUDE_CONFIG_DIR", None)
+        else:
+            os.environ["CLAUDE_CONFIG_DIR"] = previous
 
 
 def _normalise(item, root):
@@ -277,6 +296,38 @@ def _fingerprint(entry):
     return json.dumps(entry, sort_keys=True, separators=(",", ":"))
 
 
+def _registered_after_launch(host, session_id, receipt):
+    try:
+        launch = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    created_at = launch.get("created_at")
+    if isinstance(created_at, bool) or not isinstance(created_at, (int, float)) or not math.isfinite(created_at):
+        return False
+    entry = _registry(session_id)
+    started_at = entry.get("started_at") if entry else None
+    return (
+        entry is not None
+        and entry.get("host") == host
+        and _fingerprint(entry) != launch.get("registry_fingerprint")
+        and not isinstance(started_at, bool)
+        and isinstance(started_at, (int, float))
+        and math.isfinite(started_at)
+        and started_at > created_at
+    )
+
+
+def _wait_for_registration(host, session_id, receipt):
+    deadline = time.monotonic() + REGISTRATION_TIMEOUT_SECONDS
+    while True:
+        if _registered_after_launch(host, session_id, receipt):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(REGISTRATION_POLL_SECONDS, remaining))
+
+
 def _receipt_state(path, host, session_id, profile, state):
     try:
         previous = json.loads(path.read_text(encoding="utf-8"))
@@ -312,9 +363,7 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
         label = title or f"{host.title()} {session_id[:8]}"
         instruction = cli.prompt_file_argument(prompt_path)[0] if prompt_path else prompt
         if host == "claude":
-            old_profile = os.environ.get("CLAUDE_CONFIG_DIR")
-            os.environ["CLAUDE_CONFIG_DIR"] = item["profile"]
-            try:
+            with _claude_profile(item["profile"]):
                 arguments = ["--resume", session_id]
                 if dangerously_skip_permissions:
                     arguments.append("--dangerously-skip-permissions")
@@ -322,11 +371,6 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                     arguments += ["--model", model]
                 arguments.append(instruction)
                 cli.open_claude_tab(directory, label, arguments)
-            finally:
-                if old_profile is None:
-                    os.environ.pop("CLAUDE_CONFIG_DIR", None)
-                else:
-                    os.environ["CLAUDE_CONFIG_DIR"] = old_profile
         else:
             executable, _ = cli.resolve_codex_executable()
             _verify_codex_resume(executable)
@@ -345,6 +389,11 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
             arguments.append(instruction)
             cli.launch_tab(directory, executable, label, arguments, clear=("TERM",), force={"CODEX_HOME": item["profile"]})
         launched = True
+        if not _wait_for_registration(host, session_id, receipt):
+            raise cli.LaunchTimeout(
+                f"The resume command was submitted, but {host} did not register session {session_id} within "
+                f"{REGISTRATION_TIMEOUT_SECONDS:g} seconds; check the terminal before retrying."
+            )
         try:
             _receipt_state(receipt, host, session_id, item["profile"], "launched")
         except OSError:
