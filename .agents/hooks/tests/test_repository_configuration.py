@@ -38,18 +38,41 @@ class RepositoryConfigurationTests(unittest.TestCase):
         self.assertTrue(delivery_policy.auto_merge_preference(self.root, self.policy))
         self.assertFalse(CONFIGURATION.auto_approve_design(self.root))
 
-    def test_design_approval_is_independent_of_legacy_auto_merge(self):
+    def test_design_approval_defaults_to_false_without_settings(self):
         enabled, provenance = CONFIGURATION.auto_approve_design_provenance(self.root)
         self.assertFalse(enabled)
         self.assertIn("no settings file", provenance)
 
-        self.write({"configuration": {"core": {"auto_approve_design": True}}})
+    def test_design_approval_uses_nested_precedence_and_legacy_alias(self):
+        cases = (
+            ({"auto_approve": {"all": True}}, True, "auto_approve.all"),
+            ({"auto_approve": {"all": False, "design": True}}, True, "auto_approve.design"),
+            ({"auto_approve": {"all": True, "design": False}}, False, "auto_approve.design"),
+            ({"auto_approve": {}}, False, "auto_approve default"),
+            ({"auto_approve_design": True}, True, "auto_approve_design"),
+            (
+                {"auto_approve": {"design": False}, "auto_approve_design": True},
+                False,
+                "auto_approve.design",
+            ),
+            (
+                {"auto_approve": {}, "auto_approve_design": True},
+                False,
+                "auto_approve default",
+            ),
+        )
+        for core, expected, provenance_selector in cases:
+            with self.subTest(core=core):
+                self.write({"configuration": {"core": core}})
+                self.assertEqual(expected, CONFIGURATION.auto_approve_design(self.root))
+                enabled, provenance = CONFIGURATION.auto_approve_design_provenance(self.root)
+                self.assertEqual(expected, enabled)
+                self.assertIn(provenance_selector, provenance)
+
+    def test_design_approval_is_independent_of_legacy_auto_merge(self):
+        self.write({"configuration": {"core": {"auto_approve": {"design": True}}}})
         self.assertTrue(CONFIGURATION.auto_approve_design(self.root))
         self.assertFalse(delivery_policy.auto_merge_preference(self.root, self.policy))
-
-        enabled, provenance = CONFIGURATION.auto_approve_design_provenance(self.root)
-        self.assertTrue(enabled)
-        self.assertIn("configuration.core.auto_approve_design", provenance)
 
     def test_present_settings_are_authoritative_and_preserve_other_namespaces(self):
         path = self.write({
@@ -85,6 +108,12 @@ class RepositoryConfigurationTests(unittest.TestCase):
             {"auto_merge": 1},
             {"auto_approve_design": "true"},
             {"auto_approve_design": 1},
+            {"auto_approve": True},
+            {"auto_approve": {"all": "true"}},
+            {"auto_approve": {"all": 1}},
+            {"auto_approve": {"design": "true"}},
+            {"auto_approve": {"unknown": True}},
+            {"auto_approve": {"all": True}, "auto_approve_design": "true"},
             {"unknown": True},
         ):
             with self.subTest(core=core):
@@ -97,7 +126,7 @@ class RepositoryConfigurationTests(unittest.TestCase):
     def test_core_capabilities_coexist_without_affecting_foreign_namespaces(self):
         self.write({
             "configuration": {
-                "core": {"auto_merge": True, "auto_approve_design": False},
+                "core": {"auto_merge": True, "auto_approve": {"design": False}},
                 "foreign": {"enabled": "future"},
             }
         })
@@ -106,7 +135,7 @@ class RepositoryConfigurationTests(unittest.TestCase):
 
         self.write({
             "configuration": {
-                "core": {"auto_merge": False, "auto_approve_design": True},
+                "core": {"auto_merge": False, "auto_approve": {"all": True}},
                 "foreign": {"enabled": "future"},
             }
         })
@@ -122,6 +151,8 @@ class RepositoryConfigurationTests(unittest.TestCase):
             '{"configuration": {"future": {"item": 1, "item": 2}}}',
             '{"configuration": {"future": {"item": NaN}}}',
             '{"configuration": {"future": {"item": 1e999}}}',
+            '{"configuration": {"core": {"auto_approve": {'
+            '"design": true, "design": false}, "auto_approve_design": true}}}',
         )
         for value in invalid:
             with self.subTest(value=value):
@@ -203,6 +234,19 @@ class RepositoryConfigurationTests(unittest.TestCase):
         configuration = schema["properties"]["configuration"]
         self.assertEqual("^[a-z][a-z0-9-]*$", configuration["propertyNames"]["pattern"])
         self.assertEqual({"type": "object"}, configuration["additionalProperties"])
+        core = configuration["properties"]["core"]
+        self.assertFalse(core["additionalProperties"])
+        self.assertEqual({"type": "boolean"}, core["properties"]["auto_merge"])
+        self.assertEqual(
+            {"type": "boolean", "deprecated": True},
+            core["properties"]["auto_approve_design"],
+        )
+        auto_approve = core["properties"]["auto_approve"]
+        self.assertFalse(auto_approve["additionalProperties"])
+        self.assertEqual(
+            {"all": {"type": "boolean"}, "design": {"type": "boolean"}},
+            auto_approve["properties"],
+        )
 
 
 if __name__ == "__main__":
