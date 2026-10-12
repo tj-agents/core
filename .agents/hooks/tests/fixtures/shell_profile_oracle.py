@@ -32,6 +32,10 @@ EXPECTED_SOURCES = {
     "zsh-5.9-init": ("5.9", "https://raw.githubusercontent.com/zsh-users/zsh/zsh-5.9/Src/init.c", "Src/init.c", "cdbe96fe80e4c56af6101d2837ef1bdaab7f1aa79f0d61206081c82395e4ce12"),
     "zsh-5.9-options": ("5.9", "https://raw.githubusercontent.com/zsh-users/zsh/zsh-5.9/Src/options.c", "Src/options.c", "d3c5d5095922f5b42087e37512b6ae966b70dd32bc84926bd4a65d388cc85de0"),
 }
+EXPECTED_SOURCE_METADATA = {
+    "gfw-bash-5.3.015-cygwin": {"condition": "__CYGWIN__", "derivation": "separate vendor variant; no installed-5.2.37 equivalence"},
+    "debian-dash-0.5.12-2": {"derivation": "zero-offset application of the documented Debian quilt series"},
+}
 
 
 def load_json(path):
@@ -84,6 +88,11 @@ def validate(profiles, source_data):
             raise ValueError("source provenance is malformed")
         if tuple(source[field] for field in fields) != expected:
             raise ValueError("source provenance is invalid")
+        metadata = EXPECTED_SOURCE_METADATA.get(source_id, {})
+        if any(field not in metadata and field in source for field in ("condition", "derivation")):
+            raise ValueError("source provenance metadata is invalid")
+        if any(not isinstance(source.get(field), str) or source[field] != value for field, value in metadata.items()):
+            raise ValueError("source provenance metadata is invalid")
     seen_groups = set()
     for group in groups:
         required = {"id", "shell", "meaning", "source", "arity"}

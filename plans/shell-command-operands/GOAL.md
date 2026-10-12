@@ -10,9 +10,9 @@ Use the [immutable published design](https://github.com/tj-agents/docs/blob/0d74
 
 ## Current checkout and ownership
 
-Work in Core checkout `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ShellCommandOperands`, branch `Fix/ShellCommandOracle`, at reviewed candidate `74397cce73be313b976bf73d06a51fb8f1a0ba8d` based on `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`. The five owned paths are the four oracle fixture/test files below plus this Goal; the reviewed candidate has 824 additions. Parent owns the review work order, staging, commit, fresh incremental review, and delivery. Preserve old candidate `7e8b650f721b3c872446f9205922efe685be81b1` and stashes `1f6d7365409f259710ae9873ceebdbef041cbfcb` / `f51170a6a0982c976f727495dd6b7d03bb386962`.
+Work in Core checkout `C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-ShellCommandOperands`, branch `Fix/ShellCommandOracle`, at committed SO01/SO02 candidate `9add4e22eece41c3c48b60847ac64f3f2ced820d` based on `73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c`. SO03 owns only the helper, its existing test, and this Goal; it preserves the source fixtures and review work order. Parent owns the review work order, staging, commit, fresh incremental review, and delivery. Preserve old candidate `7e8b650f721b3c872446f9205922efe685be81b1` and stashes `1f6d7365409f259710ae9873ceebdbef041cbfcb` / `f51170a6a0982c976f727495dd6b7d03bb386962`.
 
-Primary-source recovery is complete. The remediation's first focused run exposed a test-only `KeyError` for signed-map rows; after reading absent conditions with `get`, captured `oracle-r3` passed all 7 tests. Credential (23), catalog, harness, and generated-output checks also passed. Linux exact-head CI and native activation remain pending. Supplementary audit `.agents/continuation/shell-primary-source-recovery.json` has SHA-256 `e02ba2c9f94d3c144e88db4821343e044a79c290e37d651566410de3c906d55a`; all execution-critical source facts are recorded here.
+Primary-source recovery is complete. The remediation's first focused run exposed a test-only `KeyError` for signed-map rows; after reading absent conditions with `get`, captured `oracle-r3` passed all 7 tests. SO03 captured `oracle-r4` passing all 7 focused tests after enforcing the fixed source condition/derivation metadata. Credential (23), catalog, harness, and generated-output checks also passed. Linux exact-head CI and native activation remain pending. Supplementary audit `.agents/continuation/shell-primary-source-recovery.json` has SHA-256 `e02ba2c9f94d3c144e88db4821343e044a79c290e37d651566410de3c906d55a`; all execution-critical source facts are recorded here.
 
 Phase 1a owns only these four files plus Goal: `.agents/hooks/tests/fixtures/shell_option_profiles.json`, `.agents/hooks/tests/fixtures/shell_profile_sources.json`, `.agents/hooks/tests/fixtures/shell_profile_oracle.py`, `.agents/hooks/tests/test_shell_profile_oracle.py`, and `plans/shell-command-operands/GOAL.md`. Do not create `shell_extraction_cases.json`, add PowerShell descriptors, change production runtime/native wiring/consumers, or alter the existing `.agents/plugins/harness/engineering.json` Claude/Codex mapping.
 
@@ -24,7 +24,7 @@ Bash rises from 104 to 105 because the uppercase-`O` union is 59: 58 GNU `shopt.
 
 Phase 1a tests only established facade behavior: supported raw command fields; ordinary Bash/sh/zsh/dash `-c` with sole script; unknown-executable joining; non-shell and nondictionary or empty tool inputs returning `None`. Do not test future parser/refusal/last-argv outcomes here.
 
-Final verification after the duplicate-group correction: captured `oracle-r3` passed all 7 focused oracle tests.
+Final verification after the SO03 provenance correction: captured `oracle-r4` passed all 7 focused oracle tests.
 
 ## Primary source evidence
 
@@ -48,34 +48,34 @@ The two recorded pwsh 7.6 parser hashes `a7fc6b5c391bb8cbd06b78edd6e3b9867f3b89c
 
 Phase 1a passes when all 394 Unix rows/variants have primary provenance, oracle completeness and compatibility tests pass on Windows and Linux, and catalog/generation/harness checks pass with derived output uncommitted. Use `python` on Windows and `python3` on Linux/macOS. Exercise counts, stable IDs, fixed group contracts, source editions/member URLs and hashes, Bash conditional/vendor variants, exact dash `privileged` (no `priv` alias), zsh names/signed maps, malformed records, and supported raw-command/`-c` facade behavior. No 1a fixture or test may fetch sources; source tests do not establish native activation.
 
-The SO01/SO02 remediation owns only the four paths listed above plus this Goal. It measured the readable base-to-working candidate at 975 additions, below the 1,000-line trigger, and passed captured oracle-r2 plus prior credential, catalog, harness, and generated-output checks. If the Unix-only slice reaches the trigger, stop for parent boundary assessment; do not add 1b data or compress records. Parent reviews before any PR; do not push or open a PR before parent review.
+The SO01/SO02/SO03 remediation keeps the four established fixture/test paths plus this Goal as one frozen review slice. It passed captured oracle-r4 plus prior credential, catalog, harness, and generated-output checks. Parent approved the bounded exception above the 1,000-line trigger; do not add 1b data or compress records. Parent reviews before any PR; do not push or open a PR before parent review.
 
 After 1a normal merge and causal publication, phase 1b owns PowerShell profiles and the 80-case oracle but no parser changes. After 1b publication, phase 2 atomically updates `.agents/hooks/git_auth_scope_gate.py` and its tests plus `test_delivery_binding_gate.py`, `test_merge_cleanup_gate.py`, and new `test_shell_command_operands.py`; run all cases against the public facade, preserve `str`/`None`/`SystemExit(2)`, and qualify credential/body/cleanup consumers. Keep the accepted algorithm and `7e8` checkpoint. Native wiring follows phase 2 review, exact-head Windows/Linux/guard CI, normal merge and causal publication.
 
-The final base-to-working candidate measures 988 additions, below the 1,000-line trigger.
+The final base-to-working candidate measures 1,010 additions, above the 1,000-line trigger under the parent-approved frozen-scope exception: the 394-row fixture, fixed source data, helper contract, regressions, and Goal remain one atomic review slice.
 
 ## Both-host source coverage
 
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "shared_source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py and .agents/hooks/tests/fixtures/shell_option_profiles.json",
+  "shared_source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py and its Unix fixtures/self-tests",
   "hosts": [
     {
       "host": "claude",
       "behavior": "Validate the complete offline Unix profile oracle while retaining established old-facade compatibility behavior.",
-      "source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py, .agents/hooks/tests/fixtures/shell_option_profiles.json, and existing mapped consumers.",
+      "source": ".agents/hooks/tests/fixtures/shell_option_profiles.json, shell_profile_sources.json, shell_profile_oracle.py, and .agents/hooks/tests/test_shell_profile_oracle.py.",
       "mapping": "Existing .agents/plugins/harness/engineering.json maps shared consumers for Claude; preserve its package closure.",
-      "verification": {"level": "source", "result": "limited", "evidence": "Reviewed candidate 74397cce73be313b976bf73d06a51fb8f1a0ba8d contains the Unix offline oracle and established-facade compatibility checks. SO01/SO02 remediation passed captured oracle-r2 (7), credential (23), catalog, harness, and generated-output checks; Linux exact-head CI and native activation remain pending."},
-      "exception": {"constraint_evidence": "Linux exact-head CI and native host activation were not run.", "supported_other_host_outcome": "Both hosts use the same source fixture and remain limited to source verification."}
+      "verification": {"level": "source", "result": "limited", "evidence": "Committed SO01/SO02 source head 9add4e22eece41c3c48b60847ac64f3f2ced820d preserves the offline oracle and facade compatibility checks. SO03 captured oracle-r4 passing 7 tests with all 394 rows, IDs, and 35 guard conditions; Windows/Linux exact-head CI and installed native profiles remain unverified."},
+      "exception": {"constraint_evidence": "Source tests only; exact-head Linux CI and installed native profiles were not run.", "supported_other_host_outcome": "Both hosts share the offline oracle and unchanged consumers; neither normal profile is claimed active."}
     },
     {
       "host": "codex",
       "behavior": "Validate the complete offline Unix profile oracle while retaining established old-facade compatibility behavior.",
-      "source": ".agents/hooks/tests/fixtures/shell_profile_oracle.py, .agents/hooks/tests/fixtures/shell_option_profiles.json, and existing mapped consumers.",
+      "source": ".agents/hooks/tests/fixtures/shell_option_profiles.json, shell_profile_sources.json, shell_profile_oracle.py, and .agents/hooks/tests/test_shell_profile_oracle.py.",
       "mapping": "Existing .agents/plugins/harness/engineering.json maps shared consumers for Codex; preserve its package closure.",
-      "verification": {"level": "source", "result": "limited", "evidence": "Reviewed candidate 74397cce73be313b976bf73d06a51fb8f1a0ba8d contains the Unix offline oracle and established-facade compatibility checks. SO01/SO02 remediation passed captured oracle-r2 (7), credential (23), catalog, harness, and generated-output checks; Linux exact-head CI and native activation remain pending."},
-      "exception": {"constraint_evidence": "Linux exact-head CI and native host activation were not run.", "supported_other_host_outcome": "Both hosts use the same source fixture and remain limited to source verification."}
+      "verification": {"level": "source", "result": "limited", "evidence": "Committed SO01/SO02 source head 9add4e22eece41c3c48b60847ac64f3f2ced820d preserves the offline oracle and facade compatibility checks. SO03 captured oracle-r4 passing 7 tests with all 394 rows, IDs, and 35 guard conditions; Windows/Linux exact-head CI and installed native profiles remain unverified."},
+      "exception": {"constraint_evidence": "Source tests only; exact-head Linux CI and installed native profiles were not run.", "supported_other_host_outcome": "Both hosts share the offline oracle and unchanged consumers; neither normal profile is claimed active."}
     }
   ]
 }
@@ -83,7 +83,7 @@ The final base-to-working candidate measures 988 additions, below the 1,000-line
 
 ## Execution readiness
 
-Verdict: SO01/SO02 remediation is ready for parent inspection and fresh incremental review. Linux exact-head CI and native activation remain pending.
+Verdict: SO03 remediation is ready for parent inspection and fresh incremental review. Linux exact-head CI and native activation remain pending.
 
 ## Next Steps
 

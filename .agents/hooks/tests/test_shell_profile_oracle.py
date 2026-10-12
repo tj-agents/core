@@ -117,6 +117,19 @@ class OracleTests(unittest.TestCase):
         malformed_sources["sources"]["gnu-bash-5.2.37-shell"].pop("sha256")
         with self.assertRaises(ValueError):
             oracle.validate(self.profiles, malformed_sources)
+        for label, source_id, mutate in (
+            ("missing Git-for-Windows condition", "gfw-bash-5.3.015-cygwin", lambda source: source.pop("condition")),
+            ("missing Git-for-Windows derivation", "gfw-bash-5.3.015-cygwin", lambda source: source.pop("derivation")),
+            ("missing Debian derivation", "debian-dash-0.5.12-2", lambda source: source.pop("derivation")),
+            ("changed Git-for-Windows derivation", "gfw-bash-5.3.015-cygwin", lambda source: source.__setitem__("derivation", "other")),
+            ("malformed Debian derivation", "debian-dash-0.5.12-2", lambda source: source.__setitem__("derivation", [])),
+            ("unexpected GNU condition", "gnu-bash-5.2.37-shell", lambda source: source.__setitem__("condition", "__CYGWIN__")),
+        ):
+            with self.subTest(label=label):
+                malformed_sources = copy.deepcopy(self.sources)
+                mutate(malformed_sources["sources"][source_id])
+                with self.assertRaises(ValueError):
+                    oracle.validate(self.profiles, malformed_sources)
         for label, index, mutate in (
             ("array id", 0, lambda group: group.__setitem__("id", [])),
             ("nested names", 0, lambda group: group.__setitem__("names", [["debug"]])),
