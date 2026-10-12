@@ -160,6 +160,11 @@
       "destination": "resources/machine/scripts/delivery_policy.py"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/workflows/repository_configuration.py",
+      "destination": "resources/machine/scripts/repository_configuration.py"
+    },
+    {
       "plugin": "engineering",
       "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
       "destination": "workflows/host_coverage.py"
