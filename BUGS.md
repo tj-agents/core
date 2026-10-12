@@ -48,14 +48,14 @@
 
 **Verification evidence:** direct invocation of `binding_active` raised `binding-head-changed` before the repair despite matching local and artifact SHAs. The focused Stop suite now covers both matching and divergent `remote_head_sha` values and passes.
 
-## B004 - Stop rejects a matching delivery binding as head-changed
+## B005 - An explicitly continued exhausted owner cannot resume
 
-**Kind:** bug. **Observed/reported:** 2026-10-12; the active controller association owner and delivery binding both named `93803964be31d8283fe2f9e79ef12ad02ed3f9e2`, yet Stop emitted `binding-head-changed`. **Cause:** confirmed: `continuation_stop.binding_active` compared the normalized delivery binding's absent `head` key rather than its canonical `remote_head_sha` key.
+**Kind:** bug. **Observed/reported:** 2026-10-12; the controller owner reached `continuation-budget-exhausted` while the goal remained active and the user explicitly directed continued work. **Cause:** confirmed: the runtime had no operation to record a new finite deadline for the same exhausted owner.
 
-**Impact and priority:** P1; an active, correctly bound continuation cannot finish a turn and repeatedly reports a false reconciliation gate.
+**Impact and priority:** P1; an unfinished authorized delivery remains blocked or requires unsafe owner replacement after an expired finite budget.
 
-**Source owner:** tj-agents/core continuation Stop hook. **State:** in-progress. **Repair link:** plans/controller-goal-association/GOAL.md and PR209. **Next action:** commit the canonical-field correction, obtain a fresh frozen review, and rerun exact-head CI.
+**Source owner:** tj-agents/core continuation runtime. **State:** in-progress. **Repair link:** plans/controller-goal-association/GOAL.md and PR209. **Next action:** commit the guarded renewal transition, renew the exact owner under the user's recorded authority, then complete fresh review and CI.
 
-**Resolution condition:** Stop accepts an identity-matching delivery artifact containing `remote_head_sha`, rejects a genuinely different SHA, and the repair passes focused tests, independent review and exact-head Windows/Linux CI.
+**Resolution condition:** only an exhausted, lease-free owner can accept an explicit finite renewal; it retains its identity and existing limits, returns to waiting, and passes focused runtime tests, independent review and exact-head Windows/Linux CI.
 
-**Verification evidence:** direct invocation of `binding_active` raised `binding-head-changed` before the repair despite matching local and artifact SHAs. The focused Stop suite now covers both matching and divergent `remote_head_sha` values and passes.
+**Verification evidence:** the exact controller owner was blocked with `continuation-budget-exhausted` after its deadline elapsed. The new focused test proves a one-hour explicit renewal succeeds without changing owner identity or counters and rejects a duplicate renewal.
