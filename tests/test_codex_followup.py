@@ -237,13 +237,25 @@ class FollowupTests(unittest.TestCase):
     def test_unavailable_proxy_never_claims_sent(self):
         output = io.StringIO()
         with patch.object(FOLLOWUP, 'Proxy', side_effect=OSError('No proxy')), \
+                patch.object(FOLLOWUP, 'send') as send, \
                 contextlib.redirect_stdout(output):
             code = FOLLOWUP.main(self.arguments())
         result = json.loads(output.getvalue())
         self.assertEqual(2, code)
         self.assertEqual('unavailable', result['status'])
-        self.assertIn('paste', result['next_action'])
+        self.assertLess(
+            result['next_action'].index('task-specific authority evidence'),
+            result['next_action'].index('machine:open-codex'),
+        )
+        self.assertLess(
+            result['next_action'].index('machine:open-codex'),
+            result['next_action'].index('provide the message'),
+        )
+        self.assertIn('unavailable or ineligible', result['next_action'])
+        self.assertIn('blocker', result['next_action'])
+        self.assertFalse(result['acknowledged'])
         self.assertFalse(self.receipt_path.exists())
+        send.assert_not_called()
 
     def test_message_change_with_same_receipt_is_rejected(self):
         self.receipt_path.write_text(json.dumps(self.receipt))
@@ -254,17 +266,28 @@ class FollowupTests(unittest.TestCase):
         self.assertIn('different target', result['detail'])
         self.assertEqual([], proxy.calls)
 
-    def test_rejection_before_any_receipt_offers_the_message_for_paste(self):
+    def test_rejection_before_any_receipt_requires_recovery_before_manual_fallback(self):
         class RejectingSession(Session):
             def initialize(self):
                 raise FOLLOWUP.Rejected('unsupported')
 
-        code, result = self.run_main(self.arguments(), RejectingSession(self.receipt))
+        with patch.object(FOLLOWUP, 'send') as send:
+            code, result = self.run_main(self.arguments(), RejectingSession(self.receipt))
         self.assertEqual(2, code)
         self.assertEqual('rejected', result['status'])
-        self.assertIn('paste', result['next_action'])
-        self.assertNotIn('do not resend', result['next_action'])
+        self.assertLess(
+            result['next_action'].index('task-specific authority evidence'),
+            result['next_action'].index('machine:open-codex'),
+        )
+        self.assertLess(
+            result['next_action'].index('machine:open-codex'),
+            result['next_action'].index('provide the message'),
+        )
+        self.assertIn('unavailable or ineligible', result['next_action'])
+        self.assertIn('blocker', result['next_action'])
+        self.assertFalse(result['acknowledged'])
         self.assertFalse(self.receipt_path.exists())
+        send.assert_not_called()
 
     def test_preexisting_mismatched_receipt_does_not_claim_unverified(self):
         foreign = dict(self.receipt, message_sha256='different')

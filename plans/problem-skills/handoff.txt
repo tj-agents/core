@@ -1,0 +1,2 @@
+cd C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-ProblemSkills
+Read @C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-ProblemSkills/plans/problem-skills/GOAL.md and execute its ## Next Steps.

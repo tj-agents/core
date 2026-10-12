@@ -425,14 +425,20 @@ def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, exe
     return int(bool(problems))
 
 
-def apply_harness_permissions() -> None:
+def apply_harness_permissions(project: Path | None = None, run=subprocess.run) -> None:
+    """Converge this machine's declared harness permissions. Fire-and-forget: any failure here is
+    swallowed rather than turned into a sync failure, because a permissions converge is strictly
+    additional to a standards refresh. `run` defaults to the real `subprocess.run` but is accepted so a
+    caller -- this module's own `main`, or codex_marketplace_sync.py's own sync, which imports this
+    function rather than duplicating it -- can supply a fake for its own tests.
+    """
     package_root = Path(__file__).resolve().parents[3]
     script = package_root / ".agents" / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "harness_permissions_sync.py"
     if not script.is_file():
         return
     try:
-        subprocess.run(
-            [sys.executable, "-B", str(script), "--apply"],
+        run(
+            [sys.executable, "-I", "-B", str(script), "--apply", "--project", str((project or Path.cwd()).resolve())],
             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
         )
     except Exception:  # noqa: BLE001
@@ -458,7 +464,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as error:  # noqa: BLE001
         print(f"standards: sync failed ({error}); this session loads the installed plugins")
         code = 1
-    apply_harness_permissions()
+    apply_harness_permissions(arguments.project.resolve())
     return code
 
 

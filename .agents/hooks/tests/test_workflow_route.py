@@ -60,16 +60,25 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_hook(self, prompt, event="UserPromptSubmit"):
+    def run_hook(self, prompt, event="UserPromptSubmit", session=None, environment=None, script=SCRIPT):
         return subprocess.run(
-            [sys.executable, "-B", str(SCRIPT)],
+            [sys.executable, "-B", str(script)],
             input=json.dumps({"hook_event_name": event, "cwd": str(self.cwd), "prompt": prompt,
-                              "session_id": str(uuid.uuid4())}),
+                              "session_id": session or str(uuid.uuid4())}),
             capture_output=True,
             text=True,
             encoding="utf-8",
+            env=environment,
             timeout=20,
         )
+
+    def receipt(self, scratch, session):
+        path = (
+            Path(scratch)
+            / "agents-workflow-route"
+            / (hashlib.sha256(session.encode("utf-8")).hexdigest() + ".json")
+        )
+        return json.loads(path.read_text(encoding="utf-8"))
 
     def test_active_goal_and_execution_prompt_load_the_full_canonical_workflow(self):
         self.write_goal()
@@ -143,6 +152,32 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertIn("engineering:handoff automatically selected", result.stdout)
 
+    def test_bounded_side_handoff_retains_the_execution_obligation(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            environment = dict(os.environ, TEMP=scratch, TMP=scratch, TMPDIR=scratch)
+            scripts = (SCRIPT, ROOT / "plugins/engineering/hooks/workflow_route.py")
+            for script in scripts:
+                with self.subTest(script=script):
+                    session = str(uuid.uuid4())
+                    result = self.run_hook(
+                        "Hand off this separate workstream and retain the current goal in this session.",
+                        session=session,
+                        environment=environment,
+                        script=script,
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertIn("engineering:handoff automatically selected", result.stdout)
+                    self.assertTrue(self.receipt(scratch, session)["execution_obligation"])
+                    full_transfer = str(uuid.uuid4())
+                    result = self.run_hook(
+                        "Hand this off to another Codex session.",
+                        session=full_transfer,
+                        environment=environment,
+                        script=script,
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertNotIn("execution_obligation", self.receipt(scratch, full_transfer))
+
     def test_handoff_questions_and_negation_do_not_launch(self):
         for prompt in (
             "Why did you not hand it off?",
@@ -183,6 +218,64 @@ class WorkflowRouteSelectionTests(unittest.TestCase):
         result = self.run_hook("Do not implement the plan.")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("", result.stdout)
+
+    def test_questions_and_quoted_examples_do_not_authorize_execution(self):
+        prompts = (
+            "How does plan-execution work?",
+            "Why didn't you finish the plan?",
+            "Explain how to implement the plan.",
+            "How do I plan and implement the migration?",
+            "Can you explain how to plan and implement the migration?",
+            "Explain how to plan and implement the migration.",
+            "Please explain how to plan and implement the migration.",
+            "Should we plan and implement the migration?",
+            "Can I plan and implement the migration?",
+            "Would we plan and implement the migration?",
+            "Do we plan and implement the migration?",
+            "Do the agents plan and implement the migration?",
+            "Can't I plan and implement the migration?",
+            "Couldn’t we plan and implement the migration?",
+            "Won't we plan and implement the migration?",
+            "Must we plan and implement the migration?",
+            "Need I plan and implement the migration?",
+            "Must not plan and implement the migration.",
+            "Mustn't plan and implement the migration.",
+            'The example says "Implement the plan."',
+            "```text\nImplement the plan.\n",
+            "> Implement the plan.",
+            "`Implement the plan.`",
+            "“Implement the plan.”",
+        )
+        for active in (False, True):
+            if active:
+                self.write_goal()
+            for prompt in prompts:
+                with self.subTest(prompt=prompt, active_goal=active):
+                    result = self.run_hook(prompt)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertEqual("", result.stdout)
+            if active:
+                (self.cwd / "GOAL.md").unlink()
+
+    def test_explicit_whole_skill_invocation_and_direct_question_authorize_execution(self):
+        for prompt in (
+            "engineering:plan-execution",
+            "$engineering:plan-execution",
+            "Can you implement the plan?",
+            "Can you please implement the plan?",
+            "Could you plan and implement the migration?",
+            "Would you plan and implement the migration?",
+            "Need to plan and implement the migration.",
+            "Must plan and implement the migration.",
+            "Do the plan and implement the migration.",
+            "Have a plan and implement the migration.",
+            "How does it work? Implement the plan.",
+            "Explain the plan, then implement it.",
+        ):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("engineering:plan-execution automatically selected", result.stdout)
 
     def test_implementing_a_plan_authoring_fix_still_selects_execution(self):
         result = self.run_hook("Implement the plan-authoring fix across all phases.")
@@ -330,6 +423,17 @@ class WorkflowRouteRecoveryTests(unittest.TestCase):
         delivered = self.run_hook("UserPromptSubmit", prompt=self.PROMPT)
         self.assertIn("engineering:plan-execution automatically selected", delivered["additionalContext"])
         self.assertIsNone(self.run_hook("PreToolUse", tool_name="Read"))
+
+    def test_recovered_bounded_side_handoff_retains_the_execution_obligation(self):
+        self.write_transcript(
+            "Hand off this separate workstream and retain the current goal in this session."
+        )
+        recovered = self.run_hook("PreToolUse", tool_name="Read")
+        self.assertIn("engineering:handoff automatically selected", recovered["additionalContext"])
+        receipt = self.scratch / "agents-workflow-route" / (
+            hashlib.sha256(self.session.encode("utf-8")).hexdigest() + ".json"
+        )
+        self.assertTrue(json.loads(receipt.read_text(encoding="utf-8"))["execution_obligation"])
 
     def test_the_prompt_id_receipt_decides_delivery_before_timestamps(self):
         self.write_transcript(self.PROMPT)

@@ -82,10 +82,15 @@ model-and-effort pair, so lane inflation cannot reach the tier. Consumers that e
 (the handoff launchers' `-Frontier`) make selecting it a distinct visible act rather than one lane value
 among others.
 
-**Re-route per phase.** One task is usually open/judgement while it is being designed, then specified and
-test-caught while it is built, then clerical to commit and push. Route each phase. Running the whole task
-in the rung its hardest phase needed is the waste this ladder exists to stop, and running the design phase
-in the rung its cleanup needed is how a bad design gets built efficiently.
+**Re-route per phase.** For every new task, work type, phase, review entry or fallback, make a fresh lane
+selection before substantive work, even when retaining the same lane. Record the phase, lane and reason in
+the existing task context, and resolve model and effort from the canonical host table. Apply the selection
+under the canonical execution rules: continue directly when the current owner already honors the selected
+lane; otherwise use a supported control or bounded lane worker. Inherited settings or an earlier phase's
+selection do not count. One task is usually open/judgement while it is being designed, then specified and
+test-caught while it is built, then clerical to commit and push. Running the whole task in the rung its
+hardest phase needed is the waste this ladder exists to stop, and running the design phase in the rung its
+cleanup needed is how a bad design gets built efficiently.
 
 Lane selection does not itself transfer task ownership. A Claude parent hands multi-phase work and every
 delegated design, implementation, or review phase to Codex before delegating, unless the user explicitly
@@ -125,10 +130,10 @@ not a lane change.
   live under the workflow contract's version rather than being re-resolved at dispatch. They are derived
   from the ladder and a test asserts they still agree with it, so a rung and its stage cannot drift apart
   — but the pin is the value the runtime reads.
-- **A handoff launcher** takes a lane (or frontier) flag per dispatch: `machine:handoff-claude`'s Python
-  launcher takes `--lane` (or `--frontier`); `machine:handoff-codex` still takes `-Lane` (or `-Frontier`)
-  until its own Python port lands. Either way the calling agent judges the lane by the four questions and
-  the launcher only prices it, never inferring one from the prompt.
+- **A handoff launcher** takes a lane (or frontier) flag per dispatch: both `machine:handoff-claude` and
+  `machine:handoff-codex`'s Python launchers take `--lane` (or `--frontier`), and `handoff-codex` also
+  takes `--reasoning-effort` for a Codex model named outright. Either way the calling agent judges the
+  lane by the four questions and the launcher only prices it, never inferring one from the prompt.
 
 L7 is in-session clerical work only. Both handoff launchers reject it before opening a tab. Claude handoff
 also requires an explicit L1–L6 lane, frontier tier, or non-Haiku model, because an unchecked CLI default

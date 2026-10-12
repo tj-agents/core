@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -81,7 +82,7 @@ class ContinuationTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def state(self):
-        return json.loads(self.owner.read_text())
+        return runtime.read(self.owner)
 
     def fixture(self, mode, **extra):
         (self.root / "scenario.json").write_text(json.dumps({"mode": mode, **extra}))
@@ -221,6 +222,53 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(first.returncode, 0, stderr)
         self.assertEqual(json.loads(stdout)["launches"], 1)
 
+    @unittest.skipUnless(os.name == "nt", "Windows sharing violations are Windows-only")
+    def test_owner_state_read_and_save_tolerate_an_open_reader(self):
+        original = self.state()
+        replacement = dict(original, reason="concurrent-save")
+        attempted = threading.Event()
+        errors = []
+        original_replace = runtime.atomic_json.__globals__["os"].replace
+        original_read_text = Path.read_text
+        read_attempts = 0
+        transient_winerrors = (5, 32)
+
+        def replace(source, destination):
+            attempted.set()
+            return original_replace(source, destination)
+
+        def save():
+            try:
+                runtime.save(self.owner, replacement, "concurrent-save")
+            except BaseException as error:
+                errors.append(error)
+
+        def read_text(path, *args, **kwargs):
+            nonlocal read_attempts
+            if path == self.owner:
+                read_attempts += 1
+                if read_attempts <= len(transient_winerrors):
+                    error = PermissionError(13, "sharing violation")
+                    error.winerror = transient_winerrors[read_attempts - 1]
+                    raise error
+            return original_read_text(path, *args, **kwargs)
+
+        with mock.patch.object(runtime.atomic_json.__globals__["os"], "replace", side_effect=replace):
+            with self.owner.open(encoding="utf-8") as reader:
+                reader.read()
+                writer = threading.Thread(target=save)
+                writer.start()
+                self.assertTrue(attempted.wait(timeout=5))
+                self.assertTrue(writer.is_alive())
+                with mock.patch.object(Path, "read_text", new=read_text):
+                    self.assertEqual(runtime.read(self.owner)["reason"], original["reason"])
+            writer.join(timeout=5)
+
+        self.assertFalse(writer.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(read_attempts, 3)
+        self.assertEqual(runtime.read(self.owner)["reason"], "concurrent-save")
+
     def test_fresh_and_stale_foreground(self):
         claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
         token = claimed["foreground"]["token"]
@@ -235,6 +283,49 @@ class ContinuationTests(unittest.TestCase):
         self.cli("checkpoint", "--owner", str(self.owner), "--token", token,
                  "--state", "waiting", "--reason", "foreground confirmed", "--next-action", "resume")
         self.assertEqual(self.wake()["state"], "complete")
+
+    def test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground(self):
+        for harness in ("claude", "codex"):
+            with self.subTest(harness=harness):
+                self.owner.unlink()
+                self.cli("init", "--root", str(self.root), "--goal", "goal.md",
+                         "--completion", "CI repaired and boundary recorded", "--authority", "Isolated test",
+                         "--harness", harness, "--actions", "edit", "test")
+                claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+                token = claimed["foreground"]["token"]
+                preserved = {key: claimed[key] for key in (
+                    "state", "goal", "repo", "worktree", "branch", "head", "authority",
+                    "max_launches", "max_failures", "deadline", "timeout_seconds", "lease_seconds",
+                )}
+                lease = {key: claimed["foreground"][key] for key in ("token", "pid", "identity")}
+
+                refreshed = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                                     "--reason", "Refresh recovery instructions", "--next-action", "Run focused checks")
+                self.assertEqual(refreshed["reason"], "Refresh recovery instructions")
+                self.assertEqual(refreshed["next_action"], "Run focused checks")
+                self.assertEqual({key: refreshed[key] for key in preserved}, preserved)
+                self.assertEqual({key: refreshed["foreground"][key] for key in lease}, lease)
+
+                for arguments in ((), ("--reason", "", "--next-action", "")):
+                    unchanged = self.cli("heartbeat", "--owner", str(self.owner), "--token", token, *arguments)
+                    self.assertEqual(unchanged["reason"], "Refresh recovery instructions")
+                    self.assertEqual(unchanged["next_action"], "Run focused checks")
+                    self.assertEqual({key: unchanged[key] for key in preserved}, preserved)
+                    self.assertEqual({key: unchanged["foreground"][key] for key in lease}, lease)
+
+                before_invalid_token = self.state()
+                invalid_token = self.cli("heartbeat", "--owner", str(self.owner), "--token", "invalid",
+                                         "--reason", "must not persist", "--next-action", "must not persist", code=2)
+                self.assertEqual(invalid_token["reason"], "foreground-token-invalid")
+                self.assertEqual(self.state(), before_invalid_token)
+
+                dead = self.state()
+                dead["foreground"]["identity"] = "dead-identity"
+                runtime.atomic_json(self.owner, dead)
+                invalid_identity = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                                            "--reason", "must not persist", "--next-action", "must not persist", code=2)
+                self.assertEqual(invalid_identity["reason"], "foreground-token-invalid")
+                self.assertEqual(self.state(), dead)
 
     def test_orphan_writer_gate_after_supervisor_exit(self):
         self.fixture("complete", sleep=3)

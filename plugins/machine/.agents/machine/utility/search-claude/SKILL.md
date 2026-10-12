@@ -10,6 +10,7 @@ route: infer
 
 Search local Claude history read-only and use the exact native id it returns. Results contain bounded metadata,
 not raw transcripts, and omit sidechains.
+Run the helper with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
 python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' search --host claude --topic '<topic>' --checkout '<absolute-checkout>'
