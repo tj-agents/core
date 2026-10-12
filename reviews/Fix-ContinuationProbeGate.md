@@ -5,14 +5,14 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `6c5acc9bad2064703ad4741ba8cb446dc3606a4e`  `(2026-10-12)`
+**Reviewed up to commit:** `9abf00d37c329b1470950eebde8fd30545b3bda1`  `(2026-10-12)`
 **Judgment:** `changes-requested`
 
 ```agent-host-coverage
 {
   "schema_version": 1,
   "shared_source": ".agents/workflows/continuation_runtime.py",
-  "candidate_head": "6c5acc9bad2064703ad4741ba8cb446dc3606a4e",
+  "candidate_head": "9abf00d37c329b1470950eebde8fd30545b3bda1",
   "hosts": [
     {
       "host": "claude",
@@ -67,3 +67,26 @@ and is covered by the next pass.
   For `--owner` calls the heartbeat/yield check compares the owner's recorded checkout with the root read
   from that same record, so it verifies nothing. Fix: also require `.git` at the recorded root, without
   running Git. Resolved in `ab9cdda` with `test_heartbeat_requires_the_recorded_checkout_root`.
+
+## Review pass — 2026-10-12 — incremental
+
+**Candidate base:** `6c5acc9bad2064703ad4741ba8cb446dc3606a4e`
+**Candidate head:** `9abf00d37c329b1470950eebde8fd30545b3bda1`
+**Candidate branch:** `Fix/ContinuationProbeGate`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:3b71c44d24f1ee7aba5899036674e46973d05995a3aeff9aa3c2b1e8713884eb` `(8 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\t9ybeXEk9xByN2Ibk3vn60\E_-MnGzZALDA42nlWNzNtd`
+**Candidate bundle identity:** `sha256:ded784621b51d73fadbfb5fc369030ceafe916cd4a189c07c9e57bea5f7ca6e9`
+**Work-order path:** `reviews/Fix-ContinuationProbeGate.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code built-in `code-review` skill (medium) over the frozen range. Lens dispatched:
+`workflow` (`review-lens`) — no findings. Security layer not required.
+
+### Findings
+
+- [x] **INC1 — LOW — native** — `tests/test_catalog_digests.py:36`
+  `CatalogWriteTests` was defined after `unittest.main()`, so running the file directly exited before the
+  LF regression existed. Fix: define it above the entry point. Resolved in `167c070`; a direct run now
+  executes 3 tests.
