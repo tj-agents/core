@@ -44,7 +44,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                               input=json.dumps(payload), capture_output=True, text=True,
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
 
-    def run_user_prompt_submit(self, host, prompt):
+    def run_user_prompt_submit(self, host, prompt, payload_root=None):
         manifest = json.loads(
             (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
         )
@@ -64,7 +64,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
             )
             arguments = None
         payload = {
-            "cwd": str(self.cwd),
+            "cwd": str(payload_root or self.cwd),
             "session_id": str(uuid.uuid4()),
             "hook_event_name": "UserPromptSubmit",
             "prompt": prompt,
@@ -78,6 +78,16 @@ class PackagedEngineeringHooks(unittest.TestCase):
             [sys.executable, *arguments], input=json.dumps(payload), capture_output=True,
             text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=20,
         )
+
+    def run_without_stdin(self, path, arguments=()):
+        return subprocess.run(
+            [sys.executable, '-B', str(self.package / path), *arguments],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8',
+            cwd=self.cwd, env=self.environment, timeout=20,
+        )
+
+    def additional_context(self, result):
+        return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
 
     def test_each_host_context_uses_its_packaged_contract_without_mutating_the_caller(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
@@ -93,13 +103,14 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertIn(chr(36) + "{" + variable + "}/" + script, command)
                 result = self.run_hook(script)
                 self.assertEqual(0, result.returncode, result.stderr)
-                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                context = self.additional_context(result)
                 self.assertIn("engineering:plan-execution", context)
                 self.assertRegex(context, r"load `engineering:lanes`.*?select the next phase")
                 self.assertIn(str(contract), context)
                 self.assertIn("source SHA-256", context)
                 body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1].strip()
-                self.assertEqual(body, context.split("\n\n", 1)[1])
+                self.assertTrue(context.split("\n\n", 1)[1].startswith(body))
+                self.assertIn("auto_approve_design=false", context)
                 bodies.append(context)
         self.assertEqual(1, len(set(bodies)))
         self.assertEqual([], list(self.cwd.iterdir()))
@@ -114,12 +125,98 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("cannot read contract", result.stderr)
         self.assertEqual("", result.stdout)
 
-    def test_user_prompt_context_is_bounded_to_the_callout_and_lifecycle_sections(self):
+    def test_each_host_uses_the_payload_checkout_for_routine_design_delegation(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        project = self.root / "configured repository"
+        agents = project / ".agents"
+        agents.mkdir(parents=True)
+        settings = agents / "settings.json"
+
+        for host in ("claude", "codex"):
+            settings.unlink(missing_ok=True)
+            with self.subTest(host=host, setting="absent"):
+                start = self.run_hook(script, {"cwd": str(project)})
+                self.assertEqual(0, start.returncode, start.stderr)
+                start_context = self.additional_context(start)
+                self.assertIn("auto_approve_design=false", start_context)
+                self.assertIn(str(settings), start_context)
+
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                self.assertIn("auto_approve_design=false", self.additional_context(prompt))
+
+            with self.subTest(host=host, setting="enabled"):
+                settings.write_text(
+                    json.dumps({"configuration": {"core": {"auto_approve_design": True}}}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                prompt_context = self.additional_context(prompt)
+                self.assertIn("auto_approve_design=true", prompt_context)
+                self.assertIn(str(settings), prompt_context)
+
+            with self.subTest(host=host, setting="disabled-next-prompt"):
+                settings.write_text(
+                    json.dumps({"configuration": {"core": {"auto_approve_design": False}}}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                self.assertIn("auto_approve_design=false", self.additional_context(prompt))
+
+            with self.subTest(host=host, setting="invalid"):
+                settings.write_text(
+                    json.dumps({"configuration": {"core": {"auto_approve_design": "true"}}}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                prompt_context = self.additional_context(prompt)
+                self.assertIn("auto_approve_design=false", prompt_context)
+                self.assertIn("cannot resolve repository routine delegation", prompt_context)
+
+        invalid_root = self.run_hook(script, {"cwd": "not-an-absolute-root"})
+        self.assertEqual(0, invalid_root.returncode, invalid_root.stderr)
+        invalid_context = self.additional_context(invalid_root)
+        self.assertIn("auto_approve_design=false", invalid_context)
+        self.assertIn("existing absolute directory", invalid_context)
+
+        self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_context_fails_when_the_packaged_settings_reader_is_missing(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        project = self.root / "configured repository"
+        (project / ".agents").mkdir(parents=True)
+        reader = self.package / "workflows" / "repository_configuration.py"
+        reader.unlink()
+        result = self.run_hook(script, {"cwd": str(project)})
+        self.assertEqual(0, result.returncode, result.stderr)
+        context = self.additional_context(result)
+        self.assertIn("auto_approve_design=false", context)
+        self.assertIn("repository settings reader is unavailable", context)
+
+    def test_instruction_fragment_stays_static_without_stdin(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        result = self.run_without_stdin(script, ("--instruction-fragment",))
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("auto_approve_design=", result.stdout)
+
+    def test_user_prompt_context_includes_routine_delegation_guidance(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
         contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
         headings = (
             "## When the user calls out a mistake",
             "## A task has an owning lifecycle — load it before the first edit",
+            "## Repository routine-decision delegation",
         )
         body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
         expected = "\n\n".join(
@@ -161,7 +258,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
                         )))
                         self.assertIn("source SHA-256", context)
                         self.assertIn(expected, context)
-                        self.assertEqual(expected, context.split("\n\n", 1)[1])
+                        self.assertTrue(context.split("\n\n", 1)[1].startswith(expected))
+                        self.assertIn("auto_approve_design=false", context)
                         normalized_context = " ".join(context.split())
                         self.assertIn("load `engineering:lanes`", normalized_context)
                         self.assertIn("select the next phase's lane", normalized_context)
@@ -169,7 +267,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                         self.assertIn("canonical execution rules", normalized_context)
                         self.assertNotIn("## A link to another skill is a stage pointer", context)
                         self.assertNotIn("## Keep large changes reviewable", context)
-                        self.assertLess(len(context), 3000)
+                        self.assertLess(len(context), 4000)
 
         before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         contract.write_text(contract.read_text(encoding="utf-8").replace(
