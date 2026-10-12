@@ -86,3 +86,27 @@
 - Next action: set repository-local `gc.auto=0` and `maintenance.auto=false` before the first fixture commit; add a TRACE2 regression through `pr-slice-rollover`.
 - Resolution condition: the independent repair is reviewed and merged, required Windows/Linux checks pass, teardown succeeds, and the bounded lifecycle trace starts no detached maintenance child.
 - Verification evidence: four bounded TRACE2 child starts and the analogous existing fixture guards support the inferred cause; causal CI attempt 2 passed. The repair has not been made.
+
+## B008 - Stop hook rejects every active delivery binding as `binding-head-changed`
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; with `.agents/persistent-workflow-binding.json` for tj-agents/github-actions PR 1 at head 465f84bf64c2de10d3dc5b0f4d7c7a270186cb0e and `continuation_runtime.identity()` returning the same head, every Stop returned "Reconcile the canonical continuation owner before ending this turn: binding-head-changed". **Cause:** confirmed. `.agents/hooks/continuation_stop.py` `binding_active()` reads `binding.get("head")` from `binding_from_artifact()`, but `.agents/workflows/delivery_runtime.py` `ARTIFACT_ALIASES` renames `head` to `remote_head_sha`, so the compared value is `None`.
+
+**Impact and priority:** P1; no session holding a correct delivery binding can end a turn, and the hook pushes it toward releasing or rewriting a valid binding.
+
+**Source owner:** tj-agents/core engineering continuation Stop hook. **State:** open. **Repair link:** `plans/hook-delivery-identity/GOAL.md` on branch `Fix/HookDeliveryIdentity`. **Next action:** add a Stop regression test with a `delivery-bind`-shaped artifact whose head matches, then compare `remote_head_sha` and `repository` against `identity()`.
+
+**Resolution condition:** a correct, current binding passes Stop and a changed head still fails, under focused hook tests and exact-head CI.
+
+**Verification evidence:** `binding_from_artifact()` returned `head: None, remote_head_sha: 465f84b…`; a simulated `continuation_stop.outcome()` with the session's cwd reproduced the message.
+
+## B009 - Merge-cleanup gate binds `gh pr merge --repo <other>` to the cwd checkout
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; `gh pr merge 6 --repo tj-agents/marketplace --merge --match-head-commit 9bb8088…` ran with cwd in `tj-agents/github-actions/.worktrees/Feature-Conventions`, whose own PR 1 was open. The gate then reported "`gh pr merge` for PR #6 (Feature/Conventions) ran from …Feature-Conventions" and demanded Step 5 cleanup of that unrelated worktree every Stop. **Cause:** unknown; observed behaviour is consistent with the gate keying on cwd rather than `--repo`/`-R`.
+
+**Impact and priority:** P2; the gate demands closing a worktree whose PR is still open, which would destroy live work if obeyed.
+
+**Source owner:** tj-agents/core engineering `merge_cleanup_gate.py`. **State:** open. **Repair link:** `plans/hook-delivery-identity/GOAL.md` on branch `Fix/HookDeliveryIdentity`. **Next action:** reproduce with a test where `--repo` names a different repository than the cwd checkout's origin.
+
+**Resolution condition:** a merge naming another repository never binds cleanup to the cwd checkout; a focused test covers it and exact-head CI passes.
+
+**Verification evidence:** the Stop hook message quoted above, while marketplace PR 6's own worktree had already been removed and github-actions PR 1 was open.
