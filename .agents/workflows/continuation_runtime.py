@@ -307,19 +307,9 @@ def lane_command(state, prompt, executable=None):
     return [*prefix, "-p", prompt, "--model", lane["model"], "--effort", lane[table["effort_key"]]]
 
 
-def apply_receipt(state, receipt):
-    if receipt.get("nonce") != state.get("launch_nonce") or receipt.get("owner_id") != state["owner_id"]:
-        raise Gate("checkpoint-identity-invalid")
-    status = receipt.get("state")
-    if status not in {"waiting", "complete", "blocked"}:
-        raise Gate("checkpoint-state-invalid")
-    if not isinstance(receipt.get("reason"), str) or not receipt["reason"].strip():
-        raise Gate("checkpoint-reason-required")
-    if status != "complete" and not receipt.get("next_action"):
-        raise Gate("checkpoint-next-action-required")
+def rebind_identity(state, rebind, status, released_binding=None):
     current = identity(Path(state["worktree"]))
     if current["head"] != state["head"]:
-        rebind = receipt.get("rebind") or {}
         binding_path = Path(state["worktree"]) / BINDING_FILE
         binding = read(binding_path) if binding_path.exists() else None
         old = {key: state[key] for key in ("repo", "worktree", "branch", "head")}
@@ -329,7 +319,7 @@ def apply_receipt(state, receipt):
         if binding is None and state.get("pr") is not None:
             if status not in {"complete", "blocked"}:
                 raise Gate("binding-removed")
-            binding = receipt.get("released_binding")
+            binding = released_binding
             if not isinstance(binding, dict):
                 raise Gate("released-binding-required")
             try:
@@ -344,6 +334,19 @@ def apply_receipt(state, receipt):
             raise Gate("repair-binding-not-refreshed")
         state["head"] = current["head"]
         state["evidence"] = None
+
+
+def apply_receipt(state, receipt):
+    if receipt.get("nonce") != state.get("launch_nonce") or receipt.get("owner_id") != state["owner_id"]:
+        raise Gate("checkpoint-identity-invalid")
+    status = receipt.get("state")
+    if status not in {"waiting", "complete", "blocked"}:
+        raise Gate("checkpoint-state-invalid")
+    if not isinstance(receipt.get("reason"), str) or not receipt["reason"].strip():
+        raise Gate("checkpoint-reason-required")
+    if status != "complete" and not receipt.get("next_action"):
+        raise Gate("checkpoint-next-action-required")
+    rebind_identity(state, receipt.get("rebind") or {}, status, receipt.get("released_binding"))
     binding = check_identity(state, allow_terminal_release=status in {"complete", "blocked"})
     if status == "complete":
         bound = binding
@@ -638,6 +641,15 @@ def operate(path, state, args):
         state["foreground"] = {"pid": pid, "identity": creation, "activity": time.time(),
                                "token": uuid.uuid4().hex}
         transition(state, "working", "foreground-owned", state["next_action"])
+    elif operation == "reconcile":
+        if state["state"] != "blocked" or state.get("reason") != "owner-head-changed":
+            raise Gate("owner-reconciliation-not-required")
+        if state.get("foreground") is not None:
+            raise Gate("owner-reconciliation-foreground-active")
+        if any(record and alive(record) for record in writer_records(state)):
+            raise Gate("owner-reconciliation-writer-active")
+        rebind_identity(state, read(args.rebind), "waiting")
+        transition(state, "waiting", args.reason, args.next_action)
     else:
         lease = state.get("foreground")
         if not lease or args.token != lease["token"] or not alive(lease):
@@ -664,7 +676,7 @@ def operate(path, state, args):
 def parser():
     result = argparse.ArgumentParser()
     subs = result.add_subparsers(dest="operation", required=True)
-    for name in ("init", "claim", "heartbeat", "yield", "checkpoint", "status", "wake", "associate-session", "_child"):
+    for name in ("init", "claim", "heartbeat", "yield", "checkpoint", "reconcile", "status", "wake", "associate-session", "_child"):
         p = subs.add_parser(name)
         p.add_argument("--root")
         p.add_argument("--owner")
@@ -692,6 +704,10 @@ def parser():
         if name == "checkpoint":
             p.add_argument("--state", choices=("waiting", "blocked", "complete"), required=True)
             p.add_argument("--rebind")
+        if name == "reconcile":
+            p.add_argument("--rebind", required=True)
+            p.add_argument("--reason", required=True)
+            p.add_argument("--next-action", required=True)
         if name == "wake":
             p.add_argument("--observer-command", nargs="+")
             p.add_argument("--host-command", nargs="+")
