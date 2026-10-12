@@ -180,3 +180,14 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - Next action: repair the verified self-close failure and retain accountable closure evidence/reporting.
 - Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
 - Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.
+
+## M014 - Asked the user how to handle a failed side handoff instead of recording the bugs
+
+- Kind: mistake. Observed/reported: 2026-10-12; after finding B008 and B009, the session wrote a side-workstream goal, but the auto-mode classifier refused the Codex launch twice. It then gave Tommy a menu ("you launch it / allow and retry / leave it recorded") instead of recording the defects under `engineering:write-bug` and continuing. Tommy: "WHY ARENT YOU FOLLOWING THE STANDARD? THAT IS A MISTAKE WRITE THIS DOWN IT CAN NEVER HAPPEN AGAIN".
+- Cause: confirmed. `engineering:session-guidance` "Record noticed problems" and `engineering:handoff` "If the launcher is unavailable or fails, preserve the side-workstream task and report that fact … while the original session continues" both applied. The session treated a recording obligation as a user decision.
+- Impact/priority: P2; the user was asked to decide routine standards work, and the defects stayed unrecorded until called out.
+- Source owner: engineering `handoff` failure path and `session-guidance` problem recording. State: open.
+- Repair link: B008, B009, `plans/hook-delivery-identity/GOAL.md` (part 3: name `write-bug`/`write-mistake` recording as the required step when a side handoff cannot launch).
+- Next action: amend the handoff failure path so a refused or failed launch records the defects in the owning register and continues, without presenting the user a choice.
+- Resolution condition: the handoff standard states that recording step, and a later refused side handoff records its defects without asking the user.
+- Verification evidence: this session's question and Tommy's reply; B008 and B009 were recorded only after the call-out.
