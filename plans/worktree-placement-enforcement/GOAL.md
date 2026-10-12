@@ -1,6 +1,6 @@
 # Worktree placement enforcement
 
-Status: R4 shell classification and qualification-test repair verified; a new incremental review watermark and CI are next.
+Status: R5 path-executable argv extraction repair verified; a new incremental review watermark and CI are next.
 
 ## Authority and ownership
 
@@ -32,14 +32,15 @@ Opaque scripts or indirect wrappers and orchestration tools that emit no support
 
 ## Verification
 
-- Twenty focused executable creation tests pass; both accepted primary and linked commands execute through the shell. Two symlink-capability cases skip on this Windows environment and remain for Linux CI.
+- Twenty-two focused executable creation tests complete; two symlink-capability cases skip on this Windows environment and remain for Linux CI. Both accepted primary and linked commands execute through the shell.
 - Fifteen harness tests and twenty-two source-layout tests passed.
 - Harness synchronization and declaration check, package generation and its consistency check passed. Regenerate the final review repair before its checkpoint.
 - Agent instruction-file pairing passed in both directions with exact Claude pointer content. Plan graph passed with zero errors; its existing oversized repository-config ledger warning belongs to that separate owner.
 - Workflow skill-name discovery's former-flat-layout failure is already recorded in docs/workflows/TECH_DEBT.md. The supported explicit lifecycle source-path input succeeded.
 - Generated package output and catalog digests remain local test state. The PR stages only the authored hook inventory addition in the catalog, preserving baseline digests.
-- Current evidence is in workflow runs worktree-placement-enforcement and worktree-placement-focused-tests-v2. First exact-head CI run 38273227680 failed only the stale expected hook inventory on both hosts; that fixture is corrected and its focused budget test passed. Replacement exact-head CI is pending.
+- Current evidence is in workflow runs worktree-placement-enforcement and worktree-placement-focused-tests-v2. First exact-head CI run 38273227680 failed only the stale expected hook inventory on both hosts; that fixture is corrected and its focused budget test passed. Prior-head CI run 38283095124 at d1 passed Windows 114924860753, Linux 114924860413 and guard 114924860584; R5 needs a new exact-head qualification.
 - Linux CI run 38279872696 failed qualification when `exec_command` selected PowerShell for an argv `bash.exe` path and the post-recognition mock test accepted an internal destination before the intended failure path. R4 normalizes shell executable names for explicit and argv forms and uses a nonexisting sibling with asserted common-root and claim calls.
+- R5 locally copies and normalizes supported shell argv executables before shared extraction, preserving the original event for claims. Outer `command`/`cmd`/`script`/`input` and nested `action.command`/`action.cmd` path-Bash argv forms reject a sibling and allow a direct internal destination; nested and outer backtick substitution regressions remain covered.
 
 ## Execution and continuation
 
@@ -51,7 +52,7 @@ A supported continuation owner was initialized and foreground-claimed at .agents
 
 Immutable full review completed at d1837ee308af71b76ffc833219bb8d6ff51c15a2 against 376df0ced5283a4ee4247d07feb10e8671b64475 with three retained gate-correctness findings. All three are repaired and verified; a new incremental watermark is required. Descriptor is in Git-private workflow run placement-review-full. Native reviewer and one fresh workflow lens run read-only; the specialist model was unavailable and the workflow lens uses the ordinary L4 fallback. Its canonical work order is reviews/Fix-WorktreePlacementEnforcement.md; do not merge until its exact-head watermark and required checks pass.
 
-Frozen native review at ea33aa1 completed with R4: `exec_command` argv shell classification did not normalize Bash `.exe` paths. The R4 repair is checkpointed for a new incremental review watermark; no delivery action is authorized before that review and required CI.
+Frozen native review at ea33aa1 completed with R4: `exec_command` argv shell classification did not normalize Bash `.exe` paths. R5 then found that shared extraction still joined a path executable wrapper. The R5 repair is checkpointed for a new incremental review watermark; no delivery action is authorized before that review and required CI.
 
 ## Next Steps
 
