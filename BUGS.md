@@ -100,3 +100,31 @@
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
 **Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+
+## B008 - A stale live foreground lease becomes an ungated blocked owner
+
+**Kind:** bug. **Observed/reported:** 2026-10-12 in the dotnet `Feature/ScriptedScaffold` owner `060208e34169e293041bf3de`: after its 19:12:21 heartbeat, Codex-sandbox heartbeats printed `{"state":"blocked","reason":"git exited 128"}`; the 19:19:29 scheduled wake recorded `blocked` with `stale-live-foreground-reconciliation`, and Stop reported that the blocked owner lacked a genuine typed gate. At 21:29 the session "recovered" a blocked state that the owner file never held. **Cause:** confirmed: `heartbeat` and `yield` ran an unneeded `git rev-parse --show-toplevel`, so a sandbox Git failure stopped lease renewal; `wake` then turned a live but stale foreground into a terminal `blocked` owner without a typed gate; and the CLI failure output reused the owner-state key, reporting `blocked` for a failed command. The sandbox's exact Git stderr was not captured.
+
+**Impact and priority:** P1; active authorized work is forced into manual owner reconciliation, and failed commands are misread as blocked owners.
+
+**Source owner:** tj-agents/core continuation runtime. **State:** in-progress. **Repair link:** branch `Fix/ContinuationProbeGate`; goal `plans/continuation-probe-gate/GOAL.md`.
+
+**Next action:** review the runtime repair, then run final required CI and merge.
+
+**Resolution condition:** token-authenticated `heartbeat` and `yield` succeed while Git exits 128; a stale live foreground stays `working` with `foreground-lease-stale` and Stop asks the session to continue or yield; CLI failures report `outcome: failed` with Git's stderr and no owner state; review, exact-head CI, merge and causal generated output pass.
+
+**Verification evidence:** owner events show the 19:19:29 wake block and the 19:22 yield/claim recovery. Focused runtime and Stop suites with the new regressions pass 65 of 66; the remaining failure is B009.
+
+## B009 - Receipt-recovery test reader exceeds the Windows sharing-violation retry
+
+**Kind:** bug. **Observed/reported:** 2026-10-12; `test_recover_final_launch_receipt_before_budget_gate` failed once with `PermissionError` reading `owner.json` during the full focused run on a heavily loaded Windows host, then passed three isolated reruns. **Cause:** unknown; the test's polling `read` racing the supervisor's atomic replace past the 2-second retry is the leading hypothesis.
+
+**Impact and priority:** P3; intermittent local focused-suite failure; no runtime behavior change is evidenced.
+
+**Source owner:** tj-agents/core continuation runtime tests. **State:** open. **Repair link:** none.
+
+**Next action:** capture the failing `winerror` and replace timing to confirm the race before changing the reader or retry window.
+
+**Resolution condition:** the race is confirmed or excluded, and the test passes repeated loaded Windows runs.
+
+**Verification evidence:** one observed failure in a 66-test focused run; three isolated passes. `plans/continuation-heartbeat-metadata/GOAL.md` recorded the same test failing its timing wait in a full run on 2026-10-10 and passing in isolation.

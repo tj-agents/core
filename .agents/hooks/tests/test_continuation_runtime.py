@@ -277,12 +277,34 @@ class ContinuationTests(unittest.TestCase):
         state = self.state()
         state["foreground"]["activity"] = time.time() - 1000
         runtime.atomic_json(self.owner, state)
-        blocked = self.wake()
-        self.assertEqual(blocked["reason"], "stale-live-foreground-reconciliation")
-        self.assertEqual(blocked["state"], "blocked")
+        stale = self.wake()
+        self.assertEqual(stale["reason"], "foreground-lease-stale")
+        self.assertEqual(stale["state"], "working")
+        self.assertEqual(stale["launches"], 0)
+        self.assertEqual(stale["foreground"]["token"], token)
+        resumed = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                           "--reason", "foreground resumed", "--next-action", "resume")
+        self.assertEqual((resumed["state"], resumed["reason"]), ("working", "foreground resumed"))
         self.cli("checkpoint", "--owner", str(self.owner), "--token", token,
                  "--state", "waiting", "--reason", "foreground confirmed", "--next-action", "resume")
         self.assertEqual(self.wake()["state"], "complete")
+
+    def test_git_failure_keeps_foreground_owner_and_reports_command_failure(self):
+        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()))
+        token = claimed["foreground"]["token"]
+        broken = dict(os.environ, GIT_DIR=str(self.root / "missing-git-dir"))
+        beat = self.cli("heartbeat", "--owner", str(self.owner), "--token", token,
+                        "--reason", "Build running", "--next-action", "Read build result", env=broken)
+        self.assertEqual((beat["state"], beat["reason"]), ("working", "Build running"))
+        before = self.state()
+        failed = self.cli("wake", "--owner", str(self.owner), code=2, env=broken)
+        self.assertEqual(failed["outcome"], "failed")
+        self.assertNotIn("state", failed)
+        self.assertRegex(failed["reason"], r"^git exited 128: .+")
+        self.assertEqual(self.state(), before)
+        released = self.cli("yield", "--owner", str(self.owner), "--token", token,
+                            "--reason", "Waiting on CI", "--next-action", "Read CI", env=broken)
+        self.assertEqual((released["state"], released["foreground"]), ("waiting", None))
 
     def test_heartbeat_refreshes_recovery_metadata_without_releasing_foreground(self):
         for harness in ("claude", "codex"):
