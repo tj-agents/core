@@ -38,7 +38,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:7d574ac433118c4afffc4638b4b505b6039702bc35e427f1d9aa1e0fc3b7d9aa",
+          "digest": "sha256:673a5917ebe29d410c0611a5ebe6c9fb80c7e0d2c9093c488b380e027159f136",
           "harness": {
             "marketplaces": [
               {
@@ -118,6 +118,9 @@
             "macos"
           ],
           "skills": [
+            "address-bug",
+            "address-debt",
+            "address-mistake",
             "address-review",
             "big-review",
             "big-review-all",
@@ -127,7 +130,7 @@
             "commit-push",
             "committing",
             "continue-roadmap",
-            "docs-and-debt",
+            "docs",
             "docs-review",
             "failing-tests",
             "failure-provenance",
@@ -169,11 +172,13 @@
             "sync",
             "sync-all",
             "sync-checkout",
-            "techdebt",
             "unmerged",
             "update-roadmap",
             "workboard",
-            "worktree"
+            "worktree",
+            "write-bug",
+            "write-debt",
+            "write-mistake"
           ],
           "dependencies": {
             "required": [
@@ -193,7 +198,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:113cfc9312da34d37a3ab9035159e8971e5702244ccb041b08a9194fd1a6f44d",
+          "digest": "sha256:ed2cf9a86a7889858d5986ff8ec668f4942a190e46ea1a96fa21f41bd68f7b75",
           "harness": {
             "marketplaces": [
               {
@@ -491,7 +496,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:868965cd91924b82b47c46463660886c811d981749621fb0e4d72930e150b81f",
+          "digest": "sha256:b34df2b3608a6466bcf121cf96264229c1b4cd30f1cceaf950cba45395d1ce13",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -574,7 +579,15 @@
                 "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)"
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -678,6 +691,70 @@
                       "-B",
                       "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/other.py",
                       "off"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py"
+                    ],
+                    [
+                      "search",
+                      "open"
+                    ],
+                    "--host",
+                    "codex"
+                  ],
+                  "justification": "machine:followup-codex recovery: inspect or reopen the exact Codex owner after no-send follow-up failure",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                      "search",
+                      "--host",
+                      "codex"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+                      "open",
+                      "--host",
+                      "codex"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                      "search",
+                      "--host",
+                      "codex"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                      "search",
+                      "--host",
+                      "claude"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                      "recover",
+                      "--host",
+                      "codex"
                     ]
                   ]
                 }

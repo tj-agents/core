@@ -45,7 +45,7 @@ class PeerCliTests(unittest.TestCase):
         close_terminal.assert_called_once_with(stale)
         killer.assert_not_called()
 
-    def test_windows_uia_unavailable_uses_verified_host_only_fallback(self):
+    def test_windows_uia_unavailable_refuses_an_unverified_host_only_close(self):
         target = {
             "title": "peer", "session_id": "peer", "pid": 31, "pid_started_at": 4.0,
             "terminal": {"kind": "windows-terminal"},
@@ -54,8 +54,9 @@ class PeerCliTests(unittest.TestCase):
                                side_effect=peer_cli.close_tab.TerminalUnavailable("no UIA")), \
                 mock.patch.object(peer_cli.session_close, "verified_live", return_value=True), \
                 mock.patch.object(peer_cli.os, "kill") as killer:
-            self.assertTrue(peer_cli.close_terminal_or_host(target, force=False))
-        killer.assert_called_once_with(31, peer_cli.signal.SIGTERM)
+            with self.assertRaisesRegex(peer_cli.session_close.Refusal, "actual-tab closure"):
+                peer_cli.close_terminal_or_host(target, force=False)
+        killer.assert_not_called()
 
     def test_windows_ambiguous_tab_never_uses_host_only_fallback(self):
         target = {
@@ -79,4 +80,16 @@ class PeerCliTests(unittest.TestCase):
                 mock.patch.object(peer_cli.os, "kill") as killer:
             with self.assertRaisesRegex(peer_cli.session_close.Refusal, "unknown"):
                 peer_cli.main(["close", "unknown", "--force"])
+        killer.assert_not_called()
+
+    def test_recorded_host_without_terminal_identity_cannot_be_reported_closed(self):
+        target = {
+            "title": "missing tab", "session_id": "missing-tab", "pid": 31,
+            "pid_started_at": 4.0, "alive": True,
+        }
+        with mock.patch.object(peer_cli, "records", return_value=[target]), \
+                mock.patch.object(peer_cli.session_close, "verified_live", return_value=True), \
+                mock.patch.object(peer_cli.os, "kill") as killer:
+            with self.assertRaisesRegex(peer_cli.session_close.Refusal, "terminal identity"):
+                peer_cli.main(["close", "missing-tab", "--force"])
         killer.assert_not_called()

@@ -5,9 +5,9 @@ import fnmatch
 import json
 import os
 import shutil
-import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import register_session
@@ -20,6 +20,10 @@ class TerminalRefusal(RuntimeError):
 
 class TerminalUnavailable(TerminalRefusal):
     """The platform adapter cannot identify a terminal target."""
+
+
+CLOSE_CONFIRM_ATTEMPTS = 5
+CLOSE_CONFIRM_INTERVAL_SECONDS = 0.1
 
 
 def is_windows():
@@ -196,6 +200,27 @@ def current_terminal_targets():
     return []
 
 
+def inventory_for_identity(identity):
+    kind = identity.get("kind")
+    if kind == "kitty":
+        return kitty_inventory(identity)
+    if kind == "tmux":
+        return tmux_inventory(identity)
+    if kind == "windows-terminal":
+        return windows_inventory()
+    raise TerminalUnavailable("the terminal cannot verify an exact tab closure")
+
+
+def require_closed(identity):
+    for attempt in range(CLOSE_CONFIRM_ATTEMPTS):
+        targets = inventory_for_identity(identity)
+        if not any(same_target(target["identity"], identity) for target in targets):
+            return
+        if attempt + 1 < CLOSE_CONFIRM_ATTEMPTS:
+            time.sleep(CLOSE_CONFIRM_INTERVAL_SECONDS)
+    raise TerminalRefusal("the terminal did not confirm the exact tab closed")
+
+
 def same_target(left, right):
     if left.get("kind") != right.get("kind"):
         return False
@@ -315,6 +340,7 @@ def close_actual(target, force=False, fallback_entry=None):
         raise TerminalRefusal("global inventory cannot safely close this terminal target")
     if result.returncode:
         raise TerminalRefusal((result.stderr or result.stdout or "terminal refused close").strip())
+    require_closed(identity)
 
 
 def close_stale_entry(entry):
@@ -387,12 +413,7 @@ def close_entry(entry, force=False):
         roots = konsole_roots(identity)
         if not host_belongs_to(entry, roots):
             raise TerminalRefusal("registered host is not owned by the exact Konsole session")
-        try:
-            os.kill(roots[0], signal.SIGTERM)
-        except OSError as error:
-            raise TerminalRefusal(
-                "could not signal the exact Konsole terminal process: " + str(error)) from error
-        return
+        raise TerminalUnavailable("Konsole cannot verify exact tab closure")
     elif kind == "windows-terminal":
         if not is_windows():
             raise TerminalUnavailable("Windows Terminal control is available only on Windows")
@@ -416,6 +437,7 @@ def close_entry(entry, force=False):
         raise TerminalRefusal("unsupported terminal kind")
     if result.returncode:
         raise TerminalRefusal((result.stderr or result.stdout or "terminal refused close").strip())
+    require_closed(identity)
 
 
 def print_inventory(targets):

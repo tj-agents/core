@@ -76,7 +76,8 @@ do not invoke the repository helpers, load Workflow v2 envelopes, or require the
 Use the remaining sections only when the selected engineering lifecycle has its runtime installed.
 
 Resolve `plan-execution` as the single owning lifecycle skill and only the technical skills directly routed
-by the current changed paths. Use `python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id>
+by the current changed paths. Run workflow commands as `python` on Windows or `python3` on Linux/macOS.
+Use `python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id>
 skills --lifecycle plan-execution --changed-path <path>` to record their identities and content hashes, and reuse that record
 while those hashes remain unchanged. Use the shared `inspect` operation once for routine repository state.
 
