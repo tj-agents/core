@@ -106,6 +106,56 @@ class CompletionTests(unittest.TestCase):
         with self.assertRaisesRegex(CompletionError, "owner and next_action"):
             completion_check(path, None, path.parent, lambda *_: {})
 
+    def test_local_closeout_evidence_uses_the_current_goal_and_fresh_delivery(self):
+        pending = [{"id": "verified", "criterion": "A result is observed.", "evidence": [],
+                    "owner": "delivery owner", "next_action": "Observe the terminal result."}]
+        path = self.write_goal(goal(acceptance=pending))
+        requested = []
+
+        def merged(delivery, _):
+            requested.append(delivery["head"])
+            return {"number": 42, "headRefOid": HEAD, "state": "MERGED", "body": ""}
+
+        missing = completion_check(
+            path,
+            {"repository": "example/test", "pr": 42, "head": HEAD},
+            path.parent,
+            merged,
+        )
+        self.assertFalse(missing["ready"])
+        self.assertIn("acceptance verified lacks evidence", missing["blockers"])
+
+        observed = [{"id": "verified", "criterion": "A result is observed.",
+                     "evidence": [{"source": "fresh delivery check", "result": "merged"}],
+                     "owner": "delivery owner", "next_action": "None."}]
+        path.write_text(goal(acceptance=observed), encoding="utf-8")
+        accepted = completion_check(
+            path,
+            {"repository": "example/test", "pr": 42, "head": HEAD},
+            path.parent,
+            merged,
+        )
+        self.assertTrue(accepted["ready"])
+        self.assertEqual([HEAD, HEAD], requested)
+
+        changed = completion_check(
+            path,
+            {"repository": "example/test", "pr": 42, "head": HEAD},
+            path.parent,
+            lambda *_: {"number": 42, "headRefOid": "b" * 40, "state": "MERGED", "body": ""},
+        )
+        self.assertFalse(changed["ready"])
+        self.assertIn("delivery PR #42 identity changed", changed["blockers"])
+
+        unmerged = completion_check(
+            path,
+            {"repository": "example/test", "pr": 42, "head": HEAD},
+            path.parent,
+            lambda *_: {"number": 42, "headRefOid": HEAD, "state": "OPEN", "body": ""},
+        )
+        self.assertFalse(unmerged["ready"])
+        self.assertIn("delivery PR #42 is not merged", unmerged["blockers"])
+
     def test_visible_tasks_excludes_examples_and_quotes(self):
         content = "- [ ] live task\n> - [ ] quoted\n```md\n- [ ] fenced\n```\n<!-- - [ ] hidden -->\n    - [ ] indented"
         self.assertEqual(["live task"], visible_tasks(content))

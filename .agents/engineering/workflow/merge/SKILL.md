@@ -379,13 +379,14 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   build to discover the rest rather than starting a full local solution build. Record the red state once as a
   blocker, then commit fixes locally, run targeted builds, and make one stable push. GitHub retains replacement
   checks and merge evidence. Never push the source plan's recovery commits to either PR.
-- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Before
-  deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
-  plan and its owned actions in place. Once
-  publication and sync are terminal, record the final transition, delete the plan and ledger, and tick
-  the owning roadmap item in one docs-only
-  closeout commit. Review it per `engineering:docs-review` — skipped for a pure close-out — and
-  land it through `engineering:merge-docs`.
+- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Once a source
+  candidate is frozen, late inert closeout state must not advance its `HEAD`; after terminal delivery, follow
+  `engineering:committing` for the current-file completion check and terminal local checkpoint. Retain the
+  existing goal until that check succeeds, then record the final transition and delete the plan and ledger and
+  tick the owning roadmap item locally. That exception is limited to plan, ledger, review-observation, or
+  problem-record status/evidence, so executable instructions, meaningful documentation deliverables, and code
+  or security fixes still require their normal delivery gates. A missing, invalid, or failing completion record
+  leaves the plan and its owned actions in place.
 
 ## Plan-managed delivery records material boundaries only
 
@@ -412,12 +413,13 @@ report its owned next actions as incomplete.
 One short report: the PR that merged (number plus merge commit); whether the full suite ran because a
 positive trigger was present or was skipped by label because none was; that the base is synced; and that the
 branch — and its worktree, if the work was done in one — is cleaned up. For plan-managed work, that the
-close-out PR landed and any isolated checkout was removed. Then the sync outcome: **nothing published, sync merged
+source delivery is terminal, the closeout remains locally recorded, and any isolated checkout was removed. Then
+the sync outcome: **nothing published, sync merged
 green at a new version, or sync went red and you migrated its consumers** (which files, now green) — never
 "merged, and left a red sync PR behind." If you stopped early, say exactly what is blocking and what is
 needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
-follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
+follow the sync PR to green or migrate it → record the local plan closeout → summarize →
 run `finish.py` when the session is attached to the removable merged worktree, or `close.py` when its
 checkout is retained. No preamble.
