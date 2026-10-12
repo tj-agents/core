@@ -250,10 +250,13 @@ def outcome(data):
         writer = headless_writer_record(owner)
         if state != "working" or writer is None:
             return "The canonical continuation has an unverified headless writer; reconcile it before ending this turn."
-        if (runtime.process_identity(writer["pid"]) != writer["identity"]
-                or not scheduler_ready(owner_path, owner, root) or not observed_wake(owner_path, owner)):
+        live = runtime.process_identity(writer["pid"]) == writer["identity"]
+        durable = scheduler_ready(owner_path, owner, root) and observed_wake(owner_path, owner)
+        if live and durable:
+            return None
+        if live or durable:
             return "The canonical continuation has a headless writer; wait for its receipt before ending this turn."
-        return None
+        return "The canonical continuation's headless writer ended without a scheduled recovery; reconcile it before ending this turn."
     if state == "working":
         return "The canonical continuation is working without a released foreground lease; reconcile it before ending this turn."
     if not scheduler_ready(owner_path, owner, root) or not observed_wake(owner_path, owner):

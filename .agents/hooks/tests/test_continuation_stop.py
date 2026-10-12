@@ -228,6 +228,15 @@ class ContinuationStopTests(unittest.TestCase):
             self.write_owner(self.owner("working", child=child))
             self.assertIn("wait for its receipt", self.call())
 
+    def test_ended_headless_writer_without_scheduled_recovery_blocks_for_reconciliation(self):
+        writer, child = self.live_writer()
+        writer.kill()
+        writer.wait()
+        self.write_owner(self.owner("working", child=child))
+        for scheduler, wake in ((False, True), (True, False), (False, False)):
+            with self.subTest(scheduler=scheduler, wake=wake), self.durable(scheduler, wake):
+                self.assertIn("ended without a scheduled recovery", self.call())
+
     def test_headless_writer_does_not_release_foreground_or_stale_obligations(self):
         _, child = self.live_writer()
         runtime = continuation_stop.module("continuation_runtime", continuation_stop.workflow_root())
