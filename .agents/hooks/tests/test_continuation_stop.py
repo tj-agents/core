@@ -173,6 +173,66 @@ class ContinuationStopTests(unittest.TestCase):
         with patch.dict(os.environ, {"CONTINUATION_OWNER_ID": "owner", "CONTINUATION_NONCE": "wrong", "CONTINUATION_RESULT_PATH": str(result)}, clear=False):
             self.assertIn("working without", self.call())
 
+    def live_writer(self):
+        writer = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(writer.wait)
+        self.addCleanup(writer.kill)
+        runtime = continuation_stop.module("continuation_runtime", continuation_stop.workflow_root())
+        return writer, {"pid": writer.pid, "identity": runtime.process_identity(writer.pid)}
+
+    def durable(self, scheduler=True, wake=True):
+        return patch.multiple(continuation_stop, scheduler_ready=Mock(return_value=scheduler),
+                              observed_wake=Mock(return_value=wake))
+
+    def test_released_lease_with_live_scheduled_headless_writer_allows_stop_on_both_hosts(self):
+        _, child = self.live_writer()
+        for harness in ("claude", "codex"):
+            for payload in (self.payload(), {"hookEventName": "Stop", "cwd": str(self.root), "sessionId": self.session}):
+                for receipt in (self.receipt(), {}):
+                    with self.subTest(harness=harness, payload=sorted(payload), obligation=bool(receipt)):
+                        self.write_owner(self.owner("working", harness=harness, child=child,
+                                                    launch_nonce="nonce", result_path=str(self.root / "result.json")))
+                        with self.durable(), patch.object(continuation_stop, "read_receipt", return_value=receipt):
+                            self.assertIsNone(continuation_stop.outcome(payload))
+
+    def test_headless_writer_without_durable_continuation_still_blocks(self):
+        _, child = self.live_writer()
+        self.write_owner(self.owner("working", child=child))
+        for scheduler, wake in ((False, True), (True, False), (False, False)):
+            with self.subTest(scheduler=scheduler, wake=wake), self.durable(scheduler, wake):
+                self.assertIn("wait for its receipt", self.call())
+
+    def test_unverified_headless_writer_blocks(self):
+        writer, child = self.live_writer()
+        cases = {
+            "reused": {**child, "identity": "reused"},
+            "unknown": {**child, "identity": "unknown"},
+            "missing-pid": {"identity": child["identity"]},
+            "malformed": True,
+        }
+        for name, record in cases.items():
+            with self.subTest(name=name), self.durable():
+                self.write_owner(self.owner("working", child=record))
+                self.assertIn("unverified headless writer", self.call())
+        with self.subTest(name="waiting-state"), self.durable():
+            self.write_owner(self.owner("waiting", child=child))
+            self.assertIn("unverified headless writer", self.call())
+        writer.kill()
+        writer.wait()
+        with self.subTest(name="exited"), self.durable():
+            self.write_owner(self.owner("working", child=child))
+            self.assertIn("unverified headless writer", self.call())
+
+    def test_headless_writer_does_not_release_foreground_or_stale_obligations(self):
+        _, child = self.live_writer()
+        runtime = continuation_stop.module("continuation_runtime", continuation_stop.workflow_root())
+        lease = {"pid": os.getpid(), "identity": runtime.process_identity(os.getpid())}
+        with self.durable():
+            self.write_owner(self.owner("working", child=child, foreground=lease))
+            self.assertIn("foreground ownership", self.call())
+            self.write_owner(self.owner("working", child=child, updated_at=1))
+            self.assertIn("no current continuation owner", self.call(self.receipt(execution_obligation_at=2)))
+
     def test_no_receipt_active_binding_and_repeated_stop_still_block(self):
         binding = self.root / ".agents/persistent-workflow-binding.json"
         binding.parent.mkdir(exist_ok=True)
