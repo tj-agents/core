@@ -106,6 +106,6 @@ Readiness authorizes this source boundary, including the mandatory existing-mani
 
 ## Current checkpoint
 
-Status: the authorized source slice is committed at `168b87d8607bbc756ce2c9ff37faa251d729a877`; focused continuation and harness-manifest validation passed after catalog synchronization and local generation.
+Status: the authorized source slice is committed at `168b87d8607bbc756ce2c9ff37faa251d729a877`, with checkpoint `a38eaf6c1a134b2f91c3e49452247093a58f8215`. The continuation runtime now provides a bounded, evidence-backed reconciliation path for a lease-free `owner-head-changed` owner; the recovered owner was reconciled without changing its ID or limits. Focused continuation runtime and harness-manifest validation passed after catalog synchronization and local generation.
 
-Next action: obtain the required frozen independent review and Windows/Linux CI evidence for that exact commit before normal delivery steps.
+Next action: commit the lifecycle recovery regression, then obtain the required frozen independent review and Windows/Linux CI evidence before normal delivery steps.

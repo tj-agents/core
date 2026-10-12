@@ -464,6 +464,22 @@ class ContinuationTests(unittest.TestCase):
         self.git("commit", "--allow-empty", "-m", "External replacement")
         self.assertEqual(self.wake()["reason"], "owner-head-changed")
 
+    def test_reconcile_blocked_head_change_preserves_owner_limits(self):
+        before = self.state()
+        old = {key: before[key] for key in ("repo", "worktree", "branch", "head")}
+        self.git("commit", "--allow-empty", "-m", "External replacement")
+        blocked = self.wake()
+        self.assertEqual(blocked["reason"], "owner-head-changed")
+        rebind = self.root / "rebind.json"
+        rebind.write_text(json.dumps({"old": old, "new": dict(old, head=self.git("rev-parse", "HEAD"))}))
+        result = self.cli("reconcile", "--owner", str(self.owner), "--rebind", str(rebind),
+                          "--reason", "head reconciled", "--next-action", "resume delivery")
+        self.assertEqual(result["state"], "waiting")
+        self.assertEqual(result["reason"], "head reconciled")
+        self.assertEqual(result["head"], self.git("rev-parse", "HEAD"))
+        for key in ("owner_id", "launches", "failures", "max_launches", "max_failures", "deadline"):
+            self.assertEqual(result[key], before[key])
+
     def test_deadline_is_terminal_and_canonical_goal_required(self):
         state = self.state()
         state["deadline"] = time.time() - 1
