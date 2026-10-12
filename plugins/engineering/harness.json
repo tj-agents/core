@@ -138,6 +138,13 @@
           "claude",
           "codex"
         ]
+      },
+      {
+        "path": "hooks/worktree_placement_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
       }
     ],
     "permissions": {
