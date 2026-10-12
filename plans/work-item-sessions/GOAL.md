@@ -180,6 +180,16 @@ Steps 1–2 and 4 ship to every consumer through the marketplace automatically. 
 
 This Markdown registry is the interim. Termboard (SQLite) supersedes it: once Termboard covers the daily loop, `ACTIVE_SESSIONS.md` and the work-item session convention stop being used and are retired under their own goal. Keep the interim tooling minimal accordingly. Nothing in Core waits on Termboard.
 
+### S2 runtime dual-read specification
+
+A work-item README is `plans/features/<f>/work-items/<w>/README.md`; it is both plan and ledger. Ledger handling stays unchanged until S5.
+
+- `workflow_runtime.py` `RepositoryStateProvider.resolve`: when the path is a work-item README, require headers `Status`, `Worktree`, `Branch`; `artifacts.plan` and `artifacts.ledger` are the README, `artifacts.roadmap` is `plans/features/<f>/README.md` (must exist), `workflow_id` is `<f>/<w>`, decisions come from `## Decisions`. Next Steps, `PR:`, `## Reviews` and worktree/branch checks reuse the existing code. The v2 schema is unchanged.
+- `plan_graph.py`: `repository_report` also checks every work-item README: `Status:` in the D1 set; the feature README holds exactly one checklist line containing `` `<f>/<w>` ``; the existing Next Steps scope, blocker, review-gate and terminal-handoff checks; `Blocked by:` and `## Downstream handoffs` may name a work-item README; the 200-line/16 KB budget; `Status: done` requires `Complete:` Next Steps and no `ACTIVE_SESSIONS.md`.
+- `plan_handoff_stop.py`: recognise work-item README paths wherever it recognises `_PROGRESS.md`; the pointer becomes `Read @<absolute README> and do what its `## Next Steps` says.`; the `Why:` line names the README.
+- `workflow_ops.py`: `inspect_repository` adds `work_items`; `delivery-preflight --ledger` accepts a work-item README.
+- Tests mirror each existing ledger case with a work-item fixture.
+
 ## Delivery slices
 
 | Slice | Content | Route | Depends on |
@@ -204,11 +214,13 @@ This Markdown registry is the interim. Termboard (SQLite) supersedes it: once Te
 
 ## Current progress
 
-- 2026-10-12, Claude session `claude:c27c07bf-a274-466a-a10e-10ef96f36841`: investigation complete; design, migration map and slices recorded above. No source changes yet.
+- 2026-10-12, Claude session `claude:c27c07bf-a274-466a-a10e-10ef96f36841`: investigation complete; design, migration map and slices recorded above.
+- S1 implemented in this commit: `.agents/machine/scripts/work_item_sessions.py`, `tests/test_work_item_sessions.py` (24 tests), `.agents/machine/resources/work-item-sessions.md`, the `recover-agents` "Continue a work item" section, machine harness permissions (Codex scoped to `status`/`resume`), sources mapping and catalog digest. Windows: `test_work_item_sessions`, `test_agent_recovery`, `test_harness_manifests`, `test_catalog_digests`, `test_harness_permissions_sync`, `test_open_claude` — 115 passed, 1 pre-existing symlink skip; `sync-generated.ps1 -Check` passes after a throwaway regeneration (`plugins/` restored). Linux, review and PR outstanding.
+- Persistent-workflow owner initialized and claimed; scheduler registration was denied by the permission classifier as unauthorized persistence, so the owner is checkpointed `blocked` (`host-capability-or-permission-unavailable`) pending Tommy's approval. Foreground work continues.
 
 ## Next Steps
 
-Implement S1 on this branch (`Feature/WorkItemSessions`): `work_item_sessions.py` and its tests under `.agents/machine/scripts`, the `ACTIVE_SESSIONS.md` schema/template under machine resources, and the `recover-agents` "continue work item" entry, per D2/D3. Then review, validate on Windows and Linux, and deliver through `merge`.
+Review the S1 candidate on `Feature/WorkItemSessions` through `engineering:review`, validate it on Linux, open its PR through `engineering:open-pr`, and deliver through `engineering:merge`. Then start S2 from the updated remote default.
 
 - Scope: whole plan through all remaining phases and terminal delivery.
 - Current slice: S1 session registry helper and recover-agents entry.
