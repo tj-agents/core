@@ -87,3 +87,15 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Intended correction:** Reconcile actual state after failed or ambiguous mutations before reporting, retrying, rolling back or handing ownership to another agent.
 
 **Resolved when:** The workflow demonstrates accurate state reconciliation for complete, partial and unexecuted failures.
+
+
+## M008 - Unverified delayed CLI closure after completed delivery
+
+- Kind: mistake. Observed/reported: 2026-10-12; predecessor ended its report after delegating delayed self-close and did not reconcile the nonzero command/observer cancellation.
+- Cause: confirmed unobserved final action; no valid basis to equate a delayed worker promise with completed session exit.
+- Impact/priority: P2; completed CLI remained live and Tommy had to call out unfinished closure.
+- Source owner: engineering session-guidance terminal lifecycle and machine peer-cli runtime. State: in-progress.
+- Repair link: B001, plans/verified-self-close/GOAL.md; one causal repair owner.
+- Next action: repair the verified self-close failure and retain accountable closure evidence/reporting.
+- Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
+- Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.

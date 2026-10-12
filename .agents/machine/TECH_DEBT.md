@@ -27,6 +27,9 @@ cleanup on Linux and Windows while retaining PID/start-time and terminal identit
 registration must be reported as an incomplete attachment, rather than successful closure or evidence
 that no native CLI exists.
 
+
+2026-10-12 follow-up incident (kind: debt, P2, in-progress): completed native session 01a12d05-0e36-7cd2-afac-1936aa63404b retained a verified host attachment but close.py refused an absent/ambiguous Windows Terminal target; its accepted/armed observer cancelled without exit. Current inventory has zero actual tabs. This is a distinct verified-self-close fallback gap, not missing registry or sandbox PID visibility. Canonical causal repair: [B001](../../BUGS.md#b001) and [verified self-close goal](../../plans/verified-self-close/GOAL.md), Fix/VerifiedSelfCloseFallback. Next action: reproduce and correct safe own-host fallback and observed closure accountability. Resolve this incident when focused identity/observer tests, both platform CI and actual registered self-exit prove closure; retain this broader debt until its original Linux/Windows acceptance condition passes.
+
 ## The Codex plugin cache is not reconciled
 
 `~/.codex/plugins/cache/` accumulates orphaned plugin payloads exactly as the Claude cache did, and
