@@ -281,6 +281,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/worktree_placement_gate.py",
+      "destination": "hooks/worktree_placement_gate.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/workflow_route.py",
       "destination": "hooks/workflow_route.py"
     },

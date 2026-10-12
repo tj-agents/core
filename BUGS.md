@@ -72,3 +72,17 @@
 **Resolution condition:** Both native hosts receive unchanged recovery instructions containing existing authority evidence; supported caller guidance carries exact task/scope/provenance into approval review without adding authority or overriding rejection; focused regressions, independent review and Windows/Linux CI pass, and the source correction plus causal generated packages reach main.
 
 **Verification evidence:** Baseline recovery/follow-up/Claude-launcher suites passed on Windows. Delivery and new-regression evidence remains pending.
+
+## B006 - Native worktree creation bypasses repository placement
+
+**Kind:** bug. **Observed/reported:** October 8, 2026 creation records, reconciled October 12, 2026. Native Git created a sibling worktree despite internal-placement guidance. **Cause:** confirmed absence of a creation gate in both host engineering manifests.
+
+**Impact and priority:** P2; new worktrees spread outside repository-owned layout.
+
+**Source owner:** tj-agents/core engineering shared hooks and both host wiring. **State:** in-progress. **Repair link:** plans/worktree-placement-enforcement/GOAL.md, branch Fix/WorktreePlacementEnforcement. The allocator and migration remain owned by Feature/RepositoryOwnedLayout.
+
+**Next action:** qualify the shared native-Git creation gate without copying the allocator or moving active checkouts.
+
+**Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
+
+**Verification evidence:** refreshed base 376df0ced5283a4ee4247d07feb10e8671b64475 still has no placement gate or allocator. A filtered native creation statement was observed at 2026-10-08T16:19:37.087Z; no raw transcript ships. Installed native-host acceptance remains unverified.
