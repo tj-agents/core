@@ -37,7 +37,7 @@ Resolution condition: an agent can choose and perform eligible exact-owner recov
 
 ## Evidence and boundaries
 
-Origin task: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-RepositorySettingsContract/plans/repository-settings/GOAL.md.
+Origin task: [Core repository settings delivery](https://github.com/tj-agents/core/pull/208); historical originating session 01a12ccb-c604-77f1-bb4c-cc8c5e21ead1.
 Existing closed controller: native 01a122c4-e884-7402-a873-9fa7449e5c37, recorded cwd C:/Users/TommySeery/source/repos/tj-agents/rust/.worktrees/Fix-RustStandardDiscovery.
 Its child: 01a12ad1-ca57-78c1-ac1b-7900005a5db8, /root/implement_repository_configuration, preserving substantial uncommitted Core work in Feature-RepositoryConfiguration.
 Supported follow-up result: unavailable, existing app-server proxy disconnected/unavailable, no send attempted, no receipt created. No daemon or replacement session was started.
