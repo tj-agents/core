@@ -20,6 +20,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import delivery_runtime
+import delivery_policy
 import workflow_runtime
 from pr_body import validate_pr_body
 
@@ -2001,23 +2002,20 @@ def review_binding(root, branch, head):
 
 
 def standing_authorization(root, changed_paths, labels):
-    path = root / delivery_runtime.STANDING_AUTHORIZATION_FILE
-    if not path.is_file():
-        resolution = delivery_runtime.StandingMergeAuthorization().resolve(
-            {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
-            changed_paths, labels,
-        )
-        if resolution["stopped_by"] is None:
-            resolution["stopped_by"] = {"class": "no-recorded-authorization"}
-        return resolution
     try:
-        policy = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise WorkflowOperationError(
-            f"{delivery_runtime.STANDING_AUTHORIZATION_FILE} exists but could not be read: {error}"
-        ) from error
+        policy = delivery_policy.load_legacy_policy(root)
+    except delivery_policy.PolicyViolation as error:
+        raise WorkflowOperationError(str(error)) from error
     try:
-        return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels)
+        if policy is None:
+            resolution = delivery_runtime.StandingMergeAuthorization().resolve(
+                {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
+                changed_paths, labels, root,
+            )
+            if resolution["stopped_by"] is None:
+                resolution["stopped_by"] = {"class": "no-recorded-authorization"}
+            return resolution
+        return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels, root)
     except delivery_runtime.DeliveryContractViolation as error:
         raise WorkflowOperationError(str(error)) from error
 
