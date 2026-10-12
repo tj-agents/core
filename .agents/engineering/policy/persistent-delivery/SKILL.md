@@ -79,15 +79,20 @@ stop paths and its hold label still apply; without a table, `human-gate` is the 
 approval cannot add exemptions or bypass a stop. **Re-run the binder on every rebind:** a repaired head
 may add a stop path or hold.
 
-`auto_merge` is a separate optional boolean in that same declaration. Omit it or set it to `false` to keep
-GitHub auto-merge unavailable. With `true`, after the normal green exact-head, independent-review and merge
-authorization decision, invoke only the packaged guarded command:
+The auto-merge preference comes from `.agents/settings.json` in the actual checkout, at
+`configuration.core.auto_merge`, separately from delivery authority. When that file is present, it is
+authoritative: `false` or an omitted `configuration`, `core` or `auto_merge` disables auto-merge and never
+falls back to the legacy declaration, and malformed present settings fail closed. Only when the settings
+file is wholly absent may the validated published legacy declaration's `auto_merge: true` enable the
+preference; omitted legacy `auto_merge` means `false`. The settings file itself is always a non-exemptible
+stop. After the normal green exact-head, independent-review and merge-authorization decision, invoke only
+the packaged guarded command:
 
 ```text
 python -B workflows/auto_merge.py --root ROOT
 ```
 
-It reloads the declaration and authority, complete remote diff and labels, live PR readiness, exact local and
+It reloads fresh settings and authority, the complete remote diff and labels, live PR readiness, exact local and
 remote branch/head/worktree identity, and the canonical review and security evidence before executing its
 fixed GitHub command. Do not run `gh pr merge --auto` directly; the delivery hook directs it to this wrapper.
 
