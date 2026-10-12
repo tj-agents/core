@@ -203,26 +203,3 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
   missing launch or record is surfaced as an actionable failure rather than explained away.
 - **Verification evidence:** this session read the exact `engineering:session-guidance` rule, then returned
   without either action; the peer registry later showed the active source-repair session cited above.
-
-## M014 - Explicit mistake-callout repair obligation was not executed
-
-- **Kind:** mistake.
-- **Observed/reported:** 2026-10-12; after Tommy called out that no background CI waiter had been launched,
-  this session had the governing `engineering:session-guidance` instruction available but did not record the
-  incident or launch the required bounded source-owner repair in that same turn. It instead gave an
-  explanation of the failure until Tommy explicitly demanded a permanent record.
-- **Cause:** confirmed failure to execute an explicit instruction, not an absence of instruction or authority.
-- **Impact and priority:** P1; Tommy must repeatedly enforce the workflow himself, and the required repair
-  can be skipped despite an unambiguous standing obligation.
-- **Source owner:** Core `engineering:session-guidance` callout-repair contract and the host/runtime
-  enforcement that must make its required transition observable.
-- **State:** in-progress.
-- **Repair link:** active `Fix-StandardsMistakeCallout` source repair, session
-  `01a11698-c02c-7b72-9f67-ec82fd91efb0`.
-- **Next action:** reconcile this incident with the active source repair and make the callout path require
-  observed incident recording plus verified bounded-handoff launch before the original task resumes.
-- **Resolution condition:** automated host acceptance proves that a user mistake callout causes the required
-  incident record and source-owner handoff to be observed before a normal task response can continue; a
-  missing launch or record is surfaced as an actionable failure rather than explained away.
-- **Verification evidence:** this session read the exact `engineering:session-guidance` rule, then returned
-  without either action; the peer registry later showed the active source-repair session cited above.
