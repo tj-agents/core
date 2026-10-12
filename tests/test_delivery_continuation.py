@@ -150,6 +150,12 @@ class DeliveryContinuationTests(unittest.TestCase):
         return scheduler.windows_receipt(self.owner, self.owner_path, ADAPTER, ROOT / ".agents/workflows/continuation_runtime.py",
                                          sys.executable, host, 20, self.environment)
 
+    def test_cli_failure_reports_a_failed_command_not_an_owner_state(self):
+        result = subprocess.run([sys.executable, "-B", str(ADAPTER), "wake", "--owner", "relative/owner.json"],
+                                capture_output=True, text=True, encoding="utf-8", timeout=30)
+        self.assertEqual(2, result.returncode, result.stderr)
+        self.assertEqual({"outcome": "failed", "reason": "owner path must be absolute"}, json.loads(result.stdout))
+
     @unittest.skipIf(os.name == "nt" or not shutil.which("systemd-analyze"),
                      "Linux unit parser; Windows path transport has its inbox PowerShell counterpart")
     def test_real_systemd_parser_accepts_a_working_directory_with_special_characters(self):
