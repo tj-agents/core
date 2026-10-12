@@ -50,9 +50,10 @@ against its stable mistake ID. D002 records the later observed CI-waiter gap.
 - **Repair link:** [M003](../../MISTAKES.md#M003).
 - **Next action:** make the delivery lifecycle launch and verify a background CI waiter when exact-head CI
   is pending, or persist a typed gate naming the resolver and observable resume condition.
-- **Resolution condition:** a test-covered PR delivery with pending exact-head CI launches an active,
-  verified background waiter or agent that owns the PR through terminal CI and the next delivery action;
-  no foreground owner may return while neither a registered background owner nor a typed gate exists.
+- **Resolution condition:** both Core host-package paths prove that a nonterminal delivery is either
+  actively foreground-owned, has a registered and verified background waiter or agent through the next
+  delivery action, records a typed external gate with a resolver and observable resume condition, or is
+  terminally closed. No Core consumer may leave a nonterminal delivery idle without one of those states.
 - **Verification evidence:** PR #230 on `Fix/ContinuationStopBindingHead` was open at
   `2173ae76ab0fd1e042ae0f414c95dc1f67ff5fcb` with `verify-windows` and `verify-linux` pending; no
   background CI waiter, continuation, or background agent had been launched before the session returned.
