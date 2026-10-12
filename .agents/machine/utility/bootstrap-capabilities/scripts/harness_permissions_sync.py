@@ -228,15 +228,14 @@ def load_requires(root: Path, warnings: list[str]) -> tuple[dict, dict] | None:
 def auto_merge_enabled(project: Path | None) -> bool:
     if project is None:
         return False
-    policy = read_json(project / ".agents" / "delivery-authorization.json")
     validator = policy_validator()
     if validator is None:
         return False
     try:
-        validator.validate(policy)
-    except validator.PolicyViolation:
+        policy = validator.load_legacy_policy(project)
+        return validator.auto_merge_preference(project, policy)
+    except ValueError:
         return False
-    return policy.get("auto_merge") is True
 
 
 def own_payload_root() -> Path | None:

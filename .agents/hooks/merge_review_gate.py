@@ -82,6 +82,7 @@ SHELL_TOOLS = {"bash", "powershell"}
 # CONFIG_FILE under `security_paths`.
 _SECURITY_PATTERNS = (
     re.compile(r"^\.github/workflows/"),
+    re.compile(r"(?:^|/)\.agents/settings\.json$", re.IGNORECASE),
     re.compile(r"(?i)(authoriz|authentic|credential|\bsecret|password|apikey|api_key)"),
 )
 
