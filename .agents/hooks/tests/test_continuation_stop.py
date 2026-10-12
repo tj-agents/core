@@ -285,17 +285,36 @@ class ContinuationStopTests(unittest.TestCase):
         self.assertIsNone(self.call({"worktree": str(self.root.resolve()), "routed_at": 1, "prompt": "Planning only: revise the plan."}))
 
     def test_unrelated_read_only_session_does_not_adopt_another_foreground_owner(self):
-        self.write_owner(self.owner("working", foreground={"pid": 1}))
+        foreign = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(foreign.wait)
+        self.addCleanup(foreign.kill)
+        runtime = continuation_stop.module("continuation_runtime", continuation_stop.workflow_root())
+        self.write_owner(self.owner("working", foreground={
+            "pid": foreign.pid,
+            "identity": runtime.process_identity(foreign.pid),
+        }))
         self.assertIsNone(self.call({"worktree": str(self.root.resolve()), "routed_at": 1, "prompt": "Review this diff only."}))
 
-    def test_unrouted_owner_process_still_blocks_and_pid_reuse_does_not(self):
+    def test_foreign_verified_foreground_owner_head_drift_does_not_block_stop(self):
+        foreign = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(foreign.wait)
+        self.addCleanup(foreign.kill)
+        runtime = continuation_stop.module("continuation_runtime", continuation_stop.workflow_root())
+        self.write_owner(self.owner(
+            "working",
+            head="changed",
+            foreground={"pid": foreign.pid, "identity": runtime.process_identity(foreign.pid)},
+        ))
+        self.assertIsNone(self.call({"worktree": str(self.root.resolve()), "routed_at": 1, "prompt": "Review this diff only."}))
+
+    def test_unrouted_owner_process_and_pid_reuse_block(self):
         workflows = continuation_stop.workflow_root()
         runtime = continuation_stop.module("continuation_runtime", workflows)
         receipt = {"worktree": str(self.root.resolve()), "routed_at": 1, "prompt": "Go."}
         self.write_owner(self.owner("working", foreground={"pid": os.getpid(), "identity": runtime.process_identity(os.getpid())}))
         self.assertIn("foreground ownership", self.call(receipt))
         self.write_owner(self.owner("working", foreground={"pid": os.getpid(), "identity": "reused"}))
-        self.assertIsNone(self.call(receipt))
+        self.assertIn("foreground ownership", self.call(receipt))
 
     def test_foreground_association_requires_the_nearest_cli_owner(self):
         lease = {"pid": 111, "identity": "identity"}
