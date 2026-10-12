@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `d03b34dd289064840cddebeb07fc6d402ef3ae71`  `(2026-10-12)`
-**Judgment:** `approved`
+**Reviewed up to commit:** `67b45a87b390a722727dc6f428ff08922113b238`  `(2026-10-13)`
+**Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-12 — full
 
@@ -22,10 +22,6 @@
 **Pass judgment:** `changes-requested`
 
 Native layer: Claude Code `code-review` skill (medium). Lens: `workflow` (`review-lens`). No security-sensitive paths.
-
-```agent-host-coverage
-{"schema_version":1,"shared_source":".agents/machine/scripts/work_item_sessions.py","candidate_head":"afa69fa55a938cde389e56d171db21fac8877660","hosts":[{"host":"claude","behavior":"Record, report and resume the exact Claude session recorded for a work item through the guarded open_session path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources/machine/scripts with Claude allow rules in .agents/plugins/harness/machine.json; routed by machine:recover-agents.","verification":{"level":"source","result":"passed","evidence":"tests/test_work_item_sessions.py records a Claude owner from CLAUDE_CODE_SESSION_ID, validates it, and resumes it through a mocked open_session with the Claude projects root; focused suite 115 passed on Windows."}},{"host":"codex","behavior":"Record, report and resume the exact Codex session recorded for a work item through the guarded open_session path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources/machine/scripts with a Codex prefix rule scoped to status/resume in .agents/plugins/harness/machine.json; routed by machine:recover-agents.","verification":{"level":"source","result":"passed","evidence":"tests/test_work_item_sessions.py records a bounded Codex row from CODEX_THREAD_ID beside the Claude owner and validates both; test_harness_manifests checks the Codex prefix rule match and not_match cases."}}]}
-```
 
 ### Findings
 
@@ -102,3 +98,73 @@ Native layer: Claude Code `code-review` skill (medium). Lens: `workflow` (`revie
 ### Findings
 
 No findings. R7 and R8 dispositions verified.
+
+## Review pass — 2026-10-13 — incremental
+
+**Candidate base:** `d03b34dd289064840cddebeb07fc6d402ef3ae71`
+**Candidate head:** `67b45a87b390a722727dc6f428ff08922113b238`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:69c39bad441c9e92dca09869bdd2cd06515a55c4b229718a1d6ed7f855a4f0c8` `(16 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\lRVmo24oi_Xug_5KxuqHSL\hBINm-RI6thx-ILDMdEZch`
+**Candidate bundle identity:** `sha256:e99327032211b45c25b81cdc467bcbaf7327dd2e99f27baacab3a5da4b829c25`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). No security-sensitive paths. Resume registration verification is out of scope here (PR #233).
+
+```agent-host-coverage
+{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"67b45a87b390a722727dc6f428ff08922113b238","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"tests/test_session_store.py and tests/test_work_item_sessions.py pass on Windows (90 session tests), but R9 shows the packaged SessionStart loader cannot find session_store.py."},"exception":{"constraint_evidence":"register_session.py _load_session_store candidates miss PLUGIN_ROOT/resources/machine/scripts/session_store.py in the packaged layout (R9).","supported_other_host_outcome":"Codex shares the same loader defect; neither host records SessionStart until R9 is fixed."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"Same source tests; test_codex_windows_hook_commands passes; the packaged SessionStart loader defect R9 applies."},"exception":{"constraint_evidence":"Same R9 loader path miss; Codex additionally has no SessionEnd hook, so hand-closed Codex tabs read as interrupted by design.","supported_other_host_outcome":"Claude records SessionEnd once R9 is fixed."}}]}
+```
+
+### Findings
+
+- [ ] **R9 — HIGH — native, workflow** — `.agents/machine/utility/peer-cli/scripts/register_session.py:342`
+  `_load_session_store` looks under `HERE.parents[2]` (`.agents/machine` in the package), but `sources.json` ships the
+  module only at `PLUGIN_ROOT/resources/machine/scripts/session_store.py`, so installed SessionStart never writes a
+  row and `interrupted` finds nothing. Add the packaged candidates (`HERE.parents[4]/resources/machine/scripts` for the
+  `.agents/machine/utility/...` layout, `HERE.parents[2]/resources/machine/scripts` for `skills`/`codex-skills`) and
+  test the loader against both packaged layouts.
+- [ ] **R10 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:137`
+  `_read_time_status` returns `closed` for any ended row before the foreign and stale checks, and a not-ended dead
+  session skips the worktree check, so `resume` can reopen a foreign session or one whose worktree is gone. Check
+  `foreign` first, then liveness for not-ended rows, then the worktree staleness for every resumable row.
+- [ ] **R11 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:267`
+  `resume` without `--handle` only considers owners with `ended_at IS NULL`, so an owner whose tab was closed cleanly
+  (`end_reason = 'closed'`) always needs `--handle`. Select the single owner that is not ended or ended `closed`;
+  `finished` and `handed_off` owners are not resumable.
+- [ ] **R12 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:196`
+  `start_session` clears `ended_at`/`end_reason` but keeps `role = 'owner'`, so a handed-off predecessor that is
+  resumed becomes a second live owner. When the previous end reason was `handed_off`, clear its role.
+- [ ] **R13 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:184`
+  `claim` reads live owners and then sets ownership outside a transaction, so two concurrent claims can both become
+  owner. Wrap the check and the update in one `BEGIN IMMEDIATE` transaction.
+- [wontfix] **R14 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:188`
+  `--predecessor` takes ownership from a live owner without a `handing-off` state.
+  Disposition: intended by the approved spec ("A predecessor's ownership transfers with `handed_off` and `successor`
+  set"); `engineering:handoff` requires the predecessor to stop owned-path writes before launching its successor, so
+  the transfer does not create a second writer.
+- [ ] **R15 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:136`
+  `_normalise_remote` keeps only the last two path segments, so one Azure DevOps repository gets different identities
+  over HTTPS and SSH, and repositories on different hosts collide. Include the host and the full path, mapping
+  `ssh.dev.azure.com:v3/<org>/<project>/<repo>` to `dev.azure.com/<org>/<project>/_git/<repo>`.
+- [ ] **R16 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:176`
+  `--role` is not validated, so `Owner` or `owner ` bypasses the single-owner rule. Accept only `owner` or
+  `bounded: <non-empty scope>`.
+- [ ] **R17 — LOW — native** — `.agents/machine/scripts/session_store.py:107`
+  `_git` decodes output with `text=True` and no encoding, against `CODE_CONVENTIONS.md`; non-ASCII output can raise
+  outside the handled exceptions. Pass `encoding="utf-8", errors="replace"`.
+- [ ] **R18 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:182`
+  `claim` from the default branch records it on the work item, after which every unclaimed session on that branch
+  auto-attaches to the item. Do not record the repository's default branch (`origin/HEAD`, else `main`/`master`).
+- [ ] **R19 — LOW — native** — `.agents/machine/utility/peer-cli/scripts/finish.py:12`
+  `_record_own_end` is duplicated in `close.py` and `finish.py`. Move it into the shared `session_close.py`.
+- [ ] **R20 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:157`
+  Each SessionStart/Stop hook runs three to four `git` subprocesses with 3-second timeouts; on Codex, SessionStart
+  shares a 7-second deadline with three other hooks. Collapse the probes into one `rev-parse` call plus the remote
+  lookup with a shorter timeout.
+- [ ] **R21 — MEDIUM — workflow** — `.agents/plugins/harness/machine.json:301`
+  The Codex justification calls `interrupted` read-only, but `interrupted --resume` reopens sessions like `resume`.
+  State that `--resume` performs the same guarded reopen, limited to rows confirmed dead on this machine (mirror in
+  `catalog.json`'s harness field).
