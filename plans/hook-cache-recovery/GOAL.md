@@ -87,9 +87,53 @@ PR #209 note (not edited here): its `BUGS.md` adds B004 twice; its owner should 
 - `sync-generated.ps1 -Check` (529 files, 0 changed after local regenerate, output left uncommitted),
   `sync_harness_manifests.py --check` and the `host_coverage.py --stage plan` validator pass.
 
+## Delivery
+
+PR https://github.com/tj-agents/core/pull/226 (draft), head `2ccff70939bbf8265c8dc58f5cece94440eb3510`; standing
+merge authorization AUTO from the repository table. Independent review lens over `8425d10..2ccff70`: no findings.
+
+```completion
+{
+  "outcome": "A valid continuation binding no longer raises binding-head-changed once the released Stop hook is installed, and operators have a documented supported recovery path.",
+  "acceptance": [
+    {
+      "id": "source-repair",
+      "criterion": "binding_active compares remote_head_sha and a real-normalization regression passes on Windows and Linux.",
+      "evidence": [
+        {"source": "local Windows run of test_continuation_stop.py", "result": "30 tests OK; new regression errors against the unrepaired hook"}
+      ],
+      "owner": "Claude hook-cache-recovery session",
+      "next_action": "Observe green exact-head verify-windows and verify-linux CI on PR 226."
+    },
+    {
+      "id": "operator-recovery",
+      "criterion": "README documents source repair vs installed-cache recovery and the running-session action.",
+      "evidence": [
+        {"source": "README.md Recover from a faulty installed hook", "result": "section present; review lens verified commands against codex_marketplace_sync.py and claude_standards_sync.py"}
+      ],
+      "owner": "Claude hook-cache-recovery session",
+      "next_action": "Merge PR 226."
+    }
+  ],
+  "deliveries": [
+    {"repository": "tj-agents/core", "pr": 226, "head": "2ccff70939bbf8265c8dc58f5cece94440eb3510"}
+  ],
+  "open_tasks": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 226,
+      "head": "2ccff70939bbf8265c8dc58f5cece94440eb3510",
+      "text": "Exact-head verify-windows / verify-linux CI",
+      "owner": "Claude hook-cache-recovery session",
+      "next_action": "Monitor exact-head CI and merge through the guarded auto-merge path."
+    }
+  ]
+}
+```
+
 ## Next Steps
 
-1. Review, push, open PR, merge under the Authorization above; Linux evidence comes from `verify-linux` CI.
+1. Monitor exact-head CI on PR 226, then merge under the Authorization above; Linux evidence comes from `verify-linux` CI.
 
 - Scope: only installed Stop-hook cache recovery.
 - Current slice: delivery of the implemented remedy.
