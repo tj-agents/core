@@ -539,7 +539,6 @@ class CommandOwnershipTests(unittest.TestCase):
         self.assertTrue(process.stdout.closed)
         self.assertTrue(process.stderr.closed)
 
-    @unittest.skipUnless(os.name == "nt", "Windows Job Object setup")
     def test_zero_startup_budget_raises_command_timeout_after_drain(self):
         process = None
         original_popen = subprocess.Popen
@@ -563,7 +562,6 @@ class CommandOwnershipTests(unittest.TestCase):
         self.assertTrue(process.stdout.closed)
         self.assertTrue(process.stderr.closed)
 
-    @unittest.skipUnless(os.name == "nt", "Windows Job Object setup")
     def test_startup_overrun_raises_command_timeout_after_drain(self):
         process = None
         original_popen = subprocess.Popen
