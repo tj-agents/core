@@ -7,7 +7,8 @@ from pathlib import Path
 
 SETTINGS_PATH = Path(".agents") / "settings.json"
 NAMESPACE_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
-CORE_KEYS = frozenset({"auto_merge", "auto_approve_design"})
+CORE_KEYS = frozenset({"auto_merge", "auto_approve", "auto_approve_design"})
+AUTO_APPROVE_KEYS = frozenset({"all", "design"})
 
 
 class ConfigurationViolation(ValueError):
@@ -91,9 +92,21 @@ def core(root):
     unknown = set(value) - CORE_KEYS
     if unknown:
         raise ConfigurationViolation(f"core settings have unknown keys {sorted(unknown)!r}")
-    for key in CORE_KEYS:
+    for key in ("auto_merge", "auto_approve_design"):
         if key in value and type(value[key]) is not bool:
             raise ConfigurationViolation(f"core {key} must be a boolean")
+    if "auto_approve" in value:
+        auto_approve = value["auto_approve"]
+        if not isinstance(auto_approve, dict):
+            raise ConfigurationViolation("core auto_approve must be an object")
+        unknown_auto_approve = set(auto_approve) - AUTO_APPROVE_KEYS
+        if unknown_auto_approve:
+            raise ConfigurationViolation(
+                f"core auto_approve has unknown keys {sorted(unknown_auto_approve)!r}"
+            )
+        for key in AUTO_APPROVE_KEYS:
+            if key in auto_approve and type(auto_approve[key]) is not bool:
+                raise ConfigurationViolation(f"core auto_approve {key} must be a boolean")
     return value
 
 
@@ -106,7 +119,14 @@ def auto_merge(root, legacy_policy):
 
 def auto_approve_design(root):
     settings = core(root)
-    return False if settings is None else settings.get("auto_approve_design", False)
+    if settings is None:
+        return False
+    auto_approve = settings.get("auto_approve")
+    if auto_approve is None:
+        return settings.get("auto_approve_design", False)
+    if "design" in auto_approve:
+        return auto_approve["design"]
+    return auto_approve.get("all", False)
 
 
 def auto_approve_design_provenance(root):
@@ -114,6 +134,13 @@ def auto_approve_design_provenance(root):
     path = Path(root) / SETTINGS_PATH
     if settings is None:
         return False, f"no settings file at {path}"
-    if "auto_approve_design" not in settings:
-        return False, f"auto_approve_design absent from {path}"
-    return settings["auto_approve_design"], f"configuration.core.auto_approve_design at {path}"
+    auto_approve = settings.get("auto_approve")
+    if auto_approve is not None:
+        if "design" in auto_approve:
+            return auto_approve["design"], f"configuration.core.auto_approve.design at {path}"
+        if "all" in auto_approve:
+            return auto_approve["all"], f"configuration.core.auto_approve.all at {path}"
+        return False, f"configuration.core.auto_approve default at {path}"
+    if "auto_approve_design" in settings:
+        return settings["auto_approve_design"], f"configuration.core.auto_approve_design at {path}"
+    return False, f"configuration.core.auto_approve default at {path}"
