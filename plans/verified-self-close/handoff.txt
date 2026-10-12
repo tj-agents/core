@@ -1,0 +1,2 @@
+cd C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-VerifiedSelfCloseFallback
+Read @C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-VerifiedSelfCloseFallback/plans/verified-self-close/GOAL.md and execute its ## Next Steps. This is the isolated verified-self-close standards repair; acknowledge pickup before source writes.
