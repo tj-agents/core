@@ -152,4 +152,15 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **2026-10-12 related evidence:** PR210 on `Fix/RecoveryAuthorizationContext` reproduced the same generated-digest mistake at run38189190964: verify-windows and verify-linux succeeded, while the source guard failed on the `base-agents/machine` digest. Commit `f63538d` restored the reviewed digest and retained the authored embedded harness metadata.
 
-**PR210 prevention and next action:** The focused corrected-head source guard passed with artifact `78dd200ee7badf43-corrected-source-guard.log`; complete final review and corrected-head CI without adopting PR208's broader delivery state.
+**PR210 prevention and next action:** The focused corrected-head source guard passed with artifact `78dd200ee7badf43-corrected-source-guard.log`; complete final review and corrected-head CI without adopting other workstreams' delivery state.
+
+## M012 - Unverified delayed CLI closure after completed delivery
+
+- Kind: mistake. Observed/reported: 2026-10-12; predecessor ended its report after delegating delayed self-close and did not reconcile the nonzero command/observer cancellation.
+- Cause: confirmed unobserved final action; no valid basis to equate a delayed worker promise with completed session exit.
+- Impact/priority: P2; completed CLI remained live and Tommy had to call out unfinished closure.
+- Source owner: engineering session-guidance terminal lifecycle and machine peer-cli runtime. State: in-progress.
+- Repair link: B004, plans/verified-self-close/GOAL.md; one causal repair owner.
+- Next action: repair the verified self-close failure and retain accountable closure evidence/reporting.
+- Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
+- Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.
