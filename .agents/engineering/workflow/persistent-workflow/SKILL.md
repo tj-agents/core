@@ -147,6 +147,16 @@ Runtime budgets default to six child launches, three consecutive transport failu
 and a 900-second child timeout. Tighter limits already recorded by the user take precedence. Do not
 increase them silently or add bypass-permission flags.
 
+When a blocked owner reports `continuation-budget-exhausted` and the user explicitly renews the task's
+finite authority, renew that same owner rather than deleting or reinitializing it:
+
+```text
+python -B <engineering-package-root>/workflows/continuation_runtime.py renew --owner OWNER --deadline-hours HOURS --reason "explicit user renewal" --next-action "concrete next action"
+```
+
+`HOURS` must be greater than zero and no more than 24. Renewal requires no foreground or child writer,
+preserves the owner identity and recorded limits, and is available only for the exhausted-budget state.
+
 For remote delivery, preserve one exact PR/head/worktree/run identity and one continuation. Route every
 remote decision through `persistent-delivery`; reject observations from another identity. An exact-head
 failure receives one appropriate repair context, a green head receives independent current-head review,

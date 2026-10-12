@@ -650,6 +650,19 @@ def operate(path, state, args):
             raise Gate("owner-reconciliation-writer-active")
         rebind_identity(state, read(args.rebind), "waiting")
         transition(state, "waiting", args.reason, args.next_action)
+    elif operation == "renew":
+        check_identity(state)
+        if state["state"] != "blocked" or state["reason"] != "continuation-budget-exhausted":
+            raise Gate("owner-renewal-not-required")
+        if state.get("foreground") is not None:
+            raise Gate("owner-renewal-foreground-active")
+        if any(record and alive(record) for record in writer_records(state)):
+            raise Gate("owner-renewal-writer-active")
+        if not 0 < args.deadline_hours <= 24 or not args.reason.strip() or not args.next_action.strip():
+            raise Gate("finite-renewal-required")
+        state["deadline"] = time.time() + args.deadline_hours * 3600
+        state["evidence"] = None
+        transition(state, "waiting", args.reason, args.next_action)
     else:
         lease = state.get("foreground")
         if not lease or args.token != lease["token"] or not alive(lease):
@@ -676,7 +689,7 @@ def operate(path, state, args):
 def parser():
     result = argparse.ArgumentParser()
     subs = result.add_subparsers(dest="operation", required=True)
-    for name in ("init", "claim", "heartbeat", "yield", "checkpoint", "reconcile", "status", "wake", "associate-session", "_child"):
+    for name in ("init", "claim", "heartbeat", "yield", "checkpoint", "reconcile", "renew", "status", "wake", "associate-session", "_child"):
         p = subs.add_parser(name)
         p.add_argument("--root")
         p.add_argument("--owner")
@@ -706,6 +719,10 @@ def parser():
             p.add_argument("--rebind")
         if name == "reconcile":
             p.add_argument("--rebind", required=True)
+            p.add_argument("--reason", required=True)
+            p.add_argument("--next-action", required=True)
+        if name == "renew":
+            p.add_argument("--deadline-hours", type=float, required=True)
             p.add_argument("--reason", required=True)
             p.add_argument("--next-action", required=True)
         if name == "wake":
