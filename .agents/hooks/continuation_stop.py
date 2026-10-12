@@ -221,6 +221,18 @@ def foreground_owns_current_process(owner, runtime):
     return False
 
 
+def foreign_foreground_is_verified(owner, runtime):
+    foreground = owner.get("foreground")
+    if not isinstance(foreground, dict):
+        return False
+    pid = foreground.get("pid")
+    identity = foreground.get("identity")
+    if not isinstance(pid, int) or not isinstance(identity, str) or not identity:
+        return False
+    actual = runtime.process_identity(pid)
+    return actual is not None and actual != "unknown" and actual == identity
+
+
 def outcome(data):
     if (data.get("hook_event_name") or data.get("hookEventName")) != "Stop":
         return None
@@ -264,13 +276,14 @@ def outcome(data):
             if obligation or active_binding:
                 return "Initialize persistent-workflow for the active delivery binding before ending this turn."
             return None
+        if (not associated and not obligation and foreign_foreground_is_verified(owner, runtime)
+                and not foreground_owns_current_process(owner, runtime)):
+            return None
         binding = runtime.check_identity(owner, allow_terminal_release=owner.get("state") in {"complete", "blocked"})
     except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
         return f"Reconcile the canonical continuation owner before ending this turn: {error}"
     if obligation and owner.get("updated_at", 0) < receipt.get("execution_obligation_at", 0):
         return "The routed execution has no current continuation owner; initialize persistent-workflow before ending this turn."
-    if not associated and not obligation and owner.get("foreground") and not foreground_owns_current_process(owner, runtime):
-        return None
     if supervised(owner):
         return None
     state = owner.get("state")
