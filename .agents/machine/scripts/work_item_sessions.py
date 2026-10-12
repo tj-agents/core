@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -8,6 +9,7 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -149,11 +151,14 @@ def validate(records):
         seen.add(handle)
         missing = [name for name in FIELDS if name not in fields]
         unknown = [name for name in fields if name not in FIELDS]
+        empty = [name for name in FIELDS if name in fields and not fields[name].strip()]
         for name in missing:
             errors.append(f"{handle}: missing field {name!r}")
         for name in unknown:
             errors.append(f"{handle}: unknown field {name!r}")
-        if missing or unknown:
+        for name in empty:
+            errors.append(f"{handle}: empty field {name!r}")
+        if missing or unknown or empty:
             continue
         role = fields["Role"]
         if role != "owner" and not (role.startswith("bounded: ") and role[len("bounded: "):].strip()):
@@ -222,17 +227,28 @@ def write(work_item_dir, sessions):
     path.write_bytes(render(sessions).encode("utf-8"))
 
 
-def _run_git(cwd, *args):
+def _git(cwd, *args):
     try:
-        completed = subprocess.run(
+        return subprocess.run(
             ["git", "-C", str(cwd), *args],
             capture_output=True, encoding="utf-8", timeout=GIT_TIMEOUT, shell=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    if completed.returncode != 0:
+
+
+def _run_git(cwd, *args):
+    completed = _git(cwd, *args)
+    if completed is None or completed.returncode != 0:
         return None
     return completed.stdout.strip()
+
+
+def _head_contains(checkout, recorded):
+    completed = _git(checkout, "merge-base", "--is-ancestor", recorded, "HEAD")
+    if completed is None or completed.returncode not in (0, 1):
+        return None
+    return completed.returncode == 0
 
 
 def _current_session_id(host):
@@ -258,11 +274,11 @@ def stale_reasons(fields):
         reasons.append("branch-unknown")
     elif branch != fields["Branch"]:
         reasons.append("branch-mismatch")
-    head = _run_git(worktree, "rev-parse", "HEAD")
-    if head is None:
+    contains = _head_contains(worktree, fields["Head"])
+    if contains is None:
         reasons.append("head-unknown")
-    elif head != fields["Head"]:
-        reasons.append("head-mismatch")
+    elif not contains:
+        reasons.append("head-diverged")
     return reasons
 
 
@@ -321,7 +337,7 @@ def cmd_find(worktree, roots):
     return {"matches": matches, "invalid": invalid}
 
 
-def resume(work_item_dir, handle=None, prompt=None, prompt_path=None, confirm_closed=False, title=None):
+def resume(work_item_dir, handle=None, prompt=None, prompt_path=None, title=None):
     records = load(work_item_dir)
     if not records:
         raise ValueError("no recorded session; start a new owner from the work item README's ## Next Steps")
@@ -346,14 +362,17 @@ def resume(work_item_dir, handle=None, prompt=None, prompt_path=None, confirm_cl
     recovery = _agent_recovery()
     roots = {host: Path(fields["Profile"]) / ("projects" if host == "claude" else "sessions")}
     if prompt_path:
-        return recovery.open_session(
-            host, session_id, prompt=None, title=title, roots=roots,
-            confirm_closed=confirm_closed, prompt_path=prompt_path,
-        )
+        return recovery.open_session(host, session_id, prompt=None, title=title, roots=roots, prompt_path=prompt_path)
     return recovery.open_session(
-        host, session_id, prompt=prompt or "Continue the requested work.", title=title,
-        roots=roots, confirm_closed=confirm_closed,
+        host, session_id, prompt=prompt or "Continue the requested work.", title=title, roots=roots,
     )
+
+
+def _registry_lock(work_item_dir):
+    key = os.path.normcase(str(sessions_path(work_item_dir).resolve()))
+    directory = Path(tempfile.gettempdir()) / "work-item-sessions"
+    directory.mkdir(parents=True, exist_ok=True)
+    return _agent_recovery()._claim_lock(directory / f"{hashlib.sha256(key.encode('utf-8')).hexdigest()}.md")
 
 
 def record(work_item_dir, host, role, state=None, title=None, pr=None, predecessor=None, successor=None, cwd=None):
@@ -361,7 +380,6 @@ def record(work_item_dir, host, role, state=None, title=None, pr=None, predecess
     if not session_id or not _agent_recovery().SESSION_ID.fullmatch(session_id):
         variable = "CODEX_THREAD_ID" if host == "codex" else "CLAUDE_CODE_SESSION_ID"
         raise ValueError(f"missing or invalid session id in {variable}")
-    handle = f"{host}:{session_id}"
     cwd = Path(cwd) if cwd is not None else Path.cwd()
     toplevel = _run_git(cwd, "rev-parse", "--show-toplevel")
     if toplevel is None:
@@ -371,7 +389,16 @@ def record(work_item_dir, host, role, state=None, title=None, pr=None, predecess
     head = _run_git(worktree, "rev-parse", "HEAD")
     if branch is None or head is None:
         raise ValueError(f"could not determine the branch or HEAD of {worktree}")
+    if not branch:
+        raise ValueError(f"{worktree} is on a detached HEAD; check out the delivery branch before recording")
+    with _registry_lock(work_item_dir):
+        return _record_locked(work_item_dir, host, session_id, role, state, title, pr, predecessor, successor,
+                              worktree, branch, head)
 
+
+def _record_locked(work_item_dir, host, session_id, role, state, title, pr, predecessor, successor, worktree,
+                   branch, head):
+    handle = f"{host}:{session_id}"
     records = load(work_item_dir)
     existing = dict(records)
     current = existing.get(handle, {})
@@ -412,7 +439,6 @@ def record(work_item_dir, host, role, state=None, title=None, pr=None, predecess
 
 
 def remove(work_item_dir, handle=None, host=None):
-    records = load(work_item_dir)
     if handle is None:
         if not host:
             raise ValueError("either --handle or --host is required")
@@ -420,10 +446,12 @@ def remove(work_item_dir, handle=None, host=None):
         if not session_id:
             raise ValueError(f"no current session id for host {host!r}; specify --handle")
         handle = f"{host}:{session_id}"
-    remaining = [(h, f) for h, f in records if h != handle]
-    if len(remaining) == len(records):
-        raise ValueError(f"no recorded session with handle {handle!r}")
-    write(work_item_dir, remaining)
+    with _registry_lock(work_item_dir):
+        records = load(work_item_dir)
+        remaining = [(h, f) for h, f in records if h != handle]
+        if len(remaining) == len(records):
+            raise ValueError(f"no recorded session with handle {handle!r}")
+        write(work_item_dir, remaining)
     return {"removed": handle}
 
 
@@ -447,7 +475,6 @@ def _build_parser():
     prompt_group = resume_parser.add_mutually_exclusive_group()
     prompt_group.add_argument("--prompt")
     prompt_group.add_argument("--prompt-path")
-    resume_parser.add_argument("--confirm-closed", action="store_true")
     resume_parser.add_argument("--title")
 
     record_parser = subparsers.add_parser("record")
@@ -485,7 +512,7 @@ def main(argv=None):
         elif args.command == "resume":
             result = resume(
                 args.work_item_dir, handle=args.handle, prompt=args.prompt,
-                prompt_path=args.prompt_path, confirm_closed=args.confirm_closed, title=args.title,
+                prompt_path=args.prompt_path, title=args.title,
             )
             ok = True
         elif args.command == "record":

@@ -31,9 +31,11 @@ unique; exactly the 13 fields above, each once, in any order, no unknown fields.
 - `Role`: `owner` (at most one per work item, the delivery-branch writer) or `bounded: <scope>` for a
   concurrent agent with a disjoint scope.
 - `State`: `active` or `handing-off`. Liveness is never stored.
-- `Machine`/`Profile`: `socket.gethostname()` and the host's config directory (`CLAUDE_CONFIG_DIR` or
-  `~/.claude`; `CODEX_HOME` or `~/.codex`), compared case-insensitively against the reading machine.
+- `Machine`: `socket.gethostname()`, compared case-insensitively against the reading machine.
+- `Profile`: the host's config directory (`CLAUDE_CONFIG_DIR` or `~/.claude`; `CODEX_HOME` or `~/.codex`),
+  used to locate the session's history when resuming.
 - `Worktree`/`Branch`/`Head`: the recording session's absolute git worktree, current branch and HEAD.
+  Later commits on that branch keep the row current; only a HEAD that no longer contains `Head` is stale.
 - `PR`: an `https://` URL or `not opened`.
 - `Predecessor`/`Successor`: a valid handle or `none`.
 - `Resume`: exactly `` `machine:open-claude --resume <id>` `` or `` `machine:open-codex --id <id>` ``.
@@ -49,9 +51,11 @@ terminal, in the commit that records the outcome. The file is deleted when its l
 ## Read-time status
 
 Computed, never written: `live`/`closed`/`unknown` from `agent_recovery.liveness`, `foreign` when `Machine`
-differs from the reading machine, and `stale` (`worktree-missing`, `branch-mismatch`, `head-mismatch`, or `branch-unknown`/`head-unknown`)
+differs from the reading machine, and `stale` (`worktree-missing`, `branch-mismatch`, `head-diverged`, or `branch-unknown`/`head-unknown`)
 when git cannot confirm the recorded worktree. `unknown`, `stale` and `foreign` authorize nothing: no resume, no
-new writer and no worktree deletion until the row is reconciled.
+new writer and no worktree deletion until the row is reconciled. The helper never confirms a session closed;
+reconcile an `unknown` session through `machine:open-claude`/`machine:open-codex` with the user's explicit
+`--confirm-closed`.
 
 ## Helper
 
