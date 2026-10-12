@@ -198,6 +198,16 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                 matching_rules = [rule for rule in codex_rules if script in json.dumps(rule)]
                 self.assertEqual(1, len(matching_rules), f"{plugin}: expected exactly one Codex rule for {script}")
 
+    def test_associate_session_runtime_command_is_declared_for_both_hosts(self):
+        claude_allow, codex_rules = self.rendered("engineering")
+        claude_allow = [entry.replace("\\", "/") for entry in claude_allow]
+        command = f"{self.PLUGIN_ROOT.replace('\\', '/')}/workflows/continuation_runtime.py associate-session"
+        self.assertIn(f"Bash(python -B {command} *)", claude_allow)
+        self.assertIn(f"PowerShell(python -B {command} *)", claude_allow)
+        matching = [rule for rule in codex_rules if "continuation_runtime.py" in json.dumps(rule)]
+        self.assertEqual(1, len(matching))
+        self.assertEqual("associate-session", matching[0]["pattern"][-1])
+
     def test_host_entry_and_vendored_script_paths_are_both_declared(self):
         for plugin, script in INSTRUCTED_SCRIPTS:
             skill = HOST_ENTRY_SKILLS[plugin]

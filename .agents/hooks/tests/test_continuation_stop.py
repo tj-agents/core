@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -72,6 +73,21 @@ class ContinuationStopTests(unittest.TestCase):
 
     def payload(self):
         return {"hook_event_name": "Stop", "cwd": str(self.root), "session_id": self.session}
+
+    def associated_native(self, state="working", **extra):
+        native = self.root.parent / "native session"
+        native.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=native, check=True)
+        native = native.resolve()
+        workflows = continuation_stop.workflow_root()
+        runtime = continuation_stop.module("continuation_runtime", workflows)
+        owner = self.owner(state, foreground={"pid": os.getpid(),
+                           "identity": runtime.process_identity(os.getpid()), "token": "current-token"}, **extra)
+        self.write_owner(owner)
+        runtime.associate_session(SimpleNamespace(
+            owner=str(self.root / ".agents/continuation/owner.json"), token="current-token",
+            session_id="native-session", session_cwd=str(native)))
+        return native, runtime
 
     def call(self, receipt=None):
         with patch.object(continuation_stop, "read_receipt", return_value=receipt if receipt is not None else self.receipt()):
@@ -294,6 +310,50 @@ class ContinuationStopTests(unittest.TestCase):
             self.assertFalse(continuation_stop.foreground_owns_current_process(owner, runtime))
         runtime.process_identity.return_value = "foreign"
         self.assertFalse(continuation_stop.foreground_owns_current_process(owner, runtime))
+
+    def test_reciprocal_native_association_selects_the_controller_owner(self):
+        native, _ = self.associated_native()
+        payload = {"hook_event_name": "Stop", "cwd": str(native), "session_id": "native-session"}
+        receipt = {"worktree": str(native), "execution_obligation": False, "prompt": "status"}
+        with patch.object(continuation_stop, "read_receipt", return_value=receipt), \
+             patch.object(continuation_stop, "foreground_owns_current_process", return_value=True):
+            self.assertIn("canonical continuation still has foreground ownership", continuation_stop.outcome(payload))
+
+    def test_released_association_uses_controller_scheduler_without_a_route_obligation(self):
+        native, _ = self.associated_native()
+        owner = continuation_stop.read_json(self.root / ".agents/continuation/owner.json", required=True)
+        owner.update(state="waiting", foreground=None)
+        self.write_owner(owner)
+        payload = {"hook_event_name": "Stop", "cwd": str(native), "session_id": "native-session"}
+        receipt = {"worktree": str(native), "routed_at": 1, "prompt": "status"}
+        with patch.object(continuation_stop, "read_receipt", return_value=receipt), \
+             patch.object(continuation_stop, "scheduler_ready", return_value=True), \
+             patch.object(continuation_stop, "observed_wake", return_value=True):
+            self.assertIsNone(continuation_stop.outcome(payload))
+
+    def test_associated_owner_state_and_identity_drift_require_reconciliation(self):
+        native, _ = self.associated_native()
+        owner = continuation_stop.read_json(self.root / ".agents/continuation/owner.json", required=True)
+        owner.update(foreground=None)
+        self.write_owner(owner)
+        payload = {"hook_event_name": "Stop", "cwd": str(native), "session_id": "native-session"}
+        with patch.object(continuation_stop, "read_receipt", return_value={"worktree": str(native), "prompt": "status"}):
+            self.assertIn("association-foreground-lease-missing", continuation_stop.outcome(payload))
+        owner = continuation_stop.read_json(self.root / ".agents/continuation/owner.json", required=True)
+        owner.update(state="waiting", head="changed")
+        self.write_owner(owner)
+        with patch.object(continuation_stop, "read_receipt", return_value={"worktree": str(native), "prompt": "status"}):
+            self.assertIn("association-controller-identity-changed", continuation_stop.outcome(payload))
+
+    def test_new_claim_invalidates_the_old_association_generation(self):
+        native, runtime = self.associated_native()
+        owner = continuation_stop.read_json(self.root / ".agents/continuation/owner.json", required=True)
+        owner["foreground"] = {"pid": os.getpid(), "identity": runtime.process_identity(os.getpid()),
+                               "token": "replacement-token"}
+        self.write_owner(owner)
+        payload = {"hook_event_name": "Stop", "cwd": str(native), "session_id": "native-session"}
+        with patch.object(continuation_stop, "read_receipt", return_value={"worktree": str(native), "prompt": "status"}):
+            self.assertIn("association-foreground-generation-changed", continuation_stop.outcome(payload))
 
     def test_read_only_questions_do_not_create_or_resume_an_execution_obligation(self):
         scratch = Path(self.temp.name) / "receipt-questions"

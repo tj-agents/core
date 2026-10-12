@@ -198,7 +198,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:bb2a689bf3ee03c500494081f5f44daef0fc2d15356ed4dceb046beea525f091",
+          "digest": "sha256:7044a77fd3c1da705f7402d966b197ecff92ae6df60ce5c35d3b794f41414207",
           "harness": {
             "marketplaces": [
               {
@@ -336,12 +336,45 @@
               "claude_allow": [
                 "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+                "Bash(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py associate-session *)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/workflows/continuation_runtime.py associate-session *)",
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
               ],
               "codex_prefix_rules": [
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python.exe",
+                      "python3",
+                      "py"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/workflows/continuation_runtime.py"
+                    ],
+                    "associate-session"
+                  ],
+                  "justification": "persistent-workflow binds a native session to its exact live canonical controller without exposing the foreground token or widening the controller lease",
+                  "match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/workflows/continuation_runtime.py",
+                      "associate-session"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "${PLUGIN_ROOT}/workflows/continuation_runtime.py",
+                      "associate-session"
+                    ]
+                  ]
+                },
                 {
                   "pattern": [
                     [
