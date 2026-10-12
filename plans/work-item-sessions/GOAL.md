@@ -65,13 +65,154 @@ The immediate evidence was a controller-association session on `Fix/ControllerGo
 
 Tommy explicitly authorized this Core-wide convention and migration on 2026-10-12, including normal implementation, testing, review, PRs and merge after repository gates pass. This does not authorize destructive cleanup of existing worktrees, deleting user data, profile installation, bypassing hooks/checks, or bulk edits to consumer repositories without the reviewed migration plan and their normal ownership gates.
 
-## First actions
-
-1. Read this goal, repository instructions, current plan conventions and the directly relevant Core skill/workflow sources.
-2. Inventory the actual progress dump and every reader before proposing deletion.
-3. Write the canonical convention and phased migration plan in this goal, including exact source paths and a PR-slice map.
-4. Implement only the first reviewable Core source slice after the design is recorded and sized; hand off later consumer migration or Termboard integration only with their own canonical goals.
-
 ## Handoff lane
 
 Lane: L3. This is an open cross-repository convention and migration design with unresolved ownership, compatibility and recovery choices. Tommy explicitly selected Claude for this non-frontier handoff.
+
+## Investigation evidence (2026-10-12)
+
+### The progress dump is the `<NAME>_PROGRESS.md` ledger
+
+Identified from the user's own words, not by name resemblance:
+
+- Originating Codex session `codex:01a12aa7-5b58-7312-9400-ef710762147f` (Fix-ControllerGoalAssociation), lines 7203–7230: the work-item/`ACTIVE_SESSIONS.md` proposal, then "that way we can finally delete the progress dump also, that can FULLY GET REMOVED NOW".
+- Claude session `claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875` (Concertable pipeline, 2026-09-23): "for now we just have the plan and progress dump" and "workboard ... should be used to make plans easier to track and eventually remove the progress dump".
+- `~/.claude/plans/agent-workboard/PLAN_TRACKING_AND_THE_PROGRESS_DUMP.md` records the diagnosis: state is inferred from prose, progress accretes, and nothing distinguishes plan classes. Resolution condition: state is a field, progress is no longer an append-only plan section.
+
+The dump is therefore the engineering progress ledger defined by `engineering:plans` ("A progress ledger (`<NAME>_PROGRESS.md`)") and templated by `engineering:plan-checkpoint`. `GOAL.md` (base default), `.agents/continuation/*` runtime state and `cli-session-recovery/` vault data are not the dump and are not deletion targets.
+
+### Ledger responsibilities and readers (source, excluding generated `plugins/`)
+
+| Responsibility | Owner today | Source |
+|---|---|---|
+| Structural graph: `Plan:`/`Roadmap:`/`Roadmap item:` headers, one-roadmap-item-per-plan, blocker 4-field schema, `## Downstream handoffs` reciprocity, terminal-with-undispatched-handoff, 4 scope lines, review-before-merge, 200-line/16 KB budget | `plan_graph.py` | `.agents/hooks/plan_graph.py:26-347` |
+| Stop-hook transfer gate: claimed-ledger discovery, worktree/branch ownership, owner-copy dedupe, exact pointer and `Why:` line, blocker verbatim report | `plan_handoff_stop.py` | `.agents/hooks/plan_handoff_stop.py:24-526`; wired `.agents/plugins/manifests/claude/engineering-hooks.json:108`, `.agents/plugins/harness/engineering.json:111` |
+| Workflow v2 repository provider: resolve plan/roadmap/worktree/branch, `## Next Steps` kind (`Paused:`/`Blocked:`/`Transfer:`/`Complete:`), `## Reviews`, decisions, `PR:` → `artifacts.pull_request`, `artifacts.ledger` | `workflow_runtime.py` | `.agents/workflows/workflow_runtime.py:541-787` |
+| Repository inspection and delivery ownership (`progress_ledgers`, `delivery-preflight --ledger`) | `workflow_ops.py` | `.agents/workflows/workflow_ops.py:417,430,1657-1745,2213,2276` |
+| Contract | Workflow v2 | `.agents/workflows/contract/v2/state.schema.json:43-48` (`artifacts.ledger` required), `examples/state.example.json:16`, `gates.md:35`, `.agents/workflows/providers/repository.md:4-18` |
+| Convention text | skills | `engineering:plans` (definition, lifecycle, close-out), `plan-checkpoint` (template, budget, compaction), `handoff-format` (pointer), and ledger create/update text in `plan-authoring`, `plan-execution`, `feature`, `update-roadmap`, `merge`, `handoff`, `commit`, `committing`, `open-pr`, `stack`, `git-branching`, `resume-plan`, `pr-preflight`, `open-worktree` |
+| Tests/fixtures | hooks tests | `test_plan_graph.py` (22), `test_plan_handoff_stop.py` (30), `test_plan_handoff_ownership.py` (10), `test_workflow_contracts.py:1806-2001`, `test_workflow_ops.py:939-1077`, `test_plan_workflows.py`, `test_task_workflows.py:235`, `test_hook_runtime.py`, `test_process_standards.py`, fixtures `plan_progress.template`, `provider_progress.template`, `plan_workflow_harness.py`, `plan_authoring_harness.py`, `task_workflow_harness.py`, `*_scenarios.json` |
+| Live Core ledgers | plans | `plans/conditional-skill-routes/CONDITIONAL_SKILL_ROUTES_PROGRESS.md`, `plans/merge-worktree-cleanup/MERGE_WORKTREE_CLEANUP_PROGRESS.md`, `plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md` (214 lines, over budget) |
+
+Generated copies exist in 59 tracked `plugins/` files; they are regenerated by CI after each source change and are never edited here.
+
+### Native session tooling to reuse
+
+- Exact guarded resume: `.agents/machine/scripts/agent_recovery.py open --host claude|codex --id <id>` (`open_session`, :292). It resumes in the recorded cwd and profile, refuses a verified `live` session ("refusing to create a duplicate writer"), refuses `unknown` without `--confirm-closed`, and claims a cross-process launch receipt. `machine:open-claude --resume` and `machine:open-codex` both delegate to it.
+- Liveness: `agent_recovery.liveness` (:53) over the SessionStart registry `~/.agents-state/cli-sessions/<id>.json` written by `register_session.py` (pid + start time; `live`/`closed`/`unknown`).
+- Current session id: `CLAUDE_CODE_SESSION_ID` (Claude) and `CODEX_THREAD_ID` (Codex) (`agent_recovery.py:55`).
+- Unguarded resume strings (`history.py` `claude --resume <id>` / `codex resume <id>`, handoff launchers, the Windows-only vault) must not be recorded as the registry's resume command.
+- Handoff launchers do not report the successor's id; `transfer.py acknowledge --successor` takes free text. The successor must record its own row.
+- `.agents/continuation/` (`owner.json`, lock, receipts) is gitignored, pid-bound and worktree-bound runtime state with no native session id. It stays runtime coordination, not the registry.
+
+### Termboard
+
+`termboard/plans/ROADMAP.md`: a Rust learning project; milestone 1 not started; milestone 5 is "reopen each card's native session with its resume command". `tj-agents/docs/plans/agentic-delivery/ROADMAP.md:27-37`: do not make Termboard a prerequisite; until it exists, peer-cli and exact native resume identity are the lookup path.
+
+## Proposed design
+
+### D1 Layout and path grammar
+
+```text
+plans/features/<feature>/README.md
+plans/features/<feature>/work-items/<work-item>/README.md
+plans/features/<feature>/work-items/<work-item>/ACTIVE_SESSIONS.md   (only while a session is recorded)
+plans/features/<feature>/work-items/<work-item>/<SUPPORTING>.md       (optional design/research docs)
+```
+
+`<feature>` and `<work-item>` are lowercase kebab-case. The work-item key is `<feature>/<work-item>`, derived from the path; it replaces the `Roadmap item:` header.
+
+- Feature `README.md` replaces `<EPIC>_ROADMAP.md`: purpose, then one checklist line per work item with a link, its `Status:` and its delivery PRs.
+- Work-item `README.md` replaces both `<NAME>_PLAN.md` and `<NAME>_PROGRESS.md` (and base's `plans/<goal>/GOAL.md`). Header fields: `Status:` (`proposed`/`active`/`blocked`/`paused`/`delivery-gated`/`done`, a field, never inferred), `Branch:`, `PR:`, `Worktree:`. Sections: outcome and scope, authorization, design (or links to supporting docs), delivery slices as a checklist with PR links, current state, verification, `## Reviews`, decisions, `## Next Steps` (unchanged semantics: blocker/paused/transfer forms and the four scope lines). Delivery history is the checked slice list; no chronological log.
+- The 200-line/16 KB budget applies to the work-item README. Large design moves to a supporting doc in the same folder.
+- `features/` is required for every new repository plan once the convention slice lands. Existing `_PLAN`/`_PROGRESS`/`_ROADMAP` and `plans/<goal>/GOAL.md` are read during a bridge until their migration slice; nothing new is created in those shapes. Standalone non-repository tasks are unchanged.
+
+### D2 `ACTIVE_SESSIONS.md` schema and lifecycle
+
+One section per recorded native session. The heading is its **session handle**, `<host>:<native-session-id>`:
+
+```markdown
+# Active sessions
+
+## codex:01a12aa7-5b58-7312-9400-ef710762147f
+- Role: owner
+- State: active
+- Machine: <hostname>
+- Profile: default
+- Title: <visible CLI/tab title, or none>
+- Worktree: <absolute path>
+- Branch: <branch>
+- PR: <URL, or not opened>
+- Head: <40-hex commit>
+- Predecessor: <handle, or none>
+- Successor: <handle, or none>
+- Verified: <UTC ISO-8601>
+- Resume: `machine:open-codex --id 01a12aa7-5b58-7312-9400-ef710762147f`
+```
+
+- `Role:` is `owner` (at most one per work item: the delivery-branch writer) or `bounded: <scope>` for a concurrent agent whose scope and writable paths are disjoint from every other row.
+- Stored `State:` is `active` or `handing-off`. Liveness is never stored.
+- `Resume:` is the guarded skill invocation, never a raw `claude --resume`/`codex resume`: `machine:open-claude --resume <id>` or `machine:open-codex --id <id>`, plus `--claude-history-root`/`--codex-history-root <profile>/…` when `Profile:` is not `default`.
+- Record: a session adds its own row when it takes ownership (plan-execution pickup, handoff acknowledgement, or a bounded lease), using `CLAUDE_CODE_SESSION_ID`/`CODEX_THREAD_ID` and Git for the other fields. Refresh `Head:`/`PR:`/`Verified:` only at material checkpoints, in the same substantive commit as the README; never an observation-only commit.
+- Handoff: the predecessor sets `State: handing-off` before launch. On acknowledgement the successor adds its row with `Predecessor:` and removes the predecessor's row in its first checkpoint.
+- Remove a row when that session's work is terminal (work item done or bounded scope delivered), in the commit that records the outcome in the README. Delete the file when its last row goes; absence means no recorded session.
+- Read-time status (computed, never written): `live`/`closed`/`unknown` from `agent_recovery.liveness` on the recorded machine; `foreign` when `Machine:` differs from the current machine; `stale` when the worktree is missing or its branch/HEAD differs from the row. `unknown`, `stale` and `foreign` authorize nothing: no resume, no new writer, no worktree deletion, until reconciled (session search evidence or the user's explicit confirmation).
+- A worktree is deletable only when no row in any checkout names it and its branch head is on the remote with the PR recorded in the README; peer-cli `finish.py`'s existing claimant and cleanup-proof gates still apply.
+
+### D3 Resume path
+
+`machine:recover-agents` gains a "continue work item" entry rather than a new skill: read the work item's `ACTIVE_SESSIONS.md`; with exactly one `owner` row, run its `Resume:`; with several rows, list them and require an explicit handle; with no rows, start a new owner from the README's `## Next Steps` through `engineering:plan-execution`. `agent_recovery.open_session` already refuses a live or unknown session, so a recorded resume cannot create a duplicate writer. A small helper, `work_item_sessions.py` beside `agent_recovery.py`, parses and validates the file, reports read-time status, finds the work item that names a given worktree, and prints the guarded command.
+
+### D4 Migration and deletion map for the progress dump
+
+Ordered so guidance never points at behavior that does not exist:
+
+1. Engineering runtime accepts a work-item README wherever it accepts a ledger (`plan_graph.py`, `plan_handoff_stop.py`, `workflow_runtime.py` provider, `workflow_ops.py`), plus feature README as roadmap. Ledgers still read.
+2. Convention switch: `base:plan-artifacts`, `engineering:plans`, `plan-checkpoint` template, `handoff-format` pointer (`Read @<work-item README> and do what its ## Next Steps says`), and every skill listed in the readers table; templates for both READMEs and `ACTIVE_SESSIONS.md`.
+3. Core's own `plans/` migrated: the three live ledgers and each live `plans/<goal>/GOAL.md` become work items; terminal leftovers are identified individually with evidence before any deletion.
+4. Removal: ledger parsing, `_PROGRESS`/`_PLAN`/`_ROADMAP` patterns, fixtures and tests replaced; rename grep gate `_PROGRESS|progress ledger` returns zero outside an explicit allowlist. Workflow v2 `artifacts.ledger` needs a contract decision at this step (additive field vs v3) because host pins live under the contract version.
+
+### D5 Consumer rollout
+
+Steps 1–2 and 4 ship to every consumer through the marketplace automatically. Consumer `plans/` content is never rewritten from Core. Each consumer migrates under its own goal and gates; the bridge in step 1 keeps legacy ledgers working until step 4, and step 4 does not merge until every recorded consumer migration has landed. `plan_graph.py` reports legacy artifact counts so adoption is measurable per repository. Work repositories decide whether machine-local paths and session ids belong in their tracked plans.
+
+### D6 Termboard
+
+Markdown stays the source of truth. Termboard (milestone 5) reads `ACTIVE_SESSIONS.md` and the work-item README to populate cards and calls the same guarded resume; it neither mirrors nor supersedes the files unless Tommy later decides otherwise. Nothing in Core waits on Termboard.
+
+## Delivery slices
+
+| Slice | Content | Route | Depends on |
+|---|---|---|---|
+| S1 | `ACTIVE_SESSIONS.md` schema doc and template under machine resources; `work_item_sessions.py` (`validate`, `status`, `find --worktree`, `resume` via `open_session`, `record`/`remove` for the current session); `recover-agents` "continue work item" text; Windows/Linux tests | `merge` | none |
+| S2 | Engineering runtime dual-read (D4 step 1) with tests | `merge` | none |
+| S3 | Convention switch (D4 step 2), own docs slice | `merge-docs` unless a test-selection path is touched | S1, S2 |
+| S4 | Core `plans/` migration (D4 step 3) | `merge-docs` | S3 |
+| S5 | Ledger removal and contract decision (D4 step 4) | `merge` | S4 and recorded consumer migrations |
+| S6+ | One goal per consumer repository | that repository | S3 |
+
+## Decisions awaiting Tommy
+
+`.agents/settings.json` leaves `auto_approve_design` false, so these routine design choices are recorded as recommendations, not decided:
+
+1. Done work items: keep the work-item README (Status `done`, delivery slices) until the whole feature is terminal, then delete the feature folder (recommended; Git stays the archive) — or keep done work items indefinitely.
+2. `ACTIVE_SESSIONS.md` format: one `## <handle>` section with `- Field:` lines (recommended; reuses existing header parsers, diffs cleanly) — or a Markdown table.
+3. Slice order: runtime-first S1/S2 then the convention switch (recommended) — or convention text first.
+4. Termboard: reads the Markdown as its source (recommended) — or eventually supersedes it.
+
+```agent-host-coverage
+{"schema_version":1,"shared_source":".agents/machine/scripts/work_item_sessions.py","hosts":[{"host":"claude","behavior":"Record, report and resume the exact Claude session recorded for a work item through the guarded open-claude path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources consumed by machine:recover-agents and machine:open-claude --resume.","verification":{"level":"planned","result":"pending","evidence":"S1 unit tests for parse, validation, status and resume delegation with a Claude row and CLAUDE_CODE_SESSION_ID."}},{"host":"codex","behavior":"Record, report and resume the exact Codex session recorded for a work item through the guarded open-codex path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources consumed by machine:recover-agents and machine:open-codex.","verification":{"level":"planned","result":"pending","evidence":"S1 unit tests for parse, validation, status and resume delegation with a Codex row and CODEX_THREAD_ID."}}]}
+```
+
+## Current progress
+
+- 2026-10-12, Claude session `claude:c27c07bf-a274-466a-a10e-10ef96f36841`: investigation complete; design, migration map and slices recorded above. No source changes yet.
+
+## Next Steps
+
+Paused: Tommy — answer the four "Decisions awaiting Tommy". Resume when his answers are recorded here; then implement S1 on this branch (`Feature/WorkItemSessions`).
+
+- Scope: whole plan through all remaining phases and terminal delivery.
+- Current slice: S1 session registry helper and recover-agents entry.
+- Remaining scope: S2–S5 in Core; consumer migrations under their own goals.
+- Done when: the progress ledger is removed from Core with no dangling references, and every recorded consumer migration has landed.
