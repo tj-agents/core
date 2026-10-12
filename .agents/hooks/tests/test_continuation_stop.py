@@ -202,10 +202,9 @@ class ContinuationStopTests(unittest.TestCase):
             with self.subTest(scheduler=scheduler, wake=wake), self.durable(scheduler, wake):
                 self.assertIn("wait for its receipt", self.call())
 
-    def test_unverified_headless_writer_blocks(self):
-        writer, child = self.live_writer()
+    def test_unverifiable_headless_writer_record_blocks_for_reconciliation(self):
+        _, child = self.live_writer()
         cases = {
-            "reused": {**child, "identity": "reused"},
             "unknown": {**child, "identity": "unknown"},
             "missing-pid": {"identity": child["identity"]},
             "malformed": True,
@@ -217,11 +216,17 @@ class ContinuationStopTests(unittest.TestCase):
         with self.subTest(name="waiting-state"), self.durable():
             self.write_owner(self.owner("waiting", child=child))
             self.assertIn("unverified headless writer", self.call())
+
+    def test_ended_headless_writer_waits_for_its_receipt(self):
+        writer, child = self.live_writer()
+        with self.subTest(name="reused"), self.durable():
+            self.write_owner(self.owner("working", child={**child, "identity": "reused"}))
+            self.assertIn("wait for its receipt", self.call())
         writer.kill()
         writer.wait()
         with self.subTest(name="exited"), self.durable():
             self.write_owner(self.owner("working", child=child))
-            self.assertIn("unverified headless writer", self.call())
+            self.assertIn("wait for its receipt", self.call())
 
     def test_headless_writer_does_not_release_foreground_or_stale_obligations(self):
         _, child = self.live_writer()
