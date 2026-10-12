@@ -97,31 +97,44 @@ def _front_matter_name(path):
 def _local_path(root, value, reference):
     relative = _relative(value, reference, "repository-local path")
     candidate = root / relative
-    try:
-        resolved = candidate.resolve(strict=True)
-        resolved.relative_to(root.resolve())
-    except (OSError, ValueError):
-        _error(reference, "repository-local path escapes the repository")
-    if not resolved.is_file():
+    path = _safe_existing(root, candidate, reference, "repository-local path")
+    if not path.is_file():
         _error(reference, "repository-local body does not exist")
-    return resolved, relative.as_posix()
+    return path, relative.as_posix()
 
 
 def _local_candidates(root, bare):
     legacy = root / ".agents" / "skills" / bare / "SKILL.md"
     if legacy.is_file():
         return [legacy]
+    declared = root / ".agents" / "plugins" / "sources.json"
+    roots = []
+    if declared.is_file():
+        try:
+            scopes = json.loads(declared.read_text(encoding="utf-8")).get("scopes", [])
+        except (OSError, ValueError):
+            _error(bare, "local sources declaration is invalid")
+        for scope in scopes:
+            value = scope.get("root") if isinstance(scope, dict) else None
+            if not isinstance(value, str):
+                _error(bare, "local sources declaration is invalid")
+            relative = _relative(value, bare, "local source root")
+            candidate = root / relative
+            _safe_existing(root, candidate, bare, "local source root")
+            roots.append(candidate)
+    else:
+        agents = root / ".agents"
+        roots = [path for path in agents.iterdir() if path.is_dir() and not path.name.startswith(".")] if agents.is_dir() else []
     candidates = []
-    agents = root / ".agents"
-    if not agents.is_dir():
-        return candidates
-    for owner in agents.iterdir():
-        if not owner.is_dir() or owner.name.startswith("."):
-            continue
+    for owner in roots:
         for kind in owner.iterdir():
+            if not kind.is_dir():
+                continue
             candidate = kind / bare / "SKILL.md"
-            if candidate.is_file() and _front_matter_name(candidate) == bare:
-                candidates.append(candidate)
+            if candidate.is_file():
+                safe = _safe_existing(root, candidate, bare, "local canonical skill")
+                if _front_matter_name(safe) == bare:
+                    candidates.append(safe)
     return candidates
 
 
@@ -196,18 +209,31 @@ def _plugin_parts(record, host, reference):
 
 def _select_native(plugin, host, project_root, inventory):
     wanted_name = _safe_name(plugin, plugin, "plugin name")
-    candidates = []
+    owners = {}
+    enabled_owners = {}
     for record in inventory:
-        if not isinstance(record, dict) or record.get("enabled") is not True:
+        if not isinstance(record, dict):
             continue
         name, marketplace = _plugin_parts(record, host, plugin)
         if name != wanted_name:
             continue
+        owners.setdefault((name, marketplace), []).append(record)
+        if record.get("enabled") is True and not (host == "codex" and record.get("installed") is False):
+            enabled_owners.setdefault((name, marketplace), []).append(record)
+    if not owners:
+        _error(plugin, "native owner is absent")
+    if not enabled_owners:
+        _error(plugin, "native owner is disabled or unavailable")
+    if len(enabled_owners) != 1:
+        _error(plugin, "enabled native installation is ambiguous across marketplaces")
+    candidates = []
+    owner_name, owner_marketplace = next(iter(enabled_owners))
+    for record in enabled_owners[(owner_name, owner_marketplace)]:
         rank = _scope_rank(record, project_root, plugin)
         if rank is not None:
-            candidates.append((rank, name, marketplace, record))
+            candidates.append((rank, owner_name, owner_marketplace, record))
     if not candidates:
-        _error(plugin, "no enabled applicable native installation")
+        _error(plugin, "native owner is disabled or unavailable")
     highest = max(item[0] for item in candidates)
     candidates = [item for item in candidates if item[0] == highest]
     locations = {(item[1], item[2], str(item[3].get("installPath") or "")) for item in candidates}
@@ -253,7 +279,9 @@ def _manifest(root, host, reference):
 
 def _roots(root, manifest, host, reference):
     if manifest is None or "skills" not in manifest:
-        return [Path("skills")], "native-default"
+        candidate = root / "skills"
+        _safe_existing(root, candidate, reference, "native default skills root")
+        return [candidate], "native-default"
     values = manifest["skills"] if isinstance(manifest["skills"], list) else [manifest["skills"]]
     if not values or not all(isinstance(item, str) for item in values):
         _error(reference, "manifest skills declaration is invalid")
@@ -280,7 +308,15 @@ def _canonical_body(root, entry, reference):
     if len(links) != 1:
         _error(reference, "generated canonical definition link is ambiguous")
     relative = _relative(links[0], reference, "generated canonical definition link", allow_parent=True)
-    candidate = (entry.parent / relative).resolve()
+    parts = list(entry.parent.relative_to(root).parts)
+    for part in relative.parts:
+        if part == "..":
+            if not parts:
+                _error(reference, "generated canonical definition link escapes its declared package")
+            parts.pop()
+        else:
+            parts.append(part)
+    candidate = root.joinpath(*parts)
     _contained(root, candidate, reference, "generated canonical definition link")
     body = _safe_existing(root, candidate, reference, "generated canonical definition link")
     if not body.is_file():
@@ -309,12 +345,14 @@ def resolve_installed_skill(plugin, bare_name, host, project_root, inventory):
     entry = matches[0]
     body, entry_hash, body_hash = _canonical_body(root, entry, plugin)
     native_version = record.get("version") if isinstance(record.get("version"), str) else None
+    native_revision = record.get("revision") if isinstance(record.get("revision"), str) else None
     scope = record.get("scope") if isinstance(record.get("scope"), str) else "native-effective"
     project = record.get("projectPath") if isinstance(record.get("projectPath"), str) else str(Path(project_root).resolve())
     source = record.get("source") if isinstance(record.get("source"), (str, dict, list)) else None
     resolved_name = f"{name}:{bare}"
     return {
         "name": f"{name}:{bare}",
+        "requested_name": f"{plugin}:{bare}",
         "resolved_name": resolved_name,
         "source_type": "installed_plugin",
         "path": body.relative_to(root).as_posix(),
@@ -323,12 +361,14 @@ def resolve_installed_skill(plugin, bare_name, host, project_root, inventory):
         "plugin_id": f"{name}@{marketplace}",
         "marketplace": marketplace,
         "native_version": native_version,
+        "native_revision": native_revision,
         "native_scope": scope,
         "project_path": project,
         "advertised_source": source,
         "declaration_method": declaration_method,
         "manifest_path": manifest_path.relative_to(root).as_posix() if manifest_path else None,
         "manifest_sha256": _raw_hash(manifest_path)[1] if manifest_path else None,
+        "manifest_version": manifest.get("version") if isinstance(manifest, dict) and isinstance(manifest.get("version"), str) else None,
         "entry_path": entry.relative_to(root).as_posix(),
         "entry_sha256": entry_hash,
         "body_path": body.relative_to(root).as_posix(),
@@ -346,22 +386,41 @@ def resolve_skill(reference, repository_root, local_body_root, host=None, invent
         return local
     if "=" in reference:
         _error(reference, "repository-local body does not exist")
-    match = _QUALIFIED.fullmatch(reference)
-    if not match:
-        _error(reference, "no unique repository-local skill exists")
     if host is None:
-        _error(reference, "installed skills require --host")
+        _error(reference, "no unique repository-local skill exists")
     inventory = _router().native_plugin_inventory(host, repository_root) if inventory is None else inventory
+    match = _QUALIFIED.fullmatch(reference)
+    if match is None:
+        bare = _safe_name(reference, reference, "skill name")
+        owners = sorted({
+            _plugin_parts(record, host, reference)[0]
+            for record in inventory
+            if isinstance(record, dict) and record.get("enabled") is True
+            and not (host == "codex" and record.get("installed") is False)
+        })
+        matches = []
+        for owner in owners:
+            try:
+                matches.append(resolve_installed_skill(owner, bare, host, repository_root, inventory))
+            except SkillSourceError as error:
+                if "declared skill entry is missing" not in str(error):
+                    raise
+        if len(matches) != 1:
+            _error(reference, "installed declared skill is missing or ambiguous")
+        matches[0]["name"] = reference
+        matches[0]["requested_name"] = reference
+        return matches[0]
     try:
         return resolve_installed_skill(match.group(1), match.group(2), host, repository_root, inventory)
     except SkillSourceError as direct:
         alias = _router().skill_aliases().get(reference)
-        if alias is None or not _QUALIFIED.fullmatch(alias):
+        if "native owner is absent" not in str(direct) or alias is None or not _QUALIFIED.fullmatch(alias):
             raise direct
         target = _QUALIFIED.fullmatch(alias)
         record = resolve_installed_skill(target.group(1), target.group(2), host, repository_root, inventory)
         record["alias_from"] = reference
         record["name"] = reference
+        record["requested_name"] = reference
         return record
 
 
@@ -369,9 +428,9 @@ def identity_key(record):
     if record.get("source_type") == "repository_local":
         return tuple(record.get(key) for key in ("kind", "name", "path", "sha256"))
     fields = (
-        "kind", "name", "resolved_name", "source_type", "host", "plugin_id", "marketplace",
-        "native_version", "native_scope", "project_path", "advertised_source", "declaration_method",
-        "manifest_path", "manifest_sha256", "entry_path", "entry_sha256", "body_path", "body_sha256",
+        "kind", "name", "requested_name", "resolved_name", "source_type", "host", "plugin_id", "marketplace",
+        "native_version", "native_revision", "native_scope", "project_path", "advertised_source", "declaration_method",
+        "manifest_path", "manifest_sha256", "manifest_version", "entry_path", "entry_sha256", "body_path", "body_sha256",
         "alias_from",
     )
     return tuple(json.dumps(record.get(field), sort_keys=True, separators=(",", ":")) for field in fields)

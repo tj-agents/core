@@ -151,6 +151,222 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
             env=self.environment, timeout=60,
         )
 
+    def external_skill_package(self, host):
+        package = self.root / f"external {host}"
+        if host == "codex":
+            self.environment["CODEX_HOME"] = str(self.root / "codex home")
+            package = Path(self.environment["CODEX_HOME"]) / "plugins" / "cache" / "example" / "external" / "1.0"
+            tree = "codex-skills"
+        else:
+            tree = "skills"
+        manifest = package / f".{host}-plugin"
+        body = package / ".agents" / "external" / "workflow" / "review" / "SKILL.md"
+        entry = package / tree / "review" / "SKILL.md"
+        manifest.mkdir(parents=True)
+        body.parent.mkdir(parents=True)
+        entry.parent.mkdir(parents=True)
+        (manifest / "plugin.json").write_text(
+            json.dumps({"name": "external", "version": "1.0", "skills": f"./{tree}/"}),
+            encoding="utf-8",
+        )
+        body.write_bytes(b"---\nname: review\n---\nexternal raw\r\nbody\n")
+        entry.write_text(
+            "Read [canonical shared definition](../../.agents/external/workflow/review/SKILL.md) in full.\n",
+            encoding="utf-8",
+        )
+        return package, body
+
+    def native_cli(self, host, package):
+        directory = self.root / "native bin"
+        directory.mkdir(exist_ok=True)
+        inventory = {
+            "claude": [{
+                "enabled": True, "id": "external@example", "installPath": str(package),
+                "scope": "project", "projectPath": str(self.repository), "revision": "advertised-r1",
+            }],
+            "codex": {"installed": [{
+                "enabled": True, "installed": True, "name": "external", "marketplaceName": "example",
+                "version": "1.0", "scope": "project", "projectPath": str(self.repository),
+                "revision": "advertised-r1",
+            }]},
+        }[host]
+        suffix = ".cmd" if os.name == "nt" else ""
+        script = directory / f"{host}{suffix}"
+        payload = json.dumps(inventory, separators=(",", ":"))
+        if os.name == "nt":
+            script.write_text("@echo off\necho " + payload + "\n", encoding="utf-8")
+        else:
+            script.write_text("#!/bin/sh\nprintf '%s\\n' '" + payload.replace("'", "'\\''") + "'\n", encoding="utf-8")
+            script.chmod(0o755)
+        self.environment["PATH"] = str(directory) + os.pathsep + self.environment["PATH"]
+
+    def test_generated_helper_pins_installed_identity_for_both_native_hosts(self):
+        inherited_python_path = self.environment.get("PYTHONPATH", "")
+        self.environment["PYTHONPATH"] = str(self.package / "hooks") + (
+            os.pathsep + inherited_python_path if inherited_python_path else ""
+        )
+        for host in ("claude", "codex"):
+            with self.subTest(host=host):
+                package, body = self.external_skill_package(host)
+                self.native_cli(host, package)
+                routes = self.repository / ".agents" / "skill-routes.json"
+                lifecycle = self.repository / ".agents" / "skills" / "review" / "SKILL.md"
+                lifecycle.parent.mkdir(parents=True, exist_ok=True)
+                lifecycle.write_text("---\nname: review\n---\n", encoding="utf-8")
+                routes.write_text(
+                    json.dumps({"routes": [{"path": "^src/", "skills": ["external:review"]}]}),
+                    encoding="utf-8",
+                )
+                if host == "claude":
+                    self.git("add", ".agents")
+                    self.git("commit", "-q", "-m", "route installed external skill")
+
+                prepared = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "review-prepare",
+                    "--base", "main", "--head", "HEAD", "--host", host,
+                )
+                self.assertEqual(0, prepared.returncode, prepared.stdout + prepared.stderr)
+                descriptor = json.loads(prepared.stdout)
+                rule = descriptor["installed_rules"][0]
+                self.assertEqual("external:review", rule["requested_name"])
+                self.assertEqual("advertised-r1", rule["native_revision"])
+                self.assertEqual("1.0", rule["manifest_version"])
+
+                listed = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "skills",
+                    "--lifecycle", "review", "--technical", "external:review",
+                    "--host", host, "--descriptor", descriptor["artifact"],
+                )
+                self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+                self.assertEqual("load", json.loads(listed.stdout)["skills"][1]["action"])
+
+                shutil.rmtree(Path(descriptor["bundle"]["directory"]))
+                restored = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "review-reconcile",
+                    "--descriptor", descriptor["artifact"], "--base", "main",
+                )
+                self.assertEqual(0, restored.returncode, restored.stdout + restored.stderr)
+
+                body.write_bytes(b"---\nname: review\n---\ntampered\n")
+                drifted = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "review-reconcile",
+                    "--descriptor", descriptor["artifact"], "--base", "main",
+                )
+                self.assertNotEqual(0, drifted.returncode)
+                self.assertIn("installed rule identity changed", drifted.stdout + drifted.stderr)
+
+    def external_skill_package(self, host):
+        package = self.root / f"external {host}"
+        if host == "codex":
+            self.environment["CODEX_HOME"] = str(self.root / "codex home")
+            package = Path(self.environment["CODEX_HOME"]) / "plugins" / "cache" / "example" / "external" / "1.0"
+            tree = "codex-skills"
+        else:
+            tree = "skills"
+        manifest = package / f".{host}-plugin"
+        body = package / ".agents" / "external" / "workflow" / "review" / "SKILL.md"
+        entry = package / tree / "review" / "SKILL.md"
+        manifest.mkdir(parents=True)
+        body.parent.mkdir(parents=True)
+        entry.parent.mkdir(parents=True)
+        (manifest / "plugin.json").write_text(
+            json.dumps({"name": "external", "version": "1.0", "skills": f"./{tree}/"}),
+            encoding="utf-8",
+        )
+        body.write_bytes(b"---\nname: review\n---\nexternal raw\r\nbody\n")
+        entry.write_text(
+            "Read [canonical shared definition](../../.agents/external/workflow/review/SKILL.md) in full.\n",
+            encoding="utf-8",
+        )
+        return package, body
+
+    def native_cli(self, host, package):
+        directory = self.root / "native bin"
+        directory.mkdir(exist_ok=True)
+        inventory = {
+            "claude": [{
+                "enabled": True, "id": "external@example", "installPath": str(package),
+                "scope": "project", "projectPath": str(self.repository), "revision": "advertised-r1",
+            }],
+            "codex": {"installed": [{
+                "enabled": True, "installed": True, "name": "external", "marketplaceName": "example",
+                "version": "1.0", "scope": "project", "projectPath": str(self.repository),
+                "revision": "advertised-r1",
+            }]},
+        }[host]
+        suffix = ".cmd" if os.name == "nt" else ""
+        script = directory / f"{host}{suffix}"
+        payload = json.dumps(inventory, separators=(",", ":"))
+        if os.name == "nt":
+            script.write_text("@echo off\necho " + payload + "\n", encoding="utf-8")
+        else:
+            script.write_text("#!/bin/sh\nprintf '%s\\n' '" + payload.replace("'", "'\\''") + "'\n", encoding="utf-8")
+            script.chmod(0o755)
+        self.environment["PATH"] = str(directory) + os.pathsep + self.environment["PATH"]
+
+    def test_generated_helper_pins_installed_identity_for_both_native_hosts(self):
+        inherited_python_path = self.environment.get("PYTHONPATH", "")
+        self.environment["PYTHONPATH"] = str(self.package / "hooks") + (
+            os.pathsep + inherited_python_path if inherited_python_path else ""
+        )
+        for host in ("claude", "codex"):
+            with self.subTest(host=host):
+                package, body = self.external_skill_package(host)
+                self.native_cli(host, package)
+                routes = self.repository / ".agents" / "skill-routes.json"
+                lifecycle = self.repository / ".agents" / "skills" / "review" / "SKILL.md"
+                lifecycle.parent.mkdir(parents=True, exist_ok=True)
+                lifecycle.write_text("---\nname: review\n---\n", encoding="utf-8")
+                routes.write_text(
+                    json.dumps({"routes": [{"path": "^src/", "skills": ["external:review"]}]}),
+                    encoding="utf-8",
+                )
+                if host == "claude":
+                    self.git("add", ".agents")
+                    self.git("commit", "-q", "-m", "route installed external skill")
+
+                prepared = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "review-prepare",
+                    "--base", "main", "--head", "HEAD", "--host", host,
+                )
+                self.assertEqual(0, prepared.returncode, prepared.stdout + prepared.stderr)
+                descriptor = json.loads(prepared.stdout)
+                rule = descriptor["installed_rules"][0]
+                self.assertEqual("external:review", rule["requested_name"])
+                self.assertEqual("advertised-r1", rule["native_revision"])
+                self.assertEqual("1.0", rule["manifest_version"])
+
+                listed = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "skills",
+                    "--lifecycle", "review", "--technical", "external:review",
+                    "--host", host, "--descriptor", descriptor["artifact"],
+                )
+                self.assertEqual(0, listed.returncode, listed.stdout + listed.stderr)
+                self.assertEqual("load", json.loads(listed.stdout)["skills"][1]["action"])
+
+                shutil.rmtree(Path(descriptor["bundle"]["directory"]))
+                restored = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "review-reconcile",
+                    "--descriptor", descriptor["artifact"], "--base", "main",
+                )
+                self.assertEqual(0, restored.returncode, restored.stdout + restored.stderr)
+
+                body.write_bytes(b"---\nname: review\n---\ntampered\n")
+                drifted = self.run_packaged(
+                    "workflows/workflow_ops.py", "--root", str(self.repository),
+                    "--workflow-run-id", f"installed-{host}", "review-reconcile",
+                    "--descriptor", descriptor["artifact"], "--base", "main",
+                )
+                self.assertNotEqual(0, drifted.returncode)
+                self.assertIn("installed rule identity changed", drifted.stdout + drifted.stderr)
+
     def test_stage_one_prepares_the_candidate_with_no_repository_runtime(self):
         self.assertFalse((self.repository / ".agents").exists())
 

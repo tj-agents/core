@@ -1022,6 +1022,19 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, host=
     return descriptor
 
 
+def frozen_local_rules(tree, routed):
+    rules = []
+    for name in routed:
+        if ":" in name:
+            continue
+        try:
+            record = skill_sources.resolve_skill(name, tree, tree)
+        except skill_sources.SkillSourceError as error:
+            raise WorkflowOperationError(str(error)) from error
+        rules.append({"name": name, "path": record["path"], "sha256": record["sha256"]})
+    return rules
+
+
 def load_descriptor(root, workflow_run_id, path):
     descriptor_path = Path(path).absolute()
     value = json.loads(descriptor_path.read_text(encoding="utf-8"))
@@ -1044,8 +1057,11 @@ def load_descriptor(root, workflow_run_id, path):
     if installed_rules:
         if not isinstance(context, dict) or context.get("host") not in {"codex", "claude"}:
             raise WorkflowOperationError("installed rules require a pinned host context")
+        context_root = context.get("project_root")
+        if not isinstance(context_root, str) or os.path.normcase(str(Path(context_root).resolve())) != os.path.normcase(str(Path(root).resolve())):
+            raise WorkflowOperationError("installed rules require the original project context")
         try:
-            skill_sources.validate_pinned_installed_rules(installed_rules, context["host"], root)
+            skill_sources.validate_pinned_installed_rules(installed_rules, context["host"], context_root)
         except (KeyError, skill_sources.SkillSourceError) as error:
             raise WorkflowOperationError(str(error)) from error
     bundle = value["bundle"]
@@ -1113,20 +1129,10 @@ def load_descriptor(root, workflow_run_id, path):
     current_patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
     if hashlib.sha256(current_patch).hexdigest() != value["patch_sha256"]:
         raise WorkflowOperationError("review patch differs from the repository objects")
-    expected_rules = []
     routed, violations = route_findings(required["tree"], paths)
     if "routed_skills" in value and (value["routed_skills"], value.get("route_violations")) != (routed, violations):
         raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
-    for name in routed:
-        rule_path = required["tree"] / ".agents" / "skills" / name / "SKILL.md"
-        if rule_path.is_file():
-            expected_rules.append(
-                {
-                    "name": name,
-                    "path": str(rule_path.relative_to(required["tree"])).replace("\\", "/"),
-                    "sha256": sha256_file(rule_path),
-                }
-            )
+    expected_rules = frozen_local_rules(required["tree"], routed)
     if expected_rules != value.get("rules"):
         raise WorkflowOperationError("review rules differ from the frozen tree routing evidence")
     value["bundle"]["last_validated_at"] = utc_now()
