@@ -56,6 +56,141 @@
             "url": "https://raw.githubusercontent.com/zsh-users/zsh/zsh-5.9/Src/options.c",
             "member": "Src/options.c",
             "sha256": "d3c5d5095922f5b42087e37512b6ae966b70dd32bc84926bd4a65d388cc85de0"
+        },
+        "pwsh-7.6.0-parser": {
+            "edition": "v7.6.0",
+            "url": "https://raw.githubusercontent.com/PowerShell/PowerShell/v7.6.0/src/Microsoft.PowerShell.ConsoleHost/host/msh/CommandLineParameterParser.cs",
+            "member": "src/Microsoft.PowerShell.ConsoleHost/host/msh/CommandLineParameterParser.cs",
+            "sha256": "a7fc6b5c391bb8cbd06b78edd6e3b9867f3b89c1e634a610e7eddc7086a49783",
+            "byte_form": "UTF-8 no BOM; existing CRLF cache",
+            "normalized_lf_sha256": "abf566b2768f65586cab9e77cb0330fb8926950c9e7720b46f0fc0a69ebed6fe",
+            "resolved_commit": null,
+            "provenance": "Existing attributed cache, v7.6.0 tag not resolved/verified; no5.1 parser equivalence.",
+            "locations": {
+                "normalization": [
+                    709,
+                    737
+                ],
+                "matching": [
+                    797,
+                    805
+                ],
+                "descriptors": [
+                    901,
+                    1246
+                ],
+                "policy_enum": [
+                    756,
+                    792
+                ],
+                "format_enum": [
+                    1293,
+                    1325
+                ],
+                "file": [
+                    1344,
+                    1435
+                ],
+                "command": [
+                    1493,
+                    1554
+                ]
+            }
+        },
+        "windows-powershell-5.1-cli-doc": {
+            "edition": "5.1",
+            "url": "https://raw.githubusercontent.com/MicrosoftDocs/PowerShell-Docs/f09ce0b678c2da1ae0fa70f0b4789a607183cc63/reference/5.1/Microsoft.PowerShell.Core/About/about_PowerShell_exe.md",
+            "member": "about_powershell_exe-5.1-f09ce0.md",
+            "sha256": "cdbaa30b2186ebedf4c78e21c529f2691c2bedf105faa7ebe7f420c2b6b1e4da",
+            "revision": "f09ce0b678c2da1ae0fa70f0b4789a607183cc63",
+            "ms_date": "2024-07-23T00:00:00Z",
+            "updated_at": "2025-09-29T22:08:00Z",
+            "observed_utc": "2026-10-11T11:52:12.832991+00:00",
+            "locations": [
+                [
+                    25,
+                    267,
+                    269,
+                    270,
+                    271,
+                    272
+                ],
+                [
+                    112,
+                    148
+                ],
+                [
+                    193,
+                    218
+                ],
+                [
+                    219,
+                    253
+                ],
+                [
+                    255,
+                    259
+                ],
+                [
+                    275,
+                    290
+                ]
+            ]
+        },
+        "pwsh-7.5-cli-doc": {
+            "edition": "7.5",
+            "url": "https://raw.githubusercontent.com/MicrosoftDocs/PowerShell-Docs/9fc54e7fc4954f7b4af134def74ba8e8cac7e23c/reference/7.5/Microsoft.PowerShell.Core/About/about_Pwsh.md",
+            "member": "about_pwsh-7.5-9fc54e.md",
+            "sha256": "6237731762df03b74e9768c30a228d9f03ab6ba98c39b03d6635e7e237cc3bb2",
+            "revision": "9fc54e7fc4954f7b4af134def74ba8e8cac7e23c",
+            "ms_date": "2026-01-18T00:00:00Z",
+            "updated_at": "2026-04-08T22:08:00Z",
+            "observed_utc": "2026-10-11T11:52:12.838975+00:00",
+            "locations": [
+                [
+                    59,
+                    61,
+                    62,
+                    64,
+                    65,
+                    68,
+                    69,
+                    70
+                ],
+                [
+                    128,
+                    131,
+                    159,
+                    160,
+                    161
+                ],
+                [
+                    209,
+                    211,
+                    212,
+                    214,
+                    215,
+                    217,
+                    218
+                ],
+                [
+                    410,
+                    412,
+                    413
+                ],
+                [
+                    295,
+                    307
+                ],
+                [
+                    377,
+                    380
+                ],
+                [
+                    415,
+                    419
+                ]
+            ]
         }
     }
 }

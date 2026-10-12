@@ -533,6 +533,404 @@
                 "v": "VERBOSE",
                 "x": "XTRACE"
             }
+        },
+        {
+            "id": "powershell-descriptors",
+            "shell": "powershell",
+            "meaning": "ordered command-line descriptor",
+            "source": "pwsh-7.6.0-parser",
+            "arity": "descriptor",
+            "descriptors": [
+                {
+                    "name": "version",
+                    "minimum_prefix": "v",
+                    "arity": 0,
+                    "action": "exit"
+                },
+                {
+                    "name": "help",
+                    "minimum_prefix": "h",
+                    "arity": 0,
+                    "action": "exit"
+                },
+                {
+                    "name": "?",
+                    "minimum_prefix": "?",
+                    "arity": 0,
+                    "action": "exit"
+                },
+                {
+                    "name": "login",
+                    "minimum_prefix": "l",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "noexit",
+                    "minimum_prefix": "noe",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "noprofile",
+                    "minimum_prefix": "nop",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "nologo",
+                    "minimum_prefix": "nol",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "noninteractive",
+                    "minimum_prefix": "noni",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "socketservermode",
+                    "minimum_prefix": "so",
+                    "arity": 0,
+                    "action": "opaque"
+                },
+                {
+                    "name": "v2socketservermode",
+                    "minimum_prefix": "v2so",
+                    "arity": 0,
+                    "action": "opaque"
+                },
+                {
+                    "name": "servermode",
+                    "minimum_prefix": "s",
+                    "arity": 0,
+                    "action": "opaque"
+                },
+                {
+                    "name": "namedpipeservermode",
+                    "minimum_prefix": "nam",
+                    "arity": 0,
+                    "action": "opaque"
+                },
+                {
+                    "name": "sshservermode",
+                    "minimum_prefix": "sshs",
+                    "arity": 0,
+                    "action": "opaque"
+                },
+                {
+                    "name": "noprofileloadtime",
+                    "minimum_prefix": "noprofileloadtime",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "interactive",
+                    "minimum_prefix": "i",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "configurationfile",
+                    "minimum_prefix": "configurationfile",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "configurationname",
+                    "minimum_prefix": "config",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "custompipename",
+                    "minimum_prefix": "cus",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "commandwithargs",
+                    "minimum_prefix": "commandwithargs",
+                    "arity": 1,
+                    "action": "cwa"
+                },
+                {
+                    "name": "cwa",
+                    "minimum_prefix": "cwa",
+                    "arity": 1,
+                    "action": "cwa"
+                },
+                {
+                    "name": "command",
+                    "minimum_prefix": "c",
+                    "arity": "remainder",
+                    "action": "command"
+                },
+                {
+                    "name": "windowstyle",
+                    "minimum_prefix": "w",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "file",
+                    "minimum_prefix": "f",
+                    "arity": 1,
+                    "action": "file"
+                },
+                {
+                    "name": "isswait",
+                    "minimum_prefix": "isswait",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "outputformat",
+                    "minimum_prefix": "o",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "of",
+                    "minimum_prefix": "o",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "inputformat",
+                    "minimum_prefix": "inp",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "if",
+                    "minimum_prefix": "if",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "executionpolicy",
+                    "minimum_prefix": "ex",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "ep",
+                    "minimum_prefix": "ep",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "encodedcommand",
+                    "minimum_prefix": "e",
+                    "arity": 1,
+                    "action": "opaque"
+                },
+                {
+                    "name": "ec",
+                    "minimum_prefix": "e",
+                    "arity": 1,
+                    "action": "opaque"
+                },
+                {
+                    "name": "encodedarguments",
+                    "minimum_prefix": "encodeda",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "ea",
+                    "minimum_prefix": "ea",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "settingsfile",
+                    "minimum_prefix": "settings",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "sta",
+                    "minimum_prefix": "sta",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "mta",
+                    "minimum_prefix": "mta",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "workingdirectory",
+                    "minimum_prefix": "wo",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "wd",
+                    "minimum_prefix": "wd",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "removeworkingdirectorytrailingcharacter",
+                    "minimum_prefix": "removeworkingdirectorytrailingcharacter",
+                    "arity": 0,
+                    "action": "continue"
+                },
+                {
+                    "name": "token",
+                    "minimum_prefix": "to",
+                    "arity": 1,
+                    "action": "continue"
+                },
+                {
+                    "name": "utctimestamp",
+                    "minimum_prefix": "utc",
+                    "arity": 1,
+                    "action": "continue"
+                }
+            ],
+            "aliases": {
+                "?": "help",
+                "cwa": "commandwithargs",
+                "of": "outputformat",
+                "if": "inputformat",
+                "ep": "executionpolicy",
+                "ec": "encodedcommand",
+                "ea": "encodedarguments",
+                "wd": "workingdirectory"
+            },
+            "source_lines": {
+                "version": 901,
+                "help": 912,
+                "?": 912,
+                "login": 919,
+                "noexit": 925,
+                "noprofile": 931,
+                "nologo": 936,
+                "noninteractive": 941,
+                "socketservermode": 946,
+                "v2socketservermode": 953,
+                "servermode": 960,
+                "namedpipeservermode": 966,
+                "sshservermode": 972,
+                "noprofileloadtime": 978,
+                "interactive": 983,
+                "configurationfile": 988,
+                "configurationname": 1001,
+                "custompipename": 1014,
+                "commandwithargs": 1041,
+                "cwa": 1041,
+                "command": 1054,
+                "windowstyle": 1063,
+                "file": 1092,
+                "isswait": 1102,
+                "outputformat": 1107,
+                "of": 1107,
+                "inputformat": 1113,
+                "if": 1113,
+                "executionpolicy": 1118,
+                "ep": 1118,
+                "encodedcommand": 1133,
+                "ec": 1133,
+                "encodedarguments": 1143,
+                "ea": 1143,
+                "settingsfile": 1152,
+                "sta": 1162,
+                "mta": 1182,
+                "workingdirectory": 1202,
+                "wd": 1202,
+                "removeworkingdirectorytrailingcharacter": 1216,
+                "token": 1220,
+                "utctimestamp": 1235
+            },
+            "conditions": {
+                "v2socketservermode": [
+                    "!UNIX"
+                ],
+                "isswait": [
+                    "DEBUG"
+                ],
+                "removeworkingdirectorytrailingcharacter": [
+                    "!UNIX"
+                ],
+                "token": [
+                    "!UNIX"
+                ],
+                "utctimestamp": [
+                    "!UNIX"
+                ]
+            },
+            "windows_common_names": [
+                "help",
+                "?",
+                "noexit",
+                "noprofile",
+                "nologo",
+                "noninteractive",
+                "configurationname",
+                "command",
+                "windowstyle",
+                "file",
+                "outputformat",
+                "of",
+                "inputformat",
+                "if",
+                "executionpolicy",
+                "ep",
+                "encodedcommand",
+                "ec",
+                "encodedarguments",
+                "ea",
+                "sta",
+                "mta"
+            ],
+            "windows_extra": [
+                {
+                    "name": "psconsolefile",
+                    "minimum_prefix": "psconsolefile",
+                    "arity": 1,
+                    "action": "continue",
+                    "source": "windows-powershell-5.1-cli-doc"
+                }
+            ],
+            "windows_overrides": {
+                "version": {
+                    "minimum_prefix": "v",
+                    "arity": 1,
+                    "action": "continue",
+                    "source": "windows-powershell-5.1-cli-doc"
+                }
+            },
+            "enums": {
+                "executionpolicy": [
+                    "default",
+                    "remotesigned",
+                    "bypass",
+                    "allsigned",
+                    "restricted",
+                    "unrestricted",
+                    "undefined"
+                ],
+                "inputformat": [
+                    "text",
+                    "xml"
+                ],
+                "outputformat": [
+                    "text",
+                    "xml"
+                ],
+                "windowstyle": [
+                    "normal",
+                    "minimized",
+                    "maximized",
+                    "hidden"
+                ]
+            }
         }
     ]
 }
