@@ -140,6 +140,16 @@ class ContinuationStopTests(unittest.TestCase):
              patch.object(continuation_stop, "observed_wake", return_value=True):
             self.assertIn("working without", self.call())
 
+    def test_stale_live_foreground_wake_leaves_a_continuable_owner(self):
+        runtime = continuation_stop.module("continuation_runtime", continuation_stop.workflow_root())
+        lease = {"pid": os.getpid(), "identity": runtime.process_identity(os.getpid()),
+                 "activity": 0, "token": "token"}
+        owner = self.owner("working", foreground=lease, lease_seconds=300, deadline=float("inf"))
+        runtime.wake(None, owner, None)
+        self.assertEqual((owner["state"], owner["reason"]), ("working", "foreground-lease-stale"))
+        self.write_owner(owner)
+        self.assertIn("continue or yield", self.call())
+
     def test_complete_uses_canonical_completion_check(self):
         self.goal.write_text(
             "# Goal\n\n```completion\n"
