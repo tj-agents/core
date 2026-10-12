@@ -57,8 +57,8 @@ class WorktreePlacementGateTests(unittest.TestCase):
         checkout.mkdir(parents=True, exist_ok=True)
         self.git(checkout, "init")
 
-    def invoke(self, command, *, codex=False, codex_argv=True, command_argv=None, tool_name=None, environment=None, shell=None):
-        tool_input = {"command": command_argv} if command_argv is not None else (
+    def invoke(self, command, *, codex=False, codex_argv=True, command_argv=None, payload_input=None, tool_name=None, environment=None, shell=None):
+        tool_input = payload_input if payload_input is not None else {"command": command_argv} if command_argv is not None else (
             {"command": ["bash", "-lc", command]} if codex and codex_argv else {"command": command}
         )
         if shell is not None:
@@ -356,6 +356,41 @@ class WorktreePlacementGateTests(unittest.TestCase):
 
         self.assertEqual(2, result.returncode)
         self.assertIn("command substitution", result.stderr)
+
+    def test_extracts_codex_path_bash_argv_for_direct_creation(self):
+        executable = r"C:\Program Files\Git\bin\bash.exe"
+        internal = self.repo / ".worktrees" / "argv-internal"
+        sibling = self.base / "argv-sibling"
+        for action, keys in ((False, ("command", "cmd", "script", "input")), (True, ("command", "cmd"))):
+            for key in keys:
+                for destination, expected in ((sibling, 2), (internal, 0)):
+                    command = self.add_command(destination, branch=destination.name)
+                    value = [executable, "-lc", command]
+                    payload_input = {"action": {key: value}} if action else {key: value}
+                    with self.subTest(action=action, key=key, destination=destination):
+                        result = self.invoke(
+                            command,
+                            codex=True,
+                            codex_argv=False,
+                            payload_input=payload_input,
+                            tool_name="exec_command",
+                        )
+                        self.assertEqual(expected, result.returncode, result.stderr)
+
+    def test_detects_nested_codex_bash_action_argv_substitution(self):
+        sibling = self.base / "nested-action-substitution-sibling"
+        native = f'git -C "{self.repo}" worktree add -b nested-action-substitution-sibling -- "{sibling}"'
+        for key in ("command", "cmd"):
+            with self.subTest(key=key):
+                result = self.invoke(
+                    f"echo `{native}`",
+                    codex=True,
+                    codex_argv=False,
+                    payload_input={"action": {key: [r"C:\Program Files\Git\bin\bash.exe", "-lc", f"echo `{native}`"]}},
+                    tool_name="exec_command",
+                )
+                self.assertEqual(2, result.returncode)
+                self.assertIn("command substitution", result.stderr)
 
     def test_explicit_shell_selects_before_command_list_heuristics(self):
         self.assertEqual(
