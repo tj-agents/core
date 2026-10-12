@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 
@@ -462,6 +463,75 @@ class ProcessStandardsTests(unittest.TestCase):
         self.assertIn(
             "do not create a second branch solely to change the type prefix to `Docs`", flat
         )
+
+    def test_inert_closeout_uses_the_canonical_local_checkpoint_choreography(self):
+        committing = " ".join(
+            authored_skill("committing").read_text(encoding="utf-8").split()
+        )
+        dependents = {
+            "checkpoint": " ".join(
+                authored_skill("plan-checkpoint").read_text(encoding="utf-8").split()
+            ),
+            "plans": " ".join(
+                authored_skill("plans").read_text(encoding="utf-8").split()
+            ),
+            "merge": " ".join(
+                authored_skill("merge").read_text(encoding="utf-8").split()
+            ),
+            "problem records": " ".join(
+                (self.root / ".agents/engineering/resources/problem-records.md")
+                .read_text(encoding="utf-8")
+                .split()
+            ),
+        }
+
+        for phrase in (
+            "source candidate freezes for review or validation",
+            "never advance the candidate's `HEAD`",
+            "read-only completion check on the current local file",
+            "next substantive change or a terminal local checkpoint",
+            "Do not push, review, or revalidate the source merely to transport them",
+            "`SKILL.md`, hooks, manifests, schemas, code or test selection",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, committing)
+
+        for owner, body in dependents.items():
+            with self.subTest(owner=owner):
+                self.assertIn("`engineering:committing`", body)
+                self.assertIn("Plan retirement: pending", body)
+
+        self.assertIn(
+            "Uncommitted executable changes, or local ahead of remote",
+            dependents["merge"],
+        )
+        self.assertIn(
+            "Do not land a PR that is missing local work",
+            dependents["merge"],
+        )
+        self.assertNotIn("close-out PR landed", dependents["merge"])
+        self.assertNotIn("land the plan close-out", dependents["merge"])
+
+        for phrase in (
+            "preserve its exact merged `HEAD`",
+            "terminal receipt against the canonical goal at its original path",
+            "Keep it there through its fresh completion check",
+            "Plan retirement: pending",
+            "next substantive publication",
+            "pure closeout PR",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, committing + " " + dependents["plans"] + " " + dependents["merge"])
+
+        self.assertIn("sets uncommitted leftovers aside", dependents["merge"])
+        self.assertIn("When the cleanup receipt names a set-aside archive, verify it before `finish.py`", dependents["merge"])
+        self.assertIn("final cleanup to `finish.py`", dependents["merge"])
+        self.assertIn("otherwise the verified set-aside archive is the durable record", dependents["merge"])
+
+        harness = json.loads(
+            (self.root / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
+        )
+        self.assertIn(".agents/workflows/completion.py", harness["source_roots"])
 
     def test_merge_requires_safe_cleanup_when_the_repository_helper_is_absent(self):
         body = authored_skill("merge").read_text(encoding="utf-8")

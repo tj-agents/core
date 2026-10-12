@@ -51,6 +51,18 @@ history. A linked mistake resolves only when its own prevention condition passes
 debt repair is resolved. Delete debt only after the whole entry is verified resolved. When separate owning
 areas need separate fixes, each retains its own debt entry and links any shared upstream source repair.
 
+## Terminal closeout evidence
+
+Once a source candidate is frozen, a late status/evidence-only problem-record update must not advance its `HEAD`;
+keep it local through terminal delivery and follow `engineering:committing` for the current-file completion check
+and terminal local checkpoint. This exception is limited to plan, ledger, review-observation, or problem-record
+status/evidence, so executable agent instructions (`SKILL.md`, hooks, manifests, schemas, code or test selection),
+independently meaningful documentation deliverables, and code or security fixes still use normal delivery gates.
+
+When the source is a linked worktree slated for cleanup, preserve the exact merged `HEAD` and follow
+`engineering:committing` before moving the canonical goal or retiring the record. Name the retained owner and
+`Plan retirement: pending`; do not retire the record from the cleanup-bound source.
+
 ## One causal repair
 
 One causal repair has one canonical repair record. Related incident or debt entries keep their own records

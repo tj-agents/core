@@ -100,3 +100,14 @@
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
 **Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+
+## B008 - Final record commits restart a frozen delivery candidate
+
+- Kind: bug. Observed/reported: 2026-10-12; the dotnet scaffold owner planned a status-only commit/push and another review/CI cycle after its final executable head was green. That extra loop was stopped before execution.
+- Cause: confirmed policy conflict. Committing includes every verified documentation closeout, while merge requires local HEAD to match the reviewed remote head. The no-bookkeeping-push rule does not provide a sequence for late problem-record and final evidence updates. The agent's exact reasoning is not established by this source inspection.
+- Impact/priority: P2; inert closeout records can trigger avoidable delivery cycles. Earlier scaffold compilation and security fixture repairs remain substantive work.
+- Source owner: tj-agents/core engineering committing, problem-record and merge closeout contracts. State: in-progress.
+- Repair link: branch Fix/InertCloseoutCadence; plans/inert-closeout-cadence/GOAL.md.
+- Next action: add explicit late-record choreography, prove it with focused regressions and deliver the reviewed correction.
+- Resolution condition: shared guidance preserves the frozen source candidate through terminal delivery, allows timely local records and terminal checkpoints without a bookkeeping push, retains exact-head review/security/CI gates, and passes focused checks plus required Windows/Linux CI before merge.
+- Verification evidence: inspected committing's immediate doc-closeout rule, merge's local-ahead rejection, auto_merge.exact_local_identity and completion_check's current-file/fresh-forge contract; implementation and delivery pending.

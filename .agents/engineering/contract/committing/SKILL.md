@@ -15,6 +15,28 @@ This is not scoped to phase boundaries or handoffs. It applies to *every* finish
 a bug fix, a refactor, an investigation's output, a doc close-out. Reading the rule as conditional on
 handing off is exactly the misread that produces the failure below.
 
+The narrow closeout exception begins when a source candidate freezes for review or validation. Late
+status/evidence-only closeout edits must remain local and uncommitted and never advance the candidate's `HEAD`.
+After that frozen candidate is reviewed and exact-head-validated, keep those edits local until source delivery is
+terminal; preserve them in the existing goal or private artifacts, run the read-only completion check on the
+current local file, then commit them with the next substantive change or a terminal local checkpoint. Do not push,
+review, or revalidate the source merely to transport them. This exception covers only late plan, ledger,
+review-observation, or problem-record status and evidence. Executable agent instructions (`SKILL.md`, hooks,
+manifests, schemas, code or test selection), independently meaningful documentation deliverables, and code or
+security fixes remain ordinary work: commit and deliver them through their normal review, exact-head, CI, and
+authorization gates.
+
+### Cleanup-bound source deliveries
+
+When a linked source worktree is due for cleanup, preserve its exact merged `HEAD`: never create a terminal
+checkpoint on that source branch. Every active continuation owner finishes its terminal receipt against the
+canonical goal at its original path before that goal is moved or deleted. Keep it there through its fresh
+completion check and every active continuation owner's terminal receipt. Only after both pass, preserve or
+transfer the goal and late closeout state outside the cleanup target, naming the `Plan retirement: pending`
+owner; otherwise the cleanup proof's verified set-aside receipt is the durable record. The retained owner, or the
+next substantive change it owns, may then take the terminal local checkpoint and retire the plan; carry pending
+retirement into that substantive publication without opening a pure closeout PR or discarding the record.
+
 ## "I've left it uncommitted so you can look first" is the anti-pattern, not the courtesy
 
 - **Review runs off commits.** A review diffs the branch against its base; work sitting in the working tree

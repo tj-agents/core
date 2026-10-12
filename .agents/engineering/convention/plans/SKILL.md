@@ -322,9 +322,15 @@ alone does not require that transfer; the context-transfer decision is owned by
 5. **Close out only after the entire lifecycle is terminal.** Planning-only work is terminal only when its
    reviewed artifacts are merged to the default branch through `merge-docs`; planning artifacts updated with
    implementation are terminal only when that delivery PR merges. A local commit, pushed branch, or open PR
-   is not completion. Record the final transition and delete the
-   plan and ledger in the next substantive commit or one final docs-only closeout. Never push a commit whose
-   only purpose is to record a remote observation.
+   is not completion. Once a source candidate is frozen, late inert closeout state must not advance its `HEAD`;
+   keep it local through terminal delivery and follow `engineering:committing` for the current-file completion
+   check and terminal local checkpoint. For a linked source cleanup, preserve the exact merged `HEAD` and follow
+   `engineering:committing` before moving the canonical goal or retiring the plan. The retained owner records
+   `Plan retirement: pending` and carries the final transition and plan and ledger retirement into its next
+   substantive publication without a pure closeout PR. That exception is limited to plan, ledger, review-observation, or
+   problem-record status/evidence, so executable instructions, meaningful documentation deliverables, and code
+   or security fixes still use normal delivery gates. Never push a commit whose only purpose is to record a remote
+   observation.
 
 ### Plans outlive delivery branches
 

@@ -95,9 +95,16 @@ A plan-managed push has one leg:
 4. fetch and require the remote-tracking ref and any PR `headRefOid` to equal the recorded local head.
 
 The equality check proves transport; it does not create another ledger entry. Remote CI, PR, queue, merge,
-publication, and sync observations stay on their providers. Record them only in the next substantive commit
-or the final closeout when they materially change the recovery state. Never create or push an
-observation-only, ledger-only, review-only, or checkpoint-transport commit.
+publication, and sync observations stay on their providers. Once a source candidate is frozen, late inert
+closeout state must not advance its `HEAD`; keep it local through terminal delivery and follow
+`engineering:committing` for the current-file completion check and terminal local checkpoint. That exception is
+limited to plan, ledger, review-observation, or problem-record status/evidence, so executable instructions,
+meaningful documentation deliverables, and code or security fixes still use normal delivery gates. Never create or push an
+observation-only, ledger-only, review-only, or checkpoint-transport commit before that checkpoint.
+
+For a linked source cleanup, preserve its exact merged `HEAD` and follow `engineering:committing` before moving
+the canonical goal or taking a terminal checkpoint. Its retained owner records `Plan retirement: pending` and
+carries retirement into its next substantive publication.
 
 If a push fails, diagnose the cause and retain the exact known heads. Update the ledger only when the failure
 creates a genuine blocker or context-ending state; do not push the record of the failure.
