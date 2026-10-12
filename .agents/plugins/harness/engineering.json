@@ -3,6 +3,7 @@
   "plugin": "base-agents/engineering",
   "source_roots": [
     ".agents/engineering",
+    ".agents/engineering/resources/problem-records.md",
     ".agents/workflows"
   ],
   "requires": {
