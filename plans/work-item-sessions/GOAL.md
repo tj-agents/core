@@ -178,7 +178,7 @@ Steps 1–2 and 4 ship to every consumer through the marketplace automatically. 
 
 ### D6 Termboard
 
-Markdown stays the source of truth. Termboard (milestone 5) reads `ACTIVE_SESSIONS.md` and the work-item README to populate cards and calls the same guarded resume; it neither mirrors nor supersedes the files unless Tommy later decides otherwise. Nothing in Core waits on Termboard.
+This Markdown registry is the interim. Termboard (SQLite) supersedes it: once Termboard covers the daily loop, `ACTIVE_SESSIONS.md` and the work-item session convention stop being used and are retired under their own goal. Keep the interim tooling minimal accordingly. Nothing in Core waits on Termboard.
 
 ## Delivery slices
 
@@ -191,14 +191,12 @@ Markdown stays the source of truth. Termboard (milestone 5) reads `ACTIVE_SESSIO
 | S5 | Ledger removal and contract decision (D4 step 4) | `merge` | S4 and recorded consumer migrations |
 | S6+ | One goal per consumer repository | that repository | S3 |
 
-## Decisions awaiting Tommy
+## Decisions (Tommy, 2026-10-12)
 
-`.agents/settings.json` leaves `auto_approve_design` false, so these routine design choices are recorded as recommendations, not decided:
-
-1. Done work items: keep the work-item README (Status `done`, delivery slices) until the whole feature is terminal, then delete the feature folder (recommended; Git stays the archive) — or keep done work items indefinitely.
-2. `ACTIVE_SESSIONS.md` format: one `## <handle>` section with `- Field:` lines (recommended; reuses existing header parsers, diffs cleanly) — or a Markdown table.
-3. Slice order: runtime-first S1/S2 then the convention switch (recommended) — or convention text first.
-4. Termboard: reads the Markdown as its source (recommended) — or eventually supersedes it.
+1. Done work items keep their README (Status `done`, delivery slices) until the whole feature is terminal; then the feature folder is deleted. Git is the archive.
+2. `ACTIVE_SESSIONS.md` uses one `## <handle>` section per session with `- Field:` lines.
+3. Runtime first: S1, S2, then the S3 convention switch.
+4. Termboard supersedes the Markdown registry once it covers the daily loop (D6).
 
 ```agent-host-coverage
 {"schema_version":1,"shared_source":".agents/machine/scripts/work_item_sessions.py","hosts":[{"host":"claude","behavior":"Record, report and resume the exact Claude session recorded for a work item through the guarded open-claude path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources consumed by machine:recover-agents and machine:open-claude --resume.","verification":{"level":"planned","result":"pending","evidence":"S1 unit tests for parse, validation, status and resume delegation with a Claude row and CLAUDE_CODE_SESSION_ID."}},{"host":"codex","behavior":"Record, report and resume the exact Codex session recorded for a work item through the guarded open-codex path.","source":".agents/machine/scripts/work_item_sessions.py","mapping":"Machine package resources consumed by machine:recover-agents and machine:open-codex.","verification":{"level":"planned","result":"pending","evidence":"S1 unit tests for parse, validation, status and resume delegation with a Codex row and CODEX_THREAD_ID."}}]}
@@ -210,7 +208,7 @@ Markdown stays the source of truth. Termboard (milestone 5) reads `ACTIVE_SESSIO
 
 ## Next Steps
 
-Paused: Tommy — answer the four "Decisions awaiting Tommy". Resume when his answers are recorded here; then implement S1 on this branch (`Feature/WorkItemSessions`).
+Implement S1 on this branch (`Feature/WorkItemSessions`): `work_item_sessions.py` and its tests under `.agents/machine/scripts`, the `ACTIVE_SESSIONS.md` schema/template under machine resources, and the `recover-agents` "continue work item" entry, per D2/D3. Then review, validate on Windows and Linux, and deliver through `merge`.
 
 - Scope: whole plan through all remaining phases and terminal delivery.
 - Current slice: S1 session registry helper and recover-agents entry.
