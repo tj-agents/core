@@ -33,7 +33,9 @@ resume, and ambiguous terminal launch results must not be retried.
 
 ## Continue a work item
 
-When asked to continue a work item, run `work_item_sessions.py status '<work-item-directory>'`, then
-`resume` on the same directory. Without `--handle` it resumes the single `owner` row; with rows but no
-single owner, pass `--handle`; with no rows, start a new owner from the work item README's `## Next Steps`. See
-[`work-item-sessions.md`](../../resources/work-item-sessions.md) for the registry format and commands.
+When asked to continue a work item, run `work_item_sessions.py status '<feature>/<item>'`, then `resume`
+on the same `<feature>/<item>`. Without `--handle` it resumes the single not-ended owner; with several
+sessions and no single owner, pass `--handle`; with no sessions, start a new owner from the work item
+README's `## Next Steps` and `claim` it. Run `interrupted` to find and resume sessions whose process died
+without closing cleanly. See [`work-item-sessions.md`](../../resources/work-item-sessions.md) for the
+session store's schema and commands.
