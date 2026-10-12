@@ -107,10 +107,16 @@
 
 **Impact and priority:** P2. A completed milestone report could not end its turn for up to the 900-second child timeout, and the user was confused about an already merged release. No ownership or completion gate was bypassed.
 
-**Source owner:** tj-agents/core engineering shared Stop hook, shipped to both hosts. **State:** in-progress. **Repair link:** [goal](plans/headless-continuation-turn-release/GOAL.md), branch Fix/HeadlessContinuationTurnRelease. If PR209 lands, its association path still rejects an associated working owner without a foreground lease before this branch; PR209 owns that reconciliation.
+**Source owner:** tj-agents/core engineering shared Stop hook, shipped to both hosts. **State:** in-progress. **Repair link:** [PR229](https://github.com/tj-agents/core/pull/229), [goal](plans/headless-continuation-turn-release/GOAL.md), branch Fix/HeadlessContinuationTurnRelease. If PR209 lands, its association path still rejects an associated working owner without a foreground lease before this branch; PR209 owns that reconciliation.
 
-**Next action:** review, open the PR and merge the repair.
+**Next action:** merge PR229 through the merge queue once its exact-head CI and review are green.
 
-**Resolution condition:** a released-lease `working` owner whose child process identity matches exactly and whose scheduler receipt and observed wake verify allows Stop on both hosts. A missing scheduler or wake still waits. Unknown, reused, exited or malformed writers and foreground or stale-obligation cases still block. Focused regressions, independent review and exact-head CI pass before normal merge.
+**Resolution condition:** a released-lease `working` owner whose child process identity matches exactly, and whose scheduler receipt and observed wake verify, allows Stop on both hosts. Every other case still blocks:
 
-**Verification evidence:** against the original hook, the new regressions failed 14 subtests, including all 8 positive Claude/Codex payload cases. With the fix, `test_continuation_stop.py` passed 32 tests locally on Windows.
+- A live writer missing scheduler or wake proof waits for its receipt.
+- An exited or reused writer waits when that proof holds, and reconciles when it does not.
+- Unknown or malformed writer records, and foreground or stale-obligation cases, block for reconciliation.
+
+Focused regressions, independent review and exact-head CI pass before normal merge.
+
+**Verification evidence:** against the original hook, the first regressions failed 14 subtests, including all 8 positive Claude/Codex payload cases. Review findings STOP1 and STOP2 each added a regression that fails on its predecessor head. At 6b6e291 the file has 34 tests. Its 7 headless tests pass locally on Windows, and CI run 38317477446 passed `verify-linux`.
