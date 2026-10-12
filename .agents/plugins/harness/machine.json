@@ -217,7 +217,7 @@
             "--host",
             "codex"
           ],
-          "justification": "machine:followup-codex recovery: inspect or reopen the exact Codex owner after no-send follow-up failure",
+          "justification": "machine:followup-codex recovery: preserve task-specific authority evidence and authorized scope, limits, holds, and remaining gates while inspecting or reopening the exact Codex owner after no-send follow-up failure",
           "match": [
             [
               "python3",

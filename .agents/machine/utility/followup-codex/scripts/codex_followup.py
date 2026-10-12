@@ -313,10 +313,12 @@ def main(argv=None):
             )
         else:
             status, next_action = 'unavailable', (
-                'No send was attempted. Assess available supported automated coordination, including '
-                'authorized exact-owner recovery through machine:open-codex; verify the exact native id, '
-                'cwd, and Codex profile. If automated coordination is unavailable or ineligible, report the '
-                'blocker and provide the message for the user to paste.'
+                'No send was attempted. Preserve task-specific authority evidence and the authorized scope, '
+                'limits, holds, and remaining gates in the private recovery context and any required tool '
+                'approval justification. Assess available supported automated coordination through '
+                'machine:open-codex for the verified exact owner; verify the exact native id, cwd, and Codex '
+                'profile. If automated coordination is unavailable or ineligible, report the blocker and '
+                'provide the message for the user to paste.'
             )
         if isinstance(error, Rejected):
             status = 'rejected'
