@@ -17,7 +17,7 @@ def close_host(entry, wrapper=None):
         return
     try:
         close_tab.close_entry(entry)
-    except close_tab.TerminalUnavailable:
+    except close_tab.TerminalRefusal:
         if not session_close.verified_live(entry["pid"], entry["pid_started_at"]):
             raise session_close.Refusal("registered host identity changed before fallback close")
         os.kill(entry["pid"], signal.SIGTERM)
