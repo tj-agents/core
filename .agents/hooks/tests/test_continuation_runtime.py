@@ -151,6 +151,30 @@ class ContinuationTests(unittest.TestCase):
             runtime.associate_session(SimpleNamespace(**{**vars(args), "token": "wrong-token"}))
         self.assertEqual(owner["session_association"], runtime.read(self.owner)["session_association"])
 
+    def test_associate_session_recovers_interrupted_publication_and_rejects_conflicts(self):
+        native = self.native_root()
+        state = self.state()
+        state.update(state="working", foreground={"pid": os.getpid(),
+                     "identity": runtime.process_identity(os.getpid()), "token": "current-token"})
+        runtime.atomic_json(self.owner, state)
+        args = SimpleNamespace(owner=str(self.owner), token="current-token", session_id="native-session",
+                               session_cwd=str(native))
+        before = runtime.read(self.owner)
+        locator = runtime.session_locator(native, args.session_id)
+        with mock.patch.object(runtime, "save", side_effect=OSError("interrupted owner publication")):
+            with self.assertRaisesRegex(OSError, "interrupted owner publication"):
+                runtime.associate_session(args)
+        self.assertEqual(runtime.read(self.owner), before)
+        self.assertTrue(locator.is_file())
+        runtime.associate_session(args)
+        conflicting = SimpleNamespace(**{**vars(args), "session_id": "other-session"})
+        conflict_locator = runtime.session_locator(native, conflicting.session_id)
+        owner = runtime.read(self.owner)
+        with self.assertRaisesRegex(runtime.Gate, "association-owner-conflict"):
+            runtime.associate_session(conflicting)
+        self.assertEqual(runtime.read(self.owner), owner)
+        self.assertFalse(conflict_locator.exists())
+
     def test_unverified_complete_receipt_preserves_active_owner(self):
         state = self.state()
         state.update(launch_nonce="fixture", state="working", reason="headless-launch", next_action="Verify outcome")
@@ -479,6 +503,28 @@ class ContinuationTests(unittest.TestCase):
         self.assertEqual(result["head"], self.git("rev-parse", "HEAD"))
         for key in ("owner_id", "launches", "failures", "max_launches", "max_failures", "deadline"):
             self.assertEqual(result[key], before[key])
+
+    def test_reconcile_rejects_other_writer_states_without_mutation(self):
+        args = SimpleNamespace(operation="reconcile", rebind="unused", reason="head reconciled",
+                               next_action="resume delivery")
+        state = self.state()
+        state.update(state="blocked", reason="owner-head-changed", foreground={"pid": os.getpid(),
+                     "identity": runtime.process_identity(os.getpid()), "token": "current-token"})
+        before = json.loads(json.dumps(state))
+        with self.assertRaisesRegex(runtime.Gate, "owner-reconciliation-foreground-active"):
+            runtime.operate(self.owner, state, args)
+        self.assertEqual(state, before)
+        state["foreground"] = None
+        state["child"] = {"pid": os.getpid(), "identity": runtime.process_identity(os.getpid())}
+        before = json.loads(json.dumps(state))
+        with self.assertRaisesRegex(runtime.Gate, "owner-reconciliation-writer-active"):
+            runtime.operate(self.owner, state, args)
+        self.assertEqual(state, before)
+        state.update(state="waiting", reason="foreground-yielded", child=None)
+        before = json.loads(json.dumps(state))
+        with self.assertRaisesRegex(runtime.Gate, "owner-reconciliation-not-required"):
+            runtime.operate(self.owner, state, args)
+        self.assertEqual(state, before)
 
     def test_deadline_is_terminal_and_canonical_goal_required(self):
         state = self.state()
