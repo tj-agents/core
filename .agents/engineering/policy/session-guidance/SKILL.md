@@ -43,6 +43,15 @@ execution owner; apply it even when the engineering runtime is unavailable.
 On Claude, hand multi-phase work and any delegated design, implementation, or review phase to Codex before
 delegating. An explicit user choice of Claude may keep non-frontier work local; otherwise do not fall back.
 
+## Repository routine-decision delegation
+
+When the actual repository checkout sets `configuration.core.auto_approve_design` to `true` in
+`.agents/settings.json`, proceed with routine design and convention choices, including the recording
+needed by work the user already authorized. Explain and record the rationale. Planning-only work remains
+planning-only. An explicit user decision reservation, task scope, or stricter repository rule still
+controls. A procedural gate added by an agent does not reserve a decision for the user. This setting grants
+no merge, publication, installation, permission, or other external authority.
+
 ## A link to another skill is a stage pointer, not a read
 
 Load a referenced skill when its stage is actually entered, never because a document you are reading names
