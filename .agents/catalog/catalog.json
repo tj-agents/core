@@ -26,6 +26,7 @@
             "agent-files",
             "cd",
             "goal-continuation",
+            "idea-initialization",
             "plan-artifacts"
           ],
           "dependencies": {
@@ -59,6 +60,13 @@
               },
               {
                 "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
