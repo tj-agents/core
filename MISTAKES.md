@@ -148,7 +148,7 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Verification evidence:** authoritative gh run view38183296901 failed-step logs name .agents/catalog/catalog.json digest of base-agents/engineering and base-agents/machine. scripts/check_generated_paths.py reads merge-base digest values and explicitly rejects these changes.
 
-## M012 - Completed review used an unsupported final judgment token
+## M013 - Completed review used an unsupported final judgment token
 
 **Kind:** mistake. **Observed/reported:** 2026-10-12; the guarded merge rejected PR208 with review work order is incomplete although all independent lenses had completed. **Cause:** confirmed parent synthesis wrote clean instead of the review-lifecycle approved final judgment token; the existing merge-review gate accepts approved or changes-requested. No missing standards rule is established.
 
@@ -159,3 +159,14 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Resolution condition:** canonical final judgment agrees with the existing work-order contract and the guarded merge accepts the same independently reviewed source.
 
 **Verification evidence:** local final judgment was corrected to approved while retaining historical pass judgments and resolved findings. Fresh PR body validation passed, the guarded merge returned success, and forge confirmed PR208 MERGED at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d on 2026-10-12T00:46:32Z.
+
+## M012 - Unverified delayed CLI closure after completed delivery
+
+- Kind: mistake. Observed/reported: 2026-10-12; predecessor ended its report after delegating delayed self-close and did not reconcile the nonzero command/observer cancellation.
+- Cause: confirmed unobserved final action; no valid basis to equate a delayed worker promise with completed session exit.
+- Impact/priority: P2; completed CLI remained live and Tommy had to call out unfinished closure.
+- Source owner: engineering session-guidance terminal lifecycle and machine peer-cli runtime. State: in-progress.
+- Repair link: B004, plans/verified-self-close/GOAL.md; one causal repair owner.
+- Next action: repair the verified self-close failure and retain accountable closure evidence/reporting.
+- Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
+- Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.
