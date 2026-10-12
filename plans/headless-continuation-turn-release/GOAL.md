@@ -46,13 +46,13 @@ Known limitation: the runtime writes the `wake` event only after the wake operat
 - `.agents/hooks/continuation_stop.py`: `headless_writer_live` plus the gated child branch.
 - `.agents/hooks/tests/test_continuation_stop.py`: four tests. One covers the positive case across claude/codex harness, both Stop payload spellings, and with and without an obligation. One covers missing scheduler or wake proof. One covers reused, unknown, missing-pid, malformed, waiting-state and exited writers. One covers a foreground lease and a stale obligation with a live writer.
 - Evidence: against the original hook, `-k headless` failed 14 subtests, including all 8 positive host and payload cases. With the fix, the full file passed 32 tests locally on Windows (`python -B -m unittest discover -s .agents/hooks/tests -p test_continuation_stop.py`).
-- No harness manifest change: no new hook, file or permission.
+- No harness manifest change: no new hook, file or permission. Catalog digests are left to the post-merge job (`check_generated_paths.py` passes); harness and tier checks pass locally.
+- Independent read-only review of 1d0b42d (engineering:review-lens): no high or medium findings. Low 1: owner.json is per worktree, so another session in the same worktree shares the gate; this predates the change and the `waiting` gate behaves the same way. Low 2: a wake process that crashes mid-launch leaves a dead child, which gets a reconcile block until the next wake self-heals it, as acceptance intends. Neither needs a change.
 
 ## Next Steps
 
-1. Commit the source-only candidate, run an independent review at the selected lane, address findings.
-2. Open the owning PR, monitor its required CI to terminal, merge normally under standing authority; leave generated `plugins/*` uncommitted.
-3. Record delivery evidence here and in B011, then finish only this side session.
+1. Open the owning PR, monitor its required CI to terminal, merge normally under standing authority; leave generated `plugins/*` uncommitted.
+2. Record delivery evidence here and in B011, then finish only this side session.
 
 ```agent-host-coverage
 {
