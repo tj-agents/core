@@ -260,7 +260,7 @@
               "--root",
               "${PROJECT_ROOT}"
             ],
-            "justification": "rechecks the declared opt-in, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+            "justification": "rechecks the validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
             "match": [
               ["python", "-B", "${PLUGIN_ROOT}/workflows/auto_merge.py", "--root", "${PROJECT_ROOT}"]
             ],

@@ -198,7 +198,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:ae13760a1c1249e04d84b3a46a883eacda0ac53914dc7dce6d2e1d3289f1e5b5",
+          "digest": "sha256:7044a77fd3c1da705f7402d966b197ecff92ae6df60ce5c35d3b794f41414207",
           "harness": {
             "marketplaces": [
               {
@@ -458,7 +458,7 @@
                       "--root",
                       "${PROJECT_ROOT}"
                     ],
-                    "justification": "rechecks the declared opt-in, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+                    "justification": "rechecks the validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
                     "match": [
                       [
                         "python",
@@ -529,7 +529,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:b34df2b3608a6466bcf121cf96264229c1b4cd30f1cceaf950cba45395d1ce13",
+          "digest": "sha256:5b8fbaf9053112a0d2c1e85920ea174857b2a6912046e31d5855876880a3bd47",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
