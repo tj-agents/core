@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 import types
 import unittest
 from unittest import mock
@@ -245,24 +246,24 @@ class RecordStatusResumeTests(unittest.TestCase):
 
     def test_concurrent_records_keep_every_row(self):
         session_ids = [f"bounded-{index}" for index in range(6)]
-        head = self._run_git(self.repo, "rev-parse", "HEAD")
         errors = []
+        original_load = WIS.load
+
+        def slow_load(work_item_dir):
+            records = original_load(work_item_dir)
+            time.sleep(0.05)
+            return records
 
         def record(session_id):
             try:
-                WIS._record_locked(self.work_item, "claude", session_id, f"bounded: {session_id}", None, None,
-                                   None, None, None, str(self.repo), "main", head)
+                WIS.record(self.work_item, "claude", f"bounded: {session_id}", cwd=self.repo)
             except Exception as error:
                 errors.append(error)
 
-        original = WIS._record_locked
-
-        def locked(*args):
-            with WIS._registry_lock(self.work_item):
-                return original(*args)
-
-        with mock.patch.object(WIS, "_record_locked", side_effect=locked):
-            threads = [threading.Thread(target=record, args=(session_id,)) for session_id in session_ids]
+        with mock.patch.object(WIS, "_current_session_id", side_effect=lambda host: threading.current_thread().name), \
+                mock.patch.object(WIS, "load", side_effect=slow_load):
+            threads = [threading.Thread(target=record, args=(session_id,), name=session_id)
+                       for session_id in session_ids]
             for thread in threads:
                 thread.start()
             for thread in threads:
