@@ -5,6 +5,7 @@
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
     ".agents/workflows",
+    ".agents/workflows/completion.py",
     ".agents/workflows/repository_configuration.py"
   ],
   "requires": {
