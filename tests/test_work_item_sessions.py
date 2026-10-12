@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
 import types
 import unittest
 from unittest import mock
@@ -115,6 +116,11 @@ class ParseRenderValidateTests(unittest.TestCase):
         errors = WIS.validate([("codex:01a12aa7-5b58-7312-9400-ef710762147f", fields)])
         self.assertTrue(any("invalid Resume" in error for error in errors))
 
+    def test_empty_field_is_rejected(self):
+        fields = valid_fields(Branch="")
+        errors = WIS.validate([("codex:01a12aa7-5b58-7312-9400-ef710762147f", fields)])
+        self.assertTrue(any("empty field 'Branch'" in error for error in errors))
+
 
 @unittest.skipUnless(GIT, "git is required for record/status/resume tests")
 class RecordStatusResumeTests(unittest.TestCase):
@@ -202,18 +208,68 @@ class RecordStatusResumeTests(unittest.TestCase):
         self.assertEqual("foreign", row["liveness"])
         self.assertEqual([], row["stale"])
 
-    def test_status_reports_stale_head_mismatch(self):
+    def _commit(self, name):
+        (self.repo / name).write_text(name + "\n", encoding="utf-8")
+        self._run_git(self.repo, "add", name)
+        self._run_git(self.repo, "commit", "-m", name)
+
+    def _diverge(self):
+        self._commit("recorded.txt")
         self._record_claude()
-        (self.repo / "more.txt").write_text("more\n", encoding="utf-8")
-        self._run_git(self.repo, "add", "more.txt")
-        self._run_git(self.repo, "commit", "-m", "second")
+        self._run_git(self.repo, "reset", "--hard", "HEAD~1")
+        self._commit("other.txt")
+
+    def test_later_commits_on_the_branch_keep_the_row_current(self):
+        self._record_claude()
+        self._commit("more.txt")
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            result = WIS.cmd_status(self.work_item)
+        self.assertEqual([], result["sessions"][0]["stale"])
+
+    def test_status_reports_diverged_head_as_stale(self):
+        self._diverge()
         recovery = fake_recovery(liveness_result="closed")
         with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
             result = WIS.cmd_status(self.work_item)
         row = result["sessions"][0]
-        self.assertIn("head-mismatch", row["stale"])
+        self.assertIn("head-diverged", row["stale"])
         self.assertEqual("closed", row["liveness"])
         recovery.liveness.assert_called_once()
+
+    def test_record_refuses_detached_head(self):
+        self._run_git(self.repo, "checkout", "--detach")
+        with self.assertRaises(ValueError):
+            self._record_claude()
+        self.assertFalse(WIS.sessions_path(self.work_item).is_file())
+
+    def test_concurrent_records_keep_every_row(self):
+        session_ids = [f"bounded-{index}" for index in range(6)]
+        head = self._run_git(self.repo, "rev-parse", "HEAD")
+        errors = []
+
+        def record(session_id):
+            try:
+                WIS._record_locked(self.work_item, "claude", session_id, f"bounded: {session_id}", None, None,
+                                   None, None, None, str(self.repo), "main", head)
+            except Exception as error:
+                errors.append(error)
+
+        original = WIS._record_locked
+
+        def locked(*args):
+            with WIS._registry_lock(self.work_item):
+                return original(*args)
+
+        with mock.patch.object(WIS, "_record_locked", side_effect=locked):
+            threads = [threading.Thread(target=record, args=(session_id,)) for session_id in session_ids]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        self.assertEqual([], errors)
+        self.assertEqual({f"claude:{session_id}" for session_id in session_ids},
+                         {handle for handle, _ in WIS.load(self.work_item)})
 
     def test_status_never_calls_open_session(self):
         self._record_claude()
@@ -252,10 +308,7 @@ class RecordStatusResumeTests(unittest.TestCase):
         recovery.open_session.assert_not_called()
 
     def test_resume_refuses_stale(self):
-        self._record_claude()
-        (self.repo / "more.txt").write_text("more\n", encoding="utf-8")
-        self._run_git(self.repo, "add", "more.txt")
-        self._run_git(self.repo, "commit", "-m", "second")
+        self._diverge()
         recovery = fake_recovery()
         with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
             with self.assertRaises(ValueError):
@@ -305,7 +358,7 @@ class RecordStatusResumeTests(unittest.TestCase):
     def test_unverifiable_git_state_is_stale(self):
         self._record_claude()
         records = WIS.load(self.work_item)
-        with mock.patch.object(WIS, "_run_git", return_value=None):
+        with mock.patch.object(WIS, "_git", return_value=None):
             self.assertEqual(["branch-unknown", "head-unknown"], WIS.stale_reasons(records[0][1]))
 
 
