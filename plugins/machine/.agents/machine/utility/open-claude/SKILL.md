@@ -43,6 +43,10 @@ alias stub rather than a real interpreter, and it fails rather than running the 
   it. Omitted, the CLI uses its own configured default.
 - `--dangerously-skip-permissions` only when the user asks for it in that request.
 
+For task recovery, follow the shared [task recovery context](../../resources/task-recovery.md). Write its private
+UTF-8 instruction file outside version control and pass it with `--prompt-path '<recovery-prompt-file>'`.
+Do not also pass `--prompt`.
+
 It opens a tab in whichever terminal it detects it is already running inside (Windows Terminal, tmux,
 kitty or Konsole). With none detected, it opens a new window instead and prints a warning — except on
 Windows, where a `wt.exe` it can still find opens a tab in the most recently used Windows Terminal window
