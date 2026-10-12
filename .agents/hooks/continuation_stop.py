@@ -78,6 +78,16 @@ def observed_wake(path, owner):
     return False
 
 
+def headless_writer_live(owner, runtime):
+    record = owner.get("child")
+    if not isinstance(record, dict) or not isinstance(record.get("pid"), int):
+        return False
+    identity = record.get("identity")
+    if not isinstance(identity, str) or identity in {"", "unknown"}:
+        return False
+    return runtime.process_identity(record["pid"]) == identity
+
+
 def supervised(owner):
     result = exact_path(os.environ.get("CONTINUATION_RESULT_PATH"))
     return bool(
@@ -237,7 +247,11 @@ def outcome(data):
     if owner.get("foreground"):
         return "The canonical continuation still has foreground ownership; continue or yield it before ending this turn."
     if owner.get("child"):
-        return "The canonical continuation has a headless writer; wait for its receipt before ending this turn."
+        if state != "working" or not headless_writer_live(owner, runtime):
+            return "The canonical continuation has an unverified headless writer; reconcile it before ending this turn."
+        if not scheduler_ready(owner_path, owner, root) or not observed_wake(owner_path, owner):
+            return "The canonical continuation has a headless writer; wait for its receipt before ending this turn."
+        return None
     if state == "working":
         return "The canonical continuation is working without a released foreground lease; reconcile it before ending this turn."
     if not scheduler_ready(owner_path, owner, root) or not observed_wake(owner_path, owner):
