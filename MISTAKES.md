@@ -1,4 +1,4 @@
-# Mistakes
+﻿# Mistakes
 
 This is core's incident record. Entries describe the observed mistake, its cause where known, and the intended correction. They are proposals for later repair, not additional operating instructions. `engineering:write-mistake` records incidents and `engineering:address-mistake` reconciles an authorized correction while retaining this learning history.
 
@@ -144,7 +144,7 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Impact and priority:** P2; the draft PR failed CI, with no normal merge or publication attempted.
 
-**Source owner:** this repository-settings candidate preparation. **State:** in-progress. **Repair link:** plans/repository-settings/GOAL.md and PR208. **Next action:** restore only generated digest values to the merge-base baseline and verify the existing guard before replacement-head validation.
+**Source owner:** this repository-settings candidate preparation. **State:** resolved. **Repair links:** PR208 and PR213. **Next action:** none; both source slices passed the committed generated-path guard and exact-head CI, and causal post-merge publication completed.
 
 **Resolution condition:** the committed runtime and later guidance slices contain no generated digest or package deltas, the generated-path guard and exact-head CI pass, and causal post-merge publication owns regeneration.
 
@@ -152,7 +152,9 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **2026-10-12 related evidence:** PR210 on `Fix/RecoveryAuthorizationContext` reproduced the same generated-digest mistake at run38189190964: verify-windows and verify-linux succeeded, while the source guard failed on the `base-agents/machine` digest. Commit `f63538d` restored the reviewed digest and retained the authored embedded harness metadata.
 
-**PR210 prevention and next action:** The focused corrected-head source guard passed with artifact `78dd200ee7badf43-corrected-source-guard.log`; complete final review and corrected-head CI without adopting other workstreams' delivery state.
+**PR210 related repair evidence:** The focused corrected-head source guard passed with artifact `78dd200ee7badf43-corrected-source-guard.log`. PR210 later merged at full head `4577c581214a18b03e28246e09e4fec4cae1f36b`; source CI `38192901173` was green, merge commit `286c747130bdb0440b6b19c5eb28f068528c990d` had successful causal run `38194033253`, and bot publication `7fed153b078c60fa69b6db4b50ab03c0b3f5d025` completed. This records observed repair evidence only; it does not adopt PR210's goal.
+
+**PR208 and PR213 resolution evidence:** PR208's exact reviewed runtime head `0f98144fceff5040f6050413e036d26f1cf98ea8` passed the committed generated-path guard and CI `38187755625`; it merged at `a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d`, with causal run `38189303890` and regeneration job `114618404712` publishing bot commit `cbe97265fcd8267493c24d18f74a5a0a26b872c9`. PR213's exact reviewed guidance head `245e9300526753f62ba860375b52b7635f7ea297` passed the committed guard without generated-path changes and CI `38195921819` (Windows `114638417763`, Linux `114638417829`, guard `114638417670`); it merged normally at `b477125f50c6279e0f993cf3f555346182875136` on `2026-10-12T11:04:33Z`. Causal regeneration run `38240324302`, job `114781040815`, succeeded and published `13751eeb0c740d3e7ddcbb2e236046bbd5abb9ec` with sole parent `b477125f50c6279e0f993cf3f555346182875136` and the expected subject. Shared-policy byte parity, both-host canonical pointers and harness/catalog JSON parity passed. Exact causal full-main run `38240324302` subsequently completed successfully, including Windows `114781040624`, Linux `114781040299` and regeneration `114781040815`.
 
 ## M013 - Completed review used an unsupported final judgment token
 
@@ -165,6 +167,8 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 **Resolution condition:** canonical final judgment agrees with the existing work-order contract and the guarded merge accepts the same independently reviewed source.
 
 **Verification evidence:** local final judgment was corrected to approved while retaining historical pass judgments and resolved findings. Fresh PR body validation passed, the guarded merge returned success, and forge confirmed PR208 MERGED at a1a8d051e65e15d639a7a0fb0fc343c7b89fd72d on 2026-10-12T00:46:32Z.
+
+**Related guidance-delivery evidence:** PR213's guarded merge first rejected the completed review because the review work order's status and judgment fields lacked the required backtick format. The correction added only those required backticks to the existing local canonical review; it did not change the review decision or introduce a missing standards rule or gate bypass. The exact unchanged reviewed head `245e9300526753f62ba860375b52b7635f7ea297` with approved judgment was accepted by the guarded normal merge. PR213 merged at `b477125f50c6279e0f993cf3f555346182875136` on `2026-10-12T11:04:33Z`; exact-head CI `38195921819` passed Windows `114638417763`, Linux `114638417829` and guard `114638417670`.
 
 ## M012 - Unverified delayed CLI closure after completed delivery
 
