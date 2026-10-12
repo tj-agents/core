@@ -42,6 +42,17 @@ def normalize(command):
     return CONTINUATION.sub(" ", command).strip()
 
 
+def executable_shell_kind(value):
+    executable = str(value).replace("\\", "/").rsplit("/", 1)[-1].casefold()
+    if executable.endswith(".exe"):
+        executable = executable[:-4]
+    if executable in {"bash", "sh", "zsh", "dash"}:
+        return "bash"
+    if executable in {"powershell", "pwsh"}:
+        return "powershell"
+    return None
+
+
 def shell_kind(tool_name, tool_input):
     name = str(tool_name).casefold()
     if name == "powershell":
@@ -50,18 +61,14 @@ def shell_kind(tool_name, tool_input):
         return "bash"
     shell = tool_input.get("shell") if isinstance(tool_input, dict) else None
     if isinstance(shell, str):
-        executable = shell.replace("\\", "/").rsplit("/", 1)[-1].casefold()
-        if executable in {"bash", "bash.exe", "sh", "sh.exe", "zsh", "zsh.exe", "dash", "dash.exe"}:
-            return "bash"
-        if executable in {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}:
-            return "powershell"
+        kind = executable_shell_kind(shell)
+        if kind:
+            return kind
     for value in (tool_input or {}).values() if isinstance(tool_input, dict) else ():
         if isinstance(value, list) and value:
-            executable = str(value[0]).replace("\\", "/").rsplit("/", 1)[-1].casefold()
-            if executable in {"bash", "sh", "zsh", "dash"}:
-                return "bash"
-            if executable in {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}:
-                return "powershell"
+            kind = executable_shell_kind(value[0])
+            if kind:
+                return kind
     return "powershell" if os.name == "nt" else "bash"
 
 
