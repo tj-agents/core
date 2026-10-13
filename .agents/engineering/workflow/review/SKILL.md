@@ -36,7 +36,9 @@ helper below runs from there against the reviewed repository, which needs no `.a
 
 Use `incremental-review` when the canonical work order already has a completed watermark and HEAD moved.
 Use `big-review` when the frozen changed surface is too large for one pass, normally more than 300 files or
-several substantial components. Use `docs-review` for a documentation/meta-only diff.
+several substantial components. Use `docs-review` for a documentation/meta-only diff. Documentation review
+is ordinary unless `docs-review` records an explicit routine semantic assessment; Markdown alone does not
+select a reduced pass.
 
 ## Stage 1 — resolve and freeze the candidate
 
