@@ -26,6 +26,7 @@
             "agent-files",
             "cd",
             "goal-continuation",
+            "idea-initialization",
             "plan-artifacts"
           ],
           "dependencies": {
@@ -38,7 +39,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:673a5917ebe29d410c0611a5ebe6c9fb80c7e0d2c9093c488b380e027159f136",
+          "digest": "sha256:7011cc3369a7ccf8952db908c3aa49834552337f45a40ebff92369a23214b591",
           "harness": {
             "marketplaces": [
               {
@@ -59,6 +60,13 @@
               },
               {
                 "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
+              },
+              {
+                "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -198,7 +206,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:ed2cf9a86a7889858d5986ff8ec668f4942a190e46ea1a96fa21f41bd68f7b75",
+          "digest": "sha256:8f95eec0d7e9c8c89ac976514078aeafcf66785b82ba77dc768d13ad44d1b29b",
           "harness": {
             "marketplaces": [
               {
@@ -330,6 +338,13 @@
                   "claude",
                   "codex"
                 ]
+              },
+              {
+                "path": "hooks/worktree_placement_gate.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
               }
             ],
             "permissions": {
@@ -385,7 +400,7 @@
                       "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
                     ]
                   ],
-                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
+                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
                   "match": [
                     [
                       "python",
@@ -425,7 +440,7 @@
                       "--root",
                       "${PROJECT_ROOT}"
                     ],
-                    "justification": "rechecks the declared opt-in, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+                    "justification": "rechecks the freshly validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
                     "match": [
                       [
                         "python",
@@ -496,7 +511,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:09baa871b274f64ca2065e2a02408e60feb7098fb828c4b993c01908cd35c26e",
+          "digest": "sha256:e16196a32b595eecabb06443afac0c330199c54543e4976cf9ece33a3bc4a738",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -556,6 +571,13 @@
                   "claude",
                   "codex"
                 ]
+              },
+              {
+                "path": "resources/machine/scripts/session_store.py",
+                "hosts": [
+                  "claude",
+                  "codex"
+                ]
               }
             ],
             "permissions": {
@@ -579,7 +601,31 @@
                 "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)"
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -595,7 +641,7 @@
                       "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
                     ]
                   ],
-                  "justification": "engineering:merge Step 5: finish closes this verified session and removes its merged worktree after cleanup_proof.py approved it",
+                  "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
                   "match": [
                     [
                       "python3",
@@ -629,7 +675,7 @@
                       "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
                     ]
                   ],
-                  "justification": "Close only this verified completed CLI session while retaining its checkout",
+                  "justification": "After its delivered report, close only this verified unchanged-idle CLI session while retaining its checkout",
                   "match": [
                     [
                       "python3",
@@ -683,6 +729,176 @@
                       "-B",
                       "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/other.py",
                       "off"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py"
+                    ],
+                    [
+                      "search",
+                      "open"
+                    ],
+                    "--host",
+                    "codex"
+                  ],
+                  "justification": "Permits exact-session recovery tooling; callers follow the shared task-recovery contract when preparing private instructions and any per-call approval justification.",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                      "search",
+                      "--host",
+                      "codex"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+                      "open",
+                      "--host",
+                      "codex"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                      "search",
+                      "--host",
+                      "codex"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                      "search",
+                      "--host",
+                      "claude"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                      "recover",
+                      "--host",
+                      "codex"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                    ],
+                    [
+                      "status",
+                      "find",
+                      "interrupted",
+                      "resume"
+                    ]
+                  ],
+                  "justification": "machine:recover-agents 'Continue a work item': status, find and interrupted without --resume are read-only; resume and interrupted --resume perform the guarded reopen through agent_recovery.open_session, limited to rows that are not live, foreign or stale on this machine.",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "status"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "find"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "interrupted"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "resume"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                      "status"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "claim"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "end"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "item"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/codex-skills/bootstrap-capabilities/scripts/adopt_repository.py"
+                    ],
+                    "--root"
+                  ],
+                  "justification": "machine:bootstrap-capabilities composes and applies the repository-declared immutable capability selection",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "--root",
+                      "/workspace/project"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/other.py",
+                      "--root",
+                      "/workspace/project"
                     ]
                   ]
                 }

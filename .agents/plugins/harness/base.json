@@ -3,7 +3,9 @@
   "plugin": "base-agents/base",
   "source_roots": [
     ".agents/base",
-    ".agents/base/policy/plan-artifacts/scripts/host_coverage.py"
+    ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
+    ".agents/hooks/hook_dispatch.py",
+    ".agents/hooks/hook_runtime.py"
   ],
   "requires": {
     "marketplaces": [
@@ -25,6 +27,13 @@
       },
       {
         "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
         "hosts": [
           "claude",
           "codex"

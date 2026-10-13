@@ -79,6 +79,42 @@ or change their tracking. A later adoption caller can use `plan(..., prospective
 or `preflight_paths(...)` to validate its own prospective lock, catalog and receipt paths.
 The default `--scope project` retains the existing project settings contract.
 
+## Adopt an immutable repository selection
+
+Use `adopt_repository.py` when a repository is being created or an additional standards package is
+being selected. Its `--input` is the composition request described in
+[Compose immutable source catalogs](#compose-immutable-source-catalogs); it reads only the exact
+commits named there.
+For a first adoption, include the Core three-package source and every requested stack source in that
+input. For an addition, compose the new packages together with their complete required package
+dependencies and every declared marketplace owner. Preserved owners not required by that composition
+may be omitted and are reused from the committed catalog. An existing owner supplied again must
+match the lock's pinned commit.
+
+```powershell
+python -B '<skill-directory>\scripts\adopt_repository.py' `
+  --root C:\path\to\repository `
+  --input C:\path\to\sources.json `
+  --plugin dotagents/dotnet `
+  --plugin azure-agents/azure `
+  --mode preview
+```
+
+Use `python3` and POSIX paths on Linux or macOS. Repeat `--plugin` for every requested package.
+The command always includes the three Core packages and required package dependencies. It preserves
+existing selections and their required skills, path scopes, exceptions and other project lock fields.
+
+`preview` lists the repository lock, composed catalog and host-setting changes without writing.
+`write` updates those files together. `check` exits nonzero when any managed file drifts. Commit the
+resulting `.agents/capabilities.lock.json`, `.agents/catalog/catalog.json`, `.claude/settings.json`
+and `.codex/config.toml`, plus `.codex/rules/agent-harness.rules` when emitted, with the repository.
+
+Adding packages is additive only. A known marketplace can contribute further packages only at its
+already pinned snapshot; a changed owner, package record or snapshot is rejected. An existing tagged
+catalog release without a selected full commit cannot supply a new package. The command preflights
+all output paths against the composition input and repository harness overlay before mutation, and
+rolls back a failed write batch.
+
 After each repository has adopted its generated project settings, audit the machine before removing
 old user-profile behavior:
 
@@ -124,6 +160,50 @@ The bootstrap uses argument arrays for Git and host CLIs. A failed operation lea
 host registrations in place and records the failing step; rerunning `apply` resumes from observable state.
 Exit zero means the selected mode completed. Invalid locks, cycles, missing prerequisites, drift and partial
 application exit nonzero.
+
+## Compose immutable source catalogs
+
+Use `compose_catalog.py` before lock selection when combining source owners. Its input is an
+explicit JSON object with `schema_version: 1` and a non-empty `sources` list. Each source declares
+`repository` (`owner/repo`), an absolute local `checkout`, a full lowercase commit SHA,
+`plugins` (canonical package names), and `version_plugin` (one selected package):
+
+```json
+{
+  "schema_version": 1,
+  "sources": [{
+    "repository": "example/capabilities",
+    "checkout": "C:/sources/capabilities",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "plugins": ["base", "compiler"],
+    "version_plugin": "base"
+  }]
+}
+```
+
+```powershell
+python -B '<skill-directory>\scripts\compose_catalog.py' `
+  --input C:\path\to\sources.json --platform windows
+```
+
+The composed v1 catalog is printed to stdout; the composer writes no files.
+`--platform` defaults to the current platform. Source-owned catalog entries
+supply platforms, executable prerequisites, status and digest exclusions when present; otherwise
+the entry records only that consumption platform and no additional declared executable
+prerequisites. Those defaults describe the supplied catalog, without establishing owner support.
+
+The composer reads immutable Git blobs, so working-tree edits cannot change its output. It checks
+the GitHub origin, both native marketplace/package identities, actual `N.N.N` package versions
+supported by catalog v1, shipped skills, required harness declarations and their hook payloads. Top-level `selection.json`
+prerequisites/dependencies must agree with harness plugin requirements; local names qualify to
+the package's own marketplace in both dependency edges and emitted harness declarations.
+Skill-level library requirements do not become plugin edges.
+Unresolved dependencies, contradictory owners, cycles and linked payloads fail before output.
+Each package keeps its own native version. The selected anchor supplies only the release grouping
+version; the full commit and `sha256-tree-v1` payload digest identify the snapshot. Composition
+requires every inspected Git object to be locally available, disables Git lazy fetching, and
+performs no fetch, snapshot execution, lock selection, installation or profile changes. Git must
+support `--no-lazy-fetch`; unsupported versions fail before inspecting snapshot objects.
 
 ## Catalog and digest contract
 

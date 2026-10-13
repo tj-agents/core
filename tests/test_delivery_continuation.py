@@ -90,19 +90,35 @@ class WindowsTransport(scheduler.SchedulerTransport):
         self.fail_register = False
         self.query_error = None
         self.query_invalid_json = False
+        self.query_duration = None
+        self.query_timeouts = []
+        self.legacy_timeouts = []
+        self.inventory_timeouts = []
         self.legacy_tasks = []
+        self.registrations = []
 
     def run(self, args, **kwargs):
         self.calls.append(tuple(args))
         payload = json.loads(kwargs.get("input_text") or "{}")
         operation = payload.get("operation")
+        if "Get-ScheduledTask -TaskName 'AgentStandards-Continuation-*'" in args[-1]:
+            self.inventory_timeouts.append(kwargs.get("timeout"))
+            if self.query_duration is not None and self.query_duration > kwargs.get("timeout", 15):
+                raise subprocess.TimeoutExpired(args, kwargs.get("timeout", 15))
+            return Result(json.dumps(self.registrations))
         if args[-1] == adapter.LEGACY_WINDOWS_SCRIPT:
+            self.legacy_timeouts.append(kwargs.get("timeout"))
+            if self.query_duration is not None and self.query_duration > kwargs.get("timeout", 15):
+                raise subprocess.TimeoutExpired(args, kwargs.get("timeout", 15))
             if self.query_error:
                 return Result(returncode=1, stderr=self.query_error)
             if self.query_invalid_json:
                 return Result("{")
             return Result(json.dumps({"Tasks": self.legacy_tasks}))
         if operation == "query":
+            self.query_timeouts.append(kwargs.get("timeout"))
+            if self.query_duration is not None and self.query_duration > kwargs.get("timeout", 15):
+                raise subprocess.TimeoutExpired(args, kwargs.get("timeout", 15))
             if self.query_error:
                 return Result(returncode=1, stderr=self.query_error)
             if self.query_invalid_json:
@@ -379,6 +395,46 @@ class DeliveryContinuationTests(unittest.TestCase):
         transport.legacy_tasks = [{"TaskName": "AgentStandards-Delivery-old", "TaskPath": "\\",
                                    "Actions": [{"WorkingDirectory": str(self.root)}]}]
         with self.assertRaisesRegex(RuntimeError, "legacy delivery task"):
+            adapter.legacy_conflict(self.root, transport, windows=True)
+
+    def test_windows_read_queries_allow_slow_valid_reads_and_reject_invalid_or_timed_out_tasks(self):
+        receipt = self.windows_receipt()
+        transport = WindowsTransport()
+        transport.query_duration = 9
+        arguments = self.args("register", "--owner", str(self.owner_path), "--host-executable", receipt["host_executable"])
+        with patch.object(adapter, "receipt_for", return_value=receipt):
+            result = adapter.register(self.owner, self.root, self.owner_path, arguments, transport, windows=True)
+        self.assertEqual(receipt["task_name"], result["registered"])
+        self.assertTrue(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+        self.assertTrue(transport.query_timeouts)
+        self.assertTrue(transport.legacy_timeouts)
+        transport.registrations = [{"TaskName": receipt["task_name"]}]
+        with patch.object(adapter.os, "name", "nt"):
+            self.assertEqual([{"TaskName": receipt["task_name"]}], adapter.list_registrations(transport)["entries"])
+        self.assertTrue(transport.inventory_timeouts)
+        self.assertEqual({scheduler.WINDOWS_READ_QUERY_TIMEOUT},
+                         set(transport.query_timeouts + transport.legacy_timeouts + transport.inventory_timeouts))
+
+        conflicting = WindowsTransport()
+        conflicting.query_duration = 9
+        conflicting.legacy_tasks = [{"TaskName": "AgentStandards-Delivery-old", "TaskPath": "\\",
+                                     "Actions": [{"WorkingDirectory": str(self.root)}]}]
+        receipt_before = (self.owner_path.parent / "scheduler.json").read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "legacy delivery task"):
+            with patch.object(adapter, "receipt_for", return_value=receipt):
+                adapter.register(self.owner, self.root, self.owner_path, arguments, conflicting, windows=True)
+        self.assertIsNone(conflicting.task)
+        self.assertFalse((self.owner_path.parent / "scheduler.pending.json").exists())
+        self.assertEqual(receipt_before, (self.owner_path.parent / "scheduler.json").read_bytes())
+
+        transport.task["Actions"][0]["Arguments"] = "foreign"
+        self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+        transport.task = self.windows_task(receipt, enabled=False)
+        self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+
+        transport.query_duration = 16
+        self.assertFalse(scheduler.verify_windows(receipt, self.owner_path, self.owner, self.root, transport))
+        with self.assertRaises(subprocess.TimeoutExpired):
             adapter.legacy_conflict(self.root, transport, windows=True)
 
     def test_known_version_two_windows_receipt_migrates_for_remove_but_arbitrary_receipts_do_not(self):
