@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $source = Join-Path $PSScriptRoot 'hidden-bash.c'
 $target = Join-Path $PSScriptRoot 'hidden-bash.exe'
+$buildTarget = Join-Path $PSScriptRoot 'hidden-bash.build.exe'
 $profileSource = Join-Path $PSScriptRoot 'hidden-bash-profile.ps1'
 $profileStart = '# >>> core hidden bash >>>'
 $profileEnd = '# <<< core hidden bash <<<'
@@ -42,8 +43,34 @@ $compiler = (Get-Command clang.exe -CommandType Application -ErrorAction Silentl
 if (-not $compiler) { $compiler = (Get-Command gcc.exe -CommandType Application -ErrorAction SilentlyContinue).Source }
 if (-not $compiler) { throw 'clang.exe or gcc.exe is required to build the Windows GUI Bash proxy' }
 if ($PSCmdlet.ShouldProcess($target, 'build the no-window Bash proxy')) {
-    & $compiler -O2 -municode -mwindows $source -o $target
-    if ($LASTEXITCODE -ne 0) { throw "Failed to build $target" }
+    try {
+        & $compiler -O2 -municode -mwindows $source -o $buildTarget
+        if ($LASTEXITCODE -ne 0) { throw "Failed to build $buildTarget" }
+        $startInfo = [Diagnostics.ProcessStartInfo]::new($buildTarget)
+        $startInfo.ArgumentList.Add('-c')
+        $startInfo.ArgumentList.Add('printf HIDDEN_BASH_OK; exit 73')
+        $startInfo.Environment['TJ_AGENTS_REAL_GIT_BASH'] = $realBash
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.CreateNoWindow = $true
+        $probe = [Diagnostics.Process]::Start($startInfo)
+        try {
+            if (-not $probe.WaitForExit(10000)) {
+                $probe.Kill($true)
+                throw 'The hidden Bash proxy smoke check timed out'
+            }
+            $probeOutput = $probe.StandardOutput.ReadToEnd()
+            if ($probe.ExitCode -ne 73 -or $probeOutput -ne 'HIDDEN_BASH_OK') {
+                throw 'The hidden Bash proxy did not preserve Bash output and exit status'
+            }
+        }
+        finally { $probe.Dispose() }
+        Move-Item -LiteralPath $buildTarget -Destination $target -Force
+    }
+    finally {
+        Remove-Item -LiteralPath $buildTarget -ErrorAction SilentlyContinue
+    }
 }
 if ($PSCmdlet.ShouldProcess('user environment', 'configure Claude Code to use the no-window Bash proxy')) {
     [Environment]::SetEnvironmentVariable('TJ_AGENTS_REAL_GIT_BASH', $realBash, 'User')
