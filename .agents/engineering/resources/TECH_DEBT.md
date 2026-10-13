@@ -6,7 +6,7 @@
 - **Cause:** confirmed shared convention gap and branch-local publication practice. The total backlog is not yet inventoried; do not claim every branch is affected.
 - **Impact and priority:** P1; deferred repair can be omitted, duplicated or lost independently of feature delivery.
 - **Source owner:** Core engineering shared problem-record conventions and their publication consumers. **State:** deferred.
-- **Repair link:** this D001; related incident main M017 and immediate Docs/SharedProblemRecords convention correction. That bounded correction does not close this historical migration and enforcement debt.
+- **Repair link:** `.agents/engineering/resources/TECH_DEBT.md#D001`; related incident main M017 and immediate Docs/SharedProblemRecords convention correction. That bounded correction does not close this historical migration and enforcement debt.
 - **Deferral:** historical audit and any automated enforcement are separate future work; blocked_by: dependency. **Resolver:** Tommy/Core problem-record owner. **Resume when:** that owner resumes the historical audit under a bounded scope. No new agent CLI or background job is started by this entry.
 - **Next action:** inventory bug, mistake and area-owned TECH_DEBT.md records across active, stalled and abandoned branches/worktrees; reconcile existing repair owners and conflicting IDs; publish missing observations and current status independently of feature PRs. Add enforcement only if the audit establishes a remaining consumer gap.
 - **Declarative prevention:** shared records are available on main promptly; feature plans link to their canonical IDs, and delayed feature merges do not delay unrelated defect discovery or repair.
