@@ -94,6 +94,12 @@ def _default_branch(cwd, current_branch):
     return None
 
 
+def _branch_to_record(cwd, branch):
+    if not branch:
+        return None
+    return None if branch == _default_branch(cwd, branch) else branch
+
+
 def _require_repo(cwd):
     repo = _session_store().repo_identity(cwd)
     if not repo:
@@ -159,8 +165,7 @@ def _read_time_status(row, machine):
     if not ended:
         liveness = _agent_recovery().liveness({"host": row["host"], "session": row["session_id"]})
         if liveness == "live":
-            worktree = _worktree_status(row)
-            return worktree if worktree != "live" else "live"
+            return "live"
         if liveness == "unknown":
             return "unknown"
     resumable = not ended or row.get("end_reason") == "closed"
@@ -201,32 +206,19 @@ def cmd_claim(work_item, host, role=None, predecessor=None, cwd=None):
     session_id = _require_session_id(host)
     handle = store.session_handle(host, session_id)
     branch, _head = store.current_branch_and_head(cwd)
-    if branch and branch == _default_branch(cwd, branch):
-        branch = None
+    record_branch = _branch_to_record(cwd, branch)
     connection = store.connect()
     try:
         store.ensure_session(connection, host, session_id, cwd)
         if store.get_work_item(connection, key) is None:
-            store.upsert_work_item(connection, key, repo, feature, item, status="active", branch=branch)
+            store.upsert_work_item(connection, key, repo, feature, item, status="active", branch=record_branch)
+        elif record_branch:
+            store.set_work_item_branch_if_unset(connection, key, record_branch)
         result = {"handle": handle, "work_item": f"{feature}/{item}"}
-        connection.execute("BEGIN IMMEDIATE")
-        try:
-            if role == "owner":
-                others = [row for row in store.live_owners(connection, key) if row["handle"] != handle]
-                if others:
-                    other = others[0]
-                    if predecessor and predecessor == other["handle"]:
-                        store.transfer_ownership(connection, predecessor, handle, key, role=role)
-                        result["removed"] = predecessor
-                        return result
-                    raise ValueError(
-                        f"{other['handle']} already owns this work item; hand off before taking ownership"
-                    )
-            store.set_session_ownership(connection, handle, role, key, predecessor=predecessor)
-            return result
-        except Exception:
-            connection.rollback()
-            raise
+        removed = store.claim_work_item(connection, handle, key, role, predecessor=predecessor)
+        if removed:
+            result["removed"] = removed
+        return result
     finally:
         connection.close()
 
@@ -344,13 +336,18 @@ def cmd_interrupted(resume_handles=None, cwd=None):
     grouped = {}
     for row in dead:
         label = item_names.get(row["work_item"], "(unclaimed)")
-        grouped.setdefault(label, []).append({"handle": row["handle"], "turn_state": row["turn_state"]})
+        grouped.setdefault(label, []).append(
+            {"handle": row["handle"], "turn_state": row["turn_state"], "status": _read_time_status(row, machine)}
+        )
     result = {"interrupted": grouped}
     if resume_handles:
         by_handle = {row["handle"]: row for row in dead}
         for handle in resume_handles:
             if handle not in by_handle:
                 raise ValueError(f"{handle!r} is not a listed interrupted session")
+            status = _read_time_status(by_handle[handle], machine)
+            if status != "closed":
+                raise ValueError(f"{handle}: {status}; resume only a session confirmed closed on this machine")
         recovery = _agent_recovery()
         resumed = []
         for handle in resume_handles:
@@ -384,7 +381,8 @@ def cmd_item(work_item, status, pr=None, cwd=None):
     try:
         if store.get_work_item(connection, key) is None:
             branch, _head = store.current_branch_and_head(cwd)
-            store.upsert_work_item(connection, key, repo, feature, item, status=status, branch=branch, pr=pr)
+            record_branch = _branch_to_record(cwd, branch)
+            store.upsert_work_item(connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr)
         else:
             store.set_work_item_status(connection, key, status, pr=pr)
     finally:

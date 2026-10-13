@@ -200,37 +200,47 @@ work order and the host check rejects a second one.
 
 ### Findings
 
-- [ ] **R22 — MEDIUM — native, workflow** — `.agents/machine/scripts/work_item_sessions.py:219`
+- [x] **R22 — MEDIUM — native, workflow** — `.agents/machine/scripts/work_item_sessions.py:219`
   Inside claim's `BEGIN IMMEDIATE`, `transfer_ownership` calls `end_session`, which commits and releases the lock before
   `set_session_ownership`, so a concurrent claim can take ownership in the gap and a failure leaves no owner. Move claim
   and handoff into one store function whose statements share a single transaction with no inner commits.
-- [ ] **R23 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:302`
+  Fixed: `session_store.claim_work_item` runs the owner check, handoff, demotion and ownership write in one `BEGIN IMMEDIATE` transaction with no inner commits; tests cover concurrent handoff claims and rollback.
+- [x] **R23 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:302`
   Claim never demotes an earlier owner that ended `closed`, so after close, reclaim and close, `resume` without
   `--handle` sees two owners. Keep at most one `role = 'owner'` row per work item: a claim demotes every other owner row
   in the same transaction.
-- [ ] **R24 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:228`
+  Fixed: every successful owner claim clears `role` on all other owner rows for the work item; close-reclaim-close then `resume` selects the latest owner.
+- [x] **R24 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:228`
   A former owner ended `closed`/`finished` that is resumed with `--handle` comes back as a second live owner; only the
   `handed_off` case clears its role. The single-owner-row rule (R23) removes this; handoff also demotes the predecessor.
-- [ ] **R25 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:356`
+  Fixed: demoted and handed-off owners lose `role`, so a resumed former owner is not an owner; tested through SessionStart.
+- [x] **R25 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:356`
   `interrupted --resume` reopens without the worktree staleness check that `resume` applies, contrary to the
   auto-approval justification. Resume only rows whose read-time status is `closed`.
-- [ ] **R26 — LOW — native** — `.agents/machine/scripts/session_store.py:154`
+  Fixed: `interrupted` lists each row's read-time status and `--resume` refuses any handle that is not `closed`.
+- [x] **R26 — LOW — native** — `.agents/machine/scripts/session_store.py:154`
   The combined `rev-parse HEAD … --git-common-dir` probe fails as a whole on an unborn HEAD, losing the repository
   identity. Fall back to `--git-common-dir` and `symbolic-ref -q HEAD` when the fast probe fails.
-- [ ] **R27 — LOW — native** — `.agents/machine/scripts/session_store.py:161`
+  Fixed: the fast probe falls back to `rev-parse --git-common-dir` and `symbolic-ref -q HEAD` on an unborn HEAD; tested.
+- [x] **R27 — LOW — native** — `.agents/machine/scripts/session_store.py:161`
   `--abbrev-ref HEAD` can return `heads/<name>` for an ambiguous name, which never equals `branch --show-current`, so
   the row stays stale. Record the branch from `--symbolic-full-name HEAD` with `refs/heads/` stripped, and compare the
   same form.
-- [ ] **R28 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:386`
+  Fixed: branches come from `--symbolic-full-name HEAD` with `refs/heads/` stripped; a tag/branch name clash stays non-stale.
+- [x] **R28 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:386`
   `item` creates a work item with the default branch recorded, re-enabling cross-attachment of default-branch sessions.
   Apply the default-branch rule wherever a work item's branch is written.
-- [ ] **R29 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:209`
+  Fixed: `_branch_to_record` drops the default branch for both `item` and `claim`.
+- [x] **R29 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:209`
   An item first claimed on the default branch keeps `branch = NULL` after a later claim from its feature branch, so
   auto-attach never works. Set the branch on claim when it is NULL and the current branch is not the default.
-- [ ] **R30 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:162`
+  Fixed: `claim` fills a NULL work-item branch from a non-default branch (`set_work_item_branch_if_unset`).
+- [x] **R30 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:162`
   A live session reports its worktree status (`stale`/`unknown`) instead of `live`, inviting a competing owner. Report
   `live` for a live session; staleness applies only to resumable rows.
-- [ ] **R31 — LOW — native** — `.agents/machine/scripts/session_store.py:141`
+  Fixed: a live session reports `live` regardless of its worktree.
+- [x] **R31 — LOW — native** — `.agents/machine/scripts/session_store.py:141`
   Legacy Azure DevOps remotes (`<org>.visualstudio.com/<project>/_git/<repo>`, `vs-ssh.visualstudio.com:v3/...`) are not
   unified with `dev.azure.com`, and the path is not case-folded as documented. Map both to
   `dev.azure.com/<org>/<project>/_git/<repo>` and lowercase the identity.
+  Fixed: legacy `visualstudio.com` HTTPS and `vs-ssh.visualstudio.com` SSH remotes map to `dev.azure.com/<org>/<project>/_git/<repo>`; the identity is fully case-folded.
