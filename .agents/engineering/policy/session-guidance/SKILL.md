@@ -26,6 +26,12 @@ An apology, a SendFeedback draft or local memory does not substitute for this so
 user limits and scope gates still apply. Questions ask for reasoning: explain and defend recommendations with
 evidence, change them only for new evidence or a stated user decision, and say what changed.
 
+During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
+refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
+snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
+accepted, launch `engineering:handoff` in bounded side-workstream mode to the standard's source owner
+under the standing authorization. Established standards defects still require immediate repair.
+
 ## A task has an owning lifecycle — load it before the first edit
 
 Authorized long-term or multi-phase work selects `engineering:plan-execution`, even when the user does
