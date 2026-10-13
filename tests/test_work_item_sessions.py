@@ -149,13 +149,13 @@ class WorkItemSessionsTests(unittest.TestCase):
         result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
         self.assertEqual("foreign", result["sessions"][0]["status"])
 
-    def test_status_reports_stale_on_branch_mismatch(self):
+    def test_status_reports_live_for_a_live_session_even_on_branch_mismatch(self):
         self._claim_claude()
         self._run_git(self.repo, "checkout", "-b", "other-branch")
         recovery = fake_recovery(liveness_result="live")
         with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
             result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
-        self.assertEqual("stale", result["sessions"][0]["status"])
+        self.assertEqual("live", result["sessions"][0]["status"])
 
     def test_resume_selects_single_owner_and_calls_open_session(self):
         self._claim_claude()
@@ -196,7 +196,7 @@ class WorkItemSessionsTests(unittest.TestCase):
                 WIS.cmd_resume("example-feature/example-item", cwd=self.repo)
         recovery.open_session.assert_not_called()
 
-    def test_resume_refuses_stale(self):
+    def test_resume_refuses_live_even_with_a_branch_mismatch(self):
         self._claim_claude()
         self._run_git(self.repo, "checkout", "-b", "other-branch")
         recovery = fake_recovery(liveness_result="live")
@@ -463,6 +463,104 @@ class WorkItemSessionsTests(unittest.TestCase):
         with mock.patch.object(STORE, "_git", return_value=None):
             self.assertEqual("main", WIS._default_branch(self.repo, "main"))
             self.assertIsNone(WIS._default_branch(self.repo, "feature"))
+
+    def test_close_reclaim_close_then_resume_without_handle_selects_the_latest_owner(self):
+        self._claim_claude()
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"}, clear=False):
+            WIS.cmd_end("claude", "closed")
+        self._claim_codex(role="owner")
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": "01a12aa7-5b58-7312-9400-ef710762147f"}, clear=False):
+            WIS.cmd_end("codex", "closed")
+        connection = self._connection()
+        try:
+            former_owner = STORE.get_session(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875")
+        finally:
+            connection.close()
+        self.assertIsNone(former_owner["role"])
+
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            result = WIS.cmd_resume("example-feature/example-item", cwd=self.repo)
+        self.assertEqual({"ok": True}, result)
+        recovery.open_session.assert_called_once()
+        args, _kwargs = recovery.open_session.call_args
+        self.assertEqual(("codex", "01a12aa7-5b58-7312-9400-ef710762147f"), args)
+
+    def test_interrupted_listing_includes_each_rows_status(self):
+        self._claim_claude()
+        connection = self._connection()
+        try:
+            STORE.start_session(
+                connection, "claude", "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", self.repo,
+                pid=999999999, pid_started_at=1234.0,
+            )
+        finally:
+            connection.close()
+        register_session = WIS._register_session()
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(register_session, "build_process_lookup", return_value=lambda pid: None), \
+                mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            result = WIS.cmd_interrupted(cwd=self.repo)
+        rows = result["interrupted"]["example-feature/example-item"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("closed", rows[0]["status"])
+
+    def test_interrupted_resume_refuses_a_handle_that_is_not_closed(self):
+        self._claim_claude()
+        connection = self._connection()
+        try:
+            STORE.start_session(
+                connection, "claude", "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", self.repo,
+                pid=999999999, pid_started_at=1234.0,
+            )
+        finally:
+            connection.close()
+        self._run_git(self.repo, "checkout", "-b", "other-branch")
+        register_session = WIS._register_session()
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(register_session, "build_process_lookup", return_value=lambda pid: None), \
+                mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            with self.assertRaises(ValueError):
+                WIS.cmd_interrupted(resume_handles=["claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"], cwd=self.repo)
+            recovery.open_session.assert_not_called()
+
+    def test_item_on_the_default_branch_does_not_record_a_branch(self):
+        self._run_git(self.repo, "branch", "-M", "main")
+        WIS.cmd_item("example-feature/example-item", "active", cwd=self.repo)
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertIsNone(item["branch"])
+
+    def test_claim_fills_a_null_branch_when_claimed_again_from_a_feature_branch(self):
+        self._run_git(self.repo, "branch", "-M", "main")
+        self._claim_claude()
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertIsNone(item["branch"])
+
+        self._run_git(self.repo, "checkout", "-b", "feature-branch")
+        self._claim_codex(role="bounded: docs")
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertEqual("feature-branch", item["branch"])
+
+    def test_ambiguous_tag_and_branch_name_does_not_make_the_row_stale(self):
+        self._run_git(self.repo, "checkout", "-b", "shared-name")
+        self._run_git(self.repo, "tag", "shared-name")
+        self._claim_claude()
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
+        self.assertEqual("closed", result["sessions"][0]["status"])
 
 
 if __name__ == "__main__":

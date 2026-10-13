@@ -138,7 +138,7 @@ def _normalise_remote(url):
         path = path[: -len(".git")]
     if not path:
         return None
-    if host == "ssh.dev.azure.com":
+    if host in ("ssh.dev.azure.com", "vs-ssh.visualstudio.com"):
         parts = [part for part in path.split("/") if part]
         if parts and parts[0] == "v3":
             parts = parts[1:]
@@ -147,25 +147,45 @@ def _normalise_remote(url):
         org, project, repository = parts
         host = "dev.azure.com"
         path = f"{org}/{project}/_git/{repository}"
-    return f"{host}/{path}"
+    elif host.endswith(".visualstudio.com"):
+        org = host[: -len(".visualstudio.com")]
+        if not org or "." in org:
+            return None
+        parts = [part for part in path.split("/") if part]
+        if parts and parts[0].casefold() == "defaultcollection":
+            parts = parts[1:]
+        if len(parts) != 3 or parts[1] != "_git":
+            return None
+        project, _git_segment, repository = parts
+        host = "dev.azure.com"
+        path = f"{org}/{project}/_git/{repository}"
+    return f"{host}/{path}".casefold()
+
+
+def _branch_from_symbolic_ref(value):
+    if not value:
+        return None
+    prefix = "refs/heads/"
+    return value[len(prefix):] if value.startswith(prefix) else None
 
 
 def _rev_parse_probe(cwd, timeout):
-    output = _git(cwd, "rev-parse", "HEAD", "--abbrev-ref", "HEAD", "--git-common-dir", timeout=timeout)
-    if not output:
-        return None, None, None
-    lines = output.splitlines()
-    if len(lines) < 3:
-        return None, None, None
-    head = lines[0].strip() or None
-    abbreviated = lines[1].strip()
-    branch = None if abbreviated in ("", "HEAD") else abbreviated
-    common_dir = lines[2].strip() or None
-    return head, branch, common_dir
+    output = _git(cwd, "rev-parse", "HEAD", "--git-common-dir", "--symbolic-full-name", "HEAD", timeout=timeout)
+    if output:
+        lines = output.splitlines()
+        if len(lines) >= 3:
+            head = lines[0].strip() or None
+            common_dir = lines[1].strip() or None
+            branch = _branch_from_symbolic_ref(lines[2].strip())
+            return head, branch, common_dir
+    common_dir = _git(cwd, "rev-parse", "--git-common-dir", timeout=timeout)
+    symbolic = _git(cwd, "symbolic-ref", "-q", "HEAD", timeout=timeout)
+    branch = _branch_from_symbolic_ref(symbolic)
+    return None, branch, (common_dir.strip() if common_dir else None)
 
 
 def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
-    """Resolve repo identity, branch and HEAD in exactly two git subprocesses."""
+    """Resolve repo identity, branch and HEAD, falling back to extra probes on an unborn HEAD."""
     origin = _git(cwd, "config", "--get", "remote.origin.url", timeout=timeout)
     head, branch, common_dir = _rev_parse_probe(cwd, timeout)
     repo = _normalise_remote(origin) if origin else None
@@ -284,7 +304,7 @@ def record_stop(connection, handle, cwd):
         connection.commit()
 
 
-def end_session(connection, handle, reason, successor=None):
+def _end_session_locked(connection, handle, reason, successor=None):
     connection.execute(
         """
         UPDATE sessions SET
@@ -295,6 +315,10 @@ def end_session(connection, handle, reason, successor=None):
         """,
         (time.time(), reason, successor, handle),
     )
+
+
+def end_session(connection, handle, reason, successor=None):
+    _end_session_locked(connection, handle, reason, successor=successor)
     connection.commit()
 
 
@@ -348,17 +372,61 @@ def set_work_item_status(connection, key, status, pr=None):
     connection.commit()
 
 
-def set_session_ownership(connection, handle, role, item, predecessor=None):
+def set_work_item_branch_if_unset(connection, key, branch):
     connection.execute(
-        "UPDATE sessions SET role = ?, work_item = ?, predecessor = COALESCE(?, predecessor) WHERE handle = ?",
-        (role, item, predecessor, handle),
+        "UPDATE work_items SET branch = ?, updated_at = ? WHERE key = ? AND branch IS NULL",
+        (branch, time.time(), key),
     )
     connection.commit()
 
 
-def transfer_ownership(connection, predecessor_handle, successor_handle, item, role="owner"):
-    end_session(connection, predecessor_handle, "handed_off", successor=successor_handle)
-    set_session_ownership(connection, successor_handle, role, item, predecessor=predecessor_handle)
+def _set_session_ownership_locked(connection, handle, role, item, predecessor=None):
+    connection.execute(
+        "UPDATE sessions SET role = ?, work_item = ?, predecessor = COALESCE(?, predecessor) WHERE handle = ?",
+        (role, item, predecessor, handle),
+    )
+
+
+def set_session_ownership(connection, handle, role, item, predecessor=None):
+    _set_session_ownership_locked(connection, handle, role, item, predecessor=predecessor)
+    connection.commit()
+
+
+def _demote_other_owners_locked(connection, item, keep_handle):
+    connection.execute(
+        "UPDATE sessions SET role = NULL WHERE work_item = ? AND role = 'owner' AND handle != ?",
+        (item, keep_handle),
+    )
+
+
+def claim_work_item(connection, handle, key, role, predecessor=None):
+    """Atomically claim ``role`` on ``key`` for ``handle``, keeping at most one live 'owner' row.
+
+    Runs under a single ``BEGIN IMMEDIATE`` transaction with no inner commits: the live-owner
+    check, any handoff, the demotion of every other owner row for the key, and this handle's own
+    ownership write all land in one commit, or none of them do.
+    """
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        removed = None
+        if role == "owner":
+            others = [row for row in live_owners(connection, key) if row["handle"] != handle]
+            if others:
+                other = others[0]
+                if predecessor and predecessor == other["handle"]:
+                    _end_session_locked(connection, predecessor, "handed_off", successor=handle)
+                    removed = predecessor
+                else:
+                    raise ValueError(
+                        f"{other['handle']} already owns this work item; hand off before taking ownership"
+                    )
+            _demote_other_owners_locked(connection, key, handle)
+        _set_session_ownership_locked(connection, handle, role, key, predecessor=predecessor)
+        connection.commit()
+        return removed
+    except Exception:
+        connection.rollback()
+        raise
 
 
 def get_session(connection, handle):
