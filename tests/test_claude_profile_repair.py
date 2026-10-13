@@ -237,6 +237,112 @@ class ProfileMigrationTests(StandardsSyncHarness):
         self.assertIn("affected preferences changed", output)
         self.assertEqual(self.profile()["enabledPlugins"], {"dotnet@dotagents": False, "unrelated@foreign": True})
 
+    def test_new_sibling_false_preference_defers_the_selection(self):
+        self.configure_dotnet_sources()
+        self.install("dotnet@dotagents")
+        self.install("dotnet@tj-agents")
+        self.enable({"dotnet@dotagents": True, "unrelated@foreign": True})
+        original = SYNC.read_json_object
+        reads = 0
+
+        def reread(path):
+            nonlocal reads
+            if path == self.config / "settings.json":
+                reads += 1
+                if reads == 2:
+                    self.enable({
+                        "dotnet@dotagents": True,
+                        "dotnet@dotnet": False,
+                        "unrelated@foreign": True,
+                    })
+            return original(path)
+
+        with mock.patch.object(SYNC, "read_json_object", side_effect=reread):
+            code, output = self.migrate()
+        self.assertEqual(code, 1)
+        self.assertIn("affected preferences changed", output)
+        self.assertEqual(self.profile()["enabledPlugins"], {
+            "dotnet@dotagents": True,
+            "dotnet@dotnet": False,
+            "unrelated@foreign": True,
+        })
+
+    def test_new_active_project_legacy_false_defers_before_profile_save(self):
+        self.configure_dotnet_sources()
+        self.install("dotnet@dotagents")
+        self.install("dotnet@tj-agents")
+        self.enable({"dotnet@dotagents": True})
+        original = SYNC.read_json_object
+        reads = 0
+
+        def reread(path):
+            nonlocal reads
+            if path == self.config / "settings.json":
+                reads += 1
+                if reads == 2:
+                    self.write(self.project / ".claude" / "settings.json", {
+                        "enabledPlugins": {"dotnet@dotagents": False},
+                    })
+            return original(path)
+
+        with mock.patch.object(SYNC, "read_json_object", side_effect=reread):
+            code, output = self.migrate()
+        self.assertEqual(code, 1)
+        self.assertIn("scoped legacy selection would change", output)
+        self.assertEqual(self.profile()["enabledPlugins"], {"dotnet@dotagents": True})
+
+    def test_native_install_canonical_enablement_is_removed_when_new_scope_defers(self):
+        self.configure_dotnet_sources()
+        self.install("dotnet@dotagents")
+        scoped = self.project / ".claude" / "settings.json"
+        for malformed in (False, True):
+            with self.subTest(malformed=malformed):
+                self.enable({"dotnet@dotagents": True})
+                registry = SYNC.read_json_object(self.plugins / "installed_plugins.json")
+                registry["plugins"].pop("dotnet@tj-agents", None)
+                self.write(self.plugins / "installed_plugins.json", registry)
+                scoped.unlink(missing_ok=True)
+
+                def install_and_change_scope(*_):
+                    self.install("dotnet@tj-agents")
+                    self.enable({"dotnet@dotagents": True, "dotnet@tj-agents": True})
+                    if malformed:
+                        scoped.parent.mkdir(parents=True, exist_ok=True)
+                        scoped.write_text("[]", encoding="utf-8")
+                    else:
+                        self.write(scoped, {"enabledPlugins": {"dotnet@dotagents": False}})
+                    return True, ""
+
+                with mock.patch.object(SYNC, "claude", side_effect=install_and_change_scope):
+                    code, output = self.migrate()
+                self.assertEqual(code, 1)
+                self.assertIn("scoped profile changed or is malformed" if malformed else "scoped legacy selection would change", output)
+                self.assertEqual(self.profile()["enabledPlugins"], {"dotnet@dotagents": True})
+
+    def test_new_malformed_active_project_profile_defers_before_profile_save(self):
+        self.configure_dotnet_sources()
+        self.install("dotnet@dotagents")
+        self.install("dotnet@tj-agents")
+        self.enable({"dotnet@dotagents": True})
+        original = SYNC.read_json_object
+        reads = 0
+
+        def reread(path):
+            nonlocal reads
+            if path == self.config / "settings.json":
+                reads += 1
+                if reads == 2:
+                    scoped = self.project / ".claude" / "settings.json"
+                    scoped.parent.mkdir(parents=True, exist_ok=True)
+                    scoped.write_text("[]", encoding="utf-8")
+            return original(path)
+
+        with mock.patch.object(SYNC, "read_json_object", side_effect=reread):
+            code, output = self.migrate()
+        self.assertEqual(code, 1)
+        self.assertIn("scoped profile changed or is malformed", output)
+        self.assertEqual(self.profile()["enabledPlugins"], {"dotnet@dotagents": True})
+
     def test_registered_stale_alias_requires_its_own_authenticated_marketplace(self):
         self.configure_dotnet_sources()
         self.install("dotnet@dotagents")
