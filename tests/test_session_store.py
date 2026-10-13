@@ -61,13 +61,40 @@ class SchemaTests(unittest.TestCase):
         }
         self.assertEqual({"sessions", "work_items"}, tables)
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        self.assertEqual(1, version)
+        self.assertEqual(2, version)
 
     def test_reconnecting_does_not_lose_the_schema_version(self):
         STORE.connect(self.db_path).close()
         connection = STORE.connect(self.db_path)
         self.addCleanup(connection.close)
-        self.assertEqual(1, connection.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual(2, connection.execute("PRAGMA user_version").fetchone()[0])
+
+    def test_migration_deduplicates_legacy_owner_rows_before_creating_the_index(self):
+        connection = sqlite3.connect(self.db_path)
+        connection.executescript(STORE.WORK_ITEMS_SCHEMA)
+        connection.executescript(STORE.SESSIONS_SCHEMA)
+        connection.execute("PRAGMA user_version = 1")
+        connection.execute(
+            "INSERT INTO work_items (key, repo, feature, item, status) VALUES ('key-1', 'repo', 'f', 'i', 'active')"
+        )
+        connection.execute(
+            "INSERT INTO sessions (handle, host, session_id, role, work_item, last_activity_at) "
+            "VALUES ('claude:old', 'claude', 'old', 'owner', 'key-1', 1)"
+        )
+        connection.execute(
+            "INSERT INTO sessions (handle, host, session_id, role, work_item, last_activity_at) "
+            "VALUES ('codex:new', 'codex', 'new', 'owner', 'key-1', 2)"
+        )
+        connection.commit()
+        connection.close()
+
+        migrated = STORE.connect(self.db_path)
+        self.addCleanup(migrated.close)
+        owners = migrated.execute(
+            "SELECT handle FROM sessions WHERE work_item = 'key-1' AND role = 'owner'"
+        ).fetchall()
+        self.assertEqual(["codex:new"], [row[0] for row in owners])
+        self.assertEqual(2, migrated.execute("PRAGMA user_version").fetchone()[0])
 
     def test_connect_enables_wal_and_foreign_keys(self):
         connection = STORE.connect(self.db_path)

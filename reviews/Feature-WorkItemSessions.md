@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `6c4ed0790ea2f1fec7f822292e1ae88238aadeb0`  `(2026-10-13)`
+**Reviewed up to commit:** `e0b1d0da0ea57c374689c08a8f67b6d625861553`  `(2026-10-13)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-12 — full
@@ -302,3 +302,24 @@ case-folded repository key — `sessions.db` has never shipped, so no recorded r
 - [x] **R40 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:213`
   `claim` resolves repository, branch and HEAD twice. Resolve them once and reuse the result.
   Fixed: `claim` and `item` resolve repository, branch and HEAD once through `_require_repo_branch_head`; tested.
+
+## Review pass — 2026-10-13 — incremental
+
+**Candidate base:** `6c4ed0790ea2f1fec7f822292e1ae88238aadeb0`
+**Candidate head:** `e0b1d0da0ea57c374689c08a8f67b6d625861553`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:d6dbba39967b6ecd666f368f01c662515abcda56762fb42d5156938af0ecaf06` `(7 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\0sxD8Dhd9yeoJk9pjyNG5n\MpyOmenC9dggy9M-WIAPxD`
+**Candidate bundle identity:** `sha256:4aa82a0185895940b4e045fadf6ae1399eedc6404eabd3e28ae76ccf76a315a3`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Codex `codex review` (medium; no findings emitted). Workflow review: parent fallback. No security-sensitive paths.
+
+### Findings
+
+- [x] **R41 — MEDIUM — workflow** — `.agents/machine/scripts/session_store.py:91`
+  A database created before the unique-owner index can contain duplicate `owner` rows from the earlier close/reclaim bug. Creating the index before reconciling those rows makes every later `connect` fail with `UNIQUE constraint failed`. Deduplicate existing owner rows in a schema migration before creating the index, retaining the most recently active owner.
+  Fixed: schema v2 demotes older duplicate owners before creating the unique index; a migration test retains the most recently active owner.
