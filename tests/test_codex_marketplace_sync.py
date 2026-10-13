@@ -78,6 +78,12 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
         self.lines = []
+        self.catalog = mock.patch.object(
+            SYNC, 'canonical_catalog',
+            return_value={'base': ('tj-agents', 'core'), 'engineering': ('tj-agents', 'core')},
+        )
+        self.catalog.start()
+        self.addCleanup(self.catalog.stop)
 
     def out(self, line):
         self.lines.append(line)
@@ -354,6 +360,204 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.assertIn('helper missing', str(raised.exception))
         self.assertEqual(fake.calls, [])
 
+
+class MigrationCodex(FakeCodex):
+    def __init__(self, legacy='base@base-agents', repository='tj-agents/core', enabled=True, verify=True):
+        super().__init__()
+        self.legacy = legacy
+        self.repository = repository
+        self.enabled = enabled
+        self.verify = verify
+        self.canonical_installed = False
+        self.legacy_installed = True
+
+    def inventory(self):
+        installed = []
+        if self.legacy_installed:
+            installed.append({
+                'pluginId': self.legacy,
+                'installed': True,
+                'enabled': self.enabled,
+                'scope': 'user',
+                'marketplaceSource': {'sourceType': 'git', 'source': f'https://github.com/{self.repository}.git'},
+            })
+        if self.canonical_installed and self.verify:
+            installed.append({
+                'pluginId': 'base@tj-agents',
+                'installed': True,
+                'enabled': self.enabled,
+                'marketplaceSource': {'sourceType': 'git', 'source': 'https://github.com/tj-agents/marketplace.git'},
+            })
+        return {
+            'installed': installed,
+            'available': [{
+                'pluginId': 'base@tj-agents',
+                'enabled': False,
+                'marketplaceSource': {'sourceType': 'git', 'source': 'https://github.com/tj-agents/marketplace.git'},
+            }],
+        }
+
+    def run(self, argv, cwd=None, **kwargs):
+        if argv[0] == sys.executable:
+            return super().run(argv, cwd=cwd, **kwargs)
+        arguments = argv[1:]
+        self.calls.append(' '.join(arguments))
+        if arguments == ['plugin', 'marketplace', 'upgrade', '--json']:
+            return completed(argv, 0, stdout=json.dumps({'errors': []}))
+        if arguments == ['plugin', 'list', '--available', '--json']:
+            return completed(argv, 0, stdout=json.dumps(self.inventory()))
+        if arguments == ['plugin', 'add', 'base@tj-agents', '--json']:
+            self.canonical_installed = True
+            return completed(argv, 0, stdout=json.dumps({'pluginId': 'base@tj-agents'}))
+        if arguments == ['plugin', 'remove', self.legacy, '--json']:
+            self.legacy_installed = False
+            return completed(argv, 0, stdout=json.dumps({'pluginId': self.legacy}))
+        if len(arguments) == 4 and arguments[:2] == ['plugin', 'add']:
+            return completed(argv, 0, stdout=json.dumps({'pluginId': arguments[2]}))
+        raise AssertionError(arguments)
+
+
+class IdentityMigrationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='codex identity migration ')
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.project = self.root / 'project'
+        self.project.mkdir()
+        self.profile = self.root / 'profile'
+        self.profile.mkdir()
+        self.lines = []
+        self.catalog = mock.patch.object(SYNC, 'canonical_catalog', return_value={'base': ('tj-agents', 'core')})
+        self.catalog.start()
+        self.addCleanup(self.catalog.stop)
+
+    def sync(self, fake):
+        return SYNC.sync_codex_standards(
+            'Invoke-FakeCodex', self.project, out=self.lines.append, run=fake.run, config_root=self.profile,
+        )
+
+    def test_owned_same_name_plugin_migrates_after_canonical_payload_verification(self):
+        path = self.profile / 'config.toml'
+        path.write_text('# retain this comment\nmodel = "test"\n', encoding='utf-8')
+        fake = MigrationCodex()
+
+        selected = self.sync(fake)
+
+        self.assertIn('base@tj-agents', selected)
+        self.assertFalse(fake.legacy_installed)
+        self.assertEqual(
+            '# retain this comment\nmodel = "test"\n[plugins."base@tj-agents"]\nenabled = true\n',
+            path.read_text(encoding='utf-8'),
+        )
+        self.assertLess(fake.calls.index('plugin add base@tj-agents --json'),
+                        fake.calls.index('plugin remove base@base-agents --json'))
+
+    def test_disabled_legacy_preference_transfers_to_the_canonical_identity(self):
+        path = self.profile / 'config.toml'
+        path.write_text('[plugins."base@base-agents"]\nenabled = false\n', encoding='utf-8')
+        fake = MigrationCodex(enabled=False)
+
+        self.sync(fake)
+
+        self.assertIn('[plugins."base@tj-agents"]\nenabled = false\n', path.read_text(encoding='utf-8'))
+        self.assertFalse(fake.legacy_installed)
+
+    def test_existing_canonical_false_dominates_legacy_true(self):
+        path = self.profile / 'config.toml'
+        original = '[plugins."base@base-agents"]\nenabled = true\n\n[plugins."base@tj-agents"]\nenabled = false\n'
+        path.write_text(original, encoding='utf-8')
+        fake = MigrationCodex(enabled=True)
+
+        self.sync(fake)
+
+        self.assertEqual(original, path.read_text(encoding='utf-8'))
+        self.assertFalse(fake.legacy_installed)
+
+    def test_foreign_same_name_plugin_is_not_migrated(self):
+        fake = MigrationCodex(repository='other-org/core')
+
+        selected = self.sync(fake)
+
+        self.assertEqual(selected, ['base@base-agents'])
+        self.assertTrue(fake.legacy_installed)
+        self.assertNotIn('plugin remove base@base-agents --json', fake.calls)
+
+    def test_missing_replacement_payload_leaves_the_legacy_identity_intact(self):
+        path = self.profile / 'config.toml'
+        path.write_text('model = "test"\n', encoding='utf-8')
+        fake = MigrationCodex(verify=False)
+
+        with self.assertRaisesRegex(SYNC.SyncError, 'did not verify replacement payload'):
+            self.sync(fake)
+
+        self.assertTrue(fake.legacy_installed)
+        self.assertNotIn('plugin remove base@base-agents --json', fake.calls)
+        self.assertEqual('model = "test"\n', path.read_text(encoding='utf-8'))
+
+    def test_scoped_project_preference_is_an_actionable_migration_conflict(self):
+        scoped = self.project / '.codex'
+        scoped.mkdir()
+        path = scoped / 'config.toml'
+        path.write_text('[plugins."base@base-agents"]\nenabled = false\n', encoding='utf-8')
+        fake = MigrationCodex()
+
+        with self.assertRaisesRegex(SYNC.SyncError, 'scoped project preference'):
+            self.sync(fake)
+
+        self.assertTrue(fake.legacy_installed)
+        self.assertNotIn('plugin add base@tj-agents --json', fake.calls)
+
+    def test_unlisted_owned_plugin_is_reported_without_a_guessed_replacement(self):
+        fake = MigrationCodex(legacy='retired-standard@legacy-catalog', repository='tj-agents/dotnet')
+
+        selected = self.sync(fake)
+
+        self.assertEqual(selected, ['retired-standard@legacy-catalog'])
+        self.assertTrue(fake.legacy_installed)
+        self.assertIn('shared catalog has no matching plugin with shipped skill-coverage evidence', self.lines[0])
+
+    def test_canonical_inventory_requires_the_authenticated_marketplace_source(self):
+        inventory = {
+            'installed': [],
+            'available': [{'pluginId': 'base@tj-agents', 'marketplaceSource': {
+                'sourceType': 'git', 'source': 'https://github.com/other-org/marketplace.git',
+            }}],
+        }
+
+        with self.assertRaisesRegex(SYNC.SyncError, 'unauthenticated marketplace source'):
+            SYNC.canonical_records(inventory, {'base': ('tj-agents', 'core')})
+
+    def test_authenticated_catalog_requires_a_published_shared_marketplace_checkout(self):
+        root = self.root / 'marketplace'
+        root.mkdir()
+        (root / 'catalog.json').write_text(
+            json.dumps({'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'core'}]}),
+            encoding='utf-8',
+        )
+
+        def git_run(argv, **_kwargs):
+            command = argv[3:]
+            output = {
+                ('remote', 'get-url', 'origin'): 'https://github.com/tj-agents/marketplace.git\n',
+                ('status', '--porcelain'): '',
+                ('rev-parse', 'HEAD'): 'abc123\n',
+                ('ls-remote', 'origin', 'HEAD', 'refs/heads/*', 'refs/tags/*'): 'abc123\trefs/heads/main\n',
+            }[tuple(command)]
+            return completed(argv, 0, stdout=output)
+
+        self.assertEqual({'base': ('tj-agents', 'core')}, SYNC.authenticated_catalog(root, git_run))
+
+    def test_preference_revalidation_refuses_to_overwrite_a_concurrent_change(self):
+        path = self.profile / 'config.toml'
+        before = b'# preserve\nmodel = "test"\n'
+        changed = b'# preserve\nmodel = "changed"\n'
+        path.write_bytes(before)
+
+        with mock.patch.object(Path, 'read_bytes', side_effect=[before, changed]):
+            with self.assertRaisesRegex(SYNC.SyncError, 'changed while preparing'):
+                SYNC.append_preference(path, 'base@tj-agents', True)
+
+        self.assertEqual(before, path.read_bytes())
 
 class ApplyHarnessPermissionsTests(unittest.TestCase):
     """apply_harness_permissions() in isolation: the fire-and-forget contract shared with
