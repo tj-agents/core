@@ -46,6 +46,15 @@ bugs default to the repository-root `BUGS.md`; mistakes default to root `MISTAKE
 the owning area's `TECH_DEBT.md` under `engineering:write-debt`. A shared register keeps the kind on
 each entry and preserves these fields.
 
+Repository-wide records must remain discoverable on the source repository's default branch. Publish new
+observations and material status changes promptly through a separate authorized documentation delivery;
+do not make publication depend on an unrelated feature branch merging. Reconcile the default-branch record
+and stable IDs first, preserve other writers' entries, and verify the merged record before reporting
+publication complete. Feature plans link to the shared records. Recording grants no authority to bypass
+review, delivery or user gates; when publication is genuinely blocked, preserve the observation and name its
+resolver and resume condition. Keep a frozen feature candidate unchanged by delivering its new records
+separately.
+
 Retain bugs after resolution with their final status and verification evidence. Retain mistakes as learning
 history. A linked mistake resolves only when its own prevention condition passes, even when a linked bug or
 debt repair is resolved. Delete debt only after the whole entry is verified resolved. When separate owning
