@@ -11,6 +11,7 @@ import tempfile
 TASK_PREFIX = "AgentStandards-Continuation-"
 PROFILE_VARIABLES = ("CODEX_HOME", "CLAUDE_CONFIG_DIR", "GH_CONFIG_DIR")
 CONTROL_VARIABLES = ("CONTINUATION_OWNER_ID", "CONTINUATION_NONCE", "CONTINUATION_RESULT_PATH")
+WINDOWS_READ_QUERY_TIMEOUT = 15
 
 
 class SchedulerError(RuntimeError):
@@ -370,7 +371,8 @@ def verify_linux(receipt, owner_path, owner, root, transport=None):
 
 def _windows_task(receipt, transport):
     result = _result(transport, [_powershell(), "-NoProfile", "-NonInteractive", "-Command", WINDOWS_SCRIPT],
-                     input_text=json.dumps({"operation": "query", "task_name": receipt["task_name"]}), timeout=8)
+                     input_text=json.dumps({"operation": "query", "task_name": receipt["task_name"]}),
+                     timeout=WINDOWS_READ_QUERY_TIMEOUT)
     try:
         return json.loads(result.stdout)
     except ValueError as error:
