@@ -184,6 +184,58 @@ class MainTests(unittest.TestCase):
         self.assertEqual(self._run_main_with_stdin("[1, 2, 3]"), 0)
 
 
+class LoadSessionStoreTests(unittest.TestCase):
+    """R9: the loader must find session_store.py in source and every packaged layout."""
+
+    def _write_store_stub(self, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("MARKER = 'session-store-stub'\n", encoding="utf-8")
+
+    def _load_from(self, script_path):
+        spec = importlib.util.spec_from_file_location("register_session_under_test", script_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_finds_the_store_in_the_source_tree_layout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            script = root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+            self._write_store_stub(root / ".agents/machine/scripts/session_store.py")
+            module = self._load_from(script)
+            store = module._load_session_store()
+            self.assertIsNotNone(store)
+            self.assertEqual("session-store-stub", store.MARKER)
+
+    def test_finds_the_store_in_the_agents_machine_utility_packaged_layout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin_root = Path(tmp)
+            script = plugin_root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+            self._write_store_stub(plugin_root / "resources/machine/scripts/session_store.py")
+            module = self._load_from(script)
+            store = module._load_session_store()
+            self.assertIsNotNone(store)
+            self.assertEqual("session-store-stub", store.MARKER)
+
+    def test_finds_the_store_in_the_skills_packaged_layout(self):
+        for layout in ("skills", "codex-skills"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    plugin_root = Path(tmp)
+                    script = plugin_root / layout / "peer-cli/scripts/register_session.py"
+                    script.parent.mkdir(parents=True, exist_ok=True)
+                    script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+                    self._write_store_stub(plugin_root / "resources/machine/scripts/session_store.py")
+                    module = self._load_from(script)
+                    store = module._load_session_store()
+                    self.assertIsNotNone(store)
+                    self.assertEqual("session-store-stub", store.MARKER)
+
+
 class ProcessLookupSafetyTests(unittest.TestCase):
     def test_ps_distinguishes_missing_process_from_inspection_failures(self):
         missing = mock.Mock(returncode=1, stdout="", stderr="")

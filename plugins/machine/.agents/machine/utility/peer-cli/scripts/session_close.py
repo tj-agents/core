@@ -46,6 +46,28 @@ class Refusal(RuntimeError):
     pass
 
 
+def _update_own_end(entry, operation, reason):
+    try:
+        store = register_session._load_session_store()
+        if store is None or not entry.get("host") or not entry.get("session_id"):
+            return
+        connection = store.connect()
+        try:
+            getattr(store, operation)(connection, store.session_handle(entry["host"], entry["session_id"]), reason)
+        finally:
+            connection.close()
+    except Exception:
+        pass
+
+
+def _record_own_end(entry, reason):
+    _update_own_end(entry, "end_session", reason)
+
+
+def _reopen_own_end(entry, reason):
+    _update_own_end(entry, "reopen_session", reason)
+
+
 def state_directory():
     return Path(os.environ.get("AGENT_STATE_DIRECTORY") or Path.home() / ".agents-state")
 

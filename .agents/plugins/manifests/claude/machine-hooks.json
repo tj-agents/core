@@ -54,6 +54,63 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/session_store.py",
+              "hook",
+              "prompt",
+              "--host",
+              "claude"
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/session_store.py",
+              "hook",
+              "stop",
+              "--host",
+              "claude"
+            ]
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python",
+            "args": [
+              "-B",
+              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/session_store.py",
+              "hook",
+              "session-end",
+              "--host",
+              "claude"
+            ]
+          }
+        ]
+      }
     ]
   }
 }

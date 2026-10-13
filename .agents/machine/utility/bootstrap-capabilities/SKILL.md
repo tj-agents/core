@@ -86,8 +86,9 @@ being selected. Its `--input` is the composition request described in
 [Compose immutable source catalogs](#compose-immutable-source-catalogs); it reads only the exact
 commits named there.
 For a first adoption, include the Core three-package source and every requested stack source in that
-input. For an addition, preserved source owners may be omitted and are reused from the committed
-catalog; if an existing owner is supplied again, its snapshot must match the lock's pinned commit.
+input. For an addition, include every source owner required by the newly composed packages and their
+marketplace declarations. Other preserved owners may be omitted and are reused from the committed
+catalog. An existing owner supplied again must match the lock's pinned commit.
 
 ```powershell
 python -B '<skill-directory>\scripts\adopt_repository.py' `

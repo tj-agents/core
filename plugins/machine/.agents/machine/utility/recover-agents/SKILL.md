@@ -30,3 +30,12 @@ python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' rec
 Use `--codex-history-root '<profile>/sessions'` or `--claude-history-root '<profile>/projects'` for an alternate
 profile. Unknown live identity requires reconciliation before a
 resume, and ambiguous terminal launch results must not be retried.
+
+## Continue a work item
+
+When asked to continue a work item, run `work_item_sessions.py status '<feature>/<item>'`, then `resume`
+on the same `<feature>/<item>`. Without `--handle` it resumes the single not-ended owner; with several
+sessions and no single owner, pass `--handle`; with no sessions, start a new owner from the work item
+README's `## Next Steps` and `claim` it. Run `interrupted` to find and resume sessions whose process died
+without closing cleanly. See [`work-item-sessions.md`](../../resources/work-item-sessions.md) for the
+session store's schema and commands.

@@ -173,3 +173,25 @@ with a test that `review-prepare` names the skill for such a path.
 - **Related:** core PR #230 (binding `head` versus `remote_head_sha`).
 - **Resolution condition:** `continuation_stop` evaluates only checkouts this session owns, as its registry or
   lease records them, with a test where a foreign-owned launch directory doesn't block Stop.
+
+## D006 — A noticed problem can be parked outside its owning ledger
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-13. A Claude coordinator noticed two hook defects (now D004 and D005) and
+  wrote them only to a private host notes file. It cited the session limit as a reason to defer. The core
+  ledger got them only after Tommy said "note it down". The `close.py` failure, the D003 repeat and a
+  dotnet M003 were likewise recorded only after his callouts.
+- **Impact and priority:** P1. Known problems stay invisible to other sessions and to the source owner, and
+  Tommy has to prompt for every record.
+- **Cause:** `engineering:session-guidance` ("Record noticed problems") says to record while the observation
+  is available, but nothing enforces it. Recording was conflated with repair: being unable to launch a
+  repair session was treated as a reason to postpone the record.
+- **Source owner:** core engineering (session guidance, `write-debt`, `write-mistake` and the callout-repair
+  gate).
+- **State:** open.
+- **Next action:**
+  - state that a record lands in the owning repository's ledger, straight to `main` (D003), at the moment
+    of noticing, whatever repair capacity there is;
+  - add a gate that blocks a terminal report while the session has noticed a problem without recording it.
+- **Resolution condition:** in a hook test, a session that observes a defect and then tries to finish
+  without a matching ledger entry on `main` is blocked, and recording the entry releases it.

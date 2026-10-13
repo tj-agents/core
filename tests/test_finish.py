@@ -804,3 +804,50 @@ class ObserverHandshakeTests(unittest.TestCase):
             self.assertTrue(session_close.valid_armed(armed, expected, observer, accepted))
             armed["session_id"] = "different"
             self.assertFalse(session_close.valid_armed(armed, expected, observer, accepted))
+
+
+class EndReasonRecordingTests(unittest.TestCase):
+    def setUp(self):
+        self.entry = {"host": "claude", "session_id": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "pid": 1, "pid_started_at": 1.0}
+
+    def test_finish_records_finished_reason_through_the_shared_store(self):
+        store = mock.Mock()
+        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
+            finish._record_own_end(self.entry, "finished")
+        store.end_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "finished")
+        connection.close.assert_called_once()
+
+    def test_close_records_closed_reason_through_the_shared_store(self):
+        store = mock.Mock()
+        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=store):
+            own_close._record_own_end(self.entry, "closed")
+        store.end_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "closed")
+        connection.close.assert_called_once()
+
+    def test_reopen_reverses_a_recorded_end_through_the_shared_store(self):
+        store = mock.Mock()
+        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
+            finish._reopen_own_end(self.entry, "finished")
+        store.reopen_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "finished")
+        connection.close.assert_called_once()
+
+    def test_recording_never_raises_when_the_store_is_unavailable(self):
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=None):
+            finish._record_own_end(self.entry, "finished")
+        with mock.patch.object(finish.register_session, "_load_session_store", side_effect=RuntimeError("boom")):
+            finish._record_own_end(self.entry, "finished")
+
+    def test_recording_is_skipped_without_a_known_host_or_session(self):
+        store = mock.Mock()
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
+            finish._record_own_end({"pid": 1, "pid_started_at": 1.0}, "finished")
+        store.connect.assert_not_called()

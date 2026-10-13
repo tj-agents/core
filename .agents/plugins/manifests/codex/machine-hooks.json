@@ -11,6 +11,30 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook prompt --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook prompt --host codex",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook stop --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook stop --host codex",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }

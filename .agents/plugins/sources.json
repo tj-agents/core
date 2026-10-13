@@ -136,6 +136,11 @@
     },
     {
       "plugin": "machine",
+      "source": ".agents/machine/resources/work-item-sessions.md",
+      "destination": ".agents/machine/resources/work-item-sessions.md"
+    },
+    {
+      "plugin": "machine",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
     },
