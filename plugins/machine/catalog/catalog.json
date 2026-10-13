@@ -206,7 +206,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:2d17eda5ea0f464b181e3f7ebb07715d9b2b123565b867d210376bcbc3ec2bc6",
+          "digest": "sha256:8f95eec0d7e9c8c89ac976514078aeafcf66785b82ba77dc768d13ad44d1b29b",
           "harness": {
             "marketplaces": [
               {
@@ -400,7 +400,7 @@
                       "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
                     ]
                   ],
-                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
+                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
                   "match": [
                     [
                       "python",
@@ -511,7 +511,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:98a179636beabd331e35b62a10348a56da1da561970f49f5c157bce185c561bb",
+          "digest": "sha256:e16196a32b595eecabb06443afac0c330199c54543e4976cf9ece33a3bc4a738",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -641,7 +641,7 @@
                       "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
                     ]
                   ],
-                  "justification": "engineering:merge Step 5: finish closes this verified session and removes its merged worktree after cleanup_proof.py approved it",
+                  "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
                   "match": [
                     [
                       "python3",
@@ -675,7 +675,7 @@
                       "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
                     ]
                   ],
-                  "justification": "Close only this verified completed CLI session while retaining its checkout",
+                  "justification": "After its delivered report, close only this verified unchanged-idle CLI session while retaining its checkout",
                   "match": [
                     [
                       "python3",
