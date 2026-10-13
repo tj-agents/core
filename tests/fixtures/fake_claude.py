@@ -25,6 +25,18 @@ def plugin_source(checkout, name):
     return None, None
 
 
+def write_package(path, name):
+    (path / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    (path / "skills" / "fixture").mkdir(parents=True, exist_ok=True)
+    (path / "hooks").mkdir(parents=True, exist_ok=True)
+    (path / ".claude-plugin" / "plugin.json").write_text(
+        json.dumps({"name": name, "skills": "./skills", "hooks": "./hooks/claude.json"}), encoding="utf-8"
+    )
+    (path / "skills" / "fixture" / "SKILL.md").write_text("fixture\n", encoding="utf-8")
+    (path / "hooks" / "claude.json").write_text(json.dumps({"hooks": {}}), encoding="utf-8")
+    (path / "harness.json").write_text(json.dumps({"requires": {"hooks": []}}), encoding="utf-8")
+
+
 def main(arguments):
     config = Path(os.environ["CLAUDE_CONFIG_DIR"])
     plugins = config / "plugins"
@@ -44,7 +56,18 @@ def main(arguments):
         git(known[arguments[3]]["installLocation"], "pull", "--ff-only", "--quiet")
         print(f"Successfully updated marketplace: {arguments[3]}")
         return 0
-    if arguments[:2] == ["plugin", "update"]:
+    if arguments[:2] == ["plugin", "uninstall"]:
+        identity, scope = arguments[2], arguments[arguments.index("--scope") + 1]
+        registry_path = plugins / "installed_plugins.json"
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        for record in registry["plugins"].get(identity, []):
+            if record["scope"] == scope and (scope not in ("project", "local") or os.path.normcase(record["projectPath"]) == os.path.normcase(os.getcwd())):
+                shutil.rmtree(record["installPath"], ignore_errors=True)
+        registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+        print(json.dumps({"command": "uninstall", "outcome": "ok"}))
+        return 0
+    if arguments[:2] in (["plugin", "update"], ["plugin", "install"]):
+        command = arguments[1]
         identity, scope = arguments[2], arguments[arguments.index("--scope") + 1]
         if os.environ.get("FAKE_CLAUDE_FAIL") == identity:
             print(json.dumps({"command": "update", "outcome": "failed", "message": "command needs acceptance"}))
@@ -69,17 +92,14 @@ def main(arguments):
                     continue
                 if scope in ("project", "local") and os.path.normcase(record["projectPath"]) != os.path.normcase(os.getcwd()):
                     continue
-                if record["version"] == version:
+                if command == "update" and record["version"] == version:
                     print(json.dumps({"command": "update", "outcome": "ok", "message": "already at the latest version"}))
                     return 0
                 target = plugins / "cache" / marketplace / name / version
-                plugin_dir = content_root / "plugins" / name
-                if plugin_dir.is_dir():
-                    shutil.copytree(plugin_dir, target, dirs_exist_ok=True)
-                else:
-                    target.mkdir(parents=True, exist_ok=True)
-                (Path(record["installPath"]) / ".orphaned_at").write_text(str(int(time.time() * 1000)), encoding="utf-8")
-                record.update(version=version, installPath=str(target))
+                if command == "update":
+                    (Path(record["installPath"]) / ".orphaned_at").write_text(str(int(time.time() * 1000)), encoding="utf-8")
+                write_package(target, name)
+                record.update(version=version, installPath=str(target), gitCommitSha=git(content_root, "rev-parse", "HEAD"))
             registry_path.write_text(json.dumps(registry, indent=2), encoding="utf-8")
         print(json.dumps({"command": "update", "outcome": "ok", "message": f"updated to {version}"}))
         return 0
