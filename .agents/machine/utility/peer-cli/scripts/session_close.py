@@ -68,6 +68,44 @@ def _reopen_own_end(entry, reason):
     _update_own_end(entry, "reopen_session", reason)
 
 
+def awaiting_input_activity(entry, expected_activity=None):
+    if not valid_entry(entry) or not verified_live(entry["pid"], entry["pid_started_at"]):
+        raise Refusal("registered host identity is not live")
+    try:
+        store = register_session._load_session_store()
+        if store is None:
+            raise Refusal("session turn state is unavailable")
+        connection = store.connect()
+        try:
+            row = store.get_session(
+                connection, store.session_handle(entry["host"], entry["session_id"]),
+            )
+        finally:
+            connection.close()
+    except Refusal:
+        raise
+    except Exception as error:
+        raise Refusal("cannot read session turn state") from error
+    if not isinstance(row, dict):
+        raise Refusal("session turn state is missing")
+    if (row.get("host") != entry["host"] or row.get("session_id") != entry["session_id"]
+            or row.get("pid") != entry["pid"]
+            or row.get("pid_started_at") != entry["pid_started_at"]
+            or not nonempty_string(row.get("cwd"))
+            or path_key(row["cwd"]) != path_key(entry["cwd"])):
+        raise Refusal("session turn state does not match this attachment")
+    if row.get("ended_at") is not None:
+        raise Refusal("session is already ended")
+    if row.get("turn_state") != "awaiting_input":
+        raise Refusal("session is not awaiting input")
+    activity = row.get("last_activity_at")
+    if not finite_positive(activity):
+        raise Refusal("session activity state is invalid")
+    if expected_activity is not None and activity != expected_activity:
+        raise Refusal("session activity changed before close")
+    return activity
+
+
 def state_directory():
     return Path(os.environ.get("AGENT_STATE_DIRECTORY") or Path.home() / ".agents-state")
 

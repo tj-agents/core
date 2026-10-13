@@ -588,6 +588,7 @@ def review_candidate_key(value):
             "head": value.get("head"),
             "path_digest": value.get("path_digest"),
             "patch_sha256": value.get("patch_sha256"),
+            "docs_review": value.get("docs_review"),
         }
     )
 
@@ -725,6 +726,7 @@ def expected_identity(value, path_bytes):
         "tree_archive_sha256": value["tree_archive_sha256"],
         "tree_content_sha256": value["tree_content_sha256"],
         "rules": value["rules"],
+        "docs_review": value["docs_review"],
     }
 
 
@@ -871,6 +873,52 @@ def coverage_requirement(paths):
     return host_coverage_module().agent_surface_paths(paths)
 
 
+def routine_docs_path(path):
+    normalized = path.replace("\\", "/")
+    name = normalized.rsplit("/", 1)[-1].casefold()
+    lowered = normalized.casefold()
+    if lowered.startswith((".agents/", ".claude/", ".codex/")):
+        return False
+    if name in {"agents.md", "claude.md", "skill.md"}:
+        return False
+    return name.endswith(".md") or name.startswith("readme")
+
+
+def docs_review_request(risk, rationale):
+    text = rationale.strip() if isinstance(rationale, str) else ""
+    if risk == "routine":
+        if not text:
+            raise WorkflowOperationError("routine docs review requires a nonempty --docs-rationale")
+        return {"mode": "routine", "rationale": text}
+    if text:
+        raise WorkflowOperationError("--docs-rationale requires --docs-risk routine")
+    return {"mode": "ordinary", "rationale": None}
+
+
+def classify_docs_review(request, paths, security):
+    value = dict(request)
+    if value["mode"] != "routine":
+        return value
+    ineligible = next((path for path in paths if not routine_docs_path(path)), None)
+    if ineligible:
+        raise WorkflowOperationError("routine docs review excludes " + ineligible)
+    if security.get("first_path"):
+        raise WorkflowOperationError("routine docs review excludes security-sensitive path " + security["first_path"])
+    return value
+
+
+def validate_docs_review(value, paths, security):
+    if not isinstance(value, dict) or value.get("mode") not in {"ordinary", "routine"}:
+        raise WorkflowOperationError("review docs classification is invalid")
+    rationale = value.get("rationale")
+    if value["mode"] == "ordinary":
+        if rationale is not None:
+            raise WorkflowOperationError("ordinary review cannot carry a docs rationale")
+    elif not isinstance(rationale, str) or not rationale.strip():
+        raise WorkflowOperationError("routine docs review rationale is invalid")
+    classify_docs_review(value, paths, security)
+
+
 def review_host_check(root, workflow_run_id, descriptor_path, work_order):
     descriptor = load_descriptor(root, workflow_run_id, descriptor_path)
     paths = coverage_requirement(descriptor["paths"])
@@ -894,7 +942,7 @@ def review_host_check(root, workflow_run_id, descriptor_path, work_order):
     return result
 
 
-def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
+def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_risk="ordinary", docs_rationale=None):
     cleanup_review_bundles(root)
     sync = synchronize_for_review(root, base_ref) if synchronize else None
     base = git(root, "merge-base", base_ref, head_ref)
@@ -904,7 +952,8 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
     paths_bytes = b"\0".join(item.encode("utf-8", errors="surrogateescape") for item in paths)
     path_digest = hashlib.sha256(paths_bytes).hexdigest()
     patch = run_process(["git", "diff", "--binary", "--full-index", base, head], root, text=False).stdout
-    candidate_key = digest({"base": base, "head": head, "path_digest": path_digest, "patch_sha256": hashlib.sha256(patch).hexdigest()})
+    request = docs_review_request(docs_risk, docs_rationale)
+    candidate_key = digest({"base": base, "head": head, "path_digest": path_digest, "patch_sha256": hashlib.sha256(patch).hexdigest(), "docs_review": request})
     locations = review_bundle_locations(root, workflow_run_id, candidate_key)
     if locations["descriptor"].exists():
         stored = json.loads(locations["descriptor"].read_text(encoding="utf-8"))
@@ -919,6 +968,8 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         locations["paths"].write_bytes(paths_bytes)
         tree_archive = materialize_tree(root, head, locations["tree_archive"], locations["tree"])
         tree_sha256 = tree_content_digest(locations["tree"])
+        security = security_classification(root, locations["tree"], head, paths)
+        docs_review = classify_docs_review(request, paths, security)
         skills, route_violations = route_findings(locations["tree"], paths)
         agent_paths = coverage_requirement(paths)
         rules = []
@@ -947,8 +998,9 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
             "rules": rules,
             "routed_skills": skills,
             "route_violations": route_violations,
-            "lenses": select_review_lenses(paths),
-            "security": security_classification(root, locations["tree"], head, paths),
+            "lenses": ["docs-routine"] if docs_review["mode"] == "routine" else select_review_lenses(paths),
+            "docs_review": docs_review,
+            "security": security,
             "waves": 1,
             "context": {
                 "immutable_artifacts": [f"git-base:{base}", f"git-head:{head}"],
@@ -975,6 +1027,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
             "tree_archive_sha256": descriptor["tree_archive_sha256"],
             "tree_content_sha256": tree_sha256,
             "rules": rules,
+            "docs_review": docs_review,
         }
         descriptor["bundle"] = {
             "directory": str(locations["directory"]),
@@ -1003,7 +1056,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
 def load_descriptor(root, workflow_run_id, path):
     descriptor_path = Path(path).absolute()
     value = json.loads(descriptor_path.read_text(encoding="utf-8"))
-    required_fields = ("operation", "repository", "base", "head", "head_tree", "tree_archive_sha256", "tree_content_sha256", "paths", "path_digest", "patch_sha256", "rules", "descriptor_id", "bundle")
+    required_fields = ("operation", "repository", "base", "head", "head_tree", "tree_archive_sha256", "tree_content_sha256", "paths", "path_digest", "patch_sha256", "rules", "docs_review", "descriptor_id", "bundle")
     if not isinstance(value, dict) or any(field not in value for field in required_fields):
         raise WorkflowOperationError("review descriptor is incomplete")
     if value.get("operation") != "review-prepare":
@@ -1076,6 +1129,8 @@ def load_descriptor(root, workflow_run_id, path):
         raise WorkflowOperationError("review head tree differs from the repository object")
     if tree_content_digest(required["tree"]) != value["tree_content_sha256"]:
         raise WorkflowOperationError("materialized review tree differs from its descriptor")
+    frozen_security = security_classification(root, required["tree"], value["head"], paths)
+    validate_docs_review(value["docs_review"], paths, frozen_security)
     current_patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
     if hashlib.sha256(current_patch).hexdigest() != value["patch_sha256"]:
         raise WorkflowOperationError("review patch differs from the repository objects")
@@ -2179,6 +2234,8 @@ def parser():
     review.add_argument("--base", default="origin/main")
     review.add_argument("--head", default="HEAD")
     review.add_argument("--synchronize", action="store_true")
+    review.add_argument("--docs-risk", choices=("ordinary", "routine"), default="ordinary")
+    review.add_argument("--docs-rationale")
 
     host_check = commands.add_parser("review-host-check")
     host_check.add_argument("--descriptor", required=True)
@@ -2260,7 +2317,10 @@ def main(argv=None):
     elif arguments.operation == "inspect":
         result = inspect_repository(root, arguments.workflow_run_id)
     elif arguments.operation == "review-prepare":
-        result = review_prepare(root, arguments.workflow_run_id, arguments.base, arguments.head, arguments.synchronize)
+        result = review_prepare(
+            root, arguments.workflow_run_id, arguments.base, arguments.head, arguments.synchronize,
+            arguments.docs_risk, arguments.docs_rationale,
+        )
     elif arguments.operation == "review-host-check":
         result = review_host_check(root, arguments.workflow_run_id, arguments.descriptor, arguments.work_order)
     elif arguments.operation == "review-reconcile":
