@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -124,6 +125,77 @@ class RepoIdentityTests(unittest.TestCase):
         directory = self.root / "not-a-repo"
         directory.mkdir()
         self.assertIsNone(STORE.repo_identity(directory))
+
+    def test_legacy_visualstudio_https_remote_normalises_like_dev_azure_com(self):
+        repo = _init_repo(
+            self.root / "legacy-vso-https",
+            origin="https://org@ORG.visualstudio.com/DefaultCollection/Project/_git/Repo",
+        )
+        self.assertEqual("dev.azure.com/org/project/_git/repo", STORE.repo_identity(repo))
+
+    def test_legacy_visualstudio_https_remote_without_defaultcollection(self):
+        repo = _init_repo(
+            self.root / "legacy-vso-https-no-dc", origin="https://org.visualstudio.com/project/_git/repo",
+        )
+        self.assertEqual("dev.azure.com/org/project/_git/repo", STORE.repo_identity(repo))
+
+    def test_legacy_vs_ssh_remote_normalises_like_ssh_dev_azure_com(self):
+        repo = _init_repo(self.root / "legacy-vso-ssh", origin="git@vs-ssh.visualstudio.com:v3/org/project/repo")
+        self.assertEqual("dev.azure.com/org/project/_git/repo", STORE.repo_identity(repo))
+
+    def test_identity_is_fully_case_folded(self):
+        repo = _init_repo(self.root / "case-fold-repo", origin="https://GitHub.com/Tj-Agents/Core.git")
+        self.assertEqual("github.com/tj-agents/core", STORE.repo_identity(repo))
+
+    def test_unborn_head_keeps_repo_identity_via_git_common_dir_fallback(self):
+        directory = self.root / "unborn-repo"
+        directory.mkdir()
+        _run_git(directory, "init")
+        _run_git(directory, "config", "user.email", "test@example.com")
+        _run_git(directory, "config", "user.name", "Test User")
+        identity = STORE.repo_identity(directory)
+        self.assertEqual(str((directory / ".git").resolve()), identity)
+
+    def test_ambiguous_tag_and_branch_name_still_records_the_branch(self):
+        repo = _init_repo(self.root / "ambiguous-name-repo")
+        _run_git(repo, "checkout", "-b", "shared-name")
+        _run_git(repo, "tag", "shared-name")
+        branch, _head = STORE.current_branch_and_head(repo)
+        self.assertEqual("shared-name", branch)
+
+    def test_rev_parse_probe_fast_path_uses_one_git_call(self):
+        repo = _init_repo(self.root / "fast-path-repo")
+        calls = []
+        original_run = STORE.subprocess.run
+
+        def counting_run(*args, **kwargs):
+            calls.append(args)
+            return original_run(*args, **kwargs)
+
+        with mock.patch.object(STORE.subprocess, "run", side_effect=counting_run):
+            head, branch, common_dir = STORE._rev_parse_probe(repo, STORE.GIT_TIMEOUT)
+        self.assertEqual(1, len(calls))
+        self.assertIsNotNone(head)
+        self.assertIsNotNone(common_dir)
+
+    def test_rev_parse_probe_falls_back_on_unborn_head_within_three_calls(self):
+        directory = self.root / "unborn-fallback-repo"
+        directory.mkdir()
+        _run_git(directory, "init")
+        _run_git(directory, "config", "user.email", "test@example.com")
+        _run_git(directory, "config", "user.name", "Test User")
+        calls = []
+        original_run = STORE.subprocess.run
+
+        def counting_run(*args, **kwargs):
+            calls.append(args)
+            return original_run(*args, **kwargs)
+
+        with mock.patch.object(STORE.subprocess, "run", side_effect=counting_run):
+            head, branch, common_dir = STORE._rev_parse_probe(directory, STORE.GIT_TIMEOUT)
+        self.assertLessEqual(len(calls), 3)
+        self.assertIsNone(head)
+        self.assertIsNotNone(common_dir)
 
 
 @unittest.skipUnless(GIT, "git is required for hook lifecycle tests")
@@ -330,6 +402,115 @@ class HookLifecycleTests(unittest.TestCase):
             calls.clear()
             self.assertEqual(0, self._invoke("stop", "claude", payload))
             self.assertLessEqual(len(calls), 2)
+
+
+class ClaimWorkItemTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="claim work item é ")
+        self.addCleanup(self.temp.cleanup)
+        self.db_path = Path(self.temp.name) / "state" / "sessions.db"
+
+    def _connection(self):
+        return STORE.connect(self.db_path)
+
+    def _seed_work_item(self, connection, key):
+        STORE.upsert_work_item(connection, key, "repo", "feature", "item")
+
+    def test_claim_work_item_demotes_every_other_owner_row_for_the_key(self):
+        connection = self._connection()
+        try:
+            self._seed_work_item(connection, "key-1")
+            STORE.ensure_session(connection, "claude", "a")
+            STORE.set_session_ownership(connection, "claude:a", "owner", "key-1")
+            STORE.end_session(connection, "claude:a", "closed")
+            STORE.ensure_session(connection, "codex", "b")
+            removed = STORE.claim_work_item(connection, "codex:b", "key-1", "owner")
+            predecessor = STORE.get_session(connection, "claude:a")
+            successor = STORE.get_session(connection, "codex:b")
+        finally:
+            connection.close()
+        self.assertIsNone(removed)
+        self.assertIsNone(predecessor["role"])
+        self.assertEqual("owner", successor["role"])
+
+    def test_claim_work_item_rollback_leaves_predecessor_untouched_on_write_failure(self):
+        connection = self._connection()
+        try:
+            self._seed_work_item(connection, "key-1")
+            STORE.ensure_session(connection, "claude", "a")
+            STORE.set_session_ownership(connection, "claude:a", "owner", "key-1")
+            STORE.ensure_session(connection, "codex", "b")
+            with mock.patch.object(STORE, "_set_session_ownership_locked", side_effect=RuntimeError("boom")):
+                with self.assertRaises(RuntimeError):
+                    STORE.claim_work_item(connection, "codex:b", "key-1", "owner", predecessor="claude:a")
+            predecessor = STORE.get_session(connection, "claude:a")
+            successor = STORE.get_session(connection, "codex:b")
+        finally:
+            connection.close()
+        self.assertIsNone(predecessor["ended_at"])
+        self.assertEqual("owner", predecessor["role"])
+        self.assertIsNone(successor["role"])
+
+    def test_concurrent_handoff_claims_never_yield_two_owners(self):
+        connection = self._connection()
+        try:
+            self._seed_work_item(connection, "key-1")
+            STORE.ensure_session(connection, "claude", "a")
+            STORE.set_session_ownership(connection, "claude:a", "owner", "key-1")
+            STORE.ensure_session(connection, "codex", "b")
+            STORE.ensure_session(connection, "codex", "c")
+        finally:
+            connection.close()
+
+        original_live_owners = STORE.live_owners
+
+        def slow_live_owners(connection, key):
+            result = original_live_owners(connection, key)
+            time.sleep(0.3)
+            return result
+
+        errors = {}
+
+        def claim(name, handle):
+            own_connection = self._connection()
+            try:
+                STORE.claim_work_item(own_connection, handle, "key-1", "owner", predecessor="claude:a")
+            except Exception as error:  # noqa: BLE001 - collected for the assertion below
+                errors[name] = error
+            finally:
+                own_connection.close()
+
+        with mock.patch.object(STORE, "live_owners", side_effect=slow_live_owners):
+            threads = [
+                threading.Thread(target=claim, args=("b", "codex:b")),
+                threading.Thread(target=claim, args=("c", "codex:c")),
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=10)
+
+        connection = self._connection()
+        try:
+            owners = connection.execute("SELECT handle FROM sessions WHERE role = 'owner'").fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(1, len(owners))
+
+    def test_demoted_former_owner_resumed_via_session_start_is_not_an_owner(self):
+        connection = self._connection()
+        try:
+            self._seed_work_item(connection, "key-1")
+            STORE.ensure_session(connection, "claude", "a")
+            STORE.set_session_ownership(connection, "claude:a", "owner", "key-1")
+            STORE.end_session(connection, "claude:a", "closed")
+            STORE.ensure_session(connection, "codex", "b")
+            STORE.claim_work_item(connection, "codex:b", "key-1", "owner")
+            STORE.start_session(connection, "claude", "a", self.temp.name)
+            row = STORE.get_session(connection, "claude:a")
+        finally:
+            connection.close()
+        self.assertIsNone(row["role"])
 
 
 if __name__ == "__main__":
