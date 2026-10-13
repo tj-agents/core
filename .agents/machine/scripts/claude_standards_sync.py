@@ -544,12 +544,25 @@ def legacy_install_is_authenticated(plugins: Path, identity: str, records: dict[
     return isinstance(source, dict) and isinstance(expected, str) and source_matches_repository(source, expected)
 
 
-def scoped_alias_conflict(records: dict[str, list[Install]], project: Path, canonical: str, aliases: tuple[str, ...], selected: bool) -> bool:
+def scoped_roots(records: dict[str, list[Install]], project: Path, initial: set[Path] | None = None) -> set[Path]:
+    return {project, *(initial or ()), *(install.project for installs in records.values() for install in installs
+                                       if install.scope in ("project", "local") and install.project is not None)}
+
+
+def scoped_profiles_valid(records: dict[str, list[Install]], project: Path, initial: set[Path] | None = None) -> bool:
+    return all(
+        read_json_object(path) is not None
+        for root in scoped_roots(records, project, initial)
+        for path in (root / ".claude" / "settings.json", root / ".claude" / "settings.local.json")
+        if path.exists()
+    )
+
+
+def scoped_alias_conflict(records: dict[str, list[Install]], project: Path, canonical: str, aliases: tuple[str, ...], selected: bool,
+                          initial: set[Path] | None = None) -> bool:
     if not selected:
         return False
-    roots = {project, *(install.project for installs in records.values() for install in installs
-                       if install.scope in ("project", "local") and install.project is not None)}
-    for root in roots:
+    for root in scoped_roots(records, project, initial):
         for path in (root / ".claude" / "settings.json", root / ".claude" / "settings.local.json"):
             scoped = read_json(path).get("enabledPlugins")
             if not isinstance(scoped, dict) or scoped.get(canonical) is False:
@@ -606,13 +619,10 @@ def migrate_profile(config: Path, plugins: Path, project: Path, executable: str 
         print("standards: profile migration deferred because a profile registry is malformed", file=out)
         return 1
     records = registered_installs(plugins)
-    roots = {project, *(install.project for installs in records.values() for install in installs
-                        if install.scope in ("project", "local") and install.project is not None)}
-    for root in roots:
-        for scoped_path in (root / ".claude" / "settings.json", root / ".claude" / "settings.local.json"):
-            if scoped_path.exists() and read_json_object(scoped_path) is None:
-                print("standards: profile migration deferred because a scoped profile is malformed", file=out)
-                return 1
+    initial_roots = scoped_roots(records, project)
+    if not scoped_profiles_valid(records, project, initial_roots):
+        print("standards: profile migration deferred because a scoped profile is malformed", file=out)
+        return 1
     updated, selected, deferred = profile_plan(plugins, settings, project)
     for identity in deferred:
         print(f"standards: profile migration deferred for {identity} because a scoped legacy selection would change", file=out)
@@ -634,8 +644,8 @@ def migrate_profile(config: Path, plugins: Path, project: Path, executable: str 
     initial_enabled = settings.get("enabledPlugins")
     initial_enabled = dict(initial_enabled) if isinstance(initial_enabled, dict) else {}
     snapshots = {
-        canonical: {identity: initial_enabled.get(identity) for identity in (canonical, *aliases)}
-        for canonical, aliases, _ in candidates
+        canonical: {identity: initial_enabled.get(identity) for identity in (canonical, *PROFILE_ALIASES[canonical])}
+        for canonical, _, _ in candidates
     }
     installed = set()
     for canonical, aliases, enabled in candidates:
@@ -659,21 +669,40 @@ def migrate_profile(config: Path, plugins: Path, project: Path, executable: str 
         return 1
     saved_enabled = saved.get("enabledPlugins")
     saved_enabled = dict(saved_enabled) if isinstance(saved_enabled, dict) else {}
+    current_records = registered_installs(plugins)
+    scopes_valid = scoped_profiles_valid(current_records, project, initial_roots)
+    if not scopes_valid:
+        print("standards: profile migration deferred because a scoped profile changed or is malformed", file=out)
+        problems += 1
     apply = []
+    rollback = []
     for canonical, aliases, enabled in candidates:
         snapshot = snapshots[canonical]
-        aliases_unchanged = all(saved_enabled.get(alias) == snapshot[alias] for alias in aliases)
+        configured_aliases = PROFILE_ALIASES[canonical]
+        aliases_unchanged = all(saved_enabled.get(alias) == snapshot[alias] for alias in configured_aliases)
         canonical_value = saved_enabled.get(canonical)
         expected = snapshot[canonical]
         canonical_unchanged = canonical_value == expected or canonical in installed and expected is None and canonical_value is True
-        if aliases_unchanged and canonical_unchanged:
+        if not scopes_valid:
+            if canonical in installed and expected is None and canonical_value is True:
+                rollback.append(canonical)
+        elif scoped_alias_conflict(current_records, project, canonical, configured_aliases, enabled, initial_roots):
+            problems += 1
+            if canonical in installed and expected is None and canonical_value is True:
+                rollback.append(canonical)
+            print(f"standards: profile migration deferred for {canonical} because a scoped legacy selection would change", file=out)
+        elif aliases_unchanged and canonical_unchanged:
             apply.append((canonical, aliases, enabled))
         else:
             problems += 1
+            if canonical in installed and expected is None and canonical_value is True:
+                rollback.append(canonical)
             print(f"standards: profile migration deferred for {canonical} because affected preferences changed", file=out)
-    if not apply:
+    if not apply and not rollback:
         return int(bool(problems))
     merged_enabled = dict(saved_enabled)
+    for canonical in rollback:
+        merged_enabled.pop(canonical, None)
     for canonical, aliases, enabled in apply:
         merged_enabled[canonical] = enabled
         for alias in aliases:
