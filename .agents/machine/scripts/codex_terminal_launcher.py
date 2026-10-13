@@ -14,6 +14,42 @@ from codex_marketplace_sync import SyncError, resolve_codex_for_sync, sync_codex
 from terminal_command import flush_before_cli, run_target
 
 
+NON_INTERACTIVE_COMMANDS = frozenset({
+    "agents", "exec", "e", "review", "login", "logout", "mcp", "plugin",
+    "app-server", "remote-control", "app", "completion", "update", "doctor",
+    "sandbox", "debug", "apply", "a", "queue", "archive", "delete",
+    "migrate-rollouts", "unarchive", "cloud", "exec-server", "features", "help",
+})
+OPTIONS_WITH_VALUES = frozenset({
+    "-c", "--config", "--enable", "--disable", "--remote", "--remote-auth-token-env",
+    "-i", "--image", "-m", "--model", "--local-provider", "-p", "--profile",
+    "-s", "--sandbox", "-C", "--cd", "--add-dir", "-a", "--ask-for-approval",
+})
+
+
+def without_daemon_for_interactive(arguments: list[str]) -> list[str]:
+    """Avoid the Windows daemon's visible hook children for interactive sessions."""
+    if sys.platform != "win32" or "--no-daemon" in arguments:
+        return arguments
+    if any(argument in ("--help", "-h", "--version", "-V") for argument in arguments):
+        return arguments
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == "--":
+            break
+        if argument in OPTIONS_WITH_VALUES:
+            index += 2
+            continue
+        if argument.startswith("-"):
+            index += 1
+            continue
+        if argument in NON_INTERACTIVE_COMMANDS:
+            return arguments
+        break
+    return ["--no-daemon", *arguments]
+
+
 def hook_control(arguments: list[str]) -> int:
     script = Path(__file__).resolve().parents[3] / ".agents" / "machine" / "utility" / "hook-control" / "scripts" / "hook_control.py"
     if not script.is_file():
@@ -43,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         except SyncError as error:
             print(f"standards: Codex refresh failed; this session loads installed plugins: {error}", file=sys.stderr)
     flush_before_cli()
-    return run_target(parsed.target, parsed.arguments)
+    return run_target(parsed.target, without_daemon_for_interactive(parsed.arguments))
 
 
 if __name__ == "__main__":

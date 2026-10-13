@@ -160,6 +160,9 @@ class LaunchCodexTests(unittest.TestCase):
     def test_no_model_lane_or_effort_means_only_cd_and_the_prompt_sentence(self):
         self.run_main()
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        if sys.platform == 'win32':
+            self.assertEqual(arguments[0], '--no-daemon')
+            arguments = arguments[1:]
         self.assertEqual(arguments[0], '--cd')
         self.assertEqual(arguments[1], os.path.abspath(self.directory))
         self.assertTrue(arguments[2].startswith('Read the file at'))
@@ -169,6 +172,9 @@ class LaunchCodexTests(unittest.TestCase):
     def test_argument_order_is_cd_model_config_bypass_then_prompt(self):
         self.run_main('--model', 'explicit-model', '--reasoning-effort', 'high', '--bypass-hook-trust')
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        if sys.platform == 'win32':
+            self.assertEqual(arguments[0], '--no-daemon')
+            arguments = arguments[1:]
         self.assertEqual(arguments[0], '--cd')
         self.assertEqual(arguments[2], '--model')
         self.assertEqual(arguments[3], 'explicit-model')
@@ -420,7 +426,8 @@ class LaunchCodexEndToEndTests(unittest.TestCase):
         )
         self.assertEqual(
             inner[codex_index:],
-            ['/bin/codex', '--cd', directory, '--model', CODEX_LANES['lanes']['L4']['model'],
+            ['/bin/codex', *(['--no-daemon'] if sys.platform == 'win32' else []),
+             '--cd', directory, '--model', CODEX_LANES['lanes']['L4']['model'],
              '--config', f"model_reasoning_effort={CODEX_LANES['lanes']['L4']['reasoning_effort']}",
              expected_prompt_sentence],
         )

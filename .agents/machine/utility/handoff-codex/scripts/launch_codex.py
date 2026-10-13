@@ -105,6 +105,8 @@ def resolve_model(args, agent_cli):
 
 def build_arguments(working_directory, model, effort, bypass_hook_trust, prompt_sentence):
     arguments = ['--cd', str(working_directory)]
+    if sys.platform == 'win32':
+        arguments.insert(0, '--no-daemon')
     if model:
         arguments += ['--model', model]
     if effort:
