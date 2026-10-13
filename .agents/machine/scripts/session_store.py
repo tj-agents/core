@@ -86,15 +86,20 @@ def connect(path=None):
 
 
 def _ensure_schema(connection):
-    connection.execute(WORK_ITEMS_SCHEMA)
-    connection.execute(SESSIONS_SCHEMA)
-    version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if version < 2:
-        _deduplicate_owner_rows(connection)
-    connection.execute(SESSIONS_ONE_OWNER_INDEX)
-    if version < SCHEMA_VERSION:
-        connection.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
-    connection.commit()
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        connection.execute(WORK_ITEMS_SCHEMA)
+        connection.execute(SESSIONS_SCHEMA)
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        if version < 2:
+            _deduplicate_owner_rows(connection)
+        connection.execute(SESSIONS_ONE_OWNER_INDEX)
+        if version < SCHEMA_VERSION:
+            connection.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
 
 
 def _deduplicate_owner_rows(connection):
