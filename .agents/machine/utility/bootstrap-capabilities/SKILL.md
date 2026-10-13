@@ -79,6 +79,40 @@ or change their tracking. A later adoption caller can use `plan(..., prospective
 or `preflight_paths(...)` to validate its own prospective lock, catalog and receipt paths.
 The default `--scope project` retains the existing project settings contract.
 
+## Adopt an immutable repository selection
+
+Use `adopt_repository.py` when a repository is being created or an additional standards package is
+being selected. Its `--input` is the composition request described in
+[Compose immutable source catalogs](#compose-immutable-source-catalogs); it reads only the exact
+commits named there.
+For a first adoption, include the Core three-package source and every requested stack source in that
+input. For an addition, preserved source owners may be omitted and are reused from the committed
+catalog; if an existing owner is supplied again, its snapshot must match the lock's pinned commit.
+
+```powershell
+python -B '<skill-directory>\scripts\adopt_repository.py' `
+  --root C:\path\to\repository `
+  --input C:\path\to\sources.json `
+  --plugin dotagents/dotnet `
+  --plugin azure-agents/azure `
+  --mode preview
+```
+
+Use `python3` and POSIX paths on Linux or macOS. Repeat `--plugin` for every requested package.
+The command always includes the three Core packages and required package dependencies. It preserves
+existing selections and their required skills, path scopes, exceptions and other project lock fields.
+
+`preview` lists the repository lock, composed catalog and host-setting changes without writing.
+`write` updates those files together. `check` exits nonzero when any managed file drifts. Commit the
+resulting `.agents/capabilities.lock.json`, `.agents/catalog/catalog.json`, `.claude/settings.json`
+and `.codex/config.toml` with the repository.
+
+Adding packages is additive only. A known marketplace can contribute further packages only at its
+already pinned snapshot; a changed owner, package record or snapshot is rejected. An existing tagged
+catalog release without a selected full commit cannot supply a new package. The command preflights
+all output paths against the composition input and repository harness overlay before mutation, and
+rolls back a failed write batch.
+
 After each repository has adopted its generated project settings, audit the machine before removing
 old user-profile behavior:
 

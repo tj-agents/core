@@ -33,7 +33,7 @@ class RepositoryAdoptionTests(unittest.TestCase):
         )
         self.dotnet, dotnet_commit = self.source(
             "dotnet", "dotagents", "tj-agents/dotnet",
-            {"dotnet": ([], ["direction", "knowledge", "scaffold"])},
+            {"dotnet": ([], ["direction", "knowledge", "scaffold"]), "extras": ([], ["extras"])},
         )
         self.azure, azure_commit = self.source(
             "azure", "azure-agents", "tj-agents/azure",
@@ -44,7 +44,7 @@ class RepositoryAdoptionTests(unittest.TestCase):
             "schema_version": 1,
             "sources": [
                 self.request(self.core, "tj-agents/core", core_commit, ["base", "engineering", "machine"], "base"),
-                self.request(self.dotnet, "tj-agents/dotnet", dotnet_commit, ["dotnet"], "dotnet"),
+                self.request(self.dotnet, "tj-agents/dotnet", dotnet_commit, ["dotnet", "extras"], "dotnet"),
                 self.request(self.azure, "tj-agents/azure", azure_commit, ["azure"], "azure"),
             ],
         }
@@ -106,15 +106,6 @@ class RepositoryAdoptionTests(unittest.TestCase):
         self.git(root, "commit", "-qm", "Changed fixture")
         return self.git(root, "rev-parse", "HEAD")
 
-    def commit_json_change(self, root, relative, mutate):
-        path = root / relative
-        value = json.loads(path.read_text(encoding="utf-8"))
-        mutate(value)
-        path.write_text(json.dumps(value), encoding="utf-8")
-        self.git(root, "add", ".")
-        self.git(root, "commit", "-qm", "Changed fixture")
-        return self.git(root, "rev-parse", "HEAD")
-
     def files(self):
         if not self.project.exists():
             return {}
@@ -157,6 +148,55 @@ class RepositoryAdoptionTests(unittest.TestCase):
         self.assertEqual({"owner": "fixture"}, updated["project_metadata"])
         self.assertIn("azure-agents/azure", {entry["id"] for entry in updated["plugins"]})
 
+    def test_tagged_existing_release_adds_sibling_at_its_pinned_commit(self):
+        self.invoke(["dotagents/dotnet"])
+        lock_path = self.project / ".agents/capabilities.lock.json"
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        dotnet = next(entry for entry in lock["plugins"] if entry["id"] == "dotagents/dotnet")
+        dotnet["path_scopes"] = [{"path": "src", "skills": ["knowledge"]}]
+        commit = dotnet["commit"]
+        lock_path.write_text(json.dumps(lock), encoding="utf-8")
+        catalog_path = self.project / ".agents/catalog/catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        release = next(value for value in catalog["releases"] if value["marketplace"] == "dotagents")
+        release["revision"] = "v1.0.0"
+        catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+        self.input.write_text(json.dumps({"schema_version": 1, "sources": [self.document["sources"][0]]}), encoding="utf-8")
+        self.invoke(["dotagents/extras"])
+        updated = json.loads(lock_path.read_text(encoding="utf-8"))
+        selected = {entry["id"]: entry for entry in updated["plugins"]}
+        self.assertEqual(commit, selected["dotagents/extras"]["commit"])
+        self.assertEqual([{"path": "src", "skills": ["knowledge"]}], selected["dotagents/dotnet"]["path_scopes"])
+
+    def test_unpinned_existing_tagged_release_cannot_add_a_sibling(self):
+        self.invoke(["dotagents/dotnet"])
+        lock_path = self.project / ".agents/capabilities.lock.json"
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        lock["plugins"] = [entry for entry in lock["plugins"] if entry["id"] != "dotagents/dotnet"]
+        lock_path.write_text(json.dumps(lock), encoding="utf-8")
+        catalog_path = self.project / ".agents/catalog/catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        release = next(value for value in catalog["releases"] if value["marketplace"] == "dotagents")
+        release["revision"] = "v1.0.0"
+        catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+        self.input.write_text(json.dumps({"schema_version": 1, "sources": [self.document["sources"][0]]}), encoding="utf-8")
+        before = self.files()
+        with self.assertRaisesRegex(bootstrap.BootstrapError, "commit must be a full lowercase Git commit"):
+            self.invoke(["dotagents/extras"])
+        self.assertEqual(before, self.files())
+
+    def test_unpinned_existing_sha_release_can_add_a_sibling(self):
+        self.invoke(["dotagents/dotnet"])
+        lock_path = self.project / ".agents/capabilities.lock.json"
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        lock["plugins"] = [entry for entry in lock["plugins"] if entry["id"] != "dotagents/dotnet"]
+        lock_path.write_text(json.dumps(lock), encoding="utf-8")
+        self.input.write_text(json.dumps({"schema_version": 1, "sources": [self.document["sources"][0]]}), encoding="utf-8")
+        self.invoke(["dotagents/extras"])
+        updated = json.loads(lock_path.read_text(encoding="utf-8"))
+        extras = next(entry for entry in updated["plugins"] if entry["id"] == "dotagents/extras")
+        self.assertRegex(extras["commit"], r"^[0-9a-f]{40}$")
+
     def test_preview_missing_root_is_read_only_and_check_detects_drift(self):
         missing = self.base / "new-project"
         self.assertEqual([
@@ -198,57 +238,8 @@ class RepositoryAdoptionTests(unittest.TestCase):
             self.invoke(["missing/standard"])
         self.assertEqual({}, self.files())
 
-    def test_contradictory_committed_metadata_and_incomplete_pair_leave_no_outputs(self):
-        changed = self.commit_json_change(
-            self.azure,
-            "plugins/azure/selection.json",
-            lambda value: value.update(dependencies=[]),
-        )
-        invalid = copy.deepcopy(self.document)
-        invalid["sources"][2]["commit"] = changed
-        self.input.write_text(json.dumps(invalid), encoding="utf-8")
-        with self.assertRaisesRegex(bootstrap.BootstrapError, "Selection dependencies disagree"):
-            self.invoke(["azure-agents/azure"])
-        self.assertEqual({}, self.files())
-        self.save_input()
-        self.invoke(["dotagents/dotnet"])
-        catalog = self.project / ".agents/catalog/catalog.json"
-        catalog.unlink()
-        before = self.files()
-        with self.assertRaisesRegex(bootstrap.BootstrapError, "committed together"):
-            self.invoke(["azure-agents/azure"])
-        self.assertEqual(before, self.files())
-
-    def test_incompatible_existing_package_record_is_rejected_without_writes(self):
-        self.invoke(["dotagents/dotnet"])
-        catalog_path = self.project / ".agents/catalog/catalog.json"
-        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-        dotnet = next(plugin for release in catalog["releases"] for plugin in release["plugins"] if plugin["id"] == "dotagents/dotnet")
-        dotnet["digest"] = "sha256:" + "0" * 64
-        catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
-        before = self.files()
-        with self.assertRaisesRegex(bootstrap.BootstrapError, "package cannot change"):
-            self.invoke(["azure-agents/azure"])
-        self.assertEqual(before, self.files())
-
-    def test_invalid_source_dependency_and_unknown_plugin_leave_no_outputs(self):
-        invalid = copy.deepcopy(self.document)
-        invalid["sources"] = [source for source in invalid["sources"] if source["repository"] != "tj-agents/dotnet"]
-        self.input.write_text(json.dumps(invalid), encoding="utf-8")
-        with self.assertRaisesRegex(bootstrap.BootstrapError, "unresolved or contradictory"):
-            self.invoke(["azure-agents/azure"])
-        self.assertEqual({}, self.files())
-        self.save_input()
-        with self.assertRaisesRegex(bootstrap.BootstrapError, "unknown plugin"):
-            self.invoke(["missing/standard"])
-        self.assertEqual({}, self.files())
-
-    def test_contradictory_committed_metadata_and_incomplete_pair_leave_no_outputs(self):
-        changed = self.commit_json_change(
-            self.azure,
-            "plugins/azure/selection.json",
-            lambda value: value.update(dependencies=[]),
-        )
+    def test_contradictory_metadata_and_incomplete_pair_leave_no_outputs(self):
+        changed = self.commit_json_change(self.azure, "plugins/azure/selection.json", lambda value: value.update(dependencies=[]))
         invalid = copy.deepcopy(self.document)
         invalid["sources"][2]["commit"] = changed
         self.input.write_text(json.dumps(invalid), encoding="utf-8")
