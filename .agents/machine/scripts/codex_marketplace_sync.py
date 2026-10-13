@@ -5,11 +5,14 @@ trust any of tj-agents' own hook definitions among them.
 A faithful Python port of codex_marketplace_sync.ps1. Exposes sync_codex_standards() for launch_codex.py
 to call before opening a handoff tab, and for codex_terminal_launcher.py to call from a typed `codex` in a
 terminal. Not runnable from a terminal in any other way.
+
+Legacy preference migration requires Python 3.11 or newer for TOML parsing. Ordinary refreshes do not.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import json
 import os
@@ -19,6 +22,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    tomllib = None
 
 HERE = Path(__file__).resolve().parent
 
@@ -37,10 +46,6 @@ CANONICAL_MARKETPLACE = 'tj-agents'
 CANONICAL_MARKETPLACE_SOURCE = 'tj-agents/marketplace'
 CANONICAL_MARKETPLACE_REPOSITORY = ('tj-agents', 'marketplace')
 PLUGIN_ID = re.compile(r'(?P<name>[a-z][a-z0-9-]*)@(?P<marketplace>[a-z][a-z0-9-]*)\Z')
-PLUGIN_TABLE = re.compile(
-    r'^\s*\[\s*plugins\.(?:"(?P<double>[^"]+)"|\'(?P<single>[^\']+)\')\s*\]\s*(?:#.*)?$'
-)
-ENABLED_ASSIGNMENT = re.compile(r'^\s*enabled\s*=\s*(?P<value>true|false)\s*(?:#.*)?$', re.IGNORECASE)
 
 
 class SyncError(Exception):
@@ -264,49 +269,170 @@ def profile_root(config_root):
     return Path(configured).expanduser() if configured else Path.home() / '.codex'
 
 
-def plugin_preference(path, identity):
+def toml_library():
+    if tomllib is None:
+        raise SyncError('Codex plugin migration requires Python 3.11 or newer for TOML preferences')
+    return tomllib
+
+
+def read_preference_config(path):
     if not path.is_file():
+        return b'', {}
+    try:
+        raw = path.read_bytes()
+        parsed = toml_library().loads(raw.decode('utf-8-sig'))
+    except (OSError, UnicodeError, toml_library().TOMLDecodeError) as error:
+        raise SyncError(f'Cannot parse Codex preference {path}: {error}') from None
+    if not isinstance(parsed, dict):
+        raise SyncError(f'Codex preference {path} must contain a TOML table')
+    return raw, parsed
+
+
+def preference_value(parsed, identity, path):
+    plugins = parsed.get('plugins')
+    if plugins is None:
         return None
-    try:
-        lines = path.read_text(encoding='utf-8-sig').splitlines()
-    except (OSError, UnicodeError) as error:
-        raise SyncError(f'Cannot read Codex preference {path}: {error}') from None
-    found = None
-    active = False
-    for line in lines:
-        table = PLUGIN_TABLE.match(line)
-        if table:
-            active = (table['double'] or table['single']) == identity
-            continue
-        if line.lstrip().startswith('['):
-            active = False
-            continue
-        assignment = ENABLED_ASSIGNMENT.match(line) if active else None
-        if assignment:
-            value = assignment['value'].casefold() == 'true'
-            if found is not None and found != value:
-                raise SyncError(f'Ambiguous Codex preference for {identity} in {path}')
-            found = value
-    return found
+    if not isinstance(plugins, dict):
+        raise SyncError(f'Codex preference plugins must be a TOML table in {path}')
+    plugin = plugins.get(identity)
+    if plugin is None:
+        return None
+    if not isinstance(plugin, dict):
+        raise SyncError(f'Codex preference for {identity} must be a TOML table in {path}')
+    enabled = plugin.get('enabled')
+    if enabled is None:
+        return None
+    if type(enabled) is not bool:
+        raise SyncError(f'Codex preference enabled must be true or false for {identity} in {path}')
+    return enabled
 
 
-def append_preference(path, identity, enabled):
+def plugin_preference(path, identity):
+    _raw, parsed = read_preference_config(path)
+    return preference_value(parsed, identity, path)
+
+
+def project_preference_paths(working_directory, global_path):
+    paths = []
+    current = Path(working_directory).resolve()
+    root = current
+    ancestor = current
+    while True:
+        if (ancestor / '.git').exists():
+            root = ancestor
+            break
+        parent = ancestor.parent
+        if parent == ancestor:
+            break
+        ancestor = parent
+    while True:
+        candidate = current / '.codex' / 'config.toml'
+        if candidate != global_path and candidate.is_file():
+            paths.append(candidate)
+        if current == root:
+            return paths
+        current = current.parent
+
+
+class PreferenceLock:
+    def __init__(self, path):
+        self.path = path
+        self.handle = None
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        deadline = time.monotonic() + PLUGIN_TIMEOUT_SECONDS
+        while True:
+            handle = None
+            try:
+                handle = open(self.path, 'a+b')
+                handle.seek(0)
+                if not handle.read(1):
+                    handle.seek(0)
+                    handle.write(b'0')
+                    handle.flush()
+                handle.seek(0)
+                if os.name == 'nt':
+                    import msvcrt
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.handle = handle
+                return self
+            except OSError:
+                if handle is not None:
+                    handle.close()
+                if time.monotonic() >= deadline:
+                    raise SyncError(f'Codex migration timed out waiting for preference lock: {self.path}') from None
+                time.sleep(0.05)
+
+    def __exit__(self, exception_type, exception, traceback):
+        if self.handle is None:
+            return
+        self.handle.seek(0)
+        if os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
+        self.handle.close()
+
+
+def preference_lock(config_root):
+    return PreferenceLock(profile_root(config_root) / '.codex-marketplace-sync.lock')
+
+
+def native_preference_text(text, identity, enabled):
+    lines = text.splitlines(keepends=True)
+    header = f'[plugins."{identity}"]'
+    table = next((index for index, line in enumerate(lines)
+                  if line.rstrip('\r\n').partition('#')[0].strip() == header), None)
+    if table is None:
+        raise SyncError(f'Codex did not create the canonical preference table for {identity}')
+    for index in range(table + 1, len(lines)):
+        line = lines[index]
+        body = line.rstrip('\r\n')
+        if body.lstrip().startswith('['):
+            break
+        code, marker, comment = body.partition('#')
+        if code.strip() != 'enabled = true':
+            continue
+        ending = line[len(body):]
+        leading = code[:len(code) - len(code.lstrip())]
+        trailing = code[len(code.rstrip()):]
+        lines[index] = f'{leading}enabled = {str(enabled).lower()}{trailing}{marker}{comment}{ending}'
+        return ''.join(lines)
+    raise SyncError(f'Codex did not create an enabled preference for {identity}')
+
+
+def update_native_preference(path, identity, enabled):
+    before, parsed = read_preference_config(path)
+    current = preference_value(parsed, identity, path)
+    if current == enabled:
+        return
+    if current is None:
+        raise SyncError(f'Codex did not create a canonical preference for {identity} in {path}')
     try:
-        before = path.read_bytes() if path.is_file() else b''
         text = before.decode('utf-8-sig')
-    except (OSError, UnicodeError) as error:
+        updated = native_preference_text(text, identity, enabled).encode('utf-8')
+        after = toml_library().loads(updated.decode('utf-8-sig'))
+    except (UnicodeError, toml_library().TOMLDecodeError) as error:
         raise SyncError(f'Cannot preserve Codex preference {path}: {error}') from None
-    ending = '\r\n' if b'\r\n' in before else '\n'
-    suffix = f'[plugins."{identity}"]{ending}enabled = {str(enabled).lower()}{ending}'.encode('utf-8')
-    updated = before + (b'' if not text or text.endswith(('\n', '\r')) else ending.encode('ascii')) + suffix
+    expected = copy.deepcopy(parsed)
+    expected['plugins'][identity]['enabled'] = enabled
+    if after != expected:
+        raise SyncError(f'Codex preference edit would change unrelated content in {path}')
     try:
         if (path.read_bytes() if path.is_file() else b'') != before:
             raise SyncError(f'Codex preference changed while preparing migration: {path}')
-        path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary = tempfile.mkstemp(prefix=path.name + '.', dir=str(path.parent))
         try:
             with os.fdopen(descriptor, 'wb') as handle:
                 handle.write(updated)
+                handle.flush()
+                os.fsync(handle.fileno())
             if (path.read_bytes() if path.is_file() else b'') != before:
                 raise SyncError(f'Codex preference changed while applying migration: {path}')
             os.replace(temporary, path)
@@ -317,22 +443,54 @@ def append_preference(path, identity, enabled):
         raise SyncError(f'Cannot update Codex preference {path}: {error}') from None
 
 
+def config_snapshot(path):
+    try:
+        return path.is_file(), path.read_bytes() if path.is_file() else b''
+    except OSError as error:
+        raise SyncError(f'Cannot read Codex preference {path}: {error}') from None
+
+
+def restore_preference_config(path, original, expected):
+    current = config_snapshot(path)
+    if current == original:
+        return
+    if current != expected:
+        raise SyncError(f'Codex preference changed while recovering failed migration: {path}')
+    existed, contents = original
+    try:
+        if existed:
+            descriptor, temporary = tempfile.mkstemp(prefix=path.name + '.', dir=str(path.parent))
+            try:
+                with os.fdopen(descriptor, 'wb') as handle:
+                    handle.write(contents)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                if config_snapshot(path) != expected:
+                    raise SyncError(f'Codex preference changed while recovering failed migration: {path}')
+                os.replace(temporary, path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+        else:
+            if config_snapshot(path) != expected:
+                raise SyncError(f'Codex preference changed while recovering failed migration: {path}')
+            path.unlink()
+    except OSError as error:
+        raise SyncError(f'Cannot restore Codex preference {path}: {error}') from None
+
+
 def migration_preference(legacy, canonical, working_directory, config_root):
+    toml_library()
     global_path = profile_root(config_root) / 'config.toml'
-    project_path = Path(working_directory) / '.codex' / 'config.toml'
-    if project_path != global_path and plugin_preference(project_path, legacy) is not None:
-        raise SyncError(
-            f'Codex migration cannot rewrite scoped project preference {project_path} for {legacy}; '
-            f'update it to {canonical} before retrying'
-        )
-    project_choice = None if project_path == global_path else plugin_preference(project_path, canonical)
-    global_choice = plugin_preference(global_path, canonical)
+    for project_path in project_preference_paths(working_directory, global_path):
+        if plugin_preference(project_path, legacy) is not None:
+            raise SyncError(
+                f'Codex migration cannot rewrite scoped project preference {project_path} for {legacy}; '
+                f'update it to {canonical} before retrying'
+            )
+    canonical_choice = plugin_preference(global_path, canonical)
     legacy_choice = plugin_preference(global_path, legacy)
-    if project_choice is not None:
-        return None
-    if global_choice is not None:
-        return None
-    return global_path, legacy_choice
+    return global_path, canonical_choice if canonical_choice is not None else legacy_choice
 
 
 def migration_candidates(inventory, catalog, out):
@@ -363,29 +521,37 @@ def migration_candidates(inventory, catalog, out):
 
 def migrate_plugin(codex_executable, legacy, canonical, inventory, working_directory, config_root, run):
     preference = migration_preference(legacy, canonical, working_directory, config_root)
-    installed = invoke_codex_sync_command(codex_executable, ['plugin', 'add', canonical, '--json'],
-                                           cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-    if installed.get('pluginId') != canonical:
-        raise SyncError(f"Codex installed {installed.get('pluginId')} while migrating {legacy} to {canonical}")
-    verified = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
-                                         cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-    replacement = next((entry for entry in inventory_records(verified, 'installed')
-                        if entry.get('pluginId') == canonical and entry.get('installed') is True), None)
-    if replacement is None or source_repository(replacement) != CANONICAL_MARKETPLACE_REPOSITORY:
-        raise SyncError(f'Codex did not verify replacement payload for {legacy} as {canonical}')
-    if preference is not None:
-        path, enabled = preference
-        append_preference(path, canonical, bool(inventory.get('enabled')) if enabled is None else enabled)
-    removed = invoke_codex_sync_command(codex_executable, ['plugin', 'remove', legacy, '--json'],
-                                        cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-    if removed.get('pluginId') not in (None, legacy):
-        raise SyncError(f"Codex removed {removed.get('pluginId')} while migrating {legacy}")
-    final = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
-                                      cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-    if any(entry.get('pluginId') == legacy and entry.get('installed') is True
-           for entry in inventory_records(final, 'installed')):
-        raise SyncError(f'Codex retained legacy plugin cache for {legacy}')
-    return final
+    path, enabled = preference
+    original = config_snapshot(path)
+    expected = None
+    try:
+        installed = invoke_codex_sync_command(codex_executable, ['plugin', 'add', canonical, '--json'],
+                                               cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+        expected = config_snapshot(path)
+        if installed.get('pluginId') != canonical:
+            raise SyncError(f"Codex installed {installed.get('pluginId')} while migrating {legacy} to {canonical}")
+        verified = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                             cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+        replacement = next((entry for entry in inventory_records(verified, 'installed')
+                            if entry.get('pluginId') == canonical and entry.get('installed') is True), None)
+        if replacement is None or source_repository(replacement) != CANONICAL_MARKETPLACE_REPOSITORY:
+            raise SyncError(f'Codex did not verify replacement payload for {legacy} as {canonical}')
+        update_native_preference(path, canonical, bool(inventory.get('enabled')) if enabled is None else enabled)
+        expected = config_snapshot(path)
+        removed = invoke_codex_sync_command(codex_executable, ['plugin', 'remove', legacy, '--json'],
+                                            cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+        if removed.get('pluginId') not in (None, legacy):
+            raise SyncError(f"Codex removed {removed.get('pluginId')} while migrating {legacy}")
+        final = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                          cwd=working_directory, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+        if any(entry.get('pluginId') == legacy and entry.get('installed') is True
+               for entry in inventory_records(final, 'installed')):
+            raise SyncError(f'Codex retained legacy plugin cache for {legacy}')
+        return final
+    except SyncError:
+        if expected is not None:
+            restore_preference_config(path, original, expected)
+        raise
 
 
 def sync_codex_standards(codex_executable, working_directory, out=print, run=subprocess.run,
@@ -422,24 +588,25 @@ def sync_codex_standards(codex_executable, working_directory, out=print, run=sub
 
             catalog = canonical_catalog(codex_executable, resolved, run, git_run)
 
-            inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
-                                                   cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-            canonical_records(inventory, catalog)
-            for legacy in migration_candidates(inventory, catalog, out):
-                name, _marketplace = plugin_identity(legacy)
-                inventory = migrate_plugin(
-                    codex_executable, legacy['pluginId'], f'{name}@{CANONICAL_MARKETPLACE}', legacy,
-                    resolved, config_root, run,
-                )
-            canonical_records(inventory, catalog)
-            installed = inventory_records(inventory, 'installed')
-            available = inventory_records(inventory, 'available')
-            selected = sorted(enabled_git_plugins((*installed, *available)))
-            for identity in selected:
-                installed_result = invoke_codex_sync_command(codex_executable, ['plugin', 'add', identity, '--json'],
-                                                               cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-                if installed_result.get('pluginId') != identity:
-                    raise SyncError(f"Codex installed {installed_result.get('pluginId')} while refreshing {identity}")
+            with preference_lock(config_root):
+                inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                                       cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+                canonical_records(inventory, catalog)
+                for legacy in migration_candidates(inventory, catalog, out):
+                    name, _marketplace = plugin_identity(legacy)
+                    inventory = migrate_plugin(
+                        codex_executable, legacy['pluginId'], f'{name}@{CANONICAL_MARKETPLACE}', legacy,
+                        resolved, config_root, run,
+                    )
+                canonical_records(inventory, catalog)
+                installed = inventory_records(inventory, 'installed')
+                available = inventory_records(inventory, 'available')
+                selected = sorted(enabled_git_plugins((*installed, *available)))
+                for identity in selected:
+                    installed_result = invoke_codex_sync_command(codex_executable, ['plugin', 'add', identity, '--json'],
+                                                                   cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+                    if installed_result.get('pluginId') != identity:
+                        raise SyncError(f"Codex installed {installed_result.get('pluginId')} while refreshing {identity}")
 
             if selected or any(isinstance(plugin, dict) and plugin.get('enabled') for plugin in installed):
                 invoke_codex_hook_trust(codex_executable, resolved, snapshot, cwd=resolved, run=run, out=out)
