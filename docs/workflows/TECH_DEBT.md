@@ -136,3 +136,36 @@ review of a changed `SKILL.md` is not required to load `engineering:skill-author
 Resolve when a route can apply at review time alone, without opting the repository into write-time routing
 or the red-run gate, and core routes authored `SKILL.md` paths to `engineering:skill-authoring` through it,
 with a test that `review-prepare` names the skill for such a path.
+
+## D004 — The merge cleanup gate demands session exit after every merge, even mid-goal
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12 to 2026-10-13. A Claude coordinator session merged several PRs across
+  azure, dotnet and core while the goal still had authorized work left.
+- **Impact and priority:** the Stop hook re-blocked every 10 minutes for about a day. That covered azure #1,
+  whose worktree had been removed on 2026-10-12, and later merges. The repetition buried real status in
+  noise. P2: there's no harm to data, but it costs user attention on every turn.
+- **Evidence:** `hooks/merge_cleanup_gate.py`.
+  - `handle_stop` blocks while `session_exit_required` is set or the worktree exists.
+  - `cli_clear` sets `checkout_retained` and `session_exit_required = True`, so `--clear` on a removed
+    worktree never releases the block.
+  - This contradicts `engineering:session-guidance`, under which only a terminal goal closes its own session.
+- **Source owner:** core engineering hooks.
+- **State:** open.
+- **Next action:** stop blocking when the obligation's worktree is gone, or recorded as retained, and the
+  session's canonical goal still has authorized remaining work. Keep session exit required only at the
+  terminal merge.
+- **Resolution condition:** a hook test where a coordinator merges two PRs from different worktrees, removes
+  both, and keeps working. Stop doesn't block after removal, and still blocks at the goal's terminal merge.
+
+## D005 — The continuation stop hook judges the launch checkout without checking its owner
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-13. A Claude session launched from a directory where another session was the
+  writer was judged on that checkout's state.
+- **Impact and priority:** the Stop hook blocks on another owner's work. P3.
+- **Source owner:** core engineering hooks (`continuation_stop.py`).
+- **State:** open.
+- **Related:** core PR #230 (binding `head` versus `remote_head_sha`).
+- **Resolution condition:** `continuation_stop` evaluates only checkouts this session owns, as its registry or
+  lease records them, with a test where a foreign-owned launch directory doesn't block Stop.
