@@ -210,7 +210,7 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - **Impact and priority:** P1; the requested repair remained unfinished and the user had to identify that work was incomplete.
 - **Source owner:** Core task-continuation and stop-gate behavior, with the dispatcher defect tracked by B009.
 - **State:** in-progress.
-- **Repair link:** `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateAndProfileRepair`; related bug: [B009](BUGS.md#B009).
+- **Repair link:** `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateFailures`; related bug: [B009](BUGS.md#B009).
 - **Next action:** continue the authorized goal with focused repair review, Windows/Linux CI, and guarded normal merge.
 - **Resolution condition:** authorized work reaches its recorded completion criteria; stop-gate repair is reviewed, required Windows/Linux CI passes, and guarded normal merge completes.
 - **Verification evidence:** transcript records the missing workflow route and cleanup gate with exit 0 and empty stdout; investigation found no entities, migrations, endpoints, necessary question, or owned wait that would block continuing. The canonical goal records the next action and branch.

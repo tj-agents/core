@@ -39,7 +39,7 @@ GATES = {
     "context.py": """
         import json, sys
         data = json.load(sys.stdin)
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": data["hook_event_name"],
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": data.get("hook_event_name") or data["hookEventName"],
             "additionalContext": "context from " + data["tool_name"]}}))
     """,
     "echo.py": """
@@ -98,8 +98,8 @@ class HookDispatchTests(unittest.TestCase):
         for name, body in GATES.items():
             (self.hooks / name).write_text(textwrap.dedent(body).lstrip(), encoding="utf-8")
 
-    def dispatch(self, gates, event="PreToolUse", tool="Bash", **extra):
-        payload = {"hook_event_name": event, "tool_name": tool, "marker": "m1", **extra}
+    def dispatch(self, gates, event="PreToolUse", tool="Bash", event_field="hook_event_name", **extra):
+        payload = {event_field: event, "tool_name": tool, "marker": "m1", **extra}
         result = subprocess.run(
             [sys.executable, "-B", str(self.hooks / DISPATCH.name), *gates],
             input=json.dumps(payload), capture_output=True, text=True, encoding="utf-8",
@@ -152,6 +152,68 @@ class HookDispatchTests(unittest.TestCase):
         self.assertEqual("keep working\n\ndeny reason", output["reason"])
         self.assertEqual("sibling import resolved", output["systemMessage"])
         self.assertNotIn("hookSpecificOutput", output)
+
+    def test_stop_nonblocking_gate_failures_block_and_preserve_siblings(self):
+        cases = (
+            ("crash.py", "gate exploded", [[]]),
+            ("silent_failure.py", "exited with status 1", [[]]),
+            ("missing.py", "FileNotFoundError", [[]]),
+            ("interrupt.py", "gate interrupted", [[], ["--deadline", "20"]]),
+        )
+        for failed, diagnostic, deadlines in cases:
+            for deadline in deadlines:
+                for event_field in ("hook_event_name", "hookEventName"):
+                    with self.subTest(failed=failed, deadline=deadline, event_field=event_field):
+                        output, stderr = self.dispatch(
+                            [*deadline, "block.py", "context.py", "imports.py", failed],
+                            event="Stop", tool="Bash", event_field=event_field,
+                        )
+                        self.assertEqual("block", output["decision"])
+                        self.assertIn("keep working", output["reason"])
+                        self.assertIn(f"{failed} failed with exit status 1", output["reason"])
+                        self.assertIn("Repair the gate and retry this Stop event.", output["reason"])
+                        self.assertIn(diagnostic, stderr)
+                        self.assertEqual("context from Bash",
+                                         output["hookSpecificOutput"]["additionalContext"])
+                        self.assertEqual("sibling import resolved", output["systemMessage"])
+
+    def test_stop_deadline_blocks_with_and_without_finished_siblings(self):
+        output, _ = self.dispatch(["--deadline", "1", "hang.py"], event="Stop", tool="")
+        self.assertEqual("block", output["decision"])
+        self.assertIn("hang.py did not finish within 1s", output["reason"])
+        self.assertIn("hang.py did not finish within 1s", output["systemMessage"])
+
+        output, _ = self.dispatch(
+            ["--deadline", "1", "block.py", "context.py", "imports.py", "hang.py", "deny.py"],
+            event="Stop", tool="Bash",
+        )
+        self.assertEqual("block", output["decision"])
+        self.assertIn("keep working", output["reason"])
+        self.assertIn("hang.py did not finish within 1s", output["reason"])
+        self.assertIn("these gates did not run: deny.py", output["reason"])
+        self.assertEqual("context from Bash", output["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("sibling import resolved", output["systemMessage"])
+
+    def test_torn_stop_install_fails_closed_when_continuation_dependencies_are_missing(self):
+        hooks = Path(self.temp.name) / "torn" / "hooks"
+        hooks.mkdir(parents=True)
+        shutil.copy2(DISPATCH, hooks / DISPATCH.name)
+        shutil.copy2(HOOKS / "continuation_stop.py", hooks / "continuation_stop.py")
+        isolated = Path(self.temp.name) / "isolated"
+        isolated.mkdir()
+        environment = dict(os.environ, PYTHONPATH="")
+        result = subprocess.run(
+            [sys.executable, "-B", str(hooks / DISPATCH.name), "continuation_stop.py"],
+            input=json.dumps({"hookEventName": "Stop", "cwd": str(isolated), "sessionId": "session"}),
+            capture_output=True, text=True, encoding="utf-8", cwd=isolated, env=environment, timeout=20,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        output = json.loads(result.stdout)
+        self.assertEqual("block", output["decision"])
+        self.assertIn("continuation_stop.py failed with exit status 1", output["reason"])
+        self.assertIn("Repair the gate and retry this Stop event.", output["reason"])
+        self.assertIn("ModuleNotFoundError", result.stderr)
+        self.assertIn("workflow_route", result.stderr)
 
     def test_a_gate_past_the_deadline_keeps_finished_verdicts_and_reports_the_rest(self):
         started = time.monotonic()
