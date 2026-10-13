@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `ba74c9c932e200a049c92c7a3488930c52a12d57`  `(2026-10-13)`
+**Reviewed up to commit:** `3f41cf88ed247f55e4a675b907674f4690644d04`  `(2026-10-13)`
 **Judgment:** `approved`
 
 ## Review pass — 2026-10-12 — full
@@ -115,7 +115,7 @@ No findings. R7 and R8 dispositions verified.
 Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). No security-sensitive paths. Resume registration verification is out of scope here (PR #233).
 
 ```agent-host-coverage
-{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"ba74c9c932e200a049c92c7a3488930c52a12d57","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"Windows focused session-store and work-item-session suites: 89 OK; the current base-merge review retained no S1 findings."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"Windows focused session-store and work-item-session suites: 89 OK; the current base-merge review retained no S1 findings."}}]}
+{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"3f41cf88ed247f55e4a675b907674f4690644d04","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"The shared store retries a transient WAL initialisation lock and closes failed connections; focused regression tests cover both paths."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"The shared store retries a transient WAL initialisation lock and closes failed connections; focused regression tests cover both paths."}}]}
 ```
 
 ### Findings
@@ -404,5 +404,24 @@ Native layer: Codex `codex review` (high). No security-sensitive paths.
 ### Findings
 
 No retained findings. This is the current-main merge required to refresh the review basis; the imported changes are not part of the PR's authored S1 diff.
+
+## Review pass - 2026-10-13 - incremental
+
+**Candidate base:** `1b1b8d91c7b494f6e7b05d8c809aa3360ef31f12`
+**Candidate head:** `3f41cf88ed247f55e4a675b907674f4690644d04`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:8ac8d488dca4145ec1bf6e57d7fd0d21be725baf4170175dcaeae797957c2e7c` `(3 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\0sxD8Dhd9yeoJk9pjyNG5n\PO4kUaSIy81hrMcZ1WMpVL`
+**Candidate bundle identity:** `sha256:457664a3a83190b474ec54ba46db164acfdeb2ab97a914ba9cdec85ea87dc125`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: parent fallback over the frozen descriptor; the local native reviewer could not initialise because its home directory was unavailable. No security-sensitive paths.
+
+### Findings
+
+No retained findings. The retry is limited to SQLite lock/busy errors, preserves non-lock initialisation failures, closes the connection on failure, and has focused regression coverage.
 
 
