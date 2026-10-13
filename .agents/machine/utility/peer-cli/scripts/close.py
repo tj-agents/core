@@ -44,6 +44,7 @@ def main(argv=None):
     worktree = session_close.worktree_from_cwd()
     if not session_close.under_or_equal(os.getcwd(), entry["cwd"]):
         raise session_close.Refusal("current directory is not this session's registered attachment")
+    activity = session_close.awaiting_input_activity(entry)
     result = session_close.results_path()
     invocation_id = uuid.uuid4().hex
     wrapper = session_close.qualified_windows_wrapper(entry)
@@ -66,8 +67,8 @@ def main(argv=None):
     if wrapper:
         observer.extend(["--parent-pid", str(wrapper["pid"]),
                          "--parent-start", str(wrapper["started_at"])])
+    recorded_end = False
     try:
-        _record_own_end(entry, "closed")
         spawned_at = time.time()
         observer_pid = session_close.start_observer(observer)
         started = session_close.wait_for_record(
@@ -93,9 +94,13 @@ def main(argv=None):
         )
         if not session_close.valid_armed(armed, expected, started, accepted):
             raise session_close.Refusal("session exit observer did not acknowledge acceptance")
+        session_close.awaiting_input_activity(entry, activity)
+        _record_own_end(entry, "closed")
+        recorded_end = True
         close_host(entry, wrapper)
     except Exception as error:
-        _reopen_own_end(entry, "closed")
+        if recorded_end:
+            _reopen_own_end(entry, "closed")
         session_close.cancel_observer(result, str(error))
         raise
     return 0
