@@ -24,7 +24,7 @@ $adapterRoots = @(
 $script:RequiredSkillScripts = @{
     'bootstrap-capabilities' = 'scripts\bootstrap_capabilities.py'
     'handoff-claude'         = 'scripts\launch_claude.py'
-    'handoff-codex'          = 'scripts\launch-codex.ps1'
+    'handoff-codex'          = 'scripts\launch_codex.py'
     'followup-codex'         = 'scripts\codex_followup.py'
     'open-claude'            = 'scripts\open_claude.py'
 }

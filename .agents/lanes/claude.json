@@ -8,11 +8,15 @@
 
   "lanes": {
     "L1": {
-      "summary": "Plans and design decisions of any size, where the work decides how something should be built.",
-      "model": "claude-fable-5",
-      "effort": "xhigh",
+      "summary": "Routes critical design or a large complex plan to Codex L1.",
+      "model": "claude-sonnet-5",
+      "effort": "low",
       "context_ceiling": 1000000,
-      "why": "frontier family at the setting above `high`. Planning and design: authoring a plan, large or small, that takes a design position; architecture; a data model or contract; a mechanism choice. The agent picks it on its own judgement. Never implementation, review or delivery; a merge, push or publish at the end of a job never raises its lane."
+      "why": "A cheap routing proxy, not a local L1 worker. It returns a required Codex L1 handoff for a critical design decision or a big, complex plan with substantial interacting decisions. A plan label, architecture, data model, contract, or mechanism choice alone does not select it. Never implementation, review or delivery.",
+      "handoff": {
+        "host": "codex",
+        "lane": "L1"
+      }
     },
     "L2": {
       "summary": "High-stakes judgement that is not design, where a wrong call is costly or hard to undo.",
@@ -22,18 +26,18 @@
       "why": "top general family at the setting above `high`. Judgement with a lot riding on it that designs nothing: a diagnosis of a production failure, a security or migration review. Delivering a change never selects it; merge, push and publish are governed by the delivery gates."
     },
     "L3": {
-      "summary": "Open-ended judgement that is not design, where the answer is not yet known.",
+      "summary": "Open investigation or bounded uncertain design with unresolved alternatives.",
       "model": "claude-opus-5-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "top general family at its default setting. Open-ended judgement that designs nothing: a diagnosis with no known answer, an investigation, weighing evidence a test cannot settle."
+      "why": "top general family at its default setting. Open investigation or bounded uncertain design with unresolved alternatives, including a diagnosis with no known answer or evidence a test cannot settle."
     },
     "L4": {
-      "summary": "Specified implementation that still needs code-level judgement.",
+      "summary": "Specified implementation, ordinary review, and small local testable choices.",
       "model": "claude-sonnet-5",
       "effort": "high",
       "context_ceiling": 1000000,
-      "why": "the workhorse. Specified implementation that still needs code-level judgement: features, bugfixes and review lenses whose mistakes a compiler or a test suite will catch. Delivery never selects this rung."
+      "why": "the workhorse. Specified implementation and ordinary review, including a small local mechanism choice inside a testable fix. Features, bugfixes and review lenses whose mistakes a compiler or a test suite will catch. Delivery never selects this rung."
     },
     "L5": {
       "summary": "Mechanical work whose shape is already decided.",
@@ -62,6 +66,6 @@
     "summary": "Frontier deliberation above the ladder, priced by provenance rather than by task shape.",
     "model": "claude-fable-5",
     "effort": "max",
-    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select this spend. L1 prices the same family one effort step below, and a test asserts no rung prices this exact model-and-effort pair, so lane inflation can never reach it."
+    "why": "valid only when the user explicitly asks for this tier or its model by name. Deliberately not a rung: the four lane questions grade task shape, and no answer to them may select this spend. No Claude lane selects the frontier model; tests enforce that model invariant regardless of effort."
   }
 }

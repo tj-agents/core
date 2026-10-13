@@ -117,7 +117,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "A defect in a consumed standards package or its source repository is the exception: "
             "a stale or broken standard",
             "and so is a standard that caused or failed to prevent a mistake",
-            "in the same turn, before the current task resumes, without asking",
+            "in the same turn, after answering the user's direct question and before the current task resumes, without asking",
             "announcing a later or separate fix instead of launching is a violation",
         ):
             with self.subTest(phrase=phrase):
@@ -131,6 +131,7 @@ class ProcessStandardsTests(unittest.TestCase):
 
         self.assertTrue(section.startswith("When the user calls out a mistake, before apologizing"))
         self.assertLess(section.index("before apologizing"), section.index("An apology"))
+        self.assertLess(section.index("Answer the user's direct question first"), section.index("If it did, launch"))
         for phrase in (
             "missing, ambiguous, contradictory, mispriced or unenforced",
             "every consumed `tj-agents` plugin on both hosts",
@@ -197,7 +198,7 @@ class ProcessStandardsTests(unittest.TestCase):
             codex,
         )
         self.assertIn("fresh headless `codex exec` context", codex)
-        self.assertIn("delivery-continuation.ps1", codex)
+        self.assertIn("delivery_continuation.py", codex)
         self.assertNotIn("Claude uses", remote)
         self.assertNotIn("Codex Desktop uses", remote)
         for skill in ("e2e-debug", "e2e-api-debug", "e2e-ui-debug", "integration-debug"):
@@ -289,8 +290,8 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(per_pr_reading=per_pr_reading):
                 self.assertNotIn(per_pr_reading, corpus)
 
-    def test_techdebt_uses_mode_specific_isolation_and_picks_fast(self):
-        body = authored_skill("techdebt").read_text(encoding="utf-8")
+    def test_address_debt_uses_mode_specific_isolation_and_picks_fast(self):
+        body = authored_skill("address-debt").read_text(encoding="utf-8")
         flat = " ".join(body.split())
 
         self.assertIn("Single-repo mode:** survey the repository", flat)
@@ -341,12 +342,12 @@ class ProcessStandardsTests(unittest.TestCase):
             authored_skill("plan-execution").read_text(encoding="utf-8").split()
         )
         self.assertIn("Lane selection does not itself transfer task ownership", lanes)
-        self.assertIn("small and medium plans, the parent normally continues", lanes)
+        self.assertIn("For Codex, the parent normally continues in the same checkout", lanes)
         self.assertIn("explicit path and responsibility ownership", lanes)
         self.assertIn("A small follow-up can stay with the parent", lanes)
         self.assertIn("If delegation is unavailable", lanes)
         self.assertIn("Continue in the current context by default for small and medium plans", plans)
-        self.assertIn("parent may delegate bounded work", plans)
+        self.assertIn("The parent retains ownership", plans)
         self.assertIn("massive plan whose design was a substantial phase", plans)
         self.assertIn("normally hand execution to one fresh harness", plans)
         self.assertIn("even when the checkout stays the same", plans)
@@ -368,6 +369,20 @@ class ProcessStandardsTests(unittest.TestCase):
                 self.assertIn("normally transfers execution to one fresh harness", flat_launcher)
                 self.assertIn("even in the same checkout", flat_launcher)
                 self.assertNotIn("Split a job that designs and then delivers", launcher)
+
+    def test_side_handoff_submission_keeps_the_parent_executing(self):
+        for host in ("codex", "claude"):
+            with self.subTest(host=host):
+                launcher = (
+                    self.root / f".agents/machine/utility/handoff-{host}/SKILL.md"
+                ).read_text(encoding="utf-8")
+                flat_launcher = " ".join(launcher.split())
+                self.assertIn("bounded side-workstream handoff", flat_launcher)
+                self.assertIn("retain the originating goal and foreground writer lease", flat_launcher)
+                self.assertIn("continue its next action in the same turn", flat_launcher)
+                self.assertIn("does not satisfy the originating goal's completion condition", flat_launcher)
+                self.assertIn("full-goal transfer follows `engineering:handoff`", flat_launcher)
+                self.assertNotIn("the handoff happened. Report it and stop.", launcher)
 
     def test_plan_artifacts_always_reach_merged_default_branch(self):
         plans = authored_skill("plans").read_text(encoding="utf-8")
@@ -470,7 +485,7 @@ class ProcessStandardsTests(unittest.TestCase):
             "proof covers exactly this head, so delete it with",
             "branch -D <branch>",
             "Step 5 is a blocking post-merge gate",
-            "Only the `finish.ps1` path may enter Step 6 first",
+            "Only the `finish.py` path may enter Step 6 first",
             "never remove that path",
         ):
             with self.subTest(required=required):
@@ -493,10 +508,10 @@ class ProcessStandardsTests(unittest.TestCase):
             "Only when the recorded target is a linked worktree, the host is attached to that target, and the target differs from the primary checkout",
             "the session closes itself as the delivery's final action, after Step 6",
             'no arguments and no leading `&`, because the harness allow rule matches only this string',
-            'powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1',
+            'python3 -B <machine:peer-cli skill-directory>/scripts/finish.py',
             "detaches a reaper that removes the worktree and branch once this session exits",
             "closes this session's CLI and tab",
-            "Only when `finish.ps1` is unavailable or its preflight fails",
+            "Only when `finish.py` is unavailable or its preflight fails",
             "shell `cd`, or `git -C` does not retarget Codex or Claude",
             "invoke `/cd <primary-checkout>` there",
             "invoke the unqualified `handoff` workflow once with the primary checkout",
@@ -507,9 +522,9 @@ class ProcessStandardsTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, flat)
 
-        self.assertLess(cleanup.index("finish.ps1"), cleanup.index("$worktreeHelper"))
+        self.assertLess(cleanup.index("finish.py"), cleanup.index("$worktreeHelper"))
         self.assertLess(
-            cleanup.index("finish.ps1"),
+            cleanup.index("finish.py"),
             cleanup.index("worktree remove -- <target-worktree>"),
         )
 

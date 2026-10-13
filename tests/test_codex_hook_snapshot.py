@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -13,11 +14,37 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent.parent
+HOST_COMMAND = "commandWindows" if os.name == "nt" else "command"
+
+
+def posix_code_argument(command):
+    """Return the -c argument of a POSIX command line, split by POSIX shell rules."""
+    arguments = shlex.split(command)
+    return arguments[arguments.index("-c") + 1]
+
+
+def windows_code_argument(command):
+    """Return the -c argument of a commandWindows line as CommandLineToArgvW yields it.
+
+    The generator emits it as one double-quoted token holding no double quote or backslash, and for
+    such a token the Windows rules yield exactly the text between the quotes; anything else fails.
+    """
+    match = re.match(r'python -I -B -c "([^"\\]*)" ', command)
+    if match is None:
+        raise AssertionError(f"Unexpected commandWindows shape: {command[:80]}")
+    return match.group(1)
+
+
 SPEC = importlib.util.spec_from_file_location(
     "codex_hook_snapshot", ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py"
 )
 SNAPSHOT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SNAPSHOT)
+GENERATOR_SPEC = importlib.util.spec_from_file_location(
+    "sync_plugin_packages_for_snapshot", ROOT / "scripts" / "sync_plugin_packages.py"
+)
+GENERATOR = importlib.util.module_from_spec(GENERATOR_SPEC)
+GENERATOR_SPEC.loader.exec_module(GENERATOR)
 
 
 class CodexHookSnapshotTests(unittest.TestCase):
@@ -126,6 +153,117 @@ class CodexHookSnapshotTests(unittest.TestCase):
                                     re.search(r"sha256:[0-9a-f]{64}", command).group(), expected
                                 )
 
+    def test_snapshot_bootstrap_is_plaintext_and_binds_the_loader_hash(self):
+        loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+        for text in (loader, 'print("café")\n', ""):
+            with self.subTest(length=len(text)):
+                bootstrap = GENERATOR.codex_snapshot_bootstrap(text)
+                digest = hashlib.sha256(GENERATOR.canonical_output_bytes(text)).hexdigest()
+                self.assertEqual(bootstrap, GENERATOR.codex_snapshot_bootstrap(text))
+                self.assertIn(digest, bootstrap)
+                self.assertIn("runpy.run_path", bootstrap)
+                self.assertIn("tempfile.TemporaryDirectory", bootstrap)
+                self.assertNotIn("base64", bootstrap)
+                self.assertNotIn("exec", bootstrap)
+                self.assertNotIn("compile", bootstrap)
+                self.assertNotIn('"', bootstrap)
+                self.assertNotIn("$", bootstrap)
+                self.assertNotIn("`", bootstrap)
+                compile(bootstrap, "<codex-hook-bootstrap>", "exec")
+
+    def test_generation_refuses_a_windows_command_over_budget(self):
+        hook = {"command": 'python3 -B "${PLUGIN_ROOT}/hooks/probe.py"',
+                "commandWindows": 'python -B "${PLUGIN_ROOT}/hooks/probe.py"'}
+        manifest = json.dumps({"hooks": {"SessionStart": [{"hooks": [hook]}]}}).encode("utf-8")
+        budget = GENERATOR.CODEX_WINDOWS_COMMAND_BUDGET
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            loader = root / ".agents" / "hooks" / "codex_hook_snapshot.py"
+            loader.parent.mkdir(parents=True)
+            lengths = []
+            for size in (budget // 2, budget):
+                with self.subTest(size=size):
+                    loader.write_text("#" * size, encoding="utf-8")
+                    output = {"plugins/probe/hooks/codex.json": manifest}
+                    GENERATOR.bind_codex_hook_snapshots(root, output, {"probe"})
+                    bound = json.loads(output["plugins/probe/hooks/codex.json"])
+                    command = bound["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
+                    self.assertLessEqual(len(command), budget)
+                    lengths.append(len(command))
+            self.assertEqual(lengths[0], lengths[1])
+
+    def test_each_host_parsing_of_each_command_preserves_the_plaintext_bootstrap(self):
+        loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+        digest = hashlib.sha256(GENERATOR.canonical_output_bytes(loader)).hexdigest()
+        for plugin in ("base", "engineering", "machine"):
+            manifest = json.loads(
+                (ROOT / "plugins" / plugin / "hooks" / "codex.json").read_text(encoding="utf-8")
+            )
+            for groups in manifest["hooks"].values():
+                for group in groups:
+                    for hook in group["hooks"]:
+                        for field, extract in (("command", posix_code_argument),
+                                               ("commandWindows", windows_code_argument)):
+                            with self.subTest(plugin=plugin, field=field):
+                                code = extract(hook[field])
+                                self.assertTrue(code.startswith("import hashlib,os,runpy,sys,tempfile;"))
+                                self.assertIn(digest, code)
+                                self.assertIn("runpy.run_path", code)
+                                self.assertNotIn("base64", code)
+                                self.assertNotIn("exec", code)
+                                self.assertNotIn("compile", code)
+                                self.assertNotIn('"', code)
+                                self.assertNotIn("$", code)
+                                self.assertNotIn("`", code)
+                                compile(code, "<codex-hook-bootstrap>", "exec")
+                                self.assertIn(f'-c "{code}" ', hook[field])
+                                self.assertTrue(
+                                    hook[field].startswith(
+                                        "python3 -I -B " if field == "command" else "python -I -B "
+                                    )
+                                )
+
+    def test_bootstrap_rejects_tampered_cache_and_snapshot_loaders_before_execution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            payload = temporary / "cache" / "base-agents" / "base" / "2.1.16"
+            shutil.copytree(ROOT / "plugins" / "base", payload)
+            data = temporary / "data"
+            marker = temporary / "loader-executed"
+            manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
+            command = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
+            command = command.replace("${PLUGIN_ROOT}", str(payload))
+            environment = dict(os.environ, PLUGIN_DATA=str(data))
+
+            initial = subprocess.run(
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
+                capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(initial.returncode, 0, initial.stderr)
+            expected = SNAPSHOT.digest_tree(payload, "base")
+            key = hashlib.sha256((str(payload) + "\0" + expected).encode("utf-8")).hexdigest()
+            snapshot_loader = data / "hook-snapshots" / key / "hooks" / "codex_hook_snapshot.py"
+            malicious = f"from pathlib import Path; Path({str(marker)!r}).write_text('executed')\n"
+
+            (payload / "hooks" / "codex_hook_snapshot.py").write_text(malicious, encoding="utf-8")
+            cache_result = subprocess.run(
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
+                capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(cache_result.returncode, 2, cache_result.stderr)
+            self.assertIn("loader integrity check failed", cache_result.stderr)
+            self.assertFalse(marker.exists())
+
+            shutil.rmtree(payload)
+            snapshot_loader.write_text(malicious, encoding="utf-8")
+            snapshot_result = subprocess.run(
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
+                capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(snapshot_result.returncode, 2, snapshot_result.stderr)
+            self.assertIn("loader integrity check failed", snapshot_result.stderr)
+            self.assertFalse(marker.exists())
+
     def test_hook_survives_deleted_cache_path_and_rejects_modified_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
@@ -133,12 +271,12 @@ class CodexHookSnapshotTests(unittest.TestCase):
             shutil.copytree(ROOT / "plugins" / "base", payload)
             data = temporary / "data"
             manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
-            command = manifest["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
+            command = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
             command = command.replace("${PLUGIN_ROOT}", str(payload))
             environment = dict(os.environ, PLUGIN_DATA=str(data))
 
             first = subprocess.run(
-                command, shell=True, cwd=ROOT, env=environment,
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(first.returncode, 0, first.stderr)
@@ -149,7 +287,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
 
             shutil.rmtree(payload)
             recovered = subprocess.run(
-                command, shell=True, cwd=ROOT, env=environment,
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(recovered.returncode, 0, recovered.stderr)
@@ -158,7 +296,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertIn("Maintained plan artifacts", first_context)
             self.assertIn("Maintained plan artifacts", recovered_context)
 
-            pre_tool = manifest["hooks"]["PreToolUse"][0]["hooks"][0]["commandWindows"]
+            pre_tool = manifest["hooks"]["PreToolUse"][0]["hooks"][0][HOST_COMMAND]
             pre_tool = pre_tool.replace("${PLUGIN_ROOT}", str(payload))
             routed = subprocess.run(
                 pre_tool, shell=True, cwd=ROOT, env=environment,
@@ -172,7 +310,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
 
             (snapshot / "hooks" / "hook_runtime.py").write_text("changed", encoding="utf-8")
             rejected = subprocess.run(
-                command, shell=True, cwd=ROOT, env=environment,
+                command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(rejected.returncode, 2, rejected.stderr)
@@ -185,7 +323,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             shutil.copytree(ROOT / "plugins" / "base", payload)
             data = temporary / "data"
             manifest = json.loads((payload / "hooks" / "codex.json").read_text(encoding="utf-8"))
-            template = manifest["hooks"]["SessionStart"][0]["hooks"][0]["commandWindows"]
+            template = manifest["hooks"]["SessionStart"][0]["hooks"][0][HOST_COMMAND]
             template = template.replace("${PLUGIN_ROOT}", str(payload))
             original = re.search(r"sha256:[0-9a-f]{64}", template).group()
             environment = dict(os.environ, PLUGIN_DATA=str(data))
@@ -197,7 +335,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
                 command = template.replace(original, expected)
                 commands.append(command)
                 result = subprocess.run(
-                    command, shell=True, cwd=ROOT, env=environment,
+                    command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                     capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -211,7 +349,7 @@ class CodexHookSnapshotTests(unittest.TestCase):
             shutil.rmtree(payload)
             for command in commands:
                 recovered = subprocess.run(
-                    command, shell=True, cwd=ROOT, env=environment,
+                    command, shell=True, cwd=ROOT, env=environment, stdin=subprocess.DEVNULL,
                     capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual(recovered.returncode, 0, recovered.stderr)

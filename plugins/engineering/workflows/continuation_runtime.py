@@ -12,9 +12,11 @@ import sys
 import time
 import uuid
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from delivery_runtime import BINDING_FILE, PersistentDeliveryRouter, binding_from_artifact, DeliveryContractViolation
-from workflow_ops import atomic_json, parse_status_checks, repository_slug
+from completion import CompletionError, completion_check
+from workflow_ops import atomic_json, parse_status_checks, repository_slug, retry_windows_sharing_violation
 
 
 class Gate(RuntimeError):
@@ -34,7 +36,8 @@ def git(root, *args):
 
 
 def read(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return retry_windows_sharing_violation(
+        lambda: json.loads(Path(path).read_text(encoding="utf-8")))
 
 
 def fingerprint(value):
@@ -247,7 +250,17 @@ def apply_receipt(state, receipt):
             raise Gate("repair-binding-not-refreshed")
         state["head"] = current["head"]
         state["evidence"] = None
-    check_identity(state, allow_terminal_release=status in {"complete", "blocked"})
+    binding = check_identity(state, allow_terminal_release=status in {"complete", "blocked"})
+    if status == "complete":
+        bound = binding
+        if bound is None and state.get("pr") is not None:
+            bound = {"repository": state["repo"], "pr": state["pr"], "head": state["head"]}
+        try:
+            completion = completion_check(state["goal"], bound, Path(state["worktree"]))
+        except CompletionError as error:
+            raise Gate(f"completion-check-invalid: {error}") from error
+        if not completion["ready"]:
+            raise Gate("completion-unverified: " + "; ".join(completion["blockers"]))
     transition(state, status, receipt["reason"], receipt.get("next_action", ""))
     state["failures"] = 0
 
@@ -376,7 +389,7 @@ def launch(path, state, binding, evidence, executable):
         "CONTINUATION_RESULT_PATH": str(result), "CONTINUATION_NONCE": nonce,
         "CONTINUATION_OWNER_ID": state["owner_id"]}})
     with (path.parent / f"launch-{nonce}.log").open("wb") as output:
-        process = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_child",
+        process = subprocess.Popen([sys.executable, "-B", str(Path(__file__).resolve()), "_child",
                                     "--owner", str(path), "--payload", str(payload_path)],
                                    stdout=output, stderr=output,
                                    start_new_session=os.name != "nt")
@@ -537,6 +550,10 @@ def operate(path, state, args):
             raise Gate("foreground-token-invalid")
         if operation == "heartbeat":
             lease["activity"] = time.time()
+            if args.reason.strip():
+                state["reason"] = args.reason
+            if args.next_action.strip():
+                state["next_action"] = args.next_action
         elif operation == "yield":
             state["foreground"] = None
             transition(state, "waiting", args.reason or "foreground-yielded", args.next_action or state["next_action"])

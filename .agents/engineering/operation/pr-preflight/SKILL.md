@@ -36,7 +36,7 @@ refresh remote-tracking refs, and the runtime records its inspection telemetry i
 
 ## Checks
 
-Run the deterministic local pass once:
+Run the deterministic local pass once with `python` on Windows or `python3` on Linux/macOS:
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> delivery-preflight --ledger <owning-progress-file> --descriptor <review-descriptor>

@@ -4,11 +4,13 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -32,6 +34,21 @@ class NormalizeUrlTests(unittest.TestCase):
     def test_folds_scp_style_ssh_remotes_to_the_same_form_as_https(self):
         self.assertEqual(SYNC.normalize_url('git@github.com:tj-agents/cpp.git'), SYNC.normalize_url('https://github.com/tj-agents/cpp.git'))
         self.assertEqual(SYNC.normalize_url('ssh://git@github.com/tj-agents/cpp.git'), SYNC.normalize_url('https://github.com/tj-agents/cpp.git'))
+
+    def test_repository_authentication_rejects_a_lookalike_host(self):
+        self.assertFalse(SYNC.source_matches_repository(
+            {'source': 'git', 'url': 'https://evil.example/tj-agents/core.git'}, 'tj-agents/core'
+        ))
+
+class HarnessPermissionForwardingTests(unittest.TestCase):
+    def test_harness_permission_sync_receives_the_resolved_project(self):
+        with tempfile.TemporaryDirectory() as raw:
+            project = Path(raw).resolve()
+            with mock.patch.object(SYNC.subprocess, 'run') as run:
+                SYNC.apply_harness_permissions(project)
+            if run.called:
+                arguments = run.call_args.args[0]
+                self.assertEqual(['--apply', '--project', str(project)], arguments[-3:])
 
 
 def git(cwd, *arguments):
@@ -111,13 +128,29 @@ class StandardsSyncHarness(unittest.TestCase):
         self.write(path or self.config / 'settings.json', {'enabledPlugins': values})
 
     def install(self, identity='base@core', scope='user', project=None, version=None):
+        recorded_commit = None
         if version is None:
             version = git(self.checkout, 'rev-parse', 'HEAD')[:12]
+            recorded_commit = git(self.checkout, 'rev-parse', 'HEAD')
         name, marketplace = identity.split('@')
         path = self.plugins / 'cache' / marketplace / name / version
-        path.mkdir(parents=True, exist_ok=True)
+        (path / '.claude-plugin').mkdir(parents=True, exist_ok=True)
+        (path / 'skills' / 'fixture').mkdir(parents=True, exist_ok=True)
+        (path / 'hooks').mkdir(parents=True, exist_ok=True)
+        (path / '.claude-plugin' / 'plugin.json').write_text(
+            json.dumps({'name': name, 'skills': './skills', 'hooks': './hooks/claude.json'}), encoding='utf-8'
+        )
+        (path / 'skills' / 'fixture' / 'SKILL.md').write_text('fixture\n', encoding='utf-8')
+        (path / 'hooks' / 'claude.json').write_text(json.dumps({'hooks': {}}), encoding='utf-8')
+        (path / 'harness.json').write_text(json.dumps({'requires': {'hooks': []}}), encoding='utf-8')
         registry = json.loads((self.plugins / 'installed_plugins.json').read_text(encoding='utf-8'))
-        record = {'scope': scope, 'installPath': str(path), 'version': version}
+        record = {
+            'scope': scope,
+            'installPath': str(path),
+            'version': version,
+        }
+        if recorded_commit:
+            record['gitCommitSha'] = recorded_commit
         if project is not None:
             record['projectPath'] = str(project)
         registry['plugins'].setdefault(identity, []).append(record)
@@ -230,6 +263,35 @@ class StandardsSyncTests(StandardsSyncHarness):
         self.assertEqual(code, 1)
         self.assertIn(f'core needs a refresh to {pushed[:12]}', output)
         self.assertEqual(self.invocations(), [])
+
+    def test_missing_declared_skills_reinstalls_the_same_version(self):
+        installed = self.install()
+        shutil.rmtree(installed / 'skills')
+        code, output = self.sync()
+        self.assertEqual(code, 0, output)
+        self.assertEqual(
+            [entry['argv'] for entry in self.invocations()],
+            [
+                ['plugin', 'uninstall', 'base@core', '--scope', 'user', '--keep-data'],
+                ['plugin', 'install', 'base@core', '--scope', 'user'],
+            ],
+        )
+        self.assertTrue((Path(self.records()[0]['installPath']) / 'skills' / 'fixture' / 'SKILL.md').is_file())
+
+    def test_check_reports_torn_same_version_without_repairing_it(self):
+        installed = self.install()
+        shutil.rmtree(installed / 'skills')
+        code, output = self.sync(check=True)
+        self.assertEqual(code, 1)
+        self.assertIn('needs a refresh', output)
+        self.assertEqual(self.invocations(), [])
+
+    def test_annotated_tag_resolves_to_its_peeled_commit(self):
+        self.install()
+        git(self.author, 'tag', '-a', 'annotated', '-m', 'annotated')
+        git(self.author, 'push', '--quiet', 'origin', 'annotated')
+        market = SYNC.Marketplace('core', self.checkout, str(self.remote), 'annotated')
+        self.assertEqual(SYNC.remote_commit(market), (git(self.author, 'rev-parse', 'annotated^{}'), None))
 
     def test_pinned_tag_tracks_the_tag_not_the_branch(self):
         self.install()
@@ -350,19 +412,26 @@ class ExternalPluginSourceTests(StandardsSyncHarness):
         self.assertEqual(self.records('ext@core')[0]['version'], pushed[:12])
         self.assertIn(f'at {pushed[:12]}: ext {pushed[:12]}', output)
 
-    def test_plugin_source_shaped_differently_but_same_repository_is_tracked_as_native(self):
-        differently_shaped = str(self.remote)[:-4] + '/'
-        self.declare_sources({'base': differently_shaped, 'ext': str(self.plugin_remote)})
-        self.enable({'base@core': True, 'ext@core': True})
-        self.install('base@core')
-        pushed = self.publish('second')
-        code, output = self.sync()
-        self.assertEqual(code, 0, output)
-        self.assertEqual(
-            [entry['argv'] for entry in self.invocations()],
-            [['plugin', 'marketplace', 'update', 'core'], ['plugin', 'update', 'base@core', '--scope', 'user', '--json']],
-        )
-        self.assertEqual(self.records('base@core')[0]['version'], pushed[:12])
+    def test_same_repository_git_subdir_source_respects_its_explicit_ref(self):
+        shapes = {
+            'trailing slash': lambda remote: str(remote) + '/',
+            'no .git suffix': lambda remote: str(remote).removesuffix('.git'),
+        }
+        for index, (label, shape) in enumerate(shapes.items()):
+            with self.subTest(shape=label):
+                if index:
+                    self.setUp()  # a fresh profile and remotes; cleanups from each setUp still run
+                self.declare_sources({'base': shape(self.remote), 'ext': str(self.plugin_remote)})
+                self.enable({'base@core': True, 'ext@core': True})
+                self.install('base@core')
+                pushed = self.publish('second')
+                code, output = self.sync()
+                self.assertEqual(code, 0, output)
+                self.assertEqual(
+                    [entry['argv'] for entry in self.invocations()],
+                    [['plugin', 'update', 'base@core', '--scope', 'user', '--json']],
+                )
+                self.assertEqual(self.records('base@core')[0]['version'], pushed[:12])
 
     def test_unchanged_plugin_source_outside_the_marketplace_is_silent(self):
         self.install('ext@core', version=self.plugin_head[:12])

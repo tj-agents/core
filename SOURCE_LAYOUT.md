@@ -28,6 +28,15 @@ Each host skill entry point references one canonical definition under `.agents/`
 host-specific metadata or invocation mechanics required by that host. A host difference must be explicit;
 shared prose returns to `.agents/`.
 
+A plain host entry point repeats its canonical definition's name, description, kind and domain
+verbatim, adds only the model and effort keys its canonical lane resolves to, and has the fixed reference
+body. A skill named in `extended_host_adapters` in `.agents/plugins/sources.json` is the explicit
+exception on both hosts: its entry points keep the canonical name, kind and domain and link the canonical
+definition exactly once, and may word their description and the rest of their body for their host
+without restating shared prose. Generation does not compare that wording, so review an extended entry
+point whenever its canonical definition changes. `pwsh .agents/sync-generated.ps1 -Check` fails on any
+other drift.
+
 ## Distribution output
 
 `plugins/*` contains generated installable payloads. The build assembles canonical `.agents/` definitions,

@@ -12,8 +12,8 @@ route: infer
 Opens an interactive Claude Code session the user drives themselves. Its sibling `handoff-claude` is for
 delegating prepared work to a second Claude; this one is for putting a terminal in front of the user.
 The terminal invocation and the environment scrub belong to `scripts/agent_cli.py` under
-`resources/machine/scripts`, shared with `handoff-claude`. `handoff-codex` still uses the PowerShell
-`agent-cli.ps1` until its own Python port lands.
+`resources/machine/scripts`, shared with `handoff-claude`, `handoff-codex`, and the Python terminal
+profile launchers.
 
 Never open a Claude CLI by typing `claude` into a shell command, an npm shim such as `claude.cmd`, or
 `node.exe`, or any other intermediate process. Those resolve to the npm/NVM shim, which runs the TUI
@@ -21,25 +21,37 @@ through an extra process and degrades it to a monochrome, non-interactive window
 which starts the native `claude` executable as the tab process.
 
 Resolve the exact directory the request concerns and do not substitute another checkout.
+Run the launcher with `python` on Windows or `python3` on Linux/macOS:
 
 ```sh
+# Windows
+python '<skill-directory>/scripts/open_claude.py' --working-directory '<absolute-path>' --title '<short-title>'
+# Linux/macOS
 python3 '<skill-directory>/scripts/open_claude.py' --working-directory '<absolute-path>' --title '<short-title>'
 ```
-
-Use `python` on Windows, `python3` everywhere else. On Windows, `python3` is often the Microsoft Store
+On Windows, `python3` is often the Microsoft Store
 alias stub rather than a real interpreter, and it fails rather than running the launcher.
 
-- `--resume '<session-id>'` reopens a specific past session; `--continue` reopens the most recent one for
-  that directory. A session resumes only from the directory it was started in, so pass the session's own
-  `cwd` as `--working-directory`.
+- `--resume '<session-id>'` first resolves the exact saved session and its original directory, checks for a
+  live writer, and preserves the selected Claude profile. Reconcile an unknown live identity before resuming.
+  `--continue` reopens the most recent session for that directory.
+- `--confirm-closed` records the user's explicit reconciliation that an unknown saved session has no live writer;
+  it never overrides a verified live session.
 - `--prompt '<short instruction>'` seeds a first turn. For anything substantial write a file and pass
   `--prompt-path` instead; never relay a long prompt through a nested command string.
 - `--model '<model-id>'` only when the user named one or a checked-in selection policy already resolved
   it. Omitted, the CLI uses its own configured default.
 - `--dangerously-skip-permissions` only when the user asks for it in that request.
 
-It opens a new tab in the terminal you are running in (Windows Terminal, tmux, kitty or Konsole). Open
-one tab per request, and report the directory and any session id afterwards.
+For task recovery, follow the shared [task recovery context](../../resources/task-recovery.md). Write its private
+UTF-8 instruction file outside version control and pass it with `--prompt-path '<recovery-prompt-file>'`.
+Do not also pass `--prompt`.
+
+It opens a tab in whichever terminal it detects it is already running inside (Windows Terminal, tmux,
+kitty or Konsole). With none detected, it opens a new window instead and prints a warning — except on
+Windows, where a `wt.exe` it can still find opens a tab in the most recently used Windows Terminal window
+rather than a new window. Open one tab per request, and report the directory and any session id
+afterwards.
 
 ## One tab, and never a second
 

@@ -13,10 +13,13 @@ Consumers commit the composed catalog and generated host settings; machine-local
 cannot supply a missing standard.
 
 For a substantive plan intended for execution, write an actual Markdown file before presenting the plan
-as ready. Follow applicable project plan conventions and an existing canonical owner; otherwise choose a
-descriptive filename in the working directory. A standalone directory needs no repository, roadmap,
-companion ledger, workflow provider, pull request, or publication. Quick answers and one-step tasks do
-not need ceremonial plans.
+as ready. A plan for repository work belongs in that repository: follow an existing declared plans or
+docs/plans convention, else default to `plans/<goal>/`; the active delivery branch's checkout owns
+current planning state. Before execution or handoff, promote any host-scratch draft into that repository
+owner, preserving its decisions/progress, and verify recovery references resolve to the promoted copy.
+A standalone, non-repository task keeps its own task-directory goal and needs no repository, roadmap,
+companion ledger, workflow provider, pull request, or publication; runtime state and secrets stay outside
+Git regardless of where the plan lives. Quick answers and one-step tasks do not need ceremonial plans.
 
 Whenever you create, revise, or resume a plan, include its exact absolute path as a clickable Markdown
 link in the response, including a fresh-session progress summary. A bare filename or relative link is
@@ -82,16 +85,41 @@ successor was started before releasing ownership. Never launch duplicate owners.
 is available, preserve a recoverable checkpoint and state that limitation rather than claiming a transfer
 occurred. A user request for only a handoff prompt does not authorize launching a session.
 
+## Agent-host coverage
+
+An agent-behavior plan, fix, or review records one fenced `agent-host-coverage` JSON object. It has
+`schema_version: 1`, a nonempty `shared_source`, and exactly two `hosts` entries: `claude` and `codex`.
+Each host names its `behavior`, `source`, `mapping`, and `verification` with `level`, `result`, and
+evidence. Planning may use `planned` and `pending`; a review uses `source` or `installed` with `passed`
+or `limited`, adds its full frozen `candidate_head`, and replaces the one moving coverage record in its
+work order. A `limited` result also records an `exception` object containing concrete
+`constraint_evidence` and the `supported_other_host_outcome`.
+
+Validate a plan before advancing it. The helper requires Python 3.9 or newer. Run the command as
+`python` on Windows or `python3` on Linux and macOS:
+
+```text
+python3 -B "<skill-directory>/scripts/host_coverage.py" --stage plan --document <plan-path>  # Linux/macOS
+python -B "<skill-directory>/scripts/host_coverage.py" --stage plan --document <plan-path>
+```
+
+The validator rejects omissions, duplicate host or JSON keys, placeholder values, and malformed records.
+Source verification and installed-host acceptance remain distinct evidence.
+
 ## Context delivery
 
 The packaged SessionStart hook reads this file relative to its own script, including on startup, resume,
-and compaction. It emits context only. It requires Python 3.9 or newer available as `python` on PATH;
-the host reports a missing executable, and the helper reports an unreadable contract on stderr with a
-nonzero exit. Plugin installation does not prove hook trust or execution, particularly in Codex.
+and compaction. It emits context only. Its configured interpreter must be Python 3.9 or newer and available
+on PATH: Codex uses `python3` on Linux and macOS and `python` on Windows; Claude currently invokes `python`
+on all platforms. The host reports a missing executable, and the helper reports an unreadable contract on
+stderr with a nonzero exit. Plugin installation does not prove hook trust or execution, particularly in
+Codex.
 
-When hooks are unavailable, explicitly generate the same contract as a native instruction fragment:
+When hooks are unavailable, explicitly generate the same contract as a native instruction fragment.
+Use `python3` on Linux and macOS or `python` on Windows:
 
 ```text
+python3 -B "<skill-directory>/scripts/session-context.py" --instruction-fragment  # Linux/macOS
 python -B "<skill-directory>/scripts/session-context.py" --instruction-fragment
 ```
 

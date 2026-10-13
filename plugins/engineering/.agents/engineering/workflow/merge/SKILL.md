@@ -42,6 +42,8 @@ procedure that goes stale in the repo that renames one.
 
 Immediately before every merge attempt, fetch the current PR body and require nonempty What and Why:
 
+Run the Python workflow helpers below with `python` on Windows or `python3` on Linux/macOS:
+
 ```bash
 python <workflow-ops> --root <absolute-worktree> --workflow-run-id pr-body-<n> pr-body-check --pr <pr-url>
 ```
@@ -122,7 +124,8 @@ required review and checks. A green persistent-delivery action alone does not ov
 ### 3. Wait for the PR's own checks to reach a terminal state, then verify green
 
 Wait until no check is pending through the reconnect-safe monitor from
-`engineering:remote-validation`, then confirm the terminal state with one direct read:
+`engineering:remote-validation`, then confirm the terminal state with one direct read. Use `python` on
+Windows or `python3` on Linux/macOS:
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> monitor --kind pr --id <n> --head <remote-head>
@@ -186,7 +189,7 @@ different head.
 its four terminal states resolves, reporting automatically with no reprompt. It **never retries and never
 toggles.** Read all five signals every observation, and the bare state into its own variable — a joined string
 never matches `MERGED`, which is how a wait times out instead of reporting a merge that already happened.
-Bind the recorded PR and remote head before waiting:
+Bind the recorded PR and remote head before waiting. Use `python` on Windows or `python3` on Linux/macOS:
 
 ```bash
 python .agents/workflows/workflow_ops.py --workflow-run-id <id> monitor --kind pr --id <n> --head <remote-head>
@@ -232,7 +235,8 @@ git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
 Compare the recorded target checkout in the delivery binding with the resolved primary checkout and the
-current host attachment before invoking either cleanup path below. When the target is the primary checkout,
+current host attachment before invoking either cleanup path below. Read `machine:peer-cli`'s self-session
+execution requirements first. When the target is the primary checkout,
 or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
 and branch deletion in the current session.
 
@@ -240,7 +244,8 @@ When the session remains attached to the primary checkout or another retained ch
 any plan close-out and the report, then run exactly this argument-free command as the final action:
 
 ```
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/close.ps1
+python3 -B <machine:peer-cli skill-directory>/scripts/close.py  # Linux/macOS
+python -B <machine:peer-cli skill-directory>\scripts\close.py  # Windows
 ```
 
 It verifies this session's registered host and attachment, closes only its own CLI or uniquely identified
@@ -255,7 +260,8 @@ no arguments and no leading `&`, because the harness allow rule matches only thi
 forward slashes since the Bash tool strips backslashes:
 
 ```
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File <machine:peer-cli skill-directory>/scripts/finish.ps1
+python3 -B <machine:peer-cli skill-directory>/scripts/finish.py  # Linux/macOS
+python -B <machine:peer-cli skill-directory>\scripts\finish.py  # Windows
 ```
 
 It verifies the receipt, detaches a reaper that removes the worktree and branch once this session exits, and
@@ -263,10 +269,10 @@ closes this session's CLI and tab. The reaper's result and the cleanup reminder 
 next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude and is not
 evidence that the old directory can be deleted.
 
-- Only when `finish.ps1` is unavailable or its preflight fails: if the harness exposes its native host
+- Only when `finish.py` is unavailable or its preflight fails, including an unresolved verified registry attachment: if the harness exposes its native host
   command interface, invoke `/cd <primary-checkout>` there and continue only after the host confirms that
   the session is attached to the primary checkout.
-- Only when `finish.ps1` is unavailable or its preflight fails: if that interface is unavailable, invoke
+- Only when `finish.py` is unavailable or its preflight fails: if that interface is unavailable, invoke
   the unqualified `handoff` workflow once with the primary checkout. Checkpoint the exact repository, merged
   PR, branch, remote head, target worktree, primary checkout, and remote default. Put the remaining Step 5
   cleanup and final inventory in the successor's `## Next Steps`. After verified launcher submission the
@@ -295,11 +301,14 @@ if (Test-Path -LiteralPath $worktreeHelper -PathType Leaf) {
 Add `-PlanManaged` when a plan owns the work. If that exact primary-checkout helper path is absent, do not
 skip cleanup. Apply the same gates with native Git from the primary checkout:
 
-1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py`; from
+1. From inside the target worktree run exactly `python -B <skill-directory>/scripts/cleanup_proof.py` on
+   Windows or `python3 -B <skill-directory>/scripts/cleanup_proof.py` on Linux/macOS; from
    elsewhere add `--worktree <target> --branch <branch> --head <remote-head> --pr <n>`. It refuses the
-   primary checkout, a detached or mismatched target, a dirty tree,
+   primary checkout, a detached or mismatched target,
    a PR that is not `MERGED` at exactly that head, a merge commit absent from `origin/<default>` (the
-   squash/rebase-safe containment proof), and a still-open PR for the head; `preserve:` stops cleanup.
+   squash/rebase-safe containment proof), and a still-open PR for the head. Run from inside a proven
+   merged target, it sets uncommitted leftovers aside under `<state>/merge-cleanup/set-aside/` and cleans
+   the tree; from elsewhere a dirty tree still preserves. `preserve:` stops cleanup.
 2. For a linked target, run `git -C <primary-checkout> worktree remove -- <target-worktree>` without
    `--force`, then delete the local branch with `git -C <primary-checkout> branch -d <branch>`. For a branch
    developed in the primary checkout, the checkout-and-fast-forward above replaces the removal step; delete
@@ -313,8 +322,8 @@ skip cleanup. Apply the same gates with native Git from the primary checkout:
    as incomplete cleanup; never replace the failed command with a forced removal or raw recursive deletion.
 
 **Step 5 is a blocking post-merge gate. Do not report terminal delivery or leave the cleanup for a later
-session until `finish.ps1` has run or host retargeting plus the helper or native-Git path has produced the
-final inventory above. Only the `finish.ps1` path may enter Step 6 first.** The
+session until `finish.py` has run or host retargeting plus the helper or native-Git path has produced the
+final inventory above. Only the `finish.py` path may enter Step 6 first.** The
 worktree-cleanup audit gate and the merge-cleanup gate are backstops that make a missed cleanup visible, not
 a substitute for doing it immediately.
 
@@ -370,7 +379,9 @@ merge caused, and a causally linked red one is never left behind. The mechanics:
   build to discover the rest rather than starting a full local solution build. Record the red state once as a
   blocker, then commit fixes locally, run targeted builds, and make one stable push. GitHub retains replacement
   checks and merge evidence. Never push the source plan's recovery commits to either PR.
-- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Once
+- **Close plan-managed delivery from a checkout selected under `engineering:git-branching`.** Before
+  deleting the goal, run the fresh completion check above. A missing, invalid, or failing record leaves the
+  plan and its owned actions in place. Once
   publication and sync are terminal, record the final transition, delete the plan and ledger, and tick
   the owning roadmap item in one docs-only
   closeout commit. Review it per `engineering:docs-review` — skipped for a pure close-out — and
@@ -386,6 +397,18 @@ each create a checkpoint. Never create a commit merely to make the ledger agree 
 
 ## Report
 
+Every goal completion and plan closeout requires exactly one fenced `completion` record. A missing or
+invalid record is incomplete. Run a fresh completion check with `python` on Windows or `python3` on
+Linux/macOS before claiming the requested user outcome or deleting its goal:
+
+```bash
+python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree> --bound-repository <owner/repo> --bound-pr <n> --bound-head <forty-character-head>
+```
+
+Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
+`workflows/completion.py` in an installed engineering package. On a failing result, retain the goal and
+report its owned next actions as incomplete.
+
 One short report: the PR that merged (number plus merge commit); whether the full suite ran because a
 positive trigger was present or was skipped by label because none was; that the base is synced; and that the
 branch — and its worktree, if the work was done in one — is cleaned up. For plan-managed work, that the
@@ -396,5 +419,5 @@ needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-run `finish.ps1` when the session is attached to the removable merged worktree, or `close.ps1` when its
+run `finish.py` when the session is attached to the removable merged worktree, or `close.py` when its
 checkout is retained. No preamble.

@@ -1,6 +1,6 @@
 ---
 name: lane-l4
-description: Runs one delegated task at lane L4. Specified implementation that still needs code-level judgement.
+description: Runs one delegated task at lane L4. Specified implementation, ordinary review, and small local testable choices.
 kind: lane
 model: claude-sonnet-5
 effort: high

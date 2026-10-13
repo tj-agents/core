@@ -103,11 +103,28 @@ class OpenClaudeTests(unittest.TestCase):
 
     # --- argument assembly ---
 
-    def test_resume_reaches_launch_tab_as_resume_flag_and_id(self):
-        self.run_main('--resume', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875')
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
-        self.assertIn('--resume', arguments)
-        self.assertIn('a2bcd5c4-bf6d-4087-95e3-d7ba7f711875', arguments)
+    def test_resume_routes_through_the_shared_guard(self):
+        recovery = mock.Mock()
+        recovery.open_session.return_value = {'cwd': self.directory}
+        with mock.patch.object(OPEN_CLAUDE, '_load_recovery', return_value=recovery):
+            self.run_main('--resume', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875')
+        recovery.open_session.assert_called_once()
+        self.assertEqual(recovery.open_session.call_args.args[:2], ('claude', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875'))
+        self.agent_cli.launch_tab.assert_not_called()
+
+    def test_resume_reports_recovery_value_error(self):
+        recovery = mock.Mock()
+        recovery.open_session.side_effect = ValueError('identity requires reconciliation')
+        with mock.patch.object(OPEN_CLAUDE, '_load_recovery', return_value=recovery):
+            code, _, _ = self.run_main('--resume', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875')
+        self.assertEqual(code, 1)
+
+    def test_resume_reports_shared_launch_timeout_as_three(self):
+        recovery = mock.Mock()
+        recovery.open_session.side_effect = self.agent_cli.LaunchTimeout('unknown launch')
+        with mock.patch.object(OPEN_CLAUDE, '_load_recovery', return_value=recovery):
+            code, _, _ = self.run_main('--resume', 'a2bcd5c4-bf6d-4087-95e3-d7ba7f711875')
+        self.assertEqual(code, 3)
 
     def test_continue_reaches_launch_tab(self):
         self.run_main('--continue')

@@ -1,55 +1,3 @@
-r"""PostToolUse/PostToolUseFailure/Stop hook: a red test run selects its own repair loop.
-
-The failure this exists for: over one PR roughly six runs came back red - local integration, local E2E
-three times, the merge queue three times - and `failing-tests` was never loaded once. Each time the agent
-reported the failure to the human and waited for direction, which is the first thing that skill's own body
-prohibits. The human drove the diagnose/fix cycle by hand for about eight hours.
-
-Nothing could have caught it. `.agents/skill-routes.json` is keyed on the PATH BEING WRITTEN, so it cannot
-fire on "a run came back red" - there is no write. `always_on_instructions.py` names the skill once at SessionStart,
-thousands of turns before the first failure. Every other tooth in this plugin is a PreToolUse block on a
-command shape. A red run is the one trigger only visible AFTER the tool ran, so it needs the events that
-see a result.
-
-Three registrations, because a red run arrives in three different shapes:
-
-- **PostToolUseFailure** - the runner exited non-zero. A local `dotnet test` or `./scripts/*.ps1` run.
-- **PostToolUse** - the command SUCCEEDED and its output reports someone else's failure. `gh run view` /
-  `gh pr checks` reading a failed merge-queue run is the whole merge-queue path, and it exits 0.
-- **Stop** - the tooth for the actual observed behaviour. An injection at the moment of failure is only a
-  prompt; an agent that decides to report and wait never issues another tool call, so nothing else in this
-  file would ever see it again. Stop blocks the turn from ending while a red run stands unanswered.
-
-Two shapes are deliberately NOT a red run, and getting either wrong produces a hook that fires constantly
-and is therefore ignored:
-
-- **A build, restore or compile error.** `failing-tests` says so in its own description and routes those to
-  the ordinary build loop. A run that never produced a test result has nothing to triage. So evidence is
-  graded: a counted test failure (`Failed!`, `Failed: 3`, `[FAIL]`, `2 failed`) is red whatever else the log
-  says, while a suite-level verdict carrying no count (`TESTS FAILED`) is red only when no build/restore
-  error is present - `scripts/test.ps1` prints exactly that verdict for a project that never built.
-- **A command that legitimately exits non-zero.** `grep` with no match, `git diff --quiet`, `gh run view` on
-  a run still going. So the trigger is the COMMAND SHAPE plus failure evidence in its output, never a
-  non-zero exit on its own. A shape this file does not recognise as a test runner is invisible to it.
-
-Fires once per failure, never once per line: one hook invocation is one tool call, the whole output is
-matched as a unit, and one message is emitted no matter how many `Failed X` lines it contains.
-
-Tier routing follows `failing-tests`' own table. The tier comes from the command where the command makes it
-knowable (`./scripts/e2e.ps1 ui`, a `dotnet test` naming an `*.IntegrationTests` project) and from the
-failing job name where the failure came from CI; where neither settles it, an E2E failure routes to
-`e2e-debug`, which covers both tiers. A merge-queue run additionally owes `merging`, because the queue's own
-state machine is the second thing that session got wrong.
-
-Silent once every owed skill is proven loaded in this session's transcript - the same proof
-`skill_router.py` uses, imported rather than reimplemented so the two cannot disagree about what "loaded"
-means. Silent in any repo that has not opted into routing, exactly as the instruction injector is.
-
-Contract: exit 0 = say nothing; exit 2 = stderr is fed back to the agent (PostToolUse* cannot block, the
-tool already ran). Stop instead prints the `{"decision": "block"}` envelope. Anything unexpected exits 0 -
-a broken gate must never wedge a session.
-"""
-
 import hashlib
 import json
 import re
@@ -73,15 +21,15 @@ HOOK_NAME = "red-run-gate"
 # walks every installed skill root, so the qualifier is what stops an unqualified lookup binding to a
 # same-named local skill in some other consumer repository.
 OWNER_SKILL = "engineering:failing-tests"
-QUEUE_SKILL = "engineering:merging"
 # Lowercased, and asserted against the manifest matcher: a shell the matcher omits never reaches this
 # file, and a shell this file omits is waved through when it does.
 SHELL_TOOLS = {"bash", "powershell"}
 # Where a harness puts what the tool produced. The command itself is never read as output - a
 # `dotnet test --filter Failed` would otherwise be its own failure evidence.
 RESULT_KEYS = ("tool_response", "tool_error", "tool_result", "tool_output")
+EXIT_STATUS_KEYS = ("exit_code", "exitCode", "returncode", "returnCode")
 
-Runner = namedtuple("Runner", "label tier source")
+Runner = namedtuple("Runner", "label tier")
 
 TIER_SKILLS = {
     "unit": (),
@@ -91,22 +39,28 @@ TIER_SKILLS = {
     "e2e": ("e2e-debug",),
 }
 
-_E2E_SCRIPT = re.compile(r"scripts[\\/]e2e\.ps1(?P<rest>[^\r\n;|&]*)", re.I)
-_UNIT_SCRIPT = re.compile(r"scripts[\\/]unit\.ps1", re.I)
-_INTEGRATION_SCRIPT = re.compile(r"scripts[\\/]integration\.ps1", re.I)
-_TEST_SCRIPT = re.compile(r"scripts[\\/]test\.ps1(?P<rest>[^\r\n;|&]*)", re.I)
-_LOCAL_PLATFORM_TEST = re.compile(r"scripts[\\/]local-platform\.ps1\s+test\b", re.I)
-_DOTNET_TEST = re.compile(r"\bdotnet\s+(?:test|vstest)\b", re.I)
+_RUNNER_PREFIX = (
+    r"^\s*(?:&\s*)?(?:(?:pwsh|powershell)(?:\.exe)?\s+"
+    r"(?:(?:-NoProfile|-NonInteractive|-ExecutionPolicy\s+\S+|-File)\s+)*)?"
+)
+_SCRIPT_PREFIX = _RUNNER_PREFIX + r'''(?:"[^"\r\n]*[\\/]|'[^'\r\n]*[\\/]|[^\s"']*[\\/]|["'])?scripts[\\/]'''
+_SCRIPT_END = r'''(?=["'\s]|$)["']?'''
+_E2E_SCRIPT = re.compile(_SCRIPT_PREFIX + r"e2e\.ps1" + _SCRIPT_END + r"(?P<rest>[^\r\n;|&]*)", re.I)
+_UNIT_SCRIPT = re.compile(_SCRIPT_PREFIX + r"unit\.ps1" + _SCRIPT_END, re.I)
+_INTEGRATION_SCRIPT = re.compile(_SCRIPT_PREFIX + r"integration\.ps1" + _SCRIPT_END, re.I)
+_TEST_SCRIPT = re.compile(_SCRIPT_PREFIX + r"test\.ps1" + _SCRIPT_END + r"(?P<rest>[^\r\n;|&]*)", re.I)
+_LOCAL_PLATFORM_TEST = re.compile(_SCRIPT_PREFIX + r"local-platform\.ps1" + _SCRIPT_END + r"\s+test\b", re.I)
+_DOTNET_TEST = re.compile(_RUNNER_PREFIX + r"dotnet\s+(?:test|vstest)\b", re.I)
 _NODE_TEST = re.compile(
-    r"\b(?:npm|pnpm|yarn)\s+(?:run\s+)?test\b"
-    r"|\bnpx\s+(?:vitest|jest|playwright)\b"
-    r"|\b(?:vitest|jest)\s+run\b"
-    r"|\bplaywright\s+test\b"
-    r"|\bpytest\b"
-    r"|\bpython\s+-m\s+(?:pytest|unittest)\b",
+    _RUNNER_PREFIX
+    + r"(?:npm|pnpm|yarn)\s+(?:run\s+)?test\b"
+    + r"|^\s*(?:&\s*)?npx\s+(?:vitest|jest|playwright)\b"
+    + r"|^\s*(?:&\s*)?(?:vitest|jest)\s+run\b"
+    + r"|^\s*(?:&\s*)?playwright\s+test\b"
+    + r"|^\s*(?:&\s*)?pytest\b"
+    + r"|^\s*(?:&\s*)?python(?:3(?:\.\d+)?)?(?:\.exe)?(?:\s+-B)?\s+-m\s+(?:pytest|unittest)\b",
     re.I,
 )
-_GH_CI_READ = re.compile(r"\bgh\s+(?:run\s+(?:view|list|watch)|pr\s+checks)\b")
 
 # A counted test failure. Red whatever else the log says.
 _COUNTED_TEST_FAILURE = (
@@ -124,6 +78,7 @@ _SUITE_VERDICT = (
     re.compile(r"\bTESTS FAILED\b", re.I),
     re.compile(r"\bat least one suite did not pass\b", re.I),
 )
+_PASSED_TEST_SUMMARY = re.compile(r"\bFailed:\s*0\b", re.I)
 _BUILD_FAILURE = (
     re.compile(r"\berror\s+(?:CS|MSB|NU|NETSDK|TS|BC|AD)\d+", re.I),
     re.compile(r"\bBuild FAILED\b", re.I),
@@ -133,22 +88,8 @@ _BUILD_FAILURE = (
     re.compile(r"^\s*FAILED \(no results\)", re.M | re.I),
     re.compile(r"\bMSB\d{4}\b"),
 )
-_CI_FAILURE = (
-    re.compile(r'"conclusion"\s*:\s*"(?:failure|startup_failure|timed_out|action_required)"', re.I),
-    re.compile(r'"state"\s*:\s*"(?:FAILURE|ERROR)"', re.I),
-    re.compile(r"^\s*[X×✖✗✘]\s+\S", re.M),
-    re.compile(r"\b(?!0\b)\d+\s+failing\b", re.I),
-    re.compile(r"^\S[^\r\n]*\bfail\b", re.M | re.I),
-    re.compile(r"\bProcess completed with exit code [1-9]"),
-)
-_CI_FAILED_JOB = (
-    re.compile(r"^\s*[X×✖✗✘]\s+(?P<job>[^\r\n]+?)\s+in\s+\d", re.M),
-    re.compile(r"^(?P<job>\S[^\r\n\t]*?)[\t ]+fail\b", re.M | re.I),
-)
-_MERGE_QUEUE = re.compile(r"merge_group|gh-readonly-queue|merge queue", re.I)
 _UI_JOB = re.compile(r"\bui\b|browser|playwright|reqnroll", re.I)
 _API_JOB = re.compile(r"\bapi\b|service", re.I)
-_E2E_JOB = re.compile(r"\be2e\b|end-to-end", re.I)
 
 
 def harness_of(data):
@@ -224,62 +165,94 @@ def _suite_tier(rest):
     return None
 
 
+def command_segments(command):
+    segments = []
+    start = 0
+    quote = None
+    escaped = False
+    for index, character in enumerate(command):
+        if escaped:
+            escaped = False
+            continue
+        if character in ("\\", "`") and quote != "'":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+        elif character in ("'", '"'):
+            quote = character
+        elif character in ";|&\n":
+            if command[start:index].strip():
+                segments.append(command[start:index])
+            start = index + 1
+    if command[start:].strip():
+        segments.append(command[start:])
+    return segments
+
+
 def classify_runner(command):
     """The test runner this command IS, or None. Shape first - a non-zero exit alone means nothing."""
-    match = _E2E_SCRIPT.search(command)
-    if match:
-        return Runner("scripts/e2e.ps1", _e2e_tier(match.group("rest")), "local")
-    if _INTEGRATION_SCRIPT.search(command):
-        return Runner("scripts/integration.ps1", "integration", "local")
-    if _UNIT_SCRIPT.search(command):
-        return Runner("scripts/unit.ps1", "unit", "local")
-    match = _TEST_SCRIPT.search(command)
-    if match:
-        return Runner("scripts/test.ps1", _suite_tier(match.group("rest")), "local")
-    if _LOCAL_PLATFORM_TEST.search(command):
-        return Runner("scripts/local-platform.ps1 test", _dotnet_tier(command), "local")
-    if _DOTNET_TEST.search(command):
-        return Runner("dotnet test", _dotnet_tier(command), "local")
-    if _NODE_TEST.search(command):
-        return Runner("the front-end test runner", None, "local")
-    if _GH_CI_READ.search(command):
-        return Runner("a CI / merge-queue result read", None, "ci")
+    for segment in command_segments(command):
+        match = _E2E_SCRIPT.match(segment)
+        if match:
+            return Runner("scripts/e2e.ps1", _e2e_tier(match.group("rest")))
+        if _INTEGRATION_SCRIPT.match(segment):
+            return Runner("scripts/integration.ps1", "integration")
+        if _UNIT_SCRIPT.match(segment):
+            return Runner("scripts/unit.ps1", "unit")
+        match = _TEST_SCRIPT.match(segment)
+        if match:
+            return Runner("scripts/test.ps1", _suite_tier(match.group("rest")))
+        if _LOCAL_PLATFORM_TEST.match(segment):
+            return Runner("scripts/local-platform.ps1 test", _dotnet_tier(segment))
+        if _DOTNET_TEST.match(segment):
+            return Runner("dotnet test", _dotnet_tier(segment))
+        if _NODE_TEST.match(segment):
+            return Runner("the front-end test runner", None)
     return None
 
 
-def is_red_run(runner, output):
-    if runner.source == "ci":
-        return any(pattern.search(output) for pattern in _CI_FAILURE)
+def exit_statuses(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in EXIT_STATUS_KEYS and isinstance(item, int) and not isinstance(item, bool):
+                yield item
+            else:
+                yield from exit_statuses(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from exit_statuses(item)
+
+
+def has_failed_exit(data):
+    event = data.get("hook_event_name") or data.get("hookEventName")
+    if event == "PostToolUseFailure":
+        return True
+    if any(isinstance(data.get(key), int) and not isinstance(data[key], bool)
+           and data[key] != 0 for key in EXIT_STATUS_KEYS):
+        return True
+    values = [data.get(key) for key in RESULT_KEYS]
+    return any(status != 0 for value in values for status in exit_statuses(value))
+
+
+def is_red_run(data, output):
     if any(pattern.search(output) for pattern in _COUNTED_TEST_FAILURE):
         return True
+    if _PASSED_TEST_SUMMARY.search(output):
+        return False
     if any(pattern.search(output) for pattern in _BUILD_FAILURE):
         return False
-    return any(pattern.search(output) for pattern in _SUITE_VERDICT)
-
-
-def ci_tier(output):
-    for pattern in _CI_FAILED_JOB:
-        for match in pattern.finditer(output):
-            job = match.group("job")
-            if _E2E_JOB.search(job):
-                return _e2e_tier(job)
-            if _UI_JOB.search(job):
-                return "e2e-ui"
-            if "integration" in job.lower():
-                return "integration"
-            if "unit" in job.lower():
-                return "unit"
-    return None
+    if any(pattern.search(output) for pattern in _SUITE_VERDICT):
+        return True
+    command = command_text(data.get("tool_name"), data.get("tool_input") or {}) or ""
+    return len(command_segments(command)) == 1 and has_failed_exit(data)
 
 
 def owed_skills(runner, output):
     tier = runner.tier
-    if runner.source == "ci" and tier is None:
-        tier = ci_tier(output)
     names = [OWNER_SKILL]
     names.extend(TIER_SKILLS.get(tier, ()))
-    if runner.source == "ci" and _MERGE_QUEUE.search(output):
-        names.append(QUEUE_SKILL)
     ordered, seen = [], set()
     for name in names:
         if name not in seen:
@@ -437,7 +410,7 @@ def handle_result(data):
     if runner is None:
         return 0
     output = result_text(data)
-    if not output or not is_red_run(runner, output):
+    if not is_red_run(data, output):
         return 0
     # After the cheap regex gates, not before: this runs on every shell call in the session, and
     # jurisdiction costs a directory walk and a `.git/config` read.
@@ -464,6 +437,9 @@ def handle_stop(data):
     session = data.get("session_id") or data.get("sessionId")
     state = load_state(session)
     if not state or state.get("answered"):
+        return 0
+    if classify_runner(state.get("command") or "") is None:
+        clear_state(session)
         return 0
     names = [name for name in state.get("skills") or [] if isinstance(name, str)]
     if not names:

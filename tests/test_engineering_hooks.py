@@ -44,7 +44,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                               input=json.dumps(payload), capture_output=True, text=True,
                               encoding='utf-8', cwd=self.cwd, env=self.environment, timeout=20)
 
-    def run_user_prompt_submit(self, host, prompt):
+    def run_user_prompt_submit(self, host, prompt, payload_root=None):
         manifest = json.loads(
             (self.package / f".{host}-plugin/plugin.json").read_text(encoding="utf-8")
         )
@@ -64,7 +64,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
             )
             arguments = None
         payload = {
-            "cwd": str(self.cwd),
+            "cwd": str(payload_root or self.cwd),
             "session_id": str(uuid.uuid4()),
             "hook_event_name": "UserPromptSubmit",
             "prompt": prompt,
@@ -78,6 +78,16 @@ class PackagedEngineeringHooks(unittest.TestCase):
             [sys.executable, *arguments], input=json.dumps(payload), capture_output=True,
             text=True, encoding="utf-8", cwd=self.cwd, env=self.environment, timeout=20,
         )
+
+    def run_without_stdin(self, path, arguments=()):
+        return subprocess.run(
+            [sys.executable, '-B', str(self.package / path), *arguments],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8',
+            cwd=self.cwd, env=self.environment, timeout=20,
+        )
+
+    def additional_context(self, result):
+        return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
 
     def test_each_host_context_uses_its_packaged_contract_without_mutating_the_caller(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
@@ -93,11 +103,14 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertIn(chr(36) + "{" + variable + "}/" + script, command)
                 result = self.run_hook(script)
                 self.assertEqual(0, result.returncode, result.stderr)
-                context = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+                context = self.additional_context(result)
                 self.assertIn("engineering:plan-execution", context)
                 self.assertRegex(context, r"load `engineering:lanes`.*?select the next phase")
                 self.assertIn(str(contract), context)
                 self.assertIn("source SHA-256", context)
+                body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1].strip()
+                self.assertTrue(context.split("\n\n", 1)[1].startswith(body))
+                self.assertIn("auto_approve_design=false", context)
                 bodies.append(context)
         self.assertEqual(1, len(set(bodies)))
         self.assertEqual([], list(self.cwd.iterdir()))
@@ -112,10 +125,120 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertIn("cannot read contract", result.stderr)
         self.assertEqual("", result.stdout)
 
-    def test_user_prompt_context_is_bounded_to_the_callout_section(self):
+    def test_each_host_uses_the_payload_checkout_for_routine_design_delegation(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        project = self.root / "configured repository"
+        agents = project / ".agents"
+        agents.mkdir(parents=True)
+        settings = agents / "settings.json"
+
+        for host in ("claude", "codex"):
+            settings.unlink(missing_ok=True)
+            with self.subTest(host=host, setting="absent"):
+                start = self.run_hook(script, {"cwd": str(project)})
+                self.assertEqual(0, start.returncode, start.stderr)
+                start_context = self.additional_context(start)
+                self.assertIn("auto_approve_design=false", start_context)
+                self.assertIn(str(settings), start_context)
+
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                self.assertIn("auto_approve_design=false", self.additional_context(prompt))
+
+            with self.subTest(host=host, setting="nested-all-enabled"):
+                settings.write_text(
+                    json.dumps({"configuration": {"core": {"auto_approve": {"all": True}}}}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                prompt_context = self.additional_context(prompt)
+                self.assertIn("auto_approve_design=true", prompt_context)
+                self.assertIn(str(settings), prompt_context)
+                self.assertIn("configuration.core.auto_approve.all", prompt_context)
+
+            with self.subTest(host=host, setting="nested-design-disabled-next-prompt"):
+                settings.write_text(
+                    json.dumps({"configuration": {
+                        "core": {"auto_approve": {"all": True, "design": False}}
+                    }}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                prompt_context = self.additional_context(prompt)
+                self.assertIn("auto_approve_design=false", prompt_context)
+                self.assertIn("configuration.core.auto_approve.design", prompt_context)
+
+            with self.subTest(host=host, setting="legacy-enabled"):
+                settings.write_text(
+                    json.dumps({"configuration": {"core": {"auto_approve_design": True}}}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                self.assertIn("auto_approve_design=true", self.additional_context(prompt))
+
+            with self.subTest(host=host, setting="invalid"):
+                settings.write_text(
+                    json.dumps({"configuration": {"core": {"auto_approve_design": "true"}}}),
+                    encoding="utf-8",
+                )
+                prompt = self.run_user_prompt_submit(
+                    host, "Continue the authorized task.", project
+                )
+                self.assertEqual(0, prompt.returncode, prompt.stderr)
+                prompt_context = self.additional_context(prompt)
+                self.assertIn("auto_approve_design=false", prompt_context)
+                self.assertIn("cannot resolve repository routine delegation", prompt_context)
+
+        invalid_root = self.run_hook(script, {"cwd": "not-an-absolute-root"})
+        self.assertEqual(0, invalid_root.returncode, invalid_root.stderr)
+        invalid_context = self.additional_context(invalid_root)
+        self.assertIn("auto_approve_design=false", invalid_context)
+        self.assertIn("existing absolute directory", invalid_context)
+
+        self.assertEqual([], list(self.cwd.iterdir()))
+
+    def test_context_fails_when_the_packaged_settings_reader_is_missing(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        project = self.root / "configured repository"
+        (project / ".agents").mkdir(parents=True)
+        reader = self.package / "workflows" / "repository_configuration.py"
+        reader.unlink()
+        result = self.run_hook(script, {"cwd": str(project)})
+        self.assertEqual(0, result.returncode, result.stderr)
+        context = self.additional_context(result)
+        self.assertIn("auto_approve_design=false", context)
+        self.assertIn("repository settings reader is unavailable", context)
+
+    def test_instruction_fragment_stays_static_without_stdin(self):
+        script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
+        result = self.run_without_stdin(script, ("--instruction-fragment",))
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("auto_approve_design=", result.stdout)
+
+    def test_user_prompt_context_includes_routine_delegation_guidance(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
         contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
-        heading = "## When the user calls out a mistake"
+        headings = (
+            "## When the user calls out a mistake",
+            "## A task has an owning lifecycle — load it before the first edit",
+            "## Repository routine-decision delegation",
+        )
+        body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
+        expected = "\n\n".join(
+            body.split(heading, 1)[1].split("\n## ", 1)[0].strip()
+            for heading in headings
+        )
 
         for host, variable in (("claude", "CLAUDE_PLUGIN_ROOT"), ("codex", "PLUGIN_ROOT")):
             with self.subTest(host=host):
@@ -135,26 +258,37 @@ class PackagedEngineeringHooks(unittest.TestCase):
                 self.assertEqual(1, len(prompt_context))
                 self.assertIn(chr(36) + "{" + variable + "}/" + script, prompt_context[0])
 
-                result = self.run_hook(script, {"hook_event_name": "UserPromptSubmit"}, ("--prompt-context",))
-                self.assertEqual(0, result.returncode, result.stderr)
-                output = json.loads(result.stdout)["hookSpecificOutput"]
-                self.assertEqual("UserPromptSubmit", output["hookEventName"])
-                context = output["additionalContext"]
-                body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
-                expected = body.split(heading, 1)[1].split("\n## ", 1)[0].strip()
-                self.assertIn(str(contract), context)
-                self.assertIn("source SHA-256", context)
-                self.assertNotIn(heading, context)
-                self.assertEqual(expected, context.split("\n\n", 1)[1])
-                self.assertIn("Questions ask for reasoning", context)
-                self.assertIn("only for new evidence or a stated user decision", context)
-                self.assertNotIn("## A task has an owning lifecycle", context)
-                self.assertLess(len(context), 1200)
+                for prompt in (
+                    "What should I work on?",
+                    "Move these global plans to a shared docs repo like Concertable docs.",
+                ):
+                    with self.subTest(prompt=prompt):
+                        result = self.run_user_prompt_submit(host, prompt)
+                        self.assertEqual(0, result.returncode, result.stderr)
+                        output = json.loads(result.stdout)["hookSpecificOutput"]
+                        self.assertEqual("UserPromptSubmit", output["hookEventName"])
+                        context = output["additionalContext"]
+                        source = context.split("\n\n", 1)[0].split("Source: ", 1)[1]
+                        self.assertTrue(source.endswith(str(
+                            Path(".agents") / "engineering" / "policy" / "session-guidance" / "SKILL.md"
+                        )))
+                        self.assertIn("source SHA-256", context)
+                        self.assertIn(expected, context)
+                        self.assertTrue(context.split("\n\n", 1)[1].startswith(expected))
+                        self.assertIn("auto_approve_design=false", context)
+                        normalized_context = " ".join(context.split())
+                        self.assertIn("load `engineering:lanes`", normalized_context)
+                        self.assertIn("select the next phase's lane", normalized_context)
+                        self.assertIn("Re-route per phase", normalized_context)
+                        self.assertIn("canonical execution rules", normalized_context)
+                        self.assertNotIn("## A link to another skill is a stage pointer", context)
+                        self.assertNotIn("## Keep large changes reviewable", context)
+                        self.assertLess(len(context), 4000)
 
         before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         contract.write_text(contract.read_text(encoding="utf-8").replace(
-            "Existing\nuser limits and scope gates still apply.",
-            "Existing\nuser limits and scope gates still apply. Canonical source changed.",
+            "An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair.",
+            "An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Canonical source changed.",
         ), encoding="utf-8")
         after = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertNotEqual(before, after)
@@ -203,29 +337,34 @@ class PackagedEngineeringHooks(unittest.TestCase):
     def test_prompt_context_reports_missing_and_empty_sections(self):
         script = ".agents/engineering/policy/session-guidance/scripts/session-context.py"
         contract = self.package / ".agents/engineering/policy/session-guidance/SKILL.md"
-        heading = "## When the user calls out a mistake"
+        headings = (
+            "## When the user calls out a mistake",
+            "## A task has an owning lifecycle — load it before the first edit",
+        )
         original = contract.read_text(encoding="utf-8")
 
-        contract.write_text(original.replace(heading, heading + " \t", 1), encoding="utf-8")
-        whitespace = self.run_hook(script, arguments=("--prompt-context",))
-        self.assertEqual(0, whitespace.returncode, whitespace.stderr)
+        for heading in headings:
+            with self.subTest(section=heading, defect="missing"):
+                contract.write_text(
+                    original.replace(heading, "## Replaced heading", 1), encoding="utf-8"
+                )
+                missing = self.run_hook(script, arguments=("--prompt-context",))
+                self.assertNotEqual(0, missing.returncode)
+                self.assertIn("missing prompt context section", missing.stderr)
+                self.assertIn(heading, missing.stderr)
+                self.assertEqual("", missing.stdout)
 
-        contract.write_text(original.replace(heading, "## Replaced heading"), encoding="utf-8")
-        missing = self.run_hook(script, arguments=("--prompt-context",))
-        self.assertNotEqual(0, missing.returncode)
-        self.assertIn("missing prompt context section", missing.stderr)
-        self.assertEqual("", missing.stdout)
-
-        before, remainder = original.split(heading, 1)
-        _, after = remainder.split("## A task has an owning lifecycle", 1)
-        contract.write_text(
-            before + heading + "\n\n## A task has an owning lifecycle" + after,
-            encoding="utf-8",
-        )
-        empty = self.run_hook(script, arguments=("--prompt-context",))
-        self.assertNotEqual(0, empty.returncode)
-        self.assertIn("is empty", empty.stderr)
-        self.assertEqual("", empty.stdout)
+            with self.subTest(section=heading, defect="empty"):
+                before, remainder = original.split(heading, 1)
+                _, after = remainder.split("\n## ", 1)
+                contract.write_text(
+                    before + heading + "\n\n## " + after, encoding="utf-8"
+                )
+                empty = self.run_hook(script, arguments=("--prompt-context",))
+                self.assertNotEqual(0, empty.returncode)
+                self.assertIn("is empty", empty.stderr)
+                self.assertIn(heading, empty.stderr)
+                self.assertEqual("", empty.stdout)
 
     def test_each_host_routes_an_active_goal_to_the_packaged_plan_execution_contract(self):
         (self.cwd / "GOAL.md").write_text(
@@ -338,6 +477,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
         self.assertNotIn("functions", codex_router["matcher"])
         self.assertFalse(any("skill_router.py" in command for command in commands(codex, "PreToolUse")))
         self.assertFalse(any("red_run_gate.py" in command for event in codex["hooks"] for command in commands(codex, event)))
+        self.assertTrue(any("merge_cleanup_gate.py" in command for command in commands(codex, "Stop")))
+        self.assertTrue(any("hook_dispatch.py" in command for command in commands(codex, "Stop")))
         self.assertTrue(any("skill_router.py" in command for command in commands(base_claude, "PreToolUse")))
         self.assertFalse(any("skill_router.py" in command for command in commands(claude, "PreToolUse")))
         for event in ("PostToolUse", "PostToolUseFailure", "Stop"):

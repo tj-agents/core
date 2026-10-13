@@ -9,7 +9,8 @@ domain: process
 
 An unqualified request to hand off means performing the transfer. Preparing a pointer alone does not
 complete it. Respect an explicitly named target harness; otherwise select `machine:handoff-codex`.
-For Claude select `machine:handoff-claude`. The machine plugin and that launcher's documented platform
+For a Claude parent, use `machine:handoff-codex` for multi-phase work and delegated design, implementation,
+or review; use `machine:handoff-claude` only for an explicit user choice of non-frontier Claude work. The machine plugin and that launcher's documented platform
 and CLI prerequisites must be available. Resolve the skill using native discovery and load its
 instructions; do not guess a sibling-plugin or author-checkout path.
 
@@ -33,7 +34,11 @@ session continues its independent active task.
    and branch. Preserve the review URL in the goal or ledger's `PR:` field when execution moves.
    Update the existing canonical plan with observed state,
    verification, remaining scope, next action, authorization and transfer ownership. A standalone goal
-   does not need a second ledger or an engineering runtime.
+   does not need a second ledger or an engineering runtime. Checkpoint the effective
+   design-approval value resolved from `configuration.core.auto_approve` or its legacy alias, its exact
+   settings provenance, and every decision the
+   user explicitly reserved when routine design delegation applies; the successor rereads the actual
+   checkout before acting.
 2. Apply `engineering:handoff-format` for a selected engineering lifecycle. For a standalone goal, make a
    two-line pointer: `cd <absolute-working-directory>`, followed by a request to read the absolute goal
    path and execute its `## Next Steps`. Keep the actual work instructions in that same goal file.
@@ -83,7 +88,8 @@ host execution establishes host acceptance.
    contains transport evidence only. Set an explicit pickup observation budget in the goal, honoring
    tighter user limits; absent a user limit, allow five minutes of bounded read-only observations.
    Planning-only, prompt-only and inline work creates no receipt.
-2. Run the helper from the owning checkout, using its absolute path for every command:
+2. Run the helper from the owning checkout, using its absolute path for every command. Use `python` on
+   Windows and `python3` on Linux/macOS:
 
    ```text
    python -B <skill-directory>/scripts/transfer.py prepare --goal <absolute-goal> --worktree <absolute-checkout> --receipt <absolute-receipt> --predecessor <current-session-identity> --harness codex
@@ -160,7 +166,7 @@ recorded release marker. Without `finish` it cannot end its own host process or 
 successor's `## Next Steps` must gate the operation on that marker, then close the predecessor itself with
 `machine:peer-cli`: resolve the registry entry whose `cwd` is the target checkout (and the recorded session
 id or tab title when the goal names one); `close` verifies the recorded host pid and start time against the
-live process, `close-tab.ps1` takes the tab, and an unverifiable entry stays open with the user named as
+live process, `close_tab.py` takes only its exact native terminal identity, and an unverifiable entry stays open with the user named as
 resolver. The successor then performs the operation from the target checkout and treats a command error or
 residual path as incomplete rather than accepting partial Git cleanup.
 

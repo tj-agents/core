@@ -137,8 +137,10 @@ def session(path, host):
             if not isinstance(payload, dict):
                 continue
             if kind == 'session_meta':
-                if isinstance(payload.get('source'), dict) and 'subagent' in payload['source']:
+                source = payload.get('source')
+                if isinstance(source, dict) and 'subagent' in source:
                     return None
+                result['source'] = source
                 result.update(session=payload.get('id'), cwd=payload.get('cwd'))
                 result['branch'] = (payload.get('git') or {}).get('branch')
             elif kind == 'response_item' and payload.get('type') == 'message':

@@ -73,6 +73,13 @@ it as soon as it is ready and authorized, sync the remote default, then start th
 updated base. Plan the full sequence while keeping one delivery slice active by default. A future
 dependency in a plan does not by itself require concurrent branches or open PRs.
 
+A preparatory slice exists to unblock the named substantive work. Once it has landed and its required
+checks are satisfied, begin that next authorized slice. Reuse the recorded split assessment while its
+scope and measured inputs remain valid; repeat it only for a changed concern, dependency, base or
+candidate. Required review and delivery checks still apply to their own candidate. Do not turn the
+completed preparation into another round of preparation without identifying the new fact that requires
+it.
+
 When the next slice must proceed before its required parent can land, record the concrete constraint
 preventing the parent from merging and why proceeding now is necessary. Use a stack for that overlap.
 **Every PR that builds on another unmerged PR must be stacked**: branch from the parent's verified tip,

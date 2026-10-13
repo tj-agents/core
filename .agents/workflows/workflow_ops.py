@@ -1,6 +1,7 @@
 import argparse
 import base64
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -12,11 +13,14 @@ import sys
 import tarfile
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import delivery_runtime
+import delivery_policy
 import workflow_runtime
 from pr_body import validate_pr_body
 
@@ -27,18 +31,65 @@ DEFAULT_SUMMARY_LINES = 8
 DEFAULT_FAILURE_ITEMS = 20
 DEFAULT_SUMMARY_BYTES = 4096
 DEFAULT_POLL_SECONDS = 60
+MIN_PR_READINESS_POLL_SECONDS = 15
+MAX_PR_READINESS_POLL_SECONDS = 300
 DEFAULT_MONITOR_SECONDS = 21600
 DEFAULT_OFFLINE_GAP_SECONDS = 300
 REVIEW_BUNDLE_RETENTION_SECONDS = 7 * 24 * 60 * 60
+# MoveFileEx reports a conflicting open handle as either access denied or sharing violation.
+WINDOWS_REPLACE_CONFLICTS = (5, 32)
 FAILURE_PATTERN = re.compile(
     r"(?:\bfailed\b|\bfailure\b|\berror\b|\bfatal\b|\bexception\b|\bpanic\b|\btimeout\b)",
     re.IGNORECASE,
 )
 SECRET_PATTERN = re.compile(r"(?:token|secret|password|key|authorization)", re.IGNORECASE)
+EXTERNAL_BILLING_PATTERN = re.compile(
+    r"(?:failed payment|payment failed|spending limit|billing.{0,80}(?:payment|limit)|(?:payment|billing).{0,80}(?:failed|limit))",
+    re.IGNORECASE,
+)
+EXTERNAL_RUNNER_PATTERN = re.compile(
+    r"(?:no (?:self-hosted )?runners? (?:are )?(?:available|online)|runner.{0,80}(?:unavailable|offline|not available))",
+    re.IGNORECASE,
+)
+EXTERNAL_PROVIDER_PATTERN = re.compile(
+    r"(?:provider.{0,80}(?:unavailable|outage|incident)|external service.{0,80}(?:unavailable|outage|incident))",
+    re.IGNORECASE,
+)
+EXTERNAL_ACCOUNT_PATTERN = re.compile(
+    r"(?:account.{0,80}(?:disabled|suspended|restricted)|organization.{0,80}(?:disabled|suspended|restricted))",
+    re.IGNORECASE,
+)
+HOST_COVERAGE_MODULE = None
 
 
 class WorkflowOperationError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class _DeliveryBindContext:
+    root: Path
+    common_git_directory: Path
+
+
+def host_coverage_module():
+    global HOST_COVERAGE_MODULE
+    if HOST_COVERAGE_MODULE is not None:
+        return HOST_COVERAGE_MODULE
+    candidates = (
+        Path(__file__).resolve().parent / "host_coverage.py",
+        Path(__file__).resolve().parents[1] / "base" / "policy" / "plan-artifacts" / "scripts" / "host_coverage.py",
+    )
+    path = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if path is None:
+        raise WorkflowOperationError("host coverage validator is not available")
+    spec = importlib.util.spec_from_file_location("agent_host_coverage", path)
+    if spec is None or spec.loader is None:
+        raise WorkflowOperationError("host coverage validator could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    HOST_COVERAGE_MODULE = module
+    return module
 
 
 class MonitorLease:
@@ -137,6 +188,36 @@ def common_git_directory(root):
     return common.resolve()
 
 
+def _delivery_bind_context(start):
+    completed = run_process(
+        [
+            "git",
+            "rev-parse",
+            "--path-format=absolute",
+            "--show-toplevel",
+            "--git-common-dir",
+        ],
+        start,
+    )
+    records = completed.stdout.splitlines()
+    if len(records) != 2 or any(not record.strip() for record in records):
+        raise WorkflowOperationError("git did not return the delivery binding repository context")
+    root, common = (Path(record) for record in records)
+    if not root.is_absolute() or not common.is_absolute():
+        raise WorkflowOperationError("git returned a non-absolute delivery binding repository context")
+    root = root.resolve()
+    common = common.resolve()
+    if not root.is_dir() or not common.is_dir():
+        raise WorkflowOperationError("git returned an unusable delivery binding repository context")
+    return _DeliveryBindContext(root, common)
+
+
+def _matching_delivery_bind_context(root, context):
+    if context is not None and context.root != Path(root).resolve():
+        raise WorkflowOperationError("delivery binding repository context does not match this checkout")
+    return context
+
+
 def worktree_roots(root):
     listing = run_process(
         ["git", "worktree", "list", "--porcelain", "-z"], root, text=False
@@ -148,16 +229,18 @@ def worktree_roots(root):
     return roots
 
 
-def state_root(root):
-    target = common_git_directory(root) / "agent-workflow"
+def state_root(root, context=None):
+    context = _matching_delivery_bind_context(root, context)
+    common = context.common_git_directory if context is not None else common_git_directory(root)
+    target = common / "agent-workflow"
     target.mkdir(parents=True, exist_ok=True)
     return target
 
 
-def run_root(root, workflow_run_id):
+def run_root(root, workflow_run_id, context=None):
     if not isinstance(workflow_run_id, str) or not workflow_run_id.strip():
         raise WorkflowOperationError("workflow run id is required")
-    runs = state_root(root) / "runs"
+    runs = state_root(root, context) / "runs"
     candidate = runs / workflow_run_id
     try:
         parts = candidate.relative_to(runs).parts
@@ -185,11 +268,27 @@ def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    try:
+        retry_windows_sharing_violation(lambda: os.replace(temporary, path))
+    finally:
+        if temporary.exists():
+            temporary.unlink()
 
 
-def append_event(root, workflow_run_id, event):
-    path = run_root(root, workflow_run_id) / "telemetry.jsonl"
+def retry_windows_sharing_violation(action, timeout=2):
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return action()
+        except PermissionError as error:
+            if (os.name != "nt" or getattr(error, "winerror", None) not in WINDOWS_REPLACE_CONFLICTS
+                    or time.monotonic() >= deadline):
+                raise
+            time.sleep(0.01)
+
+
+def append_event(root, workflow_run_id, event, context=None):
+    path = run_root(root, workflow_run_id, context) / "telemetry.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {"schema_version": SCHEMA_VERSION, "at": utc_now(), **event}
     with path.open("a", encoding="utf-8") as stream:
@@ -763,6 +862,38 @@ def descriptor_identity(value):
     return digest({key: item for key, item in value.items() if key not in excluded})
 
 
+def review_work_order(root, branch):
+    slug = branch.replace("/", "-").replace("\\", "-")
+    return root / "reviews" / f"{slug}.md"
+
+
+def coverage_requirement(paths):
+    return host_coverage_module().agent_surface_paths(paths)
+
+
+def review_host_check(root, workflow_run_id, descriptor_path, work_order):
+    descriptor = load_descriptor(root, workflow_run_id, descriptor_path)
+    paths = coverage_requirement(descriptor["paths"])
+    expected = review_work_order(root, descriptor["branch"])
+    candidate = (root / work_order).resolve()
+    if candidate != expected.resolve():
+        raise WorkflowOperationError("host coverage must use the canonical review work order")
+    result = {
+        "schema_version": SCHEMA_VERSION,
+        "operation": "review-host-check",
+        "required": bool(paths),
+        "paths": paths,
+        "work_order": str(expected.relative_to(root)).replace("\\", "/"),
+        "head": descriptor["head"],
+    }
+    if paths:
+        result.update(host_coverage_module().validate_documents([expected], "review", descriptor["head"]))
+    else:
+        result.update({"stage": "review", "valid": True, "errors": [], "record_count": 0})
+    append_event(root, workflow_run_id, {"kind": "operation", "operation": "review-host-check", "valid": result["valid"]})
+    return result
+
+
 def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
     cleanup_review_bundles(root)
     sync = synchronize_for_review(root, base_ref) if synchronize else None
@@ -789,6 +920,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
         tree_archive = materialize_tree(root, head, locations["tree_archive"], locations["tree"])
         tree_sha256 = tree_content_digest(locations["tree"])
         skills, route_violations = route_findings(locations["tree"], paths)
+        agent_paths = coverage_requirement(paths)
         rules = []
         for name in skills:
             path = locations["tree"] / ".agents" / "skills" / name / "SKILL.md"
@@ -806,6 +938,10 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize):
             "tree_archive_sha256": hashlib.sha256(tree_archive).hexdigest(),
             "tree_content_sha256": tree_sha256,
             "paths": paths,
+            "host_coverage": {
+                "required": bool(agent_paths),
+                "paths": agent_paths,
+            },
             "path_digest": path_digest,
             "patch_sha256": hashlib.sha256(patch).hexdigest(),
             "rules": rules,
@@ -972,8 +1108,10 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
     reasons = []
     if current_head != descriptor["head"]:
         reasons.append("candidate-head-changed")
-    if current_base != descriptor["base"]:
-        changed = git(root, "diff", "--name-only", descriptor["base"], current_base).splitlines()
+    comparison_base = git(root, "merge-base", descriptor["head"], current_base)
+    base_moved = current_base != comparison_base
+    if base_moved:
+        changed = git(root, "diff", "--name-only", comparison_base, current_base).splitlines()
         sensitive = set(descriptor["paths"]) | {rule["path"] for rule in descriptor["rules"]}
         if sensitive.intersection(changed):
             reasons.append("base-changed-relevant-evidence")
@@ -985,7 +1123,7 @@ def review_reconcile(root, workflow_run_id, descriptor_path, base_ref):
         "current_head": current_head,
         "review_required": bool(reasons),
         "reasons": reasons,
-        "base_moved": current_base != descriptor["base"],
+        "base_moved": base_moved,
         "exact_head": current_head == descriptor["head"],
     }
     append_event(root, workflow_run_id, {"kind": "review", "operation": "reconcile", "review_required": result["review_required"]})
@@ -1009,6 +1147,159 @@ def parse_status_checks(checks):
         elif status not in {"completed", "success"} or not conclusion:
             pending.append(name)
     return failures, pending
+
+
+def failed_check_items(checks):
+    failures = []
+    for check in checks or []:
+        state = str(check.get("state") or "").lower()
+        conclusion = str(check.get("conclusion") or "").lower()
+        if state in {"error", "failure", "failed"} or (
+            conclusion and conclusion not in {"success", "neutral", "skipped"}
+        ):
+            failures.append(check)
+    return failures
+
+
+def check_url(check):
+    return check.get("detailsUrl") or check.get("targetUrl") or check.get("url") or check.get("permalink")
+
+
+def classify_external_check(value):
+    output = value.get("output") or {}
+    text = "\n".join(
+        str(item or "") for item in (value.get("name"), output.get("title"), output.get("summary"), output.get("text"))
+    )
+    if EXTERNAL_BILLING_PATTERN.search(text):
+        return {
+            "kind": "github-billing",
+            "resolver": "GitHub organization/account billing administrator",
+            "resume_condition": "The GitHub organization/account billing administrator restores billing or raises the spending limit, then rerun pr-readiness.",
+        }
+    if EXTERNAL_RUNNER_PATTERN.search(text):
+        return {
+            "kind": "runner",
+            "resolver": "repository or organization runner administrator",
+            "resume_condition": "A repository or organization runner administrator restores an eligible runner, then rerun pr-readiness.",
+        }
+    if EXTERNAL_ACCOUNT_PATTERN.search(text):
+        return {
+            "kind": "account",
+            "resolver": "GitHub organization/account administrator",
+            "resume_condition": "The GitHub organization/account administrator restores the account, then rerun pr-readiness.",
+        }
+    if EXTERNAL_PROVIDER_PATTERN.search(text):
+        return {
+            "kind": "provider",
+            "resolver": "external provider administrator",
+            "resume_condition": "The external provider administrator restores the service, then rerun pr-readiness.",
+        }
+    return None
+
+
+def external_check_block(root, repository, check, head):
+    check_id = check.get("databaseId") or check.get("id")
+    endpoint = (
+        f"repos/{repository}/check-runs/{check_id}"
+        if check_id is not None
+        else f"repos/{repository}/commits/{head}/check-runs"
+    )
+    completed = run_process(["gh", "api", endpoint], root, check=False)
+    if completed.returncode:
+        return None
+    try:
+        value = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return None
+    if check_id is not None:
+        return classify_external_check(value)
+    name = check.get("name") or check.get("context")
+    for item in value.get("check_runs") or []:
+        if item.get("name") == name:
+            block = classify_external_check(item)
+            if block:
+                return block
+    return None
+
+
+def pr_readiness_observation(root, pr, repo=None, poll_seconds=DEFAULT_POLL_SECONDS):
+    value = pull_request_state(root, pr, repo)
+    repository = repo or repository_slug(root)
+    failures = failed_check_items(value.get("statusCheckRollup"))
+    pending = parse_status_checks(value.get("statusCheckRollup"))[1]
+    identity = {"pr": value.get("number"), "url": value.get("url"), "repository": repository}
+    state = str(value.get("state") or "open").lower()
+    if state != "open":
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "pr-readiness",
+            "state": state,
+            "terminal": True,
+            "message": f"PR is {state}, not ready for the next delivery gate.",
+            "identity": identity,
+            "exit_state": "passed" if state == "merged" else "failed",
+        }
+    if failures:
+        for failed in failures:
+            check = {"name": failed.get("name") or failed.get("context") or "unknown", "url": check_url(failed)}
+            block = external_check_block(root, repository, failed, value.get("headRefOid"))
+            if block:
+                return {
+                    "schema_version": SCHEMA_VERSION,
+                    "operation": "pr-readiness",
+                    "state": "blocked",
+                    "terminal": True,
+                    "eta": "no ETA available",
+                    "failed_check": check,
+                    "external_block": block,
+                    "identity": identity,
+                    "exit_state": "failed",
+                }
+        failed = failures[0]
+        check = {"name": failed.get("name") or failed.get("context") or "unknown", "url": check_url(failed)}
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "pr-readiness",
+            "state": "failed",
+            "terminal": True,
+            "failed_check": check,
+            "identity": identity,
+            "exit_state": "failed",
+        }
+    if pending:
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "operation": "pr-readiness",
+            "state": "waiting",
+            "terminal": False,
+            "observed_pending_checks": pending,
+            "recheck_seconds": poll_seconds,
+            "identity": identity,
+            "exit_state": "waiting",
+        }
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "operation": "pr-readiness",
+        "state": "ready",
+        "terminal": True,
+        "message": "PR checks are green and ready for the next delivery gate.",
+        "identity": identity,
+        "exit_state": "passed",
+    }
+
+
+def pr_readiness(root, pr, repo=None, poll_seconds=DEFAULT_POLL_SECONDS, watch=False, on_wait=None):
+    if not MIN_PR_READINESS_POLL_SECONDS <= poll_seconds <= MAX_PR_READINESS_POLL_SECONDS:
+        raise WorkflowOperationError(
+            f"pr readiness poll seconds must be between {MIN_PR_READINESS_POLL_SECONDS} and {MAX_PR_READINESS_POLL_SECONDS}"
+        )
+    while True:
+        result = pr_readiness_observation(root, pr, repo, poll_seconds)
+        if result["terminal"] or not watch:
+            return result
+        if on_wait is not None:
+            on_wait(result)
+        time.sleep(poll_seconds)
 
 
 def forge_observation(root, identity):
@@ -1428,12 +1719,36 @@ def delivery_owner(root, workflow_run_id, ledger=None, pr_url=None):
             "head": value["headRefOid"], "base": value["baseRefName"], "action": action}
 
 
+def delivery_host_coverage(root, base_ref):
+    head = git(root, "rev-parse", "HEAD")
+    base = git(root, "merge-base", base_ref, head)
+    paths = git(root, "diff", "--name-only", base, head).splitlines()
+    agent_paths = coverage_requirement(paths)
+    review = review_binding(root, git(root, "branch", "--show-current"), head)
+    coverage_head = review["reviewed_sha"] or head
+    result = {
+        "required": bool(agent_paths),
+        "paths": agent_paths,
+        "head": head,
+        "coverage_head": coverage_head,
+        "base": base,
+    }
+    if agent_paths:
+        work_order = root / review["work_order"]
+        result["work_order"] = str(work_order.relative_to(root)).replace("\\", "/")
+        result.update(host_coverage_module().validate_documents([work_order], "review", coverage_head))
+    else:
+        result.update({"stage": "review", "valid": True, "errors": [], "record_count": 0})
+    return result
+
+
 def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref, ledger=None, pr_url=None):
     ownership = delivery_owner(root, workflow_run_id, ledger, pr_url)
     owning_base = f"origin/{ownership['base']}" if ownership.get("base") else None
     base_ref = base_ref or owning_base or "origin/main"
     inspection = inspect_repository(root, workflow_run_id)
     review = review_reconcile(root, workflow_run_id, descriptor_path, base_ref) if descriptor_path else None
+    coverage = delivery_host_coverage(root, base_ref)
     counts = git(root, "rev-list", "--left-right", "--count", f"{base_ref}...HEAD").split()
     base_behind = int(counts[0]) if len(counts) == 2 else None
     branch_valid = bool(re.fullmatch(r"[A-Z][A-Za-z0-9-]*/[A-Z][A-Za-z0-9-]*", inspection["branch"]))
@@ -1459,6 +1774,8 @@ def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref, ledger=
         blockers.append("uncommitted-code")
     if review and review["review_required"]:
         blockers.append("review-invalidated")
+    if coverage["required"] and not coverage["valid"]:
+        blockers.append("host-coverage-invalid")
     result = {
         "schema_version": SCHEMA_VERSION,
         "operation": "delivery-preflight",
@@ -1469,6 +1786,7 @@ def delivery_preflight(root, workflow_run_id, descriptor_path, base_ref, ledger=
         "code_dirty_paths": code_dirty,
         "documentation_dirty_paths": [path for path in inspection["dirty_paths"] if path not in code_dirty],
         "review": review,
+        "host_coverage": coverage,
         "blockers": blockers,
         "ready": not blockers,
     }
@@ -1543,7 +1861,7 @@ def goal_preflight(root, workflow_run_id):
 
 
 def pull_request_state(root, pr, repo=None):
-    fields = "number,url,body,headRefOid,headRefName,state,isDraft,labels,files,changedFiles,statusCheckRollup"
+    fields = "number,url,body,headRefOid,headRefName,state,isDraft,mergeStateStatus,labels,files,changedFiles,statusCheckRollup"
     arguments = ["gh", "pr", "view"]
     if pr is not None:
         arguments.append(str(pr))
@@ -1569,14 +1887,14 @@ def pr_body_check(root, pr, repo=None):
     }
 
 
-def changed_paths(root, pr, reported, expected_count=None):
+def _changed_paths_for_repository(root, repository, pr, reported, expected_count=None):
     """Every path the PR changes, from GitHub's paginated pull-files endpoint.
 
     `gh pr view --json files` stops at 100 entries and `gh pr diff` is unavailable once a pull request
     exceeds GitHub's unified-diff file limit. Standing authorization needs the complete path set, so use
     the paginated REST collection, require every summary path, and verify GitHub's authoritative count.
     """
-    endpoint = f"repos/{repository_slug(root)}/pulls/{pr}/files?per_page=100"
+    endpoint = f"repos/{repository}/pulls/{pr}/files?per_page=100"
     completed = run_process(
         ["gh", "api", "--paginate", endpoint, "--jq", ".[].filename"], root, check=False
     )
@@ -1598,6 +1916,12 @@ def changed_paths(root, pr, reported, expected_count=None):
             + "; the changed-path set is not established"
         )
     return paths
+
+
+def changed_paths(root, pr, reported, expected_count=None):
+    return _changed_paths_for_repository(
+        root, repository_slug(root), pr, reported, expected_count
+    )
 
 def pending_evidence(rollup, head):
     """Every not-yet-terminal check as an exact `(check id, run id, head)` triple.
@@ -1678,23 +2002,20 @@ def review_binding(root, branch, head):
 
 
 def standing_authorization(root, changed_paths, labels):
-    path = root / delivery_runtime.STANDING_AUTHORIZATION_FILE
-    if not path.is_file():
-        resolution = delivery_runtime.StandingMergeAuthorization().resolve(
-            {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
-            changed_paths, labels,
-        )
-        if resolution["stopped_by"] is None:
-            resolution["stopped_by"] = {"class": "no-recorded-authorization"}
-        return resolution
     try:
-        policy = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise WorkflowOperationError(
-            f"{delivery_runtime.STANDING_AUTHORIZATION_FILE} exists but could not be read: {error}"
-        ) from error
+        policy = delivery_policy.load_legacy_policy(root)
+    except delivery_policy.PolicyViolation as error:
+        raise WorkflowOperationError(str(error)) from error
     try:
-        return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels)
+        if policy is None:
+            resolution = delivery_runtime.StandingMergeAuthorization().resolve(
+                {"standing_authorization": "absent", "instruction": None, "hold_label": "human-gate"},
+                changed_paths, labels, root,
+            )
+            if resolution["stopped_by"] is None:
+                resolution["stopped_by"] = {"class": "no-recorded-authorization"}
+            return resolution
+        return delivery_runtime.StandingMergeAuthorization().resolve(policy, changed_paths, labels, root)
     except delivery_runtime.DeliveryContractViolation as error:
         raise WorkflowOperationError(str(error)) from error
 
@@ -1730,8 +2051,11 @@ def scoped_approval(root, repository, number, branch, supplied):
     return record
 
 
-def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None):
-    value = pull_request_state(root, pr)
+def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, approval_record=None,
+                  context=None):
+    _matching_delivery_bind_context(root, context)
+    repository = repository_slug(root)
+    value = pull_request_state(root, pr, repository)
     validation = validate_pr_body(value.get("body"))
     if not validation["valid"]:
         raise WorkflowOperationError("; ".join(validation["errors"]))
@@ -1744,9 +2068,8 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
     if state != "open":
         raise WorkflowOperationError(f"PR #{number} is {state or 'unknown'}, so it owns no delivery")
     reported = [str(item.get("path")) for item in value.get("files") or [] if item.get("path")]
-    changed = changed_paths(root, number, reported, value.get("changedFiles"))
+    changed = _changed_paths_for_repository(root, repository, number, reported, value.get("changedFiles"))
     labels = [str(item.get("name")) for item in value.get("labels") or [] if item.get("name")]
-    repository = repository_slug(root)
     approval = scoped_approval(root, repository, number, branch, approval_record)
     resolution = standing_authorization(root, changed, labels)
     if approval is not None and (resolution["stopped_by"] is None
@@ -1763,6 +2086,7 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
         "pending_evidence": pending_evidence(value.get("statusCheckRollup"), head),
         "review": review_binding(root, branch, head),
         "merge_authorization": resolution["merge_authorization"],
+        "auto_merge": resolution["auto_merge"],
         "completion_condition": completion_condition,
     }
     if handoff is not None:
@@ -1794,6 +2118,7 @@ def delivery_bind(root, workflow_run_id, pr, completion_condition, handoff, appr
             "head": head,
             "authorization": resolution["merge_authorization"]["mode"],
         },
+        context,
     )
     return {
         "schema_version": SCHEMA_VERSION,
@@ -1855,6 +2180,10 @@ def parser():
     review.add_argument("--head", default="HEAD")
     review.add_argument("--synchronize", action="store_true")
 
+    host_check = commands.add_parser("review-host-check")
+    host_check.add_argument("--descriptor", required=True)
+    host_check.add_argument("--work-order", required=True)
+
     reconcile = commands.add_parser("review-reconcile")
     reconcile.add_argument("--descriptor", required=True)
     reconcile.add_argument("--base", default="origin/main")
@@ -1890,6 +2219,12 @@ def parser():
     body_check.add_argument("--pr", required=True)
     body_check.add_argument("--repo")
 
+    readiness = commands.add_parser("pr-readiness")
+    readiness.add_argument("--pr", required=True)
+    readiness.add_argument("--repo")
+    readiness.add_argument("--poll-seconds", type=float, default=DEFAULT_POLL_SECONDS)
+    readiness.add_argument("--watch", action="store_true")
+
     bind = commands.add_parser("delivery-bind")
     bind.add_argument("--pr", type=int)
     bind.add_argument("--approval-record")
@@ -1911,9 +2246,14 @@ def parser():
 
 def main(argv=None):
     arguments = parser().parse_args(argv)
-    root = repository_root(Path(arguments.root).resolve())
+    context = None
+    if arguments.operation == "delivery-bind":
+        context = _delivery_bind_context(Path(arguments.root).resolve())
+        root = context.root
+    else:
+        root = repository_root(Path(arguments.root).resolve())
     if arguments.operation != "pr-body-check":
-        run_root(root, arguments.workflow_run_id)
+        run_root(root, arguments.workflow_run_id, context)
     if arguments.operation == "run":
         command = arguments.command[1:] if arguments.command[:1] == ["--"] else arguments.command
         result = compact_run(root, arguments.workflow_run_id, arguments.label, command, arguments.summary_lines, arguments.failure_items, arguments.summary_bytes)
@@ -1921,6 +2261,8 @@ def main(argv=None):
         result = inspect_repository(root, arguments.workflow_run_id)
     elif arguments.operation == "review-prepare":
         result = review_prepare(root, arguments.workflow_run_id, arguments.base, arguments.head, arguments.synchronize)
+    elif arguments.operation == "review-host-check":
+        result = review_host_check(root, arguments.workflow_run_id, arguments.descriptor, arguments.work_order)
     elif arguments.operation == "review-reconcile":
         result = review_reconcile(root, arguments.workflow_run_id, arguments.descriptor, arguments.base)
     elif arguments.operation == "monitor":
@@ -1936,6 +2278,11 @@ def main(argv=None):
         result = goal_preflight(root, arguments.workflow_run_id)
     elif arguments.operation == "pr-body-check":
         result = pr_body_check(root, arguments.pr, arguments.repo)
+    elif arguments.operation == "pr-readiness":
+        result = pr_readiness(
+            root, arguments.pr, arguments.repo, arguments.poll_seconds, arguments.watch,
+            emit if arguments.watch else None,
+        )
     elif arguments.operation == "delivery-bind":
         declared = (arguments.workflow_id, arguments.state_artifact, arguments.next_stage)
         if any(declared) and not all(declared):
@@ -1953,7 +2300,7 @@ def main(argv=None):
         )
         result = delivery_bind(
             root, arguments.workflow_run_id, arguments.pr, arguments.completion_condition, handoff,
-            arguments.approval_record,
+            arguments.approval_record, context,
         )
     elif arguments.operation == "delivery-release":
         result = delivery_release(root, arguments.workflow_run_id, arguments.reason)
@@ -1961,6 +2308,8 @@ def main(argv=None):
         result = cleanup(root, arguments.workflow_run_id, arguments.retention_days)
     emit(result)
     if arguments.operation == "delivery-preflight" and not result["ready"]:
+        return 1
+    if arguments.operation == "review-host-check" and not result["valid"]:
         return 1
     return 0 if result.get("exit_state") != "failed" and result.get("budget", {}).get("allowed", True) else 1
 

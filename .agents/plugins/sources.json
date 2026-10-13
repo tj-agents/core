@@ -61,6 +61,11 @@
     },
     {
       "plugin": "base",
+      "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
+      "destination": "resources/plan-artifacts/host_coverage.py"
+    },
+    {
+      "plugin": "base",
       "source": ".agents/hooks/codex_hook_snapshot.py",
       "destination": "hooks/codex_hook_snapshot.py"
     },
@@ -110,6 +115,11 @@
       "destination": ".agents/lanes"
     },
     {
+      "plugin": "engineering",
+      "source": ".agents/engineering/resources/problem-records.md",
+      "destination": ".agents/engineering/resources/problem-records.md"
+    },
+    {
       "plugin": "machine",
       "source": ".agents/hooks/hook_dispatch.py",
       "destination": "hooks/hook_dispatch.py"
@@ -118,6 +128,11 @@
       "plugin": "machine",
       "source": ".agents/machine/scripts",
       "destination": "resources/machine/scripts"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/machine/resources/task-recovery.md",
+      "destination": ".agents/machine/resources/task-recovery.md"
     },
     {
       "plugin": "machine",
@@ -145,6 +160,21 @@
       "destination": "workflows"
     },
     {
+      "plugin": "machine",
+      "source": ".agents/workflows/delivery_policy.py",
+      "destination": "resources/machine/scripts/delivery_policy.py"
+    },
+    {
+      "plugin": "machine",
+      "source": ".agents/workflows/repository_configuration.py",
+      "destination": "resources/machine/scripts/repository_configuration.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
+      "destination": "workflows/host_coverage.py"
+    },
+    {
       "plugin": "engineering",
       "source": ".codex/install-workflow-agents.ps1",
       "destination": "scripts/install-codex-agents.ps1"
@@ -163,6 +193,16 @@
       "plugin": "engineering",
       "source": ".agents/hooks/compact_output_gate.py",
       "destination": "hooks/compact_output_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/callout_repair_gate.py",
+      "destination": "hooks/callout_repair_gate.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/continuation_stop.py",
+      "destination": "hooks/continuation_stop.py"
     },
     {
       "plugin": "engineering",
@@ -241,6 +281,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/hooks/worktree_placement_gate.py",
+      "destination": "hooks/worktree_placement_gate.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/workflow_route.py",
       "destination": "hooks/workflow_route.py"
     },
@@ -288,12 +333,43 @@
       "plugin": "machine",
       "source": ".agents/tiers/machine.json",
       "destination": "tier.json"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/project_facts.py",
+      "destination": "hooks/project_facts.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/hooks/standards_context.py",
+      "destination": "hooks/standards_context.py"
+    },
+    {
+      "plugin": "base",
+      "source": ".agents/schemas/standards-context.schema.json",
+      "destination": "schemas/standards-context.schema.json"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/project_facts.py",
+      "destination": "hooks/project_facts.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/hooks/standards_context.py",
+      "destination": "hooks/standards_context.py"
+    },
+    {
+      "plugin": "engineering",
+      "source": ".agents/schemas/standards-context.schema.json",
+      "destination": "schemas/standards-context.schema.json"
     }
   ],
   "prerequisites": {
     "base": [],
     "engineering": [
-      "base"
+      "base",
+      "machine"
     ],
     "machine": [
       "base"
@@ -304,8 +380,18 @@
     "review"
   ],
   "host_only_terms": {
-    "claude": ["(?i)[`/]code-review(?![-\\w/])", "(?i)[`/]security-review(?![-\\w/])", "\\b`?Skill`?\\s+[Tt]ool\\b", "(?i)\\bAskUserQuestion\\b", "(?i)\\bToolSearch\\b", "\\bCLAUDE_PLUGIN_ROOT\\b"],
-    "codex": ["\\bcodex\\s+(?:review|exec)\\b", "\\bScheduled Task\\b"]
+    "claude": [
+      "(?i)[`/]code-review(?![-\\w/])",
+      "(?i)[`/]security-review(?![-\\w/])",
+      "\\b`?Skill`?\\s+[Tt]ool\\b",
+      "(?i)\\bAskUserQuestion\\b",
+      "(?i)\\bToolSearch\\b",
+      "\\bCLAUDE_PLUGIN_ROOT\\b"
+    ],
+    "codex": [
+      "\\bcodex\\s+(?:review|exec)\\b",
+      "\\bScheduled Task\\b"
+    ]
   },
   "workflow": {
     "source": ".agents/workflows",

@@ -41,7 +41,7 @@ or a different worktree ends ownership and surfaces a human decision; never sile
 Resolve authority from the repository's recorded standing instruction, the user authorization kept in
 the owning goal record (`engineering:merging` owns that goal-wide scope), or an observed user approval
 for this exact PR. The source command below, or packaged `workflows/workflow_ops.py`, is the single writer of
-the binding artifact:
+the binding artifact. Run this helper with `python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B .agents/workflows/workflow_ops.py --root ROOT --workflow-run-id ID delivery-bind --pr NUMBER [--approval-record PATH]
@@ -72,10 +72,29 @@ standing instruction, goal authorization, or matching scoped approval, authority
 merge requires a user decision.
 
 The binder reads authoritative forge state and resolves `.agents/delivery-authorization.json`, when
-present, against the current changed paths and labels. Six stop classes hold everywhere: the authorization
-table itself, CI workflow, migration, auth, money and published contract. Repository stop paths and its
-hold label also apply; without a table, `human-gate` is the hold label. A scoped approval cannot bypass
-these stops. **Re-run the binder on every rebind:** a repaired head may add a stop path or hold.
+present, against the current changed paths and labels. The authorization table itself always stops.
+With `standing_authorization` set to `auto` or `merge`, its optional `authorized_stop_classes` list may
+name each of `ci-workflow`, `migration`, `auth`, `money` and `published-contract` at most once. Repository
+stop paths and its hold label still apply; without a table, `human-gate` is the hold label. A scoped
+approval cannot add exemptions or bypass a stop. **Re-run the binder on every rebind:** a repaired head
+may add a stop path or hold.
+
+The auto-merge preference comes from `.agents/settings.json` in the actual checkout, at
+`configuration.core.auto_merge`, separately from delivery authority. When that file is present, it is
+authoritative: `false` or an omitted `configuration`, `core` or `auto_merge` disables auto-merge and never
+falls back to the legacy declaration, and malformed present settings fail closed. Only when the settings
+file is wholly absent may the validated legacy declaration's `auto_merge: true` enable the
+preference; omitted legacy `auto_merge` means `false`. The settings file itself is always a non-exemptible
+stop. After the normal green exact-head, independent-review and merge-authorization decision, invoke only
+the packaged guarded command:
+
+```text
+python -B workflows/auto_merge.py --root ROOT
+```
+
+It reloads fresh settings and authority, the complete remote diff and labels, live PR readiness, exact local and
+remote branch/head/worktree identity, and the canonical review and security evidence before executing its
+fixed GitHub command. Do not run `gh pr merge --auto` directly; the delivery hook directs it to this wrapper.
 
 The artifact retains matching approval wording and provenance as `scoped_approval` across wakes and
 supported repairs to the same PR, worktree and branch. Each rebind refreshes the remote head, checks and

@@ -64,6 +64,123 @@ class RepositoryFixture(unittest.TestCase):
         return self.git("rev-parse", "HEAD")
 
 
+class PrReadinessTests(RepositoryFixture):
+    def pr(self, checks):
+        return {
+            "number": 42,
+            "url": "https://github.com/example/workflow-fixture/pull/42",
+            "headRefOid": "abc123",
+            "statusCheckRollup": checks,
+        }
+
+    def test_pending_reports_observed_checks_and_a_recheck_interval(self):
+        value = self.pr([{"name": "verify", "status": "IN_PROGRESS", "conclusion": ""}])
+        with mock.patch.object(ops, "pull_request_state", return_value=value):
+            result = ops.pr_readiness_observation(self.root, 42, "example/private", 45)
+
+        self.assertEqual("waiting", result["state"])
+        self.assertFalse(result["terminal"])
+        self.assertEqual(["verify"], result["observed_pending_checks"])
+        self.assertEqual(45, result["recheck_seconds"])
+        self.assertEqual("example/private", result["identity"]["repository"])
+
+    def test_green_checks_are_ready_for_the_next_delivery_gate(self):
+        value = self.pr([{"name": "verify", "status": "COMPLETED", "conclusion": "SUCCESS"}])
+        with mock.patch.object(ops, "pull_request_state", return_value=value):
+            result = ops.pr_readiness_observation(self.root, 42, "example/private")
+
+        self.assertEqual("ready", result["state"])
+        self.assertTrue(result["terminal"])
+        self.assertIn("next delivery gate", result["message"])
+
+    def test_closed_pr_is_terminal_not_ready(self):
+        value = self.pr([])
+        value["state"] = "CLOSED"
+        with mock.patch.object(ops, "pull_request_state", return_value=value):
+            result = ops.pr_readiness_observation(self.root, 42, "example/private")
+
+        self.assertEqual("closed", result["state"])
+        self.assertTrue(result["terminal"])
+        self.assertIn("not ready", result["message"])
+
+    def test_ordinary_failed_check_names_the_job_and_url(self):
+        value = self.pr([{
+            "name": "verify", "status": "COMPLETED", "conclusion": "FAILURE",
+            "databaseId": 90, "targetUrl": "https://github.com/example/private/actions/runs/3/job/90",
+        }])
+        unavailable = subprocess.CompletedProcess([], 1, "", "not available")
+        with mock.patch.object(ops, "pull_request_state", return_value=value), \
+                mock.patch.object(ops, "run_process", return_value=unavailable):
+            result = ops.pr_readiness_observation(self.root, 42, "example/private")
+
+        self.assertEqual("failed", result["state"])
+        self.assertTrue(result["terminal"])
+        self.assertEqual("verify", result["failed_check"]["name"])
+        self.assertEqual("https://github.com/example/private/actions/runs/3/job/90", result["failed_check"]["url"])
+
+    def test_external_block_in_any_failed_check_is_preferred(self):
+        value = self.pr([
+            {"name": "unit", "status": "COMPLETED", "conclusion": "FAILURE"},
+            {"name": "billing", "status": "COMPLETED", "conclusion": "FAILURE", "targetUrl": "https://example.test/billing"},
+        ])
+        block = {"kind": "github-billing", "resolver": "GitHub organization/account billing administrator"}
+        with mock.patch.object(ops, "pull_request_state", return_value=value), \
+                mock.patch.object(ops, "external_check_block", side_effect=[None, block]):
+            result = ops.pr_readiness_observation(self.root, 42, "example/private")
+
+        self.assertEqual("blocked", result["state"])
+        self.assertEqual("billing", result["failed_check"]["name"])
+        self.assertEqual("https://example.test/billing", result["failed_check"]["url"])
+
+    def test_failed_payment_or_spending_limit_is_an_external_billing_block(self):
+        value = self.pr([{
+            "name": "verify", "status": "COMPLETED", "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/example/private/actions/runs/3/job/90",
+        }])
+        output = {"check_runs": [{"name": "verify", "output": {"summary": "GitHub Actions failed payment: spending limit reached."}}]}
+        completed = subprocess.CompletedProcess([], 0, json.dumps(output), "")
+        with mock.patch.object(ops, "pull_request_state", return_value=value), \
+                mock.patch.object(ops, "run_process", return_value=completed) as run:
+            result = ops.pr_readiness_observation(self.root, 42, "example/private")
+
+        self.assertEqual("blocked", result["state"])
+        self.assertTrue(result["terminal"])
+        self.assertEqual("no ETA available", result["eta"])
+        self.assertEqual("GitHub organization/account billing administrator", result["external_block"]["resolver"])
+        self.assertIn("restores billing or raises the spending limit", result["external_block"]["resume_condition"])
+        run.assert_called_once_with(
+            ["gh", "api", "repos/example/private/commits/abc123/check-runs"], self.root, check=False
+        )
+
+    def test_watch_stops_immediately_for_a_terminal_external_block(self):
+        blocked = {"state": "blocked", "terminal": True}
+        with mock.patch.object(ops, "pr_readiness_observation", return_value=blocked) as observe, \
+                mock.patch.object(ops.time, "sleep") as sleep:
+            result = ops.pr_readiness(self.root, 42, "example/private", watch=True)
+
+        self.assertEqual(blocked, result)
+        observe.assert_called_once_with(self.root, 42, "example/private", ops.DEFAULT_POLL_SECONDS)
+        sleep.assert_not_called()
+
+    def test_watch_emits_each_pending_observation_before_rechecking(self):
+        pending = {"state": "waiting", "terminal": False}
+        ready = {"state": "ready", "terminal": True}
+        emitted = []
+        with mock.patch.object(ops, "pr_readiness_observation", side_effect=[pending, ready]), \
+                mock.patch.object(ops.time, "sleep") as sleep:
+            result = ops.pr_readiness(self.root, 42, "example/private", 15, watch=True, on_wait=emitted.append)
+
+        self.assertEqual(ready, result)
+        self.assertEqual([pending], emitted)
+        sleep.assert_called_once_with(15)
+
+    def test_poll_interval_is_bounded(self):
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "between 15 and 300"):
+            ops.pr_readiness(self.root, 42, "example/private", 0)
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "between 15 and 300"):
+            ops.pr_readiness(self.root, 42, "example/private", 301)
+
+
 class CompactRunTests(RepositoryFixture):
     def test_process_output_decodes_utf8_even_with_non_ascii_text(self):
         result = ops.run_process(
@@ -174,6 +291,63 @@ class CompactRunTests(RepositoryFixture):
         ):
             with self.assertRaisesRegex(ops.WorkflowOperationError, "redirected"):
                 ops.run_root(self.root, "run-1")
+
+
+class DeliveryBindContextTests(RepositoryFixture):
+    def test_context_uses_one_git_invocation_for_a_linked_worktree_with_spaces_and_non_ascii(self):
+        linked = self.root.parent / "linked worktree café"
+        subprocess.run(
+            ["git", "-C", str(self.root), "worktree", "add", "-q", "-b", "Feature/linked", str(linked)],
+            check=True,
+        )
+        original = ops.run_process
+        calls = []
+
+        def run(arguments, root, **kwargs):
+            if arguments[0] == "git":
+                calls.append(arguments)
+            return original(arguments, root, **kwargs)
+
+        with mock.patch.object(ops, "run_process", side_effect=run):
+            context = ops._delivery_bind_context(linked)
+
+        self.assertEqual(linked.resolve(), context.root)
+        self.assertEqual(
+            Path(self.git("rev-parse", "--path-format=absolute", "--git-common-dir")).resolve(),
+            context.common_git_directory,
+        )
+        self.assertEqual(
+            [["git", "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"]],
+            calls,
+        )
+
+    def test_context_rejects_malformed_or_nonabsolute_git_records(self):
+        for output in ("only-one\n", "relative\nrelative-common\n", "one\ntwo\nthree\n"):
+            with self.subTest(output=output), mock.patch.object(
+                ops, "run_process", return_value=subprocess.CompletedProcess([], 0, output, "")
+            ):
+                with self.assertRaisesRegex(ops.WorkflowOperationError, "delivery binding repository context"):
+                    ops._delivery_bind_context(self.root)
+
+    def test_context_cannot_redirect_another_checkout(self):
+        context = ops._delivery_bind_context(self.root)
+        other = self.root.parent / "other"
+        other.mkdir()
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "does not match"):
+            ops.run_root(other, "run-1", context)
+
+    def test_context_revalidates_containment_before_telemetry(self):
+        context = ops._delivery_bind_context(self.root)
+        ops.run_root(self.root, "run-1", context)
+        state = ops.state_root(self.root, context)
+        original_redirect = ops.is_redirect
+        with mock.patch.object(
+            ops,
+            "is_redirect",
+            side_effect=lambda path: Path(path) == state or original_redirect(path),
+        ):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "redirected"):
+                ops.append_event(self.root, "run-1", {"kind": "operation"}, context)
 
 
 class InspectionAndSkillTests(RepositoryFixture):
@@ -686,6 +860,33 @@ class ReviewTests(RepositoryFixture):
         self.assertTrue(result["exact_head"])
         self.assertFalse(result["review_required"])
 
+    def test_base_already_merged_into_frozen_head_does_not_restart_review(self):
+        self.git("switch", "-q", "main")
+        moved = self.commit("src/main.txt", "base advance\n", "base advance")
+        self.git("switch", "-q", "Feature/Workflow-ops")
+        self.git("merge", "-q", "--no-edit", moved)
+        descriptor = ops.review_prepare(self.root, "run-1", self.base, "HEAD", False)
+        self.git("update-ref", "refs/remotes/origin/main", moved)
+
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+
+        self.assertFalse(result["base_moved"])
+        self.assertTrue(result["exact_head"])
+        self.assertFalse(result["review_required"])
+
+    def test_relevant_base_movement_requires_incremental_review(self):
+        descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
+        self.git("switch", "-q", "main")
+        moved = self.commit("src/mapping.txt", "base change\n", "relevant base change")
+        self.git("switch", "-q", "Feature/Workflow-ops")
+        self.git("update-ref", "refs/remotes/origin/main", moved)
+
+        result = ops.review_reconcile(self.root, "run-1", descriptor["artifact"], "origin/main")
+
+        self.assertTrue(result["base_moved"])
+        self.assertTrue(result["review_required"])
+        self.assertIn("base-changed-relevant-evidence", result["reasons"])
+
     def test_head_movement_requires_incremental_review(self):
         descriptor = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)
         self.commit("src/second.txt", "later\n", "later candidate")
@@ -1117,6 +1318,89 @@ class TelemetryTests(RepositoryFixture):
         metrics = ops.transcript_telemetry(path, "codex", 300)
         self.assertEqual(2, metrics["model_turns"])
         self.assertEqual(1, metrics["wait_poll_calls"])
+
+
+class HostCoverageWorkflowTests(RepositoryFixture):
+    def coverage_record(self, head):
+        return {
+            "schema_version": 1,
+            "candidate_head": head,
+            "shared_source": ".agents/base/policy/plan-artifacts/SKILL.md",
+            "hosts": [
+                {
+                    "host": "claude",
+                    "behavior": "loads shared behavior",
+                    "source": ".claude/skills/example/SKILL.md",
+                    "mapping": "plugins/base/skills/example/SKILL.md",
+                    "verification": {"level": "source", "result": "passed", "evidence": "focused source test passed"},
+                },
+                {
+                    "host": "codex",
+                    "behavior": "loads shared behavior",
+                    "source": ".codex/skills/example/SKILL.md",
+                    "mapping": "plugins/base/codex-skills/example/SKILL.md",
+                    "verification": {"level": "source", "result": "passed", "evidence": "focused source test passed"},
+                },
+            ],
+        }
+
+    def write_work_order(self, head):
+        path = self.root / "reviews" / "Feature-Workflow-ops.md"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(
+            "# Review\n\n```agent-host-coverage\n" + json.dumps(self.coverage_record(head)) + "\n```\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def test_review_prepare_reports_shared_mapping_coverage_and_uses_frozen_head(self):
+        self.commit(".agents/plugins/sources.json", "{}\n", "change shared mapping")
+        descriptor = ops.review_prepare(self.root, "coverage", "origin/main", "HEAD", False)
+        self.assertTrue(descriptor["host_coverage"]["required"])
+        self.assertEqual([".agents/plugins/sources.json"], descriptor["host_coverage"]["paths"])
+        self.write_work_order(descriptor["head"])
+        self.commit("src/later.txt", "later\n", "move live head")
+
+        result = ops.review_host_check(self.root, "coverage", descriptor["artifact"], "reviews/Feature-Workflow-ops.md")
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(descriptor["head"], result["head"])
+
+    def test_review_host_check_rejects_a_moving_record_for_another_head(self):
+        self.commit(".agents/workflows/workflow_ops.py", "shared\n", "change workflow")
+        descriptor = ops.review_prepare(self.root, "coverage", "origin/main", "HEAD", False)
+        self.write_work_order("b" * 40)
+
+        result = ops.review_host_check(self.root, "coverage", descriptor["artifact"], "reviews/Feature-Workflow-ops.md")
+
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("candidate_head" in error for error in result["errors"]))
+
+    def test_delivery_coverage_preserves_ordinary_product_paths(self):
+        result = ops.delivery_host_coverage(self.root, "origin/main")
+        self.assertFalse(result["required"])
+        self.assertTrue(result["valid"])
+
+    def test_delivery_coverage_reuses_frozen_evidence_only_for_review_only_commits(self):
+        agent_head = self.commit(".agents/workflows/runtime.py", "shared\n", "change agent runtime")
+        work_order = self.write_work_order(agent_head)
+        work_order.write_text(
+            work_order.read_text(encoding="utf-8") + f"\nReviewed up to commit: `{agent_head}`\n",
+            encoding="utf-8",
+        )
+        self.git("add", "reviews/Feature-Workflow-ops.md")
+        self.git("commit", "-q", "-m", "stamp review")
+
+        stamped = ops.delivery_host_coverage(self.root, "origin/main")
+
+        self.assertTrue(stamped["valid"])
+        self.assertEqual(agent_head, stamped["coverage_head"])
+        self.commit(".agents/workflows/later.py", "changed\n", "move agent source")
+
+        moved = ops.delivery_host_coverage(self.root, "origin/main")
+
+        self.assertFalse(moved["valid"])
+        self.assertEqual(self.git("rev-parse", "HEAD"), moved["coverage_head"])
 
 
 if __name__ == "__main__":

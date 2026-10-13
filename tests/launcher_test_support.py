@@ -1,4 +1,4 @@
-"""Shared test fixtures for launch_claude.py and open_claude.py.
+"""Shared test fixtures for launch_claude.py, launch_codex.py and open_claude.py.
 
 Loads the real agent_cli.py with only the functions that would otherwise touch a real executable or
 terminal replaced, so resolve_tab_directory, prompt_file_argument, open_claude_tab and resolve_lane_model
@@ -13,6 +13,10 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 AGENT_CLI = ROOT / '.agents/machine/scripts/agent_cli.py'
+
+# A plausible resolve_codex_executable() result: a (path, version) pair shaped like the real function's
+# return value, for a launch_codex.py test that never runs a real codex binary.
+CODEX_EXECUTABLE = ('/bin/codex', {'core': (0, 160, 0), 'prerelease': '', 'text': '0.160.0'})
 
 
 def _load_agent_cli_module(name):
@@ -49,4 +53,24 @@ def real_agent_cli_for_e2e(name, run, claude='/bin/claude'):
         module = _load_agent_cli_module(name)
     module.resolve_claude_executable = mock.Mock(return_value=claude)
     module.sync_claude_standards = mock.Mock()
+    return module
+
+
+def real_agent_cli_for_codex(name, codex=CODEX_EXECUTABLE):
+    """The real shared library with resolve_codex_executable and launch_tab replaced -- the two functions
+    that would otherwise touch a real executable or terminal. `name` is the module registry name, distinct
+    per caller so two tests loading this in the same process never collide in `sys.modules`.
+    """
+    module = _load_agent_cli_module(name)
+    module.resolve_codex_executable = mock.Mock(return_value=codex)
+    module.launch_tab = mock.Mock()
+    return module
+
+
+def real_agent_cli_for_codex_e2e(name, run, codex=CODEX_EXECUTABLE):
+    """Load the real agent_cli.py fresh with its `launch_tab` default `run=subprocess.run` parameter bound
+    to `run`, same reasoning as real_agent_cli_for_e2e above."""
+    with mock.patch('subprocess.run', side_effect=run):
+        module = _load_agent_cli_module(name)
+    module.resolve_codex_executable = mock.Mock(return_value=codex)
     return module

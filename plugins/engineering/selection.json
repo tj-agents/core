@@ -4,9 +4,13 @@
     "process"
   ],
   "prerequisites": [
-    "base"
+    "base",
+    "machine"
   ],
   "skills": [
+    "address-bug",
+    "address-debt",
+    "address-mistake",
     "address-review",
     "big-review",
     "big-review-all",
@@ -16,7 +20,7 @@
     "commit-push",
     "committing",
     "continue-roadmap",
-    "docs-and-debt",
+    "docs",
     "docs-review",
     "failing-tests",
     "failure-provenance",
@@ -52,15 +56,18 @@
     "review",
     "review-lifecycle",
     "session-guidance",
+    "skill-authoring",
     "skill-routes",
     "stack",
     "sync",
     "sync-all",
     "sync-checkout",
-    "techdebt",
     "unmerged",
     "update-roadmap",
     "workboard",
-    "worktree"
+    "worktree",
+    "write-bug",
+    "write-debt",
+    "write-mistake"
   ]
 }

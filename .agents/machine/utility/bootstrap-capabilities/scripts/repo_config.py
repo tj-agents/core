@@ -213,7 +213,7 @@ def preflight_paths(root: Path, paths: list[Path], *, scope: str = "local", read
             raise bootstrap.BootstrapError(f"Root is not the exact Git checkout: {root}")
         if scope == "local":
             tracked_paths = sorted({relative for lexical, target in zip(lexical_targets, targets) for relative in (lexical.relative_to(root).as_posix(), target.relative_to(root).as_posix(), target.resolve().relative_to(root).as_posix())})
-            tracked = bootstrap.git(run, ["ls-files", "--cached", "-z", "--", *tracked_paths], root)
+            tracked = bootstrap.git(run, ["--literal-pathspecs", "ls-files", "--cached", "-z", "--", *tracked_paths], root)
             if tracked:
                 raise bootstrap.BootstrapError("Local targets are tracked: " + tracked.replace("\0", ", "))
             common = Path(bootstrap.git(run, ["rev-parse", "--path-format=absolute", "--git-common-dir"], root)).resolve()

@@ -15,11 +15,11 @@ someone ask for it.
 The loop is yours end to end: **run → diagnose → fix → re-run until green.** Find the root cause and fix it in
 code, wherever the real bug lives — service, handler, page object, step definition, fixture, configuration.
 
-This is hook-enforced. `.agents/hooks/red_run_gate.py` fires on a runner that exited non-zero
-(PostToolUseFailure) and on a `gh run view` / `gh pr checks` read reporting a failed CI or merge-queue run
-(PostToolUse), naming this skill and the tier below that owns the failure; on Stop it blocks the turn from
-ending while a red run is unanswered. It stays silent for a build, restore or compile error, for a command
-that merely exited non-zero, and once every named skill is proven loaded this session.
+This is hook-enforced. `.agents/hooks/red_run_gate.py` fires on an actual test-runner invocation reporting
+test failures or a failing exit (PostToolUse or PostToolUseFailure), naming this skill and the tier below
+that owns the failure; on Stop it blocks the turn from ending while a red run is unanswered. It stays
+silent for CI-log reads, passing summaries, build, restore or compile errors, unrelated non-zero exits,
+and once every named skill is proven loaded this session.
 
 **Route by tier.** Each tier has its own procedure, and entering it *is* the next action; picking through the
 failure by hand is how a tier's known traps get rediscovered one at a time.

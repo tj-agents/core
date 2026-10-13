@@ -18,7 +18,8 @@ Read the repository's branch/worktree guidance and the standards owed by the pat
 the requirement, success conditions, scope, and any material ambiguity from repository evidence before
 editing.
 
-Resolve one owning lifecycle skill and only the technical skills directly routed by the changed paths. Use
+Resolve one owning lifecycle skill and only the technical skills directly routed by the changed paths. Run
+the command as `python` on Windows or `python3` on Linux/macOS. Use
 `python .agents/workflows/workflow_ops.py --root . --workflow-run-id <id> skills --lifecycle feature --changed-path <path>` to record
 their identities and content hashes, and reuse that record while those hashes remain unchanged. Use the
 shared `inspect` operation once for routine repository state instead of reconstructing it through separate

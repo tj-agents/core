@@ -14,7 +14,7 @@ POWERSHELL_CONTROL = re.compile(r"(\$|if\s*\()")
 
 def verify_job_commands():
     lines = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8").splitlines()
-    start = lines.index("  verify:")
+    start = lines.index("  verify-windows:")
     end = next(index for index in range(start + 1, len(lines)) if re.match(r"  \S", lines[index]))
     commands = []
     block_indent = None
@@ -61,7 +61,7 @@ class RepositoryPermissionTests(unittest.TestCase):
     def test_every_ci_verify_command_is_allowed_for_both_shells(self):
         commands = verify_job_commands()
 
-        self.assertEqual(21, len(commands))
+        self.assertEqual(16, len(commands))
         for command in commands:
             with self.subTest(command=command):
                 self.assertTrue(self.auto_approved("PowerShell", command))
