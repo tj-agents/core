@@ -49,10 +49,12 @@ each entry and preserves these fields.
 Record repository-wide observations and material status changes in the source repository's primary
 checkout's shared register, outside the active feature or delivery worktree. Reconcile the default-branch
 record and stable IDs first and preserve other writers' entries. A feature worktree or its plan is not the
-canonical destination; feature plans link to the shared records.
+canonical destination; feature plans link to the shared records. Primary-checkout notes may remain
+uncommitted while the dedicated docs branch carries only their scoped publication commits.
 
-When publication is authorized, immediately deliver the scoped record changes through a separate
-`Docs/<name>` branch and PR, execute `engineering:docs-review`, then `engineering:merge-docs`, and verify
+When publication is authorized, immediately deliver the scoped record changes through a separate docs PR
+using `engineering:merge-docs` branch selection, execute `engineering:docs-review`, then
+`engineering:merge-docs`, and verify
 the merged default-branch content before unrelated work resumes or the session closes. A temporary isolated
 docs checkout may prepare that PR while preserving a dirty or actively owned primary checkout; it is a
 publication vehicle, not the only retained record owner. Do not wait for an unrelated feature PR to merge.
