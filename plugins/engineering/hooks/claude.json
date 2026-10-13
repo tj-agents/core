@@ -55,7 +55,9 @@
               "--deny-on-timeout",
               "${CLAUDE_PLUGIN_ROOT}/hooks/denial_prompt.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/git_auth_scope_gate.py@Bash|PowerShell",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_placement_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/compact_output_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/forge_poll_gate.py@Bash|PowerShell",
               "${CLAUDE_PLUGIN_ROOT}/hooks/delivery_binding_gate.py@Bash|PowerShell",
@@ -101,8 +103,10 @@
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
               "--deadline",
               "25",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/continuation_stop.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
             ]
@@ -125,6 +129,8 @@
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/engineering/policy/session-guidance/scripts/session-context.py",
               "--prompt-context",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/hooks/workflow_route.py"
             ]

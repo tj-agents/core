@@ -117,6 +117,8 @@ is already complete, reviewed, and exact-head-CI-ready.
 After every create or body edit, fetch and validate the authoritative body before binding or reporting,
 including when the head and existing binding are unchanged:
 
+For the Python workflow helper examples below, use `python` on Windows or `python3` on Linux/macOS:
+
 ```bash
 python <workflow-ops> --root <delivery-checkout> --workflow-run-id pr-body-<n> pr-body-check --pr <owning-url>
 ```
@@ -144,6 +146,10 @@ delivery-binding gate has already run it for you — then it is bound, not to be
 harness's `persistent-workflow` skill to give that binding a continuation.
 
 ### 7. Report and continue
+
+When the canonical goal has a fenced `completion` record, retain every unchecked PR task there with the
+PR's repository, number, full head SHA, task text, owner, and next action. Keep those entries until a fresh
+completion check observes the task resolved.
 
 Print the PR URL. Opening a draft is not a context boundary: continue implementing, reviewing, or observing
 the candidate when the current authorization and context still cover that work. If landing is genuinely next,

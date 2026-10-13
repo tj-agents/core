@@ -7,6 +7,59 @@ domain: process
 
 # Persistent delivery continuation
 
+## Completion record
+
+Before recording a `complete` receipt, maintain the canonical goal's fenced `completion` JSON with observed
+acceptance evidence, every delivered PR identity, and every unresolved PR task with its owner and next
+action. The runtime refreshes every recorded PR and rejects a complete receipt unless the bound delivery is
+recorded, merged at its full head, has no unchecked tasks, and the outcome evidence is present. A rejection
+keeps the current owner and leaves the returned actions open.
+
+Run the same read-only check before a foreground terminal report:
+
+Run the Python helpers with `python` on Windows or `python3` on Linux/macOS:
+
+```bash
+python -B <completion-check> --goal <absolute-goal> --root <absolute-worktree>
+```
+
+Resolve `<completion-check>` to `.agents/workflows/completion.py` in source or
+`workflows/completion.py` in an installed engineering package.
+
+The record has this exact shape. Every string is nonempty, every head is a forty-character SHA, acceptance
+and delivery records are unique, and empty evidence keeps its acceptance item open with an owner and next
+action.
+
+```completion
+{
+  "outcome": "The requested user-visible outcome.",
+  "acceptance": [
+    {
+      "id": "criterion-id",
+      "criterion": "The observable acceptance criterion.",
+      "evidence": [
+        {"source": "artifact or observation", "result": "concrete observed result"}
+      ],
+      "owner": "current execution owner",
+      "next_action": "Resolve this criterion when evidence is absent."
+    }
+  ],
+  "deliveries": [
+    {"repository": "owner/repository", "pr": 123, "head": "0123456789abcdef0123456789abcdef01234567"}
+  ],
+  "open_tasks": [
+    {
+      "repository": "owner/repository",
+      "pr": 123,
+      "head": "0123456789abcdef0123456789abcdef01234567",
+      "text": "Unchecked visible PR task.",
+      "owner": "current execution owner",
+      "next_action": "Complete the task and refresh the PR."
+    }
+  ]
+}
+```
+
 Load `engineering:persistent-delivery` for binding, review, repair, authorization and terminal behavior.
 Use this workflow when a substantive authorized task has a future decision that may outlive the current
 session. Its owner can begin before a PR exists. Ordinary quick answers and short inline work stay in the
@@ -18,7 +71,8 @@ authority; this workflow does not create a competing plan or permission.
 Use the packaged `<engineering-package-root>/workflows/continuation_runtime.py` module from an installed
 package, resolving the package root from the installed host skill entry, or its source counterpart
 `.agents/workflows/continuation_runtime.py` in a checkout. Initialize the durable owner with the canonical
-goal path, completion condition, exact authorized actions, authority record and current harness:
+goal path, completion condition, exact authorized actions, authority record and current harness. Run it with
+`python` on Windows or `python3` on Linux/macOS:
 
 ```text
 python -B "<engineering-package-root>/workflows/continuation_runtime.py" init --root ROOT --goal GOALPATH --completion TEXT --actions ACTION [ACTION ...] --authority TEXT --harness codex|claude
@@ -54,14 +108,22 @@ not call owner checkpoint itself. Continue to honor the canonical goal and autho
 The runtime lease coordinates its own writers; it does not gate arbitrary host writes or replace the
 harness's permission controls.
 
-The Windows adapter is shipped beside each host's `persistent-workflow` entry at
-`<skill-directory>/scripts/delivery-continuation.ps1`. Initialize and claim the foreground
+The cross-platform adapter is shipped beside each host's `persistent-workflow` entry at
+`<skill-directory>/scripts/delivery_continuation.py`. Initialize and claim the foreground
 owner before `register`; the adapter supports `register`, `remove`, `list`, and `wake`. The Python runtime
 supports `status` and `wake` against `--owner OWNER`. Remove only at a terminal result. Yield the foreground
 lease before waiting. Do not register another task for an
 existing owner or claim unattended progress before the host and scheduler report success. Other platforms
 must use an implemented runtime adapter; if none is available, state the limitation and continue
 independent authorized work in the current session.
+
+On Linux, registration requires a reachable `systemctl --user` manager and creates a receipt-owned systemd
+user oneshot service and timer. On Windows it requires inbox Windows PowerShell's ScheduledTasks capability.
+Neither path changes lingering or login policy: a Linux user timer runs only while the existing user manager
+runs. Use `python3` on Linux/macOS and `python` on Windows. Pin the native host executable explicitly when
+registering; for example, use `python3 -B "<skill-directory>/scripts/delivery_continuation.py" register --owner OWNER --host-executable /absolute/path/to/codex`
+on Linux/macOS, or `python -B "<skill-directory>\\scripts\\delivery_continuation.py" register --owner OWNER --host-executable C:\\absolute\\path\\to\\codex.exe`
+on Windows. Use `--dry-run` to inspect a proposed registration without changing scheduler or receipt files.
 
 Establish durable continuation through successful initialization, foreground claim, scheduler registration
 and an observed wake. Child execution resolves L4 model and effort from the packaged canonical lane table.
