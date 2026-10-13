@@ -191,6 +191,11 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
 - Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.
 
+
+**Recurrence - 2026-10-13, PR238 ownership:** The originating closeout session merged documentation PR238, verified main publication and causal generation, and removed its clean Docs-SharedProblemRecords checkout, but returned a final answer without invoking supported self-close. Its separate PR234 checkout was unmerged and explicitly deferred. Cause confirmed by the parent's reasoning: it conflated preservation of that checkout and its incomplete historical goal with retaining a live session after the current authorized work and acknowledged side-workstream handoff were finished. The governing session-guidance close rule was already loaded; this is failure to apply it, not a missing instruction. No close command failed in this occurrence because none was invoked.
+
+**Declarative prevention for this recurrence:** Decide session ownership and checkout retention separately. A retained or user-deferred checkout does not alone justify a live terminal. Once this session has no active authorized work, necessary pending answer or owned verified wait, invoke its supported self-close after reporting; delete only a independently proven removable merged checkout. Observable acceptance covers the retained-unmerged-checkout case and verifies actual exit while preserving its files, branch and other sessions. Reconcile invocation/enforcement with the existing continuation/closure owners; B004's transport fallback and an eight-second scheduler fix alone do not prove this decision error repaired.
+
 ## M014 - Explicit mistake-callout repair obligation was not executed
 
 - **Kind:** mistake.
@@ -213,6 +218,11 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
   missing launch or record is surfaced as an actionable failure rather than explained away.
 - **Verification evidence:** this session read the exact `engineering:session-guidance` rule, then returned
   without either action; the peer registry later showed the active source-repair session cited above.
+
+**Recurrence - 2026-10-13, omitted callout recording:** After Tommy explicitly challenged why PR238's completed owner had not closed, the parent gave explanations and announced self-close without first recording the called-out failure in the canonical main register. Tommy had to interrupt twice and repeat the recording requirement. The session-guidance record-noticed-problems and mistake-callout obligations, the user's explicit main-publication instruction and the freshly merged PR238 publication convention were already available. Cause confirmed from the action sequence: the parent treated an explanation and proposed operational correction as sufficient, instead of completing the required recording and reconciling the causal source owner before closure. This violates an existing requirement; no absence of instruction or authority is established.
+
+**Declarative prevention for this recurrence:** A mistake callout creates an outstanding recording/owner-reconciliation obligation before unrelated work resumes or the session closes. Reconcile the existing stable incident, record cause, violated standard, exact repair owner and observable prevention on main through independent authorized documentation delivery, then verify publication. A promise, apology or local-only note is not completion. Acceptance must demonstrate record publication and the source-owner transition or its truthful capability blocker before a normal response or terminal close. The scheduler handoff's general closure acceptance does not establish enforcement of this callout obligation; M014's existing callout repair remains the causal owner until evidence reconciles it.
+
 ## M015 - Sandbox terminated with authorized work unfinished
 - **Kind:** mistake.
 - **Observed/reported:** 2026-10-13; the original event timestamp is 2026-10-12T23:20:52.428Z. Transcript `fed1d447-ae67-4078-99a5-a813156cf86a` records termination after `continuation_stop` and `callout_repair` reported `missingworkflow_route` and `missingworktree_cleanup_gate`, 1584 ms, exit 0, empty stdout. The user asked whether the work was finished. No entities, migrations, endpoints, necessary question, or owned wait blocked the remaining work.

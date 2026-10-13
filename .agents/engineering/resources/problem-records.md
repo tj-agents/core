@@ -46,14 +46,20 @@ bugs default to the repository-root `BUGS.md`; mistakes default to root `MISTAKE
 the owning area's `TECH_DEBT.md` under `engineering:write-debt`. A shared register keeps the kind on
 each entry and preserves these fields.
 
-Repository-wide records must remain discoverable on the source repository's default branch. Publish new
-observations and material status changes promptly through a separate authorized documentation delivery;
-do not make publication depend on an unrelated feature branch merging. Reconcile the default-branch record
-and stable IDs first, preserve other writers' entries, and verify the merged record before reporting
-publication complete. Feature plans link to the shared records. Recording grants no authority to bypass
-review, delivery or user gates; when publication is genuinely blocked, preserve the observation and name its
-resolver and resume condition. Keep a frozen feature candidate unchanged by delivering its new records
-separately.
+Record repository-wide observations and material status changes in the source repository's primary
+checkout's shared register, outside the active feature or delivery worktree. Reconcile the default-branch
+record and stable IDs first and preserve other writers' entries. A feature worktree or its plan is not the
+canonical destination; feature plans link to the shared records.
+
+When publication is authorized, immediately deliver the scoped record changes through a separate
+`Docs/<name>` branch and PR, execute `engineering:docs-review`, then `engineering:merge-docs`, and verify
+the merged default-branch content before unrelated work resumes or the session closes. A temporary isolated
+docs checkout may prepare that PR while preserving a dirty or actively owned primary checkout; it is a
+publication vehicle, not the only retained record owner. Do not wait for an unrelated feature PR to merge.
+Recording grants no authority to bypass review, delivery or user gates. If primary-record reconciliation or
+publication is genuinely blocked, preserve the observation and state the blocked action, resolver and
+observable resume condition; do not report publication complete. Keep a frozen feature candidate unchanged
+by delivering its new records separately.
 
 Retain bugs after resolution with their final status and verification evidence. Retain mistakes as learning
 history. A linked mistake resolves only when its own prevention condition passes, even when a linked bug or
