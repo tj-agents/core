@@ -11,7 +11,60 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from codex_marketplace_sync import SyncError, resolve_codex_for_sync, sync_codex_standards
-from terminal_command import flush_before_cli, run_target
+from agent_cli import LaunchError
+from terminal_command import command_for_target, flush_before_cli, run_target
+
+
+NON_INTERACTIVE_COMMANDS = frozenset({
+    "agents", "exec", "e", "review", "login", "logout", "mcp", "plugin",
+    "app-server", "remote-control", "app", "completion", "update", "doctor",
+    "sandbox", "debug", "apply", "a", "queue", "archive", "delete",
+    "migrate-rollouts", "unarchive", "cloud", "exec-server", "features", "help",
+})
+OPTIONS_WITH_VALUES = frozenset({
+    "-c", "--config", "--enable", "--disable", "--remote", "--remote-auth-token-env",
+    "-i", "--image", "-m", "--model", "--local-provider", "-p", "--profile",
+    "-s", "--sandbox", "-C", "--cd", "--add-dir", "-a", "--ask-for-approval",
+})
+
+
+def supports_no_daemon(target: str) -> bool:
+    try:
+        result = subprocess.run(
+            command_for_target(target, ["--help"]), capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+    except (LaunchError, OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0 and "--no-daemon" in result.stdout
+
+
+def without_daemon_for_interactive(arguments: list[str], target: str | None = None) -> list[str]:
+    """Avoid the Windows daemon's visible hook children for interactive sessions."""
+    if sys.platform != "win32" or "--no-daemon" in arguments:
+        return arguments
+    if any(argument in ("--help", "-h", "--version", "-V") for argument in arguments):
+        return arguments
+    if any(argument == "--remote" or argument.startswith("--remote=") for argument in arguments):
+        return arguments
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == "--":
+            break
+        if argument in OPTIONS_WITH_VALUES:
+            index += 2
+            continue
+        if argument.startswith("-"):
+            index += 1
+            continue
+        if argument in NON_INTERACTIVE_COMMANDS:
+            return arguments
+        break
+    if target is not None and not supports_no_daemon(target):
+        return arguments
+    return ["--no-daemon", *arguments]
 
 
 def hook_control(arguments: list[str]) -> int:
@@ -43,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         except SyncError as error:
             print(f"standards: Codex refresh failed; this session loads installed plugins: {error}", file=sys.stderr)
     flush_before_cli()
-    return run_target(parsed.target, parsed.arguments)
+    return run_target(parsed.target, without_daemon_for_interactive(parsed.arguments, parsed.target))
 
 
 if __name__ == "__main__":
