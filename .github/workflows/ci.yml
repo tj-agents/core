@@ -27,9 +27,9 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          repository: tj-agents/kit
+          repository: tj-agents/template
           ref: v1.2.0
-          path: .kit
+          path: .template
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
@@ -69,7 +69,7 @@ jobs:
 
       - name: authored skill references resolve in the public corpus
         shell: pwsh
-        run: python -B .kit/.agents/kit/utility/check/scripts/check_skill_references.py --root . --root .kit --root .react --root .dotnet --source-root .
+        run: python -B .template/.agents/kit/utility/check/scripts/check_skill_references.py --root . --root .template --root .react --root .dotnet --source-root .
 
       - name: CLI session recovery tests
         shell: powershell
