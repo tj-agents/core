@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -23,10 +24,17 @@ TABLE = re.compile(r"^\s*\[\s*(marketplaces|plugins)(?:\.|\])")
 HEADER = re.compile(r"^\s*\[")
 
 
-def declarations(lock_path: Path, catalog_path: Path) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
-    catalog = bootstrap.load_json(catalog_path)
+def declarations(
+    lock_path: Path,
+    catalog_path: Path,
+    *,
+    lock_document: dict | None = None,
+    catalog_document: dict | None = None,
+) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
+    catalog = copy.deepcopy(catalog_document) if catalog_document is not None else bootstrap.load_json(catalog_path)
     releases, plugins = bootstrap.catalog_index(catalog)
-    selections = bootstrap.validate_lock(bootstrap.load_json(lock_path), releases, plugins)
+    lock = lock_document if lock_document is not None else bootstrap.load_json(lock_path)
+    selections = bootstrap.validate_lock(lock, releases, plugins)
     selected = {selection["id"] for selection in selections}
     missing = sorted(CORE_PLUGINS - selected)
     if missing:
@@ -197,14 +205,16 @@ def preflight_paths(root: Path, paths: list[Path], *, scope: str = "local", read
     if scope not in {"project", "local"}:
         raise bootstrap.BootstrapError(f"Unknown repository scope: {scope}")
     root = root.expanduser().resolve()
-    if not root.is_dir():
-        raise bootstrap.BootstrapError(f"Repository root does not exist: {root}")
+    if root.exists() and not root.is_dir():
+        raise bootstrap.BootstrapError(f"Repository root is not a directory: {root}")
+    if not root.exists() and not root.parent.is_dir():
+        raise bootstrap.BootstrapError(f"Repository root parent does not exist: {root.parent}")
     lexical_targets = [Path(os.path.abspath(path if path.is_absolute() else root / path)) for path in paths]
     targets = [contained(root, path) for path in paths]
     if any(not path.is_relative_to(root) for path in lexical_targets):
         raise bootstrap.BootstrapError("Target escapes repository root")
     exclude = None
-    if not (root / ".git").exists():
+    if not root.exists() or not (root / ".git").exists():
         if any((parent / ".git").exists() for parent in root.parents):
             raise bootstrap.BootstrapError(f"Root is not the exact Git checkout: {root}")
     else:
@@ -356,7 +366,18 @@ def exclusion_text(path: Path, root: Path, targets: list[Path]) -> str:
     return existing + ("\n" if existing and not existing.endswith("\n") else "") + block
 
 
-def plan(lock_path: Path, catalog_path: Path, *, root: Path | None = None, scope: str = "project", prospective_paths: list[Path] = (), execute=subprocess.run) -> dict[Path, str | None]:
+def plan(
+    lock_path: Path,
+    catalog_path: Path,
+    *,
+    root: Path | None = None,
+    scope: str = "project",
+    prospective_paths: list[Path] = (),
+    lock_document: dict | None = None,
+    catalog_document: dict | None = None,
+    read_paths: list[Path] = (),
+    execute=subprocess.run,
+) -> dict[Path, str | None]:
     if scope not in {"project", "local"}:
         raise bootstrap.BootstrapError(f"Unknown repository scope: {scope}")
     root = (root or lock_path.resolve().parent.parent).expanduser().resolve()
@@ -365,9 +386,18 @@ def plan(lock_path: Path, catalog_path: Path, *, root: Path | None = None, scope
     rules_path = root / ".codex/rules/agent-harness.rules"
     state_path = root / LOCAL_STATE
     paths = [claude, codex, rules_path] + ([state_path] if scope == "local" else [])
-    inputs = [lock_path, catalog_path, lock_path.resolve().parent / "repository-harness.json"]
+    inputs = [*read_paths, lock_path.resolve().parent / "repository-harness.json"]
+    if lock_document is None:
+        inputs.append(lock_path)
+    if catalog_document is None:
+        inputs.append(catalog_path)
     exclude = preflight_paths(root, [*paths, *prospective_paths], scope=scope, read_paths=inputs, run=execute)
-    sources, identities, allow, rules = declarations(lock_path, catalog_path)
+    sources, identities, allow, rules = declarations(
+        lock_path,
+        catalog_path,
+        lock_document=lock_document,
+        catalog_document=catalog_document,
+    )
     expected_rules = codex_rules(rules) if rules else None
     if scope == "local":
         state = local_state(state_path)

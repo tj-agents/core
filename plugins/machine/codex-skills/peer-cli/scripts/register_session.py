@@ -12,11 +12,14 @@ Contract: exit 0 always. Bookkeeping must never stop a session starting.
 """
 
 import collections
+import importlib.util
 import json
 import os
 import sys
 import time
 from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
 
 
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
@@ -336,6 +339,42 @@ def terminal_identity(environ=None):
     return None
 
 
+def _load_session_store():
+    candidates = []
+    if len(HERE.parents) > 2:
+        candidates.append(HERE.parents[2] / "scripts" / "session_store.py")
+        candidates.append(HERE.parents[2] / "resources/machine/scripts/session_store.py")
+    if len(HERE.parents) > 4:
+        candidates.append(HERE.parents[4] / "resources/machine/scripts/session_store.py")
+    candidates.append(HERE / "session_store.py")
+    for path in candidates:
+        if path.is_file():
+            try:
+                spec = importlib.util.spec_from_file_location("register_session_session_store", path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                return module
+            except Exception:
+                return None
+    return None
+
+
+def _record_session_start(host, session_id, cwd, title, pid, pid_started_at):
+    store = _load_session_store()
+    if store is None:
+        return
+    try:
+        connection = store.connect()
+    except Exception:
+        return
+    try:
+        store.start_session(connection, host, session_id, cwd, title=title, pid=pid, pid_started_at=pid_started_at)
+    except Exception:
+        pass
+    finally:
+        connection.close()
+
+
 def record(data, lookup=None, host_names=None):
     session = data.get("session_id") or data.get("sessionId")
     if not session:
@@ -343,10 +382,12 @@ def record(data, lookup=None, host_names=None):
     pid, host, pid_started_at = resolve_recorded_pid(
         os.getppid(), lookup=lookup, host_names=host_names,
     )
+    cwd = data.get("cwd") or os.getcwd()
+    title = os.environ.get(TITLE_ENV) or None
     entry = {
         "session_id": str(session),
-        "title": os.environ.get(TITLE_ENV) or None,
-        "cwd": data.get("cwd") or os.getcwd(),
+        "title": title,
+        "cwd": cwd,
         "pid": pid,
         "started_at": time.time(),
     }
@@ -362,6 +403,11 @@ def record(data, lookup=None, host_names=None):
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
     staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(staging, destination)
+    if host in ("claude", "codex"):
+        try:
+            _record_session_start(host, str(session), cwd, title, pid, pid_started_at)
+        except Exception:
+            pass
     return entry
 
 

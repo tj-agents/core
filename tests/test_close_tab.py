@@ -374,11 +374,13 @@ class CloseTabTests(unittest.TestCase):
                 mock.patch.object(close_tab, "close_actual") as closer:
             close_tab.close_entry(entry)
         closer.assert_called_once_with(tabs[0], force=True)
-        with mock.patch.object(close_tab, "is_windows", return_value=True), \
-                mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
-                mock.patch.object(close_tab, "windows_inventory", return_value=tabs * 2):
-            with self.assertRaisesRegex(close_tab.TerminalRefusal, "ambiguous"):
-                close_tab.close_entry(entry)
+        for inventory in ([], tabs * 2):
+            with self.subTest(inventory=inventory), \
+                    mock.patch.object(close_tab, "is_windows", return_value=True), \
+                    mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                    mock.patch.object(close_tab, "windows_inventory", return_value=inventory):
+                with self.assertRaisesRegex(close_tab.TerminalRefusal, "absent or ambiguous"):
+                    close_tab.close_entry(entry)
 
     def test_list_combines_actual_stale_tabs_and_registered_live_targets(self):
         actual = {"title": "stale", "identity": {"kind": "tmux", "pane_id": "%1"},

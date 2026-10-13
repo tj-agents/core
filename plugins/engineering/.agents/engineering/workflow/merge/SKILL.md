@@ -269,6 +269,13 @@ closes this session's CLI and tab. The reaper's result and the cleanup reminder 
 next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude and is not
 evidence that the old directory can be deleted.
 
+Run neither command before the completion report is delivered. Honor an explicit keep-open or continue
+instruction and an active dialogue. Both commands require a live, exact session-store attachment that is
+still `awaiting_input`; they recheck the same idle activity token immediately before recording end or
+signalling. That guard is not proof that the report was delivered. If no supported post-report execution
+path remains, preserve the session and worktree with the existing `merge_cleanup_gate --clear` deliberate-
+retention escape.
+
 - Only when `finish.py` is unavailable or its preflight fails, including an unresolved verified registry attachment: if the harness exposes its native host
   command interface, invoke `/cd <primary-checkout>` there and continue only after the host confirms that
   the session is attached to the primary checkout.

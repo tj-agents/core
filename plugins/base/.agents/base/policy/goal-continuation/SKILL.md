@@ -12,6 +12,8 @@ phase, commit, or session boundary does not end that ownership. Keep the existin
 completion condition, and authority record as the source of truth; do not create a competing goal or
 silently widen scope.
 
+## Continue through the authorized outcome
+
 For substantive authorized work with a future decision that may outlive the current session, select
 the available `engineering:persistent-workflow` early. This includes starting continuation when a
 delayed result first becomes relevant, even if the need was not clear at acceptance. Keep ordinary
@@ -27,13 +29,15 @@ It adds no authority for installation, publication, broader scope, or a new exte
 the applicable existing gate; keep authorized preparation and repair moving when they do not depend on
 that gate.
 
-Before ending at a blocker, establish what action is blocked and whether diagnosis, repair or an owned
-handoff can resolve it within the existing authorization. Perform that work when available. A gate on
-one action does not end ownership of the remaining goal. When an external decision is still required,
-record and report the blocked action, its resolver, the concrete unblock action and the observable resume
-condition, followed by the next action toward the original outcome. A partial result or saved plan alone
-is not that transition. Preserve higher-priority restrictions; a source change does not update instructions
-already loaded in an active session.
+Before ending at a blocker, exhaust all authorized unblocked diagnosis, repair, implementation and owned
+handoffs toward the remaining goal. A gate on one action does not block the whole goal. Only when no
+authorized action remains can the goal end at a genuine dependency or human-decision boundary. Record
+and report the blocked action, its resolver, the concrete unblock action and the observable resume
+condition for that remaining goal, followed by the next action toward the original outcome. A partial
+result or saved plan alone is not that transition. Honor user limits on additional sessions, schedulers
+and children; an unavailable continuation capability does not excuse leaving unblocked foreground work.
+Preserve higher-priority restrictions; a source change does not update instructions already loaded in an
+active session.
 
 Before a supported wake, checkpoint the next action and release the foreground lease. A later process
 claims the same owner before acting; it is a fresh context unless the host confirms it resumed the

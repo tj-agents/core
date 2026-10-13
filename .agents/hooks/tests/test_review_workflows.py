@@ -375,8 +375,21 @@ class ReviewWorkflowAcceptanceTests(unittest.TestCase):
         self.assertIn("marker must exist and equal the", address)
         self.assertIn("--root <candidate-bundle>/tree", docs)
         self.assertNotIn("--root <checkout>", docs)
+        self.assertIn("--docs-risk routine", docs)
+        self.assertIn("--docs-rationale", docs)
+        self.assertIn("semantic assessment", docs)
+        self.assertIn("native-plus-fresh full-code-review sequence", docs)
+        self.assertIn("reassesses the semantic risk", incremental)
         self.assertIn("only from the supplied materialized bundle", role)
         self.assertIn("do not recompute them from a live checkout", role)
+
+    def test_docs_review_host_descriptions_match_the_canonical_routine_selection(self):
+        canonical = authored_skill("docs-review").read_text(encoding="utf-8")
+        description = next(line for line in canonical.splitlines() if line.startswith("description: "))
+        for host in (".codex", ".claude"):
+            with self.subTest(host=host):
+                adapter = (ROOT / host / "skills" / "docs-review" / "SKILL.md").read_text(encoding="utf-8")
+                self.assertIn(description, adapter)
 
     def test_review_family_keeps_one_canonical_body_and_thin_host_entries(self):
         skills = (

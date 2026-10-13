@@ -27,6 +27,11 @@ cleanup on Linux and Windows while retaining PID/start-time and terminal identit
 registration must be reported as an incomplete attachment, rather than successful closure or evidence
 that no native CLI exists.
 
+
+2026-10-12 follow-up incident (kind: debt, P2, in-progress): completed native session 01a12d05-0e36-7cd2-afac-1936aa63404b retained a verified host attachment but close.py refused an absent/ambiguous Windows Terminal target; its accepted/armed observer cancelled without exit. Current inventory has zero actual tabs. This is a distinct verified-self-close fallback gap, not missing registry or sandbox PID visibility. Canonical causal repair: [B004](../../BUGS.md#b004) and [verified self-close goal](../../plans/verified-self-close/GOAL.md), Fix/VerifiedSelfCloseFallback. Next action: reproduce and correct safe own-host fallback and observed closure accountability. Resolve this incident when focused identity/observer tests, both platform CI and actual registered self-exit prove closure; retain this broader debt until its original Linux/Windows acceptance condition passes.
+
+2026-10-13 follow-up incident (kind: debt, P2, open): a native Claude Code session on Windows was asked to close itself after a completed Codex handoff, from the `tj-agents` org folder. `close.py` refused with `cannot resolve a verified registry attachment for this host and current directory`. That session had loaded machine `4090e7d23875` while `6e2e2db3d1ad` was installed, so its SessionStart registration may predate the current recorder. This is Claude rather than Codex, on Windows rather than in a Linux sandbox. The user had to close the tab by hand. Resolve together with this section's condition, adding a Claude-on-Windows case: a session that was registered before a plugin update must still resolve its own attachment after the update, or report the stale registration as the specific cause.
+
 ## The Codex plugin cache is not reconciled
 
 `~/.codex/plugins/cache/` accumulates orphaned plugin payloads exactly as the Claude cache did, and

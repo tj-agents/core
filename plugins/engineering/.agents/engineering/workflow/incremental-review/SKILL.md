@@ -47,7 +47,9 @@ deduplicated findings. A later live `HEAD` never widens this pass.
 On successful synthesis, set status back to `complete` and move the single top-level watermark to the
 frozen head. When this pass follows `address-review`, verify the original finding text, severity, completed
 pass judgment, and earlier candidate identity are unchanged apart from permitted status/disposition updates.
-The new pass may move the top-level current judgment only when its own synthesis completes.
+The new pass may move the top-level current judgment only when its own synthesis completes. A routine docs
+repair reviews only its affected delta, then reassesses the semantic risk; new consequential content returns
+the pass to ordinary review.
 
 ## Report
 

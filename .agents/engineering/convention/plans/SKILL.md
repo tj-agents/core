@@ -273,9 +273,10 @@ guess from memory. Then, for an edge that genuinely blocks *implementation*:
 
 ## Hard blockers — hand off the resolver, never the blocked plan
 
-If safe authorized work in the current session can remove the obstacle, or local implementation can proceed
-while delivery waits, do that work; it is not a hard blocker. Otherwise `## Next Steps` must begin with four
-single-line fields, reported verbatim in the final response:
+Apply `base:goal-continuation` before ending at a blocker: exhaust all authorized unblocked work across
+the remaining goal. A blocker on one slice does not justify stopping while another authorized action
+can proceed. When the remaining goal has a genuine dependency gate, `## Next Steps` must begin with
+four single-line fields, reported verbatim in the final response:
 
 ```text
 Blocked: <the exact unmet gate>
@@ -293,6 +294,11 @@ for merge permission with only a bare PR number.** Route the resolving work by o
   including the blocked ledger and the condition it unlocks. This is not the blocked plan's pointer;
 - user or external action only → replace the four fields with one
   `Paused: <who> — <action and observable resume condition>` line and give that action directly.
+
+After either boundary, allow only the four non-empty `Scope:`, `Current slice:`, `Remaining scope:` and
+`Done when:` metadata lines. Do not append actionable tasks to a blocked or paused boundary; execute
+those authorized tasks before ending. The boundary describes all remaining authorized work, not merely
+the current PR or phase. The published four-field blocker remains valid without additional fields.
 
 Do not create a checkpoint merely to prove an unchanged blocker is still blocked. **A blocked or human-gated
 plan never emits its own resume pointer** — its ledger and final report name the blocker, its owner, the

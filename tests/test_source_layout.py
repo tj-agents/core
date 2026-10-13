@@ -39,10 +39,13 @@ class SourceLayoutTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         for name in (".agents", ".codex", ".claude"):
+            patterns = ["__pycache__", "*.pyc"]
+            if name == ".agents":
+                patterns.append("continuation")
             shutil.copytree(
                 ROOT / name,
                 self.root / name,
-                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                ignore=shutil.ignore_patterns(*patterns),
             )
 
     def config(self, edit):
@@ -80,6 +83,7 @@ class SourceLayoutTests(unittest.TestCase):
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/goal-continuation/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/idea-initialization/SKILL.md", output)
 
     def test_problem_record_skills_and_shared_contract_ship_for_both_hosts(self):
         _, output, skills, _ = SYNC.build(self.root)
@@ -104,6 +108,28 @@ class SourceLayoutTests(unittest.TestCase):
                 resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
                 self.assertEqual(resource, resolved)
 
+    def test_task_recovery_contract_ships_for_both_hosts(self):
+        _, output, skills, _ = SYNC.build(self.root)
+        canonical = {
+            "open-codex": "utility/open-codex",
+            "open-claude": "utility/open-claude",
+            "followup-codex": "utility/followup-codex",
+        }
+        resource = "plugins/machine/.agents/machine/resources/task-recovery.md"
+        self.assertIn(resource, output)
+        for name, relative in canonical.items():
+            with self.subTest(skill=name):
+                self.assertEqual("machine", skills[name]["plugin"])
+                for tree in ("skills", "codex-skills"):
+                    adapter = output[f"plugins/machine/{tree}/{name}/SKILL.md"].decode("utf-8")
+                    self.assertIn(f"](../../.agents/machine/{relative}/SKILL.md)", adapter)
+                canonical_path = f"plugins/machine/.agents/machine/{relative}/SKILL.md"
+                canonical_body = output[canonical_path].decode("utf-8")
+                link = "../../resources/task-recovery.md"
+                self.assertIn(f"]({link})", canonical_body)
+                resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
+                self.assertEqual(resource, resolved)
+
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
             manifest_root = self.root / f".agents/plugins/manifests/{host}"
@@ -116,6 +142,7 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         for relative in (
             "plugins/base/skills/agent-files/scripts/session-context.py",
+            "plugins/base/skills/idea-initialization/scripts/session-context.py",
             "plugins/base/skills/plan-artifacts/scripts/session-context.py",
             "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
             "plugins/machine/skills/handoff-codex/scripts/launch_codex.py",

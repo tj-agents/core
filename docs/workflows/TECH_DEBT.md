@@ -1,5 +1,31 @@
 # Workflow runtime debt
 
+## D001 — Configured routine design approval requires stack adoption
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; a stack convention procedure reserved a routine decision despite the
+  user's already-authorized scaffold work.
+- **Impact and priority:** affected stack consumers can ask repeat approval questions; P2 because no merge,
+  publication, permission, or active production harm is involved.
+- **Source owner:** the affected stack source and its consuming repository; Core owns the shared setting and
+  both-host context delivery.
+- **State:** deferred.
+- **Reason:** each convention owner must adopt the shared setting in its own contract.
+- **blocked_by:** dependency.
+- **Repair link:** [Core repair PR #219](https://github.com/tj-agents/core/pull/219),
+  [repo-declared-config rollout owner](../../plans/repo-declared-config/REPO_DECLARED_CONFIG_PROGRESS.md), and
+  [dotnet D001](https://github.com/tj-agents/dotnet/blob/main/docs/TECH_DEBT.md#d001-honor-configured-design-approval-across-agent-hosts).
+- **Resolver:** each affected stack source and consuming repository owner.
+- **Resume when:** a stack owner schedules adoption after selecting a Core release that understands the new
+  key.
+- **Next action:** update the affected convention contract and verify the selected installed Claude and Codex
+  paths.
+- **Resolution condition:** affected convention workflows honor the effective design value from
+  `configuration.core.auto_approve` (`design` overrides `all`, with the flat alias supported only when
+  the nested object is absent) for authorized routine choices, and both installed host paths are accepted.
+- **Verification evidence:** Core source tests cover strict settings resolution and package-context delivery;
+  installed-host acceptance remains pending.
+
 ## Recovery and delivery prevention gaps
 
 The incidents and known causes are owned by [MISTAKES.md](../../MISTAKES.md), entries M001-M007.
@@ -9,7 +35,50 @@ in the 2026-10-11 sandbox recovery. Prevention work and a dedicated recording sk
 Resolve when the shared workflows and applicable host adapters verify same-goal execution selection,
 retained merge authority, supported continuation and reopening, accurate completion and recovery
 claims, and state reconciliation after failed mutations. Record each incident's observed resolution
-against its stable mistake ID. No untested CI-waiter defect or Claude runtime failure is established.
+against its stable mistake ID. D002 records the later observed CI-waiter gap.
+
+## D002 — Pending CI can be left with no launched background waiter
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; after opening Core PR #230, the guard passed while Windows and Linux
+  checks remained pending. The owner ended without launching a background CI waiter, a persistent-delivery
+  continuation, or another background agent to own the exact PR head.
+- **Impact and priority:** an authorized delivery can be stranded after local work completes; P1 because
+  the user must rediscover the pending PR and resume its merge path.
+- **Source owner:** Core engineering continuation and remote-delivery workflows.
+- **State:** open.
+- **Repair link:** [M003](../../MISTAKES.md#M003).
+- **Next action:** make the delivery lifecycle launch and verify a background CI waiter when exact-head CI
+  is pending, or persist a typed gate naming the resolver and observable resume condition.
+- **Resolution condition:** both Core host-package paths prove that a nonterminal delivery is either
+  actively foreground-owned, has a registered and verified background waiter or agent through the next
+  delivery action, records a typed external gate with a resolver and observable resume condition, or is
+  terminally closed. No Core consumer may leave a nonterminal delivery idle without one of those states.
+- **Verification evidence:** PR #230 on `Fix/ContinuationStopBindingHead` was open at
+  `2173ae76ab0fd1e042ae0f414c95dc1f67ff5fcb` with `verify-windows` and `verify-linux` pending; no
+  background CI waiter, continuation, or background agent had been launched before the session returned.
+
+## D003 — Incident records are routed through ordinary PR delivery
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; this session put the mistake and debt records for its own workflow
+  failure into PR #231 instead of committing them directly to `main`, adding an unnecessary review/CI wait
+  before the shared record was available.
+- **Impact and priority:** P2; a corrective record can remain unsynchronized while its source failure is
+  already known, and it creates avoidable background delivery work.
+- **Source owner:** Core problem-record and delivery conventions.
+- **State:** open.
+- **Repair link:** [M014](../../MISTAKES.md#M014).
+- **Next action:** make `write-mistake`, `write-debt`, and the callout-repair path commit and push incident
+  records directly to `main`, while keeping ordinary implementation changes on their normal delivery path.
+- **Resolution condition:** a new incident record is committed directly to `main` without a PR, and both
+  host-delivered conventions make that direct-main route explicit for mistake and debt records.
+- **Verification evidence:** PR #231 was opened solely to carry D002 and M014 before Tommy corrected the
+  delivery route.
+- **Repeated 2026-10-13, now P1:** a Claude session made a worktree and PR #243 to carry D004, D005 and a
+  machine incident, and Tommy corrected it again. The records moved straight to `main`, and #243 was closed.
+  The primary checkout was dirty with another session's work, so a direct-to-main route also needs a way to
+  land a record without touching that checkout.
 
 ## Slice retirement checks the broader goal's completion
 
@@ -71,3 +140,58 @@ review of a changed `SKILL.md` is not required to load `engineering:skill-author
 Resolve when a route can apply at review time alone, without opting the repository into write-time routing
 or the red-run gate, and core routes authored `SKILL.md` paths to `engineering:skill-authoring` through it,
 with a test that `review-prepare` names the skill for such a path.
+
+## D004 — The merge cleanup gate demands session exit after every merge, even mid-goal
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12 to 2026-10-13. A Claude coordinator session merged several PRs across
+  azure, dotnet and core while the goal still had authorized work left.
+- **Impact and priority:** the Stop hook re-blocked every 10 minutes for about a day. That covered azure #1,
+  whose worktree had been removed on 2026-10-12, and later merges. The repetition buried real status in
+  noise. P2: there's no harm to data, but it costs user attention on every turn.
+- **Evidence:** `hooks/merge_cleanup_gate.py`.
+  - `handle_stop` blocks while `session_exit_required` is set or the worktree exists.
+  - `cli_clear` sets `checkout_retained` and `session_exit_required = True`, so `--clear` on a removed
+    worktree never releases the block.
+  - This contradicts `engineering:session-guidance`, under which only a terminal goal closes its own session.
+- **Source owner:** core engineering hooks.
+- **State:** open.
+- **Next action:** stop blocking when the obligation's worktree is gone, or recorded as retained, and the
+  session's canonical goal still has authorized remaining work. Keep session exit required only at the
+  terminal merge.
+- **Resolution condition:** a hook test where a coordinator merges two PRs from different worktrees, removes
+  both, and keeps working. Stop doesn't block after removal, and still blocks at the goal's terminal merge.
+
+## D005 — The continuation stop hook judges the launch checkout without checking its owner
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-13. A Claude session launched from a directory where another session was the
+  writer was judged on that checkout's state.
+- **Impact and priority:** the Stop hook blocks on another owner's work. P3.
+- **Source owner:** core engineering hooks (`continuation_stop.py`).
+- **State:** open.
+- **Related:** core PR #230 (binding `head` versus `remote_head_sha`).
+- **Resolution condition:** `continuation_stop` evaluates only checkouts this session owns, as its registry or
+  lease records them, with a test where a foreign-owned launch directory doesn't block Stop.
+
+## D006 — A noticed problem can be parked outside its owning ledger
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-13. A Claude coordinator noticed two hook defects (now D004 and D005) and
+  wrote them only to a private host notes file. It cited the session limit as a reason to defer. The core
+  ledger got them only after Tommy said "note it down". The `close.py` failure, the D003 repeat and a
+  dotnet M003 were likewise recorded only after his callouts.
+- **Impact and priority:** P1. Known problems stay invisible to other sessions and to the source owner, and
+  Tommy has to prompt for every record.
+- **Cause:** `engineering:session-guidance` ("Record noticed problems") says to record while the observation
+  is available, but nothing enforces it. Recording was conflated with repair: being unable to launch a
+  repair session was treated as a reason to postpone the record.
+- **Source owner:** core engineering (session guidance, `write-debt`, `write-mistake` and the callout-repair
+  gate).
+- **State:** open.
+- **Next action:**
+  - state that a record lands in the owning repository's ledger, straight to `main` (D003), at the moment
+    of noticing, whatever repair capacity there is;
+  - add a gate that blocks a terminal report while the session has noticed a problem without recording it.
+- **Resolution condition:** in a hook test, a session that observes a defect and then tries to finish
+  without a matching ledger entry on `main` is blocked, and recording the entry releases it.

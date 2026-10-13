@@ -4,7 +4,12 @@
   "source_roots": [
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
-    ".agents/workflows"
+    ".agents/hooks/callout_repair_gate.py",
+    ".agents/hooks/continuation_stop.py",
+    ".agents/hooks/docs_reachability.py",
+    ".agents/hooks/hook_dispatch.py",
+    ".agents/workflows",
+    ".agents/workflows/repository_configuration.py"
   ],
   "requires": {
     "marketplaces": [
@@ -137,6 +142,13 @@
           "claude",
           "codex"
         ]
+      },
+      {
+        "path": "hooks/worktree_placement_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
       }
     ],
     "permissions": {
@@ -192,7 +204,7 @@
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
             ]
           ],
-          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
+          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
           "match": [
             [
               "python",
@@ -232,7 +244,7 @@
               "--root",
               "${PROJECT_ROOT}"
             ],
-            "justification": "rechecks the declared opt-in, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+            "justification": "rechecks the freshly validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
             "match": [
               [
                 "python",

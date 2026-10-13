@@ -99,10 +99,18 @@ def merge(event: str, results: list[tuple[str, int, str, str]]) -> tuple[dict, s
                 decisions.setdefault("deny", []).append(reason)
             else:
                 blocks.append(reason)
+        elif code:
+            if event == "Stop":
+                blocks.append(
+                    f"hook-dispatch: {Path(name).name} failed with exit status {code}. "
+                    "Repair the gate and retry this Stop event."
+                )
+            if stderr.strip():
+                diagnostics.append(f"{name}: {stderr.strip()}")
+            else:
+                diagnostics.append(f"{name}: exited with status {code}")
         elif stderr.strip():
             diagnostics.append(f"{name}: {stderr.strip()}")
-        elif code:
-            diagnostics.append(f"{name}: exited with status {code}")
         if event == "SessionStart" and code not in (0, BLOCKING_EXIT):
             notice = f"hook-dispatch: {name} failed with exit status {code}."
             if stderr.strip():
@@ -204,6 +212,10 @@ def overrun_notice(event: str, merged: dict, deadline: float, unfinished: list[s
     merged = dict(merged)
     message = merged.get("systemMessage")
     merged["systemMessage"] = f"{message}\n{notice}" if message else notice
+    if event == "Stop":
+        reason = merged.get("reason")
+        merged["decision"] = "block"
+        merged["reason"] = f"{reason}\n\n{notice}" if reason else notice
     if event in ("SessionStart", "PreToolUse", "PostToolUse", "PostToolUseFailure", "UserPromptSubmit"):
         specific = dict(merged.get("hookSpecificOutput") or {"hookEventName": event})
         context = specific.get("additionalContext")

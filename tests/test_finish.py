@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 import json
 import os
 from pathlib import Path
@@ -31,17 +32,44 @@ class HostFallbackTests(unittest.TestCase):
             with self.assertRaisesRegex(session_close.Refusal, "do not force-close the host"):
                 session_close.own_host_and_entry(Path.cwd())
 
-    def test_unavailable_terminal_can_close_verified_host_without_wrapper(self):
+    def test_terminal_refusal_can_close_verified_host_without_wrapper(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
-        for module in (own_close, finish):
-            with self.subTest(module=module.__name__), \
-                    mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
-                    mock.patch.object(session_close, "verified_live", return_value=True), \
-                    mock.patch.object(module.close_tab, "close_entry",
-                                      side_effect=module.close_tab.TerminalUnavailable("unavailable")), \
-                    mock.patch.object(module.os, "kill") as killer:
-                module.close_host(entry)
-                killer.assert_called_once_with(30, module.signal.SIGTERM)
+        for refusal in (
+                own_close.close_tab.TerminalUnavailable("unavailable"),
+                own_close.close_tab.TerminalRefusal("Windows Terminal target is absent or ambiguous"),
+        ):
+            for module in (own_close, finish):
+                with self.subTest(module=module.__name__, refusal=type(refusal).__name__), \
+                     mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                     mock.patch.object(session_close, "verified_live", return_value=True), \
+                     mock.patch.object(module.close_tab, "close_entry",
+                                       side_effect=refusal), \
+                     mock.patch.object(module.os, "kill") as killer:
+                    module.close_host(entry)
+                    killer.assert_called_once_with(30, module.signal.SIGTERM)
+
+    def test_windows_terminal_absent_or_ambiguous_target_can_close_verified_host(self):
+        entry = {
+            "pid": 30,
+            "pid_started_at": 3.0,
+            "title": "own",
+            "terminal": {"kind": "windows-terminal", "automation_id": "tab-1"},
+        }
+        target = {
+            "title": "own",
+            "identity": {"kind": "windows-terminal", "automation_id": "tab-1"},
+        }
+        for inventory in ([], [target, target]):
+            for module in (own_close, finish):
+                with self.subTest(module=module.__name__, inventory=inventory), \
+                        mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                        mock.patch.object(session_close, "verified_live", return_value=True), \
+                        mock.patch.object(module.close_tab.session_close, "liveness", return_value=True), \
+                        mock.patch.object(module.close_tab, "is_windows", return_value=True), \
+                        mock.patch.object(module.close_tab, "windows_inventory", return_value=inventory), \
+                        mock.patch.object(module.os, "kill") as killer:
+                    module.close_host(entry)
+                    killer.assert_called_once_with(30, module.signal.SIGTERM)
 
     def test_fallback_rechecks_host_after_terminal_inspection(self):
         entry = {"pid": 30, "pid_started_at": 3.0}
@@ -50,11 +78,42 @@ class HostFallbackTests(unittest.TestCase):
                     mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
                     mock.patch.object(session_close, "verified_live", side_effect=[True, False]), \
                     mock.patch.object(module.close_tab, "close_entry",
-                                      side_effect=module.close_tab.TerminalUnavailable("unavailable")), \
+                                      side_effect=module.close_tab.TerminalRefusal("ambiguous")), \
                     mock.patch.object(module.os, "kill") as killer:
                 with self.assertRaisesRegex(session_close.Refusal, "identity changed"):
                     module.close_host(entry)
                 killer.assert_not_called()
+
+    def test_unknown_host_refuses_before_terminal_close_or_signal(self):
+        entry = {"pid": 30, "pid_started_at": 3.0}
+        for module in (own_close, finish):
+            with self.subTest(module=module.__name__), \
+                    mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                    mock.patch.object(session_close, "verified_live", return_value=False), \
+                    mock.patch.object(module.close_tab, "close_entry") as closer, \
+                    mock.patch.object(module.os, "kill") as killer:
+                with self.assertRaisesRegex(session_close.Refusal, "identity changed before close"):
+                    module.close_host(entry)
+                closer.assert_not_called()
+                killer.assert_not_called()
+
+    def test_terminal_refusal_signals_only_a_verified_wrapper(self):
+        entry = {"pid": 30, "pid_started_at": 3.0}
+        wrapper = {"pid": 20, "started_at": 2.0}
+        for wrapper_live, expected in ((True, [30, 20]), (False, [30])):
+            for module in (own_close, finish):
+                with self.subTest(module=module.__name__, wrapper_live=wrapper_live), \
+                        mock.patch.dict(os.environ, {"AGENT_FINISH_CLOSE_MODE": ""}), \
+                        mock.patch.object(session_close, "verified_live",
+                                          side_effect=[True, True, wrapper_live]), \
+                        mock.patch.object(module.close_tab, "close_entry",
+                                          side_effect=module.close_tab.TerminalRefusal("absent")), \
+                        mock.patch.object(module.os, "kill") as killer:
+                    module.close_host(entry, wrapper)
+                    self.assertEqual(
+                        [mock.call(pid, module.signal.SIGTERM) for pid in expected],
+                        killer.call_args_list,
+                    )
 
 
 def git(cwd, *args):
@@ -138,7 +197,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 os.environ,
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_CLI_HOST_NAMES=host_name,
-                AGENT_FINISH_CLOSE_MODE="process",
+                AGENT_FINISH_CLOSE_MODE="",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
             )
             host = subprocess.Popen([
@@ -157,6 +216,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                     "pid_started_at": started, "started_at": time.time(),
                     "host": host_name,
                 }), encoding="utf-8")
+                self.record_idle_session(state, host_name, "ours", worktree, host.pid, started)
                 (root / "start").touch()
                 result_directory = state / "merge-cleanup/results"
                 for _ in range(300):
@@ -214,7 +274,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 os.environ,
                 AGENT_STATE_DIRECTORY=str(state),
                 AGENT_CLI_HOST_NAMES=host_name,
-                AGENT_FINISH_CLOSE_MODE="process",
+                AGENT_FINISH_CLOSE_MODE="",
                 AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10",
             )
             host = subprocess.Popen([
@@ -233,6 +293,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                     "pid_started_at": started, "started_at": time.time(),
                     "host": host_name,
                 }), encoding="utf-8")
+                self.record_idle_session(state, host_name, "ours", worktree, host.pid, started)
                 (root / "start").touch()
                 result_directory = state / "merge-cleanup/results"
                 for _ in range(300):
@@ -278,6 +339,20 @@ class FinishReaperProcessTests(unittest.TestCase):
         if process is None or not session_close.valid_identity(pid, process.started_at):
             raise AssertionError("disposable host has no queryable process identity")
         return process.started_at
+
+    @staticmethod
+    def record_idle_session(state, host, session_id, cwd, pid, pid_started_at):
+        store = session_close.register_session._load_session_store()
+        if store is None:
+            raise AssertionError("session store is unavailable")
+        connection = store.connect(state / "sessions.db")
+        try:
+            handle = store.start_session(
+                connection, host, session_id, cwd, pid=pid, pid_started_at=pid_started_at,
+            )
+            store.record_stop(connection, handle, cwd)
+        finally:
+            connection.close()
 
 
 class ReceiptSafetyTests(unittest.TestCase):
@@ -432,12 +507,13 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
                     self.assertIsNotNone(session_close.other_live_claimant(worktree, own))
 
     def test_finish_preflight_passes_full_own_identity_to_claim_check(self):
-        entry = {"session_id": "ours", "pid": 10, "pid_started_at": 1.0,
-                 "cwd": str(self.worktree)}
+        entry = {"host": "codex", "session_id": "ours", "pid": 10, "pid_started_at": 1.0,
+                 "started_at": 2.0, "cwd": str(self.worktree)}
         receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
         with mock.patch.object(finish.session_close, "own_host_and_entry", return_value=entry), \
                 mock.patch.object(finish.session_close, "worktree_from_cwd", return_value=self.worktree), \
                 mock.patch.object(finish.session_close, "under_or_equal", return_value=True), \
+                mock.patch.object(finish.session_close, "awaiting_input_activity", return_value=3.0), \
                 mock.patch.object(finish.session_close, "fresh_removable_receipt", return_value=receipt), \
                 mock.patch.object(finish.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
                 mock.patch.object(finish.session_close, "start_observer") as observer, \
@@ -449,12 +525,13 @@ class ClaimAndObligationSafetyTests(unittest.TestCase):
         killer.assert_not_called()
 
     def test_refresh_cleanup_passes_full_own_identity_to_claim_check(self):
-        entry = {"session_id": "ours", "pid": 10, "pid_started_at": 1.0,
-                 "cwd": str(self.worktree)}
+        entry = {"host": "codex", "session_id": "ours", "pid": 10, "pid_started_at": 1.0,
+                 "started_at": 2.0, "cwd": str(self.worktree)}
         receipt = {"head": "head", "primary": "primary", "branch": "branch", "default": "main"}
         with mock.patch.object(finish.session_close, "own_host_and_entry", return_value=entry), \
                 mock.patch.object(finish.session_close, "worktree_from_cwd", return_value=self.worktree), \
                 mock.patch.object(finish.session_close, "under_or_equal", return_value=True), \
+                mock.patch.object(finish.session_close, "awaiting_input_activity", return_value=3.0), \
                 mock.patch.object(finish.session_close, "fresh_removable_receipt", return_value=receipt), \
                 mock.patch.object(finish.session_close, "other_live_claimant", return_value={"pid": 11}) as claimant, \
                 mock.patch.object(finish.os, "kill") as killer:
@@ -746,3 +823,172 @@ class ObserverHandshakeTests(unittest.TestCase):
             self.assertTrue(session_close.valid_armed(armed, expected, observer, accepted))
             armed["session_id"] = "different"
             self.assertFalse(session_close.valid_armed(armed, expected, observer, accepted))
+
+
+class EndReasonRecordingTests(unittest.TestCase):
+    def setUp(self):
+        self.entry = {"host": "claude", "session_id": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "pid": 1, "pid_started_at": 1.0}
+
+    def test_finish_records_finished_reason_through_the_shared_store(self):
+        store = mock.Mock()
+        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
+            finish._record_own_end(self.entry, "finished")
+        store.end_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "finished")
+        connection.close.assert_called_once()
+
+    def test_close_records_closed_reason_through_the_shared_store(self):
+        store = mock.Mock()
+        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        with mock.patch.object(own_close.register_session, "_load_session_store", return_value=store):
+            own_close._record_own_end(self.entry, "closed")
+        store.end_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "closed")
+        connection.close.assert_called_once()
+
+    def test_reopen_reverses_a_recorded_end_through_the_shared_store(self):
+        store = mock.Mock()
+        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
+            finish._reopen_own_end(self.entry, "finished")
+        store.reopen_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "finished")
+        connection.close.assert_called_once()
+
+    def test_recording_never_raises_when_the_store_is_unavailable(self):
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=None):
+            finish._record_own_end(self.entry, "finished")
+        with mock.patch.object(finish.register_session, "_load_session_store", side_effect=RuntimeError("boom")):
+            finish._record_own_end(self.entry, "finished")
+
+    def test_recording_is_skipped_without_a_known_host_or_session(self):
+        store = mock.Mock()
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
+            finish._record_own_end({"pid": 1, "pid_started_at": 1.0}, "finished")
+        store.connect.assert_not_called()
+
+
+class SelfCloseActivityGuardTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.state = Path(self.temp.name) / "state"
+        self.cwd = Path(self.temp.name) / "checkout"
+        self.cwd.mkdir()
+        self.entry = {
+            "host": "codex", "session_id": "session", "pid": 10,
+            "pid_started_at": 20.0, "started_at": 30.0, "cwd": str(self.cwd),
+        }
+
+    def store_row(self, turn_state="awaiting_input", ended_at=None, activity=40.0, **changes):
+        return {
+            "host": "codex", "session_id": "session", "pid": 10,
+            "pid_started_at": 20.0, "cwd": str(self.cwd), "turn_state": turn_state,
+            "ended_at": ended_at, "last_activity_at": activity, **changes,
+        }
+
+    def test_guard_requires_real_idle_store_evidence_and_refuses_active_missing_or_mismatched_rows(self):
+        store = mock.Mock()
+        store.session_handle.return_value = "codex:session"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        cases = (
+            (None, "missing"),
+            (self.store_row(turn_state="working"), "not awaiting input"),
+            (self.store_row(ended_at=41.0), "already ended"),
+            (self.store_row(pid_started_at=21.0), "does not match"),
+        )
+        with mock.patch.object(session_close, "verified_live", return_value=True), \
+                mock.patch.object(session_close.register_session, "_load_session_store", return_value=store):
+            for row, message in cases:
+                with self.subTest(message=message):
+                    store.get_session.return_value = row
+                    with self.assertRaisesRegex(session_close.Refusal, message):
+                        session_close.awaiting_input_activity(self.entry)
+            store.get_session.return_value = self.store_row()
+            self.assertEqual(40.0, session_close.awaiting_input_activity(self.entry))
+            with self.assertRaisesRegex(session_close.Refusal, "activity changed"):
+                session_close.awaiting_input_activity(self.entry, 39.0)
+
+    def test_first_guard_refuses_before_cleanup_observer_end_record_or_signal(self):
+        for module in (own_close, finish):
+            with self.subTest(module=module.__name__), \
+                    mock.patch.object(module.session_close, "own_host_and_entry", return_value=self.entry), \
+                    mock.patch.object(module.session_close, "worktree_from_cwd", return_value=self.cwd), \
+                    mock.patch.object(module.session_close, "under_or_equal", return_value=True), \
+                    mock.patch.object(module.session_close, "awaiting_input_activity", side_effect=session_close.Refusal("session is not awaiting input")), \
+                    mock.patch.object(module.session_close, "fresh_removable_receipt") as receipt, \
+                    mock.patch.object(module.session_close, "start_observer") as observer, \
+                    mock.patch.object(module, "_record_own_end") as end_record, \
+                    mock.patch.object(module, "close_host") as closer:
+                with self.assertRaisesRegex(session_close.Refusal, "not awaiting input"):
+                    module.main([])
+                receipt.assert_not_called()
+                observer.assert_not_called()
+                end_record.assert_not_called()
+                closer.assert_not_called()
+
+    def test_prompt_then_stop_with_a_new_idle_token_refuses_before_end_or_signal(self):
+        for module in (own_close, finish):
+            with self.subTest(module=module.__name__), ExitStack() as stack:
+                stack.enter_context(mock.patch.object(module.session_close, "own_host_and_entry", return_value=self.entry))
+                stack.enter_context(mock.patch.object(module.session_close, "worktree_from_cwd", return_value=self.cwd))
+                stack.enter_context(mock.patch.object(module.session_close, "under_or_equal", return_value=True))
+                stack.enter_context(mock.patch.object(
+                    module.session_close, "awaiting_input_activity",
+                    side_effect=[40.0, session_close.Refusal("session activity changed before close")],
+                ))
+                stack.enter_context(mock.patch.object(module.session_close, "fresh_removable_receipt", return_value={"head": "h", "primary": str(self.cwd), "branch": "b", "default": "main"}))
+                stack.enter_context(mock.patch.object(module.session_close, "other_live_claimant", return_value=None))
+                stack.enter_context(mock.patch.object(module.session_close, "git", return_value=(0, "", "")))
+                stack.enter_context(mock.patch.object(module.session_close, "results_path", return_value=self.state / "result.json"))
+                stack.enter_context(mock.patch.object(module.session_close, "qualified_windows_wrapper", return_value=None))
+                stack.enter_context(mock.patch.object(module.session_close, "start_observer", return_value=20))
+                stack.enter_context(mock.patch.object(module.session_close, "wait_for_record", side_effect=[{"reaper_pid": 20, "reaper_started_at": 30.0}, {"armed": 50.0}]))
+                stack.enter_context(mock.patch.object(module.session_close, "valid_observer_start", return_value=True))
+                stack.enter_context(mock.patch.object(module.session_close, "valid_armed", return_value=True))
+                stack.enter_context(mock.patch.object(module.session_close, "write_json"))
+                cancel = stack.enter_context(mock.patch.object(module.session_close, "cancel_observer"))
+                stack.enter_context(mock.patch.object(module, "refresh_attachment", return_value=None, create=True))
+                stack.enter_context(mock.patch.object(module, "refresh_cleanup", return_value=None, create=True))
+                end_record = stack.enter_context(mock.patch.object(module, "_record_own_end"))
+                closer = stack.enter_context(mock.patch.object(module, "close_host"))
+                with self.assertRaisesRegex(session_close.Refusal, "activity changed"):
+                    module.main([])
+                end_record.assert_not_called()
+                closer.assert_not_called()
+                cancel.assert_called_once()
+
+    def test_real_store_turn_transitions_require_the_current_idle_token_for_both_hosts(self):
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state)}), \
+                mock.patch.object(session_close, "verified_live", return_value=True):
+            store = session_close.register_session._load_session_store()
+            self.assertIsNotNone(store)
+            for host in ("codex", "claude"):
+                with self.subTest(host=host):
+                    entry = {
+                        "host": host, "session_id": host + "-session", "pid": 10,
+                        "pid_started_at": 20.0, "started_at": 30.0, "cwd": str(self.cwd),
+                    }
+                    connection = store.connect()
+                    try:
+                        with mock.patch.object(store.time, "time", side_effect=(10.0, 20.0, 30.0, 40.0)):
+                            handle = store.start_session(
+                                connection, host, entry["session_id"], self.cwd,
+                                pid=entry["pid"], pid_started_at=entry["pid_started_at"],
+                            )
+                            store.record_stop(connection, handle, self.cwd)
+                            idle_token = session_close.awaiting_input_activity(entry)
+                            store.record_prompt(connection, handle)
+                            with self.assertRaisesRegex(session_close.Refusal, "not awaiting input"):
+                                session_close.awaiting_input_activity(entry)
+                            store.record_stop(connection, handle, self.cwd)
+                    finally:
+                        connection.close()
+                    with self.assertRaisesRegex(session_close.Refusal, "activity changed"):
+                        session_close.awaiting_input_activity(entry, idle_token)
+                    self.assertEqual(40.0, session_close.awaiting_input_activity(entry))

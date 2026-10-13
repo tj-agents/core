@@ -22,6 +22,12 @@ mistake, and the required bounded source-repair handoff. Existing user limits an
 Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
 evidence or a stated user decision, and say what changed.
 
+During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
+refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
+snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
+accepted, launch `engineering:handoff` in bounded side-workstream mode to the standard's source owner
+under the standing authorization. Established standards defects still require immediate repair.
+
 ## A task has an owning lifecycle — load it before the first edit
 
 Authorized long-term or multi-phase work selects `engineering:plan-execution`, even when the user does
@@ -38,6 +44,17 @@ direct execution, tiny inline follow-ups, capability limits, and when substantia
 execution owner; apply it even when the engineering runtime is unavailable.
 On Claude, hand multi-phase work and any delegated design, implementation, or review phase to Codex before
 delegating. An explicit user choice of Claude may keep non-frontier work local; otherwise do not fall back.
+
+## Repository routine-decision delegation
+
+Read routine delegation from the actual checkout's `.agents/settings.json`. Within
+`configuration.core.auto_approve`, an explicit `design` overrides `all`, including false. The flat
+`configuration.core.auto_approve_design` alias applies only when the nested object is absent. When
+the effective design value is true, proceed with routine design and convention choices, including the recording
+needed by work the user already authorized. Explain and record the rationale. Planning-only work remains
+planning-only. An explicit user decision reservation, task scope, or stricter repository rule still
+controls. A procedural gate added by an agent does not reserve a decision for the user. This setting grants
+no merge, publication, installation, permission, or other external authority.
 
 ## A link to another skill is a stage pointer, not a read
 
@@ -81,12 +98,14 @@ when delivery is authorized. Bind remote monitoring to the exact repository, hea
 pending CI is owned without an active monitor. A failed test selects `engineering:failing-tests` and its
 diagnose, repair and focused verification loop. Do not weaken a check merely to produce a pass.
 
-A terminal goal closes its own session as its final action, after its workflow's remaining steps and
-the completion report: run `machine:peer-cli`'s
-`finish.py` when `cleanup_proof.py` printed `removable` for this merged linked worktree,
-`close.py` for any other checkout. Run them with `python3 -B` on Linux/macOS or `python -B` on Windows. Stay open while the final message asks the user something or is
-an answer that exists only in the transcript. A handoff predecessor follows `engineering:handoff`'s
-release instead.
+A terminal goal may close its own session only after its workflow's remaining steps and the delivered
+completion report: run `machine:peer-cli`'s `finish.py` when `cleanup_proof.py` printed `removable` for
+this merged linked worktree, `close.py` for any other checkout. Run them with `python3 -B` on Linux/macOS
+or `python -B` on Windows. Keep the session open for an explicit keep-open or continue instruction, active
+dialogue, or a necessary user answer. Idle turn state permits a supported post-report close attempt; it does
+not prove report delivery. When that execution path is unavailable, preserve the session and checkout with
+the existing `merge_cleanup_gate --clear` deliberate-retention escape. A handoff predecessor follows
+`engineering:handoff`'s release instead.
 
 ## Maintain the right source owner
 

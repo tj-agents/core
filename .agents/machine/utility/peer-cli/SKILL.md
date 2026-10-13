@@ -101,8 +101,12 @@ For a completed session whose checkout must remain, run exactly
 `python3 -B <skill-directory>/scripts/close.py` on Linux/macOS or
 `python -B <skill-directory>\scripts\close.py` on Windows, with no
 arguments after the completion report. It requires this host's verified registry entry and attachment,
-closes only its own host or uniquely identified tab, and records session exit without changing files,
-branches or worktree registration. `finish.py` retains ownership of removable linked-worktree cleanup.
+an active unended `awaiting_input` turn with an unchanged activity token immediately before close, then
+closes only its own host or uniquely identified tab and records session exit without changing files, branches
+or worktree registration. Idle state does not prove report delivery. Honor keep-open, continue and active
+dialogue; when no supported post-report execution path exists, preserve the session and checkout through
+the existing `merge_cleanup_gate --clear` deliberate-retention escape. `finish.py` retains ownership of
+removable linked-worktree cleanup.
 
 Run self-session close and finish with visibility of the registered native host. When a command sandbox
 isolates the process tree, use the harness's supported host-side execution path, subject to its permission
