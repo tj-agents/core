@@ -2,10 +2,13 @@
 exercised against a fake `codex` runner so no real marketplace, plugin or hook-trust call ever happens."""
 import importlib.util
 import json
+import multiprocessing
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -19,6 +22,12 @@ SPEC.loader.exec_module(SYNC)
 
 def completed(argv, returncode=0, stdout='', stderr=''):
     return subprocess.CompletedProcess(argv, returncode, stdout=stdout, stderr=stderr)
+
+
+def hold_preference_lock(path, acquired, release):
+    with SYNC.PreferenceLock(Path(path)):
+        acquired.set()
+        release.wait(10)
 
 
 class FakeCodex:
@@ -77,6 +86,11 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='codex marketplace sync ')
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
+        self.profile = self.project / 'profile'
+        self.profile.mkdir()
+        self.codex_home = mock.patch.dict(os.environ, {'CODEX_HOME': str(self.profile)})
+        self.codex_home.start()
+        self.addCleanup(self.codex_home.stop)
         self.lines = []
         self.catalog = mock.patch.object(
             SYNC, 'canonical_catalog',
@@ -145,6 +159,14 @@ class SyncCodexStandardsTests(unittest.TestCase):
         self.assertEqual(selected, [])
         self.assertEqual(fake.calls, ['plugin marketplace upgrade --json', 'plugin list --available --json'])
         self.assertEqual(fake.trust_calls, [])
+
+    def test_refresh_without_legacy_migration_does_not_require_tomllib(self):
+        fake = FakeCodex()
+
+        with mock.patch.object(SYNC, 'tomllib', None):
+            selected = SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=fake.run)
+
+        self.assertEqual(selected, ['base@base-agents', 'engineering@base-agents'])
 
     def test_a_failed_marketplace_upgrade_blocks_the_rest_of_the_sync(self):
         fake = FakeCodex(fail_upgrade=True)
@@ -362,12 +384,15 @@ class SyncCodexStandardsTests(unittest.TestCase):
 
 
 class MigrationCodex(FakeCodex):
-    def __init__(self, legacy='base@base-agents', repository='tj-agents/core', enabled=True, verify=True):
+    def __init__(self, legacy='base@base-agents', repository='tj-agents/core', enabled=True, verify=True,
+                 native_prefix=''):
         super().__init__()
         self.legacy = legacy
         self.repository = repository
         self.enabled = enabled
         self.verify = verify
+        self.native_prefix = native_prefix
+        self.config_path = None
         self.canonical_installed = False
         self.legacy_installed = True
 
@@ -382,10 +407,13 @@ class MigrationCodex(FakeCodex):
                 'marketplaceSource': {'sourceType': 'git', 'source': f'https://github.com/{self.repository}.git'},
             })
         if self.canonical_installed and self.verify:
+            canonical_enabled = self.enabled
+            if self.config_path is not None and self.config_path.is_file():
+                canonical_enabled = SYNC.plugin_preference(self.config_path, 'base@tj-agents')
             installed.append({
                 'pluginId': 'base@tj-agents',
                 'installed': True,
-                'enabled': self.enabled,
+                'enabled': canonical_enabled,
                 'marketplaceSource': {'sourceType': 'git', 'source': 'https://github.com/tj-agents/marketplace.git'},
             })
         return {
@@ -408,6 +436,10 @@ class MigrationCodex(FakeCodex):
             return completed(argv, 0, stdout=json.dumps(self.inventory()))
         if arguments == ['plugin', 'add', 'base@tj-agents', '--json']:
             self.canonical_installed = True
+            if self.config_path is not None:
+                self.config_path.write_text(
+                    self.native_prefix + '[plugins."base@tj-agents"]\nenabled = true\n', encoding='utf-8'
+                )
             return completed(argv, 0, stdout=json.dumps({'pluginId': 'base@tj-agents'}))
         if arguments == ['plugin', 'remove', self.legacy, '--json']:
             self.legacy_installed = False
@@ -432,6 +464,7 @@ class IdentityMigrationTests(unittest.TestCase):
         self.addCleanup(self.catalog.stop)
 
     def sync(self, fake):
+        fake.config_path = self.profile / 'config.toml'
         return SYNC.sync_codex_standards(
             'Invoke-FakeCodex', self.project, out=self.lines.append, run=fake.run, config_root=self.profile,
         )
@@ -439,7 +472,7 @@ class IdentityMigrationTests(unittest.TestCase):
     def test_owned_same_name_plugin_migrates_after_canonical_payload_verification(self):
         path = self.profile / 'config.toml'
         path.write_text('# retain this comment\nmodel = "test"\n', encoding='utf-8')
-        fake = MigrationCodex()
+        fake = MigrationCodex(native_prefix='# retain this comment\nmodel = "test"\n')
 
         selected = self.sync(fake)
 
@@ -464,13 +497,16 @@ class IdentityMigrationTests(unittest.TestCase):
 
     def test_existing_canonical_false_dominates_legacy_true(self):
         path = self.profile / 'config.toml'
-        original = '[plugins."base@base-agents"]\nenabled = true\n\n[plugins."base@tj-agents"]\nenabled = false\n'
+        original = 'plugins."base@tj-agents".enabled = false\n'
         path.write_text(original, encoding='utf-8')
-        fake = MigrationCodex(enabled=True)
+        fake = MigrationCodex(enabled=True, native_prefix='# retain this comment\n')
 
         self.sync(fake)
 
-        self.assertEqual(original, path.read_text(encoding='utf-8'))
+        self.assertEqual(
+            '# retain this comment\n[plugins."base@tj-agents"]\nenabled = false\n',
+            path.read_text(encoding='utf-8'),
+        )
         self.assertFalse(fake.legacy_installed)
 
     def test_foreign_same_name_plugin_is_not_migrated(self):
@@ -494,6 +530,37 @@ class IdentityMigrationTests(unittest.TestCase):
         self.assertNotIn('plugin remove base@base-agents --json', fake.calls)
         self.assertEqual('model = "test"\n', path.read_text(encoding='utf-8'))
 
+    def test_missing_replacement_payload_removes_an_installer_created_config(self):
+        path = self.profile / 'config.toml'
+        fake = MigrationCodex(verify=False)
+
+        with self.assertRaisesRegex(SYNC.SyncError, 'did not verify replacement payload'):
+            self.sync(fake)
+
+        self.assertFalse(path.exists())
+        self.assertTrue(fake.legacy_installed)
+
+    def test_failed_migration_does_not_overwrite_a_concurrent_preference_change(self):
+        path = self.profile / 'config.toml'
+        original = b'model = "test"\n'
+        concurrent = b'model = "concurrent"\n'
+        path.write_bytes(original)
+        fake = MigrationCodex(verify=False, native_prefix=original.decode('utf-8'))
+
+        def run(argv, **kwargs):
+            result = fake.run(argv, **kwargs)
+            if argv[1:] == ['plugin', 'list', '--available', '--json'] and fake.canonical_installed:
+                path.write_bytes(concurrent)
+            return result
+
+        with self.assertRaisesRegex(SYNC.SyncError, 'changed while recovering'):
+            SYNC.sync_codex_standards(
+                'Invoke-FakeCodex', self.project, out=self.lines.append, run=run, config_root=self.profile,
+            )
+
+        self.assertEqual(concurrent, path.read_bytes())
+        self.assertTrue(fake.legacy_installed)
+
     def test_scoped_project_preference_is_an_actionable_migration_conflict(self):
         scoped = self.project / '.codex'
         scoped.mkdir()
@@ -506,6 +573,50 @@ class IdentityMigrationTests(unittest.TestCase):
 
         self.assertTrue(fake.legacy_installed)
         self.assertNotIn('plugin add base@tj-agents --json', fake.calls)
+
+    def test_inherited_project_preference_is_an_actionable_migration_conflict(self):
+        nested = self.project / 'src' / 'module'
+        nested.mkdir(parents=True)
+        (self.project / '.git').mkdir()
+        scoped = self.project / '.codex'
+        scoped.mkdir()
+        path = scoped / 'config.toml'
+        path.write_text('[plugins."base@base-agents"]\nenabled = false\n', encoding='utf-8')
+        fake = MigrationCodex()
+
+        with self.assertRaisesRegex(SYNC.SyncError, 'scoped project preference') as raised:
+            SYNC.sync_codex_standards(
+                'Invoke-FakeCodex', nested, out=self.lines.append, run=fake.run, config_root=self.profile,
+            )
+
+        self.assertIn('project', str(raised.exception))
+        self.assertTrue(fake.legacy_installed)
+        self.assertNotIn('plugin add base@tj-agents --json', fake.calls)
+
+    def test_plugin_preference_reads_inline_dotted_and_quoted_toml_forms(self):
+        cases = (
+            '[plugins]\n"base@tj-agents" = { enabled = false }\n',
+            'plugins."base@tj-agents".enabled = false\n',
+            "[plugins.'base@tj-agents']\nenabled = false\n",
+        )
+        path = self.profile / 'config.toml'
+
+        for content in cases:
+            with self.subTest(content=content):
+                path.write_text(content, encoding='utf-8')
+                self.assertIs(False, SYNC.plugin_preference(path, 'base@tj-agents'))
+
+    def test_preference_migration_requires_python_311_toml_support(self):
+        fake = MigrationCodex()
+        path = self.profile / 'config.toml'
+
+        with mock.patch.object(SYNC, 'tomllib', None):
+            with self.assertRaisesRegex(SYNC.SyncError, 'Python 3.11 or newer'):
+                self.sync(fake)
+
+        self.assertNotIn('plugin add base@tj-agents --json', fake.calls)
+        self.assertNotIn('plugin remove base@base-agents --json', fake.calls)
+        self.assertFalse(path.exists())
 
     def test_unlisted_owned_plugin_is_reported_without_a_guessed_replacement(self):
         fake = MigrationCodex(legacy='retired-standard@legacy-catalog', repository='tj-agents/dotnet')
@@ -549,15 +660,44 @@ class IdentityMigrationTests(unittest.TestCase):
 
     def test_preference_revalidation_refuses_to_overwrite_a_concurrent_change(self):
         path = self.profile / 'config.toml'
-        before = b'# preserve\nmodel = "test"\n'
-        changed = b'# preserve\nmodel = "changed"\n'
+        before = b'# preserve\n[plugins."base@tj-agents"]\nenabled = true\n'
+        changed = b'# preserve\n[plugins."base@tj-agents"]\nenabled = false\n'
         path.write_bytes(before)
 
         with mock.patch.object(Path, 'read_bytes', side_effect=[before, changed]):
             with self.assertRaisesRegex(SYNC.SyncError, 'changed while preparing'):
-                SYNC.append_preference(path, 'base@tj-agents', True)
+                SYNC.update_native_preference(path, 'base@tj-agents', False)
 
         self.assertEqual(before, path.read_bytes())
+
+    def test_preference_lock_serializes_competing_processes(self):
+        context = multiprocessing.get_context('spawn')
+        path = self.profile / '.codex-marketplace-sync.lock'
+        first_acquired = context.Event()
+        release = context.Event()
+        process = context.Process(target=hold_preference_lock, args=(str(path), first_acquired, release))
+        process.start()
+        try:
+            self.assertTrue(first_acquired.wait(5))
+            second_acquired = threading.Event()
+
+            def acquire():
+                with SYNC.PreferenceLock(path):
+                    second_acquired.set()
+
+            contender = threading.Thread(target=acquire)
+            contender.start()
+            self.assertFalse(second_acquired.wait(0.2))
+            release.set()
+            process.join(5)
+            contender.join(5)
+            self.assertEqual(0, process.exitcode)
+            self.assertTrue(second_acquired.is_set())
+        finally:
+            release.set()
+            if process.is_alive():
+                process.kill()
+            process.join()
 
 class ApplyHarnessPermissionsTests(unittest.TestCase):
     """apply_harness_permissions() in isolation: the fire-and-forget contract shared with

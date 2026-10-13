@@ -206,6 +206,8 @@ Typing `codex` in Bash on Linux or PowerShell on Windows/Linux and using `handof
 enabled plugins before Codex loads them. The launcher then records native Codex hook trust only for
 enabled plugins sourced from GitHub's `tj-agents` organisation, after checking the installed package
 against its unchanged Git source. Other publishers and user/project hooks retain normal trust review.
+Ordinary refreshes support the launcher runtime; migrating legacy plugin preferences to `@tj-agents`
+requires Python 3.11 or newer for TOML parsing.
 Set `BASE_AGENTS_CODEX_HOOK_TRUST=off` to keep manual review for all hooks. The machine plugin's SessionStart hook adds a marked block
 to the supported terminal profiles. That block resolves the active installed machine package at invocation time, so later
 terminals load its `codex` wrapper without pulling this checkout. The first session after installing
