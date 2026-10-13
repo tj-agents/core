@@ -17,8 +17,8 @@ its own goal and checkout. This successor owns only this goal.
 ## Checkout
 
 `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-StopGateAndProfileRepair`, branch
-`Fix/StopGateAndProfileRepair` from `origin/main` `4090e7d`. Split into PR-sized slices under
-`engineering:git-branching` if the defects don't belong in one diff.
+`Docs/StopGateOwnership` from remote main `c95b899fc8119a37dfbde1b25d9e34bacbc3c265`.
+The same foreground owner continues this goal across its sequential delivery slices.
 
 ## Defects
 
@@ -88,13 +88,15 @@ not this goal.
 
 ## Lane
 
-L3: open investigation (D2) and bounded design (D1 enforcement) with unresolved alternatives.
+Current phase: L5 mechanical guidance implementation; the exact ownership, blocker and session-close
+wording is resolved. Bounded in-session worker applies it; parent owns goal, verification and transitions.
+Review reselects L4 for ordinary correctness and workflow judgment.
 
 ## Delivery slices
 
-1. Current `Fix/StopGateAndProfileRepair`: D3/D4 package health, native cache recovery,
+1. Completed `Fix/StopGateAndProfileRepair`: D3/D4 package health, native cache recovery,
    pinned external sources and opt-in user-profile migration, with focused synthetic profile tests.
-   Base: `4090e7d238754b3f1a37cd297142a698129cd3c8`; expected fewer than 1,000 code/test lines.
+   Base: `4090e7d238754b3f1a37cd297142a698129cd3c8`; actual 1,002 substantive code/test lines. The final two-line overage remains atomic with migration safety and its regressions; splitting those would weaken the qualified change.
 2. Separate `Docs/StopGateOwnership`: canonical continuation and session-close wording,
    retaining published four-field blocker and `Paused:` formats. Base: updated remote main after slice 1.
 3. Separate `Fix/StopGateFailures`: fail-closed Stop dispatch and blocker-boundary enforcement,
@@ -105,12 +107,12 @@ sessions or schedulers are required; this foreground owner continues across the 
 
 ## Next Steps
 
-Finish the final profile migration concurrency guards, commit their tested source, complete fresh
-incremental review and exact-head CI, then merge PR #235 before starting the ownership wording slice.
+Ownership wording and supported harness declarations are implemented and packaging checks pass.
+Review the immutable candidate, deliver this slice, then implement the Stop runtime slice.
 
-Scope: whole-plan.
-Current slice: D3/D4 package checks, pinned sources and user alias migration.
-Remaining scope: D1 ownership wording; D2 Stop dispatcher/continuation enforcement; fresh-host acceptance within Tommy's session limit.
+Scope: whole plan through all remaining phases and terminal delivery.
+Current slice: D1 canonical continuation, blocker and session-close wording.
+Remaining scope: D2 Stop dispatcher/continuation enforcement; fresh-host acceptance within Tommy's session limit.
 Done when: all authorized repairs are verified and merged, with any genuine capability boundary recorded.
 
 ## Agent-host coverage
@@ -166,17 +168,18 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
 - Fresh-session loading is unobserved under the explicit no-extra-session limit. Native registry and
   declared-payload checks passed for all eight repaired packages; do not claim source changes are adopted
   by the currently pinned installed packages or that a new host session accepted them.
-- Current source slice: PR #235, latest published head `ef5be3ad47ea3c20049778d6bb0ebbe5364b9d5c`.
-  CI runs `38329611877` and `38332331180` passed Windows/Linux for their exact historical heads.
-  Review owner: `reviews/Fix-StopGateAndProfileRepair.md`; current judgment changes-requested.
-  R1-R10 source remediation is fixed in this commit; fresh incremental review remains required.
-  The specialist reviewer model is unsupported on this account; fresh supported L4 native/workflow and
-  L2 migration contexts review the same immutable candidate. No extra native review CLI was launched.
-- Validation: original 27 sync, 13 repair and 36 Codex consumer tests passed; 21 focused remediation
-  checks and generated/harness/packaging checks passed. The correcting candidate needs targeted tests,
-  a fresh incremental watermark and new exact-head CI. No merge is armed before those gates pass.
-- Final profile guards: 11 targeted tests passed, including new sibling opt-outs, scoped preference
-  changes, malformed scopes and removal of unchanged enable flags created by native installation.
-- Final tiny follow-up: the alias-removal race was reproduced red, corrected and verified green
-  alongside three preservation/rollback tests. README accurately describes best-effort permission sync.
-  CI run `38335031539` passed the prior head; this commit needs its own review and CI.
+- D3/D4 source delivery: PR #235 merged reviewed head `9690bff537e90f82c3c3a562c1ffa54a57c334e0`
+  at `8b33980747476f9369c1b39497908226c2990b21`; exact-head CI `38336373168` passed Windows/Linux.
+  Independent native, migration and workflow review approved; all ten findings resolved. Review evidence
+  is archived outside the checkout after retirement of the merged branch. No additional CLI was launched.
+- Main consequence `38337890284` is owned by the foreground monitor at its exact merge commit.
+  Regeneration is the repository's only publication consequence; no external marketplace is published here.
+- Validation: original 27 sync, 13 repair and 36 Codex consumer tests passed; focused migration/authentication,
+  scope and race checks passed. The final alias-removal regression was reproduced red, then four checks
+  passed after correction. Generated/harness/packaging checks passed; full Windows/Linux CI passed.
+- Current source slice: `Docs/StopGateOwnership` uses the updated remote base and this same goal owner.
+  Preserve four published blocker fields and `Paused:`; exhaust all unblocked authorized work before
+  either form can describe the remaining whole goal. Harness declarations identify shipped Stop resources;
+  extra skill-file roots were rejected because the mandatory canonical scope roots already ship skills.
+- Ownership validation: catalog generation, both-host generated-tree checks, three harness manifests
+  and `skill-packaging.tests.ps1` passed. Generated distribution output is excluded from this commit.
