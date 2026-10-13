@@ -9,20 +9,7 @@ from pathlib import Path
 import close_tab
 import session_close
 import register_session
-
-
-def _record_own_end(entry, reason):
-    try:
-        store = register_session._load_session_store()
-        if store is None or not entry.get("host") or not entry.get("session_id"):
-            return
-        connection = store.connect()
-        try:
-            store.end_session(connection, store.session_handle(entry["host"], entry["session_id"]), reason)
-        finally:
-            connection.close()
-    except Exception:
-        pass
+from session_close import _record_own_end, _reopen_own_end
 
 
 def close_host(entry, wrapper=None):
@@ -100,6 +87,7 @@ def main(argv=None):
         observer.extend(["--parent-pid", str(wrapper["pid"]),
                          "--parent-start", str(wrapper["started_at"])])
     try:
+        _record_own_end(entry, "finished")
         spawned_at = time.time()
         observer_pid = session_close.start_observer(observer)
         started = session_close.wait_for_record(
@@ -125,9 +113,9 @@ def main(argv=None):
         )
         if not session_close.valid_armed(armed, expected, started, accepted):
             raise session_close.Refusal("cleanup observer did not acknowledge acceptance")
-        _record_own_end(entry, "finished")
         close_host(entry, wrapper)
     except Exception as error:
+        _reopen_own_end(entry, "finished")
         session_close.cancel_observer(result, str(error))
         raise
     return 0

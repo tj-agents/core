@@ -81,17 +81,39 @@ class RepoIdentityTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
 
-    def test_https_remote_normalises_to_owner_name(self):
+    def test_https_remote_normalises_to_host_and_owner_name(self):
         repo = _init_repo(self.root / "https-repo", origin="https://github.com/tj-agents/core.git")
-        self.assertEqual("tj-agents/core", STORE.repo_identity(repo))
+        self.assertEqual("github.com/tj-agents/core", STORE.repo_identity(repo))
 
-    def test_ssh_scp_remote_normalises_to_owner_name(self):
+    def test_ssh_scp_remote_normalises_to_host_and_owner_name(self):
         repo = _init_repo(self.root / "ssh-repo", origin="git@github.com:tj-agents/core.git")
-        self.assertEqual("tj-agents/core", STORE.repo_identity(repo))
+        self.assertEqual("github.com/tj-agents/core", STORE.repo_identity(repo))
 
-    def test_ssh_url_remote_normalises_to_owner_name(self):
+    def test_ssh_url_remote_normalises_to_host_and_owner_name(self):
         repo = _init_repo(self.root / "ssh-url-repo", origin="ssh://git@github.com/tj-agents/core.git")
-        self.assertEqual("tj-agents/core", STORE.repo_identity(repo))
+        self.assertEqual("github.com/tj-agents/core", STORE.repo_identity(repo))
+
+    def test_github_https_ssh_and_scp_remotes_are_the_same_identity(self):
+        https = _init_repo(self.root / "gh-https", origin="https://github.com/tj-agents/core.git")
+        ssh_url = _init_repo(self.root / "gh-ssh-url", origin="ssh://git@github.com/tj-agents/core.git")
+        scp = _init_repo(self.root / "gh-scp", origin="git@github.com:tj-agents/core.git")
+        identities = {STORE.repo_identity(https), STORE.repo_identity(ssh_url), STORE.repo_identity(scp)}
+        self.assertEqual({"github.com/tj-agents/core"}, identities)
+
+    def test_azure_devops_https_and_ssh_remotes_are_the_same_identity(self):
+        https = _init_repo(self.root / "ado-https", origin="https://org@dev.azure.com/org/project/_git/repo")
+        ssh = _init_repo(self.root / "ado-ssh", origin="git@ssh.dev.azure.com:v3/org/project/repo")
+        self.assertEqual(STORE.repo_identity(https), STORE.repo_identity(ssh))
+        self.assertEqual("dev.azure.com/org/project/_git/repo", STORE.repo_identity(https))
+
+    def test_same_path_on_different_hosts_is_a_different_identity(self):
+        github = _init_repo(self.root / "gh-collide", origin="https://github.com/tj-agents/core.git")
+        gitlab = _init_repo(self.root / "gl-collide", origin="https://gitlab.com/tj-agents/core.git")
+        self.assertNotEqual(STORE.repo_identity(github), STORE.repo_identity(gitlab))
+
+    def test_userinfo_and_port_are_stripped_from_the_identity(self):
+        repo = _init_repo(self.root / "port-repo", origin="https://user:token@github.com:443/tj-agents/core.git")
+        self.assertEqual("github.com/tj-agents/core", STORE.repo_identity(repo))
 
     def test_no_remote_falls_back_to_absolute_git_common_dir(self):
         repo = _init_repo(self.root / "no-remote-repo")
@@ -141,7 +163,7 @@ class HookLifecycleTests(unittest.TestCase):
         self.assertEqual(0, self._invoke("stop", "claude", payload))
         row = self._row(handle)
         self.assertEqual("awaiting_input", row["turn_state"])
-        self.assertEqual("tj-agents/core", row["repo"])
+        self.assertEqual("github.com/tj-agents/core", row["repo"])
 
         self.assertEqual(0, self._invoke("session-end", "claude", payload))
         row = self._row(handle)
@@ -172,6 +194,21 @@ class HookLifecycleTests(unittest.TestCase):
             connection.close()
         self.assertEqual("finished", row["end_reason"])
 
+    def test_reopen_clears_only_the_matching_end_reason(self):
+        connection = STORE.connect()
+        try:
+            STORE.start_session(connection, "claude", "id-1", self.repo)
+            STORE.end_session(connection, "claude:id-1", "finished")
+            STORE.reopen_session(connection, "claude:id-1", "closed")
+            kept = STORE.get_session(connection, "claude:id-1")
+            STORE.reopen_session(connection, "claude:id-1", "finished")
+            reopened = STORE.get_session(connection, "claude:id-1")
+        finally:
+            connection.close()
+        self.assertEqual("finished", kept["end_reason"])
+        self.assertIsNone(reopened["ended_at"])
+        self.assertIsNone(reopened["end_reason"])
+
     def test_session_start_hook_malformed_stdin_exits_zero(self):
         with mock.patch.object(sys, "stdin", io.StringIO("not json {{{")):
             self.assertEqual(0, STORE.main(["hook", "session-start", "--host", "claude"]))
@@ -187,8 +224,8 @@ class HookLifecycleTests(unittest.TestCase):
     def test_work_item_auto_attach_requires_exactly_one_match(self):
         connection = STORE.connect()
         try:
-            repo = "tj-agents/core"
-            STORE.upsert_work_item(connection, "tj-agents/core:f/a", repo, "f", "a", status="active", branch="topic")
+            repo = "github.com/tj-agents/core"
+            STORE.upsert_work_item(connection, "github.com/tj-agents/core:f/a", repo, "f", "a", status="active", branch="topic")
             STORE.start_session(connection, "claude", "attach-id", self.repo)
             STORE.record_stop(connection, "claude:attach-id", self.repo)
         finally:
@@ -199,13 +236,13 @@ class HookLifecycleTests(unittest.TestCase):
         try:
             STORE.record_stop(connection, "claude:attach-id", self.repo)
             row = STORE.get_session(connection, "claude:attach-id")
-            self.assertEqual("tj-agents/core:f/a", row["work_item"])
+            self.assertEqual("github.com/tj-agents/core:f/a", row["work_item"])
         finally:
             connection.close()
 
         connection = STORE.connect()
         try:
-            STORE.upsert_work_item(connection, "tj-agents/core:f/b", "tj-agents/core", "f", "b", status="active", branch="topic")
+            STORE.upsert_work_item(connection, "github.com/tj-agents/core:f/b", "github.com/tj-agents/core", "f", "b", status="active", branch="topic")
             STORE.start_session(connection, "claude", "attach-id-2", self.repo)
             STORE.record_stop(connection, "claude:attach-id-2", self.repo)
             row = STORE.get_session(connection, "claude:attach-id-2")
@@ -240,6 +277,59 @@ class HookLifecycleTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual({f"claude:thread-{index}" for index in range(8)}, handles)
+
+    def test_resume_start_after_handoff_clears_role_but_keeps_work_item(self):
+        connection = STORE.connect()
+        try:
+            STORE.upsert_work_item(connection, "some-key", "repo", "f", "a", status="active")
+            STORE.start_session(connection, "claude", "id-1", self.repo)
+            STORE.set_session_ownership(connection, "claude:id-1", "owner", "some-key")
+            STORE.end_session(connection, "claude:id-1", "handed_off", successor="codex:id-2")
+            STORE.start_session(connection, "claude", "id-1", self.repo)
+            row = STORE.get_session(connection, "claude:id-1")
+        finally:
+            connection.close()
+        self.assertIsNone(row["role"])
+        self.assertEqual("some-key", row["work_item"])
+
+    def test_resume_start_keeps_role_when_not_handed_off(self):
+        connection = STORE.connect()
+        try:
+            STORE.upsert_work_item(connection, "some-key", "repo", "f", "a", status="active")
+            STORE.start_session(connection, "claude", "id-2", self.repo)
+            STORE.set_session_ownership(connection, "claude:id-2", "owner", "some-key")
+            STORE.end_session(connection, "claude:id-2", "closed")
+            STORE.start_session(connection, "claude", "id-2", self.repo)
+            row = STORE.get_session(connection, "claude:id-2")
+        finally:
+            connection.close()
+        self.assertEqual("owner", row["role"])
+
+    def test_git_decodes_with_utf8_and_replaces_errors(self):
+        with mock.patch.object(STORE.subprocess, "run") as run:
+            run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n")
+            STORE._git(self.repo, "status")
+        _, kwargs = run.call_args
+        self.assertEqual("utf-8", kwargs.get("encoding"))
+        self.assertEqual("replace", kwargs.get("errors"))
+
+    def test_session_start_and_stop_each_issue_at_most_two_git_subprocesses(self):
+        payload = {"session_id": "budget-id", "cwd": str(self.repo)}
+        calls = []
+        original_run = STORE.subprocess.run
+
+        def counting_run(*args, **kwargs):
+            calls.append(args)
+            return original_run(*args, **kwargs)
+
+        with mock.patch.object(STORE.subprocess, "run", side_effect=counting_run):
+            calls.clear()
+            self.assertEqual(0, self._invoke("session-start", "claude", payload))
+            self.assertLessEqual(len(calls), 2)
+
+            calls.clear()
+            self.assertEqual(0, self._invoke("stop", "claude", payload))
+            self.assertLessEqual(len(calls), 2)
 
 
 if __name__ == "__main__":

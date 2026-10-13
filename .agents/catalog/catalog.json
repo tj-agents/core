@@ -806,7 +806,7 @@
                       "resume"
                     ]
                   ],
-                  "justification": "machine:recover-agents 'Continue a work item': status/find/interrupted are read-only and resume only reopens the exact recorded session through the shared agent_recovery guard, which refuses a live, foreign, stale or unknown session.",
+                  "justification": "machine:recover-agents 'Continue a work item': status, find and interrupted without --resume are read-only; resume and interrupted --resume perform the guarded reopen through agent_recovery.open_session, limited to rows that are not live, foreign or stale on this machine.",
                   "match": [
                     [
                       "python3",

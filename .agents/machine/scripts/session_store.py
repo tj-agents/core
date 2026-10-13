@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 SCHEMA_VERSION = 1
 GIT_TIMEOUT = 3
+HOOK_GIT_TIMEOUT = 2
 
 WORK_ITEMS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS work_items (
@@ -55,7 +56,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 )
 """
 
-_SSH_SCP_RE = re.compile(r"^[^/@\s]+@[^:/\s]+:(?P<path>.+)$")
+_SSH_SCP_RE = re.compile(r"^[^/@\s]+@(?P<host>[^:/\s]+):(?P<path>.+)$")
 
 
 def state_directory():
@@ -104,7 +105,7 @@ def _git(cwd, *args, timeout=GIT_TIMEOUT):
     try:
         result = subprocess.run(
             ["git", "-C", str(cwd), *args],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -114,48 +115,78 @@ def _git(cwd, *args, timeout=GIT_TIMEOUT):
     return output or None
 
 
+def _host_and_path(url):
+    if url.startswith(("ssh://", "https://", "http://", "git://")):
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").casefold()
+        return (host or None), parsed.path
+    match = _SSH_SCP_RE.match(url)
+    if not match:
+        return None, None
+    return match.group("host").casefold(), match.group("path")
+
+
 def _normalise_remote(url):
     url = (url or "").strip()
     if not url:
         return None
-    path = None
-    if url.startswith(("ssh://", "https://", "http://", "git://")):
-        path = urlparse(url).path
-    else:
-        match = _SSH_SCP_RE.match(url)
-        if match:
-            path = match.group("path")
-    if not path:
+    host, path = _host_and_path(url)
+    if not host or not path:
         return None
     path = path.strip("/")
     if path.endswith(".git"):
         path = path[: -len(".git")]
-    parts = [part for part in path.split("/") if part]
-    if len(parts) < 2:
+    if not path:
         return None
-    return "/".join(parts[-2:])
+    if host == "ssh.dev.azure.com":
+        parts = [part for part in path.split("/") if part]
+        if parts and parts[0] == "v3":
+            parts = parts[1:]
+        if len(parts) != 3:
+            return None
+        org, project, repository = parts
+        host = "dev.azure.com"
+        path = f"{org}/{project}/_git/{repository}"
+    return f"{host}/{path}"
+
+
+def _rev_parse_probe(cwd, timeout):
+    output = _git(cwd, "rev-parse", "HEAD", "--abbrev-ref", "HEAD", "--git-common-dir", timeout=timeout)
+    if not output:
+        return None, None, None
+    lines = output.splitlines()
+    if len(lines) < 3:
+        return None, None, None
+    head = lines[0].strip() or None
+    abbreviated = lines[1].strip()
+    branch = None if abbreviated in ("", "HEAD") else abbreviated
+    common_dir = lines[2].strip() or None
+    return head, branch, common_dir
+
+
+def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
+    """Resolve repo identity, branch and HEAD in exactly two git subprocesses."""
+    origin = _git(cwd, "config", "--get", "remote.origin.url", timeout=timeout)
+    head, branch, common_dir = _rev_parse_probe(cwd, timeout)
+    repo = _normalise_remote(origin) if origin else None
+    if not repo and common_dir:
+        path = Path(common_dir)
+        if not path.is_absolute():
+            path = Path(cwd) / path
+        try:
+            repo = str(path.resolve())
+        except OSError:
+            repo = None
+    return repo, branch, head
 
 
 def repo_identity(cwd):
-    origin = _git(cwd, "config", "--get", "remote.origin.url")
-    normalised = _normalise_remote(origin) if origin else None
-    if normalised:
-        return normalised
-    common_dir = _git(cwd, "rev-parse", "--git-common-dir")
-    if not common_dir:
-        return None
-    path = Path(common_dir)
-    if not path.is_absolute():
-        path = Path(cwd) / path
-    try:
-        return str(path.resolve())
-    except OSError:
-        return None
+    repo, _branch, _head = _collect_repo_branch_head(cwd, timeout=GIT_TIMEOUT)
+    return repo
 
 
 def current_branch_and_head(cwd):
-    branch = _git(cwd, "branch", "--show-current")
-    head = _git(cwd, "rev-parse", "HEAD")
+    _repo, branch, head = _collect_repo_branch_head(cwd, timeout=GIT_TIMEOUT)
     return branch, head
 
 
@@ -171,8 +202,7 @@ def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_s
     handle = session_handle(host, session_id)
     machine = current_machine()
     profile = profile_directory(host)
-    repo = repo_identity(cwd)
-    branch, head = current_branch_and_head(cwd)
+    repo, branch, head = _collect_repo_branch_head(cwd)
     now = time.time()
     connection.execute(
         """
@@ -194,7 +224,8 @@ def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_s
             last_activity_at = excluded.started_at,
             turn_state = 'working',
             ended_at = NULL,
-            end_reason = NULL
+            end_reason = NULL,
+            role = CASE WHEN sessions.end_reason = 'handed_off' THEN NULL ELSE sessions.role END
         """,
         (handle, host, session_id, machine, profile, title, str(cwd), repo, branch, head,
          pid, pid_started_at, now, now),
@@ -212,8 +243,7 @@ def ensure_session(connection, host, session_id, cwd=None):
         return handle
     machine = current_machine()
     profile = profile_directory(host)
-    repo = repo_identity(cwd) if cwd else None
-    branch, head = current_branch_and_head(cwd) if cwd else (None, None)
+    repo, branch, head = _collect_repo_branch_head(cwd) if cwd else (None, None, None)
     now = time.time()
     connection.execute(
         """
@@ -238,8 +268,7 @@ def record_prompt(connection, handle):
 
 
 def record_stop(connection, handle, cwd):
-    repo = repo_identity(cwd)
-    branch, head = current_branch_and_head(cwd)
+    repo, branch, head = _collect_repo_branch_head(cwd)
     now = time.time()
     connection.execute(
         """
@@ -265,6 +294,14 @@ def end_session(connection, handle, reason, successor=None):
         WHERE handle = ?
         """,
         (time.time(), reason, successor, handle),
+    )
+    connection.commit()
+
+
+def reopen_session(connection, handle, reason):
+    connection.execute(
+        "UPDATE sessions SET ended_at = NULL, end_reason = NULL WHERE handle = ? AND end_reason = ?",
+        (handle, reason),
     )
     connection.commit()
 

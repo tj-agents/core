@@ -100,3 +100,14 @@
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
 **Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+
+## B008 - Finish reaper integration test times out under machine load
+
+- Kind: bug. Observed/reported: 2026-10-13 on Windows after a reboot under heavy load; `tests/test_finish.py` `FinishReaperProcessTests.test_finish_entrypoint_removes_verified_disposable_worktree_after_host_exit` intermittently ends with `KeyError: 'status'` (the reaper's result never reaches a terminal status within the 15 s poll), then `TemporaryDirectory` cleanup fails with `WinError 32` on `state`, the still-running reaper's working directory. Interleaved local runs failed on `main` (1 of 3) and on `Feature/WorkItemSessions` before its end-reason move; exact-head CI run 38323199927 passed `verify-windows`.
+- Cause: unknown. The reaper's 10 s timeout plus Task Scheduler start-up leaves little margin inside the test's fixed 15 s poll; the failed reaper step was not observed.
+- Impact/priority: P3; local Windows verification flakes; no observed CI or product failure.
+- Source owner: tj-agents/core peer-cli finish integration tests. State: open.
+- Repair link: none.
+- Next action: record the reaper's progress in the result file and make the test wait on the reaper's own terminal status rather than a fixed poll, then reproduce under load.
+- Resolution condition: the test passes repeatedly on a loaded Windows host, and on failure reports the reaper step instead of `KeyError`.
+- Verification evidence: interleaved local runs on `main` and the branch, both failing intermittently; CI 38323199927 green.

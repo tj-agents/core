@@ -13,7 +13,7 @@ Location: `~/.agents-state/sessions.db` (honouring `AGENT_STATE_DIRECTORY`), SQL
   successor.
 - `work_items`: one row per `<repo>:<feature>/<item>` key. Columns: repo, feature, item, status
   (`proposed`/`active`/`blocked`/`paused`/`delivery-gated`/`done`), branch, pr, updated_at.
-- `repo` is the `origin` remote normalised to `owner/name`, else the absolute `git-common-dir`.
+- `repo` is the `origin` remote as lowercase host plus path (`github.com/owner/name`; Azure DevOps SSH and HTTPS map to `dev.azure.com/<org>/<project>/_git/<repo>`), else the absolute `git-common-dir`.
 
 ## Hook lifecycle
 
@@ -27,10 +27,12 @@ best-effort record `finished`/`closed` for their own session before closing it.
 
 ## Read-time status
 
-Computed, never trusted from storage: `live`/`closed`/`unknown` from `agent_recovery.liveness`,
-`foreign` when the recorded machine differs, `stale` when the worktree is missing, its branch differs,
-or its recorded HEAD is not an ancestor of the worktree's current HEAD. `unknown`, `stale`, `foreign` and
-`live` never authorize a resume.
+Computed, never trusted from storage, in order: `foreign` when the recorded machine differs; for a
+not-ended row, `live`/`unknown` from `agent_recovery.liveness`; otherwise, for a row that could still be
+resumed (not ended, or ended `closed`), worktree staleness (`stale`/`unknown` when the worktree is
+missing, its branch differs, or its recorded HEAD is not an ancestor of the worktree's current HEAD),
+else `closed`. A `finished`/`handed_off` ended row reports `closed` directly. `unknown`, `stale`,
+`foreign` and `live` never authorize a resume.
 
 ## Commands
 
@@ -43,12 +45,14 @@ python '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py'
 ```
 
 - `claim <feature>/<item> --host claude|codex [--role owner|"bounded: <scope>"] [--predecessor <handle>]`:
-  creates the work item (`active`, current branch) when absent; refuses a second live owner unless
-  `--predecessor` names the live owner's handle, which hands its ownership off.
+  creates the work item (`active`, current branch, or no branch when it is the repository's default
+  branch) when absent; refuses a second live owner unless `--predecessor` names the live owner's handle,
+  which hands its ownership off. `--role` must be exactly `owner` or `bounded: <non-empty scope>`.
 - `status <feature>/<item>`: read-only; reports each session's role, turn state and computed status.
 - `find --worktree <absolute-path>`: read-only; reports the work item and handle recorded for that path.
-- `resume <feature>/<item> [--handle <handle>]`: without `--handle`, resumes the single not-ended owner;
-  refuses foreign, stale, live or unknown sessions, then calls `agent_recovery.open_session`.
+- `resume <feature>/<item> [--handle <handle>]`: without `--handle`, resumes the single owner that is not
+  ended or ended `closed`; refuses foreign, stale, live or unknown sessions, then calls
+  `agent_recovery.open_session`.
 - `interrupted [--resume <handle>...]`: lists not-ended sessions whose recorded pid is dead, grouped by
   work item with their last turn state; resumes only the listed handles.
 - `end --host claude|codex --reason finished|closed|handed_off [--successor <handle>]`: records the

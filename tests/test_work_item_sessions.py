@@ -4,6 +4,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import types
 import unittest
 from unittest import mock
@@ -83,7 +85,7 @@ class WorkItemSessionsTests(unittest.TestCase):
         self._claim_claude()
         connection = self._connection()
         try:
-            item = STORE.get_work_item(connection, "tj-agents/core:example-feature/example-item")
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
             self.assertEqual("active", item["status"])
             row = STORE.get_session(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875")
             self.assertEqual("owner", row["role"])
@@ -115,7 +117,7 @@ class WorkItemSessionsTests(unittest.TestCase):
         self._claim_codex(role="bounded: docs")
         connection = self._connection()
         try:
-            rows = STORE.sessions_for_work_item(connection, "tj-agents/core:example-feature/example-item")
+            rows = STORE.sessions_for_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
         finally:
             connection.close()
         self.assertEqual(2, len(rows))
@@ -234,7 +236,7 @@ class WorkItemSessionsTests(unittest.TestCase):
             )
             STORE.set_session_ownership(
                 connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "owner",
-                "tj-agents/core:example-feature/example-item",
+                "github.com/tj-agents/core:example-feature/example-item",
             )
         finally:
             connection.close()
@@ -305,7 +307,7 @@ class WorkItemSessionsTests(unittest.TestCase):
         WIS.cmd_item("example-feature/example-item", "done", pr="https://github.com/tj-agents/core/pull/1", cwd=self.repo)
         connection = self._connection()
         try:
-            item = STORE.get_work_item(connection, "tj-agents/core:example-feature/example-item")
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
         finally:
             connection.close()
         self.assertEqual("done", item["status"])
@@ -316,6 +318,151 @@ class WorkItemSessionsTests(unittest.TestCase):
             WIS._parse_work_item("Not-Valid/Item")
         with self.assertRaises(ValueError):
             WIS._parse_work_item("missing-slash")
+
+    def test_status_reports_foreign_before_checking_an_ended_row(self):
+        self._claim_claude()
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"}, clear=False):
+            WIS.cmd_end("claude", "finished")
+        connection = self._connection()
+        try:
+            connection.execute(
+                "UPDATE sessions SET machine = 'some-other-host' WHERE handle = ?",
+                ("claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875",),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
+        self.assertEqual("foreign", result["sessions"][0]["status"])
+
+    def test_status_and_resume_report_a_dead_not_ended_session_with_a_stale_worktree_as_stale(self):
+        self._claim_claude()
+        self._run_git(self.repo, "checkout", "-b", "other-branch")
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
+        self.assertEqual("stale", result["sessions"][0]["status"])
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            with self.assertRaises(ValueError):
+                WIS.cmd_resume("example-feature/example-item", cwd=self.repo)
+        recovery.open_session.assert_not_called()
+
+    def test_resume_selects_an_owner_ended_closed_without_a_handle(self):
+        self._claim_claude()
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"}, clear=False):
+            WIS.cmd_end("claude", "closed")
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            result = WIS.cmd_resume("example-feature/example-item", cwd=self.repo)
+        self.assertEqual({"ok": True}, result)
+        recovery.open_session.assert_called_once()
+
+    def test_resume_does_not_select_a_finished_owner_without_a_handle(self):
+        self._claim_claude()
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"}, clear=False):
+            WIS.cmd_end("claude", "finished")
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            with self.assertRaises(ValueError):
+                WIS.cmd_resume("example-feature/example-item", cwd=self.repo)
+        recovery.open_session.assert_not_called()
+
+    def test_concurrent_claims_wrap_the_live_owner_check_and_write_in_one_transaction(self):
+        original_live_owners = STORE.live_owners
+
+        def slow_live_owners(connection, key):
+            result = original_live_owners(connection, key)
+            time.sleep(0.3)
+            return result
+
+        results = {}
+        errors = {}
+
+        def claim(name, env_key, env_value, host):
+            os.environ[env_key] = env_value
+            try:
+                results[name] = WIS.cmd_claim(
+                    "example-feature/example-item", host, role="owner", cwd=self.repo,
+                )
+            except ValueError as error:
+                errors[name] = error
+            finally:
+                os.environ.pop(env_key, None)
+
+        with mock.patch.object(STORE, "live_owners", side_effect=slow_live_owners):
+            threads = [
+                threading.Thread(
+                    target=claim,
+                    args=("a", "CLAUDE_CODE_SESSION_ID", "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "claude"),
+                ),
+                threading.Thread(
+                    target=claim,
+                    args=("b", "CODEX_THREAD_ID", "01a12aa7-5b58-7312-9400-ef710762147f", "codex"),
+                ),
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=10)
+
+        self.assertEqual(1, len(results))
+        self.assertEqual(1, len(errors))
+        connection = self._connection()
+        try:
+            owners = STORE.live_owners(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertEqual(1, len(owners))
+
+    def test_invalid_role_is_rejected_before_writing_anything(self):
+        for invalid in ("Owner", "owner ", "bounded:", "bounded: ", "random"):
+            with self.subTest(role=invalid):
+                with self.assertRaises(ValueError):
+                    self._claim_claude(role=invalid)
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertIsNone(item)
+
+    def test_valid_bounded_role_with_a_scope_is_accepted(self):
+        self._claim_claude(role="bounded: docs")
+        connection = self._connection()
+        try:
+            row = STORE.get_session(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875")
+        finally:
+            connection.close()
+        self.assertEqual("bounded: docs", row["role"])
+
+    def test_claim_on_the_default_branch_does_not_record_a_branch(self):
+        self._run_git(self.repo, "branch", "-M", "main")
+        self._claim_claude()
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertIsNone(item["branch"])
+
+    def test_claim_on_a_non_default_branch_records_the_branch(self):
+        self._run_git(self.repo, "checkout", "-b", "feature-branch")
+        self._claim_claude()
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertEqual("feature-branch", item["branch"])
+
+    def test_default_branch_prefers_symbolic_ref_over_the_literal_fallback(self):
+        with mock.patch.object(STORE, "_git", return_value="origin/trunk"):
+            self.assertEqual("trunk", WIS._default_branch(self.repo, "not-trunk"))
+
+    def test_default_branch_falls_back_to_literal_main_or_master(self):
+        with mock.patch.object(STORE, "_git", return_value=None):
+            self.assertEqual("main", WIS._default_branch(self.repo, "main"))
+            self.assertIsNone(WIS._default_branch(self.repo, "feature"))
 
 
 if __name__ == "__main__":
