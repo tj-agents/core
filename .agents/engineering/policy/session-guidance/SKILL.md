@@ -115,13 +115,8 @@ A defect in a consumed standards package or its source repository is the excepti
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
 to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and follow
 `engineering:self-repair` in the same turn, after answering the user's direct question and before the
-current task resumes, without asking, regardless of that task's own authority. It records the problem,
-reuses an exact owner or closed context where supported, and launches only an admitted runnable
-`engineering:handoff` side workstream; a concrete obstacle stays in the canonical record with its
-resolver and resume condition. This rule is the standing authorization: it covers implementing, testing,
-opening the PR and merging once that repository's gates pass. Installing into any other scope (the
-consuming repository included), publishing outside that repository, and destructive operations stay
-gated; explicit user limits still hold.
+current task resumes. That workflow owns the repair authorization, admission, disposition, and delivery
+procedure; explicit user limits still hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
 entry. `engineering:write-debt` defines the selected repository convention. Do not create a second

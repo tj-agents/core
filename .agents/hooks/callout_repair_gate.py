@@ -7,6 +7,7 @@ import tempfile
 import uuid
 
 from workflow_route import HOST_GENERATED_PROMPTS, prompt_text
+from worktree_placement_gate import normalized_extraction_input, shell_kind, shell_segments
 
 
 try:
@@ -78,11 +79,29 @@ def load_state(session):
     return value if isinstance(value, dict) else {}
 
 
-def save_state(session, prompt, pending, resolved=False, callout_id=""):
+def obligations(state):
+    values = state.get("obligations")
+    if isinstance(values, list):
+        return [value for value in values if isinstance(value, dict)
+                and isinstance(value.get("prompt"), str) and isinstance(value.get("callout_id"), str)]
+    if state.get("pending") and isinstance(state.get("prompt"), str):
+        return [{"prompt": state["prompt"], "callout_id": state.get("callout_id", "")}]
+    return []
+
+
+def completed_prompts(state):
+    values = state.get("completed")
+    return {value for value in values if isinstance(value, str)} if isinstance(values, list) else set()
+
+
+def save_state(session, values, completed=()):
     if not session:
         return
+    current = values[-1] if values else {}
     state_path(session).write_text(
-        json.dumps({"prompt": prompt, "pending": pending, "resolved": resolved, "callout_id": callout_id}),
+        json.dumps({"obligations": values, "completed": sorted(set(completed)), "prompt": current.get("prompt", ""),
+                    "pending": bool(values), "resolved": False,
+                    "callout_id": current.get("callout_id", "")}),
         encoding="utf-8",
     )
 
@@ -163,24 +182,21 @@ def assistant_answer(records):
 
 def launcher_call(value):
     text = "\n".join(texts(value))
+    if re.search(r"(?im)^\s*(?:echo|write-output|printf)\b[^\n]*" + LAUNCHER.pattern, text):
+        return False
     return bool(LAUNCHER.search(text) and re.search(r"-+WorkingDirectory|-+working-directory", text, re.I)
                 and re.search(r"-+PromptPath|-+prompt-path", text, re.I))
 
 
-def source_owner_handoff(value):
-    if isinstance(value, dict) and value.get("event") == "agent-handoff-submitted":
-        paths = [value.get("worktree"), value.get("prompt_path")]
-        if not all(isinstance(item, str) and item for item in paths):
-            return False
-    else:
-        text = "\n".join(texts(value)).replace('\\"', '"')
-        paths = []
-        for flag in (r"-+WorkingDirectory|-+working-directory", r"-+PromptPath|-+prompt-path"):
-            match = re.search(rf"(?:{flag})\s+('([^']+)'|\"([^\"]+)\"|([^\s,;)]+))", text, re.I)
-            if match is None:
-                return False
-            paths.append(next(item for item in match.groups()[1:] if item is not None).replace("\\\\", "\\"))
+def source_owner_handoff(receipt, session, prompt, callout_id):
+    if not isinstance(receipt, dict) or receipt.get("event") != "agent-handoff-submitted":
+        return False
+    paths = [receipt.get("worktree"), receipt.get("prompt_path")]
+    if not all(isinstance(item, str) and item for item in paths):
+        return False
     workdir, prompt_path = map(Path, paths)
+    if not workdir.is_absolute():
+        return False
     if not prompt_path.is_absolute():
         prompt_path = workdir / prompt_path
     try:
@@ -194,11 +210,20 @@ def source_owner_handoff(value):
         context = goal.read_text(encoding="utf-8-sig")[:65536]
     except (OSError, UnicodeError):
         return False
+    expected = {
+        "Repair workflow": "engineering:self-repair",
+        "Callout session": session,
+        "Callout id": callout_id,
+        "Prompt SHA256": prompt_digest(prompt),
+    }
     return bool(re.search(r"(?im)^## Authorization\b", context)
-                and re.search(r"standards[- ](?:defect|repair)|source[- ]owner repair", context, re.I))
+                and re.search(r"standards[- ](?:defect|repair)|source[- ]owner repair", context, re.I)
+                and re.search(r"(?im)^Source owner:\s*\S.+$", context)
+                and all(re.search(rf"(?im)^{re.escape(label)}:\s*{re.escape(value)}\s*$", context)
+                        for label, value in expected.items()))
 
 
-def launch_succeeded(records):
+def launch_succeeded(records, session, prompt, callout_id):
     pending = {}
     for record in records:
         value = message(record)
@@ -208,7 +233,7 @@ def launch_succeeded(records):
                 pending[value["call_id"]] = tool_input
         elif value.get("type") in ("custom_tool_call_output", "function_call_output"):
             tool_input = pending.pop(value.get("call_id"), None)
-            if tool_input is not None and successful_result(value, tool_input):
+            if tool_input is not None and successful_result(value, tool_input, session, prompt, callout_id):
                 return True
         content = value.get("content")
         if not isinstance(content, list):
@@ -221,12 +246,12 @@ def launch_succeeded(records):
                     pending[block["id"]] = block["input"]
             elif block.get("type") == "tool_result":
                 tool_input = pending.pop(block.get("tool_use_id"), None)
-                if tool_input is not None and successful_result(block, tool_input):
+                if tool_input is not None and successful_result(block, tool_input, session, prompt, callout_id):
                     return True
     return False
 
 
-def successful_result(value, tool_input):
+def successful_result(value, tool_input, session, prompt, callout_id):
     if value.get("is_error") or value.get("error"):
         return False
     parts = list(texts(value.get("content", value.get("output", ""))))
@@ -247,9 +272,9 @@ def successful_result(value, tool_input):
             receipt = json.loads(line)
         except ValueError:
             continue
-        if isinstance(receipt, dict) and receipt.get("event") == "agent-handoff-submitted":
-            return source_owner_handoff(receipt)
-    return source_owner_handoff(tool_input)
+        if source_owner_handoff(receipt, session, prompt, callout_id):
+            return True
+    return False
 
 
 def prompt_digest(prompt):
@@ -357,6 +382,59 @@ def emit(event, context, deny=False):
     print(json.dumps({"hookSpecificOutput": output}))
 
 
+def repair_operation(tool, tool_input):
+    if tool == "read":
+        return True
+    normalized = normalized_extraction_input(tool_input)
+    text = command_text(normalized)
+    records = {"BUGS.md", "MISTAKES.md", "TECH_DEBT.md", "GOAL.md"}
+    if tool in {"applypatch", "apply_patch"}:
+        headers = re.findall(r"(?im)^\*\*\* (Update|Add|Delete) File:\s*(.+)$", text)
+        return bool(headers) and all(
+            operation in {"Update", "Add"} and Path(path.strip()).name in records
+            for operation, path in headers
+        )
+    if tool in {"write", "edit", "multiedit"}:
+        paths = []
+
+        def collect_paths(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if key in {"file_path", "path"} and isinstance(item, str):
+                        paths.append(item)
+                    else:
+                        collect_paths(item)
+            elif isinstance(value, list):
+                for item in value:
+                    collect_paths(item)
+
+        collect_paths(normalized)
+        return bool(paths) and all(Path(path).name in records for path in paths)
+    command = next((value for value in (
+        normalized.get("command") if isinstance(normalized, dict) else None,
+        normalized.get("cmd") if isinstance(normalized, dict) else None,
+        normalized.get("script") if isinstance(normalized, dict) else None,
+        normalized.get("input") if isinstance(normalized, dict) else None,
+    ) if isinstance(value, str)), "")
+    if not command:
+        return False
+    segments = shell_segments(command, shell_kind(tool, normalized))
+    if segments is None or len(segments) != 1:
+        return False
+    command = segments[0]
+    if re.fullmatch(r"\s*(?:rg|grep|cat|type|get-content|select-string)\b.*", command, re.I):
+        return True
+    if re.fullmatch(r"\s*git\s+(?:diff|show|log)\b.*", command, re.I):
+        return True
+    if re.fullmatch(r"\s*git\s+worktree\s+add\b.*", command, re.I):
+        return True
+    return bool(re.fullmatch(
+        r"\s*(?:python(?:3)?|py)\s+(?:-B\s+)?(?:[^\s]+[\\/])?(?:admission\.py|handoff_admission\.py)\s+check\b.*",
+        command,
+        re.I,
+    ) or re.fullmatch(r"\s*\S*write-(?:bug|mistake|debt)\S*.*", command, re.I))
+
+
 def main():
     data = json.load(sys.stdin)
     if not isinstance(data, dict):
@@ -375,8 +453,12 @@ def main():
         if isinstance(origin, dict) and origin.get("kind") not in (None, "human"):
             return 0
         pending = bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) and not REPAIR_LIMIT.search(prompt)
-        callout_id = str(uuid.uuid4()) if pending else ""
-        save_state(session, prompt, pending, callout_id=callout_id)
+        values = obligations(load_state(session))
+        existing = next((value for value in reversed(values) if value["prompt"] == prompt), None)
+        callout_id = existing["callout_id"] if existing else (str(uuid.uuid4()) if pending else "")
+        if pending and existing is None:
+            values.append({"prompt": prompt, "callout_id": callout_id})
+            save_state(session, values, completed_prompts(load_state(session)))
         if pending:
             emit(
                 event,
@@ -387,34 +469,49 @@ def main():
     if event not in ("PreToolUse", "Stop"):
         return 0
     state = load_state(session)
-    prompt, records = current_turn(transcript_records(data.get("transcript_path") or data.get("transcriptPath")))
-    if prompt is None:
-        prompt = state.get("prompt", "")
-    if REPAIR_LIMIT.search(prompt) or EXPLICIT_FEEDBACK.search(prompt):
-        return 0
-    if state.get("resolved") and state.get("prompt") == prompt:
+    completed = completed_prompts(state)
+    current_prompt, records = current_turn(transcript_records(data.get("transcript_path") or data.get("transcriptPath")))
+    values = obligations(state)
+    obligation = next((value for value in reversed(values) if value["prompt"] == current_prompt), None)
+    if obligation is None and values:
+        obligation = values[0]
+    prompt = obligation["prompt"] if obligation else (current_prompt or "")
+    if REPAIR_LIMIT.search(current_prompt or ""):
         return 0
     tool = str(data.get("tool_name", "")).lower().replace("_", "")
     feedback = tool.endswith("sendfeedback")
-    pending = bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) or (state.get("pending") and state.get("prompt") == prompt)
-    if not pending and not feedback:
+    pending = obligation is not None or (
+        bool(CALLOUT.search(prompt) and STANDARDS_CONTEXT.search(prompt)) and prompt not in completed
+    )
+    if not pending and (not feedback or prompt in completed or (not values and completed and current_prompt is None)):
         return 0
-    if launch_succeeded(records):
-        save_state(session, prompt, False, resolved=True)
-        return 0
-    if valid_disposition(records, session, prompt, state.get("callout_id", "")):
+    callout_id = obligation.get("callout_id", "") if obligation else ""
+    if launch_succeeded(records, session, prompt, callout_id):
+        values = [value for value in values if value is not obligation]
+        save_state(session, values, completed | {prompt})
+        if not values:
+            return 0
+        obligation = values[0]
+        prompt = obligation["prompt"]
+        callout_id = obligation["callout_id"]
+    if values and all(
+        valid_disposition(records, session, value["prompt"], value["callout_id"])
+        for value in values
+    ):
         return 0
     if event == "PreToolUse":
-        if feedback:
-            save_state(session, prompt, bool(pending), callout_id=state.get("callout_id", ""))
+        if feedback and not EXPLICIT_FEEDBACK.search(current_prompt or prompt):
             emit(event, MESSAGE, deny=True)
-        elif launcher_call(data.get("tool_input")) and not assistant_answer(records):
-            emit(event, "Answer the user's direct question before launching the callout repair handoff.", deny=True)
-    elif not (data.get("stop_hook_active") or data.get("stopHookActive")):
+        elif launcher_call(data.get("tool_input")):
+            if not assistant_answer(records):
+                emit(event, "Answer the user's direct question before launching the callout repair handoff.", deny=True)
+        elif not repair_operation(tool, data.get("tool_input")) and not feedback:
+            emit(event, MESSAGE, deny=True)
+    else:
         binding = ""
-        if state.get("callout_id"):
+        if callout_id:
             binding = (
-                f" Admission binding: session={session}; callout_id={state['callout_id']}; "
+                f" Admission binding: session={session}; callout_id={callout_id}; "
                 f"prompt_sha256={prompt_digest(prompt)}"
             )
         print(json.dumps({"decision": "block", "reason": MESSAGE + binding}))
