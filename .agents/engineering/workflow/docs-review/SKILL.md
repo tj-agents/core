@@ -1,6 +1,6 @@
 ---
 name: docs-review
-description: Apply the canonical isolated review workflow to a documentation or agent-metadata-only branch using accuracy, contradiction, ownership, concision, dangling-reference, and followability lenses. Use to review docs, plans, skills, or a meta-only PR; route mixed runtime/product/package/CI-selection diffs to review.
+description: Apply the canonical isolated review workflow to documentation or agent-metadata-only work, using ordinary review by default and one explicitly assessed routine-docs pass only for low-risk prose/navigation changes. Use to review docs, plans, skills, or a meta-only PR; route mixed runtime/product/package/CI-selection diffs to review.
 
 kind: workflow
 domain: process
@@ -18,11 +18,25 @@ In scope: Markdown, agent metadata under `.agents/`, `.claude/`, and `.codex/`, 
 process hooks, deterministic workflow helpers/tests, and generated plugin mirrors when they cannot affect a
 product build or runtime.
 
-## Scope guard
+## Scope guard and routine mode
 
 Resolve and freeze the candidate exactly as `review` Stage 1. If any frozen path affects runtime, product
 code, a published package manifest/lockfile, migrations, or CI test selection, stop and route the entire
 mixed candidate to `review`.
+
+Ordinary review remains the default. A routine documentation candidate is an explicit semantic assessment,
+not an extension inference. Invoke the frozen preparation operation with both of these arguments:
+
+```bash
+--docs-risk routine --docs-rationale "<specific low-risk prose or navigation rationale>"
+```
+
+The descriptor binds that rationale, the `routine` mode and its one focused lens to the exact candidate and
+bundle identity. It rejects an empty rationale, executable and agent-instruction surfaces, `AGENTS.md`,
+`CLAUDE.md`, `SKILL.md`, security-sensitive paths, and every non-Markdown/non-README path. A qualifying
+path set does not prove its content harmless: escalate to ordinary review for executable contracts,
+configuration, security-sensitive or destructive instructions, materially consequential technical claims,
+or any uncertainty about the semantic risk.
 
 A pure closeout whose net diff contains deletions only is exempt because no surviving content remains for
 these lenses:
@@ -33,11 +47,12 @@ git diff --diff-filter=ACMRT --name-only "<base>..<head>"
 
 Any surviving path makes this an ordinary docs review.
 
-## Work order and native layer
+## Work order and review layer
 
 Use the same `reviews/<branch-slug>.md` contract from `review-lifecycle`. The parent records status
-`in-progress` and the frozen candidate before review. Run the `review` Stage 3 native layer over that
-descriptor, with the same `native-general` fallback.
+`in-progress` and the frozen candidate before review. An ordinary candidate runs the `review` Stage 3 native
+layer, with the same `native-general` fallback. A valid routine candidate is exempt from the repeated
+native-plus-fresh full-code-review sequence and runs its one focused docs pass instead.
 
 ## Rules
 
@@ -61,6 +76,10 @@ Dispatch only relevant fresh lenses, using the same immutable descriptor and con
   files; and
 - followability: each instruction has an unambiguous owner, action, and pass condition.
 
+A routine candidate dispatches one focused docs lens over the frozen tree. It verifies links and anchors,
+fences and formatting, privacy/source separation, targeted facts and prerequisites. It does not dispatch a
+native review or a second fresh code lens.
+
 When agent guidance changes, run the frozen tree's own `.agents/hooks/docs_reachability.py` when it ships
 one, otherwise `<engineering>/hooks/docs_reachability.py` as defined by `review`, always with
 `--root <candidate-bundle>/tree` and never against the live checkout. Treat each error as accuracy evidence.
@@ -77,4 +96,4 @@ The parent finalizes the canonical work order exactly as `review` Stage 7: one j
 
 If a plan owns the branch, the completed pass is one material review transition. Report range, finding
 counts, canonical work order, and watermark. Remediation begins only under explicit combined authorization
-and returns through `incremental-review`.
+and returns through `incremental-review` with a risk reassessment for new consequential content.
