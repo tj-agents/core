@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `3df86558f1dfb2193989cd6db054d8596ffb64a3`  `(2026-10-13)`
+**Reviewed up to commit:** `6c4ed0790ea2f1fec7f822292e1ae88238aadeb0`  `(2026-10-13)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-12 — full
@@ -115,7 +115,7 @@ No findings. R7 and R8 dispositions verified.
 Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). No security-sensitive paths. Resume registration verification is out of scope here (PR #233).
 
 ```agent-host-coverage
-{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"3df86558f1dfb2193989cd6db054d8596ffb64a3","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"tests/test_session_store.py, tests/test_work_item_sessions.py, tests/test_register_session.py (packaged-layout loader) and tests/test_finish.py pass on Windows: focused suite 219 OK, 1 skip; R22-R31 remain open."},"exception":{"constraint_evidence":"Ownership is inferred from session rows and claim's transaction is broken by inner commits (R22-R24); interrupted --resume skips the staleness check (R25).","supported_other_host_outcome":"Codex shares the same loader defect; neither host records SessionStart until R9 is fixed."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"tests/test_session_store.py, tests/test_work_item_sessions.py, tests/test_register_session.py (packaged-layout loader) and tests/test_finish.py pass on Windows: focused suite 219 OK, 1 skip; R22-R31 remain open."},"exception":{"constraint_evidence":"Ownership is inferred from session rows and claim's transaction is broken by inner commits (R22-R24); interrupted --resume skips the staleness check (R25).","supported_other_host_outcome":"Claude records SessionEnd once R9 is fixed."}}]}
+{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"6c4ed0790ea2f1fec7f822292e1ae88238aadeb0","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"Focused suite 237 tests on Windows: 235 OK, 1 skip, 1 B008 flake that also fails on main; R32-R40 remain open."},"exception":{"constraint_evidence":"An explicit --handle can reopen a handed-off or finished session beside its live successor (R32); refused claims still write the work-item branch (R33).","supported_other_host_outcome":"Codex shares the same loader defect; neither host records SessionStart until R9 is fixed."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"Focused suite 237 tests on Windows: 235 OK, 1 skip, 1 B008 flake that also fails on main; R32-R40 remain open."},"exception":{"constraint_evidence":"An explicit --handle can reopen a handed-off or finished session beside its live successor (R32); refused claims still write the work-item branch (R33).","supported_other_host_outcome":"Claude records SessionEnd once R9 is fixed."}}]}
 ```
 
 ### Findings
@@ -244,3 +244,52 @@ work order and the host check rejects a second one.
   unified with `dev.azure.com`, and the path is not case-folded as documented. Map both to
   `dev.azure.com/<org>/<project>/_git/<repo>` and lowercase the identity.
   Fixed: legacy `visualstudio.com` HTTPS and `vs-ssh.visualstudio.com` SSH remotes map to `dev.azure.com/<org>/<project>/_git/<repo>`; the identity is fully case-folded.
+
+## Review pass — 2026-10-13 — incremental
+
+**Candidate base:** `3df86558f1dfb2193989cd6db054d8596ffb64a3`
+**Candidate head:** `6c4ed0790ea2f1fec7f822292e1ae88238aadeb0`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:173d86c49119bd50cc9887af969df8e5c47d8eb6eef7f84bfcc2af2606d504a1` `(6 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\gvhOkh2MkGpNt3qgK4DxNQ\ycwTrZGtyQ_P8r0Jet12j-`
+**Candidate bundle identity:** `sha256:93379fd384bf760b602c4ab90dc03a9a7417b39af40881e432eaa1efcad26eae`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). Not retained: a migration for the
+case-folded repository key — `sessions.db` has never shipped, so no recorded rows exist to migrate.
+
+### Findings
+
+- [ ] **R32 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:172`
+  `_read_time_status` returns `closed` for rows ended `finished` or `handed_off`, so `resume --handle` (and the R25 gate)
+  can reopen a handed-off session beside its live successor in the same worktree. Report those rows as `finished` /
+  `handed_off` so only `closed` rows resume.
+- [ ] **R33 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:216`
+  `set_work_item_branch_if_unset` commits before `claim_work_item` and runs for every claimer, so a refused owner claim
+  or a bounded helper permanently sets the work item's branch. Fill the branch inside `claim_work_item`'s transaction,
+  only for a successful owner claim.
+- [ ] **R34 — LOW — native** — `.agents/machine/scripts/session_store.py:413`
+  The single-owner rule lives only in `claim_work_item`. Add a partial unique index on `sessions(work_item)` where
+  `role = 'owner'` so the database enforces it.
+- [ ] **R35 — LOW — native** — `.agents/machine/scripts/session_store.py:157`
+  Short legacy remotes `https://<org>.visualstudio.com/[DefaultCollection/]_git/<repo>` (project named after the
+  repository) normalise to nothing and fall back to the local path. Map them to
+  `dev.azure.com/<org>/<repo>/_git/<repo>`.
+- [ ] **R36 — LOW — native, workflow** — `.agents/machine/scripts/session_store.py:181`
+  The unborn-HEAD fallback also runs after a non-repository cwd or a timeout, and runs `symbolic-ref` even when
+  `--git-common-dir` failed, doubling hook git work. Fall back only on a non-timeout failure and skip `symbolic-ref`
+  without a common dir.
+- [ ] **R37 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:340`
+  `interrupted` computes each row's read-time status (process table plus git) and recomputes it for every `--resume`
+  handle. Compute once per row and reuse it.
+- [ ] **R38 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:386`
+  `item --status` on an existing item with a NULL branch never fills it from a non-default branch. Apply the same
+  branch fill as `claim`.
+- [ ] **R39 — LOW — native** — `.agents/machine/scripts/session_store.py:403`
+  The new `claim_work_item` and `_collect_repo_branch_head` docstrings narrate design and behaviour, against the global
+  no-comment rule; the test's `# noqa` explanation likewise. Remove them.
+- [ ] **R40 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:213`
+  `claim` resolves repository, branch and HEAD twice. Resolve them once and reuse the result.
