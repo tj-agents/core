@@ -234,6 +234,13 @@ class PackagedEngineeringHooks(unittest.TestCase):
             "## A task has an owning lifecycle — load it before the first edit",
             "## Repository routine-decision delegation",
         )
+        refinement_guidance = (
+            "During normal work, when an applicable standard is ambiguous, silent or improvable, propose its\n"
+            "refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a\n"
+            "snippet, and why. Continue the current task under the existing standard while awaiting the decision. If\n"
+            "accepted, launch `engineering:handoff` in bounded side-workstream mode to the standard's source owner\n"
+            "under the standing authorization. Established standards defects still require immediate repair."
+        )
         body = contract.read_text(encoding="utf-8").split("\n---\n", 1)[1]
         expected = "\n\n".join(
             body.split(heading, 1)[1].split("\n## ", 1)[0].strip()
@@ -275,6 +282,7 @@ class PackagedEngineeringHooks(unittest.TestCase):
                         self.assertIn("source SHA-256", context)
                         self.assertIn(expected, context)
                         self.assertTrue(context.split("\n\n", 1)[1].startswith(expected))
+                        self.assertIn(refinement_guidance, context)
                         self.assertIn("auto_approve_design=false", context)
                         normalized_context = " ".join(context.split())
                         self.assertIn("load `engineering:lanes`", normalized_context)
