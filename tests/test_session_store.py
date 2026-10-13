@@ -121,6 +121,45 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual("wal", connection.execute("PRAGMA journal_mode").fetchone()[0].lower())
         self.assertEqual(1, connection.execute("PRAGMA foreign_keys").fetchone()[0])
 
+    def test_connect_retries_a_locked_wal_initialization(self):
+        connection = mock.Mock()
+        wal_attempts = 0
+
+        def execute(statement):
+            nonlocal wal_attempts
+            if statement == "PRAGMA journal_mode = WAL":
+                wal_attempts += 1
+                if wal_attempts == 1:
+                    raise sqlite3.OperationalError("database is locked")
+            return mock.Mock()
+
+        connection.execute.side_effect = execute
+        with (
+            mock.patch.object(STORE.sqlite3, "connect", return_value=connection),
+            mock.patch.object(STORE, "_ensure_schema"),
+            mock.patch.object(STORE, "_LOCK_RETRY_DELAY", 0),
+        ):
+            self.assertIs(connection, STORE.connect(self.db_path))
+        self.assertEqual(2, wal_attempts)
+        connection.close.assert_not_called()
+
+    def test_connect_closes_a_connection_when_wal_initialization_fails(self):
+        connection = mock.Mock()
+
+        def execute(statement):
+            if statement == "PRAGMA journal_mode = WAL":
+                raise sqlite3.OperationalError("disk I/O error")
+            return mock.Mock()
+
+        connection.execute.side_effect = execute
+        with (
+            mock.patch.object(STORE.sqlite3, "connect", return_value=connection),
+            mock.patch.object(STORE, "_ensure_schema"),
+        ):
+            with self.assertRaisesRegex(sqlite3.OperationalError, "disk I/O error"):
+                STORE.connect(self.db_path)
+        connection.close.assert_called_once_with()
+
     def test_partial_unique_index_enforces_one_owner_row_per_work_item(self):
         connection = STORE.connect(self.db_path)
         self.addCleanup(connection.close)
