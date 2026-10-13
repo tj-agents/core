@@ -114,9 +114,9 @@ sessions or schedulers are required; this foreground owner continues across the 
 
 ## Next Steps
 
-The Stop runtime repair and its 54 focused tests pass, along with required generation and packaging.
-Review the immutable child candidate, publish it against PR #236's branch and own exact-head CI.
-Finish authorized preparation before the remaining concrete delivery and host-acceptance decisions.
+The first child review found incomplete boundary metadata (R1); the repair passes 31 continuation tests.
+Commit the verified metadata enforcement, review that delta, then publish against PR #236's
+branch and own exact-head CI. Finish authorized preparation before the delivery and host decisions.
 
 Scope: whole plan through all remaining phases and terminal delivery.
 Current slice: D2 Stop dispatcher/continuation enforcement, stacked on the human-gated ownership wording.
@@ -178,7 +178,7 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
   All ten review findings were resolved. Causal main CI/regeneration `38337890284` passed.
 - Parent PR #236: `cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d`, independent native/contract/workflow
   review approved in `reviews/Docs-StopGateOwnership.md`; frozen reference checks had no errors/warnings.
-  Exact-head CI `38339400959` is owned by the foreground monitor. The binder reserves the changed
+  Exact-head Windows/Linux CI `38339400959` passed. The binder reserves the changed
   `contract/plan-checkpoint` path under the published-contract stop class; standing authority exempts
   only auth. This gates automatic parent delivery, not authorized child preparation.
 - Child implementation: Stop nonzero exits and missing deadline verdicts fail closed, preserving sibling
@@ -191,3 +191,7 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
   scope roots. The runtime slice declares existing shared enforcement resources and keeps all schemas.
 - Incident B008 is resolved by PR #235. B009 and M015 remain owned by this goal until runtime delivery
   and whole-goal acceptance. Their retired branch qualifiers were reconciled in this substantive slice.
+
+- Child review at `c4c268a` completed changes-requested with one deduplicated finding R1: require
+  complete unique metadata for extended blocker/Paused forms; preserve the unextended four-field
+  legacy blocker. The predicate/test repair passed 31 focused tests and awaits fresh incremental review.
