@@ -17,8 +17,11 @@ its own goal and checkout. This successor owns only this goal.
 ## Checkout
 
 `C:\Users\TommySeery\source\repos\tj-agents\core\.worktrees\Fix-StopGateAndProfileRepair`, branch
-`Docs/StopGateOwnership` from remote main `c95b899fc8119a37dfbde1b25d9e34bacbc3c265`.
+`Fix/StopGateFailures` from verified parent `Docs/StopGateOwnership`
+`cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d` (PR #236), based on remote main `c95b899fc8119a37dfbde1b25d9e34bacbc3c265`.
 The same foreground owner continues this goal across its sequential delivery slices.
+
+- PR: not opened.
 
 ## Defects
 
@@ -88,9 +91,9 @@ not this goal.
 
 ## Lane
 
-Current phase: L5 mechanical guidance implementation; the exact ownership, blocker and session-close
-wording is resolved. Bounded in-session worker applies it; parent owns goal, verification and transitions.
-Review reselects L4 for ordinary correctness and workflow judgment.
+Current phase: L4 specified Stop dispatcher and continuation-boundary implementation with focused
+regressions. A bounded in-session worker owns runtime/test paths; parent owns goal and delivery.
+Independent correctness/workflow review uses L4 after implementation.
 
 ## Delivery slices
 
@@ -99,20 +102,25 @@ Review reselects L4 for ordinary correctness and workflow judgment.
    Base: `4090e7d238754b3f1a37cd297142a698129cd3c8`; actual 1,002 substantive code/test lines. The final two-line overage remains atomic with migration safety and its regressions; splitting those would weaken the qualified change.
 2. Separate `Docs/StopGateOwnership`: canonical continuation and session-close wording,
    retaining published four-field blocker and `Paused:` formats. Base: updated remote main after slice 1.
-3. Separate `Fix/StopGateFailures`: fail-closed Stop dispatch and blocker-boundary enforcement,
-   with real missing-import, deadline and continuation regressions. Base: updated main after slice 2.
+3. Current `Fix/StopGateFailures`: fail-closed Stop dispatch and blocker-boundary enforcement,
+   with real missing-import, deadline and continuation regressions. Parent: PR #236 at `cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d`.
+   Expected fewer than 400 substantive code/test lines; review the child delta and validate the cumulative tree.
+   The parent cannot merge automatically because `published-contract` is a recorded stop class. Proceeding
+   as a stack completes authorized unblocked repair before the final concrete human delivery decision.
+   Land bottom-up; retarget/reconcile the child after the parent lands.
 
 Each slice requires independent review, Windows/Linux CI and its own guarded merge. No new CLI
 sessions or schedulers are required; this foreground owner continues across the slices.
 
 ## Next Steps
 
-Ownership wording and supported harness declarations are implemented and packaging checks pass.
-Review the immutable candidate, deliver this slice, then implement the Stop runtime slice.
+The Stop runtime repair and its 54 focused tests pass, along with required generation and packaging.
+Review the immutable child candidate, publish it against PR #236's branch and own exact-head CI.
+Finish authorized preparation before the remaining concrete delivery and host-acceptance decisions.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: D1 canonical continuation, blocker and session-close wording.
-Remaining scope: D2 Stop dispatcher/continuation enforcement; fresh-host acceptance within Tommy's session limit.
+Current slice: D2 Stop dispatcher/continuation enforcement, stacked on the human-gated ownership wording.
+Remaining scope: parent/child delivery; fresh-host acceptance within Tommy's session limit.
 Done when: all authorized repairs are verified and merged, with any genuine capability boundary recorded.
 
 ## Agent-host coverage
@@ -128,9 +136,9 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
       "source": ".agents/machine/scripts/claude_standards_sync.py; .agents/hooks/continuation_stop.py; .agents/hooks/hook_dispatch.py",
       "mapping": "Machine launcher sync plus .agents/plugins/manifests/claude/engineering-hooks.json Stop dispatch and shared SessionStart contracts.",
       "verification": {
-        "level": "planned",
-        "result": "pending",
-        "evidence": "Synthetic native-plugin fixtures, missing-import Stop reproduction, continuation boundary tests and payload inspection; fresh CLI acceptance restricted by the explicit no-additional-session instruction."
+        "level": "source",
+        "result": "passed",
+        "evidence": "23 dispatcher and 31 continuation tests passed, including real missing-import failure, both host event spellings, deadline and blocker-boundary cases; generated-tree, harness and packaging checks passed. Fresh-host acceptance remains unobserved under the session limit."
       }
     },
     {
@@ -139,9 +147,9 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
       "source": ".agents/hooks/continuation_stop.py; .agents/hooks/hook_dispatch.py; .agents/base/policy/goal-continuation/SKILL.md",
       "mapping": ".agents/plugins/manifests/codex/engineering-hooks.json and generated authenticated hook snapshots; Claude profile migration has no Codex profile mutation.",
       "verification": {
-        "level": "planned",
-        "result": "pending",
-        "evidence": "Shared dispatcher/continuation regression tests with both host payload spellings and existing Codex synchronization consumer tests."
+        "level": "source",
+        "result": "passed",
+        "evidence": "23 dispatcher and 31 continuation tests passed, including real missing-import failure, both host event spellings, deadline and blocker-boundary cases; generated-tree, harness and packaging checks passed. Fresh-host acceptance remains unobserved under the session limit."
       }
     }
   ]
@@ -150,36 +158,36 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
 
 ## Progress
 
-- Pickup: this Codex successor owns the promoted goal in the named checkout. No further CLI sessions,
-  schedulers or prompt children have been launched; bounded in-session workers preserve one goal owner.
-- Assessment complete: reuse native Claude commands and the existing sync owner, adding bounded
-  payload checks and opt-in alias migration. Bootstrap remains the locked-profile digest owner.
-  Native CLI help and official plugin documentation establish scope/install semantics; preserve subdir refs.
-- D2 cause: original Stop attachment lacked `workflow_route` and `worktree_cleanup_gate.py`.
-  Dispatcher returned success without a block after 1,584 ms; this incident was not a deadline overrun.
-- Live D3/D4 repair: base/engineering/machine/cpp/msvc/win32/dotnet/react user packages are healthy
-  and enabled at `@tj-agents`; all mapped legacy user preference aliases are absent. Engineering has
-  52 complete skills at the consolidated catalog's published `v2.1.15`, rather than 61 at damaged main.
+- One Codex successor owns the promoted goal. No extra CLI sessions, schedulers or prompt children
+  were launched. Bounded in-session workers preserve this single owner.
+- Assessment complete: reuse native Claude commands and the existing sync owner, add bounded payload
+  checks and opt-in alias migration; bootstrap remains the locked-profile digest owner. Preserve pinned
+  subdirectory refs and existing project/local installations.
+- D2 cause: the original Stop attachment lacked `workflow_route` and `worktree_cleanup_gate.py`.
+  Dispatcher returned success with empty stdout after 1,584 ms. The incident was not a deadline overrun.
+- Live D3/D4: eight healthy user packages are enabled at `@tj-agents`, with mapped legacy preferences
+  absent. Engineering has 52 complete skills at published `v2.1.15`, rather than 61 at damaged main.
   Consolidated marketplace pins remain authoritative; no marketplace source repository was edited.
-- Tommy approved all 15 files and 45 C++ false flags in `MIGRATION_PREVIEW.md`. They were applied
-  and independently compared with byte backups: exactly those additions, all other values preserved.
-  Native user C++ migration then returned zero; project/local legacy installs and their marketplaces
-  remain while scoped references require them. Unrelated profile choices were preserved.
-- Fresh-session loading is unobserved under the explicit no-extra-session limit. Native registry and
-  declared-payload checks passed for all eight repaired packages; do not claim source changes are adopted
-  by the currently pinned installed packages or that a new host session accepted them.
-- D3/D4 source delivery: PR #235 merged reviewed head `9690bff537e90f82c3c3a562c1ffa54a57c334e0`
-  at `8b33980747476f9369c1b39497908226c2990b21`; exact-head CI `38336373168` passed Windows/Linux.
-  Independent native, migration and workflow review approved; all ten findings resolved. Review evidence
-  is archived outside the checkout after retirement of the merged branch. No additional CLI was launched.
-- Main consequence `38337890284` is owned by the foreground monitor at its exact merge commit.
-  Regeneration is the repository's only publication consequence; no external marketplace is published here.
-- Validation: original 27 sync, 13 repair and 36 Codex consumer tests passed; focused migration/authentication,
-  scope and race checks passed. The final alias-removal regression was reproduced red, then four checks
-  passed after correction. Generated/harness/packaging checks passed; full Windows/Linux CI passed.
-- Current source slice: `Docs/StopGateOwnership` uses the updated remote base and this same goal owner.
-  Preserve four published blocker fields and `Paused:`; exhaust all unblocked authorized work before
-  either form can describe the remaining whole goal. Harness declarations identify shipped Stop resources;
-  extra skill-file roots were rejected because the mandatory canonical scope roots already ship skills.
-- Ownership validation: catalog generation, both-host generated-tree checks, three harness manifests
-  and `skill-packaging.tests.ps1` passed. Generated distribution output is excluded from this commit.
+- Tommy approved all 15 employer-local files and 45 C++ false flags in `MIGRATION_PREVIEW.md`.
+  Exactly those additions were verified against backups; all other values were preserved. Native user
+  C++ migration returned zero, keeping scoped legacy installs/marketplaces while they remain referenced.
+- Fresh-session loading and adoption of these source changes by installed pinned packages are unobserved
+  under the explicit no-extra-session limit. Native registry/payload checks passed for all eight packages.
+- D3/D4 source: PR #235 merged reviewed head `9690bff537e90f82c3c3a562c1ffa54a57c334e0` at
+  `8b33980747476f9369c1b39497908226c2990b21`; exact-head Windows/Linux CI `38336373168` passed.
+  All ten review findings were resolved. Causal main CI/regeneration `38337890284` passed.
+- Parent PR #236: `cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d`, independent native/contract/workflow
+  review approved in `reviews/Docs-StopGateOwnership.md`; frozen reference checks had no errors/warnings.
+  Exact-head CI `38339400959` is owned by the foreground monitor. The binder reserves the changed
+  `contract/plan-checkpoint` path under the published-contract stop class; standing authority exempts
+  only auth. This gates automatic parent delivery, not authorized child preparation.
+- Child implementation: Stop nonzero exits and missing deadline verdicts fail closed, preserving sibling
+  reasons/context; documented blockers reject trailing actionable tasks and unsupported budget/capability
+  shortcuts. Four-field/Paused compatibility, completion, explicit controls and scheduler checks remain.
+- Child verification: 23 dispatcher and 31 continuation tests passed, including real missing-import,
+  deadline, both-host payload and boundary regressions. Catalog generation, generated-tree checks,
+  three harness validators and skill packaging passed. No generated distribution output is committed.
+- Harness extra roots must be mapped shipped resources; skill definitions are already covered by canonical
+  scope roots. The runtime slice declares existing shared enforcement resources and keeps all schemas.
+- Incident B008 is resolved by PR #235. B009 and M015 remain owned by this goal until runtime delivery
+  and whole-goal acceptance. Their retired branch qualifiers were reconciled in this substantive slice.
