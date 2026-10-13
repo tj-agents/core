@@ -3,7 +3,8 @@
   "plugin": "base-agents/base",
   "source_roots": [
     ".agents/base",
-    ".agents/base/policy/plan-artifacts/scripts/host_coverage.py"
+    ".agents/base/policy/plan-artifacts/scripts/host_coverage.py",
+    ".agents/hooks/hook_dispatch.py"
   ],
   "requires": {
     "marketplaces": [
