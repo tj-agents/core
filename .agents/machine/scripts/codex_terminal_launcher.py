@@ -11,6 +11,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from codex_marketplace_sync import SyncError, resolve_codex_for_sync, sync_codex_standards
+from agent_cli import LaunchError
 from terminal_command import command_for_target, flush_before_cli, run_target
 
 
@@ -34,7 +35,7 @@ def supports_no_daemon(target: str) -> bool:
             encoding="utf-8", errors="replace", timeout=10,
             creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
-    except (OSError, subprocess.SubprocessError):
+    except (LaunchError, OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and "--no-daemon" in result.stdout
 
