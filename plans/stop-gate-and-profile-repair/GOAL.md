@@ -105,16 +105,14 @@ sessions or schedulers are required; this foreground owner continues across the 
 
 ## Next Steps
 
-Finish and verify the profile repair candidate, apply its authorized user-profile migrations,
-then commit, independently review and deliver the current slice before starting its successor.
-Apply the approved 15 scoped settings equivalents and verify the resulting user C++ migration.
+Finish the final profile migration concurrency guards, commit their tested source, complete fresh
+incremental review and exact-head CI, then merge PR #235 before starting the ownership wording slice.
 
 Scope: whole-plan.
-Current slice: D3/D4 normal-profile package checks, pinned sources and user alias migration.
-Remaining scope: D1 canonical stop ownership wording; D2 dispatcher and continuation enforcement;
-approved scoped C++ migration; installed-host acceptance within the no-additional-session limit.
-Done when: all authorized repairs are verified and merged, with any genuine scope or capability
-boundary recorded against the same goal.
+Current slice: D3/D4 package checks, pinned sources and user alias migration.
+Remaining scope: D1 ownership wording; D2 Stop dispatcher/continuation enforcement; fresh-host acceptance within Tommy's session limit.
+Done when: all authorized repairs are verified and merged, with any genuine capability boundary recorded.
+
 ## Agent-host coverage
 
 ```agent-host-coverage
@@ -150,52 +148,32 @@ boundary recorded against the same goal.
 
 ## Progress
 
-- 2026-10-13: goal written and launched by the `sandbox-dotnet` session.
-- 2026-10-13: Codex successor acknowledged pickup in the named checkout. D3 verified:
-  the registered engineering cache has no `skills/` directory. D4 verified: user settings enable
-  nonexistent `dotnet@dotnet` and `react@react` identities; scoped legacy installs remain registered.
-  Investigation uses L3 for unresolved stop-gate and migration behavior. No further CLI sessions,
-  schedulers or prompt children will be launched; bounded in-session workers retain this goal owner.
-- D2 cause confirmed from the original Stop attachment: `continuation_stop.py` and
-  `callout_repair_gate.py` could not import the missing `workflow_route`; `worktree_cleanup_gate.py`
-  was missing. The dispatcher returned success and no blocking verdict. The original duration was
-  1,584 ms, ruling out its deadline as this incident's cause.
-- D3 recovery: native `engineering@tj-agents` install succeeded with 52 complete skills at the
-  consolidated catalog's published `v2.1.15` pin. The damaged main install expected 61. Native
-  user installs for base/machine/C++/.NET/React also succeeded. Fresh session loading cannot be
-  claimed without violating the no-additional-CLI-session limit; verify native registry and payload
-  now, retain fresh-session acceptance as a capability limit.
-- D4 scope: work-repository local settings disable the legacy C++ identities. New unified C++
-  identities were disabled immediately to preserve those choices. The exact proposed equivalents
-  are in `MIGRATION_PREVIEW.md`; scoped writes await Tommy's answer. Legacy marketplaces remain
-  while project/local records reference them. Source migration must preserve explicit disabled
-  choices and defer aliases whose scoped overrides cannot be safely preserved.
-- Assessment complete: reuse native Claude plugin commands and existing sync owner; add bounded
-  package checks and opt-in alias migration rather than a second installer. Existing bootstrap
-  remains the full digest verifier for locked profiles. Official Claude plugin docs and the local
-  CLI help confirm plugin scope/native install semantics. Preserve each git-subdir source ref.
-- Implementation phase selected L4: specified sync/integrity changes with synthetic regression
-  coverage; bounded in-session worker owns only sync code and its fixtures/tests.
-- Profile checkpoint: 27 synchronization tests and plugin packaging passed. Authorized user aliases
-  for base/machine/.NET/React migrated through the tested source helper; engineering was already
-  repaired. All five canonical user packages passed declared-payload checks. The C++ aliases remain
-  deliberately deferred pending the 15 scoped settings equivalents; unrelated settings and registry
-  scopes were preserved. No fresh host session was launched.
-- Profile slice published as PR #235, head `a69f2722c8f0585cbf8a214f7e39c0b5ff6bb63a`.
-  Exact-head CI run `38329611877` has a foreground shared monitor. Source review uses the frozen
-  descriptor and bundle; the account rejected the specialist reviewer model, so supported fresh
-  L4 correctness/workflow and L2 migration reviewers provide the bounded fallback. Merge remains
-  gated on completed review and Windows/Linux validation.
-- Profile review completed at `a69f2722c8f0585cbf8a214f7e39c0b5ff6bb63a` with five
-  fixable findings: active project opt-outs, concurrent preference changes, registered foreign stale
-  aliases, missing native executable, and documented CLI migration coverage. Serial L4 remediation
-  owns the existing sync source and regression module. PR #235 remains draft; no merge is armed.
-- Windows/Linux CI run `38329611877` passed for the first profile candidate. The fixing
-  candidate still needs its own tests, incremental review and exact-head CI. The reviewed publisher
-  correction also rejects local/file URLs that merely normalize to a GitHub-looking path. Migration
-  documentation states the supported current-project and registered-scope inventory explicitly.
-
-- Profile remediation stabilized: focused package, migration, authentication/CLI and existing sync
-  tests passed. All five review findings have source/test fixes. Incremental review and new exact-head
-  CI remain required. Tommy approved all 15 scoped files and 45 false flags; mechanical application
-  owns only those files, with original-byte backups and semantic preservation checks.
+- Pickup: this Codex successor owns the promoted goal in the named checkout. No further CLI sessions,
+  schedulers or prompt children have been launched; bounded in-session workers preserve one goal owner.
+- Assessment complete: reuse native Claude commands and the existing sync owner, adding bounded
+  payload checks and opt-in alias migration. Bootstrap remains the locked-profile digest owner.
+  Native CLI help and official plugin documentation establish scope/install semantics; preserve subdir refs.
+- D2 cause: original Stop attachment lacked `workflow_route` and `worktree_cleanup_gate.py`.
+  Dispatcher returned success without a block after 1,584 ms; this incident was not a deadline overrun.
+- Live D3/D4 repair: base/engineering/machine/cpp/msvc/win32/dotnet/react user packages are healthy
+  and enabled at `@tj-agents`; all mapped legacy user preference aliases are absent. Engineering has
+  52 complete skills at the consolidated catalog's published `v2.1.15`, rather than 61 at damaged main.
+  Consolidated marketplace pins remain authoritative; no marketplace source repository was edited.
+- Tommy approved all 15 files and 45 C++ false flags in `MIGRATION_PREVIEW.md`. They were applied
+  and independently compared with byte backups: exactly those additions, all other values preserved.
+  Native user C++ migration then returned zero; project/local legacy installs and their marketplaces
+  remain while scoped references require them. Unrelated profile choices were preserved.
+- Fresh-session loading is unobserved under the explicit no-extra-session limit. Native registry and
+  declared-payload checks passed for all eight repaired packages; do not claim source changes are adopted
+  by the currently pinned installed packages or that a new host session accepted them.
+- Current source slice: PR #235, latest published head `0603a16500ae926d3e55b1d49bb773c6f7a2d77f`.
+  CI runs `38329611877` and `38332331180` passed Windows/Linux for their exact historical heads.
+  Review owner: `reviews/Fix-StopGateAndProfileRepair.md`; current judgment changes-requested.
+  R1-R8 source remediation is fixed in this commit; fresh incremental review remains required.
+  The specialist reviewer model is unsupported on this account; fresh supported L4 native/workflow and
+  L2 migration contexts review the same immutable candidate. No extra native review CLI was launched.
+- Validation: original 27 sync, 13 repair and 36 Codex consumer tests passed; 21 focused remediation
+  checks and generated/harness/packaging checks passed. The correcting candidate needs targeted tests,
+  a fresh incremental watermark and new exact-head CI. No merge is armed before those gates pass.
+- Final profile guards: 11 targeted tests passed, including new sibling opt-outs, scoped preference
+  changes, malformed scopes and removal of unchanged enable flags created by native installation.
