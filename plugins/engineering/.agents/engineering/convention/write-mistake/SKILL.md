@@ -16,6 +16,11 @@ Use a repository-declared mistake owner or typed shared register. Otherwise add 
 `MISTAKES.md`. Use a stable `M` identifier and every shared field. Preserve the concrete observation and
 evidence; state whether its cause is confirmed or unknown without inventing an explanation.
 
+Every mistake states why it occurred: the causal decision or failure, whether the governing standard was
+missing, ambiguous or violated, and the observed evidence. Unknown causes stay unknown. State the correction
+as a declarative prevention rule and give an observable condition that proves it works; an apology or a
+promise to be more careful is not a correction. The shared contract owns default-branch publication.
+
 First reconcile an existing incident and its repair owner. Add repeated observations as dated evidence.
 When a mistake is already addressed by a bug, debt, or standards repair, link that repair and retain the
 incident as learning history. Merge incident records only when their common cause is known. Do not create
