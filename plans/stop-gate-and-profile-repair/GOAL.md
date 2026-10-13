@@ -166,10 +166,10 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
 - Fresh-session loading is unobserved under the explicit no-extra-session limit. Native registry and
   declared-payload checks passed for all eight repaired packages; do not claim source changes are adopted
   by the currently pinned installed packages or that a new host session accepted them.
-- Current source slice: PR #235, latest published head `0603a16500ae926d3e55b1d49bb773c6f7a2d77f`.
+- Current source slice: PR #235, latest published head `ef5be3ad47ea3c20049778d6bb0ebbe5364b9d5c`.
   CI runs `38329611877` and `38332331180` passed Windows/Linux for their exact historical heads.
   Review owner: `reviews/Fix-StopGateAndProfileRepair.md`; current judgment changes-requested.
-  R1-R8 source remediation is fixed in this commit; fresh incremental review remains required.
+  R1-R10 source remediation is fixed in this commit; fresh incremental review remains required.
   The specialist reviewer model is unsupported on this account; fresh supported L4 native/workflow and
   L2 migration contexts review the same immutable candidate. No extra native review CLI was launched.
 - Validation: original 27 sync, 13 repair and 36 Codex consumer tests passed; 21 focused remediation
@@ -177,3 +177,6 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
   a fresh incremental watermark and new exact-head CI. No merge is armed before those gates pass.
 - Final profile guards: 11 targeted tests passed, including new sibling opt-outs, scoped preference
   changes, malformed scopes and removal of unchanged enable flags created by native installation.
+- Final tiny follow-up: the alias-removal race was reproduced red, corrected and verified green
+  alongside three preservation/rollback tests. README accurately describes best-effort permission sync.
+  CI run `38335031539` passed the prior head; this commit needs its own review and CI.
