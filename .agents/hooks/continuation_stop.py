@@ -109,14 +109,17 @@ def documented_blocker(owner):
         for line, field in zip(lines, fields)
     ):
         remaining = lines[len(fields):]
+        requires_metadata = False
     elif lines and lines[0].startswith("Paused:") and lines[0].removeprefix("Paused:").strip():
         remaining = lines[1:]
+        requires_metadata = True
     else:
         return False
-    return all(
-        any(line.startswith(f"{field}:") and line.removeprefix(f"{field}:").strip()
-            for field in metadata)
-        for line in remaining
+    return (not remaining and not requires_metadata) or (
+        len(remaining) == len(metadata) and all(
+            line.startswith(f"{field}:") and line.removeprefix(f"{field}:").strip()
+            for line, field in zip(remaining, metadata)
+        )
     )
 
 
