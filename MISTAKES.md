@@ -203,3 +203,14 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
   missing launch or record is surfaced as an actionable failure rather than explained away.
 - **Verification evidence:** this session read the exact `engineering:session-guidance` rule, then returned
   without either action; the peer registry later showed the active source-repair session cited above.
+## M015 - Sandbox terminated with authorized work unfinished
+- **Kind:** mistake.
+- **Observed/reported:** 2026-10-13; the original event timestamp is 2026-10-12T23:20:52.428Z. Transcript `fed1d447-ae67-4078-99a5-a813156cf86a` records termination after `continuation_stop` and `callout_repair` reported `missingworkflow_route` and `missingworktree_cleanup_gate`, 1584 ms, exit 0, empty stdout. The user asked whether the work was finished. No entities, migrations, endpoints, necessary question, or owned wait blocked the remaining work.
+- **Cause:** confirmed observed termination; workflow allowed transcript-only status, and the handoff treated one blocker as blocking the whole task. The specific internal reasoning is unknown.
+- **Impact and priority:** P1; the requested repair remained unfinished and the user had to identify that work was incomplete.
+- **Source owner:** Core task-continuation and stop-gate behavior, with the dispatcher defect tracked by B009.
+- **State:** in-progress.
+- **Repair link:** `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateAndProfileRepair`; related bug: [B009](BUGS.md#B009).
+- **Next action:** continue the authorized goal with focused repair review, Windows/Linux CI, and guarded normal merge.
+- **Resolution condition:** authorized work reaches its recorded completion criteria; stop-gate repair is reviewed, required Windows/Linux CI passes, and guarded normal merge completes.
+- **Verification evidence:** transcript records the missing workflow route and cleanup gate with exit 0 and empty stdout; investigation found no entities, migrations, endpoints, necessary question, or owned wait that would block continuing. The canonical goal records the next action and branch.
