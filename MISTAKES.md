@@ -266,3 +266,27 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - **Verification evidence:** fresh origin/main contains B009 for a Stop dispatcher defect and M015 for sandbox termination; the prior branch used B009 for a different automatic-merge defect and had M016 plus this M003 recurrence absent from main. No merged-delivery result is asserted before observation.
 
 Current ownership verification - 2026-10-13: PR212 and PR128 are merged and contained in the reviewed base. Exact M003 successor PID32000/thread01a13562-6a28-73a3-b2bc-d3bbe884dad5 is live. The supported machine:followup-codex helper returned unavailable/disconnected, no send attempted and acknowledged=false; no daemon or replacement session was started. Original terminal/callout prevention conditions remain open, distinct from the documentation publication delivered by this PR.
+
+## M018 - Repeated full code reviews for a documentation learning update
+
+**Kind:** mistake. **Observed/reported:** 2026-10-13; career Azure Markdown-only learning update delivered across PRs2-6 using repeated native full, fresh accuracy and follow-up incremental reviews; Tommy reported approximately four hours and requested explicit docs review exemptions.
+
+**Cause:** confirmed disproportionate process selection under consumed engineering review/delivery rules. Technical review did catch actual prerequisite/factual errors; tool latency and unreliable file-write persistence also contributed, with total time allocation unknown. Core lessons/artifact-builder work was not used. Diagnose the missing or ineffective risk-based docs exemption rather than discard accuracy checks.
+
+**Impact and priority:** P2; routine docs took excessive time and repeated user intervention. **Source owner:** tj-agents/core engineering docs/review/preflight rules. **State:** open. **Repair link:** Fix/DocsReviewProportionality, plans/docs-review-proportionality/GOAL.md in C:/Users/TommySeery/source/repos/tj-agents/core.worktrees/Fix-DocsReviewProportionality.
+
+**Declarative prevention:** Classify actual behavior and risk; routine reading/navigation docs use focused links, formatting, privacy/source and targeted factual checks, with an explicit exemption from repeated full code-review pipelines and runtime builds. Escalate consequential executable/security/operational content; verify repairs only where affected unless new risk warrants more.
+
+**Next action:** bounded source owner inspects causal routes, implements the exemption, verifies representative routine and consequential cases, and publishes the shared record and reviewed source correction. **Resolution condition:** both hosts route ordinary docs proportionately while preserving meaningful technical checks and actual delivery gates; source fix and incident record are verified on remote main. **Verification evidence:** completed career goal records PRs2-6, full/fresh/incremental passes, unrun snippets and no runtime change; current source repair has only been prepared, no fix/acceptance claimed.
+
+## M019 - Intentional CLI closure before the final completion report
+
+**Kind:** mistake. **Observed/reported:** 2026-10-13; after final career PR6 merged at 19:41:27 UTC, parent invoked machine peer-cli close.py before the final user-facing report. Tool returned aborted, user observed closure and demanded continuation.
+
+**Cause:** confirmed ordering violation: engineering session-guidance explicitly says completion report precedes own-session closure. Parent applied the automatic close action too early. Whether host enforcement can guarantee report delivery needs bounded diagnosis; no transport failure is established for this event.
+
+**Impact and priority:** P2; user lost the active CLI and had to resume to obtain completion status. **Source owner:** tj-agents/core engineering completion guidance and directly causal machine closure interface. **State:** open. **Repair link:** same bounded Fix/DocsReviewProportionality goal; distinct from M012/B004's failure-to-close incident/transport repair, whose ownership remains intact.
+
+**Declarative prevention:** Deliver the completion report before intentional closure using a supported host sequence, honor explicit keep-open/continue and active dialogue, and report capability limits without killing the conversation. Treat terminal lifetime and checkout cleanup separately.
+
+**Next action:** source owner verifies practical ordering/enforcement and corrects only the causal guidance/adapter with focused acceptance. **Resolution condition:** observed or focused host acceptance proves report-before-close and preservation of explicit continue/keep-open on both hosts, without closing peers; reviewed source correction and this record reach remote main. **Verification evidence:** exact close.py invocation followed by aborted tool output and user's CLI-closure report; docs already merged at main365dc8e; parent promised not to invoke close again. No prevention acceptance claimed.
