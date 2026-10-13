@@ -100,9 +100,14 @@ def closure(plugin_ids: set[str], plugins: dict[str, dict]) -> set[str]:
     return selected
 
 
-def lock_document(existing: dict | None, catalog: dict, requested: list[str]) -> dict:
+def lock_document(
+    existing: dict | None,
+    catalog: dict,
+    requested: list[str],
+) -> dict:
     releases, plugins = bootstrap.catalog_index(copy.deepcopy(catalog))
     previous = {} if existing is None else {selection["id"]: copy.deepcopy(selection) for selection in existing["plugins"]}
+    pinned_releases = release_commits(existing)
     selected = closure(set(requested) | CORE | set(previous), plugins)
     values = []
     for plugin_id in sorted(selected):
@@ -111,10 +116,11 @@ def lock_document(existing: dict | None, catalog: dict, requested: list[str]) ->
             continue
         plugin = plugins[plugin_id]
         release = plugin["_release"]
+        commit = pinned_releases.get(release["id"], release["revision"])
         values.append({
             "id": plugin_id,
             "release": release["id"],
-            "commit": release["revision"],
+            "commit": commit,
             "required_skills": sorted(plugin["skills"]),
             "path_scopes": [],
             "exceptions": [],
