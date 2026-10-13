@@ -178,8 +178,8 @@ From a core checkout, run it directly:
 python -B .agents/machine/scripts/claude_standards_sync.py --project <directory>
 ```
 
-The ordinary command refreshes enabled Claude packages. Except in `--check` mode, it also converges declared
-harness permissions: Claude allowlist entries and Codex prefix rules with their state sidecar.
+The ordinary command refreshes enabled Claude packages. Except in `--check` mode, it also invokes best-effort
+permission synchronization for Claude allowlist entries and their state sidecar, plus Codex prefix rules.
 
 To deliberately consolidate authenticated legacy Claude profile aliases into `<plugin>@tj-agents`, preview the
 profile change first. On Windows run:
