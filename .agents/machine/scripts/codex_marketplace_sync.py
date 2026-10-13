@@ -187,9 +187,11 @@ def marketplace_root(listing):
 
 
 def invoke_git(arguments, cwd, run=subprocess.run):
+    environment = os.environ.copy()
+    environment['GIT_NO_REPLACE_OBJECTS'] = '1'
     try:
-        result = run(['git', *arguments], cwd=cwd, capture_output=True, text=True,
-                     encoding='utf-8', errors='replace', timeout=PLUGIN_TIMEOUT_SECONDS)
+        result = run(['git', '--no-replace-objects', *arguments], cwd=cwd, capture_output=True, text=True,
+                     encoding='utf-8', errors='replace', timeout=PLUGIN_TIMEOUT_SECONDS, env=environment)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise SyncError(f'Cannot verify tj-agents marketplace provenance: {error}') from None
     if result.returncode != 0:
@@ -213,7 +215,7 @@ def authenticated_catalog(root, git_run=subprocess.run):
         )
         if head not in {line.split()[0] for line in published.splitlines() if line.split()}:
             raise SyncError(f'{root}: tj-agents marketplace revision is not published by its origin')
-        catalog = json.loads((root / 'catalog.json').read_text(encoding='utf-8'))
+        catalog = json.loads(invoke_git(['-C', str(root), 'show', f'{head}:catalog.json'], root, git_run))
     except (OSError, UnicodeError, ValueError) as error:
         raise SyncError(f'{root}: cannot read the tj-agents marketplace catalog: {error}') from None
     if catalog.get('name') != CANONICAL_MARKETPLACE or not isinstance(catalog.get('plugins'), list):

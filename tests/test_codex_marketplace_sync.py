@@ -30,6 +30,26 @@ def hold_preference_lock(path, acquired, release):
         release.wait(10)
 
 
+def catalog_git_fixture(root, name, catalog):
+    checkout = root / name
+    checkout.mkdir()
+
+    def git(*arguments, env=None):
+        return subprocess.run(
+            ['git', *arguments], check=True, capture_output=True, text=True, encoding='utf-8', env=env,
+        )
+
+    git('init', str(checkout))
+    (checkout / 'catalog.json').write_text(json.dumps(catalog), encoding='utf-8')
+    git('-C', str(checkout), 'add', 'catalog.json')
+    git(
+        '-C', str(checkout), '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+        'commit', '-m', 'fixture',
+    )
+    git('-C', str(checkout), 'remote', 'add', 'origin', 'https://github.com/tj-agents/marketplace.git')
+    return checkout, git
+
+
 class FakeCodex:
     """Records every call made to it and answers the same fixed sequence the PowerShell test's
     Invoke-FakeCodex function did, keyed off the command line rather than call order."""
@@ -653,12 +673,15 @@ class IdentityMigrationTests(unittest.TestCase):
         ):
             with self.subTest(origin=origin):
                 def git_run(argv, **_kwargs):
-                    command = argv[3:]
+                    command = argv[4:]
                     output = {
                         ('remote', 'get-url', 'origin'): origin + '\n',
                         ('status', '--porcelain'): '',
                         ('rev-parse', 'HEAD'): 'abc123\n',
                         ('ls-remote', 'origin', 'HEAD', 'refs/heads/*', 'refs/tags/*'): 'abc123\trefs/heads/main\n',
+                        ('show', 'abc123:catalog.json'): json.dumps(
+                            {'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'core'}]},
+                        ),
                     }[tuple(command)]
                     return completed(argv, 0, stdout=output)
 
@@ -684,7 +707,7 @@ class IdentityMigrationTests(unittest.TestCase):
                 calls = []
 
                 def git_run(argv, **_kwargs):
-                    command = tuple(argv[3:])
+                    command = tuple(argv[4:])
                     calls.append(command)
                     if command == ('remote', 'get-url', 'origin'):
                         return completed(argv, 0, stdout=origin + '\n')
@@ -725,6 +748,53 @@ class IdentityMigrationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(SYNC.SyncError, 'authenticated GitHub remote transport'):
             SYNC.authenticated_catalog(root)
+
+    def test_authenticated_catalog_uses_committed_bytes_despite_assume_unchanged_working_bytes(self):
+        legitimate = {'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'core'}]}
+        root, git = catalog_git_fixture(self.root, 'assume-unchanged catalog', legitimate)
+        catalog = root / 'catalog.json'
+        malicious = {'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'forged'}]}
+        git('-C', str(root), 'update-index', '--assume-unchanged', 'catalog.json')
+        catalog.write_text(json.dumps(malicious), encoding='utf-8')
+        self.assertEqual('', git('-C', str(root), 'status', '--porcelain').stdout)
+        head = git('-C', str(root), 'rev-parse', 'HEAD').stdout.strip()
+        calls = []
+
+        def git_run(argv, **kwargs):
+            calls.append((tuple(argv), kwargs['env']['GIT_NO_REPLACE_OBJECTS']))
+            if 'ls-remote' in argv:
+                return completed(argv, 0, stdout=f'{head}\trefs/heads/main\n')
+            return subprocess.run(argv, **kwargs)
+
+        self.assertEqual({'base': ('tj-agents', 'core')}, SYNC.authenticated_catalog(root, git_run))
+        self.assertTrue(all(argv[1] == '--no-replace-objects' and value == '1' for argv, value in calls))
+
+    def test_authenticated_catalog_ignores_git_replace_for_the_published_catalog_blob(self):
+        legitimate = {'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'core'}]}
+        root, git = catalog_git_fixture(self.root, 'replacement catalog', legitimate)
+        catalog = root / 'catalog.json'
+        head = git('-C', str(root), 'rev-parse', 'HEAD').stdout.strip()
+        malicious = {'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'forged'}]}
+        catalog.write_text(json.dumps(malicious), encoding='utf-8')
+        git('-C', str(root), 'add', 'catalog.json')
+        git(
+            '-C', str(root), '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+            'commit', '-m', 'replacement',
+        )
+        replacement = git('-C', str(root), 'rev-parse', 'HEAD').stdout.strip()
+        git('-C', str(root), 'reset', '--hard', head)
+        git('-C', str(root), 'replace', head, replacement)
+        environment = os.environ.copy()
+        environment.pop('GIT_NO_REPLACE_OBJECTS', None)
+        spoofed = git('-C', str(root), 'show', 'HEAD:catalog.json', env=environment).stdout
+        self.assertEqual(malicious, json.loads(spoofed))
+
+        def git_run(argv, **kwargs):
+            if 'ls-remote' in argv:
+                return completed(argv, 0, stdout=f'{head}\trefs/heads/main\n')
+            return subprocess.run(argv, **kwargs)
+
+        self.assertEqual({'base': ('tj-agents', 'core')}, SYNC.authenticated_catalog(root, git_run))
 
     def test_preference_revalidation_refuses_to_overwrite_a_concurrent_change(self):
         path = self.profile / 'config.toml'
