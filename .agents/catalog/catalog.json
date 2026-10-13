@@ -511,7 +511,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:b8e4df64b520a72534f95a93d61ab6861112441f4f71f571a394b1b5b86c1a1b",
+          "digest": "sha256:98a179636beabd331e35b62a10348a56da1da561970f49f5c157bce185c561bb",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -617,7 +617,15 @@
                 "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)"
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -857,6 +865,40 @@
                       "-B",
                       "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
                       "item"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/codex-skills/bootstrap-capabilities/scripts/adopt_repository.py"
+                    ],
+                    "--root"
+                  ],
+                  "justification": "machine:bootstrap-capabilities composes and applies the repository-declared immutable capability selection",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "--root",
+                      "/workspace/project"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/other.py",
+                      "--root",
+                      "/workspace/project"
                     ]
                   ]
                 }
