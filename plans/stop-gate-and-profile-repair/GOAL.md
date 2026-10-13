@@ -10,7 +10,9 @@ its own goal and checkout. This successor owns only this goal.
 - Tommy, 2026-10-13, explicitly: launch this one repair session, and fix the plugin naming in his profile.
 - Limit: Tommy said launch no extra CLI sessions — this is the only one. Do not launch further sessions,
   schedulers or `claude -p` children.
-- Not covered: Azure writes, edits to `tj-agents/dotnet` or employer repositories, publishing elsewhere.
+- Not covered: Azure writes, edits to `tj-agents/dotnet`, other employer-repository edits, publishing elsewhere.
+- Tommy, 2026-10-13: approved all 15 employer-local settings files in `MIGRATION_PREVIEW.md`;
+  add the 45 equivalent C++ false flags while preserving all existing choices.
 
 ## Checkout
 
@@ -105,12 +107,12 @@ sessions or schedulers are required; this foreground owner continues across the 
 
 Finish and verify the profile repair candidate, apply its authorized user-profile migrations,
 then commit, independently review and deliver the current slice before starting its successor.
-Scoped C++ preference writes remain pending Tommy's answer to `MIGRATION_PREVIEW.md`.
+Apply the approved 15 scoped settings equivalents and verify the resulting user C++ migration.
 
 Scope: whole-plan.
 Current slice: D3/D4 normal-profile package checks, pinned sources and user alias migration.
 Remaining scope: D1 canonical stop ownership wording; D2 dispatcher and continuation enforcement;
-scoped C++ decision; installed-host acceptance within the no-additional-session limit.
+approved scoped C++ migration; installed-host acceptance within the no-additional-session limit.
 Done when: all authorized repairs are verified and merged, with any genuine scope or capability
 boundary recorded against the same goal.
 ## Agent-host coverage
@@ -179,3 +181,21 @@ boundary recorded against the same goal.
   repaired. All five canonical user packages passed declared-payload checks. The C++ aliases remain
   deliberately deferred pending the 15 scoped settings equivalents; unrelated settings and registry
   scopes were preserved. No fresh host session was launched.
+- Profile slice published as PR #235, head `a69f2722c8f0585cbf8a214f7e39c0b5ff6bb63a`.
+  Exact-head CI run `38329611877` has a foreground shared monitor. Source review uses the frozen
+  descriptor and bundle; the account rejected the specialist reviewer model, so supported fresh
+  L4 correctness/workflow and L2 migration reviewers provide the bounded fallback. Merge remains
+  gated on completed review and Windows/Linux validation.
+- Profile review completed at `a69f2722c8f0585cbf8a214f7e39c0b5ff6bb63a` with five
+  fixable findings: active project opt-outs, concurrent preference changes, registered foreign stale
+  aliases, missing native executable, and documented CLI migration coverage. Serial L4 remediation
+  owns the existing sync source and regression module. PR #235 remains draft; no merge is armed.
+- Windows/Linux CI run `38329611877` passed for the first profile candidate. The fixing
+  candidate still needs its own tests, incremental review and exact-head CI. The reviewed publisher
+  correction also rejects local/file URLs that merely normalize to a GitHub-looking path. Migration
+  documentation states the supported current-project and registered-scope inventory explicitly.
+
+- Profile remediation stabilized: focused package, migration, authentication/CLI and existing sync
+  tests passed. All five review findings have source/test fixes. Incremental review and new exact-head
+  CI remain required. Tommy approved all 15 scoped files and 45 false flags; mechanical application
+  owns only those files, with original-byte backups and semantic preservation checks.
