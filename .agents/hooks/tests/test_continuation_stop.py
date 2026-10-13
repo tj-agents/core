@@ -171,13 +171,20 @@ class ContinuationStopTests(unittest.TestCase):
             "Unblock action: approve the release\n"
             "Resume when: approval is recorded\n"
         )
+        paused = "## Next Steps\n\nPaused: waiting for the release owner\n"
+        metadata = (
+            "Scope: whole plan\n"
+            "Current slice: await release approval\n"
+            "Remaining scope: delivery and closeout\n"
+            "Done when: the release is approved\n"
+        )
         self.goal.write_text(published, encoding="utf-8")
         self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
 
-        self.goal.write_text("## Next Steps\n\nPaused: waiting for the release owner\n", encoding="utf-8")
+        self.goal.write_text(published + metadata, encoding="utf-8")
         self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
 
-        self.goal.write_text(published + "Scope: release\n", encoding="utf-8")
+        self.goal.write_text(paused + metadata, encoding="utf-8")
         self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
 
         invalid = (
@@ -186,9 +193,13 @@ class ContinuationStopTests(unittest.TestCase):
             "Blocked by: release owner\n"
             "Unblock action: approve the release\n"
             "Resume when: approval is recorded\n",
+            paused,
             "## Next Steps\n\nPaused:\n",
-            published + "Scope:\n",
-            published + "Run the authorized test suite.\n",
+            published + "Scope: release\n",
+            paused + "Current slice: Run the authorized test suite.\n",
+            published + metadata.removesuffix("Done when: the release is approved\n"),
+            published + metadata + "Scope: duplicate\n",
+            published + metadata + "Run the authorized test suite.\n",
         )
         for text in invalid:
             with self.subTest(text=text):
