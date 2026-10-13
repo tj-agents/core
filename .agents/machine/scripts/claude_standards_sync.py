@@ -513,7 +513,13 @@ def source_matches_repository(source: dict, repository: str) -> bool:
     if source.get("source") == "github":
         return source.get("repo") == repository
     url = source_url(source)
-    return isinstance(url, str) and normalize_url(url).lower() == "github.com/" + repository.lower()
+    if not isinstance(url, str) or not (
+        re.fullmatch(r"https://github\.com/.+", url, re.IGNORECASE)
+        or re.fullmatch(r"ssh://(?:git@)?github\.com/.+", url, re.IGNORECASE)
+        or re.fullmatch(r"[^/@]+@github\.com:.+", url, re.IGNORECASE)
+    ):
+        return False
+    return normalize_url(url).lower() == "github.com/" + repository.lower()
 
 
 def marketplace_is_authenticated(plugins: Path, identity: str) -> bool:
@@ -538,11 +544,11 @@ def legacy_install_is_authenticated(plugins: Path, identity: str, records: dict[
     return isinstance(source, dict) and isinstance(expected, str) and source_matches_repository(source, expected)
 
 
-def scoped_alias_conflict(records: dict[str, list[Install]], canonical: str, aliases: tuple[str, ...], selected: bool) -> bool:
+def scoped_alias_conflict(records: dict[str, list[Install]], project: Path, canonical: str, aliases: tuple[str, ...], selected: bool) -> bool:
     if not selected:
         return False
-    roots = {install.project for installs in records.values() for install in installs
-             if install.scope in ("project", "local") and install.project is not None}
+    roots = {project, *(install.project for installs in records.values() for install in installs
+                       if install.scope in ("project", "local") and install.project is not None)}
     for root in roots:
         for path in (root / ".claude" / "settings.json", root / ".claude" / "settings.local.json"):
             scoped = read_json(path).get("enabledPlugins")
@@ -553,7 +559,7 @@ def scoped_alias_conflict(records: dict[str, list[Install]], canonical: str, ali
     return False
 
 
-def profile_plan(plugins: Path, settings: dict) -> tuple[dict, list[tuple[str, tuple[str, ...], bool]], list[str]]:
+def profile_plan(plugins: Path, settings: dict, project: Path) -> tuple[dict, list[tuple[str, tuple[str, ...], bool]], list[str]]:
     enabled = settings.get("enabledPlugins")
     if not isinstance(enabled, dict):
         return settings, [], []
@@ -567,7 +573,7 @@ def profile_plan(plugins: Path, settings: dict) -> tuple[dict, list[tuple[str, t
         if not present:
             continue
         authentication_identities = [
-            identity if identity not in STALE_PROFILE_ALIASES else next(
+            identity if identity not in STALE_PROFILE_ALIASES or records.get(identity) else next(
                 (candidate for candidate in aliases if candidate not in STALE_PROFILE_ALIASES and records.get(candidate)), identity
             )
             for identity in present
@@ -579,7 +585,7 @@ def profile_plan(plugins: Path, settings: dict) -> tuple[dict, list[tuple[str, t
             continue
         values = [migrated[identity] for identity in (canonical, *present) if isinstance(migrated.get(identity), bool)]
         selected_value = False if False in values else True
-        if scoped_alias_conflict(records, canonical, aliases, selected_value):
+        if scoped_alias_conflict(records, project, canonical, aliases, selected_value):
             deferred.append(canonical)
             continue
         migrated[canonical] = selected_value
@@ -600,52 +606,81 @@ def migrate_profile(config: Path, plugins: Path, project: Path, executable: str 
         print("standards: profile migration deferred because a profile registry is malformed", file=out)
         return 1
     records = registered_installs(plugins)
-    roots = {install.project for installs in records.values() for install in installs
-             if install.scope in ("project", "local") and install.project is not None}
+    roots = {project, *(install.project for installs in records.values() for install in installs
+                        if install.scope in ("project", "local") and install.project is not None)}
     for root in roots:
         for scoped_path in (root / ".claude" / "settings.json", root / ".claude" / "settings.local.json"):
             if scoped_path.exists() and read_json_object(scoped_path) is None:
                 print("standards: profile migration deferred because a scoped profile is malformed", file=out)
                 return 1
-    updated, selected, deferred = profile_plan(plugins, settings)
+    updated, selected, deferred = profile_plan(plugins, settings, project)
     for identity in deferred:
         print(f"standards: profile migration deferred for {identity} because a scoped legacy selection would change", file=out)
     if updated == settings:
         return int(bool(deferred))
-    for canonical, aliases, enabled in selected:
-        if check:
+    if check:
+        for canonical, aliases, _ in selected:
             print(f"standards: profile migration would select {canonical} ({', '.join(aliases)})", file=out)
+        return 1
+    problems = int(bool(deferred))
+    candidates = []
+    for selection in selected:
+        canonical, _, enabled = selection
+        if enabled and not executable:
+            print(f"standards: profile migration deferred for {canonical} because the claude executable was not found", file=out)
+            problems += 1
             continue
-        if enabled is not True:
+        candidates.append(selection)
+    initial_enabled = settings.get("enabledPlugins")
+    initial_enabled = dict(initial_enabled) if isinstance(initial_enabled, dict) else {}
+    snapshots = {
+        canonical: {identity: initial_enabled.get(identity) for identity in (canonical, *aliases)}
+        for canonical, aliases, _ in candidates
+    }
+    installed = set()
+    for canonical, aliases, enabled in candidates:
+        if not enabled:
             continue
         existing = [install for install in registered_installs(plugins).get(canonical, []) if install.scope == "user"]
-        if not any(package_complete(install) for install in existing):
-            if not executable or not marketplace_is_authenticated(plugins, canonical):
-                print(f"standards: profile migration could not verify {canonical}; aliases were preserved", file=out)
-                return 1
-            ok, detail = claude(executable, ["plugin", "install", canonical, "--scope", "user"], project, PLUGIN_TIMEOUT_SECONDS)
-            refreshed = [install for install in registered_installs(plugins).get(canonical, []) if install.scope == "user"]
-            if not ok or not any(package_complete(install) for install in refreshed):
-                print(f"standards: profile migration could not install {canonical} ({detail}); aliases were preserved", file=out)
-                return 1
-    if check:
-        return 1
+        if any(package_complete(install) for install in existing):
+            continue
+        if not marketplace_is_authenticated(plugins, canonical):
+            print(f"standards: profile migration could not verify {canonical}; aliases were preserved", file=out)
+            return 1
+        ok, detail = claude(executable, ["plugin", "install", canonical, "--scope", "user"], project, PLUGIN_TIMEOUT_SECONDS)
+        refreshed = [install for install in registered_installs(plugins).get(canonical, []) if install.scope == "user"]
+        if not ok or not any(package_complete(install) for install in refreshed):
+            print(f"standards: profile migration could not install {canonical} ({detail}); aliases were preserved", file=out)
+            return 1
+        installed.add(canonical)
     saved = read_json_object(path)
     if saved is None:
         print("standards: profile migration deferred because the user profile changed", file=out)
         return 1
     saved_enabled = saved.get("enabledPlugins")
-    if not isinstance(saved_enabled, dict):
-        saved_enabled = {}
+    saved_enabled = dict(saved_enabled) if isinstance(saved_enabled, dict) else {}
+    apply = []
+    for canonical, aliases, enabled in candidates:
+        snapshot = snapshots[canonical]
+        aliases_unchanged = all(saved_enabled.get(alias) == snapshot[alias] for alias in aliases)
+        canonical_value = saved_enabled.get(canonical)
+        expected = snapshot[canonical]
+        canonical_unchanged = canonical_value == expected or canonical in installed and expected is None and canonical_value is True
+        if aliases_unchanged and canonical_unchanged:
+            apply.append((canonical, aliases, enabled))
+        else:
+            problems += 1
+            print(f"standards: profile migration deferred for {canonical} because affected preferences changed", file=out)
+    if not apply:
+        return int(bool(problems))
     merged_enabled = dict(saved_enabled)
-    for canonical, aliases, enabled in selected:
+    for canonical, aliases, enabled in apply:
         merged_enabled[canonical] = enabled
         for alias in aliases:
             merged_enabled.pop(alias, None)
     saved["enabledPlugins"] = merged_enabled
     save_json(path, saved)
-    problems = int(bool(deferred))
-    for canonical, aliases, enabled in selected:
+    for canonical, aliases, enabled in apply:
         if not enabled:
             continue
         for alias in aliases:
