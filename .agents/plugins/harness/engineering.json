@@ -4,6 +4,9 @@
   "source_roots": [
     ".agents/engineering",
     ".agents/engineering/resources/problem-records.md",
+    ".agents/hooks/continuation_stop.py",
+    ".agents/hooks/docs_reachability.py",
+    ".agents/hooks/hook_dispatch.py",
     ".agents/workflows",
     ".agents/workflows/repository_configuration.py"
   ],

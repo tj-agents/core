@@ -35,7 +35,46 @@ in the 2026-10-11 sandbox recovery. Prevention work and a dedicated recording sk
 Resolve when the shared workflows and applicable host adapters verify same-goal execution selection,
 retained merge authority, supported continuation and reopening, accurate completion and recovery
 claims, and state reconciliation after failed mutations. Record each incident's observed resolution
-against its stable mistake ID. No untested CI-waiter defect or Claude runtime failure is established.
+against its stable mistake ID. D002 records the later observed CI-waiter gap.
+
+## D002 — Pending CI can be left with no launched background waiter
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; after opening Core PR #230, the guard passed while Windows and Linux
+  checks remained pending. The owner ended without launching a background CI waiter, a persistent-delivery
+  continuation, or another background agent to own the exact PR head.
+- **Impact and priority:** an authorized delivery can be stranded after local work completes; P1 because
+  the user must rediscover the pending PR and resume its merge path.
+- **Source owner:** Core engineering continuation and remote-delivery workflows.
+- **State:** open.
+- **Repair link:** [M003](../../MISTAKES.md#M003).
+- **Next action:** make the delivery lifecycle launch and verify a background CI waiter when exact-head CI
+  is pending, or persist a typed gate naming the resolver and observable resume condition.
+- **Resolution condition:** both Core host-package paths prove that a nonterminal delivery is either
+  actively foreground-owned, has a registered and verified background waiter or agent through the next
+  delivery action, records a typed external gate with a resolver and observable resume condition, or is
+  terminally closed. No Core consumer may leave a nonterminal delivery idle without one of those states.
+- **Verification evidence:** PR #230 on `Fix/ContinuationStopBindingHead` was open at
+  `2173ae76ab0fd1e042ae0f414c95dc1f67ff5fcb` with `verify-windows` and `verify-linux` pending; no
+  background CI waiter, continuation, or background agent had been launched before the session returned.
+
+## D003 — Incident records are routed through ordinary PR delivery
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-12; this session put the mistake and debt records for its own workflow
+  failure into PR #231 instead of committing them directly to `main`, adding an unnecessary review/CI wait
+  before the shared record was available.
+- **Impact and priority:** P2; a corrective record can remain unsynchronized while its source failure is
+  already known, and it creates avoidable background delivery work.
+- **Source owner:** Core problem-record and delivery conventions.
+- **State:** open.
+- **Repair link:** [M014](../../MISTAKES.md#M014).
+- **Next action:** make `write-mistake`, `write-debt`, and the callout-repair path commit and push incident
+  records directly to `main`, while keeping ordinary implementation changes on their normal delivery path.
+- **Resolution condition:** a new incident record is committed directly to `main` without a PR, and both
+  host-delivered conventions make that direct-main route explicit for mistake and debt records.
+- **Verification evidence:** PR #231 was opened solely to carry D002 and M014 before Tommy corrected the
+  delivery route.
 
 ## Slice retirement checks the broader goal's completion
 

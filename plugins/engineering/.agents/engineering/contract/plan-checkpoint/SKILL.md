@@ -35,6 +35,11 @@ A local commit, push, commentary update, review stage, read-only preflight, CI p
 temporary stop is not a checkpoint by itself. Do not rewrite the ledger merely because a workflow reports.
 Unchanged blockers and repeated observations never create another checkpoint.
 
+Before recording a blocked or paused ending, apply `base:goal-continuation` across the remaining goal.
+Exhaust authorized unblocked work and use the published `engineering:plans` boundary only for what
+genuinely remains gated. After its blocker or `Paused:` fields, retain only the four execution-boundary
+metadata lines; actionable work must be completed before that ending.
+
 ## Resolve the plan
 
 1. Prefer an explicit `plans/*.md` input.

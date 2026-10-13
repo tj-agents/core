@@ -3,7 +3,9 @@
   "plugin": "base-agents/machine",
   "source_roots": [
     ".agents/catalog/catalog.schema.json",
+    ".agents/hooks/hook_dispatch.py",
     ".agents/machine",
+    ".agents/machine/scripts/claude_standards_sync.py",
     ".agents/workflows/delivery_policy.py",
     ".agents/workflows/repository_configuration.py"
   ],
