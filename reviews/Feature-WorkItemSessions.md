@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `e0b1d0da0ea57c374689c08a8f67b6d625861553`  `(2026-10-13)`
+**Reviewed up to commit:** `a5d3787acaf8f664e6a8dc2cfc47153e013ef309`  `(2026-10-13)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-12 — full
@@ -323,3 +323,27 @@ Native layer: Codex `codex review` (medium; no findings emitted). Workflow revie
 - [x] **R41 — MEDIUM — workflow** — `.agents/machine/scripts/session_store.py:91`
   A database created before the unique-owner index can contain duplicate `owner` rows from the earlier close/reclaim bug. Creating the index before reconciling those rows makes every later `connect` fail with `UNIQUE constraint failed`. Deduplicate existing owner rows in a schema migration before creating the index, retaining the most recently active owner.
   Fixed: schema v2 demotes older duplicate owners before creating the unique index; a migration test retains the most recently active owner.
+
+## Review pass — 2026-10-13 — incremental
+
+**Candidate base:** `e0b1d0da0ea57c374689c08a8f67b6d625861553`
+**Candidate head:** `a5d3787acaf8f664e6a8dc2cfc47153e013ef309`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:93394ee3efcbce9c8c33e3adda1e30bbe766710154720e0200e9b863b22abf69` `(4 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\0sxD8Dhd9yeoJk9pjyNG5n\yiUr3cyoeZR8GhpotAAJtD`
+**Candidate bundle identity:** `sha256:ec00d3dc18d4ce7b20909b53db6fbbcf0e5320acec7cf000a50e66e2c4033e7a`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Codex `codex review` (high). No security-sensitive paths.
+
+### Findings
+
+- [x] **R42 — MEDIUM — native** — `tests/test_session_store.py:73`
+  The legacy migration test opens SQLite beneath a directory that does not exist, so the suite fails before exercising the migration.
+  Fixed: the fixture creates its database parent before opening SQLite.
+- [x] **R43 — HIGH — native** — `.agents/machine/scripts/session_store.py:91`
+  Concurrent legacy migrations can use a stale keeper after another connection hands ownership to a successor, leaving no owner.
+  Fixed: schema setup holds `BEGIN IMMEDIATE` through migration, index creation and the version update; the regression test asserts the transaction precedes schema reads.

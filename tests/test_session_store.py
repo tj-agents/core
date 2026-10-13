@@ -70,6 +70,7 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(2, connection.execute("PRAGMA user_version").fetchone()[0])
 
     def test_migration_deduplicates_legacy_owner_rows_before_creating_the_index(self):
+        self.db_path.parent.mkdir()
         connection = sqlite3.connect(self.db_path)
         connection.executescript(STORE.WORK_ITEMS_SCHEMA)
         connection.executescript(STORE.SESSIONS_SCHEMA)
@@ -95,6 +96,24 @@ class SchemaTests(unittest.TestCase):
         ).fetchall()
         self.assertEqual(["codex:new"], [row[0] for row in owners])
         self.assertEqual(2, migrated.execute("PRAGMA user_version").fetchone()[0])
+
+    def test_migration_starts_an_immediate_transaction_before_reading_legacy_owners(self):
+        class RecordingConnection(sqlite3.Connection):
+            commands = []
+
+            def execute(self, sql, *args, **kwargs):
+                self.commands.append(sql)
+                return super().execute(sql, *args, **kwargs)
+
+        self.db_path.parent.mkdir(exist_ok=True)
+        connection = sqlite3.connect(self.db_path, factory=RecordingConnection)
+        self.addCleanup(connection.close)
+        STORE._ensure_schema(connection)
+        self.assertEqual("BEGIN IMMEDIATE", connection.commands[0])
+        self.assertLess(
+            connection.commands.index("BEGIN IMMEDIATE"),
+            connection.commands.index("PRAGMA user_version"),
+        )
 
     def test_connect_enables_wal_and_foreign_keys(self):
         connection = STORE.connect(self.db_path)
