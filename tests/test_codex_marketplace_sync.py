@@ -638,7 +638,7 @@ class IdentityMigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(SYNC.SyncError, 'unauthenticated marketplace source'):
             SYNC.canonical_records(inventory, {'base': ('tj-agents', 'core')})
 
-    def test_authenticated_catalog_requires_a_published_shared_marketplace_checkout(self):
+    def test_authenticated_catalog_accepts_published_shared_marketplace_over_supported_transports(self):
         root = self.root / 'marketplace'
         root.mkdir()
         (root / 'catalog.json').write_text(
@@ -646,17 +646,85 @@ class IdentityMigrationTests(unittest.TestCase):
             encoding='utf-8',
         )
 
-        def git_run(argv, **_kwargs):
-            command = argv[3:]
-            output = {
-                ('remote', 'get-url', 'origin'): 'https://github.com/tj-agents/marketplace.git\n',
-                ('status', '--porcelain'): '',
-                ('rev-parse', 'HEAD'): 'abc123\n',
-                ('ls-remote', 'origin', 'HEAD', 'refs/heads/*', 'refs/tags/*'): 'abc123\trefs/heads/main\n',
-            }[tuple(command)]
-            return completed(argv, 0, stdout=output)
+        for origin in (
+            'https://github.com/tj-agents/marketplace.git',
+            'git@github.com:tj-agents/marketplace.git',
+            'ssh://git@github.com/tj-agents/marketplace.git',
+        ):
+            with self.subTest(origin=origin):
+                def git_run(argv, **_kwargs):
+                    command = argv[3:]
+                    output = {
+                        ('remote', 'get-url', 'origin'): origin + '\n',
+                        ('status', '--porcelain'): '',
+                        ('rev-parse', 'HEAD'): 'abc123\n',
+                        ('ls-remote', 'origin', 'HEAD', 'refs/heads/*', 'refs/tags/*'): 'abc123\trefs/heads/main\n',
+                    }[tuple(command)]
+                    return completed(argv, 0, stdout=output)
 
-        self.assertEqual({'base': ('tj-agents', 'core')}, SYNC.authenticated_catalog(root, git_run))
+                self.assertEqual({'base': ('tj-agents', 'core')}, SYNC.authenticated_catalog(root, git_run))
+
+    def test_authenticated_catalog_rejects_local_and_spoofed_origins_before_publication(self):
+        root = self.root / 'marketplace'
+        root.mkdir()
+        (root / 'catalog.json').write_text(
+            json.dumps({'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'core'}]}),
+            encoding='utf-8',
+        )
+
+        for origin in (
+            'tj-agents/marketplace',
+            '../marketplace',
+            'file:///tmp/tj-agents/marketplace',
+            'https://github.com.evil/tj-agents/marketplace.git',
+            'https://github.com@evil/tj-agents/marketplace.git',
+            'ssh://git@github.com.evil/tj-agents/marketplace.git',
+        ):
+            with self.subTest(origin=origin):
+                calls = []
+
+                def git_run(argv, **_kwargs):
+                    command = tuple(argv[3:])
+                    calls.append(command)
+                    if command == ('remote', 'get-url', 'origin'):
+                        return completed(argv, 0, stdout=origin + '\n')
+                    self.fail(f'Origin {origin} reached publication verification: {command}')
+
+                with self.assertRaisesRegex(SYNC.SyncError, 'authenticated GitHub remote transport'):
+                    SYNC.authenticated_catalog(root, git_run)
+
+                self.assertEqual([('remote', 'get-url', 'origin')], calls)
+
+    def test_authenticated_catalog_rejects_a_locally_published_shorthand_origin(self):
+        root = self.root / 'local catalog'
+        root.mkdir()
+
+        def git(*arguments):
+            return subprocess.run(
+                ['git', '-C', str(root), *arguments], check=True, capture_output=True,
+                text=True, encoding='utf-8',
+            ).stdout.strip()
+
+        git('init')
+        (root / '.git' / 'info' / 'exclude').write_text('tj-agents/\n', encoding='utf-8')
+        git('init', '--bare', 'tj-agents/marketplace')
+        (root / 'catalog.json').write_text(
+            json.dumps({'name': 'tj-agents', 'plugins': [{'name': 'base', 'repository': 'core'}]}),
+            encoding='utf-8',
+        )
+        git('add', 'catalog.json')
+        git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+            'commit', '-m', 'Fabricated catalog fixture')
+        git('remote', 'add', 'origin', 'tj-agents/marketplace')
+        git('push', 'origin', 'HEAD:refs/heads/main')
+        self.assertEqual('tj-agents/marketplace', git('remote', 'get-url', 'origin'))
+        self.assertEqual('', git('status', '--porcelain'))
+        head = git('rev-parse', 'HEAD')
+        self.assertIn(head, git('ls-remote', 'origin', 'HEAD', 'refs/heads/*', 'refs/tags/*'))
+        self.assertEqual(('tj-agents', 'marketplace'), SYNC.github_repository('tj-agents/marketplace'))
+
+        with self.assertRaisesRegex(SYNC.SyncError, 'authenticated GitHub remote transport'):
+            SYNC.authenticated_catalog(root)
 
     def test_preference_revalidation_refuses_to_overwrite_a_concurrent_change(self):
         path = self.profile / 'config.toml'

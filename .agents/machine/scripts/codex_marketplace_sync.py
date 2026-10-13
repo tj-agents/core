@@ -46,6 +46,11 @@ CANONICAL_MARKETPLACE = 'tj-agents'
 CANONICAL_MARKETPLACE_SOURCE = 'tj-agents/marketplace'
 CANONICAL_MARKETPLACE_REPOSITORY = ('tj-agents', 'marketplace')
 PLUGIN_ID = re.compile(r'(?P<name>[a-z][a-z0-9-]*)@(?P<marketplace>[a-z][a-z0-9-]*)\Z')
+GITHUB_REMOTE = re.compile(
+    r'(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)'
+    r'[A-Za-z0-9-]+/[A-Za-z0-9_.-]+?(?:\.git)?/?\Z',
+    re.IGNORECASE,
+)
 
 
 class SyncError(Exception):
@@ -196,6 +201,8 @@ def invoke_git(arguments, cwd, run=subprocess.run):
 def authenticated_catalog(root, git_run=subprocess.run):
     try:
         origin = invoke_git(['-C', str(root), 'remote', 'get-url', 'origin'], root, git_run)
+        if not GITHUB_REMOTE.fullmatch(origin):
+            raise SyncError(f'{root}: tj-agents marketplace origin must use an authenticated GitHub remote transport')
         if github_repository(origin) != CANONICAL_MARKETPLACE_REPOSITORY:
             raise SyncError(f'{root}: tj-agents marketplace origin is not {CANONICAL_MARKETPLACE_SOURCE}')
         if invoke_git(['-C', str(root), 'status', '--porcelain'], root, git_run):
