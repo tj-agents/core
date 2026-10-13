@@ -12,6 +12,9 @@ stay here; shared plans link to their source owners.
 
 `base:plan-artifacts` makes substantive plans maintained Markdown files, including outside a repository.
 `base:agent-files` keeps `AGENTS.md` and `CLAUDE.md` paired with one shared instruction source.
+[`base:idea-initialization`](.agents/base/policy/idea-initialization/SKILL.md) owns the once-per-idea
+assessment of existing capabilities and solutions; [`base:goal-continuation`](.agents/base/policy/goal-continuation/SKILL.md)
+owns continued goal ownership and carries that recorded decision forward.
 The richer planning workflows are selected engineering conventions, not prerequisites for standalone plans.
 Known workflow runtime debt: [docs/workflows/TECH_DEBT.md](docs/workflows/TECH_DEBT.md).
 Observed agent mistakes and proposed corrections: [MISTAKES.md](MISTAKES.md).
@@ -57,22 +60,43 @@ closure.
 
 ## Repository auto-merge
 
-An engineering-enabled repository can opt into guarded agent auto-merge in its existing
-`.agents/delivery-authorization.json`:
+An engineering-enabled repository opts into guarded agent auto-merge in `.agents/settings.json`:
 
 ```json
-{
-  "standing_authorization": "auto",
-  "instruction": "Merge green reviewed PRs",
-  "auto_merge": true
-}
+{"configuration":{"core":{"auto_merge":true}}}
 ```
 
-Set `"auto_merge": false`, or omit it, to disable the capability. This setting only permits the guarded
-workflow command to request GitHub auto-merge; it does not authorize a merge. Standing or scoped merge
-authority, every stop class and hold label, exact-head checks, current independent review, security review,
-and checkout identity must still pass. The guarded workflow rechecks the declaration at execution time, so
-disabling it after a delivery binding prevents arming auto-merge.
+Omit `configuration.core.auto_merge`, or set it to `false`, to disable the capability. The setting only
+permits the guarded workflow command to request GitHub auto-merge; it does not authorize a merge. Standing
+or scoped merge authority, every stop class and hold label, exact-head checks, current independent review,
+security review, and checkout identity must still pass. The guarded workflow rereads settings at execution
+time, so disabling it after a delivery binding prevents arming auto-merge. See
+[repository settings](docs/workflows/REPOSITORY_CONFIGURATION.md) for the complete contract.
+
+## Repository routine design approval
+
+`configuration.core.auto_approve` is separately `false` for every supported routine category when
+absent. Its only currently supported category is `design`, including routine convention choices. A
+design-only opt-in is:
+
+```json
+{"configuration":{"core":{"auto_approve":{"design":true}}}}
+```
+
+An all-categories opt-in is:
+
+```json
+{"configuration":{"core":{"auto_approve":{"all":true}}}}
+```
+
+An explicit `design` value overrides `all`, and omitted members default to `false`. The legacy
+`configuration.core.auto_approve_design` boolean remains available only when `auto_approve` is absent;
+an empty `auto_approve` object is authoritative and disables design approval. When enabled, an agent may
+make and record routine design or convention choices within work already authorized by the user. It does
+not override an explicit user reservation, task scope, stricter repository rule, or any merge,
+publication, installation, or permission gate. Select a core release that understands the nested setting
+before enabling it; older strict readers reject unknown core settings. Source verification does not
+establish installed-host trust or acceptance.
 
 ## Layout
 
@@ -92,6 +116,27 @@ disabling it after a delivery binding prevents arming auto-merge.
 - `shell/` owns the PowerShell profile, one concern per file.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
 - install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
+
+### Windows CLI hook windows
+
+On Windows, interactive Codex launches through the installed machine profile and Codex handoff tabs
+use `--no-daemon` to avoid the shared daemon's visible hook child consoles. The option is applied to
+interactive starts, resumes, and forks; Codex's batch and maintenance commands keep their normal
+arguments. Reopen a terminal after updating the machine plugin so its profile launcher is current.
+The launcher checks that the installed Codex advertises this option and leaves `--remote` sessions alone;
+older CLIs need an update to receive this Windows workaround.
+For an existing installation that cannot yet refresh the machine plugin, run
+`pwsh shell/install-codex-no-daemon.ps1` to add the workaround to both PowerShell profiles;
+`-VerifyOnly` checks that local installation.
+
+Claude Code can open a visible Git Bash window for each hook. On Windows, run
+`pwsh shell/install-hidden-bash.ps1` once from this checkout. The installer builds the included
+GUI-subsystem Bash proxy using Clang or GCC, configures `CLAUDE_CODE_GIT_BASH_PATH` for the user, and
+loads it in new PowerShell sessions. Check it with `pwsh shell/install-hidden-bash.ps1 -VerifyOnly`.
+The proxy forwards standard handles and the exit code to the real Git Bash. If Git Bash lives outside
+`C:\Program Files\Git\bin\bash.exe`, set the user-level `TJ_AGENTS_REAL_GIT_BASH` environment variable
+to its absolute path before running the installer. Claude processes that launch `git.exe` directly
+bypass this Git Bash workaround and require an upstream host fix.
 
 A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
 workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
@@ -154,6 +199,20 @@ From a core checkout, run it directly:
 python -B .agents/machine/scripts/claude_standards_sync.py --project <directory>
 ```
 
+The ordinary command refreshes enabled Claude packages. Except in `--check` mode, it also invokes best-effort
+permission synchronization for Claude allowlist entries and their state sidecar, plus Codex prefix rules.
+
+To deliberately consolidate authenticated legacy Claude profile aliases into `<plugin>@tj-agents`, preview the
+profile change first. On Windows run:
+
+```powershell
+python -B .agents/machine/scripts/claude_standards_sync.py --project <directory> --migrate-profile --check
+```
+
+On Linux or macOS run the same command with `python3`. After reviewing the preview, omit `--check` to apply it.
+The migration checks the supplied project and registered project/local plugin roots before changing the user profile;
+it defers a selection when one of those roots preserves a conflicting legacy choice.
+
 Codex treats `INSTALLED_BY_DEFAULT` as marketplace policy, not a CLI dependency resolver. Register the
 marketplace, then install all three packages explicitly:
 
@@ -174,6 +233,25 @@ terminals load its `codex` wrapper without pulling this checkout. The first sess
 the package wires the profiles; open a new terminal to use the wrapper. Set
 `BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. A project pinned to a release continues to
 use that release until its committed selection changes.
+
+### Recover from a faulty installed hook
+
+A hook repair reaches a machine only after it merges and the `regenerate` job commits it to `main`. Until
+then the installed copy matches `main` and is not stale. Packaged versions do not change per merge; the
+refresh above re-caches same-version content, and on Codex the changed package digest changes the hook definition,
+so it needs trust again. A running session keeps the hook bytes it loaded on either host and cannot adopt the repair.
+To recover one blocked by a Stop hook, send `stop` or `pause` as the whole prompt so the continuation gate releases
+the turn, then close it and start a new session through the `codex` or `claude` terminal wrapper,
+`handoff-codex` or `handoff-claude`. Without a wrapper, refresh first:
+
+```text
+codex plugin marketplace upgrade
+codex plugin add engineering@base-agents      # then trust the changed hook in /hooks
+claude plugin marketplace update base-agents
+claude plugin update engineering@base-agents
+```
+
+Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
 Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
 resolve and verify its complete dependency closure reproducibly.

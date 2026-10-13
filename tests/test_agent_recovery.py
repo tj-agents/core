@@ -138,6 +138,81 @@ class RecoveryTests(unittest.TestCase):
                                                 ["resume", "exact_id", "Continue the requested work."], clear=("TERM",),
                                                 force={"CODEX_HOME": RECOVERY._profile("codex", self.root / "sessions")})
 
+    def test_open_main_preserves_codex_task_recovery_authority_and_limits_file(self):
+        self.write_codex()
+        prompt = self.root / "recovery prompt é ' $().txt"
+        content = "Observed follow-up blocker: proxy said 'unavailable'; $(retry) & <none>."
+        content = "\n".join((
+            content,
+            "Canonical Goal: C:/private/GOAL.md",
+            "Actual authorization: User authorized exact-owner recovery.",
+            "Provenance: recorded user request.",
+            "Authorized scope: inspect and reopen the exact owner.",
+            "Limits: no settings changes.",
+            "Holds: approval review remains a gate.",
+            "Remaining gates: verify owner identity.",
+        ))
+        prompt.write_text(content, encoding="utf-8")
+        original = prompt.read_bytes()
+        cli = RECOVERY._load("agent_cli")
+        with mock.patch.object(cli, "resolve_codex_executable", return_value=("native-codex", {})), \
+             mock.patch.object(cli, "launch_tab") as launch, \
+             mock.patch.object(RECOVERY, "_verify_codex_resume"), \
+             mock.patch.object(RECOVERY, "_sync_codex"), \
+             contextlib.redirect_stdout(io.StringIO()):
+            code = RECOVERY.main([
+                "open", "--host", "codex", "--id", "exact_id", "--confirm-closed",
+                "--codex-history-root", str(self.root / "sessions"), "--prompt-path", str(prompt),
+            ])
+        self.assertEqual(0, code)
+        arguments = launch.call_args.args[3]
+        self.assertEqual("resume", arguments[0])
+        self.assertEqual("exact_id", arguments[1])
+        self.assertEqual(
+            f"Read the file at {prompt.resolve()} and follow its instructions, working from the current directory.",
+            arguments[2],
+        )
+        self.assertNotIn(content, arguments)
+        self.assertEqual(original, prompt.read_bytes())
+
+    def test_open_session_preserves_claude_task_recovery_authority_and_limits_file(self):
+        profile = self.root / "alternate profile"
+        projects = profile / "projects"
+        self.write_claude(projects)
+        prompt = self.root / "claude recovery authority.txt"
+        content = """Host: claude
+Native session ID: claude_id
+Canonical Goal: C:/private/GOAL.md
+Actual authorization: User authorized exact-owner recovery.
+Provenance: recorded user request.
+Authorized scope: inspect and reopen the exact owner.
+Limits: no settings changes.
+Holds: approval review remains a gate.
+Remaining gates: verify owner identity.
+Observed blocker: no send was attempted."""
+        prompt.write_text(content, encoding="utf-8")
+        original = prompt.read_bytes()
+        cli = RECOVERY._load("agent_cli")
+        with mock.patch.object(cli, "open_claude_tab") as launch:
+            RECOVERY.open_session(
+                "claude",
+                "claude_id",
+                prompt=None,
+                roots={"claude": projects},
+                confirm_closed=True,
+                prompt_path=prompt,
+                cli=cli,
+            )
+        arguments = launch.call_args.args[2]
+        self.assertEqual("--resume", arguments[0])
+        self.assertEqual("claude_id", arguments[1])
+        self.assertEqual(
+            f"Read the file at {prompt.resolve()} and follow its instructions, working from the current directory.",
+            arguments[2],
+        )
+        self.assertNotIn(content, arguments)
+        self.assertEqual(original, prompt.read_bytes())
+
     def test_explicit_claude_profile_overrides_conflicting_environment_for_resume(self):
         profile = self.root / "alternate profile"
         projects = profile / "projects"

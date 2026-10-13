@@ -74,7 +74,11 @@ satisfy admission.
    and branch. Preserve the review URL in the goal or ledger's `PR:` field when execution moves.
    Update the existing canonical plan with observed state,
    verification, remaining scope, next action, authorization and transfer ownership. A standalone goal
-   does not need a second ledger or an engineering runtime.
+   does not need a second ledger or an engineering runtime. Checkpoint the effective
+   design-approval value resolved from `configuration.core.auto_approve` or its legacy alias, its exact
+   settings provenance, and every decision the
+   user explicitly reserved when routine design delegation applies; the successor rereads the actual
+   checkout before acting.
 2. Apply `engineering:handoff-format` for a selected engineering lifecycle. For a standalone goal, make a
    two-line pointer: `cd <absolute-working-directory>`, followed by a request to read the absolute goal
    path and execute its `## Next Steps`. Keep the actual work instructions in that same goal file.

@@ -110,9 +110,10 @@ commit ancestry, nor intercept arbitrary forge commands. The slice assessment be
    build output. Any hit outside a written allowlist → **blocker**: the cut-over is out of sync.
 
 8. **The targeted local checkpoint is present.** Confirm the branch records the required generators and
-   invariant checks, the smallest affected build, and focused unit tests. **Do not run a full solution build
-   or integration matrix here** — exact-head PR CI owns those, per
-   `engineering:remote-validation`.
+   invariant checks, the smallest affected build, and focused unit tests. A valid routine docs review does
+   not require stack restore or builds, but it still requires its focused docs checks and the repository's
+   mandatory exact-head CI. **Do not run a full solution build or integration matrix here** — exact-head PR
+   CI owns those, per `engineering:remote-validation`.
 
 9. **A reviewable delivery slice.** Apply `engineering:git-branching` to the measured diff against the
    actual PR base. An oversized or multi-concern candidate without a recorded split assessment and

@@ -121,5 +121,8 @@ and routed to `engineering:merge`.
 
 After that report, apply `engineering:merge` Step 5's terminal session operation: run the argument-free
 `finish.py` for this session's removable linked checkout, or its sibling `close.py` for a primary or
-retained checkout. Run `python3 -B` on Linux/macOS or `python -B` on Windows. Preserve the checkout when using `close.py`; completion requires verified session
-exit independently of branch deletion.
+retained checkout. Run `python3 -B` on Linux/macOS or `python -B` on Windows. Honor an explicit keep-open
+or continue instruction and active dialogue. A verified idle turn permits a supported close attempt but does
+not prove report delivery; preserve the session and checkout with `merge_cleanup_gate --clear` when that
+path is unavailable. Preserve the checkout when using `close.py`; completion requires verified session exit
+independently of branch deletion.

@@ -380,8 +380,8 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
     def test_enabled_project_grants_only_the_guarded_wrapper_and_disable_removes_it(self):
         project = self.root / "project"
         (project / ".agents").mkdir(parents=True)
-        policy = project / ".agents" / "delivery-authorization.json"
-        policy.write_text(json.dumps({"standing_authorization": "auto", "instruction": "merge", "auto_merge": True}), encoding="utf-8")
+        settings = project / ".agents" / "settings.json"
+        settings.write_text(json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8")
         root = install_claude_plugin(self.claude_config, "engineering", "v1", [])
         manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
         (root / "harness.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -398,7 +398,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(any("gh pr merge" in entry for entry in enabled))
         self.assertIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
 
-        policy.write_text(json.dumps({"standing_authorization": "auto", "instruction": "merge", "auto_merge": False}), encoding="utf-8")
+        settings.write_text(json.dumps({"configuration": {"core": {"auto_merge": False}}}), encoding="utf-8")
         SYNC.synchronize(self.environ, "apply", project)
 
         disabled = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
@@ -406,7 +406,36 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertFalse(any("auto_merge.py" in entry for entry in disabled))
         self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
 
-        policy.unlink()
+        settings.write_text(json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8")
+        with mock.patch.object(SYNC, "auto_merge_roots", return_value=({root}, {codex_root})):
+            SYNC.synchronize(self.environ, "apply", project)
+
+        reenabled = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertTrue(any("auto_merge.py" in entry for entry in reenabled))
+        self.assertIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+        settings.write_text(
+            '{"configuration":{"core":{"auto_merge":false},"future":{"value":'
+            + "[" * 20_000
+            + "0"
+            + "]" * 20_000
+            + "}}}",
+            encoding="utf-8",
+        )
+        SYNC.synchronize(self.environ, "apply", project)
+
+        invalid = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertFalse(any("auto_merge.py" in entry for entry in invalid))
+        self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+        settings.write_text("{", encoding="utf-8")
+        SYNC.synchronize(self.environ, "apply", project)
+
+        malformed = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertFalse(any("auto_merge.py" in entry for entry in malformed))
+        self.assertNotIn("auto_merge.py", self.rules_path().read_text(encoding="utf-8"))
+
+        settings.unlink()
         SYNC.synchronize(self.environ, "apply", project)
         omitted = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
         self.assertFalse(any("auto_merge.py" in entry for entry in omitted))
@@ -536,12 +565,19 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
                 (package / "harness.json").write_text("{}", encoding="utf-8")
                 shutil.copy2(SCRIPT, script_dir / "harness_permissions_sync.py")
                 shutil.copy2(SCRIPT.parent / "harness_permissions.py", script_dir / "harness_permissions.py")
-                for name in ("delivery_policy.py", "codex_hook_trust.py"):
-                    shutil.copy2(ROOT / ".agents/workflows/delivery_policy.py" if name == "delivery_policy.py" else ROOT / ".agents/machine/scripts/codex_hook_trust.py", resource_dir / name)
+                for name in ("delivery_policy.py", "repository_configuration.py", "codex_hook_trust.py"):
+                    source = ROOT / ".agents/workflows" / name if name != "codex_hook_trust.py" else ROOT / ".agents/machine/scripts/codex_hook_trust.py"
+                    shutil.copy2(source, resource_dir / name)
                 spec = importlib.util.spec_from_file_location(f"host_sync_{host_directory}", script_dir / "harness_permissions_sync.py")
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 self.assertEqual((resource_dir / "delivery_policy.py").resolve(), Path(module.policy_validator().__file__).resolve())
+                project = self.root / f"settings-{host_directory}"
+                (project / ".agents").mkdir(parents=True)
+                (project / ".agents" / "settings.json").write_text(
+                    json.dumps({"configuration": {"core": {"auto_merge": True}}}), encoding="utf-8"
+                )
+                self.assertTrue(module.auto_merge_enabled(project))
                 self.assertEqual((resource_dir / "codex_hook_trust.py").resolve(), Path(module.machine_module("codex_hook_trust.py").__file__).resolve())
                 missing = self.root / f"missing-{host_directory}"
                 missing_scripts = missing / host_directory / "bootstrap-capabilities" / "scripts"

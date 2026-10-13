@@ -38,6 +38,9 @@ class RepositoryFixture(unittest.TestCase):
             "---\nname: feature\n---\n\n# Feature\n",
             encoding="utf-8",
         )
+        (self.root / ".agents" / "merge-gate.json").write_text(
+            '{"security_paths":["^docs/protected\\\\.md$"]}\n', encoding="utf-8"
+        )
         (self.root / "src").mkdir()
         (self.root / "src" / "mapping.txt").write_text("baseline\n", encoding="utf-8")
         self.git("add", ".")
@@ -473,6 +476,67 @@ class ReviewTests(RepositoryFixture):
         path_bytes = Path(result["bundle"]["paths"]).read_bytes()
         self.assertFalse(path_bytes.endswith(b"\0"))
         self.assertEqual(hashlib.sha256(path_bytes).hexdigest(), result["path_digest"])
+
+    def test_routine_docs_review_requires_an_explicit_assessment_and_freezes_it(self):
+        self.git("reset", "--hard", self.base)
+        self.commit("docs/guide.md", "# Guide\n", "docs candidate")
+
+        default = ops.review_prepare(self.root, "ordinary", "origin/main", "HEAD", False)
+        routine = ops.review_prepare(
+            self.root, "routine", "origin/main", "HEAD", False, "routine", "navigation only",
+        )
+
+        self.assertEqual({"mode": "ordinary", "rationale": None}, default["docs_review"])
+        self.assertEqual(["native-general"], default["lenses"])
+        self.assertEqual({"mode": "routine", "rationale": "navigation only"}, routine["docs_review"])
+        self.assertEqual(["docs-routine"], routine["lenses"])
+        identity = json.loads(Path(routine["bundle"]["identity"]).read_text(encoding="utf-8"))
+        self.assertEqual(routine["docs_review"], identity["docs_review"])
+        self.assertEqual(routine["docs_review"], ops.load_descriptor(self.root, "routine", routine["artifact"])["docs_review"])
+
+    def test_routine_docs_review_refuses_missing_rationale_and_ineligible_or_sensitive_paths(self):
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "nonempty --docs-rationale"):
+            ops.review_prepare(self.root, "missing", "origin/main", "HEAD", False, "routine")
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "excludes src/mapping.txt"):
+            ops.review_prepare(self.root, "code", "origin/main", "HEAD", False, "routine", "prose")
+
+        for path in ("README.py", "README.sh", "README.exe"):
+            self.git("reset", "--hard", self.base)
+            self.commit(path, "content\n", "executable guidance")
+            with self.subTest(path=path), self.assertRaisesRegex(ops.WorkflowOperationError, "excludes " + path):
+                ops.review_prepare(self.root, "executable", "origin/main", "HEAD", False, "routine", "prose")
+
+        for path in ("README", "docs/guide.md"):
+            self.git("reset", "--hard", self.base)
+            self.commit(path, "# Guide\n", "docs candidate")
+            with self.subTest(path=path):
+                result = ops.review_prepare(self.root, "allowed", "origin/main", "HEAD", False, "routine", "prose")
+                self.assertEqual(["docs-routine"], result["lenses"])
+
+        self.git("reset", "--hard", self.base)
+        self.commit(".agents/README.md", "# Instructions\n", "agent guidance")
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "excludes .agents/README.md"):
+            ops.review_prepare(self.root, "agent", "origin/main", "HEAD", False, "routine", "prose")
+
+        self.git("reset", "--hard", self.base)
+        self.commit("docs/protected.md", "# Security\n", "security guidance")
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "security-sensitive"):
+            ops.review_prepare(self.root, "security", "origin/main", "HEAD", False, "routine", "prose")
+
+    def test_routine_docs_classification_tampering_rejects_the_frozen_descriptor(self):
+        self.git("reset", "--hard", self.base)
+        self.commit("README.md", "# Guide\n", "docs candidate")
+        descriptor = ops.review_prepare(
+            self.root, "routine", "origin/main", "HEAD", False, "routine", "learning prose",
+        )
+        path = Path(descriptor["artifact"])
+        value = json.loads(path.read_text(encoding="utf-8"))
+        value["docs_review"] = {"mode": "ordinary", "rationale": None}
+        value["descriptor_id"] = ops.descriptor_identity(value)
+        ops.atomic_json(path, value)
+
+        with self.assertRaisesRegex(ops.WorkflowOperationError, "outside the current workflow run"):
+            ops.load_descriptor(self.root, "routine", path)
 
     def test_materialized_review_tree_is_outside_the_checkout_and_common_git_directory(self):
         result = ops.review_prepare(self.root, "run-1", "origin/main", "HEAD", False)

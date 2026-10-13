@@ -103,7 +103,9 @@ class ContinuationStopTests(unittest.TestCase):
         self.write_owner(self.owner())
         with patch.object(continuation_stop, "scheduler_ready", return_value=False), \
              patch.object(continuation_stop, "observed_wake", return_value=True):
-            self.assertIn("Register and enable", self.call())
+            for _ in range(2):
+                self.assertIn("Continue authorized unblocked work", self.call())
+                self.assertIn("Close the CLI when the goal is verified complete", self.call())
 
     def test_scheduler_receipt_uses_shared_read_only_verifier(self):
         owner = self.owner()
@@ -160,6 +162,61 @@ class ContinuationStopTests(unittest.TestCase):
         for prompt in ("Please pause this work.", "Cancel it.", "Cancel this."):
             self.assertIsNone(self.call(self.receipt(prompt=prompt)))
         self.assertIsNotNone(self.call(self.receipt(prompt="Why did it stop?\n```text\nstop\n```")))
+
+    def test_documented_blocker_requires_a_published_boundary_without_trailing_tasks(self):
+        published = (
+            "## Next Steps\n\n"
+            "Blocked: external approval\n"
+            "Blocked by: release owner\n"
+            "Unblock action: approve the release\n"
+            "Resume when: approval is recorded\n"
+        )
+        paused = "## Next Steps\n\nPaused: waiting for the release owner\n"
+        metadata = (
+            "Scope: whole plan\n"
+            "Current slice: await release approval\n"
+            "Remaining scope: delivery and closeout\n"
+            "Done when: the release is approved\n"
+        )
+        self.goal.write_text(published, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        self.goal.write_text(published + metadata, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        self.goal.write_text(paused + metadata, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        invalid = (
+            "## Next Steps\n\n"
+            "Blocked:\n"
+            "Blocked by: release owner\n"
+            "Unblock action: approve the release\n"
+            "Resume when: approval is recorded\n",
+            paused,
+            "## Next Steps\n\nPaused:\n",
+            published + "Scope: release\n",
+            paused + "Current slice: Run the authorized test suite.\n",
+            published + metadata.removesuffix("Done when: the release is approved\n"),
+            published + metadata + "Scope: duplicate\n",
+            published + metadata + "Run the authorized test suite.\n",
+        )
+        for text in invalid:
+            with self.subTest(text=text):
+                self.goal.write_text(text, encoding="utf-8")
+                self.assertFalse(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        self.goal.write_text("# Goal\n", encoding="utf-8")
+        for reason in ("continuation-budget-exhausted", "host-capability-or-permission-unavailable"):
+            with self.subTest(reason=reason):
+                self.assertFalse(continuation_stop.documented_blocker(
+                    self.owner("blocked", reason=reason)
+                ))
+
+        self.goal.write_text(published, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(
+            self.owner("blocked", reason="continuation-budget-exhausted")
+        ))
 
     def test_old_completed_owner_cannot_satisfy_new_execution_obligation(self):
         self.write_owner(self.owner("complete", updated_at=1))
@@ -233,7 +290,7 @@ class ContinuationStopTests(unittest.TestCase):
             "repository": "tj-agents/core",
             "worktree": str(self.root.resolve()),
             "branch": "Fix/Example",
-            "head": "a" * 40,
+            "remote_head_sha": "a" * 40,
         }
         runtime.identity.return_value = {
             "repo": "tj-agents/core",
@@ -242,6 +299,23 @@ class ContinuationStopTests(unittest.TestCase):
             "head": "a" * 40,
         }
         self.assertTrue(continuation_stop.binding_active(runtime, self.root, {}))
+
+    def test_binding_active_rejects_a_different_bound_head(self):
+        runtime = Mock()
+        runtime.binding_from_artifact.return_value = {
+            "repository": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "remote_head_sha": "a" * 40,
+        }
+        runtime.identity.return_value = {
+            "repo": "tj-agents/core",
+            "worktree": str(self.root.resolve()),
+            "branch": "Fix/Example",
+            "head": "b" * 40,
+        }
+        with self.assertRaisesRegex(RuntimeError, "binding-head-changed"):
+            continuation_stop.binding_active(runtime, self.root, {})
 
     def test_foreign_owner_file_cannot_satisfy_this_worktree_obligation(self):
         self.write_owner(self.owner(worktree=str(self.root.parent / "other")))
@@ -445,6 +519,28 @@ class ContinuationStopTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("block", json.loads(result.stdout)["decision"])
         self.assertIn("persistent-workflow", json.loads(result.stdout)["reason"])
+
+    def test_binding_active_reads_the_head_through_real_artifact_normalization(self):
+        workflows = continuation_stop.workflow_root()
+        if str(workflows) not in sys.path:
+            sys.path.insert(0, str(workflows))
+        runtime = continuation_stop.module("continuation_runtime", workflows)
+        root = self.root.resolve()
+        current = runtime.identity(root)
+        artifact = {
+            "repo": current["repo"], "pr": 42, "pr_url": f"https://github.com/{current['repo']}/pull/42",
+            "branch": current["branch"], "worktree": current["worktree"], "head": current["head"],
+            "pending_evidence": [], "review": {"work_order": "review", "work_order_order": ["review"], "reviewed_sha": None},
+            "merge_authorization": {"mode": "absent", "instruction": None}, "completion_condition": "Boundary recorded",
+        }
+        path = root / runtime.BINDING_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(artifact), encoding="utf-8")
+        self.assertTrue(continuation_stop.binding_active(runtime, root))
+        subprocess.run(["git", "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q",
+                        "--allow-empty", "-m", "advance"], cwd=root, check=True)
+        with self.assertRaisesRegex(RuntimeError, "binding-head-changed"):
+            continuation_stop.binding_active(runtime, root)
 
 
 

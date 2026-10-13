@@ -2,6 +2,9 @@ import importlib.util
 import io
 import json
 import os
+import shutil
+import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -182,6 +185,174 @@ class MainTests(unittest.TestCase):
 
     def test_main_returns_zero_on_non_object_json(self):
         self.assertEqual(self._run_main_with_stdin("[1, 2, 3]"), 0)
+
+
+class LoadSessionStoreTests(unittest.TestCase):
+    """R9: the loader must find session_store.py in source and every packaged layout."""
+
+    def _write_store_stub(self, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("MARKER = 'session-store-stub'\n", encoding="utf-8")
+
+    def _load_from(self, script_path):
+        spec = importlib.util.spec_from_file_location("register_session_under_test", script_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_finds_the_store_in_the_source_tree_layout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            script = root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+            self._write_store_stub(root / ".agents/machine/scripts/session_store.py")
+            module = self._load_from(script)
+            store = module._load_session_store()
+            self.assertIsNotNone(store)
+            self.assertEqual("session-store-stub", store.MARKER)
+
+    def test_finds_the_store_in_the_agents_machine_utility_packaged_layout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin_root = Path(tmp)
+            script = plugin_root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+            self._write_store_stub(plugin_root / "resources/machine/scripts/session_store.py")
+            module = self._load_from(script)
+            store = module._load_session_store()
+            self.assertIsNotNone(store)
+            self.assertEqual("session-store-stub", store.MARKER)
+
+    def test_finds_the_store_in_the_skills_packaged_layout(self):
+        for layout in ("skills", "codex-skills"):
+            with self.subTest(layout=layout):
+                with tempfile.TemporaryDirectory() as tmp:
+                    plugin_root = Path(tmp)
+                    script = plugin_root / layout / "peer-cli/scripts/register_session.py"
+                    script.parent.mkdir(parents=True, exist_ok=True)
+                    script.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+                    self._write_store_stub(plugin_root / "resources/machine/scripts/session_store.py")
+                    module = self._load_from(script)
+                    store = module._load_session_store()
+                    self.assertIsNotNone(store)
+                    self.assertEqual("session-store-stub", store.MARKER)
+
+
+@unittest.skipUnless(shutil.which("git"), "git is required for SessionStart persistence regression")
+class SessionStartStoreIntegrationTests(unittest.TestCase):
+    def _load_from(self, script_path):
+        spec = importlib.util.spec_from_file_location("register_session_under_test", script_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _run_git(self, cwd, *args):
+        result = subprocess.run(
+            ["git", "-C", str(cwd), *args], capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=15, check=True,
+        )
+        return result.stdout.strip()
+
+    def _create_repo(self, root):
+        repo = root / "session repo é"
+        repo.mkdir()
+        self._run_git(repo, "init")
+        self._run_git(repo, "config", "user.email", "test@example.com")
+        self._run_git(repo, "config", "user.name", "Session Store Test")
+        (repo / "README.md").write_text("session store\n", encoding="utf-8")
+        self._run_git(repo, "add", "README.md")
+        self._run_git(repo, "commit", "-m", "initial session")
+        self._run_git(repo, "branch", "-M", "session-registration")
+        self._run_git(repo, "remote", "add", "origin", "https://GitHub.com/Tj-Agents/Session-Store-Regression.git")
+        return repo, self._run_git(repo, "rev-parse", "HEAD")
+
+    def _copy_layout(self, root, layout):
+        if layout == "source":
+            script = root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
+            store = root / ".agents/machine/scripts/session_store.py"
+        elif layout == "agents-utility":
+            script = root / ".agents/machine/utility/peer-cli/scripts/register_session.py"
+            store = root / "resources/machine/scripts/session_store.py"
+        else:
+            script = root / layout / "peer-cli/scripts/register_session.py"
+            store = root / "resources/machine/scripts/session_store.py"
+        script.parent.mkdir(parents=True)
+        store.parent.mkdir(parents=True)
+        shutil.copy2(SCRIPT, script)
+        shutil.copy2(ROOT / ".agents/machine/scripts/session_store.py", store)
+        return script
+
+    def test_session_start_records_real_store_from_source_and_packaged_layouts(self):
+        cases = (
+            ("source", "codex"),
+            ("source", "claude"),
+            ("agents-utility", "codex"),
+            ("skills", "codex"),
+            ("codex-skills", "codex"),
+        )
+        with tempfile.TemporaryDirectory(prefix="session start é ") as tmp:
+            root = Path(tmp)
+            repo, head = self._create_repo(root)
+            for layout, host in cases:
+                with self.subTest(layout=layout, host=host):
+                    module = self._load_from(self._copy_layout(root / f"{layout} {host}", layout))
+                    state = root / f"state {layout} {host} é"
+                    profile = root / f"profile {layout} {host} é"
+                    session_id = f"{host}-{layout}"
+                    hook_pid = os.getppid()
+                    pid = hook_pid + 10_000
+                    host_pid = pid + 1
+                    pid_started_at = 1700000000.25
+                    process_table = {
+                        hook_pid: module.ProcessInfo(pid=hook_pid, ppid=pid, name="hook-shell", started_at=1.0),
+                        pid: module.ProcessInfo(pid=pid, ppid=host_pid, name="python", started_at=2.0),
+                        host_pid: module.ProcessInfo(pid=host_pid, ppid=None, name=f"{host}.exe", started_at=pid_started_at),
+                    }
+                    payload = json.dumps({"session_id": session_id, "cwd": str(repo)})
+                    environment = {
+                        module.STATE_DIRECTORY_ENV: str(state),
+                        module.TITLE_ENV: f"{host} session é",
+                        module.HOST_NAMES_ENV: host,
+                        "CODEX_HOME": str(profile / "codex"),
+                        "CLAUDE_CONFIG_DIR": str(profile / "claude"),
+                    }
+                    with (
+                        mock.patch.dict(os.environ, environment),
+                        mock.patch.object(module, "build_process_lookup", return_value=process_table.get),
+                        mock.patch.object(sys, "stdin", io.StringIO(payload)),
+                    ):
+                        self.assertEqual(0, module.main())
+
+                    native = json.loads(
+                        (state / "cli-sessions" / f"{session_id}.json").read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(session_id, native["session_id"])
+                    self.assertEqual(host, native["host"])
+                    self.assertEqual(f"{host} session é", native["title"])
+                    self.assertEqual(str(repo), native["cwd"])
+                    self.assertEqual(host_pid, native["pid"])
+                    self.assertEqual(pid_started_at, native["pid_started_at"])
+
+                    database = state / "sessions.db"
+                    self.assertTrue(database.is_file())
+                    connection = sqlite3.connect(database)
+                    try:
+                        row = connection.execute(
+                            "SELECT handle, host, session_id, title, cwd, repo, branch, head, pid, pid_started_at "
+                            "FROM sessions WHERE handle = ?",
+                            (f"{host}:{session_id}",),
+                        ).fetchone()
+                    finally:
+                        connection.close()
+                    self.assertEqual(
+                        (
+                            f"{host}:{session_id}", host, session_id, f"{host} session é", str(repo),
+                            "github.com/tj-agents/session-store-regression", "session-registration", head,
+                            host_pid, pid_started_at,
+                        ),
+                        row,
+                    )
 
 
 class ProcessLookupSafetyTests(unittest.TestCase):
