@@ -178,6 +178,20 @@ From a core checkout, run it directly:
 python -B .agents/machine/scripts/claude_standards_sync.py --project <directory>
 ```
 
+The ordinary command refreshes enabled Claude packages. Except in `--check` mode, it also invokes best-effort
+permission synchronization for Claude allowlist entries and their state sidecar, plus Codex prefix rules.
+
+To deliberately consolidate authenticated legacy Claude profile aliases into `<plugin>@tj-agents`, preview the
+profile change first. On Windows run:
+
+```powershell
+python -B .agents/machine/scripts/claude_standards_sync.py --project <directory> --migrate-profile --check
+```
+
+On Linux or macOS run the same command with `python3`. After reviewing the preview, omit `--check` to apply it.
+The migration checks the supplied project and registered project/local plugin roots before changing the user profile;
+it defers a selection when one of those roots preserves a conflicting legacy choice.
+
 Codex treats `INSTALLED_BY_DEFAULT` as marketplace policy, not a CLI dependency resolver. Register the
 marketplace, then install all three packages explicitly:
 
@@ -198,6 +212,25 @@ terminals load its `codex` wrapper without pulling this checkout. The first sess
 the package wires the profiles; open a new terminal to use the wrapper. Set
 `BASE_AGENTS_CODEX_PROFILE=off` to leave profiles alone. A project pinned to a release continues to
 use that release until its committed selection changes.
+
+### Recover from a faulty installed hook
+
+A hook repair reaches a machine only after it merges and the `regenerate` job commits it to `main`. Until
+then the installed copy matches `main` and is not stale. Packaged versions do not change per merge; the
+refresh above re-caches same-version content, and on Codex the changed package digest changes the hook definition,
+so it needs trust again. A running session keeps the hook bytes it loaded on either host and cannot adopt the repair.
+To recover one blocked by a Stop hook, send `stop` or `pause` as the whole prompt so the continuation gate releases
+the turn, then close it and start a new session through the `codex` or `claude` terminal wrapper,
+`handoff-codex` or `handoff-claude`. Without a wrapper, refresh first:
+
+```text
+codex plugin marketplace upgrade
+codex plugin add engineering@base-agents      # then trust the changed hook in /hooks
+claude plugin marketplace update base-agents
+claude plugin update engineering@base-agents
+```
+
+Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
 Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
 resolve and verify its complete dependency closure reproducibly.

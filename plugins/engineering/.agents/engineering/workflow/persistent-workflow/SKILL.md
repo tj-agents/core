@@ -66,6 +66,13 @@ session. Its owner can begin before a PR exists. Ordinary quick answers and shor
 foreground without a scheduler. The existing canonical goal remains the source of completion criteria and
 authority; this workflow does not create a competing plan or permission.
 
+Honor the user's limits on additional sessions, schedulers and child processes before choosing a
+continuation capability. When a required wake cannot be established within those limits, continue all
+authorized unblocked work in the foreground. Use the supported foreground remote monitor for an owned
+delivery wait; it does not establish durable unattended continuation. Apply `base:goal-continuation`
+before ending at a genuine boundary for the remaining whole goal. A completed slice or unavailable
+scheduler does not establish goal completion or a whole-goal blocker.
+
 ## Initialize one owner
 
 Use the packaged `<engineering-package-root>/workflows/continuation_runtime.py` module from an installed
