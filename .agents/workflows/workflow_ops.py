@@ -881,7 +881,7 @@ def routine_docs_path(path):
         return False
     if name in {"agents.md", "claude.md", "skill.md"}:
         return False
-    return name.endswith(".md") or name.startswith("readme")
+    return name.endswith(".md") or name == "readme"
 
 
 def docs_review_request(risk, rationale):

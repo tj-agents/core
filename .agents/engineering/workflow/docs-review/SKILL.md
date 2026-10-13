@@ -45,14 +45,16 @@ these lenses:
 git diff --diff-filter=ACMRT --name-only "<base>..<head>"
 ```
 
-Any surviving path makes this an ordinary docs review.
+Any surviving path requires review in its explicitly assessed mode.
 
 ## Work order and review layer
 
 Use the same `reviews/<branch-slug>.md` contract from `review-lifecycle`. The parent records status
-`in-progress` and the frozen candidate before review. An ordinary candidate runs the `review` Stage 3 native
-layer, with the same `native-general` fallback. A valid routine candidate is exempt from the repeated
-native-plus-fresh full-code-review sequence and runs its one focused docs pass instead.
+`in-progress` and the frozen candidate before review.
+
+An ordinary candidate runs the `review` Stage 3 native layer, with the same `native-general` fallback.
+A valid routine candidate is exempt from the repeated native-plus-fresh full-code-review sequence and runs
+its one focused docs pass instead.
 
 ## Rules
 

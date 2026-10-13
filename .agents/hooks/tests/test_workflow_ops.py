@@ -500,6 +500,19 @@ class ReviewTests(RepositoryFixture):
         with self.assertRaisesRegex(ops.WorkflowOperationError, "excludes src/mapping.txt"):
             ops.review_prepare(self.root, "code", "origin/main", "HEAD", False, "routine", "prose")
 
+        for path in ("README.py", "README.sh", "README.exe"):
+            self.git("reset", "--hard", self.base)
+            self.commit(path, "content\n", "executable guidance")
+            with self.subTest(path=path), self.assertRaisesRegex(ops.WorkflowOperationError, "excludes " + path):
+                ops.review_prepare(self.root, "executable", "origin/main", "HEAD", False, "routine", "prose")
+
+        for path in ("README", "docs/guide.md"):
+            self.git("reset", "--hard", self.base)
+            self.commit(path, "# Guide\n", "docs candidate")
+            with self.subTest(path=path):
+                result = ops.review_prepare(self.root, "allowed", "origin/main", "HEAD", False, "routine", "prose")
+                self.assertEqual(["docs-routine"], result["lenses"])
+
         self.git("reset", "--hard", self.base)
         self.commit(".agents/README.md", "# Instructions\n", "agent guidance")
         with self.assertRaisesRegex(ops.WorkflowOperationError, "excludes .agents/README.md"):
