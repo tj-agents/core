@@ -94,11 +94,6 @@ def documented_blocker(owner):
     if not (isinstance(owner.get("reason"), str) and owner["reason"].strip()
             and isinstance(owner.get("next_action"), str) and owner["next_action"].strip()):
         return False
-    if owner["reason"] in {
-        "continuation-budget-exhausted",
-        "host-capability-or-permission-unavailable",
-    }:
-        return True
     try:
         text = Path(owner["goal"]).read_text(encoding="utf-8")
     except (OSError, UnicodeError, KeyError):
@@ -108,9 +103,23 @@ def documented_blocker(owner):
         return False
     lines = [line.strip() for line in match.group(1).splitlines() if line.strip()]
     fields = ("Blocked", "Blocked by", "Unblock action", "Resume when")
-    return len(lines) >= len(fields) and all(
+    metadata = ("Scope", "Current slice", "Remaining scope", "Done when")
+    if len(lines) >= len(fields) and all(
         line.startswith(f"{field}:") and line.removeprefix(f"{field}:").strip()
         for line, field in zip(lines, fields)
+    ):
+        remaining = lines[len(fields):]
+        requires_metadata = False
+    elif lines and lines[0].startswith("Paused:") and lines[0].removeprefix("Paused:").strip():
+        remaining = lines[1:]
+        requires_metadata = True
+    else:
+        return False
+    return (not remaining and not requires_metadata) or (
+        len(remaining) == len(metadata) and all(
+            line.startswith(f"{field}:") and line.removeprefix(f"{field}:").strip()
+            for line, field in zip(remaining, metadata)
+        )
     )
 
 
@@ -242,7 +251,8 @@ def outcome(data):
     if state == "working":
         return "The canonical continuation is working without a released foreground lease; reconcile it before ending this turn."
     if not scheduler_ready(owner_path, owner, root) or not observed_wake(owner_path, owner):
-        return "Register and enable the matching persistent-workflow scheduler before ending this turn."
+        return ("Continue authorized unblocked work, ask a necessary question, or document a genuine "
+                "whole-goal blocker. Close the CLI when the goal is verified complete.")
     return None
 
 

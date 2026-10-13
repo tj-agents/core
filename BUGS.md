@@ -116,7 +116,7 @@
 - Impact and priority: P1; the caller receives no actionable blocking decision and can continue without required stop/callout enforcement.
 - Source owner: tj-agents/core stop dispatcher and its workflow/gate dependency checks.
 - State: in-progress.
-- Repair link: `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateAndProfileRepair`.
+- Repair link: `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateFailures`.
 - Next action: make missing route, gate, or import produce JSON `decision:block` with actionable diagnostics, then review the focused repair.
 - Resolution condition: missing route, gate, or import produces JSON `decision:block` with actionable diagnostics; focused regressions and Windows/Linux CI pass before guarded normal merge.
 - Verification evidence: original transcript result: `continuation_stop` and `callout_repair` reported `missingworkflow_route` and `missingworktree_cleanup_gate`; elapsed 1584 ms, exit 0, empty stdout.
