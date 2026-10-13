@@ -582,6 +582,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                                         {
                                             "invoke_codex_sync_command": codex_sync_command,
                                             "invoke_codex_hook_trust": hook_trust,
+                                            "canonical_catalog": lambda *_args: {"machine": ("tj-agents", "core")},
                                         },
                                     ):
                                 code = CODEX.main(["--project", str(project), "--target", "trusted-native", "session"])
