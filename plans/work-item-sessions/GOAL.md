@@ -263,12 +263,13 @@ Observed 2026-10-12: `claude --resume <id>` keeps the native id (this session re
 - Installed `engineering@base-agents` `4090e7d23875` is truncated (no `skills/`, `workflows/`, `schemas/`); run workflow helpers from this checkout's `.agents/workflows/`. The Claude Stop hook falsely reports `binding-head-changed` until PR #230 merges.
 - 2026-10-13: Codex continuation owner `f1ce90033f7b88a7d4fae98c` was re-initialized and claimed by `codex:01a1354f-3d06-7c80-83a0-4ab0e6c5d679`. Incremental review froze `6c4ed07..e0b1d0` and found R41; its committed repair `a5d3787` was reviewed as `e0b1d0..a5d3787`, which found R42 (the fixture did not create the database directory) and R43 (schema migration reads were not serialized). The R42/R43 repair has focused passing test evidence and awaits a local commit.
 - 2026-10-13: Tommy asked for a Codex handoff to finish this. Claude session `claude:c27c07bf-a274-466a-a10e-10ef96f36841` released ownership after this checkpoint; its continuation owner (`.agents/continuation/owner.json`, harness `claude`) is checkpointed `blocked` and should be re-initialized by the Codex owner with `--harness codex`, after moving the old `owner.json`/`events.jsonl` outside the tree.
+- 2026-10-13: exact-head CI at `1b1b8d9` failed only `verify-windows`: concurrent first-open connections raced while enabling WAL, producing `sqlite3.OperationalError: database is locked` and leaving the failed connection open. The S1 repair retries transient WAL initialization locks and closes an unsuccessfully initialized connection; focused store and work-item suites passed locally, including 20 repetitions of the original race test.
 
 ## Next Steps
 
 Lane: L4 (ordinary review, CI repair and delivery); re-route to L3 before the S2 design proposal. Effective `auto_approve_design` is false (no `design` key in `.agents/settings.json`).
 
-1. Commit the R42/R43 repair, then run `engineering:incremental-review` from `a5d3787` through the repair head using `.agents/workflows/workflow_ops.py`. Record review dispositions only in `reviews/Feature-WorkItemSessions.md`.
+1. Run `engineering:incremental-review` from `ba74c9c` through the Windows CI repair head using `.agents/workflows/workflow_ops.py`. Record review dispositions only in `reviews/Feature-WorkItemSessions.md`.
 2. Confirm exact-head Windows/Linux CI on PR [#228](https://github.com/tj-agents/core/pull/228); repair failures under `engineering:failing-tests` (never commit `plugins/` or catalog `digest` changes; keep files LF). Mark the PR ready and deliver through `engineering:merge` (standing auto-merge authorization). Do not duplicate PR #233's resume-registration change.
 3. After merge, propose where `## Next Steps` and delivery fields live now that work-item READMEs carry no status (decision 6) and wait for Tommy's decision, then start S2 from the updated `origin/main`.
 

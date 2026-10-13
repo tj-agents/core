@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 SCHEMA_VERSION = 2
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
+_LOCK_RETRY_DELAY = 0.05
 
 WORK_ITEMS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS work_items (
@@ -73,16 +74,32 @@ def database_path():
     return state_directory() / "sessions.db"
 
 
+def _execute_with_lock_retry(connection, statement):
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            return connection.execute(statement)
+        except sqlite3.OperationalError as error:
+            message = str(error).lower()
+            if ("locked" not in message and "busy" not in message) or time.monotonic() >= deadline:
+                raise
+            time.sleep(_LOCK_RETRY_DELAY)
+
+
 def connect(path=None):
     target = Path(path) if path is not None else database_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(target), timeout=5)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA busy_timeout = 5000")
-    connection.execute("PRAGMA journal_mode = WAL")
-    connection.execute("PRAGMA foreign_keys = ON")
-    _ensure_schema(connection)
-    return connection
+    try:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 5000")
+        _execute_with_lock_retry(connection, "PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA foreign_keys = ON")
+        _ensure_schema(connection)
+        return connection
+    except Exception:
+        connection.close()
+        raise
 
 
 def _ensure_schema(connection):
