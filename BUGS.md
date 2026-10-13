@@ -100,3 +100,22 @@
 **Resolution condition:** supported Claude/Codex shell events reject sibling, nested and ambiguous allocation; verified internal creation works from linked checkouts; executable regressions, packaging, independent review and exact-head CI pass; source merges and causal generated distribution is verified.
 
 **Verification evidence:** PR220 merged reviewed head 40ff30d9e006f37f87201fd38ae1c36de9268dd4 as 441a09ab3894ee0e076f6ff8e97d9c61d4a7aca2. Final review found no remaining defects; exact-head CI38286569828 passed Windows, Linux and guard. Twenty-two local placement tests completed with two Windows symlink-capability skips. Causal run38288409546 attempt1 passed Windows, Linux and regeneration; generated commit3b41211db4b6349ca74036e0df3a6d8bc91784f2 carries matching hook and dependency bytes and both host mappings. No external feed or version-sync producer exists. Installed native-host trust and adoption remain unverified.
+## B008 - Claude normal-profile sync accepts incomplete or misidentified packages
+- Kind: bug. Observed/reported: 2026-10-12; profile repair found 208 cached files against 331 source files, including 61 missing skill definitions. Cause: confirmed Claude normal-profile synchronization omits torn-package checks and alias migration; installation discards `installPath` and `gitCommitSha`, and external groups ignores a different ref when `sourceURL` matches.
+- Impact and priority: P2; synchronization can accept incomplete packages, discard source identity and pin information, and retain obsolete aliases.
+- Source owner: tj-agents/core Claude normal-profile synchronization and profile-repair workflow.
+- State: in-progress.
+- Repair link: `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateAndProfileRepair`.
+- Next action: repair and review package completeness checks, preservation and validation of install source and commit pin, and alias migration.
+- Resolution condition: sync rejects torn packages, preserves and validates `installPath` and `gitCommitSha`, handles differing refs despite matching `sourceURL`, and migrates obsolete aliases; focused checks and Windows/Linux CI pass before guarded merge.
+- Verification evidence: canonical `engineering@tj-agents` pinned at v2.1.15 has 52 skills; cached state had 208 files versus 331 source files, with 61 skill definitions missing. Existing `dotnet@dotnet` and `react@react` entries point to nonexistent identities. No fresh Claude-session acceptance is claimed.
+
+## B009 - Stop dispatcher omits a blocking decision when its gate is missing
+- Kind: bug. Observed/reported: 2026-10-12; transcript `fed1d447-ae67-4078-99a5-a813156cf86a`, line 1299, records `continuation_stop` and `callout_repair` returning `missingworkflow_route` and `missingworktree_cleanup_gate` in 1584 ms, exit 0, empty stdout. Cause: confirmed dispatcher fails to emit the required blocking decision when a workflow route or cleanup gate is missing (D2).
+- Impact and priority: P1; the caller receives no actionable blocking decision and can continue without required stop/callout enforcement.
+- Source owner: tj-agents/core stop dispatcher and its workflow/gate dependency checks.
+- State: in-progress.
+- Repair link: `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateAndProfileRepair`.
+- Next action: make missing route, gate, or import produce JSON `decision:block` with actionable diagnostics, then review the focused repair.
+- Resolution condition: missing route, gate, or import produces JSON `decision:block` with actionable diagnostics; focused regressions and Windows/Linux CI pass before guarded normal merge.
+- Verification evidence: original transcript result: `continuation_stop` and `callout_repair` reported `missingworkflow_route` and `missingworktree_cleanup_gate`; elapsed 1584 ms, exit 0, empty stdout.
