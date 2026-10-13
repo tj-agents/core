@@ -27,7 +27,9 @@ writer lease, then create one bounded, independently actionable Core side workst
    reconcile that owner and contribute the new evidence without creating a duplicate writer. A verified
    closed context resumes only through its supported open skill. Otherwise record the bounded Core defect,
    its authority, source context, expected completion, exact isolated checkout, and one next action in a
-   canonical goal or plan.
+   canonical goal or plan. Before launch, that goal records `Repair workflow: engineering:self-repair`,
+   the affected `Source owner`, and the callout's session, nonce, and prompt SHA-256 so the host gate can
+   bind a successful launcher receipt to this exact repair.
 
 ## Hand off the source repair
 
@@ -42,6 +44,11 @@ If the launcher fails, preserve the canonical repair goal and report the actual 
 claim that the repair was handed off, do not create a second successor, and do not allow that failure to
 silently discharge the active repair obligation. Resume the original task only where its next action is
 independent of the unlaunched repair.
+
+This standing authorization covers the bounded Core repair through implementation, tests, review, pull
+request, merge, and publication once the source repository's gates pass. It does not authorize installing
+into a consuming repository, publishing outside the source repository, destructive operations, or work
+excluded by an explicit user limit.
 
 ## Preserve existing delivery ownership
 
