@@ -16,6 +16,7 @@ WORK_ITEM_RE = re.compile(r"^(?P<feature>[a-z0-9]+(?:-[a-z0-9]+)*)/(?P<item>[a-z
 WORK_ITEM_STATUSES = ("proposed", "active", "blocked", "paused", "delivery-gated", "done")
 END_REASONS = ("finished", "closed", "handed_off")
 HEAD_CHECK_TIMEOUT = 5
+_BOUNDED_ROLE_RE = re.compile(r"^bounded: (?P<scope>.+)$")
 
 _SESSION_STORE = None
 _AGENT_RECOVERY = None
@@ -73,6 +74,24 @@ def _parse_work_item(value):
     if not match:
         raise ValueError(f"invalid work item {value!r}; expected <feature>/<item> in lowercase kebab-case")
     return match.group("feature"), match.group("item")
+
+
+def _validate_role(role):
+    if role is None or role == "owner":
+        return "owner"
+    match = _BOUNDED_ROLE_RE.fullmatch(role)
+    if match and match.group("scope").strip():
+        return role
+    raise ValueError(f"invalid --role {role!r}; expected 'owner' or 'bounded: <non-empty scope>'")
+
+
+def _default_branch(cwd, current_branch):
+    output = _session_store()._git(cwd, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    if output:
+        return output.split("/", 1)[1] if output.startswith("origin/") else output
+    if current_branch in ("main", "master"):
+        return current_branch
+    return None
 
 
 def _require_repo(cwd):
@@ -134,14 +153,21 @@ def _worktree_status(row):
 
 
 def _read_time_status(row, machine):
-    if row.get("ended_at") is not None:
-        return "closed"
     if (row.get("machine") or "").casefold() != machine.casefold():
         return "foreign"
-    liveness = _agent_recovery().liveness({"host": row["host"], "session": row["session_id"]})
-    if liveness != "live":
-        return liveness
-    return _worktree_status(row)
+    ended = row.get("ended_at") is not None
+    if not ended:
+        liveness = _agent_recovery().liveness({"host": row["host"], "session": row["session_id"]})
+        if liveness == "live":
+            worktree = _worktree_status(row)
+            return worktree if worktree != "live" else "live"
+        if liveness == "unknown":
+            return "unknown"
+    resumable = not ended or row.get("end_reason") == "closed"
+    if not resumable:
+        return "closed"
+    worktree = _worktree_status(row)
+    return worktree if worktree in ("stale", "unknown") else "closed"
 
 
 def _pid_is_dead(pid, pid_started_at):
@@ -169,29 +195,38 @@ def cmd_claim(work_item, host, role=None, predecessor=None, cwd=None):
     store = _session_store()
     cwd = cwd or Path.cwd()
     feature, item = _parse_work_item(work_item)
+    role = _validate_role(role)
     repo = _require_repo(cwd)
     key = store.work_item_key(repo, feature, item)
     session_id = _require_session_id(host)
     handle = store.session_handle(host, session_id)
-    role = role or "owner"
     branch, _head = store.current_branch_and_head(cwd)
+    if branch and branch == _default_branch(cwd, branch):
+        branch = None
     connection = store.connect()
     try:
         store.ensure_session(connection, host, session_id, cwd)
         if store.get_work_item(connection, key) is None:
             store.upsert_work_item(connection, key, repo, feature, item, status="active", branch=branch)
         result = {"handle": handle, "work_item": f"{feature}/{item}"}
-        if role == "owner":
-            others = [row for row in store.live_owners(connection, key) if row["handle"] != handle]
-            if others:
-                other = others[0]
-                if predecessor and predecessor == other["handle"]:
-                    store.transfer_ownership(connection, predecessor, handle, key, role=role)
-                    result["removed"] = predecessor
-                    return result
-                raise ValueError(f"{other['handle']} already owns this work item; hand off before taking ownership")
-        store.set_session_ownership(connection, handle, role, key, predecessor=predecessor)
-        return result
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            if role == "owner":
+                others = [row for row in store.live_owners(connection, key) if row["handle"] != handle]
+                if others:
+                    other = others[0]
+                    if predecessor and predecessor == other["handle"]:
+                        store.transfer_ownership(connection, predecessor, handle, key, role=role)
+                        result["removed"] = predecessor
+                        return result
+                    raise ValueError(
+                        f"{other['handle']} already owns this work item; hand off before taking ownership"
+                    )
+            store.set_session_ownership(connection, handle, role, key, predecessor=predecessor)
+            return result
+        except Exception:
+            connection.rollback()
+            raise
     finally:
         connection.close()
 
@@ -264,7 +299,10 @@ def cmd_resume(work_item, handle=None, cwd=None, prompt=None, prompt_path=None, 
             raise ValueError(f"no recorded session with handle {handle!r}")
         selected = matched[0]
     else:
-        owners = [row for row in rows if row["role"] == "owner" and row["ended_at"] is None]
+        owners = [
+            row for row in rows
+            if row["role"] == "owner" and (row["ended_at"] is None or row["end_reason"] == "closed")
+        ]
         if len(owners) != 1:
             raise ValueError("specify --handle; recorded sessions: " + ", ".join(row["handle"] for row in rows))
         selected = owners[0]

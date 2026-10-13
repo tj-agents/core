@@ -830,6 +830,16 @@ class EndReasonRecordingTests(unittest.TestCase):
         store.end_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "closed")
         connection.close.assert_called_once()
 
+    def test_reopen_reverses_a_recorded_end_through_the_shared_store(self):
+        store = mock.Mock()
+        store.session_handle.side_effect = lambda host, session_id: f"{host}:{session_id}"
+        connection = mock.Mock()
+        store.connect.return_value = connection
+        with mock.patch.object(finish.register_session, "_load_session_store", return_value=store):
+            finish._reopen_own_end(self.entry, "finished")
+        store.reopen_session.assert_called_once_with(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "finished")
+        connection.close.assert_called_once()
+
     def test_recording_never_raises_when_the_store_is_unavailable(self):
         with mock.patch.object(finish.register_session, "_load_session_store", return_value=None):
             finish._record_own_end(self.entry, "finished")

@@ -120,51 +120,63 @@ Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-
 
 ### Findings
 
-- [ ] **R9 — HIGH — native, workflow** — `.agents/machine/utility/peer-cli/scripts/register_session.py:342`
+- [x] **R9 — HIGH — native, workflow** — `.agents/machine/utility/peer-cli/scripts/register_session.py:342`
   `_load_session_store` looks under `HERE.parents[2]` (`.agents/machine` in the package), but `sources.json` ships the
   module only at `PLUGIN_ROOT/resources/machine/scripts/session_store.py`, so installed SessionStart never writes a
   row and `interrupted` finds nothing. Add the packaged candidates (`HERE.parents[4]/resources/machine/scripts` for the
   `.agents/machine/utility/...` layout, `HERE.parents[2]/resources/machine/scripts` for `skills`/`codex-skills`) and
   test the loader against both packaged layouts.
-- [ ] **R10 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:137`
+  Fixed: the loader also checks `HERE.parents[4]/resources/machine/scripts`; `LoadSessionStoreTests` build each packaged layout and find the store.
+- [x] **R10 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:137`
   `_read_time_status` returns `closed` for any ended row before the foreign and stale checks, and a not-ended dead
   session skips the worktree check, so `resume` can reopen a foreign session or one whose worktree is gone. Check
   `foreign` first, then liveness for not-ended rows, then the worktree staleness for every resumable row.
-- [ ] **R11 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:267`
+  Fixed: foreign first, then liveness for not-ended rows, then worktree staleness for resumable rows; tests cover foreign ended rows and a dead session with a stale worktree.
+- [x] **R11 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:267`
   `resume` without `--handle` only considers owners with `ended_at IS NULL`, so an owner whose tab was closed cleanly
   (`end_reason = 'closed'`) always needs `--handle`. Select the single owner that is not ended or ended `closed`;
   `finished` and `handed_off` owners are not resumable.
-- [ ] **R12 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:196`
+  Fixed: owners not ended or ended `closed` are resumable without `--handle`; tests cover `closed` and `finished`.
+- [x] **R12 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:196`
   `start_session` clears `ended_at`/`end_reason` but keeps `role = 'owner'`, so a handed-off predecessor that is
   resumed becomes a second live owner. When the previous end reason was `handed_off`, clear its role.
-- [ ] **R13 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:184`
+  Fixed: `start_session` clears `role` when the previous end reason was `handed_off`; tests cover both cases.
+- [x] **R13 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:184`
   `claim` reads live owners and then sets ownership outside a transaction, so two concurrent claims can both become
   owner. Wrap the check and the update in one `BEGIN IMMEDIATE` transaction.
+  Fixed: claim's owner check and write run in one `BEGIN IMMEDIATE` transaction; a two-thread test fails without it.
 - [wontfix] **R14 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:188`
   `--predecessor` takes ownership from a live owner without a `handing-off` state.
   Disposition: intended by the approved spec ("A predecessor's ownership transfers with `handed_off` and `successor`
   set"); `engineering:handoff` requires the predecessor to stop owned-path writes before launching its successor, so
   the transfer does not create a second writer.
-- [ ] **R15 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:136`
+- [x] **R15 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:136`
   `_normalise_remote` keeps only the last two path segments, so one Azure DevOps repository gets different identities
   over HTTPS and SSH, and repositories on different hosts collide. Include the host and the full path, mapping
   `ssh.dev.azure.com:v3/<org>/<project>/<repo>` to `dev.azure.com/<org>/<project>/_git/<repo>`.
-- [ ] **R16 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:176`
+  Fixed: identity is lowercase host plus path; GitHub forms and Azure DevOps SSH/HTTPS unify; tests cover collisions.
+- [x] **R16 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:176`
   `--role` is not validated, so `Owner` or `owner ` bypasses the single-owner rule. Accept only `owner` or
   `bounded: <non-empty scope>`.
-- [ ] **R17 — LOW — native** — `.agents/machine/scripts/session_store.py:107`
+  Fixed: `_validate_role` accepts only `owner` or `bounded: <scope>` before any write; tests reject variants.
+- [x] **R17 — LOW — native** — `.agents/machine/scripts/session_store.py:107`
   `_git` decodes output with `text=True` and no encoding, against `CODE_CONVENTIONS.md`; non-ASCII output can raise
   outside the handled exceptions. Pass `encoding="utf-8", errors="replace"`.
-- [ ] **R18 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:182`
+  Fixed: `_git` passes `encoding="utf-8", errors="replace"`; test asserts the arguments.
+- [x] **R18 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:182`
   `claim` from the default branch records it on the work item, after which every unclaimed session on that branch
   auto-attaches to the item. Do not record the repository's default branch (`origin/HEAD`, else `main`/`master`).
-- [ ] **R19 — LOW — native** — `.agents/machine/utility/peer-cli/scripts/finish.py:12`
+  Fixed: claim does not record the default branch (origin/HEAD, else main/master); tests cover both branches.
+- [x] **R19 — LOW — native** — `.agents/machine/utility/peer-cli/scripts/finish.py:12`
   `_record_own_end` is duplicated in `close.py` and `finish.py`. Move it into the shared `session_close.py`.
-- [ ] **R20 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:157`
+  Fixed: one `_record_own_end` in `session_close.py`; finish and close now record before spawning the observer and reopen on refusal (`reopen_session`), keeping the armed window as on main.
+- [x] **R20 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:157`
   Each SessionStart/Stop hook runs three to four `git` subprocesses with 3-second timeouts; on Codex, SessionStart
   shares a 7-second deadline with three other hooks. Collapse the probes into one `rev-parse` call plus the remote
   lookup with a shorter timeout.
-- [ ] **R21 — MEDIUM — workflow** — `.agents/plugins/harness/machine.json:301`
+  Fixed: hook paths use one combined `rev-parse` plus the remote lookup with a 2 s timeout; test asserts at most two git calls.
+- [x] **R21 — MEDIUM — workflow** — `.agents/plugins/harness/machine.json:301`
   The Codex justification calls `interrupted` read-only, but `interrupted --resume` reopens sessions like `resume`.
   State that `--resume` performs the same guarded reopen, limited to rows confirmed dead on this machine (mirror in
   `catalog.json`'s harness field).
+  Fixed: justification states `interrupted --resume` and `resume` perform the guarded reopen; mirrored in `catalog.json`; `sync_harness_manifests.py --check` passes.

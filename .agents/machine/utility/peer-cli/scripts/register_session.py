@@ -344,6 +344,8 @@ def _load_session_store():
     if len(HERE.parents) > 2:
         candidates.append(HERE.parents[2] / "scripts" / "session_store.py")
         candidates.append(HERE.parents[2] / "resources/machine/scripts/session_store.py")
+    if len(HERE.parents) > 4:
+        candidates.append(HERE.parents[4] / "resources/machine/scripts/session_store.py")
     candidates.append(HERE / "session_store.py")
     for path in candidates:
         if path.is_file():
