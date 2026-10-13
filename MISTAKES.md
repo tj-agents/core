@@ -185,9 +185,10 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - Kind: mistake. Observed/reported: 2026-10-12; predecessor ended its report after delegating delayed self-close and did not reconcile the nonzero command/observer cancellation.
 - Cause: confirmed unobserved final action; no valid basis to equate a delayed worker promise with completed session exit.
 - Impact/priority: P2; completed CLI remained live and Tommy had to call out unfinished closure.
-- Source owner: engineering session-guidance terminal lifecycle and machine peer-cli runtime. State: in-progress.
-- Repair link: B004, plans/verified-self-close/GOAL.md; one causal repair owner.
-- Next action: repair the verified self-close failure and retain accountable closure evidence/reporting.
+- Source owner: Core terminal task/session ownership and its invocation/enforcement consumers; machine peer-cli owns transport only. State: blocked.
+- Repair link: `MISTAKES.md#M012` owns the current invocation/acceptance obligation. Historical B004 and plans/verified-self-close/GOAL.md were delivered by merged PR212; they do not establish the prevention condition for this recurrence. The M003 successor is a related full-contract acceptance candidate, not an acknowledged M012 repair owner.
+- Blocker: supported follow-up to live successor01a13562-6a28-73a3-b2bc-d3bbe884dad5 is unavailable/disconnected, with no send or acknowledgment; additional native CLI sessions remain prohibited. blocked_by: capability. Resolver: Core terminal-lifecycle owner and the existing successor's supported coordination path. Resume when: exact M012 ownership is acknowledged through supported coordination or a Core owner resumes its bounded repair within the session limit.
+- Next action: reconcile current session-terminal invocation and installed enforcement against this exact record through engineering:address-mistake; require verified exit with a retained deferred checkout before resolution. Do not attribute the omitted invocation to a transport command that was never run.
 - Resolution condition: actual registered CLI exit is observed through supported observer/process evidence after completion, without closing another/unknown host or claiming an unverified tab closed.
 - Verification evidence: original parent final report followed by worker refusal and cancelled observer; source delivery itself remained verified complete.
 
@@ -208,11 +209,10 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
   can be skipped despite an unambiguous standing obligation.
 - **Source owner:** Core `engineering:session-guidance` callout-repair contract and the host/runtime
   enforcement that must make its required transition observable.
-- **State:** in-progress.
-- **Repair link:** active `Fix-StandardsMistakeCallout` source repair, session
-  `01a11698-c02c-7b72-9f67-ec82fd91efb0`.
-- **Next action:** reconcile this incident with the active source repair and make the callout path require
-  observed incident recording plus verified bounded-handoff launch before the original task resumes.
+- **State:** blocked.
+- **Repair link:** `MISTAKES.md#M014` owns the outstanding callout invocation/acceptance obligation. Historical Fix-StandardsMistakeCallout/session01a11698-c02c-7b72-9f67-ec82fd91efb0 delivered merged PR128; it is not an active repair claim. The M003 successor has general full-contract acceptance scope but has not acknowledged this exact M014 recurrence.
+- **Blocker:** the existing successor is live, but its supported follow-up endpoint is unavailable/disconnected; no send or acknowledgment occurred, and no additional native CLI is authorized. **blocked_by:** capability. **Resolver:** Core callout-enforcement owner and supported existing-session coordination. **Resume when:** that owner acknowledges the exact M014 addressing scope or resumes a bounded causal repair within the existing session limit.
+- **Next action:** execute engineering:address-mistake for this record, verify actual callout-gate invocation and installed host enforcement, and require observed recording/main publication plus the required source-owner transition or truthful blocker before unrelated work or closure.
 - **Resolution condition:** automated host acceptance proves that a user mistake callout causes the required
   incident record and source-owner handoff to be observed before a normal task response can continue; a
   missing launch or record is surfaced as an actionable failure rather than explained away.
@@ -221,7 +221,7 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Recurrence - 2026-10-13, omitted callout recording:** After Tommy explicitly challenged why PR238's completed owner had not closed, the parent gave explanations and announced self-close without first recording the called-out failure in the canonical main register. Tommy had to interrupt twice and repeat the recording requirement. The session-guidance record-noticed-problems and mistake-callout obligations, the user's explicit main-publication instruction and the freshly merged PR238 publication convention were already available. Cause confirmed from the action sequence: the parent treated an explanation and proposed operational correction as sufficient, instead of completing the required recording and reconciling the causal source owner before closure. This violates an existing requirement; no absence of instruction or authority is established.
 
-**Declarative prevention for this recurrence:** A mistake callout creates an outstanding recording/owner-reconciliation obligation before unrelated work resumes or the session closes. Reconcile the existing stable incident, record cause, violated standard, exact repair owner and observable prevention on main through independent authorized documentation delivery, then verify publication. A promise, apology or local-only note is not completion. Acceptance must demonstrate record publication and the source-owner transition or its truthful capability blocker before a normal response or terminal close. The scheduler handoff's general closure acceptance does not establish enforcement of this callout obligation; M014's existing callout repair remains the causal owner until evidence reconciles it.
+**Declarative prevention for this recurrence:** A mistake callout creates an outstanding recording/owner-reconciliation obligation before unrelated work resumes or the session closes. Reconcile the existing stable incident, record cause, violated standard, exact repair owner and observable prevention on main through independent authorized documentation delivery, then verify publication. A promise, apology or local-only note is not completion. Acceptance must demonstrate record publication and the source-owner transition or its truthful capability blocker before a normal response or terminal close. The scheduler handoff's general closure acceptance does not establish enforcement of this callout obligation; Merged PR128 is historical guidance evidence; current invocation/enforcement acceptance remains unverified behind the concrete coordination blocker above.
 
 ## M015 - Sandbox terminated with authorized work unfinished
 - **Kind:** mistake.
@@ -264,3 +264,5 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - **Next action:** reconcile and publish the session records and convention correction independently of PR234, then verify the merged default-branch content. The remaining historical branch-record backlog belongs to .agents/engineering/resources/TECH_DEBT.md#D001.
 - **Resolution condition:** the records and prevention rule are on remote main, existing IDs and unrelated edits are preserved, both host entry points consume the same canonical convention, and completion reporting names the verified destination. A local file or open PR alone does not satisfy publication.
 - **Verification evidence:** fresh origin/main contains B009 for a Stop dispatcher defect and M015 for sandbox termination; the prior branch used B009 for a different automatic-merge defect and had M016 plus this M003 recurrence absent from main. No merged-delivery result is asserted before observation.
+
+Current ownership verification - 2026-10-13: PR212 and PR128 are merged and contained in the reviewed base. Exact M003 successor PID32000/thread01a13562-6a28-73a3-b2bc-d3bbe884dad5 is live. The supported machine:followup-codex helper returned unavailable/disconnected, no send attempted and acknowledged=false; no daemon or replacement session was started. Original terminal/callout prevention conditions remain open, distinct from the documentation publication delivered by this PR.
