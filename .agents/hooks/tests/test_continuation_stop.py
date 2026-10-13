@@ -103,7 +103,9 @@ class ContinuationStopTests(unittest.TestCase):
         self.write_owner(self.owner())
         with patch.object(continuation_stop, "scheduler_ready", return_value=False), \
              patch.object(continuation_stop, "observed_wake", return_value=True):
-            self.assertIn("Register and enable", self.call())
+            for _ in range(2):
+                self.assertIn("Continue authorized unblocked work", self.call())
+                self.assertIn("Close the CLI when the goal is verified complete", self.call())
 
     def test_scheduler_receipt_uses_shared_read_only_verifier(self):
         owner = self.owner()
@@ -160,6 +162,61 @@ class ContinuationStopTests(unittest.TestCase):
         for prompt in ("Please pause this work.", "Cancel it.", "Cancel this."):
             self.assertIsNone(self.call(self.receipt(prompt=prompt)))
         self.assertIsNotNone(self.call(self.receipt(prompt="Why did it stop?\n```text\nstop\n```")))
+
+    def test_documented_blocker_requires_a_published_boundary_without_trailing_tasks(self):
+        published = (
+            "## Next Steps\n\n"
+            "Blocked: external approval\n"
+            "Blocked by: release owner\n"
+            "Unblock action: approve the release\n"
+            "Resume when: approval is recorded\n"
+        )
+        paused = "## Next Steps\n\nPaused: waiting for the release owner\n"
+        metadata = (
+            "Scope: whole plan\n"
+            "Current slice: await release approval\n"
+            "Remaining scope: delivery and closeout\n"
+            "Done when: the release is approved\n"
+        )
+        self.goal.write_text(published, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        self.goal.write_text(published + metadata, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        self.goal.write_text(paused + metadata, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        invalid = (
+            "## Next Steps\n\n"
+            "Blocked:\n"
+            "Blocked by: release owner\n"
+            "Unblock action: approve the release\n"
+            "Resume when: approval is recorded\n",
+            paused,
+            "## Next Steps\n\nPaused:\n",
+            published + "Scope: release\n",
+            paused + "Current slice: Run the authorized test suite.\n",
+            published + metadata.removesuffix("Done when: the release is approved\n"),
+            published + metadata + "Scope: duplicate\n",
+            published + metadata + "Run the authorized test suite.\n",
+        )
+        for text in invalid:
+            with self.subTest(text=text):
+                self.goal.write_text(text, encoding="utf-8")
+                self.assertFalse(continuation_stop.documented_blocker(self.owner("blocked")))
+
+        self.goal.write_text("# Goal\n", encoding="utf-8")
+        for reason in ("continuation-budget-exhausted", "host-capability-or-permission-unavailable"):
+            with self.subTest(reason=reason):
+                self.assertFalse(continuation_stop.documented_blocker(
+                    self.owner("blocked", reason=reason)
+                ))
+
+        self.goal.write_text(published, encoding="utf-8")
+        self.assertTrue(continuation_stop.documented_blocker(
+            self.owner("blocked", reason="continuation-budget-exhausted")
+        ))
 
     def test_old_completed_owner_cannot_satisfy_new_execution_obligation(self):
         self.write_owner(self.owner("complete", updated_at=1))
