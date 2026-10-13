@@ -36,6 +36,27 @@ CODEX_PROFILE = module("codex_terminal_profile")
 
 
 class TerminalLaunchersTests(unittest.TestCase):
+    def test_codex_disables_daemon_for_windows_interactive_sessions(self):
+        cases = (
+            ([], ["--no-daemon"]),
+            (["resume", "--last"], ["--no-daemon", "resume", "--last"]),
+            (["fork", "--last"], ["--no-daemon", "fork", "--last"]),
+            (["prompt with spaces"], ["--no-daemon", "prompt with spaces"]),
+            (["-C", "project", "prompt"], ["--no-daemon", "-C", "project", "prompt"]),
+            (["plugin", "list"], ["plugin", "list"]),
+            (["-C", "project", "plugin", "list"], ["-C", "project", "plugin", "list"]),
+            (["--config", "model=default", "exec"], ["--config", "model=default", "exec"]),
+            (["exec", "--json"], ["exec", "--json"]),
+            (["--help"], ["--help"]),
+            (["--no-daemon", "resume"], ["--no-daemon", "resume"]),
+        )
+        with mock.patch.object(CODEX.sys, "platform", "win32"):
+            for arguments, expected in cases:
+                with self.subTest(arguments=arguments):
+                    self.assertEqual(expected, CODEX.without_daemon_for_interactive(arguments))
+        with mock.patch.object(CODEX.sys, "platform", "linux"):
+            self.assertEqual(["resume"], CODEX.without_daemon_for_interactive(["resume"]))
+
     def test_typed_hook_option_reaches_the_cli_argument_list(self):
         with tempfile.TemporaryDirectory(prefix="literal terminal option ") as directory:
             root = Path(directory)

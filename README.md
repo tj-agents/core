@@ -117,6 +117,25 @@ establish installed-host trust or acceptance.
 - `cli-session-recovery/` owns save/restore scripts and their regression suite.
 - install.ps1 installs the PowerShell profile; cli-session-recovery provides its own installer.
 
+### Windows CLI hook windows
+
+On Windows, interactive Codex launches through the installed machine profile and Codex handoff tabs
+use `--no-daemon` to avoid the shared daemon's visible hook child consoles. The option is applied to
+interactive starts, resumes, and forks; Codex's batch and maintenance commands keep their normal
+arguments. Reopen a terminal after updating the machine plugin so its profile launcher is current.
+For an existing installation that cannot yet refresh the machine plugin, run
+`pwsh shell/install-codex-no-daemon.ps1` to add the same behavior to both PowerShell profiles;
+`-VerifyOnly` checks that local installation.
+
+Claude Code can open a visible Git Bash window for each hook. On Windows, run
+`pwsh shell/install-hidden-bash.ps1` once from this checkout. The installer builds the included
+GUI-subsystem Bash proxy using Clang or GCC, configures `CLAUDE_CODE_GIT_BASH_PATH` for the user, and
+loads it in new PowerShell sessions. Check it with `pwsh shell/install-hidden-bash.ps1 -VerifyOnly`.
+The proxy forwards standard handles and the exit code to the real Git Bash. If Git Bash lives outside
+`C:\Program Files\Git\bin\bash.exe`, set the user-level `TJ_AGENTS_REAL_GIT_BASH` environment variable
+to its absolute path before running the installer. Claude processes that launch `git.exe` directly
+bypass this Git Bash workaround and require an upstream host fix.
+
 A PR carries authored sources only. CI's guard job rejects generated paths, PR CI regenerates its own
 workspace before testing, and the post-merge `regenerate` job commits the refreshed `plugins/*`,
 catalog digests, marketplace bridges and `CAPABILITIES.md` to main. To refresh a local tree for tests,

@@ -4,5 +4,6 @@ __pycache__/
 deployment-backups/
 *.jsonl
 *.tmp
+shell/hidden-bash.exe
 .agents/continuation/
 .agents/persistent-workflow-binding.json
