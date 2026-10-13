@@ -86,9 +86,10 @@ being selected. Its `--input` is the composition request described in
 [Compose immutable source catalogs](#compose-immutable-source-catalogs); it reads only the exact
 commits named there.
 For a first adoption, include the Core three-package source and every requested stack source in that
-input. For an addition, include every source owner required by the newly composed packages and their
-marketplace declarations. Other preserved owners may be omitted and are reused from the committed
-catalog. An existing owner supplied again must match the lock's pinned commit.
+input. For an addition, compose the new packages together with their complete required package
+dependencies and every declared marketplace owner. Preserved owners not required by that composition
+may be omitted and are reused from the committed catalog. An existing owner supplied again must
+match the lock's pinned commit.
 
 ```powershell
 python -B '<skill-directory>\scripts\adopt_repository.py' `
@@ -106,7 +107,7 @@ existing selections and their required skills, path scopes, exceptions and other
 `preview` lists the repository lock, composed catalog and host-setting changes without writing.
 `write` updates those files together. `check` exits nonzero when any managed file drifts. Commit the
 resulting `.agents/capabilities.lock.json`, `.agents/catalog/catalog.json`, `.claude/settings.json`
-and `.codex/config.toml` with the repository.
+and `.codex/config.toml`, plus `.codex/rules/agent-harness.rules` when emitted, with the repository.
 
 Adding packages is additive only. A known marketplace can contribute further packages only at its
 already pinned snapshot; a changed owner, package record or snapshot is rejected. An existing tagged
