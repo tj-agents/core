@@ -5,7 +5,7 @@
 - Plan: plans/windows-hook-windows/WINDOWS_HOOK_WINDOWS_PLAN.md
 - Roadmap: plans/windows-hook-windows/WINDOWS_HOOK_WINDOWS_PLAN.md
 - Roadmap item: windows-hook-windows
-- Base: origin/main at ee1cdbcc6e400cfba33a0ae099b54cfabe4310b7
+- Base: origin/main at ad6f3cba (merged into the delivery branch)
 - PR: https://github.com/tj-agents/core/pull/241
 
 ## Authority and outcome
@@ -35,10 +35,11 @@ This is one focused Windows CLI launch repair covering the user's explicitly nam
 - The current-main focused launcher suite passed: 61 tests (7 platform skips). Catalog digests and generated packages were refreshed locally; `sync-generated.ps1 -Check` reported zero drift. Current main forbids generated package files in a PR, so those local outputs must be left uncommitted.
 - The profile wiring, source layout and agent CLI suite passed: 119 tests (20 platform skips). The installed Claude proxy and Codex profile blocks were rechecked with their `-VerifyOnly` installers. The local Codex wrapper was expanded to cover a positional prompt as well as starts, resumes and forks, and an isolated PowerShell argument probe passed. Both local installer sources now exist in the current-main worktree so checkout updates preserve the profile references.
 - Draft PR #241 was published from the clean current-main branch. Source review found that `--no-daemon` conflicts with Codex `--remote` and may be absent in older CLI versions; the terminal launcher now probes installed CLI help before injecting it, the handoff launcher gates on the resolved version, and the local wrapper leaves remote sessions alone. The focused suite passed 64 tests (7 platform skips), a PowerShell remote/prompt probe passed, and generated output checked with zero drift after this correction.
+- `origin/main` moved 20 commits during review. The delivery branch merged it with a normal merge to preserve the published PR history. On the merged tree, 64 focused launcher tests passed, 22 source-layout tests passed after the documented local catalog refresh, and the 541-file generated package check reported zero drift. Generated output remains outside the authored PR diff.
 
 ## Remaining work
 
-1. Make a source-only commit and delivery review. Keep generated `plugins/*` output out of the commit per current main policy.
+1. Push the corrected exact head to PR #241, review Windows and Linux CI, and complete its source review. Keep generated `plugins/*` output out of the PR diff per current main policy.
 2. Verify an actual fresh Codex and Claude CLI startup visually when practical. The current Codex session may remain attached to the already-running daemon until it is closed; do not stop a daemon carrying an active session.
 3. Record any remaining direct host subprocess flashes as upstream-owned limitations, with the exact executable/process trace if observed.
 
@@ -56,4 +57,4 @@ Run delivery preflight against origin/main, publish a draft PR, then review exac
 
 ## Transition
 
-The local mitigation is installed. Continue with current-main delivery and a fresh CLI launch check. No routine design decision is pending.
+The local mitigation is installed. Continue with draft PR #241 validation and a fresh CLI launch check. No routine design decision is pending.
