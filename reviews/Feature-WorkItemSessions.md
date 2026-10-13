@@ -5,8 +5,8 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `a5d3787acaf8f664e6a8dc2cfc47153e013ef309`  `(2026-10-13)`
-**Judgment:** `changes-requested`
+**Reviewed up to commit:** `ba74c9c932e200a049c92c7a3488930c52a12d57`  `(2026-10-13)`
+**Judgment:** `approved`
 
 ## Review pass — 2026-10-12 — full
 
@@ -115,7 +115,7 @@ No findings. R7 and R8 dispositions verified.
 Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). No security-sensitive paths. Resume registration verification is out of scope here (PR #233).
 
 ```agent-host-coverage
-{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"6c4ed0790ea2f1fec7f822292e1ae88238aadeb0","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"Focused suite 237 tests on Windows: 235 OK, 1 skip, 1 B008 flake that also fails on main; R32-R40 remain open."},"exception":{"constraint_evidence":"An explicit --handle can reopen a handed-off or finished session beside its live successor (R32); refused claims still write the work-item branch (R33).","supported_other_host_outcome":"Codex shares the same loader defect; neither host records SessionStart until R9 is fixed."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"Focused suite 237 tests on Windows: 235 OK, 1 skip, 1 B008 flake that also fails on main; R32-R40 remain open."},"exception":{"constraint_evidence":"An explicit --handle can reopen a handed-off or finished session beside its live successor (R32); refused claims still write the work-item branch (R33).","supported_other_host_outcome":"Claude records SessionEnd once R9 is fixed."}}]}
+{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"ba74c9c932e200a049c92c7a3488930c52a12d57","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"Windows focused session-store and work-item-session suites: 89 OK; the current base-merge review retained no S1 findings."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"passed","evidence":"Windows focused session-store and work-item-session suites: 89 OK; the current base-merge review retained no S1 findings."}}]}
 ```
 
 ### Findings
@@ -347,3 +347,62 @@ Native layer: Codex `codex review` (high). No security-sensitive paths.
 - [x] **R43 — HIGH — native** — `.agents/machine/scripts/session_store.py:91`
   Concurrent legacy migrations can use a stale keeper after another connection hands ownership to a successor, leaving no owner.
   Fixed: schema setup holds `BEGIN IMMEDIATE` through migration, index creation and the version update; the regression test asserts the transaction precedes schema reads.
+
+## Review pass — 2026-10-13 — incremental
+
+**Candidate base:** `d15375a3749f01c927921b2860df5c99650d080b`
+**Candidate head:** `b83ac4e41b885b2f73c3526c255908d29024aef1`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:77926010de35b0789c389620a480a992f8e413a0161ffe6150ab966c8d84eef5` `(51 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\0sxD8Dhd9yeoJk9pjyNG5n\t_3o0dKowfuSnJxBcVfRYW`
+**Candidate bundle identity:** `sha256:cbf02173bd997e24f8c9d09ee65023575576f6faa8c3ca44d7dcd763b0be94e1`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Codex `codex review` (high). Fresh lenses: `data-migration`, `api-contract`, `workflow`. No security-sensitive paths.
+
+### Findings
+
+No retained findings. The native reviewer identified four Claude standards-sync issues inherited from `origin/main`; they are unchanged in the PR diff against its current base and outside this S1 review scope. Focused inherited-change suites passed 27, 23, 31 and 23 tests.
+
+## Review pass - 2026-10-13 - incremental
+
+**Candidate base:** `b83ac4e41b885b2f73c3526c255908d29024aef1`
+**Candidate head:** `ba74c9c932e200a049c92c7a3488930c52a12d57`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:5757171c929dbe6a7906548e345d03882d9ffaf7a6e3eb2a388dc61fbff8d0cd` `(22 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\0sxD8Dhd9yeoJk9pjyNG5n\GhT9-uEB_wdDRYBLK2g-mW`
+**Candidate bundle identity:** `sha256:e9bcec53f4c08830e46d10af0d1a1e87c52bf6c4f01a8fbc3999ffe5d3d64821`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Codex `codex review` (high). No security-sensitive paths.
+
+### Findings
+
+No retained findings. This is the current-main merge required to refresh the review basis; the imported changes are not part of the PR's authored S1 diff.
+
+## Review pass - 2026-10-13 - incremental
+
+**Candidate base:** `b83ac4e41b885b2f73c3526c255908d29024aef1`
+**Candidate head:** `ba74c9c932e200a049c92c7a3488930c52a12d57`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:5757171c929dbe6a7906548e345d03882d9ffaf7a6e3eb2a388dc61fbff8d0cd` `(22 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\0sxD8Dhd9yeoJk9pjyNG5n\GhT9-uEB_wdDRYBLK2g-mW`
+**Candidate bundle identity:** `sha256:e9bcec53f4c08830e46d10af0d1a1e87c52bf6c4f01a8fbc3999ffe5d3d64821`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+Native layer: Codex `codex review` (high). No security-sensitive paths.
+
+### Findings
+
+No retained findings. This is the current-main merge required to refresh the review basis; the imported changes are not part of the PR's authored S1 diff.
+
+
