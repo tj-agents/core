@@ -104,11 +104,12 @@
 - Kind: bug. Observed/reported: 2026-10-12; profile repair found 208 cached files against 331 source files, including 61 missing skill definitions. Cause: confirmed Claude normal-profile synchronization omits torn-package checks and alias migration; installation discards `installPath` and `gitCommitSha`, and external groups ignores a different ref when `sourceURL` matches.
 - Impact and priority: P2; synchronization can accept incomplete packages, discard source identity and pin information, and retain obsolete aliases.
 - Source owner: tj-agents/core Claude normal-profile synchronization and profile-repair workflow.
-- State: in-progress.
-- Repair link: `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateAndProfileRepair`.
-- Next action: repair and review package completeness checks, preservation and validation of install source and commit pin, and alias migration.
+- State: resolved.
+- Repair link: PR #235, merged head `9690bff537e90f82c3c3a562c1ffa54a57c334e0`.
+- Next action: none for the synchronization defect; fresh Claude-session acceptance remains owned by the existing goal under the user session limit.
 - Resolution condition: sync rejects torn packages, preserves and validates `installPath` and `gitCommitSha`, handles differing refs despite matching `sourceURL`, and migrates obsolete aliases; focused checks and Windows/Linux CI pass before guarded merge.
 - Verification evidence: canonical `engineering@tj-agents` pinned at v2.1.15 has 52 skills; cached state had 208 files versus 331 source files, with 61 skill definitions missing. Existing `dotnet@dotnet` and `react@react` entries point to nonexistent identities. No fresh Claude-session acceptance is claimed.
+- Delivery evidence: independent review approved and exact-head Windows/Linux CI run `38336373168` passed before guarded merge at `8b33980747476f9369c1b39497908226c2990b21`.
 
 ## B009 - Stop dispatcher omits a blocking decision when its gate is missing
 - Kind: bug. Observed/reported: 2026-10-12; transcript `fed1d447-ae67-4078-99a5-a813156cf86a`, line 1299, records `continuation_stop` and `callout_repair` returning `missingworkflow_route` and `missingworktree_cleanup_gate` in 1584 ms, exit 0, empty stdout. Cause: confirmed dispatcher fails to emit the required blocking decision when a workflow route or cleanup gate is missing (D2).
