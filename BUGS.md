@@ -137,3 +137,4 @@
 - Verification evidence: actual settings/declaration read; STOP_CLASSES and resolver inspected; delivery-bind returned auto_merge=true, standing=auto, merge_authorization.mode=absent, stopped_by.class=published-contract and path=.agents/engineering/contract/committing/SKILL.md. PR234 run38323860505 guard/Windows/Linux succeeded, review watermark equals its remote head, and the agent nevertheless asked for manual merge. No causal repair has been implemented or verified.
 
 **Record identity:** transferred from branch-local B009 on Fix/InertCloseoutCadence; main B009 already names a different defect, so B010 is this defect's canonical main ID. The earlier branch references remain historical aliases.
+
