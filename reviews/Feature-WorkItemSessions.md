@@ -5,7 +5,7 @@
 > irreversible or ambiguous finding: record its durable disposition, take the safe path, and keep going.
 
 **Review status:** `complete`
-**Reviewed up to commit:** `67b45a87b390a722727dc6f428ff08922113b238`  `(2026-10-13)`
+**Reviewed up to commit:** `3df86558f1dfb2193989cd6db054d8596ffb64a3`  `(2026-10-13)`
 **Judgment:** `changes-requested`
 
 ## Review pass — 2026-10-12 — full
@@ -115,7 +115,7 @@ No findings. R7 and R8 dispositions verified.
 Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). No security-sensitive paths. Resume registration verification is out of scope here (PR #233).
 
 ```agent-host-coverage
-{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"67b45a87b390a722727dc6f428ff08922113b238","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"tests/test_session_store.py and tests/test_work_item_sessions.py pass on Windows (90 session tests), but R9 shows the packaged SessionStart loader cannot find session_store.py."},"exception":{"constraint_evidence":"register_session.py _load_session_store candidates miss PLUGIN_ROOT/resources/machine/scripts/session_store.py in the packaged layout (R9).","supported_other_host_outcome":"Codex shares the same loader defect; neither host records SessionStart until R9 is fixed."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"Same source tests; test_codex_windows_hook_commands passes; the packaged SessionStart loader defect R9 applies."},"exception":{"constraint_evidence":"Same R9 loader path miss; Codex additionally has no SessionEnd hook, so hand-closed Codex tabs read as interrupted by design.","supported_other_host_outcome":"Claude records SessionEnd once R9 is fixed."}}]}
+{"schema_version":1,"shared_source":".agents/machine/scripts/session_store.py","candidate_head":"3df86558f1dfb2193989cd6db054d8596ffb64a3","hosts":[{"host":"claude","behavior":"Hooks record Claude session start, turns, stop and end in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Claude sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Claude machine-hooks.json SessionStart (register_session.py), UserPromptSubmit, Stop and SessionEnd entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"tests/test_session_store.py, tests/test_work_item_sessions.py, tests/test_register_session.py (packaged-layout loader) and tests/test_finish.py pass on Windows: focused suite 219 OK, 1 skip; R22-R31 remain open."},"exception":{"constraint_evidence":"Ownership is inferred from session rows and claim's transaction is broken by inner commits (R22-R24); interrupted --resume skips the staleness check (R25).","supported_other_host_outcome":"Codex shares the same loader defect; neither host records SessionStart until R9 is fixed."}},{"host":"codex","behavior":"Hooks record Codex session start, turns and stop in sessions.db; work_item_sessions claims, reports, resumes and lists interrupted Codex sessions.","source":".agents/machine/scripts/session_store.py","mapping":"Codex machine-hooks.json SessionStart via hook_dispatch (register_session.py), UserPromptSubmit and Stop entries; recover-agents routes the CLI.","verification":{"level":"source","result":"limited","evidence":"tests/test_session_store.py, tests/test_work_item_sessions.py, tests/test_register_session.py (packaged-layout loader) and tests/test_finish.py pass on Windows: focused suite 219 OK, 1 skip; R22-R31 remain open."},"exception":{"constraint_evidence":"Ownership is inferred from session rows and claim's transaction is broken by inner commits (R22-R24); interrupted --resume skips the staleness check (R25).","supported_other_host_outcome":"Claude records SessionEnd once R9 is fixed."}}]}
 ```
 
 ### Findings
@@ -180,3 +180,57 @@ Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-
   State that `--resume` performs the same guarded reopen, limited to rows confirmed dead on this machine (mirror in
   `catalog.json`'s harness field).
   Fixed: justification states `interrupted --resume` and `resume` perform the guarded reopen; mirrored in `catalog.json`; `sync_harness_manifests.py --check` passes.
+
+## Review pass — 2026-10-13 — incremental
+
+**Candidate base:** `67b45a87b390a722727dc6f428ff08922113b238`
+**Candidate head:** `3df86558f1dfb2193989cd6db054d8596ffb64a3`
+**Candidate branch:** `Feature/WorkItemSessions`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:586570d98298965c232fa061a28417a1503ff89c34691ea1beb67ff9d2af8bc7` `(16 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\64gSe6piqVGbjP6v6C6hB4\_OPV8coGTPixhNEBpA_S9k`
+**Candidate bundle identity:** `sha256:a83ed0e2732ddd9d740a78d724851b6dcafeae49b5587cbcad4f2fe66a6084ae`
+**Work-order path:** `reviews/Feature-WorkItemSessions.md`
+**Work-order mode:** `append`
+**Pass judgment:** `changes-requested`
+
+Native layer: Claude Code `code-review` skill (high). Lens: `workflow` (`review-lens`). The lens's report that removing the
+2026-10-12 coverage record was improper is not retained: `base:plan-artifacts` keeps one moving coverage record per
+work order and the host check rejects a second one.
+
+### Findings
+
+- [ ] **R22 — MEDIUM — native, workflow** — `.agents/machine/scripts/work_item_sessions.py:219`
+  Inside claim's `BEGIN IMMEDIATE`, `transfer_ownership` calls `end_session`, which commits and releases the lock before
+  `set_session_ownership`, so a concurrent claim can take ownership in the gap and a failure leaves no owner. Move claim
+  and handoff into one store function whose statements share a single transaction with no inner commits.
+- [ ] **R23 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:302`
+  Claim never demotes an earlier owner that ended `closed`, so after close, reclaim and close, `resume` without
+  `--handle` sees two owners. Keep at most one `role = 'owner'` row per work item: a claim demotes every other owner row
+  in the same transaction.
+- [ ] **R24 — MEDIUM — native** — `.agents/machine/scripts/session_store.py:228`
+  A former owner ended `closed`/`finished` that is resumed with `--handle` comes back as a second live owner; only the
+  `handed_off` case clears its role. The single-owner-row rule (R23) removes this; handoff also demotes the predecessor.
+- [ ] **R25 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:356`
+  `interrupted --resume` reopens without the worktree staleness check that `resume` applies, contrary to the
+  auto-approval justification. Resume only rows whose read-time status is `closed`.
+- [ ] **R26 — LOW — native** — `.agents/machine/scripts/session_store.py:154`
+  The combined `rev-parse HEAD … --git-common-dir` probe fails as a whole on an unborn HEAD, losing the repository
+  identity. Fall back to `--git-common-dir` and `symbolic-ref -q HEAD` when the fast probe fails.
+- [ ] **R27 — LOW — native** — `.agents/machine/scripts/session_store.py:161`
+  `--abbrev-ref HEAD` can return `heads/<name>` for an ambiguous name, which never equals `branch --show-current`, so
+  the row stays stale. Record the branch from `--symbolic-full-name HEAD` with `refs/heads/` stripped, and compare the
+  same form.
+- [ ] **R28 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:386`
+  `item` creates a work item with the default branch recorded, re-enabling cross-attachment of default-branch sessions.
+  Apply the default-branch rule wherever a work item's branch is written.
+- [ ] **R29 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:209`
+  An item first claimed on the default branch keeps `branch = NULL` after a later claim from its feature branch, so
+  auto-attach never works. Set the branch on claim when it is NULL and the current branch is not the default.
+- [ ] **R30 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:162`
+  A live session reports its worktree status (`stale`/`unknown`) instead of `live`, inviting a competing owner. Report
+  `live` for a live session; staleness applies only to resumable rows.
+- [ ] **R31 — LOW — native** — `.agents/machine/scripts/session_store.py:141`
+  Legacy Azure DevOps remotes (`<org>.visualstudio.com/<project>/_git/<repo>`, `vs-ssh.visualstudio.com:v3/...`) are not
+  unified with `dev.azure.com`, and the path is not case-folded as documented. Map both to
+  `dev.azure.com/<org>/<project>/_git/<repo>` and lowercase the identity.
