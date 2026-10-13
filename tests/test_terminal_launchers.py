@@ -74,6 +74,8 @@ class TerminalLaunchersTests(unittest.TestCase):
         with mock.patch.object(CODEX, "command_for_target", return_value=["native-codex", "--help"]), \
                 mock.patch.object(CODEX.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "older CLI", "")):
             self.assertFalse(CODEX.supports_no_daemon("codex.cmd"))
+        with mock.patch.object(CODEX, "command_for_target", side_effect=COMMAND.agent_cli.LaunchError("native missing")):
+            self.assertFalse(CODEX.supports_no_daemon("codex.cmd"))
 
     def test_typed_hook_option_reaches_the_cli_argument_list(self):
         with tempfile.TemporaryDirectory(prefix="literal terminal option ") as directory:
