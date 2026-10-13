@@ -178,6 +178,20 @@ From a core checkout, run it directly:
 python -B .agents/machine/scripts/claude_standards_sync.py --project <directory>
 ```
 
+The ordinary command refreshes enabled Claude packages. Except in `--check` mode, it also invokes best-effort
+permission synchronization for Claude allowlist entries and their state sidecar, plus Codex prefix rules.
+
+To deliberately consolidate authenticated legacy Claude profile aliases into `<plugin>@tj-agents`, preview the
+profile change first. On Windows run:
+
+```powershell
+python -B .agents/machine/scripts/claude_standards_sync.py --project <directory> --migrate-profile --check
+```
+
+On Linux or macOS run the same command with `python3`. After reviewing the preview, omit `--check` to apply it.
+The migration checks the supplied project and registered project/local plugin roots before changing the user profile;
+it defers a selection when one of those roots preserves a conflicting legacy choice.
+
 Codex treats `INSTALLED_BY_DEFAULT` as marketplace policy, not a CLI dependency resolver. Register the
 marketplace, then install all three packages explicitly:
 
