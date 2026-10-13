@@ -56,6 +56,11 @@ CREATE TABLE IF NOT EXISTS sessions (
 )
 """
 
+SESSIONS_ONE_OWNER_INDEX = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_one_owner_per_work_item
+ON sessions(work_item) WHERE role = 'owner'
+"""
+
 _SSH_SCP_RE = re.compile(r"^[^/@\s]+@(?P<host>[^:/\s]+):(?P<path>.+)$")
 
 
@@ -81,12 +86,13 @@ def connect(path=None):
 
 
 def _ensure_schema(connection):
+    connection.execute(WORK_ITEMS_SCHEMA)
+    connection.execute(SESSIONS_SCHEMA)
+    connection.execute(SESSIONS_ONE_OWNER_INDEX)
     version = connection.execute("PRAGMA user_version").fetchone()[0]
     if version < SCHEMA_VERSION:
-        connection.execute(WORK_ITEMS_SCHEMA)
-        connection.execute(SESSIONS_SCHEMA)
         connection.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
-        connection.commit()
+    connection.commit()
 
 
 def current_machine():
@@ -101,18 +107,25 @@ def profile_directory(host):
     return str(Path(value))
 
 
-def _git(cwd, *args, timeout=GIT_TIMEOUT):
+def _run_git(cwd, args, timeout):
     try:
         result = subprocess.run(
             ["git", "-C", str(cwd), *args],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
         )
+    except subprocess.TimeoutExpired:
+        return None, True
     except (OSError, subprocess.SubprocessError):
-        return None
+        return None, False
     if result.returncode != 0:
-        return None
+        return None, False
     output = result.stdout.strip()
-    return output or None
+    return (output or None), False
+
+
+def _git(cwd, *args, timeout=GIT_TIMEOUT):
+    output, _timed_out = _run_git(cwd, args, timeout)
+    return output
 
 
 def _host_and_path(url):
@@ -154,9 +167,13 @@ def _normalise_remote(url):
         parts = [part for part in path.split("/") if part]
         if parts and parts[0].casefold() == "defaultcollection":
             parts = parts[1:]
-        if len(parts) != 3 or parts[1] != "_git":
+        if len(parts) == 2 and parts[0] == "_git":
+            repository = parts[1]
+            project = repository
+        elif len(parts) == 3 and parts[1] == "_git":
+            project, _git_segment, repository = parts
+        else:
             return None
-        project, _git_segment, repository = parts
         host = "dev.azure.com"
         path = f"{org}/{project}/_git/{repository}"
     return f"{host}/{path}".casefold()
@@ -170,7 +187,9 @@ def _branch_from_symbolic_ref(value):
 
 
 def _rev_parse_probe(cwd, timeout):
-    output = _git(cwd, "rev-parse", "HEAD", "--git-common-dir", "--symbolic-full-name", "HEAD", timeout=timeout)
+    output, timed_out = _run_git(
+        cwd, ["rev-parse", "HEAD", "--git-common-dir", "--symbolic-full-name", "HEAD"], timeout,
+    )
     if output:
         lines = output.splitlines()
         if len(lines) >= 3:
@@ -178,14 +197,17 @@ def _rev_parse_probe(cwd, timeout):
             common_dir = lines[1].strip() or None
             branch = _branch_from_symbolic_ref(lines[2].strip())
             return head, branch, common_dir
+    if timed_out:
+        return None, None, None
     common_dir = _git(cwd, "rev-parse", "--git-common-dir", timeout=timeout)
+    if not common_dir:
+        return None, None, None
     symbolic = _git(cwd, "symbolic-ref", "-q", "HEAD", timeout=timeout)
     branch = _branch_from_symbolic_ref(symbolic)
-    return None, branch, (common_dir.strip() if common_dir else None)
+    return None, branch, common_dir
 
 
 def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
-    """Resolve repo identity, branch and HEAD, falling back to extra probes on an unborn HEAD."""
     origin = _git(cwd, "config", "--get", "remote.origin.url", timeout=timeout)
     head, branch, common_dir = _rev_parse_probe(cwd, timeout)
     repo = _normalise_remote(origin) if origin else None
@@ -364,18 +386,13 @@ def upsert_work_item(connection, key, repo, feature, item, status=None, branch=N
     connection.commit()
 
 
-def set_work_item_status(connection, key, status, pr=None):
+def set_work_item_status(connection, key, status, pr=None, branch=None):
     connection.execute(
-        "UPDATE work_items SET status = ?, pr = COALESCE(?, pr), updated_at = ? WHERE key = ?",
-        (status, pr, time.time(), key),
-    )
-    connection.commit()
-
-
-def set_work_item_branch_if_unset(connection, key, branch):
-    connection.execute(
-        "UPDATE work_items SET branch = ?, updated_at = ? WHERE key = ? AND branch IS NULL",
-        (branch, time.time(), key),
+        """
+        UPDATE work_items SET status = ?, pr = COALESCE(?, pr), branch = COALESCE(branch, ?), updated_at = ?
+        WHERE key = ?
+        """,
+        (status, pr, branch, time.time(), key),
     )
     connection.commit()
 
@@ -399,13 +416,7 @@ def _demote_other_owners_locked(connection, item, keep_handle):
     )
 
 
-def claim_work_item(connection, handle, key, role, predecessor=None):
-    """Atomically claim ``role`` on ``key`` for ``handle``, keeping at most one live 'owner' row.
-
-    Runs under a single ``BEGIN IMMEDIATE`` transaction with no inner commits: the live-owner
-    check, any handoff, the demotion of every other owner row for the key, and this handle's own
-    ownership write all land in one commit, or none of them do.
-    """
+def claim_work_item(connection, handle, key, role, predecessor=None, branch=None):
     connection.execute("BEGIN IMMEDIATE")
     try:
         removed = None
@@ -422,6 +433,11 @@ def claim_work_item(connection, handle, key, role, predecessor=None):
                     )
             _demote_other_owners_locked(connection, key, handle)
         _set_session_ownership_locked(connection, handle, role, key, predecessor=predecessor)
+        if role == "owner" and branch:
+            connection.execute(
+                "UPDATE work_items SET branch = COALESCE(branch, ?), updated_at = ? WHERE key = ?",
+                (branch, time.time(), key),
+            )
         connection.commit()
         return removed
     except Exception:

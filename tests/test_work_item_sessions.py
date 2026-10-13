@@ -367,6 +367,33 @@ class WorkItemSessionsTests(unittest.TestCase):
                 WIS.cmd_resume("example-feature/example-item", cwd=self.repo)
         recovery.open_session.assert_not_called()
 
+    def test_resume_refuses_a_handed_off_predecessor_handle_while_its_successor_owns_the_item(self):
+        self._claim_claude()
+        self._claim_codex(role="owner", predecessor="claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875")
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            with self.assertRaises(ValueError):
+                WIS.cmd_resume(
+                    "example-feature/example-item",
+                    handle="claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875",
+                    cwd=self.repo,
+                )
+        recovery.open_session.assert_not_called()
+
+    def test_resume_refuses_a_finished_session_handle(self):
+        self._claim_claude()
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"}, clear=False):
+            WIS.cmd_end("claude", "finished")
+        recovery = fake_recovery(liveness_result="closed")
+        with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
+            with self.assertRaises(ValueError):
+                WIS.cmd_resume(
+                    "example-feature/example-item",
+                    handle="claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875",
+                    cwd=self.repo,
+                )
+        recovery.open_session.assert_not_called()
+
     def test_concurrent_claims_wrap_the_live_owner_check_and_write_in_one_transaction(self):
         original_live_owners = STORE.live_owners
 
@@ -545,13 +572,25 @@ class WorkItemSessionsTests(unittest.TestCase):
         self.assertIsNone(item["branch"])
 
         self._run_git(self.repo, "checkout", "-b", "feature-branch")
-        self._claim_codex(role="bounded: docs")
+        self._claim_claude()
         connection = self._connection()
         try:
             item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
         finally:
             connection.close()
         self.assertEqual("feature-branch", item["branch"])
+
+    def test_claim_bounded_role_does_not_fill_a_null_branch(self):
+        self._run_git(self.repo, "branch", "-M", "main")
+        self._claim_claude()
+        self._run_git(self.repo, "checkout", "-b", "feature-branch")
+        self._claim_codex(role="bounded: docs")
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertIsNone(item["branch"])
 
     def test_ambiguous_tag_and_branch_name_does_not_make_the_row_stale(self):
         self._run_git(self.repo, "checkout", "-b", "shared-name")
@@ -561,6 +600,64 @@ class WorkItemSessionsTests(unittest.TestCase):
         with mock.patch.object(WIS, "_agent_recovery", return_value=recovery):
             result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
         self.assertEqual("closed", result["sessions"][0]["status"])
+
+    def test_item_status_fills_a_null_branch_from_a_non_default_branch(self):
+        self._run_git(self.repo, "branch", "-M", "main")
+        WIS.cmd_item("example-feature/example-item", "active", cwd=self.repo)
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertIsNone(item["branch"])
+
+        self._run_git(self.repo, "checkout", "-b", "feature-branch")
+        WIS.cmd_item("example-feature/example-item", "active", cwd=self.repo)
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertEqual("feature-branch", item["branch"])
+
+    def test_interrupted_computes_each_rows_status_once_even_when_resuming(self):
+        self._claim_claude()
+        connection = self._connection()
+        try:
+            STORE.start_session(
+                connection, "claude", "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", self.repo,
+                pid=999999999, pid_started_at=1234.0,
+            )
+        finally:
+            connection.close()
+        register_session = WIS._register_session()
+        recovery = fake_recovery(liveness_result="closed")
+        original_status = WIS._read_time_status
+        calls = []
+
+        def counting_status(row, machine):
+            calls.append(row["handle"])
+            return original_status(row, machine)
+
+        with mock.patch.object(register_session, "build_process_lookup", return_value=lambda pid: None), \
+                mock.patch.object(WIS, "_agent_recovery", return_value=recovery), \
+                mock.patch.object(WIS, "_read_time_status", side_effect=counting_status):
+            WIS.cmd_interrupted(
+                resume_handles=["claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"], cwd=self.repo,
+            )
+        self.assertEqual(1, calls.count("claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"))
+
+    def test_claim_resolves_repo_branch_and_head_once(self):
+        original = STORE._collect_repo_branch_head
+        calls = []
+
+        def counting(cwd, timeout=STORE.HOOK_GIT_TIMEOUT):
+            calls.append(cwd)
+            return original(cwd, timeout=timeout)
+
+        with mock.patch.object(STORE, "_collect_repo_branch_head", side_effect=counting):
+            self._claim_claude()
+        self.assertEqual(2, len(calls))
 
 
 if __name__ == "__main__":

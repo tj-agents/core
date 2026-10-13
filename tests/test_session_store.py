@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,23 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual("wal", connection.execute("PRAGMA journal_mode").fetchone()[0].lower())
         self.assertEqual(1, connection.execute("PRAGMA foreign_keys").fetchone()[0])
 
+    def test_partial_unique_index_enforces_one_owner_row_per_work_item(self):
+        connection = STORE.connect(self.db_path)
+        self.addCleanup(connection.close)
+        connection.execute(
+            "INSERT INTO work_items (key, repo, feature, item, status) VALUES ('key-1', 'repo', 'f', 'i', 'active')"
+        )
+        connection.execute(
+            "INSERT INTO sessions (handle, host, session_id, role, work_item) "
+            "VALUES ('claude:a', 'claude', 'a', 'owner', 'key-1')"
+        )
+        connection.commit()
+        with self.assertRaises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO sessions (handle, host, session_id, role, work_item) "
+                "VALUES ('codex:b', 'codex', 'b', 'owner', 'key-1')"
+            )
+
 
 @unittest.skipUnless(GIT, "git is required for repo-identity and hook lifecycle tests")
 class RepoIdentityTests(unittest.TestCase):
@@ -143,6 +161,16 @@ class RepoIdentityTests(unittest.TestCase):
         repo = _init_repo(self.root / "legacy-vso-ssh", origin="git@vs-ssh.visualstudio.com:v3/org/project/repo")
         self.assertEqual("dev.azure.com/org/project/_git/repo", STORE.repo_identity(repo))
 
+    def test_legacy_visualstudio_short_form_without_defaultcollection_uses_repo_as_project(self):
+        repo = _init_repo(self.root / "legacy-vso-short", origin="https://org.visualstudio.com/_git/repo")
+        self.assertEqual("dev.azure.com/org/repo/_git/repo", STORE.repo_identity(repo))
+
+    def test_legacy_visualstudio_short_form_with_defaultcollection_uses_repo_as_project(self):
+        repo = _init_repo(
+            self.root / "legacy-vso-short-dc", origin="https://org.visualstudio.com/DefaultCollection/_git/repo",
+        )
+        self.assertEqual("dev.azure.com/org/repo/_git/repo", STORE.repo_identity(repo))
+
     def test_identity_is_fully_case_folded(self):
         repo = _init_repo(self.root / "case-fold-repo", origin="https://GitHub.com/Tj-Agents/Core.git")
         self.assertEqual("github.com/tj-agents/core", STORE.repo_identity(repo))
@@ -196,6 +224,37 @@ class RepoIdentityTests(unittest.TestCase):
         self.assertLessEqual(len(calls), 3)
         self.assertIsNone(head)
         self.assertIsNotNone(common_dir)
+
+    def test_rev_parse_probe_on_a_non_repository_skips_symbolic_ref(self):
+        directory = self.root / "not-a-repo-probe"
+        directory.mkdir()
+        calls = []
+        original_run = STORE.subprocess.run
+
+        def counting_run(*args, **kwargs):
+            calls.append(args[0])
+            return original_run(*args, **kwargs)
+
+        with mock.patch.object(STORE.subprocess, "run", side_effect=counting_run):
+            head, branch, common_dir = STORE._rev_parse_probe(directory, STORE.GIT_TIMEOUT)
+        self.assertIsNone(head)
+        self.assertIsNone(common_dir)
+        self.assertFalse(any("symbolic-ref" in call for call in calls))
+
+    def test_rev_parse_probe_does_not_fall_back_on_timeout(self):
+        repo = _init_repo(self.root / "timeout-probe-repo")
+        calls = []
+
+        def timeout_run(*args, **kwargs):
+            calls.append(args[0])
+            raise subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout", 0))
+
+        with mock.patch.object(STORE.subprocess, "run", side_effect=timeout_run):
+            head, branch, common_dir = STORE._rev_parse_probe(repo, STORE.GIT_TIMEOUT)
+        self.assertEqual(1, len(calls))
+        self.assertIsNone(head)
+        self.assertIsNone(branch)
+        self.assertIsNone(common_dir)
 
 
 @unittest.skipUnless(GIT, "git is required for hook lifecycle tests")
@@ -333,7 +392,7 @@ class HookLifecycleTests(unittest.TestCase):
                     STORE.start_session(connection, "claude", f"thread-{index}", self.repo)
                 finally:
                     connection.close()
-            except Exception as error:  # noqa: BLE001 - collected for the assertion below
+            except Exception as error:  # noqa: BLE001
                 errors.append(error)
 
         threads = [threading.Thread(target=write, args=(index,)) for index in range(8)]
@@ -475,7 +534,7 @@ class ClaimWorkItemTests(unittest.TestCase):
             own_connection = self._connection()
             try:
                 STORE.claim_work_item(own_connection, handle, "key-1", "owner", predecessor="claude:a")
-            except Exception as error:  # noqa: BLE001 - collected for the assertion below
+            except Exception as error:  # noqa: BLE001
                 errors[name] = error
             finally:
                 own_connection.close()
@@ -511,6 +570,42 @@ class ClaimWorkItemTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertIsNone(row["role"])
+
+    def test_claim_work_item_refused_owner_claim_leaves_branch_unchanged(self):
+        connection = self._connection()
+        try:
+            self._seed_work_item(connection, "key-1")
+            STORE.ensure_session(connection, "claude", "a")
+            STORE.set_session_ownership(connection, "claude:a", "owner", "key-1")
+            STORE.ensure_session(connection, "codex", "b")
+            with self.assertRaises(ValueError):
+                STORE.claim_work_item(connection, "codex:b", "key-1", "owner", branch="feature-branch")
+            item = STORE.get_work_item(connection, "key-1")
+        finally:
+            connection.close()
+        self.assertIsNone(item["branch"])
+
+    def test_claim_work_item_bounded_claim_leaves_branch_unchanged(self):
+        connection = self._connection()
+        try:
+            self._seed_work_item(connection, "key-1")
+            STORE.ensure_session(connection, "codex", "b")
+            STORE.claim_work_item(connection, "codex:b", "key-1", "bounded: docs", branch="feature-branch")
+            item = STORE.get_work_item(connection, "key-1")
+        finally:
+            connection.close()
+        self.assertIsNone(item["branch"])
+
+    def test_claim_work_item_successful_owner_claim_fills_branch(self):
+        connection = self._connection()
+        try:
+            self._seed_work_item(connection, "key-1")
+            STORE.ensure_session(connection, "codex", "b")
+            STORE.claim_work_item(connection, "codex:b", "key-1", "owner", branch="feature-branch")
+            item = STORE.get_work_item(connection, "key-1")
+        finally:
+            connection.close()
+        self.assertEqual("feature-branch", item["branch"])
 
 
 if __name__ == "__main__":

@@ -263,33 +263,42 @@ case-folded repository key — `sessions.db` has never shipped, so no recorded r
 
 ### Findings
 
-- [ ] **R32 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:172`
+- [x] **R32 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:172`
   `_read_time_status` returns `closed` for rows ended `finished` or `handed_off`, so `resume --handle` (and the R25 gate)
   can reopen a handed-off session beside its live successor in the same worktree. Report those rows as `finished` /
   `handed_off` so only `closed` rows resume.
-- [ ] **R33 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:216`
+  Fixed: ended rows report `finished`/`handed_off`; only `closed` resumes; tests refuse a handed-off predecessor and a finished session.
+- [x] **R33 — MEDIUM — native** — `.agents/machine/scripts/work_item_sessions.py:216`
   `set_work_item_branch_if_unset` commits before `claim_work_item` and runs for every claimer, so a refused owner claim
   or a bounded helper permanently sets the work item's branch. Fill the branch inside `claim_work_item`'s transaction,
   only for a successful owner claim.
-- [ ] **R34 — LOW — native** — `.agents/machine/scripts/session_store.py:413`
+  Fixed: `claim_work_item` fills a NULL branch in its own transaction, only on a successful owner claim; refused and bounded claims leave it unchanged.
+- [x] **R34 — LOW — native** — `.agents/machine/scripts/session_store.py:413`
   The single-owner rule lives only in `claim_work_item`. Add a partial unique index on `sessions(work_item)` where
   `role = 'owner'` so the database enforces it.
-- [ ] **R35 — LOW — native** — `.agents/machine/scripts/session_store.py:157`
+  Fixed: partial unique index `idx_sessions_one_owner_per_work_item`; schema creation is idempotent; a second owner row raises `IntegrityError`.
+- [x] **R35 — LOW — native** — `.agents/machine/scripts/session_store.py:157`
   Short legacy remotes `https://<org>.visualstudio.com/[DefaultCollection/]_git/<repo>` (project named after the
   repository) normalise to nothing and fall back to the local path. Map them to
   `dev.azure.com/<org>/<repo>/_git/<repo>`.
-- [ ] **R36 — LOW — native, workflow** — `.agents/machine/scripts/session_store.py:181`
+  Fixed: short `visualstudio.com/[DefaultCollection/]_git/<repo>` maps to `dev.azure.com/<org>/<repo>/_git/<repo>`; tested.
+- [x] **R36 — LOW — native, workflow** — `.agents/machine/scripts/session_store.py:181`
   The unborn-HEAD fallback also runs after a non-repository cwd or a timeout, and runs `symbolic-ref` even when
   `--git-common-dir` failed, doubling hook git work. Fall back only on a non-timeout failure and skip `symbolic-ref`
   without a common dir.
-- [ ] **R37 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:340`
+  Fixed: no fallback after a timeout, and `symbolic-ref` only runs when `--git-common-dir` succeeded; tested.
+- [x] **R37 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:340`
   `interrupted` computes each row's read-time status (process table plus git) and recomputes it for every `--resume`
   handle. Compute once per row and reuse it.
-- [ ] **R38 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:386`
+  Fixed: `interrupted` computes each row's status once and reuses it for `--resume`; tested.
+- [x] **R38 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:386`
   `item --status` on an existing item with a NULL branch never fills it from a non-default branch. Apply the same
   branch fill as `claim`.
-- [ ] **R39 — LOW — native** — `.agents/machine/scripts/session_store.py:403`
+  Fixed: `item --status` fills a NULL branch from a non-default branch in the same update; tested.
+- [x] **R39 — LOW — native** — `.agents/machine/scripts/session_store.py:403`
   The new `claim_work_item` and `_collect_repo_branch_head` docstrings narrate design and behaviour, against the global
   no-comment rule; the test's `# noqa` explanation likewise. Remove them.
-- [ ] **R40 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:213`
+  Fixed: narration docstrings removed; tests keep a bare `# noqa: BLE001`.
+- [x] **R40 — LOW — native** — `.agents/machine/scripts/work_item_sessions.py:213`
   `claim` resolves repository, branch and HEAD twice. Resolve them once and reuse the result.
+  Fixed: `claim` and `item` resolve repository, branch and HEAD once through `_require_repo_branch_head`; tested.

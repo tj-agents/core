@@ -107,6 +107,14 @@ def _require_repo(cwd):
     return repo
 
 
+def _require_repo_branch_head(cwd):
+    store = _session_store()
+    repo, branch, head = store._collect_repo_branch_head(cwd, timeout=store.GIT_TIMEOUT)
+    if not repo:
+        raise ValueError(f"could not determine a git repository identity from {cwd}")
+    return repo, branch, head
+
+
 def _current_session_id(host):
     variable = "CODEX_THREAD_ID" if host == "codex" else "CLAUDE_CODE_SESSION_ID"
     return os.environ.get(variable)
@@ -168,9 +176,8 @@ def _read_time_status(row, machine):
             return "live"
         if liveness == "unknown":
             return "unknown"
-    resumable = not ended or row.get("end_reason") == "closed"
-    if not resumable:
-        return "closed"
+    if ended and row.get("end_reason") in ("finished", "handed_off"):
+        return row["end_reason"]
     worktree = _worktree_status(row)
     return worktree if worktree in ("stale", "unknown") else "closed"
 
@@ -201,21 +208,18 @@ def cmd_claim(work_item, host, role=None, predecessor=None, cwd=None):
     cwd = cwd or Path.cwd()
     feature, item = _parse_work_item(work_item)
     role = _validate_role(role)
-    repo = _require_repo(cwd)
+    repo, branch, _head = _require_repo_branch_head(cwd)
     key = store.work_item_key(repo, feature, item)
     session_id = _require_session_id(host)
     handle = store.session_handle(host, session_id)
-    branch, _head = store.current_branch_and_head(cwd)
     record_branch = _branch_to_record(cwd, branch)
     connection = store.connect()
     try:
         store.ensure_session(connection, host, session_id, cwd)
         if store.get_work_item(connection, key) is None:
             store.upsert_work_item(connection, key, repo, feature, item, status="active", branch=record_branch)
-        elif record_branch:
-            store.set_work_item_branch_if_unset(connection, key, record_branch)
         result = {"handle": handle, "work_item": f"{feature}/{item}"}
-        removed = store.claim_work_item(connection, handle, key, role, predecessor=predecessor)
+        removed = store.claim_work_item(connection, handle, key, role, predecessor=predecessor, branch=record_branch)
         if removed:
             result["removed"] = removed
         return result
@@ -333,11 +337,12 @@ def cmd_interrupted(resume_handles=None, cwd=None):
         if (row.get("machine") or "").casefold() == machine.casefold()
         and _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
     ]
+    statuses = {row["handle"]: _read_time_status(row, machine) for row in dead}
     grouped = {}
     for row in dead:
         label = item_names.get(row["work_item"], "(unclaimed)")
         grouped.setdefault(label, []).append(
-            {"handle": row["handle"], "turn_state": row["turn_state"], "status": _read_time_status(row, machine)}
+            {"handle": row["handle"], "turn_state": row["turn_state"], "status": statuses[row["handle"]]}
         )
     result = {"interrupted": grouped}
     if resume_handles:
@@ -345,7 +350,7 @@ def cmd_interrupted(resume_handles=None, cwd=None):
         for handle in resume_handles:
             if handle not in by_handle:
                 raise ValueError(f"{handle!r} is not a listed interrupted session")
-            status = _read_time_status(by_handle[handle], machine)
+            status = statuses[handle]
             if status != "closed":
                 raise ValueError(f"{handle}: {status}; resume only a session confirmed closed on this machine")
         recovery = _agent_recovery()
@@ -375,16 +380,15 @@ def cmd_item(work_item, status, pr=None, cwd=None):
     store = _session_store()
     feature, item = _parse_work_item(work_item)
     cwd = cwd or Path.cwd()
-    repo = _require_repo(cwd)
+    repo, branch, _head = _require_repo_branch_head(cwd)
+    record_branch = _branch_to_record(cwd, branch)
     key = store.work_item_key(repo, feature, item)
     connection = store.connect()
     try:
         if store.get_work_item(connection, key) is None:
-            branch, _head = store.current_branch_and_head(cwd)
-            record_branch = _branch_to_record(cwd, branch)
             store.upsert_work_item(connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr)
         else:
-            store.set_work_item_status(connection, key, status, pr=pr)
+            store.set_work_item_status(connection, key, status, pr=pr, branch=record_branch)
     finally:
         connection.close()
     return {"work_item": f"{feature}/{item}", "status": status}
