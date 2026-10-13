@@ -118,7 +118,7 @@ def legacy_conflict(root, transport, windows=None):
     if not windows:
         return
     result = transport.run([scheduler._powershell(), "-NoProfile", "-NonInteractive", "-Command",
-                            LEGACY_WINDOWS_SCRIPT], timeout=8)
+                            LEGACY_WINDOWS_SCRIPT], timeout=scheduler.WINDOWS_READ_QUERY_TIMEOUT)
     if result.returncode:
         detail = (result.stderr or result.stdout or "").strip()
         raise scheduler.SchedulerError("legacy ScheduledTasks query failed" + ((": " + detail) if detail else ""))
@@ -329,7 +329,7 @@ def wake(owner, root, path, args, transport):
 def list_registrations(transport):
     if os.name == "nt":
         result = scheduler._result(transport, [scheduler._powershell(), "-NoProfile", "-NonInteractive", "-Command",
-            "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);Get-ScheduledTask -TaskName 'AgentStandards-Continuation-*' -ErrorAction SilentlyContinue|Select-Object TaskName,TaskPath,State,Description|ConvertTo-Json -Compress"], timeout=8)
+            "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);Get-ScheduledTask -TaskName 'AgentStandards-Continuation-*' -ErrorAction SilentlyContinue|Select-Object TaskName,TaskPath,State,Description|ConvertTo-Json -Compress"], timeout=scheduler.WINDOWS_READ_QUERY_TIMEOUT)
         try:
             entries = json.loads(result.stdout) if result.stdout.strip() else []
         except ValueError as error:
