@@ -42,6 +42,16 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Resolved when:** The workflow demonstrates continued ownership through a delayed result, including correct reporting when continuation is unavailable.
 
+**2026-10-13 recurrence:** Tommy again reported that no background watcher means he must keep returning to check progress. In this closeout owner, Windows ScheduledTasks enumeration timed out after eight seconds before wake registration; no scheduler was ever registered. The foreground CI monitor ended after the recorded merge hold. The current owner is blocked on the user-deferred policy repair, with no foreground or child and no unattended wake. Saved ownership alone does not provide background continuation.
+
+**Reconciled kind, impact and ownership:** mistake; P1 because repeated manual follow-up defeats the intended unattended delivery. Source owner: tj-agents/core shared continuation activation, scheduler adapter and completion reporting. State: open. The scheduler timeout mechanism is observed; its environmental root cause is unknown. The existing activation repair owns host claim/activation, while the existing scheduler-timeout repair owns the eight-second query failure; these distinct causes are not merged.
+
+**Repair links:** existing `Fix/ContinuationMonitorActivation`, `plans/continuation-monitor-activation/GOAL.md`; existing `Fix/ContinuationSchedulerVerificationTimeout`, `plans/continuation-scheduler-verification-timeout/GOAL.md`, both in Core's corresponding worktrees. This occurrence is retained in `plans/inert-closeout-cadence/GOAL.md`. B010/M016 cover the separate automatic-merge conflict.
+
+**Next action:** reconcile these existing runtime repair owners and verify actual scheduler registration and wake/recovery in the affected host before claiming unattended continuation. Preserve Tommy's repair deferral and seven-session limit; this recording launches no duplicate repair or watcher.
+
+**Verification evidence and unresolved acceptance:** this goal records the registration timeout and absence of a scheduled wake; the current owner has state blocked, foreground null, child null and launches zero. No background progress or repair acceptance is claimed. Resolve M003 only with observed continuation through a delayed delivery result without Tommy polling or restarting it, truthful capability reporting, and preservation of explicit user deferrals.
+
 ## M004 ? Machine repair and repository delivery reported ambiguously
 
 **Status:** Open. **Observed:** 2026-10-11. **Scope:** completion reporting; observed on Codex.
@@ -214,3 +224,33 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - **Next action:** continue the authorized goal with focused repair review, Windows/Linux CI, and guarded normal merge.
 - **Resolution condition:** authorized work reaches its recorded completion criteria; stop-gate repair is reviewed, required Windows/Linux CI passes, and guarded normal merge completes.
 - **Verification evidence:** transcript records the missing workflow route and cleanup gate with exit 0 and empty stdout; investigation found no entities, migrations, endpoints, necessary question, or owned wait that would block continuing. The canonical goal records the next action and branch.
+
+## M016 - Green authorized Core delivery returned another merge question
+
+**Kind:** mistake. **Observed/reported:** 2026-10-13. After reviewing and pushing PR234, observing passing Windows/Linux CI, and marking it ready, this agent asked Tommy to approve a manual merge despite configuration.core.auto_merge=true and the recorded no-reprompt standing instruction. Tommy called out the ineffective configuration and directed that the defect be recorded for later repair.
+
+**Cause:** confirmed process handling error: the agent treated a fresh built-in published-contract classification of canonical workflow instructions as the final human-decision boundary and reported the hold without first recording and owning the configuration/classification conflict as a standards defect. The regex behavior is directly verified; the appropriate future semantic boundary is not yet implemented.
+
+**Impact and priority:** P1; another unnecessary approval interaction interrupts the already green source delivery and undermines the requested automatic workflow.
+
+**Source owner:** tj-agents/core shared delivery classification and session/merge guidance. **State:** deferred. **Repair link:** BUGS.md B010, the single causal repair owner; PR234 and plans/inert-closeout-cadence/GOAL.md retain the source delivery. M015/Fix-RevalidateRecordedMergeGate concerns stale authority and is related, not duplicated here.
+
+**Deferral:** Tommy explicitly requests documentation now and repair later. **blocked_by:** dependency. **Resolver:** Tommy/Core policy owner. **Resume when:** Tommy resumes B010.
+
+**Next action:** execute B010 under a bounded source-owner repair, verify the guarded consumer's actual effective authorization, and resume the original source delivery without treating the mere presence of a configured true value as proof that merge happened.
+
+**Resolution condition:** B010 passes its configuration/classification and preserved-gate regressions, both-host coverage and required delivery checks; an authorized canonical instruction delivery reaches its permitted merge without a repeated routine question.
+
+**Verification evidence:** PR234 reviewed/remote head df36331066f3ac1011415bce0c268f279f6cf771; run38323860505 guard/Windows/Linux green; final user-facing manual-merge question; binder evidence and precise stop regex recorded in B010. The issue is documented, not repaired.
+
+## M017 - Deferred problem records were left only in a feature worktree
+
+- **Kind:** mistake. **Observed/reported:** 2026-10-13; after Tommy asked to retain the automatic-merge and watcher incidents for later repair, this agent updated only Fix/InertCloseoutCadence's BUGS.md, MISTAKES.md and goal, then reported documentation done. PR234 was still unmerged; the shared main records lacked these notes.
+- **Cause:** confirmed destination-selection error: the agent interpreted repository-root as the current linked checkout and treated late closeout bookkeeping as sufficient durable publication. The shared problem-record contract specifies root filenames but does not require prompt default-branch publication independent of feature delivery. The agent failed to reconcile main's ledger or verify discoverability there.
+- **Impact and priority:** P1; unrelated repairs cannot reliably find deferred defects while the feature branch remains unmerged or is retired, and Tommy must intervene again.
+- **Source owner:** Core shared problem-record location/publication contract, write-mistake convention and this agent's completion reporting. **State:** in-progress.
+- **Repair link:** Docs/SharedProblemRecords; related main records B010, M003 and M016; the historical branch-local B009 is B010's alias, not main's existing B009.
+- **Declarative prevention:** Repository-wide bug, mistake and debt records are published promptly to the source repository's default branch through an independent authorized documentation delivery. Feature goals link to those shared records. A mistake record states the causal decision or confirmed uncertainty, the governing-standard gap or enforcement failure, and a declarative prevention rule with an observable acceptance condition. Documentation is complete only after its canonical main destination is verified.
+- **Next action:** reconcile and publish the session records and convention correction independently of PR234, then verify the merged default-branch content. The remaining historical branch-record backlog belongs to resources/TECH_DEBT.md D001.
+- **Resolution condition:** the records and prevention rule are on remote main, existing IDs and unrelated edits are preserved, both host entry points consume the same canonical convention, and completion reporting names the verified destination. A local file or open PR alone does not satisfy publication.
+- **Verification evidence:** fresh origin/main contains B009 for a Stop dispatcher defect and M015 for sandbox termination; the prior branch used B009 for a different automatic-merge defect and had M016 plus this M003 recurrence absent from main. No merged-delivery result is asserted before observation.
