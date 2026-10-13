@@ -343,6 +343,22 @@ class ProfileMigrationTests(StandardsSyncHarness):
         self.assertIn("scoped profile changed or is malformed", output)
         self.assertEqual(self.profile()["enabledPlugins"], {"dotnet@dotagents": True})
 
+    def test_concurrent_alias_removal_preserves_the_new_canonical_choice(self):
+        self.configure_dotnet_sources()
+        self.install("dotnet@dotagents")
+        self.enable({"dotnet@dotagents": True})
+
+        def installed(*args):
+            self.install("dotnet@tj-agents")
+            self.enable({"dotnet@tj-agents": True})
+            return True, ""
+
+        with mock.patch.object(SYNC, "claude", side_effect=installed):
+            code, output = self.migrate()
+        self.assertEqual(code, 1)
+        self.assertIn("affected preferences changed", output)
+        self.assertEqual(self.profile()["enabledPlugins"], {"dotnet@tj-agents": True})
+
     def test_registered_stale_alias_requires_its_own_authenticated_marketplace(self):
         self.configure_dotnet_sources()
         self.install("dotnet@dotagents")

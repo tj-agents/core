@@ -695,8 +695,6 @@ def migrate_profile(config: Path, plugins: Path, project: Path, executable: str 
             apply.append((canonical, aliases, enabled))
         else:
             problems += 1
-            if canonical in installed and expected is None and canonical_value is True:
-                rollback.append(canonical)
             print(f"standards: profile migration deferred for {canonical} because affected preferences changed", file=out)
     if not apply and not rollback:
         return int(bool(problems))
