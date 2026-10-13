@@ -12,7 +12,9 @@ if (-not (Get-Command Invoke-BaseAgentsCodexBeforeNoDaemon -CommandType Function
                 'sandbox', 'debug', 'apply', 'a', 'queue', 'archive', 'delete',
                 'migrate-rollouts', 'unarchive', 'cloud', 'exec-server', 'features', 'help'
             )
-            if ($forward -contains '--no-daemon' -or $forward -contains '--help' -or
+            if ($forward -contains '--no-daemon' -or $forward -contains '--remote' -or
+                @($forward | Where-Object { $_ -like '--remote=*' }).Count -gt 0 -or
+                $forward -contains '--help' -or
                 $forward -contains '-h' -or $forward -contains '--version' -or $forward -contains '-V' -or
                 ($forward.Count -gt 0 -and $forward[0] -in $maintenance)) {
                 & Invoke-BaseAgentsCodexBeforeNoDaemon @forward

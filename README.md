@@ -123,8 +123,10 @@ On Windows, interactive Codex launches through the installed machine profile and
 use `--no-daemon` to avoid the shared daemon's visible hook child consoles. The option is applied to
 interactive starts, resumes, and forks; Codex's batch and maintenance commands keep their normal
 arguments. Reopen a terminal after updating the machine plugin so its profile launcher is current.
+The launcher checks that the installed Codex advertises this option and leaves `--remote` sessions alone;
+older CLIs need an update to receive this Windows workaround.
 For an existing installation that cannot yet refresh the machine plugin, run
-`pwsh shell/install-codex-no-daemon.ps1` to add the same behavior to both PowerShell profiles;
+`pwsh shell/install-codex-no-daemon.ps1` to add the workaround to both PowerShell profiles;
 `-VerifyOnly` checks that local installation.
 
 Claude Code can open a visible Git Bash window for each hook. On Windows, run

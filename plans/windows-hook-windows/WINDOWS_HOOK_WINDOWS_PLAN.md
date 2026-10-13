@@ -6,7 +6,7 @@
 - Roadmap: plans/windows-hook-windows/WINDOWS_HOOK_WINDOWS_PLAN.md
 - Roadmap item: windows-hook-windows
 - Base: origin/main at ee1cdbcc6e400cfba33a0ae099b54cfabe4310b7
-- PR: not opened
+- PR: https://github.com/tj-agents/core/pull/241
 
 ## Authority and outcome
 
@@ -34,6 +34,7 @@ This is one focused Windows CLI launch repair covering the user's explicitly nam
 - Current main's Python terminal launcher now adds `--no-daemon` for Windows interactive Codex starts, prompts, resumes, and forks. Its Codex handoff launcher also passes that option on Windows. Non-interactive commands retain their arguments. The Windows Bash proxy source and installer were ported without changing the verified process-launch logic. The shell profile loader restores Claude's Git Bash environment when the proxy is installed.
 - The current-main focused launcher suite passed: 61 tests (7 platform skips). Catalog digests and generated packages were refreshed locally; `sync-generated.ps1 -Check` reported zero drift. Current main forbids generated package files in a PR, so those local outputs must be left uncommitted.
 - The profile wiring, source layout and agent CLI suite passed: 119 tests (20 platform skips). The installed Claude proxy and Codex profile blocks were rechecked with their `-VerifyOnly` installers. The local Codex wrapper was expanded to cover a positional prompt as well as starts, resumes and forks, and an isolated PowerShell argument probe passed. Both local installer sources now exist in the current-main worktree so checkout updates preserve the profile references.
+- Draft PR #241 was published from the clean current-main branch. Source review found that `--no-daemon` conflicts with Codex `--remote` and may be absent in older CLI versions; the terminal launcher now probes installed CLI help before injecting it, the handoff launcher gates on the resolved version, and the local wrapper leaves remote sessions alone. The focused suite passed 64 tests (7 platform skips), a PowerShell remote/prompt probe passed, and generated output checked with zero drift after this correction.
 
 ## Remaining work
 

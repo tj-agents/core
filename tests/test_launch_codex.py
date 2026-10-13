@@ -157,6 +157,11 @@ class LaunchCodexTests(unittest.TestCase):
 
     # --- argument assembly and order ---
 
+    def test_older_windows_codex_keeps_supported_handoff_arguments(self):
+        with mock.patch.object(LAUNCH_CODEX.sys, 'platform', 'win32'):
+            arguments = LAUNCH_CODEX.build_arguments('/work', None, None, False, 'prompt', no_daemon=False)
+        self.assertEqual(arguments, ['--cd', '/work', 'prompt'])
+
     def test_no_model_lane_or_effort_means_only_cd_and_the_prompt_sentence(self):
         self.run_main()
         arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
