@@ -287,8 +287,8 @@ class PackagedEngineeringHooks(unittest.TestCase):
 
         before = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         contract.write_text(contract.read_text(encoding="utf-8").replace(
-            "An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair.",
-            "An apology, a SendFeedback draft or local memory does not substitute for this source-owner repair. Canonical source changed.",
+            "Established standards defects still require immediate repair.",
+            "Established standards defects still require immediate repair. Canonical source changed.",
         ), encoding="utf-8")
         after = json.loads(self.run_hook(script, arguments=("--prompt-context",)).stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertNotEqual(before, after)
