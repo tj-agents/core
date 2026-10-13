@@ -204,7 +204,7 @@
               "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
             ]
           ],
-          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; retained sessions close through the required machine package",
+          "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
           "match": [
             [
               "python",

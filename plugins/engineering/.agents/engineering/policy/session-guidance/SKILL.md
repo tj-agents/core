@@ -102,12 +102,13 @@ when delivery is authorized. Bind remote monitoring to the exact repository, hea
 pending CI is owned without an active monitor. A failed test selects `engineering:failing-tests` and its
 diagnose, repair and focused verification loop. Do not weaken a check merely to produce a pass.
 
-A terminal goal closes its own session as its final action, after its workflow's remaining steps and
-the completion report: run `machine:peer-cli`'s
-`finish.py` when `cleanup_proof.py` printed `removable` for this merged linked worktree,
-`close.py` for any other checkout. Run them with `python3 -B` on Linux/macOS or `python -B` on Windows.
-Stay open only while actively working, awaiting a necessary user answer, or owning a background wait.
-A status report does not justify ending with unfinished authorized work. A handoff predecessor follows
+A terminal goal may close its own session only after its workflow's remaining steps and the delivered
+completion report: run `machine:peer-cli`'s `finish.py` when `cleanup_proof.py` printed `removable` for
+this merged linked worktree, `close.py` for any other checkout. Run them with `python3 -B` on Linux/macOS
+or `python -B` on Windows. Keep the session open for an explicit keep-open or continue instruction, active
+dialogue, or a necessary user answer. Idle turn state permits a supported post-report close attempt; it does
+not prove report delivery. When that execution path is unavailable, preserve the session and checkout with
+the existing `merge_cleanup_gate --clear` deliberate-retention escape. A handoff predecessor follows
 `engineering:handoff`'s release instead.
 
 ## Maintain the right source owner

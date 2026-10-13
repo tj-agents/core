@@ -135,7 +135,7 @@
               "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
             ]
           ],
-          "justification": "engineering:merge Step 5: finish closes this verified session and removes its merged worktree after cleanup_proof.py approved it",
+          "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
           "match": [
             [
               "python3",
@@ -169,7 +169,7 @@
               "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
             ]
           ],
-          "justification": "Close only this verified completed CLI session while retaining its checkout",
+          "justification": "After its delivered report, close only this verified unchanged-idle CLI session while retaining its checkout",
           "match": [
             [
               "python3",

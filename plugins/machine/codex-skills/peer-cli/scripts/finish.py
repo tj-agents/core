@@ -55,6 +55,7 @@ def main(argv=None):
     worktree = Path(args.worktree).resolve() if args.worktree else attached
     if session_close.path_key(worktree) != session_close.path_key(attached) or not session_close.under_or_equal(os.getcwd(), entry["cwd"]):
         raise session_close.Refusal("target is not this session's own attachment")
+    activity = session_close.awaiting_input_activity(entry)
     receipt = session_close.fresh_removable_receipt(worktree)
     if session_close.other_live_claimant(worktree, entry):
         raise session_close.Refusal("another verified live registered session claims this worktree")
@@ -86,8 +87,8 @@ def main(argv=None):
     if wrapper:
         observer.extend(["--parent-pid", str(wrapper["pid"]),
                          "--parent-start", str(wrapper["started_at"])])
+    recorded_end = False
     try:
-        _record_own_end(entry, "finished")
         spawned_at = time.time()
         observer_pid = session_close.start_observer(observer)
         started = session_close.wait_for_record(
@@ -113,9 +114,13 @@ def main(argv=None):
         )
         if not session_close.valid_armed(armed, expected, started, accepted):
             raise session_close.Refusal("cleanup observer did not acknowledge acceptance")
+        session_close.awaiting_input_activity(entry, activity)
+        _record_own_end(entry, "finished")
+        recorded_end = True
         close_host(entry, wrapper)
     except Exception as error:
-        _reopen_own_end(entry, "finished")
+        if recorded_end:
+            _reopen_own_end(entry, "finished")
         session_close.cancel_observer(result, str(error))
         raise
     return 0
