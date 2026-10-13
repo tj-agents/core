@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
 
@@ -88,11 +88,36 @@ def connect(path=None):
 def _ensure_schema(connection):
     connection.execute(WORK_ITEMS_SCHEMA)
     connection.execute(SESSIONS_SCHEMA)
-    connection.execute(SESSIONS_ONE_OWNER_INDEX)
     version = connection.execute("PRAGMA user_version").fetchone()[0]
+    if version < 2:
+        _deduplicate_owner_rows(connection)
+    connection.execute(SESSIONS_ONE_OWNER_INDEX)
     if version < SCHEMA_VERSION:
         connection.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
     connection.commit()
+
+
+def _deduplicate_owner_rows(connection):
+    work_items = connection.execute(
+        """
+        SELECT work_item FROM sessions
+        WHERE role = 'owner' AND work_item IS NOT NULL
+        GROUP BY work_item HAVING COUNT(*) > 1
+        """
+    ).fetchall()
+    for row in work_items:
+        keep = connection.execute(
+            """
+            SELECT handle FROM sessions WHERE work_item = ? AND role = 'owner'
+            ORDER BY COALESCE(last_activity_at, started_at, ended_at, 0) DESC, handle DESC
+            LIMIT 1
+            """,
+            (row["work_item"],),
+        ).fetchone()
+        connection.execute(
+            "UPDATE sessions SET role = NULL WHERE work_item = ? AND role = 'owner' AND handle != ?",
+            (row["work_item"], keep["handle"]),
+        )
 
 
 def current_machine():
