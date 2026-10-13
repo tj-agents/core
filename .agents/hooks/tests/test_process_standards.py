@@ -118,14 +118,22 @@ class ProcessStandardsTests(unittest.TestCase):
             "a stale or broken standard",
             "and so is a standard that caused or failed to prevent a mistake",
             "`engineering:self-repair` in the same turn, after answering the user's direct question and before the "
-            "current task resumes, without asking",
-            "reuses an exact owner or closed context where supported, and launches only an admitted runnable",
-            "a concrete obstacle stays in the canonical record with its resolver and resume condition",
-            "This rule is the standing authorization: it covers implementing, testing, opening the PR and merging",
+            "current task resumes",
+            "That workflow owns the repair authorization, admission, disposition, and delivery procedure",
             "explicit user limits still hold",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
+
+        self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
+        for phrase in (
+            "reconcile that owner and contribute the new evidence without creating a duplicate writer",
+            "A capability, dependency, conflict, or capacity obstacle is recorded as a linked deferred disposition",
+            "This standing authorization covers the bounded Core repair through implementation, tests, review, pull "
+            "request, merge, and publication",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self_repair)
 
     def test_callout_checks_standards_before_an_apology(self):
         instructions = authored_skill("session-guidance").read_text(encoding="utf-8")
