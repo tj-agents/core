@@ -36,6 +36,47 @@ CODEX_PROFILE = module("codex_terminal_profile")
 
 
 class TerminalLaunchersTests(unittest.TestCase):
+    def test_codex_disables_daemon_for_windows_interactive_sessions(self):
+        cases = (
+            ([], ["--no-daemon"]),
+            (["resume", "--last"], ["--no-daemon", "resume", "--last"]),
+            (["fork", "--last"], ["--no-daemon", "fork", "--last"]),
+            (["prompt with spaces"], ["--no-daemon", "prompt with spaces"]),
+            (["-C", "project", "prompt"], ["--no-daemon", "-C", "project", "prompt"]),
+            (["plugin", "list"], ["plugin", "list"]),
+            (["-C", "project", "plugin", "list"], ["-C", "project", "plugin", "list"]),
+            (["--config", "model=default", "exec"], ["--config", "model=default", "exec"]),
+            (["exec", "--json"], ["exec", "--json"]),
+            (["--help"], ["--help"]),
+            (["--remote", "ws://127.0.0.1:8080"], ["--remote", "ws://127.0.0.1:8080"]),
+            (["--remote=ws://127.0.0.1:8080"], ["--remote=ws://127.0.0.1:8080"]),
+            (["--no-daemon", "resume"], ["--no-daemon", "resume"]),
+        )
+        with mock.patch.object(CODEX.sys, "platform", "win32"):
+            for arguments, expected in cases:
+                with self.subTest(arguments=arguments):
+                    self.assertEqual(expected, CODEX.without_daemon_for_interactive(arguments))
+        with mock.patch.object(CODEX.sys, "platform", "linux"):
+            self.assertEqual(["resume"], CODEX.without_daemon_for_interactive(["resume"]))
+
+    def test_codex_only_disables_a_daemon_when_the_installed_cli_supports_it(self):
+        with mock.patch.object(CODEX.sys, "platform", "win32"), \
+                mock.patch.object(CODEX, "supports_no_daemon", return_value=False):
+            self.assertEqual(["resume"], CODEX.without_daemon_for_interactive(["resume"], "codex"))
+        with mock.patch.object(CODEX.sys, "platform", "win32"), \
+                mock.patch.object(CODEX, "supports_no_daemon", return_value=True):
+            self.assertEqual(["--no-daemon", "resume"], CODEX.without_daemon_for_interactive(["resume"], "codex"))
+
+    def test_codex_help_capability_probe(self):
+        with mock.patch.object(CODEX, "command_for_target", return_value=["native-codex", "--help"]), \
+                mock.patch.object(CODEX.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "  --no-daemon\n", "")):
+            self.assertTrue(CODEX.supports_no_daemon("codex.cmd"))
+        with mock.patch.object(CODEX, "command_for_target", return_value=["native-codex", "--help"]), \
+                mock.patch.object(CODEX.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "older CLI", "")):
+            self.assertFalse(CODEX.supports_no_daemon("codex.cmd"))
+        with mock.patch.object(CODEX, "command_for_target", side_effect=COMMAND.agent_cli.LaunchError("native missing")):
+            self.assertFalse(CODEX.supports_no_daemon("codex.cmd"))
+
     def test_typed_hook_option_reaches_the_cli_argument_list(self):
         with tempfile.TemporaryDirectory(prefix="literal terminal option ") as directory:
             root = Path(directory)
