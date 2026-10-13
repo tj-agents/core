@@ -12,6 +12,8 @@ phase, commit, or session boundary does not end that ownership. Keep the existin
 completion condition, and authority record as the source of truth; do not create a competing goal or
 silently widen scope.
 
+## Continue through the authorized outcome
+
 For substantive authorized work with a future decision that may outlive the current session, select
 the available `engineering:persistent-workflow` early. This includes starting continuation when a
 delayed result first becomes relevant, even if the need was not clear at acceptance. Keep ordinary

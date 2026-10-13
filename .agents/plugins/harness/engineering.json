@@ -2,7 +2,10 @@
   "schema_version": 1,
   "plugin": "base-agents/engineering",
   "source_roots": [
-    ".agents/engineering"
+    ".agents/engineering",
+    ".agents/engineering/resources/problem-records.md",
+    ".agents/workflows",
+    ".agents/workflows/repository_configuration.py"
   ],
   "requires": {
     "marketplaces": [
@@ -13,7 +16,8 @@
     ],
     "plugins": [
       "base-agents/base",
-      "base-agents/engineering"
+      "base-agents/engineering",
+      "base-agents/machine"
     ],
     "hooks": [
       {
@@ -24,7 +28,21 @@
         ]
       },
       {
+        "path": "hooks/callout_repair_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
         "path": "hooks/compact_output_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
+      },
+      {
+        "path": "hooks/continuation_stop.py",
         "hosts": [
           "claude",
           "codex"
@@ -120,16 +138,53 @@
           "claude",
           "codex"
         ]
+      },
+      {
+        "path": "hooks/worktree_placement_gate.py",
+        "hosts": [
+          "claude",
+          "codex"
+        ]
       }
     ],
     "permissions": {
       "claude_allow": [
+        "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
         "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
       ],
       "codex_prefix_rules": [
+        {
+          "pattern": [
+            [
+              "python",
+              "python.exe",
+              "python3",
+              "py"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ],
+          "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "${PLUGIN_ROOT}/workflows/completion.py"
+            ]
+          ]
+        },
         {
           "pattern": [
             [
@@ -165,7 +220,31 @@
             ]
           ]
         }
-      ]
+      ],
+      "auto_merge": {
+        "claude_allow": [
+          "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
+          "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
+        ],
+        "codex_prefix_rules": [
+          {
+            "pattern": [
+              ["python", "python.exe", "python3", "py"],
+              "-B",
+              "${PLUGIN_ROOT}/workflows/auto_merge.py",
+              "--root",
+              "${PROJECT_ROOT}"
+            ],
+            "justification": "rechecks the freshly validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+            "match": [
+              ["python", "-B", "${PLUGIN_ROOT}/workflows/auto_merge.py", "--root", "${PROJECT_ROOT}"]
+            ],
+            "not_match": [
+              ["python", "-B", "${PLUGIN_ROOT}/workflows/auto_merge.py", "--root"]
+            ]
+          }
+        ]
+      }
     }
   }
 }

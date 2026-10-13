@@ -3,6 +3,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import posixpath
 import shutil
 import tempfile
 import unittest
@@ -38,10 +39,13 @@ class SourceLayoutTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
         for name in (".agents", ".codex", ".claude"):
+            patterns = ["__pycache__", "*.pyc"]
+            if name == ".agents":
+                patterns.append("continuation")
             shutil.copytree(
                 ROOT / name,
                 self.root / name,
-                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                ignore=shutil.ignore_patterns(*patterns),
             )
 
     def config(self, edit):
@@ -52,7 +56,8 @@ class SourceLayoutTests(unittest.TestCase):
 
     def test_each_host_adapter_resolves_one_canonical_definition(self):
         _, output, skills, _ = SYNC.build(self.root)
-        self.assertEqual(69, len(skills))
+        self.assertEqual(81, len(skills))
+        self.assertEqual("machine", skills["hook-control"]["plugin"])
         self.assertEqual(set(skills), {
             path.parent.name for path in (self.root / ".codex/skills").glob("*/SKILL.md")
         })
@@ -78,6 +83,52 @@ class SourceLayoutTests(unittest.TestCase):
         )
         self.assertIn("plugins/base/.agents/base/policy/agent-files/SKILL.md", output)
         self.assertIn("plugins/base/.agents/base/policy/goal-continuation/SKILL.md", output)
+        self.assertIn("plugins/base/.agents/base/policy/idea-initialization/SKILL.md", output)
+
+    def test_problem_record_skills_and_shared_contract_ship_for_both_hosts(self):
+        _, output, skills, _ = SYNC.build(self.root)
+        canonical = {
+            "write-bug": "convention/write-bug",
+            "write-mistake": "convention/write-mistake",
+            "address-bug": "workflow/address-bug",
+            "address-mistake": "workflow/address-mistake",
+        }
+        resource = "plugins/engineering/.agents/engineering/resources/problem-records.md"
+        self.assertIn(resource, output)
+        for name, relative in canonical.items():
+            with self.subTest(skill=name):
+                self.assertEqual("engineering", skills[name]["plugin"])
+                for tree in ("skills", "codex-skills"):
+                    adapter = output[f"plugins/engineering/{tree}/{name}/SKILL.md"].decode("utf-8")
+                    self.assertIn(f"](../../.agents/engineering/{relative}/SKILL.md)", adapter)
+                canonical_path = f"plugins/engineering/.agents/engineering/{relative}/SKILL.md"
+                canonical_body = output[canonical_path].decode("utf-8")
+                link = "../../resources/problem-records.md"
+                self.assertIn(f"]({link})", canonical_body)
+                resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
+                self.assertEqual(resource, resolved)
+
+    def test_task_recovery_contract_ships_for_both_hosts(self):
+        _, output, skills, _ = SYNC.build(self.root)
+        canonical = {
+            "open-codex": "utility/open-codex",
+            "open-claude": "utility/open-claude",
+            "followup-codex": "utility/followup-codex",
+        }
+        resource = "plugins/machine/.agents/machine/resources/task-recovery.md"
+        self.assertIn(resource, output)
+        for name, relative in canonical.items():
+            with self.subTest(skill=name):
+                self.assertEqual("machine", skills[name]["plugin"])
+                for tree in ("skills", "codex-skills"):
+                    adapter = output[f"plugins/machine/{tree}/{name}/SKILL.md"].decode("utf-8")
+                    self.assertIn(f"](../../.agents/machine/{relative}/SKILL.md)", adapter)
+                canonical_path = f"plugins/machine/.agents/machine/{relative}/SKILL.md"
+                canonical_body = output[canonical_path].decode("utf-8")
+                link = "../../resources/task-recovery.md"
+                self.assertIn(f"]({link})", canonical_body)
+                resolved = posixpath.normpath(f"{posixpath.dirname(canonical_path)}/{link}")
+                self.assertEqual(resource, resolved)
 
     def test_authored_host_manifests_have_one_canonical_owner(self):
         for host in ("codex", "claude"):
@@ -91,23 +142,26 @@ class SourceLayoutTests(unittest.TestCase):
         _, output, _, _ = SYNC.build(self.root)
         for relative in (
             "plugins/base/skills/agent-files/scripts/session-context.py",
+            "plugins/base/skills/idea-initialization/scripts/session-context.py",
             "plugins/base/skills/plan-artifacts/scripts/session-context.py",
             "plugins/base/codex-skills/plan-artifacts/templates/PLAN.md",
-            "plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1",
+            "plugins/machine/skills/handoff-codex/scripts/launch_codex.py",
             "plugins/machine/codex-skills/handoff-claude/scripts/launch_claude.py",
             "plugins/machine/resources/machine/scripts/history.py",
             "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/skills/bootstrap-capabilities/scripts/bootstrap_capabilities.py",
+            "plugins/machine/skills/hook-control/scripts/hook_control.py",
+            "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
             "plugins/machine/catalog/catalog.json",
             "plugins/machine/catalog/capabilities.lock.schema.json",
             "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)
         self.assertEqual(
-            output["plugins/machine/skills/handoff-codex/scripts/launch-codex.ps1"],
+            output["plugins/machine/skills/handoff-codex/scripts/launch_codex.py"],
             SYNC.canonical_output_bytes(
-                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch-codex.ps1").read_bytes()
+                (self.root / ".agents/machine/utility/handoff-codex/scripts/launch_codex.py").read_bytes()
             ),
         )
 
@@ -330,6 +384,18 @@ class SourceLayoutTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValueError, "Duplicate public skill name"):
+            SYNC.build(self.root)
+
+    def test_public_names_equal_without_hyphens_fail_generation(self):
+        source = self.root / ".agents/engineering/workflow/address-debt"
+        near_miss = self.root / ".agents/engineering/workflow/addressdebt"
+        shutil.copytree(source, near_miss)
+        skill = near_miss / "SKILL.md"
+        skill.write_text(
+            skill.read_text(encoding="utf-8").replace("name: address-debt", "name: addressdebt"),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "differ only by hyphens: address-debt, addressdebt"):
             SYNC.build(self.root)
 
     def test_resources_and_generated_roots_cannot_escape_ownership(self):

@@ -11,6 +11,8 @@ import bootstrap_capabilities as bootstrap
 
 
 PLUGIN_ROOT_TOKEN = "${PLUGIN_ROOT}"
+PROJECT_ROOT_TOKEN = "${PROJECT_ROOT}"
+SCRIPT_SUFFIXES = (".py", ".ps1")
 
 
 def _require_tokens(value: Any, label: str) -> None:
@@ -32,6 +34,15 @@ def _require_rule_field(value: Any, label: str) -> None:
         _require_tokens(item, f"{label}[{index}]")
 
 
+def _has_unbounded_script_arguments(command: str) -> bool:
+    if not command.startswith("Bash(") or not command.endswith(")"):
+        return False
+    if PROJECT_ROOT_TOKEN in command:
+        return False
+    tokens = command[len("Bash("):-1].split()
+    return any(token.lower().endswith(SCRIPT_SUFFIXES) for token in tokens[:-1])
+
+
 def validate_requires(requires: dict, label: str) -> None:
     if not isinstance(requires, dict) or set(requires) != {"marketplaces", "plugins", "hooks", "permissions"}:
         raise bootstrap.BootstrapError(f"{label}: invalid harness requirements")
@@ -39,9 +50,24 @@ def validate_requires(requires: dict, label: str) -> None:
         raise bootstrap.BootstrapError(f"{label}: invalid marketplace or hook requirements")
     bootstrap.require_string_list(requires["plugins"], f"{label}.plugins")
     permissions = requires["permissions"]
-    if not isinstance(permissions, dict) or set(permissions) != {"claude_allow", "codex_prefix_rules"}:
+    if not isinstance(permissions, dict) or set(permissions) not in (
+        {"claude_allow", "codex_prefix_rules"},
+        {"claude_allow", "codex_prefix_rules", "auto_merge"},
+    ):
         raise bootstrap.BootstrapError(f"{label}: invalid harness permissions")
+    _validate_permissions(permissions, label)
+    if "auto_merge" in permissions:
+        conditional = permissions["auto_merge"]
+        if not isinstance(conditional, dict) or set(conditional) != {"claude_allow", "codex_prefix_rules"}:
+            raise bootstrap.BootstrapError(f"{label}: invalid auto-merge permissions")
+        _validate_permissions(conditional, f"{label}.auto_merge")
+
+
+def _validate_permissions(permissions: dict, label: str) -> None:
     bootstrap.require_string_list(permissions["claude_allow"], f"{label}.claude_allow")
+    for command in permissions["claude_allow"]:
+        if _has_unbounded_script_arguments(command):
+            raise bootstrap.BootstrapError(f"{label}.claude_allow script arguments require :*: {command}")
     rules = permissions["codex_prefix_rules"]
     if not isinstance(rules, list):
         raise bootstrap.BootstrapError(f"{label}: invalid Codex prefix rules")
@@ -68,56 +94,59 @@ def path_spellings(root: Path | str) -> tuple[str, str]:
     return text.replace("\\", "/"), text.replace("/", "\\")
 
 
-def _forward_spelling(template: str, root_forward: str) -> str:
-    return template.replace(PLUGIN_ROOT_TOKEN, root_forward).replace("\\", "/")
+def _forward_spelling(template: str, root_forward: str, project_forward: str = "") -> str:
+    return template.replace(PLUGIN_ROOT_TOKEN, root_forward).replace(PROJECT_ROOT_TOKEN, project_forward).replace("\\", "/")
 
 
-def _backslash_spelling(template: str, root_backslash: str) -> str:
-    return template.replace(PLUGIN_ROOT_TOKEN, root_backslash).replace("/", "\\")
+def _backslash_spelling(template: str, root_backslash: str, project_backslash: str = "") -> str:
+    return template.replace(PLUGIN_ROOT_TOKEN, root_backslash).replace(PROJECT_ROOT_TOKEN, project_backslash).replace("/", "\\")
 
 
-def render_claude_allow(templates: list[str], plugin_root: Path | str) -> list[str]:
+def render_claude_allow(templates: list[str], plugin_root: Path | str, project_root: Path | str | None = None) -> list[str]:
     root_forward, root_backslash = path_spellings(plugin_root)
+    project_forward, project_backslash = path_spellings(project_root or "")
     rendered: list[str] = []
     for template in templates:
         if PLUGIN_ROOT_TOKEN in template:
-            rendered.append(_forward_spelling(template, root_forward))
-            rendered.append(_backslash_spelling(template, root_backslash))
+            rendered.append(_forward_spelling(template, root_forward, project_forward))
+            rendered.append(_backslash_spelling(template, root_backslash, project_backslash))
         else:
             rendered.append(template)
     return rendered
 
 
-def _render_codex_token(token: Any, plugin_root: Path | str, alternate: bool) -> Any:
+def _render_codex_token(token: Any, plugin_root: Path | str, alternate: bool, project_root: Path | str | None = None) -> Any:
     if isinstance(token, list):
         rendered: list[Any] = []
         for item in token:
-            result = _render_codex_token(item, plugin_root, alternate)
+            result = _render_codex_token(item, plugin_root, alternate, project_root)
             if isinstance(result, list):
                 rendered.extend(result)
             else:
                 rendered.append(result)
         return rendered
-    if isinstance(token, str) and PLUGIN_ROOT_TOKEN in token:
+    if isinstance(token, str) and (PLUGIN_ROOT_TOKEN in token or PROJECT_ROOT_TOKEN in token):
         root_forward, root_backslash = path_spellings(plugin_root)
+        project_forward, project_backslash = path_spellings(project_root or "")
         if alternate:
-            return [_backslash_spelling(token, root_backslash), _forward_spelling(token, root_forward)]
-        return _backslash_spelling(token, root_backslash)
+            return [_backslash_spelling(token, root_backslash, project_backslash), _forward_spelling(token, root_forward, project_forward)]
+        return _backslash_spelling(token, root_backslash, project_backslash)
     return token
 
 
-def render_codex_rule(rule: dict, plugin_root: Path | str) -> dict:
+def render_codex_rule(rule: dict, plugin_root: Path | str, project_root: Path | str | None = None) -> dict:
     return {
-        "pattern": [_render_codex_token(token, plugin_root, True) for token in rule["pattern"]],
+        "pattern": [_render_codex_token(token, plugin_root, True, project_root) for token in rule["pattern"]],
         "justification": rule["justification"],
-        "match": [_render_codex_token(example, plugin_root, False) for example in rule["match"]],
-        "not_match": [_render_codex_token(example, plugin_root, False) for example in rule["not_match"]],
+        "match": [_render_codex_token(example, plugin_root, False, project_root) for example in rule["match"]],
+        "not_match": [_render_codex_token(example, plugin_root, False, project_root) for example in rule["not_match"]],
     }
 
 
-def render_permissions(permissions: dict, plugin_root: Path | str) -> tuple[list[str], list[dict]]:
-    claude_allow = render_claude_allow(permissions["claude_allow"], plugin_root)
-    codex_rules = [render_codex_rule(rule, plugin_root) for rule in permissions["codex_prefix_rules"]]
+def render_permissions(permissions: dict, plugin_root: Path | str, project_root: Path | str | None = None, auto_merge: bool = False) -> tuple[list[str], list[dict]]:
+    conditional = permissions.get("auto_merge", {}) if auto_merge else {}
+    claude_allow = render_claude_allow(permissions["claude_allow"] + conditional.get("claude_allow", []), plugin_root, project_root)
+    codex_rules = [render_codex_rule(rule, plugin_root, project_root) for rule in permissions["codex_prefix_rules"] + conditional.get("codex_prefix_rules", [])]
     return claude_allow, codex_rules
 
 

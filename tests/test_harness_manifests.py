@@ -1,5 +1,6 @@
 """Package harness declarations stay consistent with the catalog and hook wiring."""
 
+from copy import deepcopy
 import importlib.util
 import json
 from pathlib import Path
@@ -19,8 +20,29 @@ PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scr
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
-INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.ps1"), ("machine", "close.ps1"))
+INSTRUCTED_SCRIPTS = (("engineering", "cleanup_proof.py"), ("machine", "finish.py"), ("machine", "close.py"))
 HOST_ENTRY_SKILLS = {"engineering": "merge", "machine": "peer-cli"}
+
+
+def validate_harness_schema(documents):
+    schema = str(ROOT / ".agents/plugins/harness.schema.json").replace("'", "''")
+    script = f"""
+$documents = [Console]::In.ReadToEnd() | ConvertFrom-Json -AsHashtable -Depth 100
+foreach ($document in $documents) {{
+    $valid = $document | ConvertTo-Json -Depth 100 -Compress |
+        Test-Json -SchemaFile '{schema}' -ErrorAction SilentlyContinue
+    [Console]::Out.WriteLine($valid.ToString().ToLowerInvariant())
+}}
+"""
+    result = subprocess.run(
+        ["pwsh", "-NoProfile", "-Command", script],
+        input=json.dumps(documents),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise AssertionError(result.stderr)
+    return [line == "true" for line in result.stdout.splitlines()]
 
 
 class HarnessManifestTests(unittest.TestCase):
@@ -63,6 +85,14 @@ class HarnessManifestTests(unittest.TestCase):
             {"schema_version", "plugin", "source_roots", "requires"}, set(manifest)
         )
 
+    def test_engineering_workflow_payload_ships_the_guarded_auto_merge_wrapper(self):
+        sources = HARNESS.load(ROOT / ".agents/plugins/sources.json")["resources"]
+        self.assertIn(
+            {"plugin": "engineering", "source": ".agents/workflows", "destination": "workflows"},
+            sources,
+        )
+        self.assertTrue((ROOT / "plugins/engineering/workflows/auto_merge.py").is_file())
+
     def test_declared_hook_hosts_must_match_host_wiring(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -98,6 +128,51 @@ class HarnessManifestTests(unittest.TestCase):
         requires["marketplaces"][0]["repository"] = "another-org/core"
         with self.assertRaisesRegex(ValueError, "disagrees with catalog"):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
+
+
+@unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required for Test-Json")
+class HarnessManifestSchemaTests(unittest.TestCase):
+    def rule(self):
+        manifest = json.loads(
+            (ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8")
+        )
+        return manifest, manifest["requires"]["permissions"]["codex_prefix_rules"][0]
+
+    def test_shipped_manifests_validate_against_schema(self):
+        manifests = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in sorted((ROOT / ".agents/plugins/harness").glob("*.json"))
+        ]
+        self.assertEqual([True] * len(manifests), validate_harness_schema(manifests))
+
+    def test_codex_prefix_rule_accepts_legacy_string_tokens(self):
+        manifest, rule = self.rule()
+        rule["pattern"] = ["python", "-B", "script.py"]
+        rule["match"] = ["python"]
+        rule["not_match"] = ["pwsh"]
+        self.assertEqual([True], validate_harness_schema([manifest]))
+
+    def test_codex_prefix_rule_rejects_invalid_tokens_and_unknown_fields(self):
+        manifest, rule = self.rule()
+        invalid_rules = []
+        for field, value in (
+            ("pattern", []),
+            ("pattern", [""]),
+            ("pattern", [123]),
+            ("pattern", [[]]),
+            ("pattern", [["python", ["-B"]]]),
+            ("match", [[]]),
+            ("match", [[["python"]]]),
+            ("not_match", [123]),
+            ("not_match", [["python", ""]]),
+        ):
+            invalid = deepcopy(manifest)
+            invalid["requires"]["permissions"]["codex_prefix_rules"][0][field] = value
+            invalid_rules.append(invalid)
+        invalid = deepcopy(manifest)
+        invalid["requires"]["permissions"]["codex_prefix_rules"][0]["unexpected"] = True
+        invalid_rules.append(invalid)
+        self.assertEqual([False] * len(invalid_rules), validate_harness_schema(invalid_rules))
 
 
 class HarnessPermissionCoverageTests(unittest.TestCase):
@@ -148,21 +223,58 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
 
     def test_close_permissions_are_exact_argument_free_commands(self):
         claude_allow, codex_rules = self.rendered("machine")
-        entries = [entry for entry in claude_allow if "close.ps1" in entry]
-        self.assertEqual(8, len(entries))
+        entries = [entry for entry in claude_allow if "close.py" in entry]
+        self.assertEqual(16, len(entries))
         for entry in entries:
-            self.assertTrue(entry.replace("\\", "/").endswith("/close.ps1)"), entry)
+            self.assertTrue(entry.replace("\\", "/").endswith("/close.py)"), entry)
             self.assertNotIn("*", entry)
-        rules = [rule for rule in codex_rules if "close.ps1" in json.dumps(rule)]
+            self.assertRegex(entry, r"(?:python|python3) -B ")
+        rules = [rule for rule in codex_rules if "close.py" in json.dumps(rule)]
         self.assertEqual(1, len(rules))
-        self.assertEqual(6, len(rules[0]["pattern"]))
+        self.assertEqual(3, len(rules[0]["pattern"]))
         root = self.PLUGIN_ROOT.replace("\\", "/")
         paths = {path.replace("\\", "/") for path in rules[0]["pattern"][-1]}
         self.assertEqual({
-            f"{root}/.agents/machine/utility/peer-cli/scripts/close.ps1",
-            f"{root}/skills/peer-cli/scripts/close.ps1",
-            f"{root}/codex-skills/peer-cli/scripts/close.ps1",
+            f"{root}/.agents/machine/utility/peer-cli/scripts/close.py",
+            f"{root}/skills/peer-cli/scripts/close.py",
+            f"{root}/codex-skills/peer-cli/scripts/close.py",
         }, paths)
+
+    def test_recovery_permissions_declare_script_boundary_and_codex_prefix_inventory(self):
+        manifest = json.loads((ROOT / ".agents/plugins/harness/machine.json").read_text(encoding="utf-8"))
+        harness_permissions.validate_requires(manifest["requires"], "machine")
+        templates = [
+            entry for entry in manifest["requires"]["permissions"]["claude_allow"]
+            if "agent_recovery.py" in entry
+        ]
+        self.assertEqual(8, len(templates))
+        self.assertEqual({"Bash", "PowerShell"}, {entry.partition("(")[0] for entry in templates})
+        self.assertEqual({"python", "python3"}, {
+            entry.partition("(")[2].split(" ", 1)[0] for entry in templates
+        })
+        claude_allow, codex_rules = self.rendered("machine")
+        entries = [entry for entry in claude_allow if "agent_recovery.py" in entry]
+        self.assertEqual(16, len(entries))
+        self.assertTrue(all(entry.endswith("agent_recovery.py:*)") for entry in entries))
+        self.assertTrue(all(" -B " in entry for entry in entries))
+        root = self.PLUGIN_ROOT.replace("\\", "/")
+        paths = {
+            entry.partition(" -B ")[2].removesuffix(":*)").replace("\\", "/")
+            for entry in entries
+        }
+        self.assertEqual({
+            f"{root}/.agents/machine/scripts/agent_recovery.py",
+            f"{root}/resources/machine/scripts/agent_recovery.py",
+        }, paths)
+        rules = [rule for rule in codex_rules if "agent_recovery.py" in json.dumps(rule)]
+        self.assertEqual(1, len(rules))
+        rule = rules[0]
+        self.assertEqual(2, len(rule["match"]))
+        self.assertEqual({"python", "python3"}, {tokens[0] for tokens in rule["match"]})
+        self.assertEqual(3, len(rule["not_match"]))
+        self.assertTrue(any(tokens[2].endswith("other.py") for tokens in rule["not_match"]))
+        self.assertTrue(any(tokens[-1] == "claude" for tokens in rule["not_match"]))
+        self.assertTrue(any(tokens[3] == "recover" for tokens in rule["not_match"]))
 
     def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
         codex = shutil.which("codex")
@@ -173,11 +285,12 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         for plugin in dict.fromkeys(plugin for plugin, _ in INSTRUCTED_SCRIPTS):
             _, codex_rules = self.rendered(plugin)
             rules += codex_rules
-            checks.extend((plugin, rule["match"][0]) for rule in codex_rules)
+            checks.extend((plugin, tokens, True) for rule in codex_rules for tokens in rule["match"])
+            checks.extend((plugin, tokens, False) for rule in codex_rules for tokens in rule["not_match"])
         with tempfile.TemporaryDirectory() as raw:
             rules_path = Path(raw) / "base-agents.rules"
             rules_path.write_text("\n".join(harness_permissions.codex_rule_lines(rules)), encoding="utf-8")
-            for plugin, tokens in checks:
+            for plugin, tokens, allowed in checks:
                 with self.subTest(plugin=plugin):
                     result = subprocess.run(
                         [codex, "execpolicy", "check", "--rules", str(rules_path),
@@ -185,7 +298,11 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
                         capture_output=True, text=True,
                     )
                     self.assertEqual(0, result.returncode, result.stderr)
-                    self.assertIn('"decision":"allow"', result.stdout.replace(" ", ""))
+                    decision = result.stdout.replace(" ", "")
+                    if allowed:
+                        self.assertIn('"decision":"allow"', decision)
+                    else:
+                        self.assertNotIn('"decision":"allow"', decision)
 
 
 if __name__ == "__main__":

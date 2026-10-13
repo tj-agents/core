@@ -1,5 +1,5 @@
 name = "lane_l4"
-description = "Runs one delegated task at lane L4. Specified implementation that still needs code-level judgement."
+description = "Runs one delegated task at lane L4. Specified implementation, ordinary review, and small local testable choices."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
