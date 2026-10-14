@@ -130,13 +130,29 @@ class RecoveryTests(unittest.TestCase):
         real_load = RECOVERY._load
         with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)), \
              mock.patch.object(RECOVERY, "_verify_codex_resume"), \
-             mock.patch.object(RECOVERY, "_sync_codex"):
+             mock.patch.object(RECOVERY, "_sync_codex") as sync:
             with self.assertRaises(ValueError):
                 RECOVERY.open_session("codex", "exact_id", roots={"codex": self.root / "sessions"})
             RECOVERY.open_session("codex", "exact_id", roots={"codex": self.root / "sessions"}, confirm_closed=True)
+        sync.assert_called_once_with("native-codex", self.cwd)
         cli.launch_tab.assert_called_once_with(self.cwd, "native-codex", mock.ANY,
                                                 ["resume", "exact_id", "Continue the requested work."], clear=("TERM",),
                                                 force={"CODEX_HOME": RECOVERY._profile("codex", self.root / "sessions")})
+
+    def test_open_session_skips_codex_plugin_refresh_when_requested(self):
+        self.write_codex()
+        cli = mock.Mock()
+        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
+        cli.resolve_codex_executable.return_value = ("native-codex", {})
+        real_load = RECOVERY._load
+        with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)),              mock.patch.object(RECOVERY, "_verify_codex_resume") as verify,              mock.patch.object(RECOVERY, "_sync_codex") as sync:
+            RECOVERY.open_session(
+                "codex", "exact_id", roots={"codex": self.root / "sessions"}, confirm_closed=True,
+                refresh_plugins=False,
+            )
+        verify.assert_called_once_with("native-codex")
+        sync.assert_not_called()
+        cli.launch_tab.assert_called_once()
 
     def test_open_main_preserves_codex_task_recovery_authority_and_limits_file(self):
         self.write_codex()

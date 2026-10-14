@@ -290,7 +290,7 @@ def _receipt_state(path, host, session_id, profile, state):
 
 
 def open_session(host, session_id, prompt="Continue the requested work.", title=None, roots=None, confirm_closed=False,
-                 prompt_path=None, model=None, dangerously_skip_permissions=False, cli=None):
+                 prompt_path=None, model=None, dangerously_skip_permissions=False, cli=None, refresh_plugins=True):
     item = find(host, session_id, roots)
     if item["status"] == "live":
         raise ValueError("That exact session is verified live; refusing to create a duplicate writer.")
@@ -333,7 +333,8 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
             old_profile = os.environ.get("CODEX_HOME")
             os.environ["CODEX_HOME"] = item["profile"]
             try:
-                _sync_codex(executable, directory)
+                if refresh_plugins:
+                    _sync_codex(executable, directory)
             finally:
                 if old_profile is None:
                     os.environ.pop("CODEX_HOME", None)
