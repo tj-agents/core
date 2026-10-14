@@ -37,12 +37,13 @@ git repo) ran `gh pr merge 13 --squash --delete-branch -R tomjseery/career` and 
 
 ## Next Steps
 
-1. Read the repo's AGENTS.md, the merge gate module and its tests. Reorder so jurisdiction is decided before
-   the fail-closed git-state resolution, without letting an opted-in repo with unreadable state through.
-2. Add the regression tests, run the merge-gate test module, commit.
-3. Open the PR and record its link here. Leave merging to Tommy.
+1. Completed: jurisdiction now precedes the fail-closed Git-state resolution without weakening opted-in
+   repositories.
+2. Completed: regression coverage and focused validation passed.
+3. [PR #254](https://github.com/tj-agents/core/pull/254) is open. Leave merging to Tommy.
 
 ## Progress
 
 - 14 Oct 2026: goal written by the originating Claude session.
 - 14 Oct 2026: L4 implementation moved opt-in jurisdiction ahead of Git-state resolution, added the three non-git regressions, and passed the focused hook and runtime suites plus generated-package synchronization.
+- 14 Oct 2026: committed as `077beab`, reviewed as `88f5ce9`, and opened PR #254.
