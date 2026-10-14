@@ -105,7 +105,6 @@
               "25",
               "${CLAUDE_PLUGIN_ROOT}/hooks/continuation_stop.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/red_run_gate.py",
-              "${CLAUDE_PLUGIN_ROOT}/hooks/plan_handoff_stop_launcher.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/callout_repair_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/worktree_cleanup_gate.py",
               "${CLAUDE_PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
