@@ -2,7 +2,7 @@
 
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-CrashRecovery
 Branch: Feature/CrashRecovery
-PR: not opened
+PR: https://github.com/tj-agents/core/pull/253
 Parent session: codex:01a13a7c-e3d3-7d83-93fd-51a323f9cfce
 
 ## Outcome and authority
@@ -30,19 +30,28 @@ L3 investigation selected because population and resume safeguards were unresolv
 - Baseline interrupted command restricted inventory to the calling Git repo, required explicit handles and stopped on one launch failure. The new machine-wide inventory ran successfully against the real registry: 10 eligible closed sessions, one stale checkout and the current live owner skipped. No native launches performed during investigation.
 - Legacy Windows vault inspection proved no reliable current crash set: October snapshots contain a process predating their own boot timestamp; the unconsumed manual pin is from September1 and points to missing transcripts. Do not automatically seed SQLite from these records.
 - Harness and Windows hook command checks passed. Local package generation/check passed; a broader source-layout test observed a digest changing during the worker edit, so package checks must be refreshed after the source freeze. The frozen implementation passes both runtime test files and the targeted missing-prompt, missing-stop and per-row verification-failure regressions. Existing receipt-guard tests also pass.
+- Frozen package self-containment/determinism and both-host recovery contract checks pass after source freeze. Native review at `232e1dacd8318eb20ca92eb9755407cebb772659` passes and ran 99 runtime tests. Fresh L2 evidence confirmed two capture-ordering defects; canonical work order `reviews/Feature-CrashRecovery.md` is complete with changes requested and verified both-host coverage. One serial worker owns the coupled fixes. Linux CI is green; Windows remains pending at this first candidate.
 - Native histories and working checkouts survived; no destructive cleanup is authorized here.
 
 ## Next Steps
 
-1. Review the frozen tested runtime and thin skill/harness candidate.
+1. Commit accepted R1/R2 remediation, then run incremental review from `232e1dacd8318eb20ca92eb9755407cebb772659` to the fixing head. Four focused capture/atomicity tests pass; do not repeat the full local suite.
 2. Refresh package closure checks and required remote checks, then deliver under repository gates.
 3. Exercise authorized machine-wide recovery; retain specific failed or pending handles as actionable output.
 
 - Scope: deterministic recovery through verified delivery and a concrete recovery command.
 - Current slice: machine-wide interrupted-agent recovery.
-- Remaining scope: package verification, immutable review, delivery and observed local use.
+- Remaining scope: incremental review, exact-head delivery, installed host adoption and observed local use.
 - Done when: one script command reopens eligible interrupted sessions with no AI selection, repeated runs create no duplicate writers, fresh registrations prove successful recovery, and Windows/Linux/package checks pass.
 
 ```agent-host-coverage
 {"schema_version":1,"shared_source":".agents/machine/scripts/work_item_sessions.py","hosts":[{"host":"claude","behavior":"Persist missing current sessions and deterministically resume eligible interrupted native agents with receipt and fresh-registration guards.","source":".agents/machine/scripts/work_item_sessions.py and .agents/machine/scripts/session_store.py","mapping":".claude/skills/recover-agents/SKILL.md routes to the shared machine utility and packaged machine scripts.","verification":{"level":"source","result":"passed","evidence":"Both runtime test files pass; targeted missing prompt/stop recovery and per-row verification failure tests pass; existing agent_recovery launch-guard suite passes. Native process launches are mocked in unit tests."}},{"host":"codex","behavior":"Persist missing current sessions and deterministically resume eligible interrupted native agents with receipt and fresh-registration guards.","source":".agents/machine/scripts/work_item_sessions.py and .agents/machine/scripts/session_store.py","mapping":".codex/skills/recover-agents/SKILL.md routes to the shared machine utility and packaged machine scripts.","verification":{"level":"source","result":"passed","evidence":"Both runtime test files pass; targeted missing prompt/stop recovery and per-row verification failure tests pass; existing agent_recovery launch-guard suite passes. Native process launches are mocked in unit tests."}}]}
 ```
+
+## Adoption and execution checkpoint
+
+R1/R2 fixes are source-accepted and pass four focused regressions. The fallback now resolves and validates identity before writing; a SQL only-if-missing conflict guard prevents resetting a concurrent row and skips work-item attachment when no insert occurred. Canonical review findings are resolved but the fixing head still needs incremental review.
+
+The current native context exhausted the workflow telemetry hard limits (wait/poll and skill-read counts). Checkpoint and transfer the same authorized goal to a fresh native owner for final review/delivery; preserve the immutable first-pass work order and its watermark. No requirement is waived.
+
+After merge, observe the causal main regeneration commit before explicit Codex sync via `.agents/machine/scripts/codex_marketplace_sync.py --project <verified checkout>`. Verify installed helper/hook bytes, because Windows launcher autosync swallows sync failures. Normal Codex currently has machine@base-agents2.1.16 and its cached command is old. Normal Claude instead has machine@tj-agents pinned by tj-agents/marketplace to core ref v2.1.15, and that cache lacks SQLite. The generic Claude sync preserves the pin. Resolve the canonical marketplace release selection or perform a supported native migration to machine@base-agents with the old identity disabled to avoid duplicate hooks; do not claim Claude adoption from source tests alone. Native executables: Codex `C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/bin/codex.EXE`; Claude `C:/Users/TommySeery/.local/bin/claude.exe`.
