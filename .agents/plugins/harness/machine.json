@@ -308,7 +308,7 @@
               "resume"
             ]
           ],
-          "justification": "machine:recover-agents 'Continue a work item': status, find and interrupted without --resume are read-only; resume and interrupted --resume perform the guarded reopen through agent_recovery.open_session, limited to rows that are not live, foreign or stale on this machine.",
+          "justification": "machine:recover-agents: status, find and interrupted without resume flags inspect the registry; interrupted --all-repos --resume-all restores eligible interrupted agents serially through guarded native resume with fresh registration verification. Live, ended, foreign, unknown, stale and completed-work-item sessions are excluded; pending or ambiguous launches retain duplicate-writer safeguards.",
           "match": [
             [
               "python3",
@@ -326,7 +326,9 @@
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-              "interrupted"
+              "interrupted",
+              "--all-repos",
+              "--resume-all"
             ],
             [
               "python",

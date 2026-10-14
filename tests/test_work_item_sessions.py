@@ -647,6 +647,97 @@ class WorkItemSessionsTests(unittest.TestCase):
             )
         self.assertEqual(1, calls.count("claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"))
 
+    def test_resume_all_uses_machine_wide_rows_outside_git_and_reports_deterministic_skips(self):
+        outside = self.root / "outside git"
+        outside.mkdir()
+        connection = self._connection()
+        try:
+            for session_id in ("a-ended", "b-foreign", "c-done", "d-live", "e-unknown", "f-stale", "g-eligible"):
+                cwd = outside if session_id != "f-stale" else self.root / "missing"
+                pid = 999999998 if session_id == "d-live" else 999999999
+                STORE.start_session(connection, "claude", session_id, cwd, pid=pid, pid_started_at=1234.0)
+            STORE.end_session(connection, "claude:a-ended", "closed")
+            connection.execute("UPDATE sessions SET machine = 'other-machine' WHERE handle = 'claude:b-foreign'")
+            STORE.upsert_work_item(connection, "done-key", "repo", "feature", "done", status="done")
+            STORE.set_session_ownership(connection, "claude:c-done", "owner", "done-key")
+            connection.commit()
+        finally:
+            connection.close()
+        recovery = fake_recovery(liveness_result=lambda item: "unknown" if item["session"] == "e-unknown" else "closed")
+        recovery.liveness.side_effect = recovery.liveness.return_value
+        process = types.SimpleNamespace(started_at=1234.0)
+        register_session = WIS._register_session()
+        with mock.patch.object(register_session, "build_process_lookup", return_value=lambda pid: process if pid == 999999998 else None), \
+                mock.patch.object(WIS, "_agent_recovery", return_value=recovery), \
+                mock.patch.object(WIS, "_wait_for_fresh_registration", return_value={"handle": "claude:g-eligible"}):
+            result = WIS.cmd_interrupted(resume_all=True, all_repos=True, cwd=outside)
+        self.assertEqual(
+            ["claude:a-ended", "claude:b-foreign", "claude:c-done", "claude:d-live", "claude:e-unknown", "claude:f-stale", "claude:g-eligible"],
+            [entry["handle"] for entry in result["bulk"]],
+        )
+        self.assertEqual(
+            ["ended", "foreign", "done", "unknown", "stale", "resumed"],
+            [entry.get("reason", entry["outcome"]) for entry in result["bulk"] if entry["handle"] != "claude:d-live"],
+        )
+        self.assertEqual("live", result["bulk"][3]["reason"])
+        self.assertEqual("resumed", result["bulk"][-1]["outcome"])
+        recovery.open_session.assert_called_once_with(
+            "claude", "g-eligible", prompt="Continue the requested work.", roots=mock.ANY,
+        )
+
+    def test_resume_all_continues_after_a_launch_failure_and_marks_unverified_launch_pending(self):
+        outside = self.root / "outside git"
+        outside.mkdir()
+        connection = self._connection()
+        try:
+            for session_id in ("a-fails", "b-pending", "c-succeeds"):
+                STORE.start_session(connection, "codex", session_id, outside, pid=999999999, pid_started_at=1234.0)
+        finally:
+            connection.close()
+        recovery = fake_recovery(liveness_result="closed")
+        recovery.open_session.side_effect = [RuntimeError("launch failed"), {"id": "b-pending"}, {"id": "c-succeeds"}]
+        register_session = WIS._register_session()
+        with mock.patch.object(register_session, "build_process_lookup", return_value=lambda _pid: None), \
+                mock.patch.object(WIS, "_agent_recovery", return_value=recovery), \
+                mock.patch.object(WIS, "_wait_for_fresh_registration", side_effect=[None, {"handle": "codex:c-succeeds"}]):
+            result = WIS.cmd_interrupted(resume_all=True, all_repos=True, cwd=outside)
+        self.assertEqual(["failed", "pending", "resumed"], [entry["outcome"] for entry in result["bulk"]])
+        self.assertTrue(result["bulk_failed"])
+        self.assertEqual(3, recovery.open_session.call_count)
+
+    def test_resume_all_continues_after_a_registration_verification_failure(self):
+        outside = self.root / "outside git"
+        outside.mkdir()
+        connection = self._connection()
+        try:
+            for session_id in ("a-verification", "b-next"):
+                STORE.start_session(connection, "codex", session_id, outside, pid=999999999, pid_started_at=1234.0)
+        finally:
+            connection.close()
+        recovery = fake_recovery(liveness_result="closed")
+        register_session = WIS._register_session()
+        with mock.patch.object(register_session, "build_process_lookup", return_value=lambda _pid: None), \
+                mock.patch.object(WIS, "_agent_recovery", return_value=recovery), \
+                mock.patch.object(WIS, "_wait_for_fresh_registration", side_effect=[OSError("database busy"), {"handle": "codex:b-next"}]):
+            result = WIS.cmd_interrupted(resume_all=True, all_repos=True, cwd=outside)
+        self.assertEqual(["pending", "resumed"], [entry["outcome"] for entry in result["bulk"]])
+        self.assertTrue(result["bulk_failed"])
+        self.assertEqual(2, recovery.open_session.call_count)
+
+    def test_wait_for_fresh_registration_requires_refreshed_started_at_and_live_identity(self):
+        connection = self._connection()
+        try:
+            STORE.start_session(connection, "claude", "fresh", self.repo, pid=11, pid_started_at=20.0)
+            connection.execute("UPDATE sessions SET started_at = 30.0 WHERE handle = 'claude:fresh'")
+            connection.commit()
+        finally:
+            connection.close()
+        register_session = WIS._register_session()
+        process = types.SimpleNamespace(started_at=20.0)
+        with mock.patch.object(register_session, "build_process_lookup", return_value=lambda _pid: process):
+            self.assertIsNone(WIS._wait_for_fresh_registration("claude:fresh", 30.0, timeout=0, wait=mock.Mock()))
+            self.assertIsNotNone(WIS._wait_for_fresh_registration("claude:fresh", 29.0, timeout=0, wait=mock.Mock()))
+
     def test_claim_resolves_repo_branch_and_head_once(self):
         original = STORE._collect_repo_branch_head
         calls = []
