@@ -106,17 +106,19 @@
 - Source owner: tj-agents/core Claude normal-profile synchronization and profile-repair workflow.
 - State: resolved.
 - Repair link: PR #235, merged head `9690bff537e90f82c3c3a562c1ffa54a57c334e0`.
-- Next action: none for the synchronization defect; fresh Claude-session acceptance remains owned by the existing goal under the user session limit.
+- Next action: none; synchronization repair and approved fresh-session acceptance passed.
 - Resolution condition: sync rejects torn packages, preserves and validates `installPath` and `gitCommitSha`, handles differing refs despite matching `sourceURL`, and migrates obsolete aliases; focused checks and Windows/Linux CI pass before guarded merge.
-- Verification evidence: canonical `engineering@tj-agents` pinned at v2.1.15 has 52 skills; cached state had 208 files versus 331 source files, with 61 skill definitions missing. Existing `dotnet@dotnet` and `react@react` entries point to nonexistent identities. No fresh Claude-session acceptance is claimed.
+- Verification evidence: canonical `engineering@tj-agents` pinned at v2.1.15 has 52 skills; cached state had 208 files versus 331 source files, with 61 skill definitions missing. Existing `dotnet@dotnet` and `react@react` entries point to nonexistent identities. One explicitly approved fresh Claude acceptance session passed, listing engineering, dotnet and react skills with zero subagents.
 - Delivery evidence: independent review approved and exact-head Windows/Linux CI run `38336373168` passed before guarded merge at `8b33980747476f9369c1b39497908226c2990b21`.
 
 ## B009 - Stop dispatcher omits a blocking decision when its gate is missing
 - Kind: bug. Observed/reported: 2026-10-12; transcript `fed1d447-ae67-4078-99a5-a813156cf86a`, line 1299, records `continuation_stop` and `callout_repair` returning `missingworkflow_route` and `missingworktree_cleanup_gate` in 1584 ms, exit 0, empty stdout. Cause: confirmed dispatcher fails to emit the required blocking decision when a workflow route or cleanup gate is missing (D2).
 - Impact and priority: P1; the caller receives no actionable blocking decision and can continue without required stop/callout enforcement.
 - Source owner: tj-agents/core stop dispatcher and its workflow/gate dependency checks.
-- State: in-progress.
+- State: resolved.
 - Repair link: `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateFailures`.
-- Next action: make missing route, gate, or import produce JSON `decision:block` with actionable diagnostics, then review the focused repair.
+- Next action: none for this repair; delivered and verified.
 - Resolution condition: missing route, gate, or import produces JSON `decision:block` with actionable diagnostics; focused regressions and Windows/Linux CI pass before guarded normal merge.
 - Verification evidence: original transcript result: `continuation_stop` and `callout_repair` reported `missingworkflow_route` and `missingworktree_cleanup_gate`; elapsed 1584 ms, exit 0, empty stdout.
+
+- Final repair evidence: PRs #236 and #237 merged; reviewed runtime head 7d6f49a0c50fa9b9aefc11055a48f8a4b616daf1; 54 focused tests passed; causal run 38401523019 passed Windows/Linux and regeneration. This closes the source repair, not the original sandbox application goal.

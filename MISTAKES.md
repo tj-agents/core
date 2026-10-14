@@ -209,8 +209,10 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 - **Cause:** confirmed observed termination; workflow allowed transcript-only status, and the handoff treated one blocker as blocking the whole task. The specific internal reasoning is unknown.
 - **Impact and priority:** P1; the requested repair remained unfinished and the user had to identify that work was incomplete.
 - **Source owner:** Core task-continuation and stop-gate behavior, with the dispatcher defect tracked by B009.
-- **State:** in-progress.
+- **State:** resolved.
 - **Repair link:** `plans/stop-gate-and-profile-repair/GOAL.md`, branch `Fix/StopGateFailures`; related bug: [B009](BUGS.md#B009).
-- **Next action:** continue the authorized goal with focused repair review, Windows/Linux CI, and guarded normal merge.
+- **Next action:** none for this repair; delivered and verified.
 - **Resolution condition:** authorized work reaches its recorded completion criteria; stop-gate repair is reviewed, required Windows/Linux CI passes, and guarded normal merge completes.
 - **Verification evidence:** transcript records the missing workflow route and cleanup gate with exit 0 and empty stdout; investigation found no entities, migrations, endpoints, necessary question, or owned wait that would block continuing. The canonical goal records the next action and branch.
+
+- Final repair evidence: PRs #236 and #237 merged; reviewed runtime head 7d6f49a0c50fa9b9aefc11055a48f8a4b616daf1; 54 focused tests passed; causal run 38401523019 passed Windows/Linux and regeneration. This closes the source repair, not the original sandbox application goal.

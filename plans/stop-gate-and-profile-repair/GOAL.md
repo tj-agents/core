@@ -8,6 +8,7 @@ its own goal and checkout. This successor owns only this goal.
 - Standing standards-defect default in `engineering:session-guidance` § "Maintain the right source owner":
   implement, test, open the PR and merge in `tj-agents/core` once its gates pass.
 - Tommy, 2026-10-13, explicitly: launch this one repair session, and fix the plugin naming in his profile.
+- Exception consumed: Tommy explicitly approved exactly one bounded fresh Claude acceptance session; it passed with zero subagents. No further sessions are authorized.
 - Limit: Tommy said launch no extra CLI sessions — this is the only one. Do not launch further sessions,
   schedulers or `claude -p` children.
 - Not covered: Azure writes, edits to `tj-agents/dotnet`, other employer-repository edits, publishing elsewhere.
@@ -21,7 +22,7 @@ its own goal and checkout. This successor owns only this goal.
 `cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d` (PR #236), based on remote main `c95b899fc8119a37dfbde1b25d9e34bacbc3c265`.
 The same foreground owner continues this goal across its sequential delivery slices.
 
-- PR: not opened.
+- PR: [#237](https://github.com/tj-agents/core/pull/237), reviewed head `7d6f49a0c50fa9b9aefc11055a48f8a4b616daf1`, retargeted to main after parent merge.
 
 ## Defects
 
@@ -91,9 +92,9 @@ not this goal.
 
 ## Lane
 
-Current phase: L4 specified Stop dispatcher and continuation-boundary implementation with focused
-regressions. A bounded in-session worker owns runtime/test paths; parent owns goal and delivery.
-Independent correctness/workflow review uses L4 after implementation.
+Current phase: L7 delivery mechanics owned by this foreground workflow parent. L4 implementation and
+independent correctness/workflow review are complete; the fixing head is approved. No model switch
+is claimed. This existing Codex process owns the remaining exact CI and goal closeout.
 
 ## Delivery slices
 
@@ -114,14 +115,7 @@ sessions or schedulers are required; this foreground owner continues across the 
 
 ## Next Steps
 
-The first child review found incomplete boundary metadata (R1); the repair passes 31 continuation tests.
-Commit the verified metadata enforcement, review that delta, then publish against PR #236's
-branch and own exact-head CI. Finish authorized preparation before the delivery and host decisions.
-
-Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: D2 Stop dispatcher/continuation enforcement, stacked on the human-gated ownership wording.
-Remaining scope: parent/child delivery; fresh-host acceptance within Tommy's session limit.
-Done when: all authorized repairs are verified and merged, with any genuine capability boundary recorded.
+Complete. All three repair PRs are merged. Required Windows/Linux checks and causal regeneration passed. No authorized repair tasks remain. The original sandbox application goal remains with its original owner.
 
 ## Agent-host coverage
 
@@ -138,7 +132,7 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "23 dispatcher and 31 continuation tests passed, including real missing-import failure, both host event spellings, deadline and blocker-boundary cases; generated-tree, harness and packaging checks passed. Fresh-host acceptance remains unobserved under the session limit."
+        "evidence": "23 dispatcher and 31 continuation tests passed, including real missing-import failure, both host event spellings, deadline and blocker-boundary cases; generated-tree, harness and packaging checks passed. The one approved Claude profile-loading acceptance passed; adoption of the new Stop source by installed pins remains unobserved."
       }
     },
     {
@@ -149,7 +143,7 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "23 dispatcher and 31 continuation tests passed, including real missing-import failure, both host event spellings, deadline and blocker-boundary cases; generated-tree, harness and packaging checks passed. Fresh-host acceptance remains unobserved under the session limit."
+        "evidence": "23 dispatcher and 31 continuation tests passed, including real missing-import failure, both host event spellings, deadline and blocker-boundary cases; generated-tree, harness and packaging checks passed. The one approved Claude profile-loading acceptance passed; adoption of the new Stop source by installed pins remains unobserved."
       }
     }
   ]
@@ -158,8 +152,7 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
 
 ## Progress
 
-- One Codex successor owns the promoted goal. No extra CLI sessions, schedulers or prompt children
-  were launched. Bounded in-session workers preserve this single owner.
+- One Codex successor owns the promoted goal. Exactly one explicitly approved fresh Claude acceptance session ran; no scheduler or other extra CLI session was launched. Bounded in-session workers preserve this single owner.
 - Assessment complete: reuse native Claude commands and the existing sync owner, add bounded payload
   checks and opt-in alias migration; bootstrap remains the locked-profile digest owner. Preserve pinned
   subdirectory refs and existing project/local installations.
@@ -171,8 +164,9 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
 - Tommy approved all 15 employer-local files and 45 C++ false flags in `MIGRATION_PREVIEW.md`.
   Exactly those additions were verified against backups; all other values were preserved. Native user
   C++ migration returned zero, keeping scoped legacy installs/marketplaces while they remain referenced.
-- Fresh-session loading and adoption of these source changes by installed pinned packages are unobserved
-  under the explicit no-extra-session limit. Native registry/payload checks passed for all eight packages.
+- One explicitly approved fresh Claude session passed on 2026-10-13, listing engineering/dotnet/react
+  skills; exit zero, one turn, zero subagents. Installed pinned packages remain separate from new source
+  adoption. Native registry/payload checks passed for all eight packages.
 - D3/D4 source: PR #235 merged reviewed head `9690bff537e90f82c3c3a562c1ffa54a57c334e0` at
   `8b33980747476f9369c1b39497908226c2990b21`; exact-head Windows/Linux CI `38336373168` passed.
   All ten review findings were resolved. Causal main CI/regeneration `38337890284` passed.
@@ -194,4 +188,81 @@ Done when: all authorized repairs are verified and merged, with any genuine capa
 
 - Child review at `c4c268a` completed changes-requested with one deduplicated finding R1: require
   complete unique metadata for extended blocker/Paused forms; preserve the unextended four-field
-  legacy blocker. The predicate/test repair passed 31 focused tests and awaits fresh incremental review.
+  legacy blocker. The predicate/test repair passed 31 focused tests and independent incremental review at `7d6f49a`.
+
+- Tommy approved ordinary foreground merge of PR #236 and exactly one bounded fresh Claude acceptance
+  session. Parent merged `cdd71edd` at `19b91b83835ed15783133276b1628b7fa4cc81ba`; exact causal main
+  CI `38398869624` is owned. Child PR #237 is retargeted to main; review approved at `7d6f49a`.
+- Acceptance session `e5e8b649-7c99-44a0-aa40-9a63da2d7d16` listed three actual engineering, dotnet and
+  react skill names each; completed in one turn with zero subagent requests/spawns. No further CLI
+  sessions or scheduler are authorized. Evidence: Temp/stop-profile-acceptance-20261013/stdout.json.
+
+- Child exact-head Windows/Linux CI `38398088850` passed; PR #237 is ready. Local continuation owner
+  `db620ae4b3d3fd790f89a6b0` is claimed by existing Codex PID 21676, with zero launches and no scheduler.
+  Parent causal main CI remains actively monitored; no unattended continuation is claimed.
+
+## Final completion ? 2026-10-13
+
+PR #236 causal run 38398869624 passed. PR #237 merged reviewed head 7d6f49a0c50fa9b9aefc11055a48f8a4b616daf1 as e1fe101a1acd217c360dc02bc734d2f4822ebdab. Its causal run 38401523019 completed successfully, including verify-windows, verify-linux and regenerate. B008, B009 and M015 are resolved for this source repair. The outcome was reported to Tommy. The repaired profile remains at published pins; new Stop runtime adoption by installed marketplace packages was not claimed.
+
+```completion
+{
+  "outcome": "Profile naming and package recovery repaired; Stop enforcement and continuation contracts fixed; all three repair PRs merged and verified.",
+  "acceptance": [
+    {
+      "id": "D3-D4",
+      "criterion": "Fresh Claude loads engineering, dotnet and react skills; canonical user aliases are repaired.",
+      "evidence": [
+        {
+          "source": "Temp/stop-profile-acceptance-20261013/stdout.json; MIGRATION_PREVIEW.md and backed-up profile verification",
+          "result": "One fresh approved session exited zero, one turn, zero subagents and listed all three skill families. Eight canonical user packages healthy; all 45 approved local flags preserved scoped opt-outs."
+        }
+      ],
+      "owner": "Root repair session",
+      "next_action": "None; verified"
+    },
+    {
+      "id": "D1-D2",
+      "criterion": "Stop failures block and contracts require remaining authorized work to continue.",
+      "evidence": [
+        {
+          "source": "PRs 236 and 237; reviews/Docs-StopGateOwnership.md; reviews/Fix-StopGateFailures.md; CI 38401523019",
+          "result": "Independent reviews approved; 23 dispatcher and 31 continuation tests passed. Required and causal Windows/Linux CI and regeneration passed."
+        }
+      ],
+      "owner": "Root repair session",
+      "next_action": "None; verified"
+    },
+    {
+      "id": "delivery",
+      "criterion": "Incident records resolved, repairs merged and outcome reported.",
+      "evidence": [
+        {
+          "source": "BUGS.md B008/B009; MISTAKES.md M015; GitHub PRs 235/236/237; user completion report",
+          "result": "All three PRs are MERGED at their reviewed heads. No authorized repair work remains."
+        }
+      ],
+      "owner": "Root repair session",
+      "next_action": "None; verified"
+    }
+  ],
+  "deliveries": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 235,
+      "head": "9690bff537e90f82c3c3a562c1ffa54a57c334e0"
+    },
+    {
+      "repository": "tj-agents/core",
+      "pr": 236,
+      "head": "cdd71edd394e5a8afdb4fe0c94fffa75e57eb79d"
+    },
+    {
+      "repository": "tj-agents/core",
+      "pr": 237,
+      "head": "7d6f49a0c50fa9b9aefc11055a48f8a4b616daf1"
+    }
+  ],
+  "open_tasks": []
+}
+```
