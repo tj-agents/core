@@ -428,6 +428,7 @@ def _resume_all(rows, item_statuses, machine):
         try:
             launched = recovery.open_session(
                 row["host"], row["session_id"], prompt="Continue the requested work.", roots=_resume_roots(row),
+                refresh_plugins=False,
             )
         except Exception as error:
             if _is_pending_launch(error):
