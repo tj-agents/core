@@ -487,9 +487,12 @@ class PlanHandoffStopTests(unittest.TestCase):
         records = [{
             "type": "response_item",
             "payload": {
-                "type": "custom_tool_call",
-                "name": "exec",
-                "input": f"Read {external.as_posix()} before continuing.",
+                "type": "message",
+                "role": "user",
+                "content": [{
+                    "type": "input_text",
+                    "text": f"Read {external.as_posix()} before continuing.",
+                }],
             },
         }]
         discovered = transcript_ledgers(records, self.root)
