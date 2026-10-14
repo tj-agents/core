@@ -207,7 +207,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:312c820bb16d0a208cdad0093f33ef96201e11b83e1f478af134e2f1881dfee4",
+          "digest": "sha256:1ba8a0328ae06614688fcf87ce4aeb4cd305fe29884da00cb633945d91ec0f20",
           "harness": {
             "marketplaces": [
               {
@@ -304,12 +304,6 @@
               },
               {
                 "path": "hooks/persistent_workflow_merge_gate.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/plan_handoff_stop_launcher.py",
                 "hosts": [
                   "claude"
                 ]
