@@ -22,8 +22,15 @@ class CalloutRepairGateTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.session = str(uuid.uuid4())
         self.transcript = self.base / "transcript.jsonl"
+        self.primary = self.base / "primary"
         self.source = self.base / "source-owner"
-        self.source.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.primary)], check=True)
+        for key, value in (("user.name", "Callout test"), ("user.email", "callout@example.invalid")):
+            subprocess.run(["git", "-C", str(self.primary), "config", key, value], check=True)
+        (self.primary / "README.md").write_text("fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.primary), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(self.primary), "commit", "-q", "-m", "fixture"], check=True)
+        subprocess.run(["git", "-C", str(self.primary), "worktree", "add", "-q", "-b", "repair", str(self.source)], check=True)
         self.goal = self.source / "GOAL.md"
         self.goal.write_text("# Repair\n", encoding="utf-8")
         self.prompt = self.base / "handoff.md"
@@ -71,19 +78,21 @@ class CalloutRepairGateTests(unittest.TestCase):
             )
         )
 
-    def claude_launch(self, successful=True, tool="Bash", command=None, receipt=True, prompt=PROMPT):
+    def claude_launch(self, successful=True, tool="Bash", command=None, receipt=True, prompt=PROMPT,
+                      tool_input=None, receipt_worktree=None, receipt_prompt_path=None):
         output = "Launched codex-cli 0.154.0 from codex.exe on selected lane"
         if receipt:
             output += "\n" + json.dumps({
                 "event": "agent-handoff-submitted",
-                "worktree": str(self.source),
-                "prompt_path": str(self.prompt),
+                "worktree": str(receipt_worktree or self.source),
+                "prompt_path": str(receipt_prompt_path or self.prompt),
             })
         return [
             {"type": "user", "message": {"role": "user", "content": prompt}},
             {"type": "assistant", "message": {"role": "assistant", "content": [
                 {"type": "text", "text": "The standard caused this mistake. Here is the answer."},
-                {"type": "tool_use", "name": tool, "id": "launch", "input": {"command": command or self.command}},
+                {"type": "tool_use", "name": tool, "id": "launch",
+                 "input": tool_input if tool_input is not None else {"command": command or self.command}},
             ]}},
             {"type": "user", "message": {"role": "user", "content": [
                 {"type": "tool_result", "tool_use_id": "launch", "is_error": not successful,
@@ -94,7 +103,7 @@ class CalloutRepairGateTests(unittest.TestCase):
     def deferred_check(self, prompt=PROMPT, callout_id=None, record_id="B014"):
         state = self.callout_state()
         callout_id = callout_id or state["callout_id"]
-        record = self.base / f"{record_id}.md"
+        record = self.primary / "BUGS.md"
         goal = self.source / f"{record_id}-GOAL.md"
         evidence = self.base / "missing-read.txt"
         target = self.base / "unavailable"
@@ -135,7 +144,8 @@ class CalloutRepairGateTests(unittest.TestCase):
         }
         fence = chr(96) * 3
         record.write_text(
-            (fence + "agent-handoff-disposition\\n" + json.dumps(value) + "\\n" + fence + "\\n").replace(
+            (record.read_text(encoding="utf-8") if record.exists() else "")
+            + (fence + "agent-handoff-disposition\\n" + json.dumps(value) + "\\n" + fence + "\\n").replace(
                 "\\n", "\n"
             ),
             encoding="utf-8",
@@ -274,6 +284,46 @@ class CalloutRepairGateTests(unittest.TestCase):
         ])
         self.assertEqual({}, self.pretool("mcp__host__send_feedback"))
 
+    def test_compound_launcher_and_synthetic_success_do_not_release_repair(self):
+        compound = self.command + "; Write-Output 'Launched codex-cli'"
+        self.submit()
+        self.write_transcript(self.claude_launch(command=compound))
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+        self.session = str(uuid.uuid4())
+        self.submit(turn_id="turn")
+        self.write_transcript([
+            {"type": "response_item", "payload": {"type": "message", "role": "user",
+                "content": [{"type": "input_text", "text": PROMPT}]}},
+            {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
+                "call_id": "launch", "input": compound}},
+            {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "launch",
+                "output": [{"type": "text", "text": "Launched codex-cli\n" + json.dumps({
+                    "event": "agent-handoff-submitted", "worktree": str(self.source), "prompt_path": str(self.prompt)
+                })}]}},
+        ])
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+
+    def test_mismatched_launcher_and_receipt_paths_do_not_release_repair(self):
+        other = self.base / "other"
+        other.mkdir()
+        other_prompt = other / "handoff.md"
+        self.submit()
+        self.write_transcript(self.claude_launch(receipt_worktree=other, receipt_prompt_path=other_prompt))
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+        self.session = str(uuid.uuid4())
+        self.submit(turn_id="turn")
+        self.write_transcript([
+            {"type": "response_item", "payload": {"type": "message", "role": "user",
+                "content": [{"type": "input_text", "text": PROMPT}]}},
+            {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
+                "call_id": "launch", "input": self.command}},
+            {"type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "launch",
+                "output": [{"type": "text", "text": "Launched codex-cli\n" + json.dumps({
+                    "event": "agent-handoff-submitted", "worktree": str(other), "prompt_path": str(other_prompt)
+                })}]}},
+        ])
+        self.assertEqual("deny", self.pretool()["hookSpecificOutput"]["permissionDecision"])
+
     def test_current_typed_deferred_disposition_releases_only_the_current_claude_turn(self):
         self.submit()
         command, output = self.deferred_check()
@@ -342,7 +392,13 @@ class CalloutRepairGateTests(unittest.TestCase):
 
     def test_structured_launch_receipt_supports_variable_arguments_and_rejects_echoes(self):
         self.submit()
-        records = self.claude_launch(command="& 'plugin/launch-codex.ps1' -WorkingDirectory $owner -PromptPath $prompt")
+        records = self.claude_launch(
+            command="& 'plugin/launch-codex.ps1' -WorkingDirectory $owner -PromptPath $prompt",
+            tool_input={
+                "command": "& 'plugin/launch-codex.ps1' -WorkingDirectory $owner -PromptPath $prompt",
+                "environment": {"owner": str(self.source), "prompt": str(self.prompt)},
+            },
+        )
         result = records[-1]["message"]["content"][0]
         self.write_transcript(records)
         self.assertEqual({}, self.pretool())

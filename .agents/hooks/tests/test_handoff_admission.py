@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,8 +19,17 @@ class HandoffAdmissionTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="handoff admission ")
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
-        self.record = self.base / "BUGS.md"
-        self.goal = self.base / "GOAL.md"
+        self.primary = self.base / "primary"
+        self.feature = self.base / "feature"
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.primary)], check=True)
+        for key, value in (("user.name", "Admission test"), ("user.email", "admission@example.invalid")):
+            subprocess.run(["git", "-C", str(self.primary), "config", key, value], check=True)
+        (self.primary / "README.md").write_text("fixture\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.primary), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(self.primary), "commit", "-q", "-m", "fixture"], check=True)
+        subprocess.run(["git", "-C", str(self.primary), "worktree", "add", "-q", "-b", "repair", str(self.feature)], check=True)
+        self.record = self.primary / "BUGS.md"
+        self.goal = self.feature / "GOAL.md"
         self.target = self.base / "missing-capability"
         self.evidence = self.base / "read-failure.txt"
         self.evidence.write_text("read failed", encoding="utf-8")
@@ -79,6 +89,52 @@ class HandoffAdmissionTests(unittest.TestCase):
     def test_missing_read_capability_admits_a_linked_deferred_record(self):
         self.write_record(self.disposition())
         self.assertTrue(self.check()["valid"])
+
+    def test_record_must_be_in_the_source_primary_register(self):
+        self.write_record(self.disposition())
+        self.assertTrue(self.check()["valid"])
+        for record in (self.feature / "BUGS.md", self.base / "temporary" / "BUGS.md", self.primary / "area" / "BUGS.md"):
+            with self.subTest(record=record):
+                record.parent.mkdir(parents=True, exist_ok=True)
+                original = self.record
+                self.record = record
+                self.goal.write_text(
+                    self.goal.read_text(encoding="utf-8").replace(str(original), str(record)),
+                    encoding="utf-8",
+                )
+                self.write_record(self.disposition())
+                self.assertFalse(self.check()["valid"])
+                self.goal.write_text(
+                    self.goal.read_text(encoding="utf-8").replace(str(record), str(original)),
+                    encoding="utf-8",
+                )
+                self.record = original
+
+    def test_area_debt_register_must_be_a_tracked_primary_register(self):
+        original = self.record
+        record = self.primary / "area" / "TECH_DEBT.md"
+        record.parent.mkdir()
+        record.write_text("# Technical debt\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.primary), "add", "area/TECH_DEBT.md"], check=True)
+        subprocess.run(["git", "-C", str(self.primary), "commit", "-q", "-m", "tracked debt register"], check=True)
+        self.record = record
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace(str(original), str(record)),
+            encoding="utf-8",
+        )
+        value = self.disposition()
+        value["kind"] = "debt"
+        self.write_record(value)
+        self.assertTrue(self.check()["valid"])
+        fabricated = self.primary / "fabricated" / "TECH_DEBT.md"
+        fabricated.parent.mkdir()
+        self.goal.write_text(
+            self.goal.read_text(encoding="utf-8").replace(str(record), str(fabricated)),
+            encoding="utf-8",
+        )
+        self.record = fabricated
+        self.write_record(value)
+        self.assertFalse(self.check()["valid"])
 
     def test_stale_unrelated_and_duplicate_records_fail_closed(self):
         for field, value in (
@@ -213,12 +269,12 @@ class HandoffAdmissionTests(unittest.TestCase):
         owner = {
             "session_id": "owner-session",
             "harness": "codex",
-            "worktree": str(self.base),
+            "worktree": str(self.feature),
             "goal": str(owner_goal),
         }
         registry_path = registry / "owner.json"
         registry_path.write_text(json.dumps({
-            "session_id": "owner-session", "host": "codex", "cwd": str(self.base),
+            "session_id": "owner-session", "host": "codex", "cwd": str(self.feature),
             "pid": os.getpid(), "pid_started_at": process_started_at(os.getpid()),
             "started_at": "2026-10-11T20:00:00Z",
         }), encoding="utf-8")
@@ -259,12 +315,12 @@ class HandoffAdmissionTests(unittest.TestCase):
         unrelated = {
             "session_id": "unrelated-session",
             "harness": "codex",
-            "worktree": str(self.base),
+            "worktree": str(self.feature),
             "goal": str(unrelated_goal),
         }
         unrelated_registry = registry / "unrelated.json"
         unrelated_registry.write_text(json.dumps({
-            "session_id": "unrelated-session", "host": "codex", "cwd": str(self.base),
+            "session_id": "unrelated-session", "host": "codex", "cwd": str(self.feature),
             "pid": os.getpid(), "pid_started_at": process_started_at(os.getpid()),
             "started_at": "2026-10-11T20:00:00Z",
         }), encoding="utf-8")
@@ -300,12 +356,12 @@ class HandoffAdmissionTests(unittest.TestCase):
         owner = {
             "session_id": "conflict-session",
             "harness": "codex",
-            "worktree": str(self.base),
+            "worktree": str(self.feature),
             "goal": str(owner_goal),
         }
         registry_path = registry / "conflict.json"
         registry_path.write_text(json.dumps({
-            "session_id": "conflict-session", "host": "codex", "cwd": str(self.base),
+            "session_id": "conflict-session", "host": "codex", "cwd": str(self.feature),
             "pid": os.getpid(), "pid_started_at": process_started_at(os.getpid()),
             "started_at": "2026-10-11T20:00:00Z",
         }), encoding="utf-8")
