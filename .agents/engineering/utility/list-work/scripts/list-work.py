@@ -250,4 +250,4 @@ if needle:
         print("nothing in scope is named for '%s'; ~/.claude/plans is the whole corpus, so a plan or"
               " roadmap kept inside a repo is never searched." % subject)
 for group, count in sorted(elsewhere.items(), key=lambda value: -value[1]):
-    print("out of scope: %d in %s - rerun with SCOPE=all to include." % (count, group))
+    print("out of scope: %d in %s - rerun with the scope argument all to include." % (count, group))
