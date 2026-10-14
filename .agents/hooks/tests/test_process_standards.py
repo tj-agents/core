@@ -117,11 +117,23 @@ class ProcessStandardsTests(unittest.TestCase):
             "A defect in a consumed standards package or its source repository is the exception: "
             "a stale or broken standard",
             "and so is a standard that caused or failed to prevent a mistake",
-            "in the same turn, after answering the user's direct question and before the current task resumes, without asking",
-            "announcing a later or separate fix instead of launching is a violation",
+            "`engineering:self-repair` in the same turn, after answering the user's direct question and before the "
+            "current task resumes",
+            "That workflow owns the repair authorization, admission, disposition, and delivery procedure",
+            "explicit user limits still hold",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, flat)
+
+        self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
+        for phrase in (
+            "reconcile that owner and contribute the new evidence without creating a duplicate writer",
+            "A capability, dependency, conflict, or capacity obstacle is recorded as a linked deferred disposition",
+            "This standing authorization covers the bounded Core repair through implementation, tests, review, pull "
+            "request, merge, and publication",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self_repair)
 
     def test_callout_checks_standards_before_an_apology(self):
         instructions = authored_skill("session-guidance").read_text(encoding="utf-8")
@@ -129,18 +141,27 @@ class ProcessStandardsTests(unittest.TestCase):
             instructions.split("## When the user calls out a mistake", 1)[1].split("## ", 1)[0].split()
         )
 
-        self.assertTrue(section.startswith("When the user calls out a mistake, before apologizing"))
-        self.assertLess(section.index("before apologizing"), section.index("An apology"))
-        self.assertLess(section.index("Answer the user's direct question first"), section.index("If it did, launch"))
+        self.assertTrue(section.startswith("When the user calls out a mistake, answer the direct question first"))
         for phrase in (
-            "missing, ambiguous, contradictory, mispriced or unenforced",
-            "every consumed `tj-agents` plugin on both hosts",
-            "`engineering:handoff` in bounded side-workstream mode in the same turn",
-            "SendFeedback draft or local memory does not substitute",
+            "`engineering:self-repair`",
+            "required bounded source-repair handoff",
             "Existing user limits and scope gates still apply",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, section)
+
+        self_repair = " ".join(authored_skill("self-repair").read_text(encoding="utf-8").split())
+        for phrase in (
+            "consumed Core standard, skill, hook, workflow, or host enforcement",
+            "`engineering:handoff` in bounded side-workstream mode",
+            "native launcher reports successful submission",
+            "failed launcher is not a handoff",
+            "monitoring-only",
+            "Monitoring does not grant delivery authority",
+            "never authorizes taking over an unrelated pending delivery",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self_repair)
 
     def test_plan_execution_reads_the_plan_corpus_only_when_it_changes_a_decision(self):
         body = authored_skill("plan-execution").read_text(
