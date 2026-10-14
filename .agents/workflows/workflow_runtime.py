@@ -538,6 +538,8 @@ def _git(root, *arguments):
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     return completed.stdout.strip()
 

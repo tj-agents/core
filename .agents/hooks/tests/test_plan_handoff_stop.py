@@ -459,6 +459,39 @@ class PlanHandoffStopTests(unittest.TestCase):
             ),
         )
 
+    def test_mutation_target_uses_its_tool_workdir_without_scanning_prose(self):
+        document = self.write_work_item()
+        workdir = self.root / "subdir"
+        workdir.mkdir()
+        records = [{
+            "type": "response_item",
+            "payload": {
+                "type": "function_call",
+                "name": "write_file",
+                "arguments": {
+                    "path": document.relative_to(self.root).as_posix(),
+                    "workdir": str(workdir),
+                },
+            },
+        }]
+        with patch("plan_handoff_stop.git_root", return_value=self.root):
+            self.assertEqual(set(), transcript_ledgers(records, self.root))
+
+    def test_user_reference_discovers_the_root_work_item_readme(self):
+        document = self.write_work_item()
+        records = [{
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{
+                    "type": "input_text",
+                    "text": document.relative_to(self.root).as_posix(),
+                }],
+            },
+        }]
+        self.assertEqual({document}, transcript_ledgers(records, self.root))
+
     def test_bare_legacy_patch_target_resolves_from_its_tool_workdir(self):
         workdir = self.root / "plans" / "launch" / "subdir"
         workdir.mkdir(parents=True)

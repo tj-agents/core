@@ -29,6 +29,7 @@ from workflow_runtime import (
     WorkflowContract,
     select_state_provider,
 )
+import workflow_runtime
 from host_runtime import HostAdapterRegistry, WriterLeaseRegistry
 from fixtures.lane_expectations import authored_skill
 
@@ -2003,6 +2004,76 @@ class RepositoryProviderTests(unittest.TestCase):
                     )
                 if origin is not None:
                     subprocess.run(["git", "-C", str(self.root), "remote", "remove", "origin"], check=True)
+
+    def test_read_only_git_uses_utf8_replacement_decoding(self):
+        completed = subprocess.CompletedProcess([], 0, "github.com/example/runtime", "")
+        with mock.patch.object(workflow_runtime.subprocess, "run", return_value=completed) as run:
+            self.assertEqual(
+                "github.com/example/runtime",
+                workflow_runtime._read_only_git(self.root / "linked-\u00e9", "config", "--get", "remote.origin.url"),
+            )
+        self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
+        self.assertEqual("replace", run.call_args.kwargs["errors"])
+
+    def test_originless_non_ascii_linked_worktree_matches_writer_and_provider(self):
+        primary = self.root / "repository-\u00e9"
+        subprocess.run(["git", "clone", "-q", str(self.root), str(primary)], check=True)
+        subprocess.run(["git", "-C", str(primary), "remote", "remove", "origin"], check=True)
+        linked = self.root / "linked-\u00e9"
+        subprocess.run(
+            ["git", "-C", str(primary), "worktree", "add", "-q", "-b", "Feature/provider-linked", str(linked)],
+            check=True,
+        )
+        self.addCleanup(
+            subprocess.run,
+            ["git", "-C", str(primary), "worktree", "remove", "--force", str(linked)],
+            check=False,
+        )
+        feature = linked / "plans" / "features" / "runtime-bridge"
+        document = feature / "work-items" / "readme-reader" / "README.md"
+        document.parent.mkdir(parents=True)
+        (feature / "README.md").write_text(
+            "# Runtime bridge\n\n- [ ] `runtime-bridge/readme-reader`\n",
+            encoding="utf-8",
+        )
+        document.write_text(
+            "# README reader\n\n"
+            f"- Worktree: `{linked}`\n"
+            "- Branch: `Feature/provider-linked`\n\n"
+            "## Decisions\n\n- SQLite is authoritative.\n\n"
+            "## Next Steps\n\n"
+            "Continue the local implementation.\n"
+            "Scope: whole plan remains incomplete.\n"
+            "Current slice: resolve the runtime work item.\n"
+            "Remaining scope: review and delivery remain.\n"
+            "Done when: the runtime work item is verified.\n",
+            encoding="utf-8",
+        )
+        path = ROOT / ".agents" / "machine" / "scripts" / "session_store.py"
+        spec = importlib.util.spec_from_file_location("linked_worktree_session_store", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        state = linked / "state"
+        connection = module.connect(state / "sessions.db")
+        try:
+            repository = module.repo_identity(linked)
+            module.upsert_work_item(
+                connection,
+                module.work_item_key(repository, "runtime-bridge", "readme-reader"),
+                repository,
+                "runtime-bridge",
+                "readme-reader",
+                status="active",
+                branch="Feature/provider-linked",
+            )
+        finally:
+            connection.close()
+        provider = RepositoryStateProvider(linked, WorkflowContract(WORKFLOWS))
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
+            self.assertEqual(
+                "active",
+                provider.work_item_status(document.relative_to(linked).as_posix()),
+            )
 
     def test_work_item_store_rejects_incomplete_or_conflicting_rows_and_query_errors(self):
         document = self.write_work_item()
