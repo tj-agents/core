@@ -74,17 +74,21 @@ plan named for the subject is finished, it says that rather than pretending none
 Run this Bash command on Linux/macOS with `python3`, or on Windows through Git Bash with `python`:
 
 ```bash
-python - "${FILTER:-}" "${LIMIT:-20}" "${SCOPE:-auto}" <<'PY'
-import pathlib, re, sys, time
+python - "${FILTER:-}" "${LIMIT:-20}" "${SCOPE:-auto}" "<skill-directory>" <<'PY'
+import importlib.util, pathlib, re, sys, time
 
 root = pathlib.Path.home() / ".claude" / "plans"
 repos = pathlib.Path.home() / "source" / "repos"
 limit = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].strip().isdigit() else 20
 scope = (sys.argv[3] if len(sys.argv) > 3 else "auto").lower()
 here = pathlib.Path.cwd()
+skill_directory = pathlib.Path(sys.argv[4]).resolve() if len(sys.argv) > 4 else None
 SKIP = {".git", "node_modules"}
 PLAN_DIRS = ("plans", "docs/plans")
 NOT_PLANS = {"agents.md", "claude.md", "readme.md", "tech_debt.md", "technical_debt.md"}
+WORK_ITEM_README = re.compile(
+    r"^plans/features/([a-z0-9]+(?:-[a-z0-9]+)*)/work-items/"
+    r"([a-z0-9]+(?:-[a-z0-9]+)*)/README\.md$")
 
 WORD = re.compile(r'[a-z0-9]+')
 
@@ -108,6 +112,52 @@ def about(text):
 
 def is_repo(path):
     return (path / ".git").exists()
+
+def workflow_root():
+    if skill_directory is None:
+        raise RuntimeError("workboard capability failure: supply the exact skill directory as argument four")
+    if (skill_directory.parent.name == "utility" and
+            skill_directory.parent.parent.name == "engineering" and
+            skill_directory.parent.parent.parent.name == ".agents"):
+        source_root = skill_directory.parent.parent.parent.parent
+        source_workflows = source_root / ".agents" / "workflows"
+        package_workflows = source_root / "workflows"
+        if (source_workflows / "workflow_runtime.py").is_file():
+            return source_workflows
+        if (package_workflows / "workflow_runtime.py").is_file():
+            return package_workflows
+    if skill_directory.parent.name in {"skills", "codex-skills"}:
+        return skill_directory.parent.parent / "workflows"
+    raise RuntimeError("workboard capability failure: the skill directory has no supported runtime anchor")
+
+def work_item_reader():
+    workflows = workflow_root()
+    runtime_path = workflows / "workflow_runtime.py"
+    if not runtime_path.is_file():
+        raise RuntimeError("workboard capability failure: own workflow runtime is unavailable")
+    spec = importlib.util.spec_from_file_location("workboard_workflow_runtime", runtime_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("workboard capability failure: own workflow runtime cannot be loaded")
+    runtime = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runtime)
+    provider_type = getattr(runtime, "RepositoryStateProvider", None)
+    contract_type = getattr(runtime, "WorkflowContract", None)
+    violation_type = getattr(runtime, "ContractViolation", None)
+    if not all((callable(provider_type), callable(contract_type), callable(violation_type))):
+        raise RuntimeError("workboard capability failure: own workflow runtime lacks work-item status support")
+    if not callable(getattr(provider_type, "work_item_status", None)):
+        raise RuntimeError("workboard capability failure: own workflow runtime lacks work-item status support")
+    try:
+        contract = contract_type(workflows)
+    except (OSError, ValueError, KeyError) as error:
+        raise RuntimeError("workboard capability failure: own workflow contract is unavailable") from error
+    return runtime, contract
+
+try:
+    runtime, contract = work_item_reader()
+except RuntimeError as error:
+    print(error, file=sys.stderr)
+    raise SystemExit(2)
 
 def group_of(project):
     if (repos / project).is_dir():
@@ -156,11 +206,13 @@ def repo_plans():
                 continue
             for path in sorted(first.rglob("*.md")):
                 parts = path.relative_to(first).parts
-                if any(part in SKIP for part in parts) or path.name.lower() in NOT_PLANS:
+                relative_path = path.relative_to(member).as_posix()
+                item = WORK_ITEM_README.fullmatch(relative_path)
+                if any(part in SKIP for part in parts) or (path.name.lower() in NOT_PLANS and item is None):
                     continue
                 topic = parts[-2] if len(parts) > 1 else ""
                 label = topic or member.name
-                yield path, member.name + ("/" + topic if topic else ""), label, mine
+                yield path, member.name + ("/" + topic if topic else ""), label, mine, member, item
 
 def plan_entries():
     yield from local_plans()
@@ -178,7 +230,10 @@ DONE_BOX = re.compile(r'^\s*[-*]\s*\[[xX]\]', re.M)
 
 named, mentioned, hidden, elsewhere = [], [], 0, {}
 named_seen = False
-for path, folder, label, group in plan_entries():
+providers = {}
+for entry in plan_entries():
+    path, folder, label, group = entry[:4]
+    member, item = entry[4:] if len(entry) > 4 else (None, None)
     if scope != "all" and mine and group and group != mine:
         if about(folder) or about(path.stem):
             elsewhere[group] = elsewhere.get(group, 0) + 1
@@ -196,24 +251,48 @@ for path, folder, label, group in plan_entries():
         bucket, is_named = mentioned, False
     else:
         continue
-    opens, dones = len(OPEN_BOX.findall(text)), len(DONE_BOX.findall(text))
-    if opens:
-        state = "live %d/%d" % (dones, dones + opens)
-    elif DONE.search(text) or dones:
-        if is_named:
-            hidden += 1
-        continue
+    status_reason = ""
+    work_item = ""
+    if item is not None:
+        relative_path = path.relative_to(member).as_posix()
+        work_item = "%s/%s" % item.groups()
+        try:
+            provider = providers.get(member)
+            if provider is None:
+                provider = runtime.RepositoryStateProvider(member, contract)
+                providers[member] = provider
+            state = provider.work_item_status(relative_path)
+            if state not in {"proposed", "active", "delivery-gated", "blocked", "paused", "done"}:
+                raise runtime.ContractViolation("work-item status is unavailable")
+            if state == "done":
+                if is_named:
+                    hidden += 1
+                continue
+        except runtime.ContractViolation as error:
+            state = "unknown"
+            status_reason = str(error)
     else:
-        state = ""
+        opens, dones = len(OPEN_BOX.findall(text)), len(DONE_BOX.findall(text))
+        if opens:
+            state = "live %d/%d" % (dones, dones + opens)
+        elif DONE.search(text) or dones:
+            if is_named:
+                hidden += 1
+            continue
+        else:
+            state = ""
     hit = NEXT.search(text) or RESOLVES.search(text) or OPEN_ITEM.search(text)
     nxt = re.sub(r'\s+', ' ', hit.group(1)).strip()[:160] if hit else ""
-    bucket.append((mtime, state, label, path.name, nxt))
+    bucket.append((mtime, state, label, path.name, nxt, status_reason, work_item))
 
 rows = named or mentioned
 rows.sort(reverse=True)
-for mtime, state, label, name, nxt in rows[:limit]:
+for mtime, state, label, name, nxt, status_reason, work_item in rows[:limit]:
     stamp = time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime))
-    print("%s  %-10s %-18s %s" % (stamp, state, label, name))
+    key = " %s" % work_item if work_item else ""
+    print("%s  %-10s %-18s%s %s" % (stamp, state, label, key, name))
+    if status_reason:
+        print("%30s -> status unknown: %s" % ("", status_reason))
     if nxt:
         print("%30s -> %s" % ("", nxt))
 print("")
@@ -267,6 +346,34 @@ work restarts from it, and composing that invocation is the one step the reader 
 A checkbox roadmap resumes with `continue-roadmap`, a prose handoff with `resume-plan`; give the
 invocation itself, not the skill's name in passing. Where the printed next action was clipped, read
 the item out of the file rather than repeating a truncated line.
+
+Canonical work-item rows print their SQLite status and `<feature>/<item>` key. For one with a recorded
+session, inspect it first with the shipped machine capability:
+
+On Windows in a source checkout:
+
+```text
+python -B .agents/machine/scripts/work_item_sessions.py status '<feature>/<item>'
+python -B .agents/machine/scripts/work_item_sessions.py resume '<feature>/<item>'
+```
+
+On Linux or macOS in a source checkout:
+
+```text
+python3 -B .agents/machine/scripts/work_item_sessions.py status '<feature>/<item>'
+python3 -B .agents/machine/scripts/work_item_sessions.py resume '<feature>/<item>'
+```
+
+From an installed machine plugin, use its resolved root:
+
+```text
+python -B '<machine-plugin-root>/resources/machine/scripts/work_item_sessions.py' status '<feature>/<item>'
+python -B '<machine-plugin-root>/resources/machine/scripts/work_item_sessions.py' resume '<feature>/<item>'
+```
+
+Resume only through that capability after it reports a resumable recorded session. When it reports no
+session, read the item's `README.md` `## Next Steps`, start a new owner from that action, and claim the
+work item. Do not use `resume-plan` to infer or create native work-item state.
 
 ## What this does not do
 
