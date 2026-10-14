@@ -276,18 +276,80 @@ def nonempty_string(value):
     return isinstance(value, str) and bool(value.strip())
 
 
-def command_is_close_attempt(argv):
+def close_command_invocation(argv):
     if not isinstance(argv, list) or not argv or not all(isinstance(value, str) and value.strip() for value in argv):
-        return False
+        return None
     names = [value.replace("\\", "/").rsplit("/", 1)[-1].casefold() for value in argv]
     if names[0] in CLOSE_COMMANDS:
-        return True
-    if names[0] not in {"python", "python3", "python.exe", "python3.exe", "py", "py.exe"}:
+        return names[0], argv[1:]
+    if names[0] in {"python", "python3", "python.exe", "python3.exe", "py", "py.exe"}:
+        script_index = 1
+        while script_index < len(argv) and argv[script_index] in PYTHON_NO_VALUE_FLAGS:
+            script_index += 1
+        if script_index < len(names) and names[script_index] in CLOSE_COMMANDS:
+            return names[script_index], argv[script_index + 1:]
+    return None
+
+
+def command_is_close_attempt(argv):
+    return close_command_invocation(argv) is not None
+
+
+def close_command_matches_obligation(argv, obligation):
+    invocation = close_command_invocation(argv)
+    if invocation is None:
         return False
-    script_index = 1
-    while script_index < len(argv) and argv[script_index] in PYTHON_NO_VALUE_FLAGS:
-        script_index += 1
-    return script_index < len(names) and names[script_index] in CLOSE_COMMANDS
+    command, arguments = invocation
+    worktree = obligation.get("worktree")
+    session_id = obligation.get("session_id")
+    if command == "close.py":
+        return not arguments
+    if command == "finish.py":
+        return not arguments or (
+            len(arguments) == 2 and arguments[0] == "--worktree" and same_path(arguments[1], worktree)
+        )
+    if command == "peer_cli.py":
+        return arguments in (["close", session_id], ["close", session_id, "--force"])
+    if command != "close_tab.py" or "--list" in arguments or "--all" in arguments:
+        return False
+    selectors = 0
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == "--force":
+            index += 1
+            continue
+        if argument in ("--session", "--title"):
+            if index + 1 >= len(arguments) or not nonempty_string(arguments[index + 1]):
+                return False
+            if argument == "--session" and arguments[index + 1] != session_id:
+                return False
+            selectors += 1
+            index += 2
+            continue
+        if argument.startswith("-") or not nonempty_string(argument):
+            return False
+        selectors += 1
+        index += 1
+    return selectors == 1
+
+
+def resolved_target_matches(capability, obligation):
+    target = capability.get("resolved_target")
+    cwd = capability.get("cwd")
+    if not isinstance(target, dict) or not nonempty_string(cwd):
+        return False
+    pid = target.get("pid")
+    pid_started_at = target.get("pid_started_at")
+    return (
+        same_path(cwd, obligation.get("worktree", ""))
+        and target.get("session_id") == obligation.get("session_id")
+        and nonempty_string(target.get("cwd"))
+        and same_path(target["cwd"], obligation.get("worktree", ""))
+        and type(pid) is int and pid > 0
+        and isinstance(pid_started_at, (int, float)) and not isinstance(pid_started_at, bool)
+        and math.isfinite(pid_started_at) and pid_started_at > 0
+    )
 
 
 def capability_evidence_is_valid(evidence, obligation):
@@ -300,7 +362,8 @@ def capability_evidence_is_valid(evidence, obligation):
     fallback = capability.get("fallback")
     recorded_at = obligation.get("recorded_at")
     return (
-        command_is_close_attempt(capability.get("argv"))
+        close_command_matches_obligation(capability.get("argv"), obligation)
+        and resolved_target_matches(capability, obligation)
         and type(returncode) is int and returncode != 0
         and nonempty_string(refusal_output)
         and not TRANSIENT_REFUSAL_RE.search(refusal_output)
@@ -523,6 +586,9 @@ def stamp_transfer(command, data):
 
 def evaluate_codex_obligation(obligation, session, cwd, now):
     if not obligation.get("session_exit_required") and not worktree_still_exists(obligation):
+        return None
+    disposition = obligation.get("disposition")
+    if isinstance(disposition, dict) and disposition.get("reason") == "keep-open" and admitted_disposition(obligation):
         return None
     transferred_at = obligation.get("transferred_at")
     if transferred_at is None:
