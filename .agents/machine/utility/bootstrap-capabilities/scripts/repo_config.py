@@ -15,6 +15,7 @@ import subprocess
 
 import harness_permissions
 import bootstrap_capabilities as bootstrap
+import machine_paths
 
 
 CORE_PLUGINS = {"base-agents/base", "base-agents/engineering", "base-agents/machine"}
@@ -412,9 +413,22 @@ def plan(
             targets[exclude] = exclusion_text(exclude, root, [*paths, *[contained(root, path) for path in prospective_paths]])
     else:
         targets = {claude: claude_settings(claude, sources, identities, allow), codex: codex_settings(codex, sources, identities), rules_path: expected_rules}
+        reject_machine_paths(root, targets)
     for path in targets:
         text_at(path)
     return targets
+
+
+def reject_machine_paths(root: Path, targets: dict[Path, str | None]) -> None:
+    committed = {**{root / relative: text_at(root / relative) for relative in machine_paths.COMMITTED_SETTINGS}, **targets}
+    problems = [
+        problem
+        for path, text in committed.items()
+        if text is not None
+        for problem in machine_paths.describe(path.relative_to(root).as_posix(), text)
+    ]
+    if problems:
+        raise bootstrap.BootstrapError("Committed host settings contain machine-specific paths:\n" + "\n".join(problems))
 
 
 def write_batch(targets: dict[Path, str | None]) -> None:

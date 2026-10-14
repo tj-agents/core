@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import re
 import stat
 import subprocess
 from pathlib import Path
@@ -206,6 +207,42 @@ class RepoConfigTests(unittest.TestCase):
         self.save_lock()
         with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, "omits core plugins"):
             repo_config.run(self.lock, CATALOG, "write")
+
+    def test_machine_specific_hook_path_blocks_project_check_and_write_without_mutation(self):
+        settings = self.root / ".claude" / "settings.json"
+        settings.parent.mkdir()
+        hook = {"type": "command", "command": "pwsh -File C:\\Users\\Someone\\session-hook.ps1"}
+        original = json.dumps({"hooks": {"SessionStart": [{"hooks": [hook]}]}}, indent=2)
+        settings.write_text(original, encoding="utf-8")
+        for mode in ("check", "write", "preview"):
+            with self.subTest(mode=mode):
+                with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, r"\.claude/settings\.json:\d+: .*Someone"):
+                    repo_config.run(self.lock, CATALOG, mode)
+                self.assertEqual(original, settings.read_text(encoding="utf-8"))
+                self.assertFalse((self.root / ".codex").exists())
+
+    def test_machine_specific_codex_hook_and_config_paths_block_project_check(self):
+        cases = {
+            ".codex/config.toml": 'model = "test"\nnotify = ["/home/someone/bin/notify"]\n',
+            ".codex/hooks.json": json.dumps({"hooks": {"Stop": [{"command": "D:/tools/stop.py"}]}}),
+        }
+        for relative, text in cases.items():
+            with self.subTest(path=relative):
+                path = self.root / relative
+                path.parent.mkdir(exist_ok=True)
+                path.write_text(text, encoding="utf-8")
+                with self.assertRaisesRegex(repo_config.bootstrap.BootstrapError, re.escape(relative) + ":"):
+                    repo_config.run(self.lock, CATALOG, "check")
+                path.unlink()
+        repo_config.run(self.lock, CATALOG, "write")
+        self.assertEqual([], repo_config.run(self.lock, CATALOG, "check"))
+
+    def test_local_scope_does_not_reject_machine_paths_in_uncommitted_settings(self):
+        settings = self.root / ".claude" / "settings.local.json"
+        settings.parent.mkdir()
+        settings.write_text(json.dumps({"env": {"TOOL": "C:\\Users\\Someone\\tool.exe"}}), encoding="utf-8")
+        self.local()
+        self.assertEqual([], self.local("check"))
 
     def local(self, mode="write", root=None):
         return repo_config.run(self.lock, CATALOG, mode, root=root or self.root, scope="local")
