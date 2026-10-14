@@ -260,11 +260,15 @@ def completion_check(goal, bound_delivery=None, root=None, viewer=None):
             blockers.append(f"delivery PR #{delivery['pr']} has unchecked task: {task}")
         fetched.append({"repository": delivery["repository"], "pr": delivery["pr"], "head": delivery["head"],
                         "state": value.get("state")})
+    report_ready = not blockers
     cleanup_status, pending_cleanup = relevant_cleanup(root if root is not None else Path(goal).parent)
+    if pending_cleanup:
+        blockers.append("cleanup remains pending")
     return {
         "operation": "completion-check",
         "outcome": document["outcome"],
-        "ready": not blockers,
+        "report_ready": report_ready,
+        "ready": report_ready and not pending_cleanup,
         "blockers": blockers,
         "open_tasks": unresolved,
         "deliveries": fetched,
@@ -302,5 +306,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except CompletionError as error:
-        print(json.dumps({"operation": "completion-check", "ready": False, "error": str(error)}))
+        print(json.dumps({"operation": "completion-check", "report_ready": False, "ready": False, "error": str(error)}))
         raise SystemExit(2)

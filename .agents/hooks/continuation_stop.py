@@ -237,7 +237,7 @@ def outcome(data):
             result = completion.completion_check(Path(owner["goal"]), required, root)
         except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
             return f"Verify completion through the canonical completion check before ending this turn: {error}"
-        return None if result.get("ready") else "Completion is not verified; continue the canonical goal."
+        return None if result.get("report_ready") is True else "Completion is not verified; continue the canonical goal."
     if state == "blocked":
         if documented_blocker(owner):
             return None
