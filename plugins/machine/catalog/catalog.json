@@ -173,6 +173,7 @@
             "resume-plan",
             "review",
             "review-lifecycle",
+            "self-repair",
             "session-guidance",
             "skill-authoring",
             "skill-routes",
@@ -206,7 +207,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:8f95eec0d7e9c8c89ac976514078aeafcf66785b82ba77dc768d13ad44d1b29b",
+          "digest": "sha256:be808443210f2b3a3191989f6bd4d7585488f0e82197f67d1a3bea742718517b",
           "harness": {
             "marketplaces": [
               {
