@@ -2,7 +2,9 @@
 """Single SQLite-backed store for session and work-item status, written by hooks (Python 3.9+)."""
 
 import argparse
+import importlib.util
 import json
+import math
 import os
 import re
 import socket
@@ -13,10 +15,12 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
+HERE = Path(__file__).resolve().parent
 SCHEMA_VERSION = 2
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
 _LOCK_RETRY_DELAY = 0.05
+_REGISTER_SESSION = None
 
 WORK_ITEMS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS work_items (
@@ -72,6 +76,24 @@ def state_directory():
 
 def database_path():
     return state_directory() / "sessions.db"
+
+
+def _register_session():
+    global _REGISTER_SESSION
+    if _REGISTER_SESSION is not None:
+        return _REGISTER_SESSION
+    source = HERE.parent / "utility/peer-cli/scripts/register_session.py"
+    packaged = tuple(
+        HERE.parents[2] / layout / "peer-cli/scripts/register_session.py" for layout in ("skills", "codex-skills")
+    ) if len(HERE.parents) > 2 else ()
+    for path in (source, *packaged):
+        if path.is_file():
+            spec = importlib.util.spec_from_file_location("session_store_register_session", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            _REGISTER_SESSION = module
+            return module
+    raise RuntimeError(f"The shared register_session.py helper was not found relative to {HERE}.")
 
 
 def _execute_with_lock_retry(connection, statement):
@@ -287,13 +309,13 @@ def work_item_key(repo, feature, item):
     return f"{repo}:{feature}/{item}"
 
 
-def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_started_at=None):
+def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_started_at=None, only_if_missing=False):
     handle = session_handle(host, session_id)
     machine = current_machine()
     profile = profile_directory(host)
     repo, branch, head = _collect_repo_branch_head(cwd)
     now = time.time()
-    connection.execute(
+    cursor = connection.execute(
         """
         INSERT INTO sessions (
             handle, host, session_id, machine, profile, title, cwd, repo, branch, head,
@@ -315,11 +337,15 @@ def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_s
             ended_at = NULL,
             end_reason = NULL,
             role = CASE WHEN sessions.end_reason = 'handed_off' THEN NULL ELSE sessions.role END
+        WHERE NOT ?
         """,
         (handle, host, session_id, machine, profile, title, str(cwd), repo, branch, head,
-         pid, pid_started_at, now, now),
+         pid, pid_started_at, now, now, only_if_missing),
     )
+    changed = cursor.rowcount != 0
     connection.commit()
+    if not changed:
+        return None
     if repo and branch:
         attach_work_item_if_unique(connection, repo, branch, handle)
         connection.commit()
@@ -526,6 +552,106 @@ def interrupted_candidates(connection, repo=None):
     return [dict(row) for row in rows]
 
 
+def _valid_process_identity(pid, started_at):
+    return (
+        isinstance(pid, int)
+        and not isinstance(pid, bool)
+        and not isinstance(started_at, bool)
+        and isinstance(started_at, (int, float))
+        and math.isfinite(started_at)
+    )
+
+
+def _registry_path(session_id):
+    return state_directory() / "cli-sessions" / f"{session_id}.json"
+
+
+def _record_registry(registrar, host, session_id, payload, pid, pid_started_at):
+    try:
+        entry = registrar.record_registry(payload, pid, host, pid_started_at)
+    except Exception:
+        entry = None
+    return (
+        isinstance(entry, dict)
+        and entry.get("session_id") == session_id
+        and entry.get("host") == host
+        and entry.get("pid") == pid
+        and entry.get("pid_started_at") == pid_started_at
+    )
+
+
+def _resolve_recovery_identity(host, session_id):
+    try:
+        registrar = _register_session()
+        pid, recorded_host, pid_started_at = registrar.resolve_recorded_pid(os.getppid())
+    except Exception:
+        registrar = None
+        pid = recorded_host = pid_started_at = None
+    if (
+        registrar is None
+        or recorded_host != host
+        or not _valid_process_identity(pid, pid_started_at)
+    ):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return None
+    return registrar, pid, pid_started_at
+
+
+def _recover_missing_session(host, session_id, payload):
+    identity = _resolve_recovery_identity(host, session_id)
+    if identity is None:
+        return False
+    registrar, pid, pid_started_at = identity
+    try:
+        connection = connect()
+    except Exception:
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    try:
+        title = os.environ.get(getattr(registrar, "TITLE_ENV", "AGENT_CLI_TAB_TITLE")) or None
+        created = start_session(
+            connection, host, session_id, payload.get("cwd") or os.getcwd(), title=title,
+            pid=pid, pid_started_at=pid_started_at, only_if_missing=True,
+        )
+        row = get_session(connection, session_handle(host, session_id))
+    finally:
+        connection.close()
+    if (
+        row is None
+        or row.get("host") != host
+        or row.get("session_id") != session_id
+        or row.get("pid") != pid
+        or row.get("pid_started_at") != pid_started_at
+    ):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    if created is None:
+        return False
+    if not _record_registry(registrar, host, session_id, payload, pid, pid_started_at):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    return True
+
+
+def _recover_missing_registry(host, session_id, payload, row):
+    identity = _resolve_recovery_identity(host, session_id)
+    if identity is None:
+        return False
+    registrar, pid, pid_started_at = identity
+    if (
+        row.get("host") != host
+        or row.get("session_id") != session_id
+        or row.get("pid") != pid
+        or row.get("pid_started_at") != pid_started_at
+    ):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    if not _record_registry(registrar, host, session_id, payload, pid, pid_started_at):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    return True
+
+
 def _read_json_stdin():
     try:
         raw = sys.stdin.read()
@@ -539,6 +665,7 @@ def _read_json_stdin():
 
 
 def run_hook(event, host):
+    session_id = None
     try:
         payload = _read_json_stdin()
         session_id = payload.get("session_id") or payload.get("sessionId")
@@ -546,6 +673,21 @@ def run_hook(event, host):
             return 0
         cwd = payload.get("cwd") or os.getcwd()
         handle = session_handle(host, session_id)
+        if event in ("prompt", "stop"):
+            connection = connect()
+            try:
+                row = get_session(connection, handle)
+            finally:
+                connection.close()
+            if row is None:
+                if not _recover_missing_session(host, session_id, payload):
+                    return 0
+            elif (
+                _valid_process_identity(row.get("pid"), row.get("pid_started_at"))
+                and not _registry_path(session_id).is_file()
+                and not _recover_missing_registry(host, session_id, payload, row)
+            ):
+                return 0
         connection = connect()
         try:
             if event == "session-start":
@@ -559,7 +701,8 @@ def run_hook(event, host):
         finally:
             connection.close()
     except Exception:
-        pass
+        label = f"{host}:{session_id}" if isinstance(session_id, str) and session_id else host
+        print(f"session persistence: could not record {label}", file=sys.stderr)
     return 0
 
 

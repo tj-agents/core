@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import unittest
 from unittest import mock
 
@@ -385,6 +386,127 @@ class HookLifecycleTests(unittest.TestCase):
         row = self._row(handle)
         self.assertIsNotNone(row["ended_at"])
         self.assertEqual("closed", row["end_reason"])
+
+    def test_prompt_and_stop_recover_missing_sessions_through_the_native_resolver(self):
+        registrar = STORE._register_session()
+        with mock.patch.object(registrar, "resolve_recorded_pid", return_value=(42, "claude", 24.0)), \
+                mock.patch.object(STORE, "_register_session", return_value=registrar):
+            self.assertEqual(0, self._invoke("prompt", "claude", {"session_id": "prompt-missing", "cwd": str(self.repo)}))
+            self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "stop-missing", "cwd": str(self.repo)}))
+        prompt_row = self._row("claude:prompt-missing")
+        stop_row = self._row("claude:stop-missing")
+        sidecar = json.loads((self.state / "cli-sessions" / "prompt-missing.json").read_text(encoding="utf-8"))
+        self.assertEqual("working", prompt_row["turn_state"])
+        self.assertEqual("awaiting_input", stop_row["turn_state"])
+        self.assertEqual(42, stop_row["pid"])
+        self.assertEqual(24.0, stop_row["pid_started_at"])
+        self.assertEqual("claude", sidecar["host"])
+        self.assertEqual(42, sidecar["pid"])
+        self.assertEqual(24.0, sidecar["pid_started_at"])
+
+    def test_missing_session_recovery_retries_after_identity_discovery_fails_without_writing(self):
+        payload = {"session_id": "retry-missing", "cwd": str(self.repo)}
+        registrar = types.SimpleNamespace(
+            resolve_recorded_pid=mock.Mock(side_effect=[(42, None, None), (42, "claude", 24.0)]),
+            record_registry=mock.Mock(return_value={"session_id": "retry-missing", "host": "claude", "pid": 42, "pid_started_at": 24.0}),
+        )
+        with mock.patch.object(STORE, "_register_session", return_value=registrar):
+            self.assertEqual(0, self._invoke("prompt", "claude", payload))
+            self.assertIsNone(self._row("claude:retry-missing"))
+            self.assertEqual(0, self._invoke("prompt", "claude", payload))
+        self.assertEqual(2, registrar.resolve_recorded_pid.call_count)
+        self.assertEqual(1, registrar.record_registry.call_count)
+        self.assertEqual(42, self._row("claude:retry-missing")["pid"])
+
+    def test_missing_session_recovery_retries_registry_after_write_failure(self):
+        payload = {"session_id": "retry-registry", "cwd": str(self.repo)}
+        registrar = types.SimpleNamespace(
+            resolve_recorded_pid=mock.Mock(return_value=(42, "claude", 24.0)),
+            record_registry=mock.Mock(side_effect=[
+                OSError("unavailable"),
+                {"session_id": "retry-registry", "host": "claude", "pid": 42, "pid_started_at": 24.0},
+            ]),
+        )
+        with mock.patch.object(STORE, "_register_session", return_value=registrar):
+            self.assertEqual(0, self._invoke("prompt", "claude", payload))
+            row = self._row("claude:retry-registry")
+            self.assertEqual(42, row["pid"])
+            self.assertEqual(24.0, row["pid_started_at"])
+            self.assertEqual(0, self._invoke("stop", "claude", payload))
+        self.assertEqual(2, registrar.resolve_recorded_pid.call_count)
+        self.assertEqual(2, registrar.record_registry.call_count)
+        self.assertEqual("awaiting_input", self._row("claude:retry-registry")["turn_state"])
+
+    def test_missing_session_recovery_requires_the_matching_host_identity(self):
+        payload = {"session_id": "wrong-host", "cwd": str(self.repo)}
+        registrar = types.SimpleNamespace(resolve_recorded_pid=mock.Mock(return_value=(42, "codex", 24.0)), record_registry=mock.Mock())
+        output = io.StringIO()
+        with mock.patch.object(STORE, "_register_session", return_value=registrar), \
+                mock.patch.object(sys, "stderr", output):
+            self.assertEqual(0, self._invoke("stop", "claude", payload))
+        self.assertIsNone(self._row("claude:wrong-host"))
+        registrar.record_registry.assert_not_called()
+        self.assertIn("could not recover claude:wrong-host", output.getvalue())
+
+    def test_missing_session_recovery_preserves_a_concurrently_created_handoff_row(self):
+        handle = "claude:concurrent"
+        connection = STORE.connect()
+        try:
+            STORE.upsert_work_item(connection, "work-item", "repo", "feature", "item", status="active")
+            STORE.start_session(connection, "claude", "concurrent", self.repo, pid=99, pid_started_at=99.0)
+            STORE.set_session_ownership(connection, handle, "owner", "work-item")
+            STORE.end_session(connection, handle, "handed_off", successor="codex:successor")
+        finally:
+            connection.close()
+        original_get_session = STORE.get_session
+        calls = []
+
+        def missing_once(connection, value):
+            calls.append(value)
+            if len(calls) == 1:
+                return None
+            return original_get_session(connection, value)
+
+        registrar = types.SimpleNamespace(
+            resolve_recorded_pid=mock.Mock(return_value=(42, "claude", 24.0)),
+            record_registry=mock.Mock(return_value={"session_id": "concurrent", "host": "claude", "pid": 42, "pid_started_at": 24.0}),
+        )
+        payload = {"session_id": "concurrent", "cwd": str(self.repo)}
+        with mock.patch.object(STORE, "_register_session", return_value=registrar), \
+                mock.patch.object(STORE, "get_session", side_effect=missing_once):
+            self.assertEqual(0, self._invoke("prompt", "claude", payload))
+        row = self._row(handle)
+        self.assertEqual(99, row["pid"])
+        self.assertEqual(99.0, row["pid_started_at"])
+        self.assertIsNotNone(row["ended_at"])
+        self.assertEqual("handed_off", row["end_reason"])
+        self.assertEqual("owner", row["role"])
+        self.assertEqual("work-item", row["work_item"])
+        registrar.record_registry.assert_not_called()
+
+    def test_hook_database_failure_reports_a_persistence_diagnostic(self):
+        payload = {"session_id": "failed-db", "cwd": str(self.repo)}
+        output = io.StringIO()
+        with mock.patch.object(STORE, "connect", side_effect=OSError("locked")), \
+                mock.patch.object(sys, "stderr", output):
+            self.assertEqual(0, self._invoke("prompt", "claude", payload))
+        self.assertIn("could not record claude:failed-db", output.getvalue())
+
+    def test_register_session_loader_supports_packaged_layouts(self):
+        original_here = STORE.HERE
+        original_register = STORE._REGISTER_SESSION
+        try:
+            for layout in ("skills", "codex-skills"):
+                root = self.root / layout
+                script = root / layout / "peer-cli/scripts/register_session.py"
+                script.parent.mkdir(parents=True)
+                script.write_text("marker = True\n", encoding="utf-8")
+                STORE.HERE = root / "resources/machine/scripts"
+                STORE._REGISTER_SESSION = None
+                self.assertTrue(STORE._register_session().marker)
+        finally:
+            STORE.HERE = original_here
+            STORE._REGISTER_SESSION = original_register
 
     def test_resume_start_clears_ended_at_and_end_reason(self):
         payload = {"session_id": "exact-id", "cwd": str(self.repo)}
