@@ -8,6 +8,7 @@
     ".agents/hooks/continuation_stop.py",
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/hook_dispatch.py",
+    ".agents/hooks/merge_cleanup_gate.py",
     ".agents/workflows",
     ".agents/workflows/repository_configuration.py"
   ],

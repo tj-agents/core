@@ -247,6 +247,80 @@ class CloseTabTests(unittest.TestCase):
                         mock.patch.object(close_tab, "run", return_value=completed(payload)):
                     self.assertEqual(len(close_tab.windows_inventory()), count)
 
+    def test_windows_inventory_keeps_nonempty_titles_without_automation_ids(self):
+        payload = json.dumps([
+            {"title": "fallback", "automationId": ""},
+            {"title": "also fallback"},
+            {"title": "", "automationId": ""},
+            {"title": "identified", "automationId": "tab-1"},
+        ])
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(Path, "is_file", return_value=True), \
+                mock.patch.object(close_tab, "run", return_value=completed(payload)):
+            targets = close_tab.windows_inventory()
+        self.assertEqual([target["title"] for target in targets],
+                         ["fallback", "also fallback", "identified"])
+        self.assertEqual(targets[0]["identity"],
+                         {"kind": "windows-terminal", "title": "fallback"})
+        self.assertEqual(targets[2]["identity"],
+                         {"kind": "windows-terminal", "automation_id": "tab-1"})
+
+    def test_windows_missing_automation_ids_match_only_the_same_fallback_title(self):
+        first = {"kind": "windows-terminal", "title": "first"}
+        second = {"kind": "windows-terminal", "title": "second"}
+        missing = {"kind": "windows-terminal"}
+        self.assertFalse(close_tab.same_target(first, second))
+        self.assertFalse(close_tab.same_target(first, missing))
+        self.assertFalse(close_tab.same_target(missing, missing))
+        self.assertTrue(close_tab.same_target(first, dict(first)))
+
+    def test_windows_automation_id_never_falls_back_to_a_matching_title(self):
+        identified = {"kind": "windows-terminal", "automation_id": "tab-1",
+                      "title": "same"}
+        fallback = {"kind": "windows-terminal", "title": "same"}
+        self.assertFalse(close_tab.same_target(identified, fallback))
+
+    def test_windows_title_fallback_closes_by_exact_title(self):
+        target = {"title": " fallback ", "identity": {"kind": "windows-terminal",
+                  "title": " fallback "}, "actual": True}
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(Path, "is_file", return_value=True), \
+                mock.patch.object(close_tab, "target_liveness", return_value=False), \
+                mock.patch.object(close_tab, "inventory_for_identity", return_value=[]), \
+                mock.patch.object(close_tab, "run", return_value=completed()) as runner:
+            close_tab.close_actual(target)
+        self.assertEqual(runner.call_args.args[0][-2:], ["-Title", " fallback "])
+
+    def test_windows_title_fallback_refuses_when_the_tab_remains_visible(self):
+        target = {"title": "fallback", "identity": {"kind": "windows-terminal",
+                  "title": "fallback"}, "actual": True}
+        residuals = (
+            target,
+            {"title": "fallback", "identity": {"kind": "windows-terminal",
+             "automation_id": "tab-1"}, "actual": True},
+        )
+        for residual in residuals:
+            with self.subTest(residual=residual), \
+                    mock.patch.object(close_tab, "is_windows", return_value=True), \
+                    mock.patch.object(Path, "is_file", return_value=True), \
+                    mock.patch.object(close_tab, "target_liveness", return_value=False), \
+                    mock.patch.object(close_tab, "inventory_for_identity", return_value=[residual]), \
+                    mock.patch.object(close_tab, "run", return_value=completed()), \
+                    mock.patch.object(close_tab.time, "sleep"):
+                with self.assertRaisesRegex(close_tab.TerminalRefusal, "did not confirm"):
+                    close_tab.close_actual(target)
+
+    def test_windows_direct_title_selection_refuses_duplicate_fallback_tabs(self):
+        targets = [
+            {"title": "same", "identity": {"kind": "windows-terminal", "title": "same"},
+             "actual": True},
+            {"title": "same", "identity": {"kind": "windows-terminal", "title": "same"},
+             "actual": True},
+        ]
+        with mock.patch.object(close_tab, "merged_inventory", return_value=targets):
+            with self.assertRaisesRegex(close_tab.TerminalRefusal, "ambiguous"):
+                close_tab.main(["--title", "same"])
+
     def test_windows_inventory_refuses_single_object_payload(self):
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
                 mock.patch.object(Path, "is_file", return_value=True), \
@@ -348,7 +422,7 @@ class CloseTabTests(unittest.TestCase):
         entry = {"title": "peer", "pid": 7, "pid_started_at": 2.0,
                  "terminal": {"kind": "windows-terminal"}}
         tabs = [{"title": "peer", "identity": {"kind": "windows-terminal",
-                 "automation_id": "a"}, "actual": True}]
+                 "title": "peer"}, "actual": True}]
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
                 mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
                 mock.patch.object(close_tab.session_close, "entries", return_value=[(Path("x"), entry)]), \
@@ -371,6 +445,18 @@ class CloseTabTests(unittest.TestCase):
         with mock.patch.object(close_tab, "is_windows", return_value=True), \
                 mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
                 mock.patch.object(close_tab, "windows_inventory", return_value=tabs), \
+                mock.patch.object(close_tab, "close_actual") as closer:
+            close_tab.close_entry(entry)
+        closer.assert_called_once_with(tabs[0], force=True)
+        with mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory",
+                                  return_value=[
+                                      {"title": "other", "identity": {
+                                          "kind": "windows-terminal", "title": "other"},
+                                       "actual": True},
+                                      tabs[0],
+                                  ]), \
                 mock.patch.object(close_tab, "close_actual") as closer:
             close_tab.close_entry(entry)
         closer.assert_called_once_with(tabs[0], force=True)
