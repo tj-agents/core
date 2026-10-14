@@ -1,9 +1,11 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "workflows"))
 from completion import CompletionError, completion_check, visible_tasks
@@ -47,6 +49,39 @@ class CompletionTests(unittest.TestCase):
         result = completion_check(path, {"repository": "example/test", "pr": 42, "head": HEAD}, path.parent, forge)
         self.assertTrue(result["ready"])
         self.assertEqual([({"repository": "example/test", "pr": 42, "head": HEAD}, path.parent)], requested)
+        self.assertEqual("unobserved", result["cleanup_status"])
+        self.assertEqual([], result["pending_cleanup"])
+
+    def test_ready_report_retains_only_its_pending_cleanup_obligation(self):
+        path = self.write_goal(goal())
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        obligations = Path(state.name) / "merge-cleanup" / "obligations"
+        obligations.mkdir(parents=True)
+        obligations.joinpath("own.json").write_text(json.dumps({
+            "worktree": str(path.parent),
+            "session_id": "s1",
+            "session_exit_required": True,
+            "checkout_retained": True,
+            "disposition": {"status": "pending", "reason": "keep-open"},
+        }), encoding="utf-8")
+        obligations.joinpath("other.json").write_text(json.dumps({
+            "worktree": str(Path(state.name) / "other-worktree"),
+            "session_id": "s2",
+            "session_exit_required": True,
+        }), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state.name}):
+            result = completion_check(path, None, path.parent, lambda *_: {
+                "number": 42, "headRefOid": HEAD, "state": "MERGED", "body": "",
+            })
+        self.assertTrue(result["ready"])
+        self.assertEqual("pending", result["cleanup_status"])
+        self.assertEqual([{
+            "worktree": str(path.parent.resolve()),
+            "session_id": "s1",
+            "kind": "keep-open",
+            "reason": "keep-open",
+        }], result["pending_cleanup"])
 
     def test_rejects_bound_delivery_omitted_from_goal(self):
         path = self.write_goal(goal(deliveries=[]))

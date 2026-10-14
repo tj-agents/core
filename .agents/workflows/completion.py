@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -9,6 +10,7 @@ from pr_body import unchecked_tasks
 
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})completion\s*$", re.IGNORECASE)
 SHA = re.compile(r"[0-9a-f]{40}")
+STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
 
 
 class CompletionError(RuntimeError):
@@ -17,6 +19,62 @@ class CompletionError(RuntimeError):
 
 def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
+
+
+def state_directory():
+    configured = os.environ.get(STATE_DIRECTORY_ENV)
+    return Path(configured) if configured else Path.home() / ".agents-state"
+
+
+def resolve_path(value):
+    try:
+        return Path(value).expanduser().resolve()
+    except (OSError, TypeError):
+        return None
+
+
+def same_path(left, right):
+    return os.path.normcase(str(left)) == os.path.normcase(str(right))
+
+
+def relevant_cleanup(root):
+    root = resolve_path(root)
+    if root is None:
+        return "unobserved", []
+    directory = state_directory() / "merge-cleanup" / "obligations"
+    try:
+        paths = list(directory.glob("*.json"))
+    except OSError:
+        return "unobserved", []
+    pending = []
+    verified = False
+    for path in paths:
+        try:
+            obligation = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(obligation, dict):
+            continue
+        worktree = resolve_path(obligation.get("worktree"))
+        if worktree is None or not same_path(worktree, root):
+            continue
+        disposition = obligation.get("disposition")
+        keep_open = isinstance(disposition, dict) and disposition.get("reason") == "keep-open"
+        session_exit = obligation.get("session_exit_required") is True
+        checkout_exists = worktree.is_dir() and not obligation.get("checkout_retained")
+        if keep_open or session_exit or checkout_exists:
+            kind = "keep-open" if keep_open else "session-exit" if session_exit else "worktree"
+            pending.append({
+                "worktree": str(worktree),
+                "session_id": obligation.get("session_id"),
+                "kind": kind,
+                "reason": disposition.get("reason") if isinstance(disposition, dict) else None,
+            })
+        elif obligation.get("cleanup_status") == "verified":
+            verified = True
+    if pending:
+        return "pending", pending
+    return ("verified" if verified else "unobserved"), []
 
 
 def visible_tasks(markdown):
@@ -202,6 +260,7 @@ def completion_check(goal, bound_delivery=None, root=None, viewer=None):
             blockers.append(f"delivery PR #{delivery['pr']} has unchecked task: {task}")
         fetched.append({"repository": delivery["repository"], "pr": delivery["pr"], "head": delivery["head"],
                         "state": value.get("state")})
+    cleanup_status, pending_cleanup = relevant_cleanup(root if root is not None else Path(goal).parent)
     return {
         "operation": "completion-check",
         "outcome": document["outcome"],
@@ -209,6 +268,8 @@ def completion_check(goal, bound_delivery=None, root=None, viewer=None):
         "blockers": blockers,
         "open_tasks": unresolved,
         "deliveries": fetched,
+        "cleanup_status": cleanup_status,
+        "pending_cleanup": pending_cleanup,
     }
 
 
