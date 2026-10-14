@@ -125,7 +125,7 @@ class ContinuationTests(unittest.TestCase):
             time.sleep(0.05)
         self.fail("fixture did not reach expected subprocess boundary")
 
-    def test_unverified_complete_receipt_preserves_active_owner(self):
+    def test_unverified_report_readiness_preserves_active_owner(self):
         state = self.state()
         state.update(launch_nonce="fixture", state="working", reason="headless-launch", next_action="Verify outcome")
         receipt = {"nonce": "fixture", "owner_id": state["owner_id"], "state": "complete", "reason": "Done"}
@@ -133,10 +133,62 @@ class ContinuationTests(unittest.TestCase):
         binding = {"repository": state["repo"], "pr": 42, "head": state["head"]}
         with mock.patch.object(runtime, "identity", return_value={key: state[key] for key in ("repo", "worktree", "branch", "head")}), \
              mock.patch.object(runtime, "check_identity", return_value=binding), \
-             mock.patch.object(runtime, "completion_check", return_value={"ready": False, "blockers": ["missing observation"]}):
+             mock.patch.object(runtime, "completion_check", return_value={"report_ready": False, "ready": True,
+                                                                            "blockers": ["missing observation"]}):
             with self.assertRaisesRegex(runtime.Gate, "completion-unverified"):
                 runtime.apply_receipt(state, receipt)
         self.assertEqual(before, state)
+
+    def test_missing_report_readiness_cannot_be_forged_by_receipt(self):
+        state = self.state()
+        state.update(launch_nonce="fixture", state="working", reason="headless-launch", next_action="Verify outcome")
+        receipt = {
+            "nonce": "fixture",
+            "owner_id": state["owner_id"],
+            "state": "complete",
+            "reason": "Done",
+            "completion_snapshot": {"report_ready": True, "ready": True, "cleanup_status": "verified", "pending_cleanup": []},
+        }
+        before = dict(state)
+        binding = {"repository": state["repo"], "pr": 42, "head": state["head"]}
+        with mock.patch.object(runtime, "identity", return_value={key: state[key] for key in ("repo", "worktree", "branch", "head")}), \
+             mock.patch.object(runtime, "check_identity", return_value=binding), \
+             mock.patch.object(runtime, "completion_check", return_value={"ready": True, "blockers": ["missing report readiness"]}):
+            with self.assertRaisesRegex(runtime.Gate, "completion-unverified"):
+                runtime.apply_receipt(state, receipt)
+        self.assertEqual(before, state)
+
+    def test_pending_cleanup_complete_checkpoint_releases_foreground_and_records_snapshot(self):
+        state_directory = self.root / "state"
+        obligations = state_directory / "merge-cleanup" / "obligations"
+        obligations.mkdir(parents=True)
+        obligations.joinpath("own.json").write_text(json.dumps({
+            "worktree": str(self.root),
+            "session_id": "s1",
+            "session_exit_required": True,
+            "checkout_retained": True,
+            "disposition": {"status": "pending", "reason": "keep-open"},
+        }), encoding="utf-8")
+        environment = dict(os.environ, AGENT_STATE_DIRECTORY=str(state_directory))
+        condition = self.state()["completion"]
+        claimed = self.cli("claim", "--owner", str(self.owner), "--pid", str(os.getpid()), env=environment)
+        self.cli("checkpoint", "--owner", str(self.owner), "--token", claimed["foreground"]["token"],
+                 "--state", "complete", "--reason", "Fixture completion", env=environment)
+        after = self.state()
+        self.assertEqual("complete", after["state"])
+        self.assertIsNone(after["foreground"])
+        self.assertEqual(condition, after["completion"])
+        self.assertEqual({
+            "report_ready": True,
+            "ready": False,
+            "cleanup_status": "pending",
+            "pending_cleanup": [{
+                "worktree": str(self.root),
+                "session_id": "s1",
+                "kind": "keep-open",
+                "reason": "keep-open",
+            }],
+        }, after["completion_snapshot"])
 
     def test_released_receipt_cannot_substitute_another_delivery(self):
         state = self.state()

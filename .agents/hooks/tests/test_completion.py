@@ -52,8 +52,8 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual("unobserved", result["cleanup_status"])
         self.assertEqual([], result["pending_cleanup"])
 
-    def test_ready_report_retains_only_its_pending_cleanup_obligation(self):
-        path = self.write_goal(goal())
+    def test_pending_cleanup_preserves_report_readiness_and_blocks_cli_exit(self):
+        path = self.write_goal(goal(deliveries=[]))
         state = tempfile.TemporaryDirectory()
         self.addCleanup(state.cleanup)
         obligations = Path(state.name) / "merge-cleanup" / "obligations"
@@ -74,7 +74,16 @@ class CompletionTests(unittest.TestCase):
             result = completion_check(path, None, path.parent, lambda *_: {
                 "number": 42, "headRefOid": HEAD, "state": "MERGED", "body": "",
             })
-        self.assertTrue(result["ready"])
+            completed = subprocess.run(
+                [sys.executable, "-B", str(Path(__file__).resolve().parents[2] / "workflows/completion.py"),
+                 "--goal", str(path), "--root", str(path.parent)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertTrue(result["report_ready"])
+        self.assertFalse(result["ready"])
+        self.assertIn("cleanup remains pending", result["blockers"])
         self.assertEqual("pending", result["cleanup_status"])
         self.assertEqual([{
             "worktree": str(path.parent.resolve()),
@@ -82,6 +91,9 @@ class CompletionTests(unittest.TestCase):
             "kind": "keep-open",
             "reason": "keep-open",
         }], result["pending_cleanup"])
+        self.assertEqual(1, completed.returncode)
+        self.assertTrue(json.loads(completed.stdout)["report_ready"])
+        self.assertFalse(json.loads(completed.stdout)["ready"])
 
     def test_rejects_bound_delivery_omitted_from_goal(self):
         path = self.write_goal(goal(deliveries=[]))
@@ -140,6 +152,29 @@ class CompletionTests(unittest.TestCase):
         path = self.write_goal(goal(acceptance=acceptance))
         with self.assertRaisesRegex(CompletionError, "owner and next_action"):
             completion_check(path, None, path.parent, lambda *_: {})
+
+    def test_acceptance_failure_sets_both_readiness_values_false(self):
+        path = self.write_goal(goal(acceptance=[
+            {"id": "verified", "criterion": "A result is observed.", "evidence": [],
+             "owner": "fixture owner", "next_action": "Run the focused check."},
+        ], deliveries=[]))
+        result = completion_check(path, None, path.parent, lambda *_: {})
+        self.assertFalse(result["report_ready"])
+        self.assertFalse(result["ready"])
+
+    def test_malformed_goal_reports_both_readiness_values_false(self):
+        path = self.write_goal("# Goal\n")
+        completed = subprocess.run(
+            [sys.executable, "-B", str(Path(__file__).resolve().parents[2] / "workflows/completion.py"),
+             "--goal", str(path), "--root", str(path.parent)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        result = json.loads(completed.stdout)
+        self.assertFalse(result["report_ready"])
+        self.assertFalse(result["ready"])
 
     def test_visible_tasks_excludes_examples_and_quotes(self):
         content = "- [ ] live task\n> - [ ] quoted\n```md\n- [ ] fenced\n```\n<!-- - [ ] hidden -->\n    - [ ] indented"
