@@ -247,6 +247,7 @@ class ScopingTests(ListWorkHarness):
         output = self.board('payments')
         self.assertEqual({'PAYMENTS_SPLIT.md'}, rows(output))
         self.assertIn('out of scope: 1 in other-group', output)
+        self.assertIn('rerun with the scope argument all to include', output)
 
     def test_scope_all_lists_the_other_group(self):
         self.plan('demo/PAYMENTS_SPLIT.md')
