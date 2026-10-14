@@ -33,6 +33,10 @@ the command reads `.agents/plugins.lock.json` and, until 2027-03-31, forwards to
 `required_skills`, `path_scopes` or `exceptions`, and the bootstrap `apply` and `verify` modes still read
 only the legacy lock. The legacy form below remains until the migration finishes.
 
+To move repositories to another marketplace tag, run `bump_plugin_lock.py --revision <tag> --root <repository>`
+(repeat `--root`). It previews by default; `--mode write` rewrites each lock's revision and regenerates its
+Claude and Codex settings, and a repository that fails validation is left unchanged.
+
 ### Legacy lock (`.agents/capabilities.lock.json`)
 
 Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
