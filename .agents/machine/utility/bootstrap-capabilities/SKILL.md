@@ -32,6 +32,13 @@ python3 -B '<skill-directory>/scripts/repo_config.py' \
 ```
 
 CI uses the same command with `--mode check`; it exits nonzero if either generated file drifts.
+Project scope also rejects machine-specific absolute paths, in every mode, anywhere in the
+committed `.claude/settings.json`, `.codex/config.toml` or `.codex/hooks.json`, including hook
+commands it does not own: Windows drive and UNC paths, `/home/<user>`, `/Users/<user>` and
+`/mnt/<drive>`. Each finding is reported as `file:line`. Replace such a path with a
+repository-relative path or move the setting to an uncommitted local settings file. To scan a
+checkout without a lock, run `machine_paths.py --root <checkout>` from the same directory;
+it exits 1 when it finds one.
 Each GitHub source must match the owner in its catalog release. The generator
 owns Claude's marketplace, enabled-plugin, and `permissions.allow` keys, plus Codex's
 marketplace and plugin tables and `.codex/rules/agent-harness.rules`. Existing Claude allow
