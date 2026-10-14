@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -23,6 +24,7 @@ sys.path.insert(0, str(WORKFLOWS))
 
 from workflow_runtime import (
     ContractViolation,
+    ReadOnlyWorkItemStore,
     RepositoryStateProvider,
     WorkflowContract,
     select_state_provider,
@@ -1912,6 +1914,29 @@ class RepositoryProviderTests(unittest.TestCase):
         connection.close()
         return state
 
+    def write_session_store_with_writer(self, status):
+        path = ROOT / ".agents" / "machine" / "scripts" / "session_store.py"
+        spec = importlib.util.spec_from_file_location("workflow_contract_session_store", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        state = self.root / "writer-state"
+        connection = module.connect(state / "sessions.db")
+        try:
+            repository = module.repo_identity(self.root)
+            key = module.work_item_key(repository, "runtime-bridge", "readme-reader")
+            module.upsert_work_item(
+                connection,
+                key,
+                repository,
+                "runtime-bridge",
+                "readme-reader",
+                status=status,
+                branch="Feature/provider-fixture",
+            )
+        finally:
+            connection.close()
+        return state
+
     def test_repository_provider_resolves_portable_state_and_git_identity(self):
         self.assertEqual("available", self.provider.probe()["status"])
         self.assertEqual(self.root, self.provider.contract.repository_root)
@@ -1948,6 +1973,76 @@ class RepositoryProviderTests(unittest.TestCase):
         self.assertEqual(["reviews/runtime.md#BUG1", "reviews/runtime.md#NAT1"], state["open_findings"])
         self.assertEqual(before, after)
 
+    def test_work_item_readme_preserves_a_registered_null_pull_request(self):
+        document = self.write_work_item()
+        state_root = self.write_session_store("active")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
+            state = self.provider.resolve(
+                document.relative_to(self.root).as_posix(), "readme", "implementation"
+            )
+        self.assertIn("pull_request", state["artifacts"])
+        self.assertIsNone(state["artifacts"]["pull_request"])
+
+    def test_work_item_identity_matches_writer_without_a_normalized_origin(self):
+        document = self.write_work_item()
+        relative = document.relative_to(self.root).as_posix()
+        for origin in (None, "../local-origin"):
+            with self.subTest(origin=origin):
+                if origin is None:
+                    subprocess.run(["git", "-C", str(self.root), "remote", "remove", "origin"], check=True)
+                else:
+                    subprocess.run(
+                        ["git", "-C", str(self.root), "remote", "add", "origin", origin], check=True
+                    )
+                state_root = self.write_session_store_with_writer("active")
+                with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
+                    self.assertEqual("active", self.provider.work_item_status(relative))
+                    self.assertEqual(
+                        "runtime-bridge/readme-reader",
+                        self.provider.resolve(relative, "readme", "implementation")["workflow_id"],
+                    )
+                if origin is not None:
+                    subprocess.run(["git", "-C", str(self.root), "remote", "remove", "origin"], check=True)
+
+    def test_work_item_store_rejects_incomplete_or_conflicting_rows_and_query_errors(self):
+        document = self.write_work_item()
+        state = self.root / "malformed-state"
+        state.mkdir()
+        database = state / "sessions.db"
+        connection = sqlite3.connect(database)
+        connection.executescript(
+            "CREATE TABLE work_items (key TEXT, status TEXT);"
+            "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
+            "PRAGMA user_version = 2;"
+        )
+        connection.close()
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
+            with self.assertRaisesRegex(ContractViolation, "missing required columns"):
+                self.provider.resolve(document.relative_to(self.root).as_posix(), "schema", "implementation")
+
+        connection = sqlite3.connect(database)
+        connection.executescript(
+            "DROP TABLE work_items;"
+            "CREATE TABLE work_items (key TEXT, status TEXT, pr TEXT);"
+        )
+        key = "github.com/example/runtime:runtime-bridge/readme-reader"
+        connection.executemany(
+            "INSERT INTO work_items VALUES (?, 'active', NULL)", [(key,), (key,)]
+        )
+        connection.commit()
+        connection.close()
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
+            with self.assertRaisesRegex(ContractViolation, "conflicting registered rows"):
+                self.provider.resolve(document.relative_to(self.root).as_posix(), "duplicates", "implementation")
+
+        store = ReadOnlyWorkItemStore(database)
+        broken = mock.Mock()
+        broken.execute.side_effect = sqlite3.OperationalError("query failure")
+        with mock.patch.object(store, "_connection", return_value=broken):
+            with self.assertRaisesRegex(ContractViolation, "query failed"):
+                store.work_item(key)
+        broken.close.assert_called_once()
+
     def test_work_item_statuses_require_matching_actions(self):
         cases = {
             "proposed": "Continue the local implementation.",
@@ -1964,6 +2059,11 @@ class RepositoryProviderTests(unittest.TestCase):
                 with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
                     state = self.provider.resolve(document.relative_to(self.root).as_posix(), status, "implementation")
                 self.assertEqual({"blocked": "blocked", "paused": "paused", "done": "complete"}.get(status, "active"), state["status"])
+        document = self.write_work_item("Paused: release owner — waiting for the release.")
+        state_root = self.write_session_store("paused")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):
+            state = self.provider.resolve(document.relative_to(self.root).as_posix(), "paused-owner", "implementation")
+        self.assertEqual("release owner", state["next_action"]["owner"])
         document = self.write_work_item("Blocked: incorrect\nBlocked by: owner\nUnblock action: fix it\nResume when: fixed")
         state_root = self.write_session_store("active")
         with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state_root)}):

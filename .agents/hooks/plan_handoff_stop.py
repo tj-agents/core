@@ -29,7 +29,7 @@ PLAN_SUFFIX = (
     r"[a-z0-9]+(?:-[a-z0-9]+)*[\\/]README\.md)"
 )
 ABSOLUTE_PLAN = re.compile(
-    rf"[A-Za-z]:[\\/][^\"'\r\n<>|]*?[\\/]plans[\\/]{PLAN_SUFFIX}",
+    rf"(?:[A-Za-z]:[\\/]|/)[^\"'\r\n<>|]*?[\\/]plans[\\/]{PLAN_SUFFIX}",
     re.IGNORECASE,
 )
 RELATIVE_PLAN = re.compile(
@@ -53,7 +53,10 @@ MUTATING_TOOL_NAMES = {
 MUTATING_PATH_KEYS = {"path", "filepath"}
 PATCH_FILE_TARGET = re.compile(
     r"\*\*\*\s+(?:Add|Update|Delete)\s+File:\s*"
-    r"((?:[A-Za-z]:[\\/])?[^\"'\r\n<>|]*?_PROGRESS\.md)",
+    r"((?:[A-Za-z]:[\\/])?[^\"'\r\n<>|]*?_PROGRESS\.md|"
+    rf"(?:(?:[A-Za-z]:[\\/]|/)[^\"'\r\n<>|]*?)?plans[\\/]features[\\/]"
+    r"[a-z0-9]+(?:-[a-z0-9]+)*[\\/]work-items[\\/]"
+    r"[a-z0-9]+(?:-[a-z0-9]+)*[\\/]README\.md)",
     re.IGNORECASE,
 )
 CONTEXT_TRANSFER_DIRECTIVE = re.compile(
@@ -278,6 +281,13 @@ def transcript_ledgers(records, cwd):
         bases = explicit_bases or targeted_bases or {Path(cwd).resolve()}
         targeted_bases.update(explicit_bases)
         candidates = set()
+        for target in context.get("targets", []):
+            relative = Path(target.replace("\\", "/").rstrip("`),.;"))
+            if relative.is_absolute():
+                add_if_ledger(candidates, relative)
+            else:
+                for base in bases:
+                    add_if_ledger(candidates, Path(base) / relative)
         for value in values:
             absolute_matches = list(ABSOLUTE_PLAN.finditer(value))
             for match in absolute_matches:

@@ -20,10 +20,11 @@ def _load_repository_identity():
         raise RuntimeError(f"The shared repository_identity.py helper was not found relative to {path.parent}.")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.normalise_remote
+    return module
 
 
-normalise_remote = _load_repository_identity()
+_repository_identity = _load_repository_identity()
+normalise_remote = _repository_identity.normalise_remote
 
 SCHEMA_VERSION = 2
 GIT_TIMEOUT = 3
@@ -213,17 +214,11 @@ def _rev_parse_probe(cwd, timeout):
 
 
 def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
-    origin = _git(cwd, "config", "--get", "remote.origin.url", timeout=timeout)
-    head, branch, common_dir = _rev_parse_probe(cwd, timeout)
-    repo = normalise_remote(origin) if origin else None
-    if not repo and common_dir:
-        path = Path(common_dir)
-        if not path.is_absolute():
-            path = Path(cwd) / path
-        try:
-            repo = str(path.resolve())
-        except OSError:
-            repo = None
+    head, branch, _common_dir = _rev_parse_probe(cwd, timeout)
+    repo = _repository_identity.repository_identity(
+        cwd,
+        lambda directory, *arguments: _git(directory, *arguments, timeout=timeout),
+    )
     return repo, branch, head
 
 
