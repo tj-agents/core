@@ -217,3 +217,25 @@ with a test that `review-prepare` names the skill for such a path.
     guess.
 - **Resolution condition:** the `plan-execution` text carries the rule and a session that has a background
   check pending is not blocked from, or reminded to stop before, starting the next slice.
+
+## D008 — A documentation-only record needs a whole PR
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-15. Recording D007 meant a branch, a PR with a validated body, a delivery
+  binding and a hook gate for a ledger edit with no runtime effect. Tommy: "is there a way we can just make
+  it so you can just directly push to main ... provided it's only docs ... it's ridiculously unnecessary".
+  The agent also bundled D007 into a code PR instead of landing it on `main` (D003), because the direct
+  route does not exist.
+- **Impact and priority:** P2. Every noticed-problem record, plan update and docs fix pays PR overhead, and
+  the cheaper habit (riding along in an unrelated PR) leaves records off `main` and invisible to other
+  sessions, which is D006's failure.
+- **Source owner:** core engineering (`merge-docs`, `write-debt`, the repository's branch protection and the
+  CI guard that classifies docs-only paths).
+- **State:** open.
+- **Next action:**
+  - define the docs-only path allowlist already used by `merge-docs` as a single machine-readable list;
+  - let the agent push a commit whose changed paths are all in that list straight to `main` from a
+    non-worktree checkout, run no test suites for it, and refuse any commit that touches another path;
+  - decide whether this needs a branch-protection bypass for the agent identity or a push-time hook.
+- **Resolution condition:** an agent records a ledger entry on `main` with one push and no PR, a commit
+  touching a non-docs path is rejected by the same route, and no test suite runs for the docs-only push.
