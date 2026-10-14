@@ -309,12 +309,6 @@
                 ]
               },
               {
-                "path": "hooks/plan_handoff_stop_launcher.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
                 "path": "hooks/pre_tool_use_adapter.py",
                 "hosts": [
                   "codex"
