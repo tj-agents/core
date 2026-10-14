@@ -41,13 +41,12 @@ selects the approved isolated runtime. Ordinary sandboxed reads of this goal, th
 `.agents/engineering/workflow/plan-execution/SKILL.md` and the original sibling-checkout text prompt
 all exited 0. Matching refresh records name the isolated fixed helper and report `errors=[]`.
 
-Current phase: L5 final documentation reconciliation, followed by L4 documentation review and
-L7 delivery. These are bounded follow-ups; no model switch is claimed. Tommy explicitly authorizes
-committing, publishing and merging this branch without further permission. Tommy subsequently
-authorized MISTAKES.md now; it and its README link are written. A dedicated recording skill and
+Current phase: L7 delivery of PR #205. Source corrections and exact-head incremental review are complete
+at 8eb2e46b77360d10ed2a9cc73b55560dcc1009e7. Tommy explicitly authorizes publishing and merging
+without further permission. MISTAKES.md and its README link are included; a recording skill and
 handoff-policy implementation remain deferred.
 
-PR: not opened
+PR: https://github.com/tj-agents/core/pull/205
 Delivery slice: this existing branch, against main, containing only the recovery record and deferred
 workflow debt. No core runtime code changed; the applied runtime/profile/catalog repair is local
 machine state outside Git. Exclude all untracked machine-specific scripts, logs and JSON from the PR.
@@ -61,12 +60,22 @@ GitHub CLI actions before execution. A documentation patch reported the same err
 confirmed the handoff pointer changed, while this goal's larger correction did not. The successful
 Git checkpoint proves that operation passed, not recovery of every later action in this running host.
 
-Next actions: finish the remaining documentation corrections, checkpoint them, review the delta
-from b6830f90c0e2320b0d375ea4d824c49b849bab0e, publish with plain Git/gh, then
-merge this documentation-only slice under `engineering:merge-docs` once its gates pass. Remain the
-foreground owner through delivery; initialize supported continuation if a delayed external result
-requires it. Report the actual PR and merge SHA. GitHub confirms configurable auto-merge PR #188
-is already merged and main declares `auto_merge: true`.
+Delivery is verified complete: PR #205 merged at 429ad56751720e2cb369c3aa2e25a3b53b801234,
+with all checks green. Completion validation passed, the runtime owner is complete, and its scheduled
+wake and delivery binding were removed. No source delivery or permission decision remains.
+
+Checkout cleanup is preserved: finish.py refused because the completed acceptance verifier still
+claims this worktree. Peer inspection verifies session 01a12b41-5760-76e0-b2aa-9245ecfaf273,
+PID 23428, live. Supported peer close refused an absent/ambiguous Windows Terminal target; it did
+not close the verifier. The prescribed actual-tab inventory was then rejected before execution by
+automatic approval review's unsupported-metadata HTTP 400. No forced process kill, control bypass
+or unnecessary handoff was attempted. The dirty primary checkout and sibling sessions are preserved.
+
+Resolver: a functioning approval reviewer and verified Windows Terminal target for that completed
+verifier. Resume condition: actual tab inventory identifies the verifier unambiguously and supported
+closure succeeds; then refresh cleanup_proof and run the own-session finish utility. Terminal
+receipts are archived under the approved runtime repair-evidence/delivery-pr205-20261011T1714Z;
+the canonical completion record is restored here. Do not redo the delivered review, PR or merge.
 
 ## Approval-review P1 clarification (2026-10-11)
 
@@ -518,3 +527,49 @@ An optional sandboxed WMI process diagnostic was denied with `0x80041003`; it ch
 Phase: L5 for the small evidence reconciliation, followed by L7 for the local Git checkpoint; both are tiny inline follow-ups under the lanes contract, with no claimed session model switch. The duplicate pickup block was consolidated into this single record. Review is a direct consistency check against observed command exits, log timestamps, live-peer evidence and the original authorization; no repository code was changed, so no code test suite or PR delivery is selected. The existing machine debt entry continues to own recovery support for older runtimes.
 
 Outcome: the requested fixed-runtime host recovery and both original file-type reads are verified. The previous normal-launcher blocker is resolved by the successful normal-preflight launch and this observed pickup; no direct-launch bypass was used. Remaining action: local checkpoint and concise completion report. The checkout remains available as the durable evidence owner.
+
+## Current delivery checkpoint (2026-10-11)
+
+All three initial findings were corrected in 8eb2e46. Incremental documentation review completed at that head with no new findings. The branch is pushed and PR #205 is open; authoritative body validation passed and delivery binding resolves standing authorization auto with auto_merge=true. Continuation initialization and foreground claim now succeeded for PID 21252; scheduler registration and exact-run monitoring are being observed. Earlier approval errors are historical results, not missing merge authority.
+
+```completion
+{
+  "outcome": "Restore normal Codex sandboxed reads and deliver the authorized recovery records through merge.",
+  "acceptance": [
+    {
+      "id": "normal-launch",
+      "criterion": "Ordinary launches select the approved fixed runtime and read the goal, canonical skill and text prompt successfully.",
+      "evidence": [
+        {
+          "source": "Native verifier 01a12b41-5760-76e0-b2aa-9245ecfaf273 and retained machine repair-evidence",
+          "result": "Three ordinary sandbox reads exited 0 and setup refresh reported errors=[]. Configured-default probe 01a12b43-3ab9-72f0-ae40-1121482bd56e exited 0."
+        }
+      ],
+      "owner": "Current recovery owner",
+      "next_action": "Acceptance observed; retain the evidence."
+    },
+    {
+      "id": "repository-delivery",
+      "criterion": "The reviewed recovery documentation is merged at the exact published head.",
+      "evidence": [
+        {
+          "source": "GitHub PR tj-agents/core#205 and CI run 38157853082",
+          "result": "PR is MERGED at head 8eb2e46b77360d10ed2a9cc73b55560dcc1009e7, merge commit 429ad56751720e2cb369c3aa2e25a3b53b801234 at 2026-10-11T17:14:05Z; all CI checks passed."
+        }
+      ],
+      "owner": "Current recovery owner",
+      "next_action": "Delivery acceptance observed; retire the continuation and clean up this checkout."
+    }
+  ],
+  "deliveries": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 205,
+      "head": "8eb2e46b77360d10ed2a9cc73b55560dcc1009e7"
+    }
+  ],
+  "open_tasks": []
+}
+```
+
+Final delivery observation: GitHub returned MERGED for PR #205, at 2026-10-11T17:14:05Z. The sanctioned documentation merge followed the completed native/incremental review and green Windows/Linux CI. Seven incident records remain open for later prevention work, as requested. No new behavioral standards or Claude runtime repair is claimed.

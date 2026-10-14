@@ -16,6 +16,8 @@ Each entry has a stable ID and an open or addressed status. Address entries indi
 
 **Resolved when:** Workflow selection and focused checks demonstrate these different cases on both hosts without creating duplicate owners.
 
+**Related closeout evidence:** After PR #205 merged, the completed native acceptance verifier still claimed the checkout. The finish utility preserved it; supported peer closure refused an ambiguous Windows Terminal target, and actual-tab inventory hit the approval-review metadata HTTP 400. This is additional ownership/cleanup cost from the same verification handoff, not a GitHub merge failure.
+
 ## M002 ? Existing merge authority treated as missing permission
 
 **Status:** Open. **Observed:** 2026-10-11. **Scope:** delivery authority; observed on Codex.
