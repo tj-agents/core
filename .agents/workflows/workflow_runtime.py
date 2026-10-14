@@ -7,18 +7,6 @@ import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Protocol
 
-try:
-    from repository_identity import normalise_remote
-except ModuleNotFoundError:
-    _identity_path = Path(__file__).resolve().parents[1] / "machine" / "scripts" / "repository_identity.py"
-    _identity_spec = importlib.util.spec_from_file_location("repository_identity", _identity_path)
-    if _identity_spec is None or _identity_spec.loader is None:
-        raise
-    _identity_module = importlib.util.module_from_spec(_identity_spec)
-    _identity_spec.loader.exec_module(_identity_module)
-    normalise_remote = _identity_module.normalise_remote
-
-
 CONTRACT_VERSION = "v2"
 RELEASES = ("A", "B", "C")
 ENTRY_KINDS = ("compatibility-entry", "driver")
@@ -554,6 +542,29 @@ def _git(root, *arguments):
     return completed.stdout.strip()
 
 
+def _read_only_git(root, *arguments):
+    try:
+        return _git(root, *arguments)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _repository_identity(root):
+    paths = (
+        Path(__file__).resolve().with_name("repository_identity.py"),
+        Path(__file__).resolve().parents[1] / "machine" / "scripts" / "repository_identity.py",
+    )
+    path = next((candidate for candidate in paths if candidate.is_file()), None)
+    if path is None:
+        raise ContractViolation("work-item resolution requires the shipped repository identity helper")
+    spec = importlib.util.spec_from_file_location("workflow_repository_identity", path)
+    if spec is None or spec.loader is None:
+        raise ContractViolation("work-item resolution cannot load the shipped repository identity helper")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.repository_identity(root, _read_only_git)
+
+
 def _section(text, heading):
     match = re.search(
         rf"(?ms)^## {re.escape(heading)}\s*\n(.*?)(?=^## |\Z)",
@@ -637,6 +648,20 @@ class ReadOnlyWorkItemStore:
             }
             if not {"work_items", "sessions"}.issubset(tables):
                 raise ContractViolation("work-item session store is missing required tables")
+            required = {
+                "work_items": {"key", "status", "pr"},
+                "sessions": {"handle", "repo", "branch", "cwd", "work_item", "role", "ended_at"},
+            }
+            for table, columns in required.items():
+                available = {
+                    row[1]
+                    for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+                }
+                missing = columns - available
+                if missing:
+                    raise ContractViolation(
+                        f"work-item session store table {table} is missing required columns {sorted(missing)!r}"
+                    )
             return connection
         except ContractViolation:
             if connection is not None:
@@ -650,13 +675,20 @@ class ReadOnlyWorkItemStore:
     def work_item(self, key):
         connection = self._connection()
         try:
-            row = connection.execute("SELECT * FROM work_items WHERE key = ?", (key,)).fetchone()
-            if row is None:
+            rows = connection.execute(
+                "SELECT key, status, pr FROM work_items WHERE key = ?", (key,)
+            ).fetchall()
+            if not rows:
                 raise ContractViolation(f"work item {key} is not registered in the session store")
+            if len(rows) > 1:
+                raise ContractViolation(f"work item {key} has conflicting registered rows")
+            row = rows[0]
             value = dict(row)
             if value.get("status") not in WORK_ITEM_STATUSES:
                 raise ContractViolation(f"work item {key} has unsupported status {value.get('status')!r}")
             return value
+        except sqlite3.DatabaseError as error:
+            raise ContractViolation(f"work-item session store query failed: {error}") from error
         finally:
             connection.close()
 
@@ -664,12 +696,15 @@ class ReadOnlyWorkItemStore:
         connection = self._connection()
         try:
             rows = connection.execute(
-                "SELECT * FROM sessions WHERE work_item = ? AND role = 'owner' AND ended_at IS NULL",
+                "SELECT handle, repo, branch, cwd FROM sessions "
+                "WHERE work_item = ? AND role = 'owner' AND ended_at IS NULL",
                 (key,),
             ).fetchall()
             if len(rows) > 1:
                 raise ContractViolation(f"work item {key} has multiple active session owners")
             return dict(rows[0]) if rows else None
+        except sqlite3.DatabaseError as error:
+            raise ContractViolation(f"work-item session store query failed: {error}") from error
         finally:
             connection.close()
 
@@ -711,9 +746,9 @@ class RepositoryStateProvider:
         if document is None:
             return None
         _path, identifier, _roadmap = document
-        repository = normalise_remote(_git(self.root, "config", "--get", "remote.origin.url"))
+        repository = _repository_identity(self.root)
         if not repository:
-            raise ContractViolation("work-item resolution requires a normalized origin remote")
+            raise ContractViolation("work-item resolution requires a repository identity")
         row = ReadOnlyWorkItemStore().work_item(f"{repository}:{identifier}")
         return row["status"]
 
@@ -760,9 +795,9 @@ class RepositoryStateProvider:
         action_steps = "\n".join(
             line for line in next_steps.splitlines() if not line.startswith(scope_prefixes)
         ).strip()
-        repository = normalise_remote(_git(self.root, "config", "--get", "remote.origin.url"))
+        repository = _repository_identity(self.root)
         if not repository:
-            raise ContractViolation("work-item resolution requires a normalized origin remote")
+            raise ContractViolation("work-item resolution requires a repository identity")
         key = f"{repository}:{identifier}"
         store = ReadOnlyWorkItemStore()
         item = store.work_item(key)
@@ -786,7 +821,7 @@ class RepositoryStateProvider:
             status = "paused"
             transition_kind = "pause"
             first_line = action_steps.splitlines()[0]
-            owner = re.split(r"\s+[â€”-]\s+", first_line.removeprefix("Paused:").strip(), maxsplit=1)[0]
+            owner = re.split(r"\s+(?:—|-)\s+", first_line.removeprefix("Paused:").strip(), maxsplit=1)[0]
             resume_condition = first_line
         elif action_steps.startswith("Blocked:"):
             next_kind = "block"
@@ -880,7 +915,7 @@ class RepositoryStateProvider:
             state["next_action"]["owner"] = owner
         if owner_record and owner_record.get("handle"):
             state["owner"]["session_id"] = owner_record["handle"]
-        if item.get("pr"):
+        if "pr" in item:
             state["artifacts"]["pull_request"] = item["pr"]
         if resume_condition:
             state["next_action"]["resume_condition"] = resume_condition
@@ -945,7 +980,7 @@ class RepositoryStateProvider:
             transition_kind = "pause"
             first_line = action_steps.splitlines()[0]
             paused = first_line.removeprefix("Paused:").strip()
-            owner = re.split(r"\s+[—-]\s+", paused, maxsplit=1)[0]
+            owner = re.split(r"\s+(?:—|-)\s+", paused, maxsplit=1)[0]
             resume_condition = first_line
         elif action_steps.startswith("Blocked:"):
             next_kind = "block"

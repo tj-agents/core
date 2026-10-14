@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 
@@ -54,3 +55,20 @@ def normalise_remote(url):
         host = "dev.azure.com"
         path = f"{org}/{project}/_git/{repository}"
     return f"{host}/{path}".casefold()
+
+
+def repository_identity(cwd, git):
+    origin = git(cwd, "config", "--get", "remote.origin.url")
+    repository = normalise_remote(origin) if origin else None
+    if repository:
+        return repository
+    common_dir = git(cwd, "rev-parse", "--git-common-dir")
+    if not common_dir:
+        return None
+    path = Path(common_dir)
+    if not path.is_absolute():
+        path = Path(cwd) / path
+    try:
+        return str(path.resolve())
+    except OSError:
+        return None
