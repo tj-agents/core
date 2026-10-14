@@ -12,21 +12,28 @@ from plan_graph import (
     BLOCKER_FIELDS,
     blocker_details,
     is_paused,
+    is_plan_document,
     is_terminal,
     ledger_errors,
     ledger_root,
     looks_like_legacy_blocker,
     metadata,
     next_steps,
+    plan_documents,
     plan_path,
 )
 
-ABSOLUTE_LEDGER = re.compile(
-    r"[A-Za-z]:[\\/][^\"'\r\n<>|]*?[\\/]plans[\\/][A-Za-z0-9_.() \\/-]+?_PROGRESS\.md",
+PLAN_SUFFIX = (
+    r"(?:[A-Za-z0-9_.() \\/-]+?_PROGRESS\.md|"
+    r"features[\\/][a-z0-9]+(?:-[a-z0-9]+)*[\\/]work-items[\\/]"
+    r"[a-z0-9]+(?:-[a-z0-9]+)*[\\/]README\.md)"
+)
+ABSOLUTE_PLAN = re.compile(
+    rf"[A-Za-z]:[\\/][^\"'\r\n<>|]*?[\\/]plans[\\/]{PLAN_SUFFIX}",
     re.IGNORECASE,
 )
-RELATIVE_LEDGER = re.compile(
-    r"plans[\\/][A-Za-z0-9_.() \\/-]+?_PROGRESS\.md",
+RELATIVE_PLAN = re.compile(
+    rf"plans[\\/]{PLAN_SUFFIX}",
     re.IGNORECASE,
 )
 WORKDIR = re.compile(r"[\"']?(?:workdir|cwd)[\"']?\s*:\s*[\"']([^\"']+)", re.IGNORECASE)
@@ -232,7 +239,7 @@ def add_if_ledger(paths, candidate):
         resolved = candidate.resolve()
     except OSError:
         return
-    if resolved.is_file() and resolved.name.upper().endswith("_PROGRESS.MD"):
+    if is_plan_document(resolved):
         paths.add(resolved)
 
 
@@ -272,10 +279,10 @@ def transcript_ledgers(records, cwd):
         targeted_bases.update(explicit_bases)
         candidates = set()
         for value in values:
-            absolute_matches = list(ABSOLUTE_LEDGER.finditer(value))
+            absolute_matches = list(ABSOLUTE_PLAN.finditer(value))
             for match in absolute_matches:
                 add_if_ledger(candidates, Path(match.group(0).rstrip("`),.;")))
-            for match in RELATIVE_LEDGER.finditer(value):
+            for match in RELATIVE_PLAN.finditer(value):
                 absolute_spans = (item.span() for item in absolute_matches)
                 if any(start <= match.start() < end for start, end in absolute_spans):
                     continue
@@ -293,7 +300,7 @@ def branch_ledgers(root):
         return set()
     branch = git_branch(root)
     paths = set()
-    for path in (root / "plans").rglob("*_PROGRESS.md"):
+    for path in plan_documents(root):
         try:
             text = path.read_text(encoding="utf-8")
         except OSError:
@@ -353,9 +360,12 @@ def expected_pointer(path):
         opener = f'cd "{opener_path}"' if " " in opener_path else f"cd {opener_path}"
     plan_reference = plan.resolve().as_posix()
     ledger_reference = path.resolve().as_posix()
+    references = f"@{plan_reference}"
+    if plan_reference != ledger_reference:
+        references += f" and @{ledger_reference}"
     return (
         f"{opener}\n"
-        f"Read @{plan_reference} and @{ledger_reference} and do what its `## Next Steps` says."
+        f"Read {references} and do what its `## Next Steps` says."
     )
 
 

@@ -83,6 +83,29 @@ class PlanHandoffStopTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def write_work_item(self, next_steps="Continue the work item."):
+        feature = self.root / "plans" / "features" / "runtime-bridge"
+        document = feature / "work-items" / "readme-reader" / "README.md"
+        document.parent.mkdir(parents=True)
+        (feature / "README.md").write_text(
+            "# Runtime bridge\n\n- [ ] `runtime-bridge/readme-reader`\n",
+            encoding="utf-8",
+        )
+        document.write_text(
+            "# README reader\n\n"
+            f"- Worktree: `{self.root}`\n"
+            "- Branch: `Feature/launch_example`\n\n"
+            "## Decisions\n\n- SQLite owns session state.\n\n"
+            "## Next Steps\n\n"
+            f"{next_steps}\n"
+            "Scope: whole plan remains incomplete.\n"
+            "Current slice: resolve the README work item.\n"
+            "Remaining scope: review and delivery remain.\n"
+            "Done when: the README work item is verified.\n",
+            encoding="utf-8",
+        )
+        return document.resolve()
+
     def write_plan_pair(self, root, next_steps, worktree, branch="Feature/launch_example"):
         ledger = root / "plans" / "launch" / "EXAMPLE_PROGRESS.md"
         plan = root / "plans" / "launch" / "EXAMPLE_PLAN.md"
@@ -244,6 +267,28 @@ class PlanHandoffStopTests(unittest.TestCase):
     def assertBlocked(self, result):
         self.assertEqual("block", result["decision"])
         return result["reason"]
+
+    def test_work_item_pointer_uses_its_readme_once(self):
+        document = self.write_work_item()
+        pointer = expected_pointer(document)
+        records = [{
+            "type": "response_item",
+            "payload": {
+                "type": "custom_tool_call",
+                "name": "write_file",
+                "input": {"path": str(document), "workdir": str(self.root)},
+            },
+        }]
+        transcript = self.root / "work-item-transcript.jsonl"
+        transcript.write_text(json.dumps(records[0]), encoding="utf-8")
+        result = evaluate({
+            "cwd": str(self.root),
+            "transcript_path": str(transcript),
+            "last_assistant_message": "Continue this work in a fresh context.",
+        })
+
+        self.assertEqual(1, pointer.count(f"@{document.as_posix()}"))
+        self.assertIn(pointer, self.assertBlocked(result))
 
     def test_active_plan_allows_same_context_continuation_without_handoff(self):
         self.write_ledger("Run the repository code-review workflow, then open the PR.")

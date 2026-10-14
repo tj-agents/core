@@ -361,6 +361,21 @@ class InspectionAndSkillTests(RepositoryFixture):
         self.assertEqual(self.git("rev-parse", "HEAD"), result["head"])
         self.assertEqual([], result["dirty_paths"])
 
+    def test_inspection_lists_only_canonical_work_item_readmes(self):
+        feature = self.root / "plans" / "features" / "runtime-bridge"
+        document = feature / "work-items" / "readme-reader" / "README.md"
+        document.parent.mkdir(parents=True)
+        document.write_text("# Work item\n", encoding="utf-8")
+        (feature / "README.md").write_text("# Feature\n", encoding="utf-8")
+        (document.parent / "SUPPORTING.md").write_text("# Supporting\n", encoding="utf-8")
+
+        result = ops.inspect_repository(self.root, "work-items")
+
+        self.assertEqual(
+            ["plans/features/runtime-bridge/work-items/readme-reader/README.md"],
+            result["work_items"],
+        )
+
     def test_inspection_preserves_modified_and_renamed_paths_with_spaces(self):
         path = self.root / ".agents" / "skills" / "feature" / "SKILL.md"
         path.write_text("# Changed guidance\n", encoding="utf-8")
@@ -1024,6 +1039,15 @@ class DeliveryOwnershipTests(RepositoryFixture):
         self.assertIn("delivery-integrate", result["blockers"])
         self.assertEqual("view", self.forge_commands[0][2])
         self.assertEqual(1, len(self.forge_commands))
+
+    def test_delivery_gated_work_item_cannot_supply_delivery_authority(self):
+        provider = mock.Mock()
+        provider.resolve.return_value = {"artifacts": {"pull_request": None}}
+        provider.work_item_status.return_value = "delivery-gated"
+        with mock.patch.object(ops.workflow_runtime, "RepositoryStateProvider", return_value=provider):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "delivery-gated"):
+                ops.delivery_owner(self.root, "delivery-gated", "plans/features/runtime-bridge/work-items/readme-reader/README.md")
+        self.assertEqual([], self.forge_commands)
 
     def test_handoff_keeps_review_identity_when_execution_moves(self):
         ledger = self.ledger(self.url)
