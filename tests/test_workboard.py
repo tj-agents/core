@@ -7,6 +7,7 @@ against a stale paste cannot exist. Nothing here reads or writes the real plan c
 import os
 from pathlib import Path
 import re
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -44,7 +45,14 @@ class WorkboardHarness(unittest.TestCase):
 
     def repo(self, *parts):
         path = self.repos.joinpath(*parts)
-        (path / '.git').mkdir(parents=True)
+        subprocess.run(['git', 'init', '-q', str(path)], check=True, capture_output=True, text=True)
+        subprocess.run(
+            ['git', '-C', str(path), 'remote', 'add', 'origin',
+             'https://github.com/example/%s.git' % path.name],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         return path
 
     def plan(self, relative, text='# a plan\n'):
@@ -59,10 +67,20 @@ class WorkboardHarness(unittest.TestCase):
         path.write_text(text, encoding='utf-8')
         return path
 
-    def board(self, needle='', limit='20', scope='auto', cwd=None):
+    def work_item(self, feature='reader-bridge', item='status-reader', repo=None):
+        return self.repo_plan(
+            'plans/features/%s/work-items/%s/README.md' % (feature, item),
+            '# %s\n' % item,
+            repo=repo,
+        )
+
+    def board(self, needle='', limit='20', scope='auto', cwd=None, skill_directory=None):
         environment = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home))
+        if hasattr(self, 'state_directory'):
+            environment['AGENT_STATE_DIRECTORY'] = str(self.state_directory)
         result = subprocess.run(
-            [sys.executable, '-B', str(self.script), needle, limit, scope],
+            [sys.executable, '-B', str(self.script), needle, limit, scope,
+             str(skill_directory or SKILL_MD.parent)],
             cwd=str(cwd or self.here), capture_output=True, text=True, env=environment)
         self.assertEqual('', result.stderr)
         self.assertEqual(0, result.returncode)
@@ -70,6 +88,49 @@ class WorkboardHarness(unittest.TestCase):
 
     def listed(self, *arguments, **keywords):
         return rows(self.board(*arguments, **keywords))
+
+    def write_work_item_status(self, feature, item, status, schema=True):
+        self.state_directory = self.home / 'state'
+        self.state_directory.mkdir(exist_ok=True)
+        database = self.state_directory / 'sessions.db'
+        if database.exists():
+            database.unlink()
+        connection = sqlite3.connect(database)
+        if schema:
+            connection.executescript(
+                'CREATE TABLE work_items (key TEXT PRIMARY KEY, repo TEXT NOT NULL, '
+                'feature TEXT NOT NULL, item TEXT NOT NULL, status TEXT NOT NULL, '
+                'branch TEXT, pr TEXT, updated_at REAL);'
+                'CREATE TABLE sessions (handle TEXT PRIMARY KEY, repo TEXT, branch TEXT, cwd TEXT, '
+                'work_item TEXT, role TEXT, ended_at REAL);'
+                'PRAGMA user_version = 2;'
+            )
+            key = 'github.com/example/demo:%s/%s' % (feature, item)
+            connection.execute(
+                'INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                (key, 'github.com/example/demo', feature, item, status, None, None, 0),
+            )
+        connection.commit()
+        connection.close()
+        return database
+
+    def runtime_skill_directory(self, runtime_text):
+        root = self.home / 'runtime-fixture'
+        skill = root / '.agents' / 'engineering' / 'utility' / 'workboard'
+        workflows = root / '.agents' / 'workflows'
+        skill.mkdir(parents=True)
+        workflows.mkdir(parents=True)
+        (workflows / 'workflow_runtime.py').write_text(runtime_text, encoding='utf-8')
+        return skill
+
+    def capability_result(self, skill_directory):
+        return subprocess.run(
+            [sys.executable, '-B', str(self.script), '', '20', 'auto', str(skill_directory)],
+            cwd=str(self.here),
+            capture_output=True,
+            text=True,
+            env=dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home), PYTHONPATH=''),
+        )
 
 
 class NeedleMatchingTests(WorkboardHarness):
@@ -287,6 +348,115 @@ class RepoResidentPlanTests(WorkboardHarness):
     def test_a_repo_with_no_plan_tree_contributes_nothing(self):
         self.plan('demo/LOCAL_PAYMENTS.md')
         self.assertEqual({'LOCAL_PAYMENTS.md'}, self.listed('payments'))
+
+
+class WorkItemStatusTests(WorkboardHarness):
+    def test_all_sqlite_statuses_are_reported_and_done_is_hidden(self):
+        for status in ('proposed', 'active', 'delivery-gated', 'blocked', 'paused', 'done'):
+            with self.subTest(status=status):
+                self.work_item()
+                self.write_work_item_status('reader-bridge', 'status-reader', status)
+                output = self.board()
+                if status == 'done':
+                    self.assertNotIn('README.md', rows(output))
+                    self.assertIn('1 named and marked done, hidden', output)
+                else:
+                    self.assertIn(status, output)
+                    self.assertIn('reader-bridge/status-reader', output)
+
+    def test_missing_malformed_and_unregistered_store_state_is_visible_unknown(self):
+        self.work_item()
+        self.state_directory = self.home / 'missing-state'
+        output = self.board()
+        self.assertIn('unknown', output)
+        self.assertIn('session store does not exist', output)
+
+        database = self.write_work_item_status('reader-bridge', 'status-reader', 'active', schema=False)
+        connection = sqlite3.connect(database)
+        connection.executescript(
+            'CREATE TABLE work_items (key TEXT, status TEXT);'
+            'CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, '
+            'role TEXT, ended_at REAL);'
+            'PRAGMA user_version = 2;'
+        )
+        connection.close()
+        output = self.board()
+        self.assertIn('unknown', output)
+        self.assertIn('missing required columns', output)
+
+        database = self.write_work_item_status('other-feature', 'other-item', 'active')
+        output = self.board()
+        self.assertIn('unknown', output)
+        self.assertIn('is not registered', output)
+        self.assertTrue(database.is_file())
+
+    def test_status_lookup_is_read_only(self):
+        self.work_item()
+        database = self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        before = database.read_bytes()
+        output = self.board()
+        self.assertIn('active', output)
+        self.assertEqual(before, database.read_bytes())
+
+    def test_only_strict_lowercase_work_item_readmes_use_sqlite_status(self):
+        self.work_item()
+        self.repo_plan('plans/features/reader-bridge/README.md', '# feature\n')
+        self.repo_plan('plans/features/reader-bridge/support/README.md', '# support\n')
+        self.repo_plan('plans/features/reader-bridge/work-items/status-reader/Readme.md', '# mixed\n')
+        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        output = self.board()
+        self.assertIn('active', output)
+        self.assertEqual({'README.md'}, rows(output))
+
+    def test_out_of_scope_work_item_never_reads_the_store(self):
+        other = self.repo('other-group', 'other-repo')
+        self.work_item(repo=other)
+        self.state_directory = self.home / 'missing-state'
+        output = self.board()
+        self.assertNotIn('unknown', output)
+        self.assertNotIn('README.md', rows(output))
+
+    def test_source_and_packaged_skill_layouts_load_their_own_runtime(self):
+        self.work_item()
+        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        locations = (
+            SKILL_MD.parent,
+            ROOT / 'plugins/engineering/.agents/engineering/utility/workboard',
+            ROOT / 'plugins/engineering/skills/workboard',
+            ROOT / 'plugins/engineering/codex-skills/workboard',
+        )
+        for location in locations:
+            with self.subTest(location=location):
+                self.assertIn('active', self.board(skill_directory=location))
+
+    def test_missing_own_runtime_is_a_capability_failure(self):
+        result = self.capability_result(self.home / 'unknown')
+        self.assertEqual(2, result.returncode)
+        self.assertIn('workboard capability failure', result.stderr)
+
+    def test_runtime_without_work_item_status_is_a_capability_failure(self):
+        skill = self.runtime_skill_directory(
+            'class ContractViolation(ValueError):\n    pass\n\n'
+            'class WorkflowContract:\n    def __init__(self, source):\n        pass\n\n'
+            'class RepositoryStateProvider:\n    pass\n'
+        )
+        result = self.capability_result(skill)
+        self.assertEqual(2, result.returncode)
+        self.assertIn('own workflow runtime lacks work-item status support', result.stderr)
+
+    def test_runtime_without_its_own_contract_is_a_capability_failure(self):
+        skill = self.runtime_skill_directory(
+            'class ContractViolation(ValueError):\n    pass\n\n'
+            'class WorkflowContract:\n'
+            '    def __init__(self, source):\n'
+            "        raise FileNotFoundError('missing own contract')\n\n"
+            'class RepositoryStateProvider:\n'
+            '    def work_item_status(self, ledger):\n'
+            '        return None\n'
+        )
+        result = self.capability_result(skill)
+        self.assertEqual(2, result.returncode)
+        self.assertIn('own workflow contract is unavailable', result.stderr)
 
 
 if __name__ == '__main__':
