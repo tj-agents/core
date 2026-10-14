@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -83,8 +84,9 @@ class PlanHandoffStopTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def write_work_item(self, next_steps="Continue the work item."):
-        feature = self.root / "plans" / "features" / "runtime-bridge"
+    def write_work_item(self, next_steps="Continue the work item.", root=None, worktree=None):
+        root = root or self.root
+        feature = root / "plans" / "features" / "runtime-bridge"
         document = feature / "work-items" / "readme-reader" / "README.md"
         document.parent.mkdir(parents=True)
         (feature / "README.md").write_text(
@@ -93,7 +95,7 @@ class PlanHandoffStopTests(unittest.TestCase):
         )
         document.write_text(
             "# README reader\n\n"
-            f"- Worktree: `{self.root}`\n"
+            f"- Worktree: `{worktree or root}`\n"
             "- Branch: `Feature/launch_example`\n\n"
             "## Decisions\n\n- SQLite owns session state.\n\n"
             "## Next Steps\n\n"
@@ -427,6 +429,72 @@ class PlanHandoffStopTests(unittest.TestCase):
         ]
 
         self.assertEqual({ledger}, transcript_ledgers(records, self.root))
+
+    def test_patch_target_discovers_a_work_item_readme_without_reading_tool_output(self):
+        document = self.write_work_item()
+        relative = document.relative_to(self.root).as_posix()
+        records = [{
+            "type": "response_item",
+            "payload": {
+                "type": "custom_tool_call",
+                "name": "exec",
+                "input": (
+                    f'const patch = "*** Begin Patch\\n*** Update File: {relative}\\n*** End Patch"; '
+                    f'await tools.apply_patch(patch); const options = {{workdir: "{self.root}"}};'
+                ),
+            },
+        }]
+        self.assertEqual({document}, transcript_ledgers(records, self.root))
+        self.assertEqual(
+            set(),
+            transcript_ledgers(
+                [{
+                    "type": "custom_tool_call_output",
+                    "payload": {
+                        "type": "custom_tool_call_output",
+                        "output": f"Updated {document}",
+                    },
+                }],
+                self.root,
+            ),
+        )
+
+    def test_bare_legacy_patch_target_resolves_from_its_tool_workdir(self):
+        workdir = self.root / "plans" / "launch" / "subdir"
+        workdir.mkdir(parents=True)
+        ledger = workdir / "OWNER_PROGRESS.md"
+        ledger.write_text(f"- Worktree: `{self.root}`\n", encoding="utf-8")
+        source = (
+            'const patch = "*** Begin Patch\\n*** Update File: OWNER_PROGRESS.md\\n*** End Patch"; '
+            f'await tools.apply_patch(patch); const options = {{workdir: "{workdir}"}};'
+        )
+        records = [{
+            "type": "response_item",
+            "payload": {
+                "type": "custom_tool_call",
+                "name": "exec",
+                "input": source,
+            },
+        }]
+        with patch("plan_handoff_stop.git_root", return_value=self.root):
+            self.assertEqual({ledger.resolve()}, transcript_ledgers(records, self.root))
+
+    @unittest.skipIf(os.name == "nt", "POSIX absolute path handling runs on Linux CI")
+    def test_posix_absolute_work_item_reference_discovers_the_external_readme(self):
+        current = self.write_work_item()
+        external_root = (Path(self.temp.name) / "external-worktree").resolve()
+        external = self.write_work_item(root=external_root, worktree=self.root)
+        records = [{
+            "type": "response_item",
+            "payload": {
+                "type": "custom_tool_call",
+                "name": "exec",
+                "input": f"Read {external.as_posix()} before continuing.",
+            },
+        }]
+        discovered = transcript_ledgers(records, self.root)
+        self.assertEqual({external}, discovered)
+        self.assertNotIn(current, discovered)
 
     def test_mixed_blocked_and_active_returns_complete_repair(self):
         blocked = self.root / "plans" / "launch" / "OWNER_PROGRESS.md"
