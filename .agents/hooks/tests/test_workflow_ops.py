@@ -1,7 +1,9 @@
 import importlib.util
 import hashlib
 import json
+import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -360,6 +362,21 @@ class InspectionAndSkillTests(RepositoryFixture):
         self.assertEqual("Feature/Workflow-ops", result["branch"])
         self.assertEqual(self.git("rev-parse", "HEAD"), result["head"])
         self.assertEqual([], result["dirty_paths"])
+
+    def test_inspection_lists_only_canonical_work_item_readmes(self):
+        feature = self.root / "plans" / "features" / "runtime-bridge"
+        document = feature / "work-items" / "readme-reader" / "README.md"
+        document.parent.mkdir(parents=True)
+        document.write_text("# Work item\n", encoding="utf-8")
+        (feature / "README.md").write_text("# Feature\n", encoding="utf-8")
+        (document.parent / "SUPPORTING.md").write_text("# Supporting\n", encoding="utf-8")
+
+        result = ops.inspect_repository(self.root, "work-items")
+
+        self.assertEqual(
+            ["plans/features/runtime-bridge/work-items/readme-reader/README.md"],
+            result["work_items"],
+        )
 
     def test_inspection_preserves_modified_and_renamed_paths_with_spaces(self):
         path = self.root / ".agents" / "skills" / "feature" / "SKILL.md"
@@ -1024,6 +1041,63 @@ class DeliveryOwnershipTests(RepositoryFixture):
         self.assertIn("delivery-integrate", result["blockers"])
         self.assertEqual("view", self.forge_commands[0][2])
         self.assertEqual(1, len(self.forge_commands))
+
+    def test_delivery_gated_work_item_cannot_supply_delivery_authority(self):
+        provider = mock.Mock()
+        provider.resolve.return_value = {"artifacts": {"pull_request": None}}
+        provider.work_item_status.return_value = "delivery-gated"
+        with mock.patch.object(ops.workflow_runtime, "RepositoryStateProvider", return_value=provider):
+            with self.assertRaisesRegex(ops.WorkflowOperationError, "delivery-gated"):
+                ops.delivery_owner(self.root, "delivery-gated", "plans/features/runtime-bridge/work-items/readme-reader/README.md")
+        self.assertEqual([], self.forge_commands)
+
+    def test_real_work_item_with_null_pull_request_can_create_a_review(self):
+        feature = self.root / "plans" / "features" / "runtime-bridge"
+        document = feature / "work-items" / "readme-reader" / "README.md"
+        document.parent.mkdir(parents=True)
+        (feature / "README.md").write_text(
+            "# Runtime bridge\n\n- [ ] `runtime-bridge/readme-reader`\n",
+            encoding="utf-8",
+        )
+        document.write_text(
+            "# README reader\n\n"
+            f"- Worktree: `{self.root}`\n"
+            "- Branch: `Feature/Workflow-ops`\n\n"
+            "## Decisions\n\n- State is authoritative.\n\n"
+            "## Next Steps\n\n"
+            "Continue the local implementation.\n"
+            "Scope: whole plan remains incomplete.\n"
+            "Current slice: resolve the runtime work item.\n"
+            "Remaining scope: review and delivery remain.\n"
+            "Done when: the runtime work item is verified.\n",
+            encoding="utf-8",
+        )
+        state = self.root / "state"
+        state.mkdir()
+        database = state / "sessions.db"
+        connection = sqlite3.connect(database)
+        try:
+            connection.executescript(
+                "CREATE TABLE work_items (key TEXT PRIMARY KEY, status TEXT, pr TEXT);"
+                "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, role TEXT, ended_at REAL);"
+                "PRAGMA user_version = 2;"
+            )
+            connection.execute(
+                "INSERT INTO work_items VALUES (?, 'active', NULL)",
+                ("github.com/example/workflow-fixture:runtime-bridge/readme-reader",),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
+            result = ops.delivery_preflight(
+                self.root,
+                "real-null-pr",
+                None,
+                "origin/main",
+                document.relative_to(self.root).as_posix(),
+            )
+        self.assertEqual("create", result["ownership"]["action"])
 
     def test_handoff_keeps_review_identity_when_execution_moves(self):
         ledger = self.ledger(self.url)

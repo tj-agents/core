@@ -281,6 +281,7 @@ class SessionStartStoreIntegrationTests(unittest.TestCase):
         store.parent.mkdir(parents=True)
         shutil.copy2(SCRIPT, script)
         shutil.copy2(ROOT / ".agents/machine/scripts/session_store.py", store)
+        shutil.copy2(ROOT / ".agents/machine/scripts/repository_identity.py", store.with_name("repository_identity.py"))
         return script
 
     def test_session_start_records_real_store_from_source_and_packaged_layouts(self):

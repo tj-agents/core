@@ -286,6 +286,11 @@
     },
     {
       "plugin": "engineering",
+      "source": ".agents/machine/scripts/repository_identity.py",
+      "destination": "workflows/repository_identity.py"
+    },
+    {
+      "plugin": "engineering",
       "source": ".agents/hooks/worktree_cleanup_gate.py",
       "destination": "hooks/worktree_cleanup_gate.py"
     },

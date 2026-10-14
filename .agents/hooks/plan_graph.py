@@ -25,6 +25,7 @@ TERMINAL = {
 }
 LEDGER_MAX_LINES = 200
 LEDGER_MAX_BYTES = 16000
+SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 BLOCKER_FIELDS = ("Blocked", "Blocked by", "Unblock action", "Resume when")
 SCOPE_FIELDS = ("Scope", "Current slice", "Remaining scope", "Done when")
 BLOCKED_OR_WAITING = re.compile(r"\b(?:blocked|waiting)\b", re.IGNORECASE)
@@ -35,8 +36,8 @@ SUPPRESS_RESUME_PROMPT = re.compile(
     r"\b(?:resume|continuation|handoff)(?:\s+prompt)?\b",
     re.IGNORECASE | re.DOTALL,
 )
-LEDGER_REFERENCE = re.compile(
-    r"plans[\\/][A-Za-z0-9_.() \\/-]+?_PROGRESS\.md",
+PLAN_REFERENCE = re.compile(
+    rf"plans[\\/](?:[A-Za-z0-9_.() \\/-]+?_PROGRESS\.md|features[\\/]{SLUG}[\\/]work-items[\\/]{SLUG}[\\/]README\.md)",
     re.IGNORECASE,
 )
 # A merge of THIS PR — not "merge origin/main" / "merge main" (that is a branch sync).
@@ -156,6 +157,58 @@ def ledger_root(path):
     raise ValueError(f"Ledger is not below plans/: {path}")
 
 
+def work_item_key(path):
+    root = ledger_root(path)
+    try:
+        relative = path.resolve().relative_to(root.resolve())
+    except ValueError as error:
+        raise ValueError(f"path escapes the repository: {path}") from error
+    parts = relative.parts
+    if not work_item_candidate(path):
+        return None
+    if (
+        not re.fullmatch(SLUG, parts[2])
+        or not re.fullmatch(SLUG, parts[4])
+    ):
+        return None
+    return f"{parts[2]}/{parts[4]}"
+
+
+def work_item_candidate(path):
+    root = ledger_root(path)
+    try:
+        relative = path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    parts = relative.parts
+    return (
+        len(parts) == 6
+        and parts[0].casefold() == "plans"
+        and parts[1].casefold() == "features"
+        and parts[3].casefold() == "work-items"
+        and parts[5] == "README.md"
+    )
+
+
+def is_work_item_readme(path):
+    return path.is_file() and work_item_key(path) is not None
+
+
+def is_plan_document(path):
+    return path.is_file() and (
+        path.name.upper().endswith("_PROGRESS.MD") or work_item_candidate(path)
+    )
+
+
+def plan_documents(root):
+    plans = (Path(root).resolve() / "plans")
+    if not plans.is_dir():
+        return []
+    return sorted(
+        path for path in plans.rglob("*.md") if is_plan_document(path)
+    )
+
+
 def repo_relative_path(root, value, suffix):
     normalized = value.replace("\\", "/")
     candidate = (root / normalized).resolve()
@@ -169,6 +222,8 @@ def repo_relative_path(root, value, suffix):
 
 
 def plan_path(path):
+    if is_work_item_readme(path):
+        return path.resolve()
     root = ledger_root(path)
     text = path.read_text(encoding="utf-8")
     declared = metadata(text, "Plan")
@@ -187,6 +242,29 @@ def plan_path(path):
 
 def roadmap_errors(path, text):
     root = ledger_root(path)
+    key = work_item_key(path)
+    if work_item_candidate(path) and key is None:
+        return []
+    if key:
+        feature = key.split("/", 1)[0]
+        roadmap_path = root / "plans" / "features" / feature / "README.md"
+        try:
+            roadmap_path.resolve().relative_to(root.resolve())
+        except ValueError as error:
+            return [f"{path.name}: feature README escapes the repository"]
+        if not roadmap_path.is_file():
+            return [f"{path.name}: feature README does not exist: {roadmap_path.relative_to(root)}"]
+        marker = f"`{key}`"
+        checklist_item = re.compile(
+            rf"^(?:- \[[ xX]\].*|\|\s*\[[ xX]\]\s*\|.*){re.escape(marker)}.*$",
+            re.MULTILINE,
+        )
+        matches = checklist_item.findall(roadmap_path.read_text(encoding="utf-8"))
+        if not matches:
+            return [f"{path.name}: feature README marker {marker} is missing"]
+        if len(matches) > 1:
+            return [f"{path.name}: feature README marker {marker} is duplicated"]
+        return []
     roadmap = metadata(text, "Roadmap")
     item = metadata(text, "Roadmap item")
     if not roadmap and not item:
@@ -220,15 +298,15 @@ def roadmap_errors(path, text):
 
 def blocker_owner_references(value):
     return tuple(
-        dict.fromkeys(match.group(0).replace("\\", "/") for match in LEDGER_REFERENCE.finditer(value))
+        dict.fromkeys(match.group(0).replace("\\", "/") for match in PLAN_REFERENCE.finditer(value))
     )
 
 
 def owner_ledger_path(waiting_path, reference, live_owners):
     root = ledger_root(waiting_path)
-    owner = repo_relative_path(root, reference, "_PROGRESS.md")
-    if not owner.is_file():
-        raise ValueError(f"blocker owner ledger does not exist: {reference}")
+    owner = repo_relative_path(root, reference, ".md")
+    if not is_plan_document(owner):
+        raise ValueError(f"blocker owner plan does not exist: {reference}")
     if not live_owners:
         return owner
     text = owner.read_text(encoding="utf-8")
@@ -296,7 +374,18 @@ def execution_scope_errors(path, body):
 def ledger_errors(path, live_owners=True):
     errors = []
     text = path.read_text(encoding="utf-8")
-    if not metadata(text, "Plan"):
+    work_item = work_item_key(path)
+    if work_item_candidate(path):
+        if not work_item:
+            return [f"{path.name}: work-item README path must use lowercase kebab-case feature and work-item names"]
+        if metadata(text, "Plan"):
+            errors.append(f"{path.name}: work-item README must not declare `Plan:`")
+        for field in ("Worktree", "Branch"):
+            if not metadata(text, field):
+                errors.append(f"{path.name}: `{field}:` is required")
+        if section(text, "Decisions") is None:
+            errors.append(f"{path.name}: work-item README requires `## Decisions`")
+    elif not metadata(text, "Plan"):
         errors.append(f"{path.name}: `Plan:` is required")
     try:
         plan_path(path)
@@ -326,7 +415,7 @@ def repository_report(root):
     errors = []
     warnings = []
     claims = {}
-    for path in sorted((root / "plans").rglob("*_PROGRESS.md")):
+    for path in plan_documents(root):
         errors.extend(ledger_errors(path, live_owners=False))
         text = path.read_text(encoding="utf-8")
         line_count = len(text.splitlines())
@@ -336,7 +425,8 @@ def repository_report(root):
                 f"{path.name}: compact the current snapshot; {line_count} lines and {byte_count} bytes "
                 f"exceed the {LEDGER_MAX_LINES}-line/{LEDGER_MAX_BYTES}-byte continuation budget"
             )
-        claim = (metadata(text, "Roadmap"), metadata(text, "Roadmap item"))
+        key = work_item_key(path)
+        claim = ("work-item", key) if key else (metadata(text, "Roadmap"), metadata(text, "Roadmap item"))
         plan = metadata(text, "Plan")
         if all(claim) and plan:
             claims.setdefault(claim, {}).setdefault(plan, []).append(path)
