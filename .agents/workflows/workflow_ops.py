@@ -415,6 +415,14 @@ def inspect_repository(root, workflow_run_id):
         if len(counts) == 2:
             behind, ahead = (int(counts[0]), int(counts[1]))
     plans = sorted(str(path.relative_to(root)).replace("\\", "/") for path in root.glob("plans/**/*_PROGRESS.md"))
+    work_items = []
+    for path in root.glob("plans/features/*/work-items/*/README.md"):
+        relative = str(path.relative_to(root)).replace("\\", "/")
+        try:
+            if workflow_runtime._work_item_document(root, relative) is not None:
+                work_items.append(relative)
+        except workflow_runtime.ContractViolation:
+            continue
     reviews = sorted(str(path.relative_to(root)).replace("\\", "/") for path in root.glob("reviews/*.md"))
     result = {
         "schema_version": SCHEMA_VERSION,
@@ -428,6 +436,7 @@ def inspect_repository(root, workflow_run_id):
         "behind": behind,
         "dirty_paths": dirty_paths,
         "progress_ledgers": plans,
+        "work_items": sorted(work_items),
         "review_work_orders": reviews,
     }
     append_event(root, workflow_run_id, {"kind": "operation", "operation": "inspect"})
@@ -1717,6 +1726,8 @@ def delivery_owner(root, workflow_run_id, ledger=None, pr_url=None):
     if ledger:
         provider = workflow_runtime.RepositoryStateProvider(root, workflow_runtime.WorkflowContract())
         state = provider.resolve(ledger, workflow_run_id, "delivery-preflight")
+        if provider.work_item_status(ledger) == "delivery-gated":
+            raise WorkflowOperationError("work item is delivery-gated and does not grant delivery authority")
         artifacts = state["artifacts"]
         new_slice = "pull_request" in artifacts and artifacts["pull_request"] is None
         if artifacts.get("pull_request"):

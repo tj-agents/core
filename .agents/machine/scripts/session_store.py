@@ -2,16 +2,28 @@
 """Single SQLite-backed store for session and work-item status, written by hooks (Python 3.9+)."""
 
 import argparse
+import importlib.util
 import json
 import os
-import re
 import socket
 import sqlite3
 import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlparse
+
+
+def _load_repository_identity():
+    path = Path(__file__).resolve().with_name("repository_identity.py")
+    spec = importlib.util.spec_from_file_location("session_store_repository_identity", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"The shared repository_identity.py helper was not found relative to {path.parent}.")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.normalise_remote
+
+
+normalise_remote = _load_repository_identity()
 
 SCHEMA_VERSION = 2
 GIT_TIMEOUT = 3
@@ -61,9 +73,6 @@ SESSIONS_ONE_OWNER_INDEX = """
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_one_owner_per_work_item
 ON sessions(work_item) WHERE role = 'owner'
 """
-
-_SSH_SCP_RE = re.compile(r"^[^/@\s]+@(?P<host>[^:/\s]+):(?P<path>.+)$")
-
 
 def state_directory():
     override = os.environ.get("AGENT_STATE_DIRECTORY")
@@ -175,57 +184,6 @@ def _git(cwd, *args, timeout=GIT_TIMEOUT):
     return output
 
 
-def _host_and_path(url):
-    if url.startswith(("ssh://", "https://", "http://", "git://")):
-        parsed = urlparse(url)
-        host = (parsed.hostname or "").casefold()
-        return (host or None), parsed.path
-    match = _SSH_SCP_RE.match(url)
-    if not match:
-        return None, None
-    return match.group("host").casefold(), match.group("path")
-
-
-def _normalise_remote(url):
-    url = (url or "").strip()
-    if not url:
-        return None
-    host, path = _host_and_path(url)
-    if not host or not path:
-        return None
-    path = path.strip("/")
-    if path.endswith(".git"):
-        path = path[: -len(".git")]
-    if not path:
-        return None
-    if host in ("ssh.dev.azure.com", "vs-ssh.visualstudio.com"):
-        parts = [part for part in path.split("/") if part]
-        if parts and parts[0] == "v3":
-            parts = parts[1:]
-        if len(parts) != 3:
-            return None
-        org, project, repository = parts
-        host = "dev.azure.com"
-        path = f"{org}/{project}/_git/{repository}"
-    elif host.endswith(".visualstudio.com"):
-        org = host[: -len(".visualstudio.com")]
-        if not org or "." in org:
-            return None
-        parts = [part for part in path.split("/") if part]
-        if parts and parts[0].casefold() == "defaultcollection":
-            parts = parts[1:]
-        if len(parts) == 2 and parts[0] == "_git":
-            repository = parts[1]
-            project = repository
-        elif len(parts) == 3 and parts[1] == "_git":
-            project, _git_segment, repository = parts
-        else:
-            return None
-        host = "dev.azure.com"
-        path = f"{org}/{project}/_git/{repository}"
-    return f"{host}/{path}".casefold()
-
-
 def _branch_from_symbolic_ref(value):
     if not value:
         return None
@@ -257,7 +215,7 @@ def _rev_parse_probe(cwd, timeout):
 def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
     origin = _git(cwd, "config", "--get", "remote.origin.url", timeout=timeout)
     head, branch, common_dir = _rev_parse_probe(cwd, timeout)
-    repo = _normalise_remote(origin) if origin else None
+    repo = normalise_remote(origin) if origin else None
     if not repo and common_dir:
         path = Path(common_dir)
         if not path.is_absolute():
