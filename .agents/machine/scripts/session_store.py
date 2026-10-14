@@ -2,7 +2,9 @@
 """Single SQLite-backed store for session and work-item status, written by hooks (Python 3.9+)."""
 
 import argparse
+import importlib.util
 import json
+import math
 import os
 import re
 import socket
@@ -13,10 +15,12 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
+HERE = Path(__file__).resolve().parent
 SCHEMA_VERSION = 2
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
 _LOCK_RETRY_DELAY = 0.05
+_REGISTER_SESSION = None
 
 WORK_ITEMS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS work_items (
@@ -72,6 +76,24 @@ def state_directory():
 
 def database_path():
     return state_directory() / "sessions.db"
+
+
+def _register_session():
+    global _REGISTER_SESSION
+    if _REGISTER_SESSION is not None:
+        return _REGISTER_SESSION
+    source = HERE.parent / "utility/peer-cli/scripts/register_session.py"
+    packaged = tuple(
+        HERE.parents[2] / layout / "peer-cli/scripts/register_session.py" for layout in ("skills", "codex-skills")
+    ) if len(HERE.parents) > 2 else ()
+    for path in (source, *packaged):
+        if path.is_file():
+            spec = importlib.util.spec_from_file_location("session_store_register_session", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            _REGISTER_SESSION = module
+            return module
+    raise RuntimeError(f"The shared register_session.py helper was not found relative to {HERE}.")
 
 
 def _execute_with_lock_retry(connection, statement):
@@ -526,6 +548,50 @@ def interrupted_candidates(connection, repo=None):
     return [dict(row) for row in rows]
 
 
+def _valid_process_identity(pid, started_at):
+    return (
+        isinstance(pid, int)
+        and not isinstance(pid, bool)
+        and not isinstance(started_at, bool)
+        and isinstance(started_at, (int, float))
+        and math.isfinite(started_at)
+    )
+
+
+def _recover_missing_session(host, session_id, payload):
+    try:
+        entry = _register_session().record(payload)
+    except Exception:
+        entry = None
+    if (
+        not isinstance(entry, dict)
+        or entry.get("session_id") != session_id
+        or entry.get("host") != host
+        or not _valid_process_identity(entry.get("pid"), entry.get("pid_started_at"))
+    ):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    try:
+        connection = connect()
+    except Exception:
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    try:
+        row = get_session(connection, session_handle(host, session_id))
+    finally:
+        connection.close()
+    if (
+        row is None
+        or row.get("host") != host
+        or row.get("session_id") != session_id
+        or row.get("pid") != entry["pid"]
+        or row.get("pid_started_at") != entry["pid_started_at"]
+    ):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    return True
+
+
 def _read_json_stdin():
     try:
         raw = sys.stdin.read()
@@ -539,6 +605,7 @@ def _read_json_stdin():
 
 
 def run_hook(event, host):
+    session_id = None
     try:
         payload = _read_json_stdin()
         session_id = payload.get("session_id") or payload.get("sessionId")
@@ -546,6 +613,14 @@ def run_hook(event, host):
             return 0
         cwd = payload.get("cwd") or os.getcwd()
         handle = session_handle(host, session_id)
+        if event in ("prompt", "stop"):
+            connection = connect()
+            try:
+                missing = get_session(connection, handle) is None
+            finally:
+                connection.close()
+            if missing and not _recover_missing_session(host, session_id, payload):
+                return 0
         connection = connect()
         try:
             if event == "session-start":
@@ -559,7 +634,8 @@ def run_hook(event, host):
         finally:
             connection.close()
     except Exception:
-        pass
+        label = f"{host}:{session_id}" if isinstance(session_id, str) and session_id else host
+        print(f"session persistence: could not record {label}", file=sys.stderr)
     return 0
 
 

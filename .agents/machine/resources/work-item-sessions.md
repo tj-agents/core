@@ -19,7 +19,9 @@ Location: `~/.agents-state/sessions.db` (honouring `AGENT_STATE_DIRECTORY`), SQL
 
 SessionStart (called in-process from `register_session.py`, after its existing registry write) upserts
 the row and clears `ended_at`/`end_reason`, because a resumed session is alive again. UserPromptSubmit
-sets `turn_state: working`. Stop sets `turn_state: awaiting_input` and refreshes cwd/branch/head. Claude
+sets `turn_state: working`. Prompt and Stop repair a missing current-session row through the native
+registrar, including its PID and process start identity. Stop sets `turn_state: awaiting_input` and
+refreshes cwd/branch/head. Claude
 SessionEnd sets `ended_at` and keeps an earlier end reason, else `closed`. Codex has no SessionEnd hook,
 so a hand-closed Codex tab reads as interrupted. Start and Stop attach an unclaimed session to a work item
 when exactly one non-`done` work item in the same repo records the current branch. `finish.py`/`close.py`
@@ -56,9 +58,13 @@ python '<skill-directory>/../../resources/machine/scripts/work_item_sessions.py'
 - `resume <feature>/<item> [--handle <handle>]`: without `--handle`, resumes the single owner that is not
   ended or ended `closed`; refuses foreign, stale, live, unknown, finished or handed-off sessions, then
   calls `agent_recovery.open_session`.
-- `interrupted [--resume <handle>...]`: lists not-ended sessions whose recorded pid is dead, grouped by
+- `interrupted [--all-repos] [--resume-all | --resume <handle>...]`: lists not-ended sessions whose recorded pid is dead, grouped by
   work item with their last turn state and computed status; resumes only listed handles whose status is
   `closed`, refusing stale, unknown, foreign, live, finished or handed-off ones.
+  `--all-repos` uses this machine's whole registry and runs outside a Git repository. `--resume-all`
+  selects eligible sessions deterministically, excludes completed work items, and opens them serially.
+  Individual errors leave the other launches running; fresh native registration is required before
+  success is reported. Repeated runs skip live sessions and respect pending or ambiguous launch receipts.
 - `end --host claude|codex --reason finished|closed|handed_off [--successor <handle>]`: records the
   current session's end reason.
 - `item <feature>/<item> --status <status> [--pr <url>]`: records work-item status, filling a still-`NULL`

@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import unittest
 from unittest import mock
 
@@ -385,6 +386,62 @@ class HookLifecycleTests(unittest.TestCase):
         row = self._row(handle)
         self.assertIsNotNone(row["ended_at"])
         self.assertEqual("closed", row["end_reason"])
+
+    def test_prompt_and_stop_recover_missing_sessions_through_the_native_registrar(self):
+        def record(payload):
+            connection = STORE.connect()
+            try:
+                STORE.start_session(connection, "claude", payload["session_id"], payload["cwd"], pid=42, pid_started_at=24.0)
+            finally:
+                connection.close()
+            return {"session_id": payload["session_id"], "host": "claude", "pid": 42, "pid_started_at": 24.0}
+
+        registrar = types.SimpleNamespace(record=record)
+        with mock.patch.object(STORE, "_register_session", return_value=registrar):
+            self.assertEqual(0, self._invoke("prompt", "claude", {"session_id": "prompt-missing", "cwd": str(self.repo)}))
+            self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "stop-missing", "cwd": str(self.repo)}))
+        prompt_row = self._row("claude:prompt-missing")
+        stop_row = self._row("claude:stop-missing")
+        self.assertEqual("working", prompt_row["turn_state"])
+        self.assertEqual("awaiting_input", stop_row["turn_state"])
+        self.assertEqual(42, stop_row["pid"])
+        self.assertEqual(24.0, stop_row["pid_started_at"])
+
+    def test_missing_session_recovery_requires_the_matching_host_identity(self):
+        payload = {"session_id": "wrong-host", "cwd": str(self.repo)}
+        registrar = types.SimpleNamespace(record=mock.Mock(return_value={
+            "session_id": "wrong-host", "host": "codex", "pid": 42, "pid_started_at": 24.0,
+        }))
+        output = io.StringIO()
+        with mock.patch.object(STORE, "_register_session", return_value=registrar), \
+                mock.patch.object(sys, "stderr", output):
+            self.assertEqual(0, self._invoke("stop", "claude", payload))
+        self.assertIsNone(self._row("claude:wrong-host"))
+        self.assertIn("could not recover claude:wrong-host", output.getvalue())
+
+    def test_hook_database_failure_reports_a_persistence_diagnostic(self):
+        payload = {"session_id": "failed-db", "cwd": str(self.repo)}
+        output = io.StringIO()
+        with mock.patch.object(STORE, "connect", side_effect=OSError("locked")), \
+                mock.patch.object(sys, "stderr", output):
+            self.assertEqual(0, self._invoke("prompt", "claude", payload))
+        self.assertIn("could not record claude:failed-db", output.getvalue())
+
+    def test_register_session_loader_supports_packaged_layouts(self):
+        original_here = STORE.HERE
+        original_register = STORE._REGISTER_SESSION
+        try:
+            for layout in ("skills", "codex-skills"):
+                root = self.root / layout
+                script = root / layout / "peer-cli/scripts/register_session.py"
+                script.parent.mkdir(parents=True)
+                script.write_text("marker = True\n", encoding="utf-8")
+                STORE.HERE = root / "resources/machine/scripts"
+                STORE._REGISTER_SESSION = None
+                self.assertTrue(STORE._register_session().marker)
+        finally:
+            STORE.HERE = original_here
+            STORE._REGISTER_SESSION = original_register
 
     def test_resume_start_clears_ended_at_and_end_reason(self):
         payload = {"session_id": "exact-id", "cwd": str(self.repo)}
