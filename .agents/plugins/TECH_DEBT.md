@@ -66,11 +66,11 @@ acceptance distinct from source test results.
 ## Callout enforcement has bounded host signals
 
 The callout-repair gate blocks automatic feedback substitution and checks paired launcher results
-against the prepared standards-repair goal. Claude's Stop hook also holds recognized callouts.
+against the prepared standards-repair goal. Both host manifests dispatch the gate at Stop.
 Callout detection covers explicit mistake wording that names standards or workflow mechanisms;
 it cannot establish the meaning of every complaint,
-whether a standard caused it, or whether assistant text substantively answers a question. Codex's callout gate has no
-registered result or Stop check, and specialized host tools can bypass normal plugin hooks. Source
+whether a standard caused it, or whether assistant text substantively answers a question. Specialized
+host tools can bypass normal plugin hooks. Source
 regressions and packaging checks do not establish live activation or interception of SendFeedback.
 
 Resolve when both hosts expose trusted semantic callout and answer signals, successful source-owner
