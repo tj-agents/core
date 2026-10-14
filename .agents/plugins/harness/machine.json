@@ -169,7 +169,7 @@
               "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
             ]
           ],
-          "justification": "After its delivered report, close only this verified unchanged-idle CLI session while retaining its checkout",
+          "justification": "After its delivered report, close only the exact CLI process PID and start time whose unchanged idle guard still passes; select its native tab by unique exact title when UI Automation has no automation ID, while retaining its checkout",
           "match": [
             [
               "python3",
