@@ -7,7 +7,7 @@ import tempfile
 import uuid
 
 from workflow_route import HOST_GENERATED_PROMPTS, prompt_text
-from worktree_placement_gate import normalized_extraction_input, shell_kind, shell_segments
+from worktree_placement_gate import normalized_extraction_input, shell_kind, shell_segments, tokens_of
 
 
 try:
@@ -180,15 +180,89 @@ def assistant_answer(records):
     return False
 
 
-def launcher_call(value):
-    text = "\n".join(texts(value))
-    if re.search(r"(?im)^\s*(?:echo|write-output|printf)\b[^\n]*" + LAUNCHER.pattern, text):
-        return False
-    return bool(LAUNCHER.search(text) and re.search(r"-+WorkingDirectory|-+working-directory", text, re.I)
-                and re.search(r"-+PromptPath|-+prompt-path", text, re.I))
+def launcher_command(value):
+    if isinstance(value, str):
+        return value, value, {}
+    normalized = normalized_extraction_input(value)
+    if not isinstance(normalized, dict):
+        return None, normalized, {}
+    for container in (normalized, normalized.get("action")):
+        if not isinstance(container, dict):
+            continue
+        for key in ("command", "cmd", "script", "input"):
+            if isinstance(container.get(key), str):
+                variables = next(
+                    (item for item in (container.get("environment"), container.get("env"), container.get("variables"))
+                     if isinstance(item, dict)),
+                    {},
+                )
+                return container[key], normalized, variables
+    return None, normalized, {}
 
 
-def source_owner_handoff(receipt, session, prompt, callout_id):
+def launcher_path(value, variables, workdir=None):
+    match = re.fullmatch(r"\$([A-Za-z_][A-Za-z0-9_]*)", value)
+    if match:
+        value = variables.get(match.group(1))
+    if not isinstance(value, str) or not value or re.search(r"[$`%]", value):
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        if workdir is None:
+            return None
+        path = workdir / path
+    try:
+        return path.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def launcher_invocation(value, tool=""):
+    command, normalized, variables = launcher_command(value)
+    if not isinstance(command, str) or not command.strip():
+        return None
+    segments = shell_segments(command, shell_kind(tool, normalized))
+    if segments is None or len(segments) != 1:
+        return None
+    tokens = tokens_of(segments[0])
+    if not tokens:
+        return None
+    launcher_indices = [
+        index for index, token in enumerate(tokens)
+        if LAUNCHER.fullmatch(Path(token).name)
+    ]
+    if len(launcher_indices) != 1:
+        return None
+    launcher_index = launcher_indices[0]
+    if launcher_index:
+        interpreter = Path(tokens[0]).stem.casefold()
+        if interpreter not in {"python", "python3", "py"} or any(token != "-B" for token in tokens[1:launcher_index]):
+            return None
+    arguments = {}
+    index = launcher_index + 1
+    while index < len(tokens):
+        flag = tokens[index].casefold()
+        if flag in {"-workingdirectory", "--working-directory"}:
+            name = "worktree"
+        elif flag in {"-promptpath", "--prompt-path"}:
+            name = "prompt_path"
+        else:
+            index += 1
+            continue
+        if name in arguments or index + 1 >= len(tokens):
+            return None
+        arguments[name] = tokens[index + 1]
+        index += 2
+    if set(arguments) != {"worktree", "prompt_path"}:
+        return None
+    worktree = launcher_path(arguments["worktree"], variables)
+    prompt_path = launcher_path(arguments["prompt_path"], variables, worktree)
+    if worktree is None or prompt_path is None:
+        return None
+    return {"worktree": worktree, "prompt_path": prompt_path}
+
+
+def source_owner_handoff(receipt, invocation, session, prompt, callout_id):
     if not isinstance(receipt, dict) or receipt.get("event") != "agent-handoff-submitted":
         return False
     paths = [receipt.get("worktree"), receipt.get("prompt_path")]
@@ -200,6 +274,10 @@ def source_owner_handoff(receipt, session, prompt, callout_id):
     if not prompt_path.is_absolute():
         prompt_path = workdir / prompt_path
     try:
+        workdir = workdir.resolve()
+        prompt_path = prompt_path.resolve()
+        if workdir != invocation["worktree"] or prompt_path != invocation["prompt_path"]:
+            return False
         body = prompt_path.read_text(encoding="utf-8-sig")[:65536]
         match = re.search(r"(?im)^\s*Read\s+(.+?\.md)(?:\s+and\b|\s*$)", body)
         if match is None:
@@ -229,11 +307,12 @@ def launch_succeeded(records, session, prompt, callout_id):
         value = message(record)
         if value.get("type") in ("custom_tool_call", "function_call"):
             tool_input = value.get("input", value.get("arguments"))
-            if value.get("call_id") and launcher_call(tool_input):
-                pending[value["call_id"]] = tool_input
+            invocation = launcher_invocation(tool_input, value.get("name", ""))
+            if value.get("call_id") and invocation:
+                pending[value["call_id"]] = invocation
         elif value.get("type") in ("custom_tool_call_output", "function_call_output"):
-            tool_input = pending.pop(value.get("call_id"), None)
-            if tool_input is not None and successful_result(value, tool_input, session, prompt, callout_id):
+            invocation = pending.pop(value.get("call_id"), None)
+            if invocation is not None and successful_result(value, invocation, session, prompt, callout_id):
                 return True
         content = value.get("content")
         if not isinstance(content, list):
@@ -242,16 +321,17 @@ def launch_succeeded(records, session, prompt, callout_id):
             if not isinstance(block, dict):
                 continue
             if block.get("type") == "tool_use" and block.get("name") in ("Bash", "PowerShell"):
-                if block.get("id") and launcher_call(block.get("input")):
-                    pending[block["id"]] = block["input"]
+                invocation = launcher_invocation(block.get("input"), block.get("name", ""))
+                if block.get("id") and invocation:
+                    pending[block["id"]] = invocation
             elif block.get("type") == "tool_result":
-                tool_input = pending.pop(block.get("tool_use_id"), None)
-                if tool_input is not None and successful_result(block, tool_input, session, prompt, callout_id):
+                invocation = pending.pop(block.get("tool_use_id"), None)
+                if invocation is not None and successful_result(block, invocation, session, prompt, callout_id):
                     return True
     return False
 
 
-def successful_result(value, tool_input, session, prompt, callout_id):
+def successful_result(value, invocation, session, prompt, callout_id):
     if value.get("is_error") or value.get("error"):
         return False
     parts = list(texts(value.get("content", value.get("output", ""))))
@@ -272,7 +352,7 @@ def successful_result(value, tool_input, session, prompt, callout_id):
             receipt = json.loads(line)
         except ValueError:
             continue
-        if source_owner_handoff(receipt, session, prompt, callout_id):
+        if source_owner_handoff(receipt, invocation, session, prompt, callout_id):
             return True
     return False
 
@@ -502,7 +582,7 @@ def main():
     if event == "PreToolUse":
         if feedback and not EXPLICIT_FEEDBACK.search(current_prompt or prompt):
             emit(event, MESSAGE, deny=True)
-        elif launcher_call(data.get("tool_input")):
+        elif launcher_invocation(data.get("tool_input"), tool):
             if not assistant_answer(records):
                 emit(event, "Answer the user's direct question before launching the callout repair handoff.", deny=True)
         elif not repair_operation(tool, data.get("tool_input")) and not feedback:

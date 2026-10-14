@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import sys
 from typing import Any
 
@@ -190,6 +191,64 @@ def declared_source_owner(goal_text: str) -> str | None:
     return next(iter(owners)) if len(owners) == 1 else None
 
 
+def source_primary_checkout(goal: Path) -> Path | None:
+    try:
+        root = subprocess.run(
+            ["git", "-C", str(goal.parent), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=5,
+        )
+        if root.returncode:
+            return None
+        worktree = Path(root.stdout.strip()).resolve()
+        listed = subprocess.run(
+            ["git", "-C", str(worktree), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if listed.returncode:
+        return None
+    entries = [
+        Path(line[9:].strip()).resolve()
+        for line in listed.stdout.splitlines()
+        if line.startswith("worktree ") and line[9:].strip()
+    ]
+    if not entries or worktree not in entries:
+        return None
+    return entries[0]
+
+
+def canonical_problem_record(goal: Path, record: Path, kind: str) -> bool:
+    primary = source_primary_checkout(goal)
+    if primary is None:
+        return False
+    try:
+        candidate = record.resolve()
+        if kind == "bug":
+            return candidate == primary / "BUGS.md"
+        if kind == "mistake":
+            return candidate == primary / "MISTAKES.md"
+        if kind != "debt" or candidate.name != "TECH_DEBT.md" or not candidate.is_relative_to(primary):
+            return False
+        relative = candidate.relative_to(primary)
+        tracked = subprocess.run(
+            ["git", "-C", str(primary), "ls-files", "--error-unmatch", "--", relative.as_posix()],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=5,
+        )
+        return tracked.returncode == 0
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
+        return False
+
+
 def linked_owner_goal(owner: Any, backlink: str) -> tuple[str | None, str | None]:
     if not isinstance(owner, dict) or not all(
         nonempty(owner.get(field)) for field in ("session_id", "harness", "worktree", "goal")
@@ -310,6 +369,8 @@ def validate(
         goal_text = goal.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return {"valid": False, "reason": "repair goal is unreadable"}
+    if not canonical_problem_record(goal, record, disposition["kind"]):
+        return {"valid": False, "reason": "record is not the source repository's canonical register"}
     backlink = f"Problem record: {record}#{record_id}"
     authorization = authorization_section(goal_text)
     if backlink not in goal_text or authorization is None or AUTHORIZATION.search(authorization) is None:
