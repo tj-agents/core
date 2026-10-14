@@ -195,3 +195,25 @@ with a test that `review-prepare` names the skill for such a path.
   - add a gate that blocks a terminal report while the session has noticed a problem without recording it.
 - **Resolution condition:** in a hook test, a session that observes a defect and then tries to finish
   without a matching ledger entry on `main` is blocked, and recording the entry releases it.
+
+## D007 — An agent idles on a background test run instead of continuing the authorized work
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-15. After focused tests passed on a slice, the agent started the full
+  `.agents/hooks/tests` and `tests` suites in the background and ended its turn to wait for them, with
+  further authorized slices unstarted. Tommy: "u can walk and chew gum right ... run those individual tests
+  (definitely not all if its incremental) ... but then continue with the work? note that down as a fix".
+- **Impact and priority:** P2. Wasted wall-clock time and repeated prompts; the full suites take over ten
+  minutes and block nothing the next slice needs.
+- **Cause:** `engineering:plan-execution` says a phase boundary is not a stopping condition but does not say
+  that a pending background check is not one either, nor which tests an incremental change should run.
+- **Source owner:** core engineering (`plan-execution`, `failing-tests`).
+- **State:** open.
+- **Next action:**
+  - state in `plan-execution` that a slice runs only the focused tests for the paths it changed, in the
+    background when slow, and the agent continues with the next authorized work while they run;
+  - leave the full suites to CI and to a change that is broad enough to need them;
+  - make the focused-test selection discoverable (a changed-path to test mapping) so the agent does not
+    guess.
+- **Resolution condition:** the `plan-execution` text carries the rule and a session that has a background
+  check pending is not blocked from, or reminded to stop before, starting the next slice.
