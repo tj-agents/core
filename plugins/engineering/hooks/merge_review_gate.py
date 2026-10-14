@@ -514,12 +514,13 @@ def main():
             # Run every git query where the merge runs, not where the hook process happens to sit.
             _GIT_CWD[0] = merge_target_dir(command, data)
 
-    # From here on the command WOULD merge — fail closed on anything unproven.
-    try:
-        toplevel = git("rev-parse", "--show-toplevel")
-    except Exception as exc:  # noqa: BLE001 — a merge with a broken check must not slip through
-        block("MERGE GATE: cannot resolve git state (" + str(exc) + "); refusing "
-              "`gh pr merge` until a code-review can be verified.")
+    # Only an opted-in repository's merges. `reviews/<branch>.md` is a convention a repo
+    # adopts, and a sibling repo merged from this session has its own rules - gating it here
+    # demanded a review file that repo never had. The question is asked of the directory the
+    # merge RUNS in, so a `cd <other-repo> && merge` is judged by that repo's opt-in.
+    config_path = find_config(_GIT_CWD[0])
+    if config_path is None:
+        sys.exit(0)
 
     named = repo_flag(command)
     if named is not None:
@@ -531,13 +532,13 @@ def main():
         if local != named:
             sys.exit(0)
 
-    # Only an opted-in repository's merges. `reviews/<branch>.md` is a convention a repo
-    # adopts, and a sibling repo merged from this session has its own rules - gating it here
-    # demanded a review file that repo never had. The question is asked of the directory the
-    # merge RUNS in, so a `cd <other-repo> && merge` is judged by that repo's opt-in.
-    config_path = find_config(_GIT_CWD[0])
-    if config_path is None:
-        sys.exit(0)
+    # From here on the opted-in command WOULD merge — fail closed on anything unproven.
+    try:
+        toplevel = git("rev-parse", "--show-toplevel")
+    except Exception as exc:  # noqa: BLE001 — a merge with a broken check must not slip through
+        block("MERGE GATE: cannot resolve git state (" + str(exc) + "); refusing "
+              "`gh pr merge` until a code-review can be verified.")
+
     if not claim_invocation(data, "merge-review-gate"):
         sys.exit(0)
     try:
