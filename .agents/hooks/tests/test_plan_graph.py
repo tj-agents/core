@@ -66,11 +66,81 @@ class PlanGraphTests(unittest.TestCase):
         )
         return ledger
 
+    def write_work_item(self, next_steps="Continue the work item.", extra=""):
+        feature = self.root / "plans" / "features" / "runtime-bridge"
+        item = feature / "work-items" / "readme-reader"
+        item.mkdir(parents=True)
+        (feature / "README.md").write_text(
+            "# Runtime bridge\n\n- [ ] `runtime-bridge/readme-reader`\n",
+            encoding="utf-8",
+        )
+        document = item / "README.md"
+        document.write_text(
+            "# README reader\n\n"
+            f"- Worktree: `{self.root}`\n"
+            "- Branch: `Feature/runtime_bridge`\n\n"
+            "## Decisions\n\n- SQLite supplies status and ownership.\n\n"
+            "## Next Steps\n\n"
+            f"{next_steps}\n"
+            "Scope: whole plan remains incomplete.\n"
+            "Current slice: resolve the README work item.\n"
+            "Remaining scope: review and delivery remain.\n"
+            "Done when: the runtime bridge is verified.\n\n"
+            f"{extra}\n",
+            encoding="utf-8",
+        )
+        return document
+
     def test_declared_plan_is_authoritative_for_differently_named_ledger(self):
         ledger = self.write_ledger()
 
         self.assertEqual(self.plan, plan_path(ledger))
         self.assertEqual([], ledger_errors(ledger))
+
+    def test_work_item_readme_is_its_own_plan_and_feature_roadmap(self):
+        document = self.write_work_item()
+
+        self.assertEqual(document.resolve(), plan_path(document))
+        self.assertEqual([], ledger_errors(document))
+
+    def test_supporting_readme_is_not_discovered_as_a_work_item(self):
+        document = self.write_work_item()
+        supporting = document.with_name("SUPPORTING.md")
+        supporting.write_text("# Supporting\n", encoding="utf-8")
+        ordinary = self.root / "README.md"
+        ordinary.write_text("# Ordinary\n", encoding="utf-8")
+
+        report = repository_report(self.root)
+
+        self.assertEqual([], report["errors"])
+        self.assertEqual([], report["warnings"])
+
+    def test_work_item_requires_one_feature_checklist_marker(self):
+        document = self.write_work_item()
+        feature = document.parents[2] / "README.md"
+        feature.write_text(
+            "- [ ] `runtime-bridge/readme-reader`\n"
+            "- [ ] `runtime-bridge/readme-reader`\n",
+            encoding="utf-8",
+        )
+
+        errors = ledger_errors(document)
+
+        self.assertEqual(1, len(errors))
+        self.assertIn("feature README marker", errors[0])
+
+    def test_malformed_work_item_candidate_is_reported_but_ordinary_readmes_are_ignored(self):
+        invalid = self.root / "plans" / "features" / "Runtime" / "work-items" / "readme-reader" / "README.md"
+        invalid.parent.mkdir(parents=True)
+        invalid.write_text("# Invalid\n", encoding="utf-8")
+        (self.root / "plans" / "features" / "Runtime" / "README.md").write_text(
+            "# Feature\n", encoding="utf-8"
+        )
+
+        report = repository_report(self.root)
+
+        self.assertEqual(1, len(report["errors"]))
+        self.assertIn("lowercase kebab-case", report["errors"][0])
 
     def test_unselected_plan_does_not_block_unrelated_repository_work(self):
         self.plan.write_text(
