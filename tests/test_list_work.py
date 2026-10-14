@@ -1,12 +1,9 @@
-"""Drive the /workboard Gather script exactly as shipped, under a synthetic HOME.
-
-The script is extracted from the canonical SKILL.md rather than copied, so a test that passes
-against a stale paste cannot exist. Nothing here reads or writes the real plan corpus.
-"""
+"""Drive the list-work script exactly as shipped, under a synthetic HOME."""
 
 import os
 from pathlib import Path
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -15,8 +12,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_MD = ROOT / '.agents/engineering/utility/workboard/SKILL.md'
-GATHER = re.search(r"<<'PY'\n(.*?)\nPY\n", SKILL_MD.read_text(encoding='utf-8'), re.S)
+SCRIPT = ROOT / '.agents/engineering/utility/list-work/scripts/list-work.py'
 ROW = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2} .*$', re.M)
 
 
@@ -24,12 +20,11 @@ def rows(output):
     return {line.split()[-1] for line in ROW.findall(output)}
 
 
-class WorkboardHarness(unittest.TestCase):
+class ListWorkHarness(unittest.TestCase):
     """Synthetic home, plan corpus and repo layout. Holds no tests of its own."""
 
     def setUp(self):
-        self.assertIsNotNone(GATHER, 'the Gather block is no longer the only PY heredoc in SKILL.md')
-        self.temp = tempfile.TemporaryDirectory(prefix='synthetic workboard ')
+        self.temp = tempfile.TemporaryDirectory(prefix='synthetic list-work ')
         self.addCleanup(self.temp.cleanup)
         # resolve() expands the 8.3 short name mkdtemp returns under C:\Users\TOMMYS~1. The script
         # compares Path.cwd() against a path built from Path.home(); a short name makes every run
@@ -39,8 +34,7 @@ class WorkboardHarness(unittest.TestCase):
         self.repos = self.home / 'source' / 'repos'
         self.plans.mkdir(parents=True)
         self.repos.mkdir(parents=True)
-        self.script = self.home / 'workboard.py'
-        self.script.write_text(GATHER.group(1), encoding='utf-8')
+        self.script = SCRIPT
         self.here = self.repo('demo')
 
     def repo(self, *parts):
@@ -74,13 +68,12 @@ class WorkboardHarness(unittest.TestCase):
             repo=repo,
         )
 
-    def board(self, needle='', limit='20', scope='auto', cwd=None, skill_directory=None):
+    def board(self, needle='', limit='20', scope='auto', cwd=None, script=None):
         environment = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home))
         if hasattr(self, 'state_directory'):
             environment['AGENT_STATE_DIRECTORY'] = str(self.state_directory)
         result = subprocess.run(
-            [sys.executable, '-B', str(self.script), needle, limit, scope,
-             str(skill_directory or SKILL_MD.parent)],
+            [sys.executable, '-B', str(script or self.script), needle, limit, scope],
             cwd=str(cwd or self.here), capture_output=True, text=True, env=environment)
         self.assertEqual('', result.stderr)
         self.assertEqual(0, result.returncode)
@@ -116,16 +109,18 @@ class WorkboardHarness(unittest.TestCase):
 
     def runtime_skill_directory(self, runtime_text):
         root = self.home / 'runtime-fixture'
-        skill = root / '.agents' / 'engineering' / 'utility' / 'workboard'
+        skill = root / '.agents' / 'engineering' / 'utility' / 'list-work'
         workflows = root / '.agents' / 'workflows'
-        skill.mkdir(parents=True)
+        script = skill / 'scripts' / 'list-work.py'
+        script.parent.mkdir(parents=True)
         workflows.mkdir(parents=True)
+        shutil.copy2(SCRIPT, script)
         (workflows / 'workflow_runtime.py').write_text(runtime_text, encoding='utf-8')
-        return skill
+        return script
 
-    def capability_result(self, skill_directory):
+    def capability_result(self, script):
         return subprocess.run(
-            [sys.executable, '-B', str(self.script), '', '20', 'auto', str(skill_directory)],
+            [sys.executable, '-B', str(script), '', '20', 'auto'],
             cwd=str(self.here),
             capture_output=True,
             text=True,
@@ -133,7 +128,7 @@ class WorkboardHarness(unittest.TestCase):
         )
 
 
-class NeedleMatchingTests(WorkboardHarness):
+class NeedleMatchingTests(ListWorkHarness):
     def test_punctuated_needle_finds_its_plan(self):
         self.plan('demo/AB-28884-country-risk-domain-split.md')
         self.assertIn('AB-28884-country-risk-domain-split.md', self.listed('AB-28884'))
@@ -182,7 +177,7 @@ class NeedleMatchingTests(WorkboardHarness):
         self.assertEqual({'ONE.md', 'TWO.md'}, self.listed(''))
 
 
-class ReportingTests(WorkboardHarness):
+class ReportingTests(ListWorkHarness):
     def test_a_title_hit_is_a_name_hit(self):
         self.plan('demo/OPAQUE_FILENAME.md', '# the payments split\n')
         self.assertIn('OPAQUE_FILENAME.md', self.listed('payments'))
@@ -220,7 +215,7 @@ class ReportingTests(WorkboardHarness):
             self.assertIn('25 open, showing 20', output, limit)
 
 
-class CorpusSelectionTests(WorkboardHarness):
+class CorpusSelectionTests(ListWorkHarness):
     def test_a_flat_subfolder_is_read(self):
         self.plan('demo/Post Launch Scalability/SHARDING.md')
         self.assertIn('SHARDING.md', self.listed(''))
@@ -241,7 +236,7 @@ class CorpusSelectionTests(WorkboardHarness):
         self.assertEqual({'KEPT.md'}, self.listed(''))
 
 
-class ScopingTests(WorkboardHarness):
+class ScopingTests(ListWorkHarness):
     def setUp(self):
         super().setUp()
         self.repo('other-group', 'other-repo')
@@ -282,7 +277,7 @@ class ScopingTests(WorkboardHarness):
         self.assertIn('LOOSE_PAYMENTS.md', self.listed('payments', scope='all'))
 
 
-class RepoResidentPlanTests(WorkboardHarness):
+class RepoResidentPlanTests(ListWorkHarness):
     """A plan filed beside the code it concerns, which is where they are supposed to live."""
 
     def test_a_plan_in_the_invoking_repo_is_read(self):
@@ -350,7 +345,7 @@ class RepoResidentPlanTests(WorkboardHarness):
         self.assertEqual({'LOCAL_PAYMENTS.md'}, self.listed('payments'))
 
 
-class WorkItemStatusTests(WorkboardHarness):
+class WorkItemStatusTests(ListWorkHarness):
     def test_all_sqlite_statuses_are_reported_and_done_is_hidden(self):
         for status in ('proposed', 'active', 'delivery-gated', 'blocked', 'paused', 'done'):
             with self.subTest(status=status):
@@ -436,20 +431,42 @@ class WorkItemStatusTests(WorkboardHarness):
     def test_source_and_packaged_skill_layouts_load_their_own_runtime(self):
         self.work_item()
         self.write_work_item_status('reader-bridge', 'status-reader', 'active')
-        locations = (
-            SKILL_MD.parent,
-            ROOT / 'plugins/engineering/.agents/engineering/utility/workboard',
-            ROOT / 'plugins/engineering/skills/workboard',
-            ROOT / 'plugins/engineering/codex-skills/workboard',
+        copies = [SCRIPT]
+        layouts = (
+            '.agents/engineering/utility/list-work',
+            'skills/list-work',
+            'codex-skills/list-work',
         )
-        for location in locations:
-            with self.subTest(location=location):
-                self.assertIn('active', self.board(skill_directory=location))
+        for layout in layouts:
+            package = self.home / layout.replace('/', '-')
+            script = package / layout / 'scripts/list-work.py'
+            script.parent.mkdir(parents=True)
+            shutil.copy2(SCRIPT, script)
+            shutil.copytree(ROOT / '.agents/workflows', package / 'workflows')
+            shutil.copy2(
+                ROOT / '.agents/machine/scripts/repository_identity.py',
+                package / 'workflows/repository_identity.py',
+            )
+            copies.append(script)
+        for script in copies:
+            with self.subTest(script=script):
+                self.assertIn('active', self.board(script=script))
 
     def test_missing_own_runtime_is_a_capability_failure(self):
-        result = self.capability_result(self.home / 'unknown')
+        script = self.home / 'missing-runtime/.agents/engineering/utility/list-work/scripts/list-work.py'
+        script.parent.mkdir(parents=True)
+        shutil.copy2(SCRIPT, script)
+        result = self.capability_result(script)
         self.assertEqual(2, result.returncode)
-        self.assertIn('workboard capability failure', result.stderr)
+        self.assertIn('list-work capability failure', result.stderr)
+
+    def test_unsupported_script_anchor_is_a_capability_failure(self):
+        script = self.home / 'unknown/list-work.py'
+        script.parent.mkdir(parents=True)
+        shutil.copy2(SCRIPT, script)
+        result = self.capability_result(script)
+        self.assertEqual(2, result.returncode)
+        self.assertIn('no supported runtime anchor', result.stderr)
 
     def test_runtime_without_work_item_status_is_a_capability_failure(self):
         skill = self.runtime_skill_directory(
