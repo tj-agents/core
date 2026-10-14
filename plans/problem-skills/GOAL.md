@@ -1,13 +1,13 @@
 # Bug and mistake recording/addressing skills
 
-Status: active; native execution pickup acknowledged on 2026-10-11.
+Status: complete; PR #206 merged and generated publication verified on 2026-10-11.
 Branch: Feature/ProblemSkills
 Base: origin/main at 429ad56751720e2cb369c3aa2e25a3b53b801234
 Worktree: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Feature-ProblemSkills
 PR: https://github.com/tj-agents/core/pull/206
 Originating session: 01a12b10-3519-7f41-8e4f-7afa6828fef0
 Execution owner: Codex session 01a12c10-0de6-7152-a9f2-9e5f374021f8
-Lane: L4 independent review of the completed foundation; L3 source/design decisions remain with this owner.
+Lane: L7 terminal verification and cleanup; source design, implementation and independent review are complete.
 
 ## Outcome and authorization
 
@@ -84,11 +84,10 @@ originating session's docs checkout or adopt its other workstreams.
 
 ## Next Steps
 
-The foundation and historical-entry correction are approved at 98283b7614114b4e73b02763ecc7c15dfcd1c478.
-Push this reviewed head, open the foundation PR and own its exact
-required CI through merge. Observe the causal generated publication on main and record completion here
-so the coordinator can advance the dependent handoff policy. Installed consumer acceptance remains
-separate from the source-contract exercise; this work does not install an orchestration monitor.
+Foundation complete. The coordinator can advance the separate handoff-priority design using the shipped
+recording/addressing contract. This terminal goal is preserved at
+C:/Users/TommySeery/source/repos/tj-agents/core/.git/agent-workflow/runs/problem-skills/completed-goal.md.
+The merged linked worktree is eligible for verified cleanup; there is no remaining foundation implementation.
 
 ## Execution progress
 
@@ -144,7 +143,7 @@ separate from the source-contract exercise; this work does not install an orches
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Both-host packaging/linkage and shared-contract source exercise passed; installed-host behavior acceptance is not claimed."
+        "evidence": "Exact-head PR CI, focused packaging and source-contract example passed. Causal regenerate job published eight host entries and the shared contract on main. Installed consumer acceptance is separate."
       }
     },
     {
@@ -155,10 +154,11 @@ separate from the source-contract exercise; this work does not install an orches
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Both-host packaging/linkage and shared-contract source exercise passed; installed-host behavior acceptance is not claimed."
+        "evidence": "Exact-head PR CI, focused packaging and source-contract example passed. Causal regenerate job published eight host entries and the shared contract on main. Installed consumer acceptance is separate."
       }
     }
-  ]
+  ],
+  "candidate_head": "f1a0db58f63c545e449addb645bf9b96134e32dd"
 }
 ```
 
@@ -222,7 +222,8 @@ separate from the source-contract exercise; this work does not install an orches
   reported guard failure in run 38167988381. Windows/Linux checks were still running at that observation.
 - Cause confirmed: authored catalog skill additions were committed together with the generated engineering
   digest. scripts/check_generated_paths.py rejects digest changes because the post-merge job owns them.
-  The failed job is 114554443369; its captured log is the guard-cause artifact in this private workflow run.
+  The failed job is 114554443369; gh run view could not read its log while sibling jobs were active.
+  The completed job log was read through gh api and captured as ci-guard-job-log, confirming the digest.
 - Correction: restore only the digest field to the frozen base, preserving all four authored skill additions.
   Source and packaging already passed focused checks after local digest generation; CI regenerates digests
   before its full suites. Future local regeneration must leave these digest fields uncommitted.
@@ -231,3 +232,134 @@ separate from the source-contract exercise; this work does not install an orches
 - State: in-progress. Next action: run the guard at the correcting committed head, review that small delta,
   push one stable correction and monitor the new exact-head required CI. Resolution condition: the authored
   roster remains present, the generated digest is excluded, and required CI passes the correcting head.
+
+- Correcting head f1a0db58f63c545e449addb645bf9b96134e32dd passes the committed generated-path guard.
+  Captured artifact: problem-skills-guard-fix/artifacts/6118696b1a4f2779-generated-guard.log.
+  The correction remains under native incremental review and a fresh workflow lens; PR #206 remains draft
+  at its earlier head until the stable correction is reviewed and its binding refreshed.
+
+- Guard correction review complete and approved at f1a0db58f63c545e449addb645bf9b96134e32dd.
+  Fresh workflow lens found no actionable regression. Parent rejected the native proposal to undo the
+  correction: it used the incremental review base, whereas the actual PR guard targets origin/main and
+  passes. Final watermark, coverage and validated result are current; no open findings remain.
+
+## Exact-head CI wait
+
+- Stable correcting head f1a0db58f63c545e449addb645bf9b96134e32dd is pushed to PR #206.
+  Delivery binding and PR body were refreshed; independent review watermark covers that exact head.
+- CI run 38168830211: generated-path guard and verify-linux passed. verify-windows remains in progress
+  at the latest material monitor transition and fresh confirming read. PR is draft and MERGEABLE.
+- One reconnect-safe foreground monitor owns PR #206/head f1a0db5; it is not an unattended wake.
+  After Windows succeeds, fresh-check the full terminal set, mark ready, merge under recorded authority,
+  then observe the causal regeneration job and preserve the completed goal during verified cleanup.
+
+## Source delivery
+
+- PR #206 merged at 2026-10-11T19:55:02Z; reviewed head f1a0db58f63c545e449addb645bf9b96134e32dd.
+- Landing commit: d3fc4d49ca412d9e9811faa3b07aed4d43ff0f70. Required guard, verify-windows and verify-linux all passed
+  on the exact correcting head in run 38168830211. Review is approved with no open findings.
+- Source delivery is complete; causal generated publication is the remaining acceptance step.
+
+## Terminal outcome
+
+- PR #206 is MERGED at reviewed head f1a0db58f63c545e449addb645bf9b96134e32dd.
+  Landing commit d3fc4d49ca412d9e9811faa3b07aed4d43ff0f70; required Windows/Linux verification and
+  generated-path guard passed in exact-head PR run 38168830211. Both review findings/recovery actions are resolved.
+- Causal push run 38170019843 has head d3fc4d49ca412d9e9811faa3b07aed4d43ff0f70.
+  Its publication job regenerate (114560486079) completed successfully. Published commit
+  73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c has that landing commit as its parent.
+- Verified remote main contains all eight Claude/Codex skill entries and the packaged shared resource with
+  the historical-entry rule. This proves generated publication; no consumer profile installation is claimed.
+- Existing M001-M007 facts remain intact. Scope is the four foundation skills and common record contract;
+  handoff priority dispatch remains with its separate coordinator-owned workstream.
+- Primary-checkout fast-forward encountered an unrelated existing TECH_DEBT.md edit. It was left intact;
+  terminal evidence is preserved in Git-private state rather than overwriting another owner's document.
+- No foundation tasks remain. Cleanup will use the repository's merge proof and exact native attachment.
+
+```completion
+{
+  "outcome": "Bug and mistake recording/addressing foundation merged in PR #206 and published for both hosts.",
+  "acceptance": [
+    {
+      "id": "records",
+      "criterion": "Shared record contract defines evidence, ownership, deduplication and complete blockers.",
+      "evidence": [
+        {
+          "source": "Disposable source-contract exercise and shipped problem-records.md",
+          "result": "Passed with repeated-report append, retained bug evidence and complete conflict record."
+        }
+      ],
+      "owner": "complete",
+      "next_action": "none"
+    },
+    {
+      "id": "repair",
+      "criterion": "Addressing reuses existing repair lifecycles and preserves kind-specific history.",
+      "evidence": [
+        {
+          "source": "Independent full and incremental reviews; fixing commit 98283b7614114b4e73b02763ecc7c15dfcd1c478",
+          "result": "Approved; historical facts retained and missing fields reconciled only from evidence."
+        }
+      ],
+      "owner": "complete",
+      "next_action": "none"
+    },
+    {
+      "id": "hosts",
+      "criterion": "Both host entry points and common resource are packaged from canonical source.",
+      "evidence": [
+        {
+          "source": "PR CI source-layout packaging check; remote main 73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c",
+          "result": "Eight generated host entries and shared resource verified."
+        }
+      ],
+      "owner": "complete",
+      "next_action": "none"
+    },
+    {
+      "id": "validation",
+      "criterion": "Required repository checks pass on the exact reviewed delivery head.",
+      "evidence": [
+        {
+          "source": "PR run 38168830211 at f1a0db58f63c545e449addb645bf9b96134e32dd",
+          "result": "guard, verify-windows and verify-linux all SUCCESS."
+        }
+      ],
+      "owner": "complete",
+      "next_action": "none"
+    },
+    {
+      "id": "delivery",
+      "criterion": "Foundation source is committed, independently reviewed and merged.",
+      "evidence": [
+        {
+          "source": "tj-agents/core PR 206 at f1a0db58f63c545e449addb645bf9b96134e32dd",
+          "result": "MERGED; approved current watermark and no open findings."
+        }
+      ],
+      "owner": "complete",
+      "next_action": "none"
+    },
+    {
+      "id": "publication",
+      "criterion": "Observe generated publication causally tied to this PR merge.",
+      "evidence": [
+        {
+          "source": "Run 38170019843 job 114560486079; commit 73f1fbcc24efdda8ed1c0b0ccf07dc4064e7782c",
+          "result": "Regenerate SUCCESS; publication commit parent is the exact landing commit d3fc4d49ca412d9e9811faa3b07aed4d43ff0f70."
+        }
+      ],
+      "owner": "complete",
+      "next_action": "none"
+    }
+  ],
+  "deliveries": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 206,
+      "head": "f1a0db58f63c545e449addb645bf9b96134e32dd"
+    }
+  ],
+  "open_tasks": []
+}
+```
