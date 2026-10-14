@@ -530,6 +530,32 @@ class JurisdictionTests(unittest.TestCase):
     def test_a_repo_that_never_opted_in_is_not_this_gates_business(self):
         self.assertEqual(0, self.run_hook(M + " 1 --squash").returncode)
 
+    def test_a_non_git_directory_without_an_opt_in_is_not_this_gates_business(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(
+                0,
+                self.run_hook(M + " 1 --squash", cwd=Path(directory)).returncode,
+            )
+
+    def test_a_non_git_directory_without_an_opt_in_ignores_a_named_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(
+                0,
+                self.run_hook(
+                    M + " 1 --repo other/that --squash", cwd=Path(directory)
+                ).returncode,
+            )
+
+    def test_an_opted_in_non_git_directory_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.opt_in(root)
+
+            result = self.run_hook(M + " 1 --squash", cwd=root)
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("cannot resolve git state", result.stderr)
+
     def test_an_opted_in_repo_is_gated(self):
         self.opt_in()
 
