@@ -683,6 +683,7 @@ class WorkItemSessionsTests(unittest.TestCase):
         self.assertEqual("resumed", result["bulk"][-1]["outcome"])
         recovery.open_session.assert_called_once_with(
             "claude", "g-eligible", prompt="Continue the requested work.", roots=mock.ANY,
+            refresh_plugins=False,
         )
 
     def test_resume_all_continues_after_a_launch_failure_and_marks_unverified_launch_pending(self):
