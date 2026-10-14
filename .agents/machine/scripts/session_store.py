@@ -309,13 +309,13 @@ def work_item_key(repo, feature, item):
     return f"{repo}:{feature}/{item}"
 
 
-def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_started_at=None):
+def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_started_at=None, only_if_missing=False):
     handle = session_handle(host, session_id)
     machine = current_machine()
     profile = profile_directory(host)
     repo, branch, head = _collect_repo_branch_head(cwd)
     now = time.time()
-    connection.execute(
+    cursor = connection.execute(
         """
         INSERT INTO sessions (
             handle, host, session_id, machine, profile, title, cwd, repo, branch, head,
@@ -337,11 +337,15 @@ def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_s
             ended_at = NULL,
             end_reason = NULL,
             role = CASE WHEN sessions.end_reason = 'handed_off' THEN NULL ELSE sessions.role END
+        WHERE NOT ?
         """,
         (handle, host, session_id, machine, profile, title, str(cwd), repo, branch, head,
-         pid, pid_started_at, now, now),
+         pid, pid_started_at, now, now, only_if_missing),
     )
+    changed = cursor.rowcount != 0
     connection.commit()
+    if not changed:
+        return None
     if repo and branch:
         attach_work_item_if_unique(connection, repo, branch, handle)
         connection.commit()
@@ -560,15 +564,11 @@ def _valid_process_identity(pid, started_at):
 
 def _recover_missing_session(host, session_id, payload):
     try:
-        entry = _register_session().record(payload)
+        registrar = _register_session()
+        pid, recorded_host, pid_started_at = registrar.resolve_recorded_pid(os.getppid())
     except Exception:
-        entry = None
-    if (
-        not isinstance(entry, dict)
-        or entry.get("session_id") != session_id
-        or entry.get("host") != host
-        or not _valid_process_identity(entry.get("pid"), entry.get("pid_started_at"))
-    ):
+        pid = recorded_host = pid_started_at = None
+    if recorded_host != host or not _valid_process_identity(pid, pid_started_at):
         print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
         return False
     try:
@@ -577,6 +577,11 @@ def _recover_missing_session(host, session_id, payload):
         print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
         return False
     try:
+        title = os.environ.get(getattr(registrar, "TITLE_ENV", "AGENT_CLI_TAB_TITLE")) or None
+        created = start_session(
+            connection, host, session_id, payload.get("cwd") or os.getcwd(), title=title,
+            pid=pid, pid_started_at=pid_started_at, only_if_missing=True,
+        )
         row = get_session(connection, session_handle(host, session_id))
     finally:
         connection.close()
@@ -584,12 +589,12 @@ def _recover_missing_session(host, session_id, payload):
         row is None
         or row.get("host") != host
         or row.get("session_id") != session_id
-        or row.get("pid") != entry["pid"]
-        or row.get("pid_started_at") != entry["pid_started_at"]
+        or row.get("pid") != pid
+        or row.get("pid_started_at") != pid_started_at
     ):
         print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
         return False
-    return True
+    return created is not None
 
 
 def _read_json_stdin():
