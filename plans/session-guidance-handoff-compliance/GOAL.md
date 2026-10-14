@@ -41,12 +41,15 @@ sessions alone never establish exhaustion.
 - The shared callout gate keeps every distinct pending callout in state, reuses the saved id for a
   repeated identical callout, and does not let a neutral prompt, automatic feedback, or Stop bypass
   the obligation.
-- A launch counts only when a paired native launcher call has a successful result containing a
-  structured `agent-handoff-submitted` receipt. The receipt must load a goal whose repair workflow,
-  source owner, session, callout id, and prompt SHA-256 bind to that exact callout. Intent, echo,
-  unpaired output, failed output, a stale receipt, or a mismatched goal cannot release it.
+- A launch counts only when one parsed native launcher invocation has a successful paired result
+  containing a structured `agent-handoff-submitted` receipt. The receipt worktree and prompt must
+  match that invocation and load a goal whose repair workflow, source owner, session, callout id,
+  and prompt SHA-256 bind to that exact callout. Intent, echo, compound command, unpaired output,
+  failed output, stale receipt, or mismatched goal cannot release it.
 - A current typed disposition is revalidated for every pending obligation and is not cached as
-  completion. A successful native launch can be cached only after its exact binding is verified.
+  completion. Its problem record must be the source repository primary checkout's root `BUGS.md`
+  or `MISTAKES.md`, or a tracked primary `TECH_DEBT.md`; a delivery-worktree repair goal remains
+  valid. A successful native launch can be cached only after its exact binding is verified.
 - While a repair is pending, the gate admits only repair research, canonical record editing,
   supported isolated-checkout preparation, and admission checks. It rejects compound commands,
   normal continuation tools, unrelated patches, and patch payloads containing file deletions.
@@ -72,9 +75,9 @@ resolver and observable resume condition.
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Shared callout gate | 19 tests passed | workflow artifact `047202e68c1e7109-callout-gate-green.log` covered the preceding 18-test checkpoint; final local run added receipt-free and nonce-mismatch regressions |
-| Handoff admission | 10 tests passed | final local focused run |
-| Process standards | 23 tests passed | final local focused run after moving detailed authority to self-repair |
+| Shared callout gate | 21 tests passed | `callout-gate-p3-p4.log`: both-host compound-launch and receipt-path mismatch regressions passed |
+| Handoff admission | 12 tests passed | `e6c24d5420235d2d-admission-p3-p4-rerun.log`: canonical primary registers, feature-local/temporary lookalikes, and tracked-area debt registers passed |
+| Process standards | 23 tests passed | `3f7a05007dd3792a-process-standards-p3-p4.log` |
 | Generated synchronization | passed, 554 files from 82 definitions | `cd0a081f5a4abc46-generated-sync-final-clean.log` |
 | Generated skill packaging | passed | `62634ff46616030d-skill-packaging-final.log` |
 | Source layout | 82-skill expectation passed | `0776b6beed3e88c5-source-layout-82-final.log` |
@@ -84,9 +87,10 @@ self-repair skill. Updating it to 82 is the only source-layout change; the narro
 
 Generated catalog output required a local digest refresh before synchronization. It remains
 unstaged, as required. The pre-refresh catalog was preserved in
-`stash@{0}` (`repair-199-generated-catalog-before-sync`); the earlier main-integration preservation
-stash remains `stash@{1}` (`temporary-pr199-main-integration-20261013`). Do not commit generated
-`plugins/*` output or `.agents/catalog/catalog.json`.
+`8ad78e78955a1734fa75e93905d342e2f83a17f3`; final-review generated output and the supplied
+`RESUME_PROMPT.md` are preserved in `cfbe7bf4a4266c908634459e45b5b115c3587519`; the earlier
+main-integration preservation stash is `5edfcb10a0a87783409ef42521e6b6df8e335d66`. Do not commit
+generated `plugins/*` output or `.agents/catalog/catalog.json`.
 
 ## Slice assessment
 
@@ -97,6 +101,6 @@ out of scope.
 
 ## Next action
 
-Freeze the authored local commit for independent review against current `origin/main`. The parent
-coordinator owns final synchronization, review, publication, and delivery. Do not push from this
-lease.
+Commit the frozen-review remediation, then give the parent coordinator the exact commit and focused
+artifacts for an immutable incremental review against current `origin/main`. The parent owns final
+synchronization, review, publication, and delivery. Do not push from this lease.
