@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""Create or extend a repository's plugin lock and generate its host settings."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import sys
+
+import bootstrap_capabilities as bootstrap
+import plugin_lock
+import repo_config
+
+
+ROSTER = Path(__file__).resolve().parent / "plugin_roster.json"
+
+
+def load_roster() -> dict:
+    roster = bootstrap.load_json(ROSTER)
+    if roster.get("schema_version") != 1 or set(roster) != {"schema_version", "plugins", "stacks"}:
+        raise bootstrap.BootstrapError(f"{ROSTER}: invalid plugin roster")
+    return roster
+
+
+def expand(requested: set[str], roster: dict) -> list[str]:
+    known = roster["plugins"]
+    pending = sorted(requested | set(plugin_lock.CORE_PLUGINS))
+    selected: set[str] = set()
+    while pending:
+        name = pending.pop()
+        if name not in known:
+            raise bootstrap.BootstrapError(f"Unknown plugin: {name}")
+        if name not in selected:
+            selected.add(name)
+            pending.extend(known[name])
+    return sorted(selected)
+
+
+def requested_plugins(stacks: list[str], plugins: list[str], roster: dict) -> set[str]:
+    unknown = sorted(set(stacks) - set(roster["stacks"]))
+    if unknown:
+        raise bootstrap.BootstrapError("Unknown stack: " + ", ".join(unknown) + "; choose from " + ", ".join(sorted(roster["stacks"])))
+    return set(plugins).union(*(roster["stacks"][stack] for stack in stacks))
+
+
+def lock_document(root: Path, revision: str | None, requested: set[str], roster: dict) -> dict:
+    lock = plugin_lock.resolve(root)
+    existing = None
+    if lock.is_file():
+        existing = bootstrap.load_json(lock)
+        if not plugin_lock.is_current(existing):
+            raise bootstrap.BootstrapError(f"{lock}: a legacy lock cannot be extended; migrate it to {plugin_lock.LOCK_NAME} first")
+        requested = requested | set(existing["plugins"])
+        revision = revision or existing["marketplace"]["revision"]
+    if revision is None:
+        raise bootstrap.BootstrapError("A new plugin lock needs --marketplace-revision")
+    document = {
+        "schema_version": plugin_lock.SCHEMA_VERSION,
+        "marketplace": {"repository": plugin_lock.MARKETPLACE_REPOSITORY, "revision": revision},
+        "plugins": expand(requested, roster),
+    }
+    plugin_lock.validate(document)
+    return document
+
+
+def plan(root: Path, revision: str | None, stacks: list[str], plugins: list[str]) -> tuple[dict[Path, str | None], Path]:
+    root = root.expanduser().resolve()
+    if root.exists() and not root.is_dir():
+        raise bootstrap.BootstrapError(f"Repository root is not a directory: {root}")
+    roster = load_roster()
+    document = lock_document(root, revision, requested_plugins(stacks, plugins, roster), roster)
+    lock = root / ".agents" / plugin_lock.LOCK_NAME
+    host_targets = repo_config.plan(lock, None, root=root, scope="project", prospective_paths=[lock], lock_document=document)
+    return {lock: json.dumps(document, indent=2, ensure_ascii=False) + "\n", **host_targets}, root
+
+
+def run(root: Path, revision: str | None, stacks: list[str], plugins: list[str], mode: str) -> list[str]:
+    targets, root = plan(root, revision, stacks, plugins)
+    changed = {path: value for path, value in targets.items() if repo_config.text_at(path) != value}
+    drift = [path.relative_to(root).as_posix() for path in changed]
+    if mode == "write":
+        repo_config.write_batch(changed)
+    return drift
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", required=True, type=Path)
+    parser.add_argument("--marketplace-revision")
+    parser.add_argument("--stack", action="append", default=[])
+    parser.add_argument("--plugin", action="append", default=[])
+    parser.add_argument("--mode", required=True, choices=("preview", "check", "write"))
+    arguments = parser.parse_args(argv)
+    try:
+        drift = run(arguments.root, arguments.marketplace_revision, arguments.stack, arguments.plugin, arguments.mode)
+    except (bootstrap.BootstrapError, OSError, UnicodeError, ValueError) as error:
+        print(f"Plugin adoption failed: {error}", file=sys.stderr)
+        return 1
+    if drift:
+        prefix = "Updated" if arguments.mode == "write" else "Would update" if arguments.mode == "preview" else "Drift in"
+        print(prefix + ": " + ", ".join(drift))
+    return int(arguments.mode == "check" and bool(drift))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

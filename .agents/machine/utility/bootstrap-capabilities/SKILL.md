@@ -33,6 +33,15 @@ the command reads `.agents/plugins.lock.json` and, until 2027-03-31, forwards to
 `required_skills`, `path_scopes` or `exceptions`, and the bootstrap `apply` and `verify` modes still read
 only the legacy lock. The legacy form below remains until the migration finishes.
 
+Create or extend a repository's lock with `adopt_plugins.py --root <repository> --stack <name>
+[--plugin <name>] [--marketplace-revision <tag>] --mode preview|check|write`. A stack
+(`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
+`plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
+plugins a project type needs. Core and each plugin's required plugins are always added, existing
+selections and the existing revision are kept, and a new lock needs `--marketplace-revision`. It writes
+the lock and both hosts' settings and no catalog. An unknown stack or plugin is rejected with the valid
+choices.
+
 ### Legacy lock (`.agents/capabilities.lock.json`)
 
 Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
