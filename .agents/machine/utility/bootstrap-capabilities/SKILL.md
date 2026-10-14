@@ -14,6 +14,27 @@ The commands below show Windows paths and use `python` in Windows PowerShell. On
 
 ## Generate repository host settings
 
+### Plugin lock (`.agents/plugins.lock.json`)
+
+The current lock needs no catalog. It selects plugin names and pins one `tj-agents/marketplace`
+revision, a `vN.N.N` tag or a full commit:
+
+```json
+{"schema_version": 2,
+ "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
+ "plugins": ["base", "engineering", "machine", "dotnet"]}
+```
+
+`repo_config.py --root <repository> --mode write` reads it and generates `<plugin>@tj-agents` selections
+for Claude and Codex, both pinned to that marketplace revision. The lock must include `base`,
+`engineering` and `machine`; list stack plugins and their required plugins explicitly. Without `--lock`
+the command reads `.agents/plugins.lock.json` and, until 2027-03-31, forwards to a legacy
+`.agents/capabilities.lock.json` when only that exists. Having both is an error. The lock has no
+`required_skills`, `path_scopes` or `exceptions`, and the bootstrap `apply` and `verify` modes still read
+only the legacy lock. The legacy form below remains until the migration finishes.
+
+### Legacy lock (`.agents/capabilities.lock.json`)
+
 Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
 from `base-agents` alongside the project's stack plugins. Commit the selected owners' release
 records as `.agents/catalog/catalog.json` when selecting plugins outside core. Generate host

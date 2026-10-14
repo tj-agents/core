@@ -16,6 +16,7 @@ import subprocess
 import harness_permissions
 import bootstrap_capabilities as bootstrap
 import machine_paths
+import plugin_lock
 
 
 CORE_PLUGINS = {"base-agents/base", "base-agents/engineering", "base-agents/machine"}
@@ -32,9 +33,11 @@ def declarations(
     lock_document: dict | None = None,
     catalog_document: dict | None = None,
 ) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
+    lock = lock_document if lock_document is not None else bootstrap.load_json(lock_path)
+    if plugin_lock.is_current(lock):
+        return current_declarations(lock_path, lock)
     catalog = copy.deepcopy(catalog_document) if catalog_document is not None else bootstrap.load_json(catalog_path)
     releases, plugins = bootstrap.catalog_index(catalog)
-    lock = lock_document if lock_document is not None else bootstrap.load_json(lock_path)
     selections = bootstrap.validate_lock(lock, releases, plugins)
     selected = {selection["id"] for selection in selections}
     missing = sorted(CORE_PLUGINS - selected)
@@ -87,6 +90,34 @@ def declarations(
     claude_allow = [entry for entry in claude_allow if not harness_permissions.contains_template(entry)]
     codex_rules = [rule for rule in codex_rules if not harness_permissions.contains_template(rule)]
     return dict(sorted(sources.items())), dict(sorted(identities.items())), claude_allow, codex_rules
+
+
+def current_declarations(lock_path: Path, lock: dict) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
+    marketplace, names = plugin_lock.validate(lock)
+    sources = {plugin_lock.MARKETPLACE_NAME: {"owner_repository": marketplace["repository"], "revision": marketplace["revision"], "plugins": []}}
+    identities = {f"{name}@{plugin_lock.MARKETPLACE_NAME}": True for name in names}
+    selected = {f"{plugin_lock.MARKETPLACE_NAME}/{name}" for name in names}
+    requirements = []
+    overlay_path = lock_path.resolve().parent / "repository-harness.json"
+    if overlay_path.is_file():
+        overlay = bootstrap.load_json(overlay_path)
+        if not isinstance(overlay, dict) or set(overlay) != {"schema_version", "requires"} or overlay["schema_version"] != 1:
+            raise bootstrap.BootstrapError(f"{overlay_path}: invalid repository harness overlay")
+        harness_permissions.validate_requires(overlay["requires"], str(overlay_path))
+        for required in overlay["requires"]["marketplaces"]:
+            if not isinstance(required, dict) or set(required) != {"id", "repository"}:
+                raise bootstrap.BootstrapError("Invalid required marketplace")
+            source = sources.get(required["id"])
+            if source is None or source["owner_repository"] != required["repository"]:
+                raise bootstrap.BootstrapError(f"Required marketplace disagrees with the lock: {required['id']}")
+        missing = sorted(set(overlay["requires"]["plugins"]) - selected)
+        if missing:
+            raise bootstrap.BootstrapError("Repository lock omits harness-required plugins: " + ", ".join(missing))
+        requirements.append(overlay["requires"])
+    claude_allow, codex_rules = harness_permissions.fold_permissions(requirements)
+    claude_allow = [entry for entry in claude_allow if not harness_permissions.contains_template(entry)]
+    codex_rules = [rule for rule in codex_rules if not harness_permissions.contains_template(rule)]
+    return sources, identities, claude_allow, codex_rules
 
 
 def claude_settings(path: Path, sources: dict[str, dict], identities: dict[str, bool], allow: list[str]) -> str:
@@ -390,7 +421,7 @@ def plan(
     inputs = [*read_paths, lock_path.resolve().parent / "repository-harness.json"]
     if lock_document is None:
         inputs.append(lock_path)
-    if catalog_document is None:
+    if catalog_document is None and catalog_path is not None:
         inputs.append(catalog_path)
     exclude = preflight_paths(root, [*paths, *prospective_paths], scope=scope, read_paths=inputs, run=execute)
     sources, identities, allow, rules = declarations(
@@ -475,15 +506,19 @@ def run(lock_path: Path, catalog_path: Path, mode: str, *, root: Path | None = N
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--lock", required=True, type=Path)
+    parser.add_argument("--lock", type=Path)
     parser.add_argument("--catalog", type=Path)
     parser.add_argument("--mode", required=True, choices=("write", "check", "preview"))
     parser.add_argument("--root", type=Path)
     parser.add_argument("--scope", choices=("project", "local"), default="project")
     args = parser.parse_args(argv)
     try:
-        catalog = args.catalog or bootstrap.catalog_for_lock(args.lock, Path(__file__).resolve())
-        drift = run(args.lock, catalog, args.mode, root=args.root, scope=args.scope)
+        lock = args.lock or plugin_lock.resolve((args.root or Path.cwd()).expanduser().resolve())
+        if plugin_lock.is_current(bootstrap.load_json(lock)):
+            catalog = None
+        else:
+            catalog = args.catalog or bootstrap.catalog_for_lock(lock, Path(__file__).resolve())
+        drift = run(lock, catalog, args.mode, root=args.root, scope=args.scope)
     except (bootstrap.BootstrapError, OSError, UnicodeError) as error:
         print(str(error), file=sys.stderr)
         return 1
