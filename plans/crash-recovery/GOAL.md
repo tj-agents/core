@@ -35,13 +35,19 @@ L3 investigation selected because population and resume safeguards were unresolv
 
 ## Next Steps
 
-1. Commit accepted R1/R2 remediation, then run incremental review from `232e1dacd8318eb20ca92eb9755407cebb772659` to the fixing head. Four focused capture/atomicity tests pass; do not repeat the full local suite.
-2. Refresh package closure checks and required remote checks, then deliver under repository gates.
-3. Exercise authorized machine-wide recovery; retain specific failed or pending handles as actionable output.
+The original foreground native owner remains active. A supported five-minute continuation wake is registered; a UI successor launch failed before opening a tab because unrelated CPP plugin activation returned Access denied. No successor pickup or agent restore has occurred.
+
+1. Fix confirmed incremental finding R3: fallback SQLite capture must also restore its canonical JSON registry entry using the validated identity, preserving atomic missing-row and concurrent-state guards. The existing L4 worker owns only runtime and targeted tests. R1/R2 are fixed. Both-platform CI passes at `c6063f1`; native incremental review reported R3.
+2. Commit the focused repair, review only its frozen delta, and validate exact-head host coverage. Refresh only required package closure checks. Keep generated plugins/catalog uncommitted. Update and monitor PR253 at its exact new head; use existing guarded merge authority after clean review and required CI. Observe the causal main regeneration commit.
+3. Make recovery available in existing host profiles through supported native sync; verify installed bytes. Codex cache is old; Claude machine@tj-agents is pinned to v2.1.15 and lacks SQLite. Resolve the supported native selection without duplicate hooks or cache hand edits.
+4. Exercise `work_item_sessions.py interrupted --all-repos --resume-all` against a fresh real inventory. Record successful fresh registrations and exact pending/failure handles. Repeat only to prove live sessions are skipped. Preserve ambiguous receipts and the user's active dialogue. Do not import unreliable old vault history.
+5. Finish with direct command, database location/setup semantics and surviving migration location. Clean only owned disposable checkouts under the existing merge rules.
+
+A managed continuation child, if dispatched after foreground release, reads this goal and owns the existing supervisor lease. It must not claim/register/wake recursively. Follow the supervisor prompt and write the nonce-bound checkpoint to CONTINUATION_RESULT_PATH before its 900-second timeout; include exact old/new identity rebind after any commit. Use fresh L2 review for consequential recovery-state acceptance. Foreground/native ownership claims apply only to an actual UI successor, which has not launched.
 
 - Scope: deterministic recovery through verified delivery and a concrete recovery command.
 - Current slice: machine-wide interrupted-agent recovery.
-- Remaining scope: incremental review, exact-head delivery, installed host adoption and observed local use.
+- Remaining scope: registry repair, final delta review, exact-head delivery, installed host adoption and observed local use.
 - Done when: one script command reopens eligible interrupted sessions with no AI selection, repeated runs create no duplicate writers, fresh registrations prove successful recovery, and Windows/Linux/package checks pass.
 
 ```agent-host-coverage
@@ -50,8 +56,18 @@ L3 investigation selected because population and resume safeguards were unresolv
 
 ## Adoption and execution checkpoint
 
-R1/R2 fixes are source-accepted and pass four focused regressions. The fallback now resolves and validates identity before writing; a SQL only-if-missing conflict guard prevents resetting a concurrent row and skips work-item attachment when no insert occurred. Canonical review findings are resolved but the fixing head still needs incremental review.
+R1/R2 fixes passed focused regressions and both-platform CI. Native incremental review found R3: fallback capture omitted the JSON registry required by canonical liveness checks; a serial repair owns that gap. Native bulk recovery invokes the native terminal launcher directly, and its Windows sync treats SyncError as best-effort. It can therefore exercise the verified source without the failed UI handoff's blocking unrelated plugin activation. Installed Codex helper bytes remain old; installed adoption is still required.
 
-The current native context exhausted the workflow telemetry hard limits (wait/poll and skill-read counts). Checkpoint and transfer the same authorized goal to a fresh native owner for final review/delivery; preserve the immutable first-pass work order and its watermark. No requirement is waived.
+The original native foreground lease is retained with token-backed heartbeats. A supported five-minute managed wake is registered, but a stale-live reconciliation changed its state to blocked during context compaction; heartbeat alone preserves the lease but does not clear that state. Reconcile through the supported checkpoint/claim operations before releasing to managed continuation. No successor has acknowledged pickup and no interrupted agent has yet reopened.
 
-After merge, observe the causal main regeneration commit before explicit Codex sync via `.agents/machine/scripts/codex_marketplace_sync.py --project <verified checkout>`. Verify installed helper/hook bytes, because Windows launcher autosync swallows sync failures. Normal Codex currently has machine@base-agents2.1.16 and its cached command is old. Normal Claude instead has machine@tj-agents pinned by tj-agents/marketplace to core ref v2.1.15, and that cache lacks SQLite. The generic Claude sync preserves the pin. Resolve the canonical marketplace release selection or perform a supported native migration to machine@base-agents with the old identity disabled to avoid duplicate hooks; do not claim Claude adoption from source tests alone. Native executables: Codex `C:/Users/TommySeery/.local/share/codex/runtimes/0.163.0-alpha.1/bin/codex.EXE`; Claude `C:/Users/TommySeery/.local/bin/claude.exe`.
+## Core overhead notes requested by Tommy
+
+On 2026-10-14 Tommy asked to keep notes for later because this urgent utility had taken over two hours. Recovery stays first; these observations do not authorize a parallel process overhaul.
+
+Observed overhead: full native review took 527 seconds and independently repeated 99 tests; the subsequent native delta review took 468 seconds. Each stable candidate also required a fresh specialist lens, source bundle export, host coverage, work-order updates and delivery binding. Repeated skill reads and redundant checks by the parent added avoidable work; an incorrect unittest invocation and a generated digest race also required corrections. Continuation bookkeeping consumed time, and a fresh UI handoff failed on unrelated CPP plugin cache activation. Existing Claude release pinning prevents ordinary sync from adopting the utility. Hook permission synchronization repeatedly exceeded its seven-second timeout, and tool calls often incurred additional startup latency.
+
+At the measured checkpoint: 151 model turns, 148 tool calls, 56 wait/poll events, 32 skill reads, approximately 13.47 million cached input tokens and 287,070 uncached input tokens. Workflow hard limits then forced fresh-context transfer preparation during an already urgent task. These are measured session costs, not proof that every requirement was necessary.
+
+Candidate follow-ups after recovery: one proportionate review per stable utility candidate; focused test ownership so reviewers avoid repeating full suites; cached rule reads; cheaper deterministic bundle preparation; fewer operational checkpoints; continuation that avoids unrelated profile sync; and reliable host release adoption. Record precise enforcement sources before changing any requirements. Core should keep the agentic wrapper thin and make the deterministic path faster.
+
+R3 repair is frozen and passes six focused recovery cases plus three registrar cases. The tested frozen c606 checkout started the authorized real bulk restoration under captured run crash-recovery-live; no final outcomes have been observed yet. Final source delta is ready for commit and incremental review.

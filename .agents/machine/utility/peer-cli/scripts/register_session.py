@@ -375,13 +375,10 @@ def _record_session_start(host, session_id, cwd, title, pid, pid_started_at):
         connection.close()
 
 
-def record(data, lookup=None, host_names=None):
+def record_registry(data, pid, host, pid_started_at):
     session = data.get("session_id") or data.get("sessionId")
     if not session:
         return None
-    pid, host, pid_started_at = resolve_recorded_pid(
-        os.getppid(), lookup=lookup, host_names=host_names,
-    )
     cwd = data.get("cwd") or os.getcwd()
     title = os.environ.get(TITLE_ENV) or None
     entry = {
@@ -403,9 +400,20 @@ def record(data, lookup=None, host_names=None):
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
     staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(staging, destination)
+    return entry
+
+
+def record(data, lookup=None, host_names=None):
+    session = data.get("session_id") or data.get("sessionId")
+    if not session:
+        return None
+    pid, host, pid_started_at = resolve_recorded_pid(
+        os.getppid(), lookup=lookup, host_names=host_names,
+    )
+    entry = record_registry(data, pid, host, pid_started_at)
     if host in ("claude", "codex"):
         try:
-            _record_session_start(host, str(session), cwd, title, pid, pid_started_at)
+            _record_session_start(host, str(session), entry["cwd"], entry["title"], pid, pid_started_at)
         except Exception:
             pass
     return entry

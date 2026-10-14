@@ -562,15 +562,46 @@ def _valid_process_identity(pid, started_at):
     )
 
 
-def _recover_missing_session(host, session_id, payload):
+def _registry_path(session_id):
+    return state_directory() / "cli-sessions" / f"{session_id}.json"
+
+
+def _record_registry(registrar, host, session_id, payload, pid, pid_started_at):
+    try:
+        entry = registrar.record_registry(payload, pid, host, pid_started_at)
+    except Exception:
+        entry = None
+    return (
+        isinstance(entry, dict)
+        and entry.get("session_id") == session_id
+        and entry.get("host") == host
+        and entry.get("pid") == pid
+        and entry.get("pid_started_at") == pid_started_at
+    )
+
+
+def _resolve_recovery_identity(host, session_id):
     try:
         registrar = _register_session()
         pid, recorded_host, pid_started_at = registrar.resolve_recorded_pid(os.getppid())
     except Exception:
+        registrar = None
         pid = recorded_host = pid_started_at = None
-    if recorded_host != host or not _valid_process_identity(pid, pid_started_at):
+    if (
+        registrar is None
+        or recorded_host != host
+        or not _valid_process_identity(pid, pid_started_at)
+    ):
         print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return None
+    return registrar, pid, pid_started_at
+
+
+def _recover_missing_session(host, session_id, payload):
+    identity = _resolve_recovery_identity(host, session_id)
+    if identity is None:
         return False
+    registrar, pid, pid_started_at = identity
     try:
         connection = connect()
     except Exception:
@@ -594,7 +625,31 @@ def _recover_missing_session(host, session_id, payload):
     ):
         print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
         return False
-    return created is not None
+    if created is None:
+        return False
+    if not _record_registry(registrar, host, session_id, payload, pid, pid_started_at):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    return True
+
+
+def _recover_missing_registry(host, session_id, payload, row):
+    identity = _resolve_recovery_identity(host, session_id)
+    if identity is None:
+        return False
+    registrar, pid, pid_started_at = identity
+    if (
+        row.get("host") != host
+        or row.get("session_id") != session_id
+        or row.get("pid") != pid
+        or row.get("pid_started_at") != pid_started_at
+    ):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    if not _record_registry(registrar, host, session_id, payload, pid, pid_started_at):
+        print(f"session persistence: could not recover {host}:{session_id}", file=sys.stderr)
+        return False
+    return True
 
 
 def _read_json_stdin():
@@ -621,10 +676,17 @@ def run_hook(event, host):
         if event in ("prompt", "stop"):
             connection = connect()
             try:
-                missing = get_session(connection, handle) is None
+                row = get_session(connection, handle)
             finally:
                 connection.close()
-            if missing and not _recover_missing_session(host, session_id, payload):
+            if row is None:
+                if not _recover_missing_session(host, session_id, payload):
+                    return 0
+            elif (
+                _valid_process_identity(row.get("pid"), row.get("pid_started_at"))
+                and not _registry_path(session_id).is_file()
+                and not _recover_missing_registry(host, session_id, payload, row)
+            ):
                 return 0
         connection = connect()
         try:
