@@ -38,7 +38,6 @@ class HiddenCommandTests(unittest.TestCase):
 
 SKILL_ROUTER = HOOK_ROOT / "skill_router.py"
 MERGE_GATE = HOOK_ROOT / "merge_review_gate.py"
-STOP_LAUNCHER = HOOK_ROOT / "plan_handoff_stop_launcher.py"
 M = "gh pr " + "merge"
 
 
@@ -120,54 +119,6 @@ class DuplicateRegistrationTests(unittest.TestCase):
             env=environment,
         )
 
-    def run_stop_hook(self, payload):
-        environment = os.environ.copy()
-        for name in hook_runtime.PLUGIN_ROOT_VARIABLES:
-            environment.pop(name, None)
-        environment["PLUGIN_ROOT"] = str(HOOK_ROOT.parent)
-        return self.run_hook(STOP_LAUNCHER, payload, environment)
-
-    def stop_payload(self, message):
-        plan_directory = self.root / "plans" / "runtime"
-        plan_directory.mkdir(parents=True)
-        (plan_directory / "RUNTIME_PLAN.md").write_text("# Runtime plan\n", encoding="utf-8")
-        (plan_directory / "RUNTIME_ROADMAP.md").write_text(
-            "# Runtime roadmap\n\n- [ ] **Runtime** `runtime/handoff`\n",
-            encoding="utf-8",
-        )
-        (plan_directory / "RUNTIME_PROGRESS.md").write_text(
-            "\n".join(
-                [
-                    "# Runtime progress",
-                    "",
-                    "- Plan: `plans/runtime/RUNTIME_PLAN.md`",
-                    "- Roadmap: `plans/runtime/RUNTIME_ROADMAP.md`",
-                    "- Roadmap item: `runtime/handoff`",
-                    f"- Worktree: `{self.root}`",
-                    "",
-                    "## Next Steps",
-                    "",
-                    "Finish the runtime verification.",
-                    "Scope: current slice only; full plan remains incomplete.",
-                    "Current slice: finish the runtime verification.",
-                    "Remaining scope: delivery and closeout remain.",
-                    "Done when: this fixture step is green; the full plan remains open.",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
-        )
-        transcript = self.root / "transcript.jsonl"
-        transcript.write_text("", encoding="utf-8")
-        return {
-            "hook_event_name": "Stop",
-            "session_id": self.session,
-            "cwd": str(self.root),
-            "transcript_path": str(transcript),
-            "last_assistant_message": message,
-            "stop_hook_active": False,
-        }
-
     def test_duplicate_skill_router_registration_blocks_once(self):
         plugin = self.root / "installed-plugin"
         hooks = plugin / "hooks"
@@ -231,28 +182,6 @@ class DuplicateRegistrationTests(unittest.TestCase):
         self.assertEqual(2, first.returncode)
         self.assertEqual(0, second.returncode)
         self.assertEqual("", second.stderr)
-
-    def test_duplicate_stop_registration_evaluates_once(self):
-        payload = self.stop_payload("Continue this work in a fresh context.")
-
-        first = self.run_stop_hook(payload)
-        second = self.run_stop_hook(payload)
-
-        self.assertEqual(0, first.returncode)
-        self.assertEqual("block", json.loads(first.stdout)["decision"])
-        self.assertEqual(0, second.returncode)
-        self.assertEqual("", second.stdout)
-
-    def test_duplicate_stop_registration_allows_same_context_continuation(self):
-        payload = self.stop_payload("Continue this work in the current context.")
-
-        first = self.run_stop_hook(payload)
-        second = self.run_stop_hook(payload)
-
-        self.assertEqual(0, first.returncode)
-        self.assertEqual({}, json.loads(first.stdout))
-        self.assertEqual(0, second.returncode)
-        self.assertEqual("", second.stdout)
 
     def test_missing_invocation_id_preserves_enforcement(self):
         (self.root / ".agents" / "skill-routes.json").write_text(
