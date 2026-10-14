@@ -276,7 +276,7 @@ def transcript_ledgers(records, cwd):
     contexts = [context for record in records for context in intentional_contexts(record)]
     targeted_bases = set()
     for context in contexts:
-        values = list(strings(context))
+        values = list(strings(context.get("values", [])))
         explicit_bases = {Path(path).resolve() for path in workdirs(context)}
         bases = explicit_bases or targeted_bases or {Path(cwd).resolve()}
         targeted_bases.update(explicit_bases)
