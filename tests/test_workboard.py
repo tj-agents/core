@@ -398,6 +398,23 @@ class WorkItemStatusTests(WorkboardHarness):
         self.assertIn('active', output)
         self.assertEqual(before, database.read_bytes())
 
+    def test_work_item_key_matches_feature_full_key_and_item(self):
+        self.work_item()
+        self.write_work_item_status('reader-bridge', 'status-reader', 'active')
+        for needle in ('reader-bridge', 'reader-bridge/status-reader', 'status-reader'):
+            with self.subTest(needle=needle):
+                self.assertEqual({'README.md'}, self.listed(needle))
+
+    def test_uppercase_plans_directory_is_not_a_canonical_work_item_root(self):
+        self.repo_plan('Plans/features/reader-bridge/work-items/status-reader/README.md', '# status-reader\n')
+        self.assertEqual({'Plans'}, {child.name for child in self.here.iterdir() if child.name.casefold() == 'plans'})
+        self.assertNotIn('README.md', self.listed('status-reader'))
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows case-insensitive path traversal')
+    def test_uppercase_plans_directory_keeps_legacy_plan_discovery(self):
+        self.repo_plan('Plans/LEGACY_STATUS_PLAN.md')
+        self.assertIn('LEGACY_STATUS_PLAN.md', self.listed('legacy'))
+
     def test_only_strict_lowercase_work_item_readmes_use_sqlite_status(self):
         self.work_item()
         self.repo_plan('plans/features/reader-bridge/README.md', '# feature\n')

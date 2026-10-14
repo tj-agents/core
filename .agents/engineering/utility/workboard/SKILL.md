@@ -204,10 +204,12 @@ def repo_plans():
             first = member.joinpath(*relative.split("/"))
             if not first.is_dir():
                 continue
+            canonical_plans = relative == "plans" and any(
+                child.is_dir() and child.name == "plans" for child in member.iterdir())
             for path in sorted(first.rglob("*.md")):
                 parts = path.relative_to(first).parts
                 relative_path = path.relative_to(member).as_posix()
-                item = WORK_ITEM_README.fullmatch(relative_path)
+                item = WORK_ITEM_README.fullmatch(relative_path) if canonical_plans else None
                 if any(part in SKIP for part in parts) or (path.name.lower() in NOT_PLANS and item is None):
                     continue
                 topic = parts[-2] if len(parts) > 1 else ""
@@ -234,8 +236,9 @@ providers = {}
 for entry in plan_entries():
     path, folder, label, group = entry[:4]
     member, item = entry[4:] if len(entry) > 4 else (None, None)
+    work_item_key = "%s/%s" % item.groups() if item is not None else ""
     if scope != "all" and mine and group and group != mine:
-        if about(folder) or about(path.stem):
+        if about(folder) or about(path.stem) or (work_item_key and about(work_item_key)):
             elsewhere[group] = elsewhere.get(group, 0) + 1
         continue
     try:
@@ -244,7 +247,7 @@ for entry in plan_entries():
     except OSError:
         continue
     title = next((line for line in text.splitlines() if line.lstrip().startswith("#")), "")
-    if about(folder) or about(path.stem) or about(title):
+    if about(folder) or about(path.stem) or about(title) or (work_item_key and about(work_item_key)):
         bucket, is_named = named, True
         named_seen = True
     elif about(text):
@@ -255,7 +258,7 @@ for entry in plan_entries():
     work_item = ""
     if item is not None:
         relative_path = path.relative_to(member).as_posix()
-        work_item = "%s/%s" % item.groups()
+        work_item = work_item_key
         try:
             provider = providers.get(member)
             if provider is None:
@@ -369,6 +372,13 @@ From an installed machine plugin, use its resolved root:
 ```text
 python -B '<machine-plugin-root>/resources/machine/scripts/work_item_sessions.py' status '<feature>/<item>'
 python -B '<machine-plugin-root>/resources/machine/scripts/work_item_sessions.py' resume '<feature>/<item>'
+```
+
+On Linux or macOS, use `python3 -B`:
+
+```text
+python3 -B '<machine-plugin-root>/resources/machine/scripts/work_item_sessions.py' status '<feature>/<item>'
+python3 -B '<machine-plugin-root>/resources/machine/scripts/work_item_sessions.py' resume '<feature>/<item>'
 ```
 
 Resume only through that capability after it reports a resumable recorded session. When it reports no
