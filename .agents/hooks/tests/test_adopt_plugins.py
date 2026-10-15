@@ -107,5 +107,27 @@ class AdoptPluginsTests(unittest.TestCase):
                     adopt_plugins.run(self.root, None, ["react"], [], "write")
 
 
+    def test_existing_plugins_get_their_roster_dependencies_on_extension(self):
+        self.lock.parent.mkdir()
+        document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
+                    "plugins": ["azure", "base", "engineering", "machine"]}
+        self.lock.write_text(json.dumps(document), encoding="utf-8")
+        adopt_plugins.run(self.root, None, ["react"], [], "write")
+        self.assertIn("dotnet", self.plugins())
+
+    def test_a_lock_missing_core_plugins_is_repaired(self):
+        self.lock.parent.mkdir()
+        document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}, "plugins": ["react"]}
+        self.lock.write_text(json.dumps(document), encoding="utf-8")
+        adopt_plugins.run(self.root, None, [], [], "write")
+        self.assertEqual(["base", "engineering", "machine", "react"], self.plugins())
+
+    def test_a_local_scope_clone_is_refused(self):
+        self.lock.parent.mkdir()
+        (self.root / ".agents" / "repo-capabilities.local.json").write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(LockError, "adopted with --scope local"):
+            adopt_plugins.run(self.root, "v1.0.0", ["react"], [], "write")
+
+
 if __name__ == "__main__":
     unittest.main()
