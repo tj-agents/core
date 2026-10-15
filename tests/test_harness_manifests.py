@@ -130,6 +130,37 @@ class HarnessManifestTests(unittest.TestCase):
             HARNESS.validate_requires(ROOT, config, catalog, "base", requires)
 
 
+class HarnessPermissionValidationTests(unittest.TestCase):
+    def requires(self, command):
+        return {
+            "marketplaces": [],
+            "plugins": [],
+            "hooks": [],
+            "permissions": {"claude_allow": [command], "codex_prefix_rules": []},
+        }
+
+    def test_terminal_matchers_allow_only_literal_command_prefixes(self):
+        for command in (
+            "Bash(python -B ${PLUGIN_ROOT}/script.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear *)",
+        ):
+            with self.subTest(command=command):
+                harness_permissions.validate_requires(self.requires(command), "test")
+
+    def test_script_arguments_require_a_terminal_matcher_after_a_literal_prefix(self):
+        for command in (
+            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear)",
+            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear*)",
+            "Bash(python -B ${PLUGIN_ROOT}/script.py --clear:* more)",
+            "Bash(python* -B ${PLUGIN_ROOT}/script.py --clear:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/hooks/*.py --clear:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/script.py * --clear:*)",
+        ):
+            with self.subTest(command=command), self.assertRaisesRegex(harness_permissions.lock_io.LockError, "script arguments require :\\*"):
+                harness_permissions.validate_requires(self.requires(command), "test")
+
+
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 is required for Test-Json")
 class HarnessManifestSchemaTests(unittest.TestCase):
     def rule(self):
@@ -183,6 +214,8 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         return harness_permissions.render_permissions(manifest["requires"]["permissions"], self.PLUGIN_ROOT)
 
     def test_retention_permissions_require_the_clear_command(self):
+        manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
+        harness_permissions.validate_requires(manifest["requires"], "engineering")
         claude_allow, codex_rules = self.rendered("engineering")
         entries = [entry for entry in claude_allow if "merge_cleanup_gate.py" in entry]
         self.assertEqual(8, len(entries))
