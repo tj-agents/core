@@ -4,27 +4,35 @@
   "title": "Repository plugin lock",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "marketplace", "plugins"],
+  "required": ["schema_version", "marketplaces", "plugins"],
   "properties": {
     "schema_version": {"const": 2},
-    "marketplace": {
+    "marketplaces": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["repository", "revision"],
+      "required": ["tj-agents"],
+      "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["repository", "revision"],
+        "properties": {
+          "repository": {"type": "string", "pattern": "^(tj-agents|Concertable)/[A-Za-z0-9_.-]+$"},
+          "revision": {"type": "string", "pattern": "^(v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)|[0-9a-f]{40})$"}
+        }
+      },
       "properties": {
-        "repository": {"const": "tj-agents/marketplace"},
-        "revision": {"type": "string", "pattern": "^(v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)|[0-9a-f]{40})$"}
+        "tj-agents": {"properties": {"repository": {"const": "tj-agents/marketplace"}}}
       }
     },
     "plugins": {
       "type": "array",
       "minItems": 3,
       "uniqueItems": true,
-      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*@[a-z][a-z0-9-]*$"},
       "allOf": [
-        {"contains": {"const": "base"}},
-        {"contains": {"const": "engineering"}},
-        {"contains": {"const": "machine"}}
+        {"contains": {"const": "base@tj-agents"}},
+        {"contains": {"const": "engineering@tj-agents"}},
+        {"contains": {"const": "machine@tj-agents"}}
       ]
     }
   }
