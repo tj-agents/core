@@ -938,6 +938,63 @@ class MergeCleanupGateTests(unittest.TestCase):
                 result = self.run_hook(data=None, argv=["--clear", str(worktree), "--reason", "capability", "--evidence", str(evidence)])
                 self.assertEqual(1, result.returncode)
 
+    def test_production_close_refusal_can_be_admitted_with_separate_fallback_evidence(self):
+        sys.path.insert(0, str(CLOSE_SCRIPT.parent))
+        import close as own_close
+        import finish
+        import session_close
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.run_hook(self.payload(f'pushd "{worktree}" && gh pr merge 3 --squash'))
+        _, obligation = self.sole_obligation()
+        receipt = {"head": obligation["head"], "primary": str(primary), "branch": "feature", "default": "main"}
+        for module in (own_close, finish):
+            for host in ("codex", "claude"):
+                with self.subTest(command=module.__name__, host=host):
+                    entry = {"session_id": "s1", "cwd": str(worktree), "host": host,
+                             "pid": 123, "pid_started_at": 1.0, "started_at": 1.0}
+                    with mock.patch.dict(os.environ, self.env), \
+                            mock.patch.object(session_close, "own_host_and_entry", return_value=entry), \
+                            mock.patch.object(session_close, "worktree_from_cwd", return_value=worktree), \
+                            mock.patch.object(session_close.os, "getcwd", return_value=str(worktree)), \
+                            mock.patch.object(session_close, "awaiting_input_activity", return_value=1.0), \
+                            mock.patch.object(session_close, "fresh_removable_receipt", return_value=receipt), \
+                            mock.patch.object(session_close, "other_live_claimant", return_value=None), \
+                            mock.patch.object(session_close, "git", return_value=(0, "", "")), \
+                            mock.patch.object(session_close, "qualified_windows_wrapper", return_value=None), \
+                            mock.patch.object(session_close, "start_observer", side_effect=session_close.Refusal(
+                                "timed out starting detached cleanup observer")), \
+                            mock.patch.object(module, "close_host") as closer:
+                        with self.assertRaisesRegex(session_close.Refusal, "timed out"):
+                            module.main([])
+                        closer.assert_not_called()
+                    attempts = Path(self.state.name) / "merge-cleanup" / "close-attempts"
+                    attempt = max(attempts.glob("*.json"), key=lambda item: item.stat().st_mtime_ns)
+                    detail = json.loads(attempt.read_text(encoding="utf-8"))["capability"]
+                    self.assertEqual(entry["session_id"], detail["resolved_target"]["session_id"])
+                    self.assertEqual(123, detail["resolved_target"]["pid"])
+                    self.assertEqual(2, detail["returncode"])
+                    self.assertNotIn("fallback", detail)
+                    self.assertFalse(gate.capability_evidence_is_valid({"capability": detail}, obligation))
+                    detail["fallback"] = {"outcome": "unavailable", "source": "fixture fallback result",
+                                          "evidence": "No supported fallback in this fixture."}
+                    evidence = self.clear_evidence(worktree, obligation, "capability", detail)
+                    result = self.run_hook(argv=["--clear", str(worktree), "--reason", "capability",
+                                                 "--evidence", str(evidence)])
+                    self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_capability_close_tab_selector_must_name_the_obligated_session(self):
+        obligation = {"session_id": "ours", "worktree": str(self.root)}
+        prefix = [sys.executable, "-B", str(CLOSE_SCRIPT.with_name("close_tab.py"))]
+        for arguments in (["--session", "ours"], ["--session", "ours", "--force"],
+                          ["--force", "--session", "ours"]):
+            self.assertTrue(gate.close_command_matches_obligation(prefix + arguments, obligation))
+        for arguments in (["--title", "unrelated"], ["unrelated"], ["--title", "ours"],
+                          ["--session", "other"], ["--session", "ours", "--title", "other"],
+                          ["--session", "ours", "--all"], ["--session", "ours", "--force", "--force"]):
+            with self.subTest(arguments=arguments):
+                self.assertFalse(gate.close_command_matches_obligation(prefix + arguments, obligation))
+
     def test_revalidated_keep_open_allows_codex_tools_then_tampering_reenforces(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
