@@ -15,8 +15,7 @@ START = "# >>> base-agents claude launcher >>>"
 END = "# <<< base-agents claude launcher <<<"
 OPT_OUT_ENV = "BASE_AGENTS_CLAUDE_PROFILE"
 
-BOOTSTRAP = r'''# This source string is necessary: the active package's launcher path is unknown until its registry is read.
-import base64, json, os, subprocess, sys
+BOOTSTRAP = r'''import base64, json, os, subprocess, sys
 from pathlib import Path
 
 payload = sys.argv[1:2] == ["--payload"]
@@ -34,7 +33,7 @@ if payload:
         if not all(isinstance(value, str) for value in (kind, target, project)) or not isinstance(rest, list) or not all(isinstance(value, str) for value in rest):
             raise TypeError("payload")
     except (KeyError, TypeError, ValueError, UnicodeError):
-        print("standards: terminal launcher arguments are invalid; running the typed CLI without refresh", file=sys.stderr)
+        print("standards: terminal launcher arguments are invalid; session launch is unavailable", file=sys.stderr)
         sys.exit(1 if probe else 125)
 else:
     kind, target, project, *rest = sys.argv[2 if probe else 1:]
@@ -43,8 +42,120 @@ hooks = kind == "codex-hooks"
 if hooks:
     kind = "codex"
 def unavailable(message):
-    print("standards: " + message + "; running the typed CLI without refresh", file=sys.stderr)
+    print("standards: " + message + "; session launch is unavailable", file=sys.stderr)
     sys.exit(1 if probe else 125)
+
+def repository(source):
+    if isinstance(source, dict):
+        declared = source.get("repo")
+        if isinstance(declared, str):
+            parts = declared.strip().split("/")
+            if len(parts) == 2 and all(parts):
+                return "/".join(part.casefold() for part in parts)
+        source = source.get("url") or source.get("source")
+    if not isinstance(source, str):
+        return None
+    value = source.strip().replace("\\\\", "/")
+    if value.startswith("git@github.com:"):
+        value = value[len("git@github.com:"):]
+    elif value.startswith("https://github.com/") or value.startswith("http://github.com/"):
+        value = value.split("github.com/", 1)[1]
+    else:
+        return None
+    value = value.rstrip("/")
+    if value.endswith(".git"):
+        value = value[:-4]
+    parts = value.split("/")
+    if len(parts) != 2 or not all(parts):
+        return None
+    return "/".join(part.casefold() for part in parts)
+
+def reparse(path):
+    try:
+        if path.is_symlink():
+            return True
+        return bool(os.lstat(path).st_file_attributes & 0x400)
+    except AttributeError:
+        return False
+
+def contained(root, cache):
+    root = Path(root).absolute()
+    cache = Path(cache).absolute()
+    try:
+        relative = root.relative_to(cache)
+    except ValueError:
+        return None
+    current = cache
+    while True:
+        if reparse(current):
+            return None
+        if current == current.parent:
+            break
+        current = current.parent
+    current = cache
+    for part in relative.parts:
+        current = current / part
+        if reparse(current):
+            return None
+    try:
+        resolved = root.resolve(strict=True)
+        resolved.relative_to(cache.resolve(strict=True))
+    except (OSError, ValueError):
+        return None
+    return resolved
+
+def inside(path, parent):
+    try:
+        Path(path).absolute().relative_to(Path(parent).absolute())
+        return True
+    except ValueError:
+        return False
+
+def enabled_identities(config, project):
+    state = {}
+    for path in (config / "settings.json", Path(project) / ".claude" / "settings.json",
+                 Path(project) / ".claude" / "settings.local.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        enabled = data.get("enabledPlugins") if isinstance(data, dict) else None
+        if isinstance(enabled, dict):
+            state.update({key: value for key, value in enabled.items() if isinstance(key, str) and isinstance(value, bool)})
+    return {identity for identity, value in state.items() if value}
+
+def coordinator(candidates, enabled):
+    matching = [candidate for candidate in candidates if candidate[0] in enabled]
+    pool = matching or candidates
+    unique = {}
+    for identity, rank, root in pool:
+        previous = unique.get(root)
+        if previous is None or (rank, identity) > (previous[1], previous[0]):
+            unique[root] = (identity, rank)
+    if not unique:
+        raise ValueError("no authenticated tj-agents machine coordinator is installed")
+    return sorted(((identity, rank, root) for root, (identity, rank) in unique.items()),
+                  key=lambda candidate: (-candidate[1], candidate[0], str(candidate[2])))[0][2]
+
+def component(value):
+    return isinstance(value, str) and value not in ("", ".", "..") and "/" not in value and "\\" not in value
+
+def native_codex(target):
+    candidate = Path(target)
+    if candidate.suffix.casefold() not in (".cmd", ".bat", ".ps1"):
+        return str(candidate)
+    name = "codex.exe" if os.name == "nt" else "codex"
+    roots = (
+        candidate.parent / "node_modules" / "@openai" / "codex",
+        Path(os.path.realpath(target)).parent.parent,
+    )
+    paths = []
+    for base in roots:
+        paths.extend(path for path in base.glob("node_modules/@openai/codex-*/vendor/*/bin/" + name)
+                     if path.is_file())
+    if not paths:
+        raise ValueError("native Codex executable")
+    return str(sorted(set(paths))[0])
 
 if kind == "claude":
     config = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
@@ -53,10 +164,35 @@ if kind == "claude":
         registry = json.loads((plugins / "installed_plugins.json").read_text(encoding="utf-8-sig"))
         if not isinstance(registry, dict) or not isinstance(registry.get("plugins"), dict):
             raise TypeError("registry root")
-        entries = registry["plugins"].get("machine@base-agents")
-        if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
-            raise TypeError("plugin entries")
-        root = next(Path(entry["installPath"]) for entry in entries if entry.get("scope") == "user" and entry.get("installPath"))
+        known = json.loads((plugins / "known_marketplaces.json").read_text(encoding="utf-8-sig"))
+        if not isinstance(known, dict):
+            raise TypeError("marketplace registry")
+        candidates = []
+        for identity in ("machine@tj-agents", "machine@base-agents"):
+            marketplace = identity.rsplit("@", 1)[1]
+            expected = "tj-agents/marketplace" if marketplace == "tj-agents" else "tj-agents/core"
+            entry = known.get(marketplace)
+            source = entry.get("source") if isinstance(entry, dict) else None
+            if repository(source) != expected:
+                continue
+            entries = registry["plugins"].get(identity, [])
+            if not isinstance(entries, list):
+                raise TypeError("plugin entries")
+            for entry in entries:
+                path = entry.get("installPath") if isinstance(entry, dict) else None
+                if isinstance(path, str):
+                    candidate = contained(path, plugins)
+                    if candidate is not None and candidate.parent.name == "machine" and (candidate / "catalog" / "catalog.json").is_file():
+                        scope = entry.get("scope")
+                        project_path = entry.get("projectPath")
+                        if scope in ("project", "local"):
+                            if not isinstance(project_path, str) or not inside(project, project_path):
+                                continue
+                            rank = 2
+                        else:
+                            rank = 1
+                        candidates.append((identity, rank, candidate))
+        root = coordinator(candidates, enabled_identities(config, project))
     except OSError as error:
         unavailable("Claude plugin registry could not be read (" + str(error) + ")")
     except (ValueError, TypeError, KeyError):
@@ -66,42 +202,39 @@ if kind == "claude":
 else:
     home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
     try:
-        # The npm .cmd/.ps1 entry point is not suitable for maintenance. Locate its vendored native
-        # executable before inventory; final typed execution still receives the original target.
-        candidate = Path(target)
-        shim = candidate.suffix.casefold() in {".cmd", ".bat", ".ps1"}
-        if not shim:
-            try:
-                with candidate.open("rb") as handle:
-                    shim = handle.read(2) == b"#!"
-            except OSError:
-                shim = True
-        if shim:
-            name = "codex.exe" if os.name == "nt" else "codex"
-            roots = (candidate.parent / "node_modules" / "@openai" / "codex", Path(os.path.realpath(target)).parent.parent)
-            natives = []
-            for root in roots:
-                natives.extend(sorted(root.glob("node_modules/@openai/codex-*/vendor/*/bin/" + name)))
-            target = str(next(path for path in natives if path.is_file()))
-        result = subprocess.run([target, "plugin", "list", "--json"], capture_output=True, text=True,
-                                encoding="utf-8", errors="replace", timeout=10)
-        if result.returncode:
-            raise RuntimeError((result.stderr or result.stdout).strip() or "Codex returned " + str(result.returncode))
-        inventory = json.loads(result.stdout)
-        if not isinstance(inventory, dict) or not isinstance(inventory.get("installed"), list):
-            raise TypeError("inventory")
-        installed = inventory["installed"]
-        if any(not isinstance(item, dict) for item in installed):
-            raise TypeError("installed plugin")
-        entry = next(item for item in installed if item.get("pluginId") == "machine@base-agents" and item.get("enabled"))
-        version = str(entry["version"])
-        if not version or "/" in version or "\\" in version or ".." in version:
-            raise ValueError("unsafe plugin version")
-        root = home / "plugins" / "cache" / "base-agents" / "machine" / version
-    except StopIteration:
-        unavailable("a native Codex executable could not be found beside the selected shim")
-    except (OSError, ValueError, TypeError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
-        unavailable("Codex package inventory failed (" + str(error) + ")")
+        cache = home / "plugins" / "cache"
+        native = subprocess.run([native_codex(typed_target), "plugin", "list", "--json"], capture_output=True,
+                                text=True, encoding="utf-8", errors="replace", timeout=15)
+        if native.returncode != 0:
+            raise ValueError("native plugin inventory")
+        inventory = json.loads(native.stdout)
+        installed = inventory.get("installed") if isinstance(inventory, dict) else None
+        if not isinstance(installed, list):
+            raise TypeError("native plugin inventory")
+        candidates = []
+        expected = {
+            "machine@base-agents": "tj-agents/core",
+            "machine@tj-agents": "tj-agents/marketplace",
+        }
+        for item in installed:
+            if not isinstance(item, dict) or item.get("pluginId") not in expected:
+                continue
+            marketplace = item.get("marketplaceSource")
+            if not isinstance(marketplace, dict) or marketplace.get("sourceType") != "git":
+                continue
+            if repository(marketplace.get("source")) != expected[item["pluginId"]]:
+                continue
+            marketplace_name = item.get("marketplaceName")
+            name = item.get("name")
+            version = item.get("version") or "local"
+            if not all(component(value) for value in (marketplace_name, name, version)):
+                continue
+            root = contained(cache / marketplace_name / name / version, cache)
+            if root is not None and root.parent.name == "machine" and (root / "catalog" / "catalog.json").is_file():
+                candidates.append((item["pluginId"], int(item.get("enabled") is True), root))
+        root = coordinator(candidates, {identity for identity, enabled, _root in candidates if enabled})
+    except (OSError, ValueError, TypeError) as error:
+        unavailable("Codex machine coordinator is unavailable (" + str(error) + ")")
 script = root / "resources" / "machine" / "scripts" / f"{kind}_terminal_launcher.py"
 if not script.is_file():
     unavailable("the active machine " + kind + " launcher is unavailable")
@@ -163,8 +296,8 @@ POWERSHELL_BLOCK = "\r\n".join((
     "        $baseAgentsStatus = [pscustomobject]@{ Ran = $false; ExitCode = 125 }",
     "        Invoke-BaseAgentsBootstrap -baseAgentsKind 'claude' -baseAgentsTarget $baseAgentsTarget.Source -baseAgentsProject (Get-Location).Path -baseAgentsArguments (@($args)) -baseAgentsStatus $baseAgentsStatus",
     "        if ($baseAgentsStatus.Ran) { return }",
-    "    } else { Write-Warning 'standards: no usable Python was found; running the typed CLI without refresh' }",
-    "    & $baseAgentsTarget.Source @args",
+    "    } else { Write-Error 'standards: no usable Python was found; session launch is unavailable'; return 125 }",
+    "    Write-Error 'standards: terminal coordinator is unavailable'; return 125",
     "}",
     END,
 ))
@@ -186,8 +319,8 @@ BASH_BLOCK = "\n".join((
     "    if \"$python\" -I -B -c \"$_base_agents_bootstrap\" --probe claude \"$target\" \"$PWD\"; then",
     "      if \"$python\" -I -B -c \"$_base_agents_bootstrap\" claude \"$target\" \"$PWD\" \"$@\"; then return 0; else return $?; fi",
     "    fi",
-    "  else printf '%s\\n' 'standards: no usable Python was found; running the typed CLI without refresh' >&2; fi",
-    "  \"$target\" \"$@\"",
+    "  else printf '%s\\n' 'standards: no usable Python was found; session launch is unavailable' >&2; return 125; fi",
+    "  printf '%s\\n' 'standards: terminal coordinator is unavailable' >&2; return 125",
     "}",
     END,
 ))

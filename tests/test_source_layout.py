@@ -150,11 +150,11 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/resources/machine/scripts/history.py",
             "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
-            "plugins/machine/skills/plugin-lock/scripts/repo_config.py",
+            "plugins/machine/skills/plugin-selection/scripts/repo_config.py",
             "plugins/machine/skills/hook-control/scripts/hook_control.py",
             "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
             "plugins/machine/catalog/catalog.json",
-            "plugins/machine/catalog/plugins.lock.schema.json",
+            "plugins/machine/catalog/plugins.schema.json",
             "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)
@@ -423,13 +423,8 @@ class SourceLayoutTests(unittest.TestCase):
     def test_catalog_digest_exclusion_cannot_be_widened(self):
         path = self.root / ".agents/catalog/catalog.json"
         catalog = json.loads(path.read_text(encoding="utf-8"))
-        machine = next(
-            plugin
-            for release in catalog["releases"]
-            for plugin in release["plugins"]
-            if plugin["id"] == "base-agents/machine"
-        )
-        machine["digest_excludes"].append("codex-skills/plugin-lock/SKILL.md")
+        machine = next(package for package in catalog["packages"] if package["id"] == "base-agents/machine")
+        machine["digest_excludes"].append("codex-skills/plugin-selection/SKILL.md")
         path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
             SYNC.build(self.root, validate_catalog_digests=False)

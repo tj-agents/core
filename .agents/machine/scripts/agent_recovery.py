@@ -332,18 +332,21 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
             _verify_codex_resume(executable)
             old_profile = os.environ.get("CODEX_HOME")
             os.environ["CODEX_HOME"] = item["profile"]
+            arguments = ["resume", session_id]
+            if model:
+                arguments += ["-m", model]
+            arguments.append(instruction)
             try:
-                _sync_codex(executable, directory)
+                cli.launch_tab(
+                    directory, sys.executable, label,
+                    cli.bound_terminal_arguments("codex", directory, executable, arguments), clear=("TERM",),
+                    force={"CODEX_HOME": item["profile"]},
+                )
             finally:
                 if old_profile is None:
                     os.environ.pop("CODEX_HOME", None)
                 else:
                     os.environ["CODEX_HOME"] = old_profile
-            arguments = ["resume", session_id]
-            if model:
-                arguments += ["-m", model]
-            arguments.append(instruction)
-            cli.launch_tab(directory, executable, label, arguments, clear=("TERM",), force={"CODEX_HOME": item["profile"]})
         launched = True
         try:
             _receipt_state(receipt, host, session_id, item["profile"], "launched")
@@ -366,19 +369,6 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
         raise
     finally:
         lock.release()
-
-
-def _sync_codex(executable, directory):
-    if os.name != "nt":
-        return
-    try:
-        sync = _load("codex_marketplace_sync")
-    except RuntimeError:
-        return
-    try:
-        sync.sync_codex_standards(executable, directory, out=lambda _line: None)
-    except sync.SyncError:
-        pass
 
 
 def main(argv=None):

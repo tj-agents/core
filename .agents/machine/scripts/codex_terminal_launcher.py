@@ -10,8 +10,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from codex_marketplace_sync import SyncError, resolve_codex_for_sync, sync_codex_standards
 from agent_cli import LaunchError
+from startup_binding import StartupBindingError, run_session
 from terminal_command import command_for_target, flush_before_cli, run_target
 
 
@@ -21,6 +21,7 @@ NON_INTERACTIVE_COMMANDS = frozenset({
     "sandbox", "debug", "apply", "a", "queue", "archive", "delete",
     "migrate-rollouts", "unarchive", "cloud", "exec-server", "features", "help",
 })
+REFRESH_BYPASS_COMMANDS = NON_INTERACTIVE_COMMANDS - {"exec", "e", "review"}
 OPTIONS_WITH_VALUES = frozenset({
     "-c", "--config", "--enable", "--disable", "--remote", "--remote-auth-token-env",
     "-i", "--image", "-m", "--model", "--local-provider", "-p", "--profile",
@@ -79,6 +80,24 @@ def hook_control(arguments: list[str]) -> int:
         return 1
 
 
+def bypasses_refresh(arguments: list[str]) -> bool:
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == "--":
+            return False
+        if argument in ("--help", "-h", "--version", "-V"):
+            return True
+        if argument in OPTIONS_WITH_VALUES:
+            index += 2
+            continue
+        if argument.startswith("-"):
+            index += 1
+            continue
+        return argument in REFRESH_BYPASS_COMMANDS
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, required=True)
@@ -90,11 +109,14 @@ def main(argv: list[str] | None = None) -> int:
         parsed.arguments = parsed.arguments[1:]
     if parsed.hooks:
         return hook_control(parsed.arguments)
-    if not parsed.arguments or parsed.arguments[0] != "plugin":
+    if not bypasses_refresh(parsed.arguments):
         try:
-            sync_codex_standards(resolve_codex_for_sync(parsed.target), parsed.project)
-        except SyncError as error:
-            print(f"standards: Codex refresh failed; this session loads installed plugins: {error}", file=sys.stderr)
+            command = without_daemon_for_interactive(parsed.arguments, parsed.target)
+            flush_before_cli()
+            return run_session("codex", parsed.target, parsed.project, command)
+        except StartupBindingError as error:
+            print(f"standards: Codex refresh failed: {error}", file=sys.stderr)
+            return 1
     flush_before_cli()
     return run_target(parsed.target, without_daemon_for_interactive(parsed.arguments, parsed.target))
 

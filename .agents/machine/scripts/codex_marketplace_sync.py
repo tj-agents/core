@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-"""Refresh enabled Codex plugins from their registered marketplaces before a session loads them, and
-trust any of tj-agents' own hook definitions among them.
-
-A faithful Python port of codex_marketplace_sync.ps1. Exposes sync_codex_standards() for launch_codex.py
-to call before opening a handoff tab, and for codex_terminal_launcher.py to call from a typed `codex` in a
-terminal. Not runnable from a terminal in any other way.
-"""
+"""Prepare enabled Codex plugins from current authenticated publisher main branches."""
 
 from __future__ import annotations
 
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -20,20 +15,140 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 
-# codex_hook_trust.py's own `.ps1`-shim handling and claude_standards_sync.py's own harness-permissions
-# convergence are reused rather than duplicated here. Both live beside this file in every layout it ships
-# in (authored and both packaged copies), the same hop codex_hook_trust.py and agent_cli.py already rely on.
 sys.path.insert(0, str(HERE))
-from codex_hook_trust import command as codex_command  # noqa: E402
-from claude_standards_sync import (  # noqa: E402
-    apply_harness_permissions,
-    MARKETPLACE_TIMEOUT_SECONDS,
-    PLUGIN_TIMEOUT_SECONDS,
-)
+from codex_hook_trust import AppServer, apply_trust, command as codex_command  # noqa: E402
+import rolling_plugins  # noqa: E402
+from claude_standards_sync import MARKETPLACE_TIMEOUT_SECONDS, PLUGIN_TIMEOUT_SECONDS  # noqa: E402
+
+TJ_AGENTS_MARKETPLACES = {"base-agents", "tj-agents", "dotagents", "cpp-agents", "react-agents"}
 
 
 class SyncError(Exception):
     """A Codex standards refresh step failed; the message is the whole report."""
+
+
+def maintenance_arguments(arguments):
+    values = list(arguments or ())
+    result = []
+    index = 0
+    while index < len(values):
+        value = values[index]
+        if value == "--":
+            break
+        if value in {"-c", "--config", "--enable", "--disable"}:
+            if index + 1 >= len(values):
+                raise SyncError(f"Codex option {value} requires a value")
+            result.extend((value, values[index + 1]))
+            index += 2
+            continue
+        if value.startswith("--config=") or value.startswith("--enable=") or value.startswith("--disable="):
+            result.append(value)
+            index += 1
+            continue
+        if value in {"-C", "--cd"}:
+            if index + 1 >= len(values):
+                raise SyncError(f"Codex option {value} requires a directory")
+            index += 2
+            continue
+        if value.startswith("--cd="):
+            index += 1
+            continue
+        if value in {"--profile", "-p"} or value.startswith("--profile=") or value.startswith("-p"):
+            raise SyncError("Codex named profiles are unsupported by rolling plugin preflight")
+        if value.startswith("-"):
+            index += 1
+            continue
+        index += 1
+    return result
+
+
+def effective_codex_directory(working_directory, arguments=()):
+    current = Path(working_directory).resolve()
+    values = list(arguments or ())
+    index = 0
+    while index < len(values):
+        value = values[index]
+        if value == "--":
+            break
+        if value in {"-C", "--cd"}:
+            if index + 1 >= len(values):
+                raise SyncError(f"Codex option {value} requires a directory")
+            current = (current / values[index + 1]).resolve()
+            index += 2
+            continue
+        if value.startswith("--cd="):
+            current = (current / value.split("=", 1)[1]).resolve()
+        if value in {"-c", "--config", "--enable", "--disable"}:
+            index += 2
+            continue
+        if value in {"--profile", "-p"} or value.startswith("--profile=") or value.startswith("-p"):
+            raise SyncError("Codex named profiles are unsupported by rolling plugin preflight")
+        index += 1
+    return current
+
+
+def _effective_config(response):
+    if not isinstance(response, dict):
+        raise SyncError("Codex config/read returned an invalid response")
+    config = response.get("config", response.get("effectiveConfig", response))
+    if not isinstance(config, dict):
+        raise SyncError("Codex config/read returned no effective config")
+    return config
+
+
+def _plugin_enabled(value):
+    if value is True:
+        return True
+    if value is False:
+        return False
+    if isinstance(value, dict) and isinstance(value.get("enabled"), bool):
+        return value["enabled"]
+    return None
+
+
+def _marketplace_source(value):
+    if not isinstance(value, dict):
+        return None
+    kind = value.get("source_type", value.get("sourceType"))
+    source = value.get("source")
+    if kind != "git" or not isinstance(source, str):
+        return None
+    return source
+
+
+def codex_config_selection(codex_executable, working_directory, launch_args=(), timeout=None):
+    arguments = maintenance_arguments(launch_args)
+    directory = effective_codex_directory(working_directory, launch_args)
+    try:
+        with AppServer(codex_executable, directory, arguments, timeout=timeout or 90) as server:
+            response = server.request("config/read", {"cwd": str(directory), "includeLayers": True})
+    except (OSError, RuntimeError, ValueError) as error:
+        raise SyncError(f"Codex effective configuration could not be read: {error}") from None
+    config = _effective_config(response)
+    plugins = config.get("plugins")
+    marketplaces = config.get("marketplaces")
+    if plugins is None:
+        plugins = {}
+    if marketplaces is None:
+        marketplaces = {}
+    if not isinstance(plugins, dict) or not isinstance(marketplaces, dict):
+        raise SyncError("Codex effective configuration has invalid plugins or marketplaces")
+    selected, disabled = [], []
+    for identity, value in plugins.items():
+        enabled = _plugin_enabled(value)
+        if enabled is None or not isinstance(identity, str) or identity.count("@") != 1:
+            continue
+        name, marketplace = identity.rsplit("@", 1)
+        if enabled is False:
+            disabled.append(identity)
+            continue
+        source = _marketplace_source(marketplaces.get(marketplace))
+        if source is None:
+            if marketplace.casefold() in TJ_AGENTS_MARKETPLACES:
+                raise SyncError(f"Codex effective configuration has no authenticated Git source for selected plugin {identity}")
+            continue
+        selected.append({"identity": identity, "marketplace": marketplace, "source_url": source})
+    return {"selections": selected, "final_selections": selected, "disabled": disabled, "project": directory}
 
 
 def _load_agent_cli():
@@ -140,51 +255,21 @@ def enabled_git_plugins(entries):
 
 
 def sync_codex_standards(codex_executable, working_directory, out=print, run=subprocess.run):
-    """Refresh every enabled git-sourced Codex plugin and trust tj-agents' own hooks among them.
-
-    Returns the sorted, de-duplicated list of plugin identities refreshed. Mirrors
-    codex_marketplace_sync.ps1's Sync-CodexStandards: upgrade the registered marketplaces, enumerate every
-    enabled git-sourced plugin (installed or merely available), reinstall each one to pick up the upgrade,
-    then trust any tj-agents hooks among them -- skipped only when there was nothing enabled to check at
-    all. The hook trust helper is copied to a private temporary file before any of this runs, because the
-    marketplace upgrade this triggers can replace the installed copy out from under a later read of it.
-    Converges this machine's declared harness permissions last, always, even when an earlier step raised --
-    the ps1 original ran it from a `finally`, after the same cleanup this function's own `with` block
-    performs on the way out.
-    """
+    """Materialize current selected Codex plugins and trust their verified hooks."""
     resolved = Path(working_directory).resolve()
+    home = Path(os.environ.get('CODEX_HOME') or Path.home() / '.codex').resolve()
     try:
-        helper = HERE / 'codex_hook_trust.py'
-        if not helper.is_file():
-            raise SyncError(f'Codex hook trust helper missing: {helper}')
-
-        with tempfile.TemporaryDirectory(prefix='codex-hook-trust-') as scratch:
-            snapshot = Path(scratch) / 'codex_hook_trust.py'
-            shutil.copyfile(helper, snapshot)
-
-            upgrade = invoke_codex_sync_command(codex_executable, ['plugin', 'marketplace', 'upgrade', '--json'],
-                                                 cwd=resolved, run=run, timeout=MARKETPLACE_TIMEOUT_SECONDS)
-            errors = upgrade.get('errors') or []
-            if errors:
-                raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(errors)}')
-
-            inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
-                                                   cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-            installed = inventory.get('installed') or []
-            available = inventory.get('available') or []
-            selected = sorted(enabled_git_plugins((*installed, *available)))
-            for identity in selected:
-                installed_result = invoke_codex_sync_command(codex_executable, ['plugin', 'add', identity, '--json'],
-                                                               cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
-                if installed_result.get('pluginId') != identity:
-                    raise SyncError(f"Codex installed {installed_result.get('pluginId')} while refreshing {identity}")
-
-            if selected or any(isinstance(plugin, dict) and plugin.get('enabled') for plugin in installed):
-                invoke_codex_hook_trust(codex_executable, resolved, snapshot, cwd=resolved, run=run, out=out)
-
-            return selected
-    finally:
-        apply_harness_permissions(resolved, run=run)
+        selection = codex_config_selection(codex_executable, resolved)
+        selection['selection_reader'] = lambda: codex_config_selection(codex_executable, resolved)
+        with rolling_plugins.preflight('codex', home, resolved, selection) as active:
+            prepared = active.materialize_native(codex_executable)
+            if prepared.selected_roots:
+                apply_trust(codex_executable, resolved, verified_roots=prepared.selected_roots,
+                            launch_args=rolling_plugins.hook_trust_arguments(prepared), environment=prepared.environment)
+            active.acknowledge_binding()
+        return [root.identity for root in prepared.selected_roots]
+    except (rolling_plugins.RollingPluginError, SyncError) as error:
+        raise SyncError(str(error)) from None
 
 
 def main(argv: list[str] | None = None) -> int:

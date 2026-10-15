@@ -185,6 +185,12 @@ class HookTrustTests(unittest.TestCase):
             TRUST.apply_trust("codex", self.cwd, preview=True)
         server.request.assert_called_once_with("hooks/list", {"cwds": [str(self.cwd)]})
 
+    @patch.object(TRUST, "AppServer")
+    def test_uses_the_remaining_preflight_deadline_for_app_server_requests(self, server_class):
+        server = server_class.return_value.__enter__.return_value
+        server.request.return_value = {"data": []}
+        self.assertEqual({}, TRUST.apply_trust("codex", self.cwd, timeout=7))
+        self.assertEqual(server_class.call_args.kwargs["timeout"], 7)
 
 if __name__ == "__main__":
     unittest.main()

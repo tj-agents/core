@@ -242,49 +242,28 @@ def claude_config_dir():
 
 
 def standards_sync_script():
-    """The user-installed machine plugin's sync script, else the copy beside this file."""
-    plugins = os.environ.get('CLAUDE_CODE_PLUGIN_CACHE_DIR')
-    plugins = Path(plugins) if plugins else claude_config_dir() / 'plugins'
-    candidates = []
-    try:
-        with open(plugins / 'installed_plugins.json', encoding='utf-8-sig') as f:
-            registry = json.load(f)
-        for entry in (registry.get('plugins') or {}).get('machine@base-agents') or []:
-            if entry.get('scope') == 'user' and entry.get('installPath'):
-                candidates.append(Path(entry['installPath']) / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py')
-    except (OSError, ValueError, AttributeError):
-        pass
-    candidates.append(HERE / 'claude_standards_sync.py')
-    return next((path for path in candidates if path.is_file()), None)
+    """The synchronizer shipped beside this launcher."""
+    path = HERE / 'claude_standards_sync.py'
+    return path if path.is_file() else None
 
 
 def sync_claude_standards(working_directory, claude=None, out=print):
-    """Refresh the registered standards before a Claude session opens. Never blocks the launch when the
-    check cannot even start, and never raises: a failure to start it is reported as a `standards:` line,
-    same as every other outcome here.
-
-    No outer timeout bounds how long a normally running check takes: claude_standards_sync.py already
-    bounds its own steps (a 180s marketplace update, 120s per plugin), so an outer timeout here would kill
-    a check that was progressing normally and orphan its `claude plugin` grandchild -- on Windows, not even
-    killable from here, because that grandchild holds the stdout pipe this would be waiting on.
-    """
+    """Refresh the registered standards before a Claude session opens."""
     script = standards_sync_script()
     if script is None:
-        out('standards: claude_standards_sync.py was not found; this session loads the installed plugins')
-        return
+        raise LaunchError(f'Claude standards sync script was not found beside {HERE}.')
     arguments = [sys.executable, '-I', '-B', str(script), '--project', str(working_directory)]
     if claude:
         arguments += ['--claude', str(claude)]
     try:
-        # errors='replace' rather than bare text=True: a byte sequence the check's own output cannot
-        # decode as UTF-8 must not turn "never blocks the launch" into a crash here instead.
         result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                  encoding='utf-8', errors='replace')
     except OSError as exc:
-        out(f'standards: the check could not be run ({exc}); this session loads the installed plugins')
-        return
+        raise LaunchError(f'Claude standards refresh could not start: {exc}') from exc
     for line in result.stdout.splitlines():
         out(line)
+    if result.returncode != 0:
+        raise LaunchError(f'Claude standards refresh failed with exit {result.returncode}.')
 
 
 def prompt_file_argument(path):
@@ -663,6 +642,18 @@ def launch_tab(working_directory, executable, title, arguments=(), clear=(), for
     return _launch_new_window(directory, executable, title, arguments, cleared, forced, environ, run, popen)
 
 
+def startup_binding_script():
+    path = HERE / "startup_binding.py"
+    if not path.is_file():
+        raise LaunchError(f"startup binding script was not found beside {HERE}")
+    return path
+
+
+def bound_terminal_arguments(host, working_directory, target, arguments):
+    return ["-I", "-B", str(startup_binding_script()), "--host", host, "--project",
+            str(working_directory), "--target", str(target), "--", *arguments]
+
+
 def open_claude_tab(working_directory, title, arguments, out=print):
     """Resolve the native claude executable, sync standards and open the tab.
 
@@ -671,7 +662,6 @@ def open_claude_tab(working_directory, title, arguments, out=print):
     launchers call resolve_tab_directory first, and launch_tab checks it once more for its direct callers.
     """
     claude = resolve_claude_executable()
-    sync_claude_standards(working_directory, claude=claude, out=out)
 
     # Forced, not merely un-cleared: an automation-spawned terminal tab is not the interactive shell a
     # human would have launched it from, so colour/terminal-capability auto-detection cannot be trusted to
@@ -679,5 +669,6 @@ def open_claude_tab(working_directory, title, arguments, out=print):
     # to force colour outright. TERM=xterm-256color is forced the same way, but only ever reaches the
     # session on Windows: launch_tab drops any forced TERM on POSIX, because the terminal that actually
     # starts the tab sets TERM for that session itself, and forcing or clearing it here would fight that.
-    launch_tab(working_directory, claude, title, arguments=list(arguments),
+    launch_tab(working_directory, sys.executable, title,
+               arguments=bound_terminal_arguments("claude", working_directory, claude, list(arguments)),
                force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
