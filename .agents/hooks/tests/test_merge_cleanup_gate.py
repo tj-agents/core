@@ -186,6 +186,17 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.assertIsNone(obligation["transferred_at"])
         self.assertEqual(str(primary.resolve()), obligation["primary"])
 
+    def test_direct_merge_without_a_session_records_a_null_session_obligation(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        payload = self.payload(command)
+        payload.pop("session_id")
+        result = self.run_hook(payload)
+        self.assertEqual(0, result.returncode, result.stderr)
+        _, obligation = self.sole_obligation()
+        self.assertIsNone(obligation["session_id"])
+
     def test_queued_merge_mode_recorded_from_auto_flag(self):
         bare, primary = init_repo(self.root)
         worktree = add_feature_worktree(primary, self.root, "feature")
@@ -238,6 +249,20 @@ class MergeCleanupGateTests(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.sole_obligation()
                 self.obligation_files()[0].unlink()
+
+    def test_auto_merge_wrapper_accepts_mixed_case_suffix_only_on_case_insensitive_hosts(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        command = self.auto_merge_command(
+            self.root / ".agents" / "WORKFLOWS" / "AUTO_MERGE.PY", worktree
+        )
+        result = self.run_hook(self.payload(command, cwd=str(primary)))
+        self.assertEqual(0, result.returncode, result.stderr)
+        if os.path.normcase("AUTO_MERGE.PY") == "auto_merge.py":
+            self.sole_obligation()
+        else:
+            self.assertEqual([], self.obligation_files())
 
     def test_auto_merge_wrapper_reads_the_packaged_delivery_runtime_without_an_author_checkout(self):
         bare, primary = init_repo(self.root)
