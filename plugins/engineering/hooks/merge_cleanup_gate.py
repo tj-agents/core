@@ -511,18 +511,133 @@ def pushd_target(command):
     return last.group(1) or last.group(2) or last.group(3)
 
 
-def record_obligation(command, data):
-    from merge_review_gate import canonical_merge_target_dir, merge_target_dir, normalize_slug, pr_number
+def native_session_id(data):
+    for key in ("session_id", "sessionId"):
+        value = data.get(key)
+        if nonempty_string(value):
+            return value
+    return None
 
-    target = canonical_merge_target_dir(command) or pushd_target(command) or merge_target_dir(command, data)
+
+def literal_command_argv(command):
+    if not isinstance(command, str) or not command or "\n" in command or "\r" in command:
+        return None
+    argv, current, quote = [], [], None
+    for char in command:
+        if char in "$`()":
+            return None
+        if quote is not None:
+            if char == quote:
+                quote = None
+            else:
+                current.append(char)
+            continue
+        if char in "'\"":
+            quote = char
+        elif char.isspace():
+            if current:
+                argv.append("".join(current))
+                current = []
+        elif char in ";&|<>":
+            return None
+        else:
+            current.append(char)
+    if quote is not None:
+        return None
+    if current:
+        argv.append("".join(current))
+    return argv or None
+
+
+def auto_merge_root(command):
+    argv = literal_command_argv(command)
+    if argv is None:
+        return None
+    names = {"python", "python3", "python.exe", "python3.exe", "py", "py.exe"}
+    if argv[0].replace("\\", "/").rsplit("/", 1)[-1].casefold() not in names:
+        return None
+    script_index = 1
+    while script_index < len(argv) and argv[script_index] in PYTHON_NO_VALUE_FLAGS:
+        script_index += 1
+    if len(argv) != script_index + 3 or argv[script_index + 1] != "--root":
+        return None
+    components = argv[script_index].replace("\\", "/").split("/")
+    if [os.path.normcase(component) for component in components[-2:]] != [
+        os.path.normcase("workflows"), os.path.normcase("auto_merge.py")
+    ]:
+        return None
+    root = Path(argv[script_index + 2])
+    if not root.is_absolute():
+        return None
     try:
-        worktree = Path(target).resolve()
+        return root.resolve()
     except OSError:
-        return
-    if not worktree.is_dir():
-        return
-    branch = git(worktree, "rev-parse", "--abbrev-ref", "HEAD")
-    head = git(worktree, "rev-parse", "HEAD")
+        return None
+
+
+def read_auto_merge_binding(root):
+    workflow_directory = str(Path(__file__).resolve().parent.parent / "workflows")
+    if workflow_directory not in sys.path:
+        sys.path.insert(0, workflow_directory)
+    from delivery_runtime import (
+        BINDING_FILE,
+        DeliveryContractViolation,
+        PersistentDeliveryRouter,
+        binding_from_artifact,
+    )
+
+    try:
+        artifact = json.loads((root / BINDING_FILE).read_text(encoding="utf-8"))
+        if not isinstance(artifact, dict):
+            return None
+        binding = binding_from_artifact(artifact)
+        binding.setdefault("auto_merge", False)
+        PersistentDeliveryRouter().validate_binding(binding)
+        return binding
+    except (AttributeError, KeyError, OSError, TypeError, ValueError, DeliveryContractViolation):
+        return None
+
+
+def local_binding_identity(root, binding):
+    from merge_review_gate import normalize_slug
+
+    if not root.is_dir() or not same_path(binding.get("worktree"), root):
+        return None
+    top_level = git(root, "rev-parse", "--show-toplevel")
+    repository = git(root, "remote", "get-url", "origin")
+    branch = git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    head = git(root, "rev-parse", "HEAD")
+    normalized_repository = normalize_slug(repository) if repository else None
+    if not (
+        top_level is not None
+        and same_path(top_level, root)
+        and normalized_repository == binding.get("repository")
+        and branch == binding.get("branch")
+        and head == binding.get("remote_head_sha")
+    ):
+        return None
+    return {"worktree": str(root), "repository": normalized_repository, "branch": branch, "head": head}
+
+
+def record_obligation_for_identity(command, data, worktree, pr, merge_mode, expected_identity=None):
+    from merge_review_gate import normalize_slug
+
+    session = native_session_id(data) if expected_identity is not None else data.get("session_id") or data.get("sessionId")
+    if (expected_identity is not None and session is None) or not worktree.is_dir():
+        return False
+    if expected_identity is None:
+        branch = git(worktree, "rev-parse", "--abbrev-ref", "HEAD")
+        head = git(worktree, "rev-parse", "HEAD")
+        origin_url = git(worktree, "remote", "get-url", "origin")
+        repository = normalize_slug(origin_url) if origin_url else None
+    else:
+        if not same_path(expected_identity.get("worktree"), worktree):
+            return False
+        branch = expected_identity.get("branch")
+        head = expected_identity.get("head")
+        repository = expected_identity.get("repository")
+        if not all(nonempty_string(value) for value in (branch, head, repository)):
+            return False
     common_dir_raw = git(worktree, "rev-parse", "--path-format=absolute", "--git-common-dir")
     common_dir = primary = None
     if common_dir_raw:
@@ -533,8 +648,6 @@ def record_obligation(command, data):
         if common_path is not None:
             common_dir = str(common_path)
             primary = str(common_path.parent) if common_path.name == ".git" else str(common_path)
-    origin_url = git(worktree, "remote", "get-url", "origin")
-    session = data.get("session_id") or data.get("sessionId")
     save_obligation(obligation_path(worktree), {
         "session_id": session,
         "worktree": str(worktree),
@@ -542,19 +655,44 @@ def record_obligation(command, data):
         "common_dir": common_dir,
         "branch": branch,
         "head": head,
-        "pr": pr_number(command),
+        "pr": pr,
         "command": command,
-        "repo": normalize_slug(origin_url) if origin_url else None,
+        "repo": repository,
         "recorded_at": time.time(),
         "confirmed_merged": False,
         "checkout_retained": worktree == Path(primary) if primary else False,
         "session_exit_required": True,
-        "merge_mode": "queued" if "--auto" in command else "direct",
+        "merge_mode": merge_mode,
         "nagged_at": None,
         "transferred_at": None,
         "transferred_by": None,
         "disposition": None,
     })
+    return True
+
+
+def record_obligation(command, data):
+    from merge_review_gate import canonical_merge_target_dir, merge_target_dir, pr_number
+
+    target = canonical_merge_target_dir(command) or pushd_target(command) or merge_target_dir(command, data)
+    try:
+        worktree = Path(target).resolve()
+    except OSError:
+        return
+    record_obligation_for_identity(
+        command, data, worktree, pr_number(command), "queued" if "--auto" in command else "direct"
+    )
+
+
+def record_auto_merge_obligation(command, data):
+    root = auto_merge_root(command)
+    if root is None or native_session_id(data) is None:
+        return False
+    binding = read_auto_merge_binding(root)
+    identity = local_binding_identity(root, binding) if binding is not None else None
+    if identity is None:
+        return False
+    return record_obligation_for_identity(command, data, root, str(binding["pr_number"]), "queued", identity)
 
 
 def stamp_transfer(command, data):
@@ -628,6 +766,8 @@ def handle_pretooluse(data):
         return 0
     if is_merge_enable(command):
         record_obligation(command, data)
+        return 0
+    if record_auto_merge_obligation(command, data):
         return 0
     stamp_transfer(command, data)
     if not is_codex_invocation(data):
