@@ -42,6 +42,10 @@ selections and the existing revision are kept, and a new lock needs `--marketpla
 the lock and both hosts' settings and no catalog. An unknown stack or plugin is rejected with the valid
 choices.
 
+To move repositories to another marketplace tag, run `bump_plugin_lock.py --revision <tag> --root <repository>`
+(repeat `--root`). It previews by default; `--mode write` rewrites each lock's revision and regenerates its
+Claude and Codex settings, and a repository that fails validation is left unchanged.
+
 ### Legacy lock (`.agents/capabilities.lock.json`)
 
 Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
