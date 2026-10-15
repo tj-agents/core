@@ -1,7 +1,8 @@
 # Rolling Plugin Sync
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-AlwaysLatestPlugins
-Branch: Fix/RollingPluginSync, off origin/main baa8f13a.
+Branch: Fix/RollingPluginSync, originally off baa8f13a; integrated origin/main f2dd95ca.
+PR: not opened
 Owner: Codex session `01a13fa0-a1c6-7051-b3ce-a63fb26916da`;
 work item `always-latest-plugins/implementation` (stable in-flight identifier).
 
@@ -47,7 +48,7 @@ Do not modify those other owners' PRs. Keep source selection an input to freshne
 
 Old umbrella refs, same-version native cache reuse, incomplete selection handling and fail-open launchers
 caused stale sessions. See the native artifacts below and the original incident for observed evidence.
-Current main is fetched at f2dd95ca; this checkout has not merged it.
+Fetched main f2dd95ca was integrated in merge commit af100167 after authored checkpoint 2452dbb4.
 
 ## Execution state
 
@@ -68,8 +69,11 @@ replaced, deleted files disappeared, and real saved settings stayed byte-identic
 2026-10-15T21:03:19Z. This supersedes the earlier timed-out probe. Source generation check, source-layout
 suite and harness closure also passed (`6d7715d227921ff5`, `c9ec2fc20a53a71b`, `92b3a9342c330be2`).
 Focused evidence: runtime 45 tests (one POSIX-only skip), convergence/integration 18 passed, startup binding
-7 passed, terminal launchers 24 passed (five platform skips). Full suites, independent review, integration
-of current main and exact-head Windows/Linux CI remain delivery gates.
+7 passed, terminal launchers 24 passed (five platform skips). Independent review and exact-head Windows/Linux CI remain delivery gates.
+The duplicate local full suites were stopped; they do not count as passing validation. Their observed
+snapshot and continuation errors passed isolated reproduction (`68f0e0f2621c95ef`, `e291bec80de63fce`).
+Tests of the retired release-version validator were removed. Post-merge generation and its check passed.
+The catalog guard passes six checks, including legacy-base/new-format digest preservation.
 
 PR #268's proportionality changes preserve authorization, autonomous ownership and correctness gates while
 reducing repeated reads, bookkeeping, checks and handoffs. Its bounded assessment retained no blocking
@@ -85,7 +89,7 @@ ran the old wrapper's refresh; subsequent probes use native executable paths and
 This original CLI has not restarted; freshly loaded startup hooks are not claimed. The replacement started
 fresh and was then interrupted. No persistent continuation scheduler was initialized.
 
-Review, authored commits and PR remain outstanding. Tommy owns merge. Deferred self-repair followups and
+The implementation and main integration are committed. Independent review and the PR remain outstanding. Tommy owns merge. Deferred self-repair followups and
 the separate personal-policy design resume after this delivery; they must not divert this implementation.
 
 ## Implementation decision and delivery boundary
@@ -124,7 +128,7 @@ project registry entries. The native experiment is captured in the Git-private w
 `952bc814239d7eec-native-claude-versionless-reinstall.log`.
 Codex named profiles use NAME.config.toml and are not accepted directly by app-server; selection must
 honor that format or refuse the option clearly. No live host acceptance of the integrated updater is
-claimed yet. Current main `f2dd95ca` is fetched but not merged; reconcile it once after the refresh.
+claimed yet. Current main `f2dd95ca` is integrated; preserve that single pre-review synchronization.
 
 Release removal: replace release/pin catalog metadata and manual manifest versions with current package
 metadata and automatic host-required identity only. Retire the version-bump command and turn adoption
@@ -179,8 +183,8 @@ No merge or branch installation is authorized by refresh. Preserve this worktree
 ## Next Steps
 
 Scope: whole authorized goal through implementation, verification, review, commit and open PR.
-Current slice: native acceptance passed; prepare the authored checkpoint, integrate main and review the candidate.
-Remaining scope: full-suite validation, main integration, review, commit and PR; Tommy owns merge.
+Current slice: authored checkpoint and main integration complete; review and publish the stable candidate for CI.
+Remaining scope: independent review, exact-head CI and ready PR; Tommy owns merge.
 Done when: verified implementation and any machine changes are reported with an open reviewed PR.
 
 1. Original session codex:01a13fa0-a1c6-7051-b3ce-a63fb26916da has retaken ownership on Tommy's explicit
@@ -188,8 +192,8 @@ Done when: verified implementation and any machine changes are reported with an 
    follow-up was unavailable with no send attempted. This original live native identity was reattached
    with PID/start-time verification, then the work-item claim atomically removed the replacement owner.
    Preserve the rename and removal already made; do not create refresh-cli or transfer this original task again.
-2. Native acceptance and generation/invariants passed. Finish required full suites, commit authored
-   sources, synchronize main once, review independently,
+2. Native acceptance, focused regressions and post-merge generation passed. Main was synchronized once.
+   Review the committed candidate independently,
    and open the reviewed PR with exact-head Windows/Linux CI. Tommy owns merge. Generated output stays
    out of authored commits; preserve current test evidence instead of repeating passed suites blindly.
 3. Separate planning-only research in C:/Users/TommySeery/source/repos/tj-agents/docs/plans/problem-management/PLAN.md
