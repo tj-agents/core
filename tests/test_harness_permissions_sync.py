@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py"
+SCRIPT = ROOT / ".agents/machine/utility/plugin-lock/scripts/harness_permissions_sync.py"
 sys.path.insert(0, str(SCRIPT.parent))
 SPEC = importlib.util.spec_from_file_location("harness_permissions_sync", SCRIPT)
 SYNC = importlib.util.module_from_spec(SPEC)
@@ -558,7 +558,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         for host_directory in ("skills", "codex-skills"):
             with self.subTest(host_directory=host_directory):
                 package = self.root / f"machine-{host_directory}"
-                script_dir = package / host_directory / "bootstrap-capabilities" / "scripts"
+                script_dir = package / host_directory / "plugin-lock" / "scripts"
                 resource_dir = package / "resources" / "machine" / "scripts"
                 script_dir.mkdir(parents=True)
                 resource_dir.mkdir(parents=True, exist_ok=True)
@@ -580,7 +580,7 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
                 self.assertTrue(module.auto_merge_enabled(project))
                 self.assertEqual((resource_dir / "codex_hook_trust.py").resolve(), Path(module.machine_module("codex_hook_trust.py").__file__).resolve())
                 missing = self.root / f"missing-{host_directory}"
-                missing_scripts = missing / host_directory / "bootstrap-capabilities" / "scripts"
+                missing_scripts = missing / host_directory / "plugin-lock" / "scripts"
                 missing_scripts.mkdir(parents=True)
                 (missing / "harness.json").write_text("{}", encoding="utf-8")
                 shutil.copy2(SCRIPT, missing_scripts / "harness_permissions_sync.py")

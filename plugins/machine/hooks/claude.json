@@ -48,7 +48,7 @@
             "command": "python",
             "args": [
               "-B",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/harness_permissions_sync.py",
               "--apply"
             ]
           }
