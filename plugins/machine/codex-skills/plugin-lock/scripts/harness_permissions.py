@@ -39,7 +39,16 @@ def _has_unbounded_script_arguments(command: str) -> bool:
         return False
     if PROJECT_ROOT_TOKEN in command:
         return False
-    tokens = command[len("Bash("):-1].split()
+    body = command[len("Bash("):-1]
+    if body.endswith(":*"):
+        prefix = body[:-2]
+    elif body.endswith(" *"):
+        prefix = body[:-2]
+    else:
+        prefix = None
+    if prefix and not any(character in prefix for character in "*?[]"):
+        return False
+    tokens = body.split()
     return any(token.lower().endswith(SCRIPT_SUFFIXES) for token in tokens[:-1])
 
 
