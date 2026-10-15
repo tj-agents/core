@@ -87,6 +87,12 @@ When preparation or approved design has resolved the next action, enter that act
 lifecycle. A failed CI observation requires recovery under `engineering:plan-execution`; it does not end
 ownership or establish a CI result.
 
+At normal start, read `machine:recover-agents`' linked command contract and inspect `status`. For a new
+planning task, `item <feature>/<item> --status proposed --title '<useful title>'`; for new authorized
+execution, `claim <feature>/<item> --host <actual host> --role owner --status active --title '<useful title>'`.
+Use `--plan-path` only for an existing repo-relative plan. Questions need no registration; chores need no
+plan. Retain metadata and status unless deliberately transitioning; another owner follows recovery or handoff.
+
 Act on authorized reversible work and keep the canonical plan aligned with observed results. A phase,
 commit, open PR or context boundary does not narrow the original scope. Honor user limits and real
 external-action gates. Use `engineering:handoff` for an actual authorized context transfer; it checkpoints

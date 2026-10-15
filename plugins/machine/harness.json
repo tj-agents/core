@@ -346,19 +346,95 @@
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-              "claim"
+              "end"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+            ],
+            "item"
+          ],
+          "justification": "Local work-item status and context updates through the shipped CLI; the owning workflow supplies task authority",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+              "item",
+              "feature/item",
+              "--status",
+              "proposed",
+              "--title",
+              "Plan the feature"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+              "item"
             ],
             [
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
               "end"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+            ],
+            "claim"
+          ],
+          "justification": "Native-verified work-item ownership claims through the shipped CLI; the owning workflow supplies task authority and the store guards competing owners",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "claim",
+              "feature/item",
+              "--host",
+              "codex",
+              "--role",
+              "owner",
+              "--status",
+              "active",
+              "--title",
+              "Implement the feature"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/other.py",
+              "claim"
             ],
             [
-              "python3",
+              "python",
               "-B",
-              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-              "item"
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "end"
             ]
           ]
         },
