@@ -25,10 +25,10 @@ HEADER = re.compile(r"^\s*\[")
 
 
 def declarations(lock_path: Path, lock: dict) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
-    marketplace, names = plugin_selection.validate(lock)
-    sources = {plugin_selection.MARKETPLACE_NAME: {"owner_repository": marketplace["repository"]}}
-    identities = {f"{name}@{plugin_selection.MARKETPLACE_NAME}": True for name in names}
-    selected = {f"{plugin_selection.MARKETPLACE_NAME}/{name}" for name in names}
+    marketplaces, selected_identities = plugin_selection.validate(lock)
+    sources = {name: {"owner_repository": source["repository"]} for name, source in marketplaces.items()}
+    identities = {identity: True for identity in selected_identities}
+    selected = {plugin_selection.overlay_id(identity) for identity in selected_identities}
     requirements = []
     overlay_path = lock_path.resolve().parent / "repository-harness.json"
     if overlay_path.is_file():
@@ -100,10 +100,11 @@ def codex_settings(path: Path, sources: dict[str, dict], identities: dict[str, b
 def codex_block(sources: dict, identities: dict) -> str:
     lines = [MANAGED_START]
     for marketplace, release in sources.items():
-        sparse_paths = [".agents/plugins", ".claude-plugin", "plugins"]
         lines += [f"[marketplaces.{marketplace}]", 'source_type = "git"',
-                  f'source = "https://github.com/{release["owner_repository"]}.git"',
-                  f"sparse_paths = {json.dumps(sparse_paths)}", ""]
+                  f'source = "https://github.com/{release["owner_repository"]}.git"']
+        if marketplace == plugin_selection.MARKETPLACE_NAME:
+            lines.append(f'sparse_paths = {json.dumps([".agents/plugins", ".claude-plugin", "plugins"])}')
+        lines.append("")
     for identity, enabled in identities.items():
         lines += [f'[plugins."{identity}"]', f"enabled = {str(enabled).lower()}", ""]
     lines.append(MANAGED_END)

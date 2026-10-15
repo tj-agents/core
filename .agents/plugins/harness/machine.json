@@ -453,7 +453,7 @@
             ],
             "--root"
           ],
-          "justification": "machine:plugin-selection creates a repository's rolling-main plugin selection and generates its host settings",
+          "justification": "machine:plugin-selection selects approved marketplaces on main, migrates old locks and generates repository host settings",
           "match": [
             [
               "python3",

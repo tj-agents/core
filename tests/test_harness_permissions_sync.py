@@ -52,6 +52,15 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         SYNC.apply_verified(self.environ, "claude", self.root, [self.verified("dotnet@tj-agents", root, "https://github.com/tj-agents/dotnet.git")])
         self.assertTrue((Path(self.environ["CLAUDE_CONFIG_DIR"]) / "settings.json").is_file())
 
+    def test_authenticated_concertable_root_converges_its_declared_permissions(self):
+        root = self.root / "project-policy"
+        harness(root, {"claude_allow": ["Bash(project-task)"], "codex_prefix_rules": []})
+        SYNC.apply_verified(self.environ, "claude", self.root, [
+            self.verified("concertable@agents", root, "https://github.com/concertable/agents.git"),
+        ])
+        settings = Path(self.environ["CLAUDE_CONFIG_DIR"]) / "settings.json"
+        self.assertEqual(["Bash(project-task)"], json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"])
+
     def test_opt_out_and_legacy_scanner_fail_when_permissions_are_required(self):
         root = self.root / "engineering"
         harness(root, {"claude_allow": ["Bash(shipped)"], "codex_prefix_rules": []})

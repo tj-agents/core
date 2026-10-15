@@ -24,11 +24,11 @@ class RepoConfigTests(unittest.TestCase):
         self.root = Path(self.temp.name).resolve()
         self.lock = self.root / ".agents" / "plugins.json"
         self.lock.parent.mkdir()
-        self.plugins = ["base", "engineering", "machine"]
+        self.plugins = ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents"]
         self.save_lock()
 
     def save_lock(self):
-        document = {"schema_version": 1, "marketplace": {"repository": "tj-agents/marketplace"}, "plugins": self.plugins}
+        document = {"schema_version": 1, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}, "plugins": self.plugins}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
 
     def test_generates_both_hosts_preserving_unrelated_settings_and_checks_drift(self):

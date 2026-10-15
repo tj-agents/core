@@ -13,40 +13,108 @@ SELECTION_NAME = "plugins.json"
 SCHEMA_VERSION = 1
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
+ALLOWED_OWNERS = ("tj-agents", "Concertable")
 CORE_PLUGINS = ("base", "engineering", "machine")
-PLUGIN_NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
+NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
+REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/(?P<name>[A-Za-z0-9_][A-Za-z0-9_.-]*)\Z")
+GIT_SUFFIX = ".git"
 
 
 def resolve(root: Path) -> Path:
     return root / ".agents" / SELECTION_NAME
 
 
-def is_current(selection: dict) -> bool:
-    return isinstance(selection, dict) and selection.get("schema_version") == SCHEMA_VERSION
+def is_current(lock: dict) -> bool:
+    return isinstance(lock, dict) and lock.get("schema_version") == SCHEMA_VERSION
 
 
-def validate(selection: dict) -> tuple[dict, list[str]]:
-    """Return the marketplace and sorted plugin names, or raise on invalid selection."""
-    if not is_current(selection) or set(selection) != {"schema_version", "marketplace", "plugins"}:
-        raise lock_io.LockError(f"{SELECTION_NAME} must contain exactly schema_version {SCHEMA_VERSION}, marketplace and plugins")
-    marketplace = selection["marketplace"]
-    if not isinstance(marketplace, dict) or set(marketplace) != {"repository"}:
-        raise lock_io.LockError("marketplace must contain exactly repository")
-    if marketplace["repository"] != MARKETPLACE_REPOSITORY:
-        raise lock_io.LockError(f"marketplace.repository must be {MARKETPLACE_REPOSITORY}")
-    names = selection["plugins"]
-    if not isinstance(names, list) or any(not isinstance(name, str) or not PLUGIN_NAME.fullmatch(name) for name in names):
-        raise lock_io.LockError("plugins must be a list of plugin names")
-    if len(set(names)) != len(names):
+def plugin_id(name: str, marketplace: str = MARKETPLACE_NAME) -> str:
+    return f"{name}@{marketplace}"
+
+
+def split(identity: str) -> tuple[str, str]:
+    name, _, marketplace = identity.partition("@")
+    return name, marketplace
+
+
+def valid_identity(identity: object) -> bool:
+    if not isinstance(identity, str) or identity.count("@") != 1:
+        return False
+    name, marketplace = split(identity)
+    return bool(NAME.fullmatch(name) and NAME.fullmatch(marketplace))
+
+
+def overlay_id(identity: str) -> str:
+    name, marketplace = split(identity)
+    return f"{marketplace}/{name}"
+
+
+def validate_marketplace(name: str, value: object) -> dict:
+    if not isinstance(name, str) or not NAME.fullmatch(name):
+        raise lock_io.LockError(f"Invalid marketplace name: {name!r}")
+    if not isinstance(value, dict) or set(value) != {"repository"}:
+        raise lock_io.LockError(f"marketplaces.{name} must contain exactly repository")
+    repository = value["repository"]
+    match = REPOSITORY.fullmatch(repository) if isinstance(repository, str) else None
+    if match is None or match["owner"] not in ALLOWED_OWNERS or match["name"].lower().endswith(GIT_SUFFIX):
+        raise lock_io.LockError(
+            f"marketplaces.{name}.repository must be <owner>/<repository> without .git, owned by " + " or ".join(ALLOWED_OWNERS)
+        )
+    if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
+        raise lock_io.LockError(f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name")
+    return value
+
+
+def validate(lock: dict) -> tuple[dict, list[str]]:
+    """Return the marketplaces and the sorted `<plugin>@<marketplace>` selections, or raise."""
+    if not is_current(lock) or set(lock) != {"schema_version", "marketplaces", "plugins"}:
+        raise lock_io.LockError(f"{SELECTION_NAME} must contain exactly schema_version {SCHEMA_VERSION}, marketplaces and plugins")
+    marketplaces = lock["marketplaces"]
+    if not isinstance(marketplaces, dict) or not marketplaces:
+        raise lock_io.LockError("marketplaces must be a nonempty object")
+    for name, value in marketplaces.items():
+        validate_marketplace(name, value)
+    seen: dict[str, str] = {}
+    for name, value in marketplaces.items():
+        other = seen.setdefault(value["repository"].lower(), name)
+        if other != name:
+            raise lock_io.LockError(f"Marketplaces {other} and {name} select the same repository {value['repository']}")
+    identities = lock["plugins"]
+    if not isinstance(identities, list) or not identities or any(not isinstance(identity, str) for identity in identities):
+        raise lock_io.LockError("plugins must be a list of <plugin>@<marketplace> names")
+    for identity in identities:
+        if not valid_identity(identity) or split(identity)[1] not in marketplaces:
+            raise lock_io.LockError(f"Invalid plugin {identity!r}: use <plugin>@<marketplace> with a declared marketplace")
+    if len(set(identities)) != len(identities):
         raise lock_io.LockError("plugins must not repeat a plugin")
-    return marketplace, sorted(names)
+    unused = sorted(set(marketplaces) - {split(identity)[1] for identity in identities})
+    if unused:
+        raise lock_io.LockError("Declared marketplaces select no plugin: " + ", ".join(unused))
+    return dict(sorted(marketplaces.items())), sorted(identities)
 
 
 def migrate(lock: dict) -> dict:
-    if not isinstance(lock, dict) or lock.get("schema_version") != 2:
-        raise lock_io.LockError("Migration accepts only schema_version 2 plugin locks")
-    marketplace = lock.get("marketplace")
-    names = lock.get("plugins")
-    if not isinstance(marketplace, dict) or marketplace.get("repository") != MARKETPLACE_REPOSITORY:
-        raise lock_io.LockError("Legacy marketplace.repository must be tj-agents/marketplace")
-    return {"schema_version": SCHEMA_VERSION, "marketplace": {"repository": MARKETPLACE_REPOSITORY}, "plugins": names}
+    if not isinstance(lock, dict) or lock.get("schema_version") not in {2, 3}:
+        raise lock_io.LockError("Migration accepts only schema_version 2 or 3 plugin locks")
+    if lock["schema_version"] == 2:
+        if set(lock) != {"schema_version", "marketplace", "plugins"}:
+            raise lock_io.LockError("Legacy lock has invalid fields")
+        marketplaces = {MARKETPLACE_NAME: lock["marketplace"]}
+        names = lock["plugins"]
+        if not isinstance(names, list) or any(not isinstance(name, str) or not NAME.fullmatch(name) for name in names):
+            raise lock_io.LockError("Legacy lock plugins must be plugin names")
+        identities = [plugin_id(name) for name in names]
+    else:
+        if set(lock) != {"schema_version", "marketplaces", "plugins"}:
+            raise lock_io.LockError("Legacy lock has invalid fields")
+        marketplaces, identities = lock["marketplaces"], lock["plugins"]
+    if not isinstance(marketplaces, dict):
+        raise lock_io.LockError("Legacy lock marketplaces must be an object")
+    sources = {}
+    for name, value in marketplaces.items():
+        if not isinstance(value, dict) or set(value) != {"repository", "revision"} or not isinstance(value["revision"], str) or not value["revision"]:
+            raise lock_io.LockError(f"Legacy marketplace {name} has invalid fields")
+        sources[name] = {"repository": value["repository"]}
+    document = {"schema_version": SCHEMA_VERSION, "marketplaces": sources, "plugins": identities}
+    validate(document)
+    return document

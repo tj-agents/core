@@ -1,7 +1,7 @@
 # Rolling Plugin Sync
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-AlwaysLatestPlugins
-Branch: Fix/RollingPluginSync, originally off baa8f13a; integrated origin/main f2dd95ca.
+Branch: Fix/RollingPluginSync, originally off baa8f13a; integrated f2dd95ca; merging newer main 6be8c45a.
 PR: https://github.com/tj-agents/core/pull/269 (draft; Tommy owns merge)
 Owner: Codex session `01a13fa0-a1c6-7051-b3ce-a63fb26916da`;
 work item `always-latest-plugins/implementation` (stable in-flight identifier).
@@ -101,6 +101,20 @@ config. Post-fix generation and its check passed. Incremental review and exact-h
 remain delivery gates. Tommy owns merge. Deferred self-repair followups and
 the separate personal-policy design resume after this delivery; they must not divert this implementation.
 
+## Main overlap discovered during delivery (16 October 2026)
+
+PR #270 merged after the earlier synchronization and advanced main to 6be8c45a. GitHub blocked CI for
+38b148ab because its multi-marketplace lock touched files this cutover retires. This is new integration
+work required to unblock the original PR, not another search for the unidentified other-machine work.
+The prior incremental review completed clean at 38b148ab, including native review and host coverage.
+
+Preserve PR #270's qualified identities, per-marketplace source map, canonical owner/source validation,
+duplicate-source rejection and unrelated host settings. Remove revision pins and explicitly migrate
+schema 2 and 3 locks. Keep this branch's approved selective-package behavior: only requested packages and
+dependencies are selected; an empty initial adoption defaults to base, engineering and machine. Do not
+restore a mandatory all-Core roster or the old project-only refusal. Extend verified rolling refresh and
+permission convergence to explicitly selected Concertable publishers already allowed by PR #270.
+
 ## Implementation decision and delivery boundary
 
 Use a shared Python rolling synchronizer with host adapters. Git main objects are authoritative; native
@@ -192,7 +206,7 @@ No merge or branch installation is authorized by refresh. Preserve this worktree
 ## Next Steps
 
 Scope: whole authorized goal through implementation, verification, review, commit and open PR.
-Current slice: runtime findings and CI fixtures repaired; freeze the fixing head for incremental review and CI.
+Current slice: repairs reviewed clean at 38b148ab; integrate newly merged PR #270, then validate the integration head.
 Remaining scope: independent review, exact-head CI and ready PR; Tommy owns merge.
 Done when: verified implementation and any machine changes are reported with an open reviewed PR.
 

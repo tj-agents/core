@@ -13,19 +13,26 @@ The commands below show Windows paths and use `python` in Windows PowerShell. On
 `python3` with POSIX paths and the same script arguments.
 
 A repository commits `.agents/plugins.json`, `.claude/settings.json` and `.codex/config.toml`. A fresh
-clone then installs exactly the plugins it selects from `tj-agents/marketplace` on `main`, without depending
-on any machine's user settings.
+clone then installs exactly the plugins it selects from its declared marketplaces on `main`, without
+depending on any machine's user settings.
 
 ## The selection
 
 ```json
 {"schema_version": 1,
- "marketplace": {"repository": "tj-agents/marketplace"},
- "plugins": ["base", "engineering", "machine", "dotnet"]}
+ "marketplaces": {
+   "tj-agents": {"repository": "tj-agents/marketplace"},
+   "agents": {"repository": "Concertable/agents"}},
+ "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents",
+             "dotnet@tj-agents", "concertable@agents"]}
 ```
 
-The selection lists every required package explicitly. The schema is `catalog/plugins.schema.json`. A schema
-2 lock is migrated only by running the adoption command, which writes the schema 1 selection and discards its pin.
+The selection lists every required package explicitly as `<plugin>@<marketplace>`. A marketplace key must
+match its published identity, and its repository must belong to `tj-agents` or `Concertable`. The `tj-agents`
+name belongs only to `tj-agents/marketplace`. Each declared marketplace supplies a selected plugin, and
+two marketplace names cannot refer to the same repository. The schema is `catalog/plugins.schema.json`.
+Schema 2 and 3 locks migrate only through the adoption command; it preserves their source repositories
+and plugin identities, writes the schema 1 selection, and removes the old lock and all revision pins.
 
 ## Adopt a stack
 
@@ -40,6 +47,10 @@ plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Requir
 existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
 engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
+
+A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
+`--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
+existing foreign marketplaces and selections. Every selected approved publisher follows `main`.
 
 ## Generate settings from an existing selection
 

@@ -29,7 +29,7 @@ class PluginSelectionTests(unittest.TestCase):
         self.root = Path(self.temp.name).resolve()
         self.selection = self.root / ".agents" / "plugins.json"
         self.selection.parent.mkdir()
-        self.document = {"schema_version": 1, "marketplace": {"repository": "tj-agents/marketplace"}, "plugins": ["base", "engineering", "machine", "dotnet"]}
+        self.document = {"schema_version": 1, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}, "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "dotnet@tj-agents"]}
         self.selection.write_text(json.dumps(self.document), encoding="utf-8")
 
     def run_mode(self, mode, scope="project"):
@@ -47,19 +47,34 @@ class PluginSelectionTests(unittest.TestCase):
         self.assertIn('sparse_paths = [".agents/plugins", ".claude-plugin", "plugins"]', codex)
 
     def test_selection_allows_only_effective_packages(self):
-        self.document["plugins"] = ["dotnet"]
+        self.document["plugins"] = ["dotnet@tj-agents"]
         self.selection.write_text(json.dumps(self.document), encoding="utf-8")
         self.run_mode("write")
         claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
         self.assertEqual({"dotnet@tj-agents": True}, claude["enabledPlugins"])
 
     def test_invalid_selection_and_legacy_pin_are_rejected_by_settings_generation(self):
-        self.document["marketplace"]["revision"] = "v1.2.3"
+        self.document["marketplaces"]["tj-agents"]["revision"] = "v1.2.3"
         with self.assertRaises(LockError):
             plugin_selection.validate(self.document)
         legacy = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.2.3"}, "plugins": ["base"]}
         with self.assertRaises(LockError):
             plugin_selection.validate(legacy)
+
+    def test_marketplace_identity_validation_prevents_ambiguous_or_unowned_sources(self):
+        invalid = (
+            ({"agents": {"repository": "Other/agents"}}, ["project@agents"]),
+            ({"agents": {"repository": "Concertable/agents.git"}}, ["project@agents"]),
+            ({"agents": {"repository": "Concertable/agents"}, "alias": {"repository": "Concertable/Agents"}},
+             ["project@agents", "project@alias"]),
+            ({"agents": {"repository": "Concertable/agents"}}, ["project@missing"]),
+            ({"agents": {"repository": "Concertable/agents"}}, ["project@agents", "project@agents"]),
+            ({"agents": {"repository": "Concertable/agents"}}, ["project"]),
+            ({"alias": {"repository": "tj-agents/marketplace"}}, ["base@alias"]),
+        )
+        for marketplaces, identities in invalid:
+            with self.subTest(marketplaces=marketplaces, identities=identities), self.assertRaises(LockError):
+                plugin_selection.validate({"schema_version": 1, "marketplaces": marketplaces, "plugins": identities})
 
     def test_local_scope_writes_local_settings(self):
         self.run_mode("write", "local")

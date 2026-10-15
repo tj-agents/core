@@ -113,7 +113,8 @@ establish installed-host trust or acceptance.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
 - `.agents/catalog/catalog.json` records current package definitions and package digests. The generated
   [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers select plugins in a
-  committed `.agents/plugins.json` from rolling `tj-agents/marketplace` main.
+  committed `.agents/plugins.json` with qualified identities and a marketplace-to-repository map; selected
+  approved publishers follow `main`.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
@@ -153,6 +154,8 @@ pwsh .agents/sync-generated.ps1
 
 The `machine:plugin-selection` skill creates a repository's `.agents/plugins.json` and generates the committed
 Claude and Codex plugin settings from it, so a fresh clone installs exactly what it selects from rolling main.
+Selections can combine `tj-agents` and `Concertable` marketplaces without revision pins. Adoption explicitly
+migrates the old single- or multi-marketplace lock, preserving selections and removing its pins.
 It also audits a machine for old user-level plugin settings.
 
 Catalog packages have no release or manifest version. `sha256-tree-v1` hashes

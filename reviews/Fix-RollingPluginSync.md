@@ -1,9 +1,9 @@
 # Code review — Fix/RollingPluginSync
 
 **Review status:** `complete`
-**Judgment:** `changes-requested`
-**Reviewed up to commit:** `1be576a46f5f07f4688418ae9ecb5c0bdca8b59b` `(2026-10-15)`
-**Security-reviewed up to commit:** `1be576a46f5f07f4688418ae9ecb5c0bdca8b59b` `(2026-10-15)`
+**Judgment:** `approved`
+**Reviewed up to commit:** `38b148ab03189aa667ff1c3780bd3deb47f27f70` `(2026-10-15)`
+**Security-reviewed up to commit:** `38b148ab03189aa667ff1c3780bd3deb47f27f70` `(2026-10-15)`
 
 ## Review pass — 2026-10-15 — full
 
@@ -77,7 +77,7 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "candidate_head": "1be576a46f5f07f4688418ae9ecb5c0bdca8b59b",
+  "candidate_head": "38b148ab03189aa667ff1c3780bd3deb47f27f70",
   "shared_source": ".agents/machine/scripts/rolling_plugins.py and startup_binding.py; shared hooks and selection generator",
   "hosts": [
     {
@@ -87,12 +87,8 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
       "mapping": "Canonical runtime is generated into plugins/machine/resources/machine/scripts with host-specific hooks and cache materialization",
       "verification": {
         "level": "source",
-        "result": "limited",
-        "evidence": "Native disposable adapter acceptance 4d722d0af34b3626 passed two generations for both hosts. Source startup and convergence tests were reviewed. Full packaged launch is blocked by R3; CI 38810619930 has failing fixtures."
-      },
-      "exception": {
-        "constraint_evidence": "No installed integrated-launch acceptance is claimed; publication and activation await user merge. R1\u2013R4 and CI repairs must complete first.",
-        "supported_other_host_outcome": "Both hosts passed native disposable payload replacement and deletion; both remain subject to the same packaged permission-helper defect."
+        "result": "passed",
+        "evidence": "Frozen repairs reviewed. Rolling runtime: 22 tests, one platform skip (6786223bd000197f); startup binding: 8 passed (024ca2385dff225c); startup integration: 4 passed (68f8ed104308ddd0). Both native disposable adapters previously passed two-generation replacement and deletion (4d722d0af34b3626). Integrated installed-session activation still awaits user merge and main generation."
       }
     },
     {
@@ -102,12 +98,8 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
       "mapping": "Canonical runtime is generated into plugins/machine/resources/machine/scripts with host-specific hooks and cache materialization",
       "verification": {
         "level": "source",
-        "result": "limited",
-        "evidence": "Native disposable adapter acceptance 4d722d0af34b3626 passed two generations for both hosts. Source startup and convergence tests were reviewed. Full packaged launch is blocked by R3; CI 38810619930 has failing fixtures."
-      },
-      "exception": {
-        "constraint_evidence": "No installed integrated-launch acceptance is claimed; publication and activation await user merge. R1\u2013R4 and CI repairs must complete first.",
-        "supported_other_host_outcome": "Both hosts passed native disposable payload replacement and deletion; both remain subject to the same packaged permission-helper defect."
+        "result": "passed",
+        "evidence": "Frozen repairs reviewed. Rolling runtime: 22 tests, one platform skip (6786223bd000197f); startup binding: 8 passed (024ca2385dff225c); startup integration: 4 passed (68f8ed104308ddd0). Both native disposable adapters previously passed two-generation replacement and deletion (4d722d0af34b3626). Integrated installed-session activation still awaits user merge and main generation."
       }
     }
   ]
@@ -129,3 +121,25 @@ binding cases passed, including both helper imports from a disposable packaged l
 
 R4 fix evidence: an expired budget prevents spawn; any post-spawn exception terminates the child.
 Both expiry regressions passed in `165396aa4b823c64-rolling-deadline-review-fix.log`.
+
+## Review pass — 2026-10-15 — incremental
+
+**Candidate base:** `1be576a46f5f07f4688418ae9ecb5c0bdca8b59b`
+**Candidate head:** `38b148ab03189aa667ff1c3780bd3deb47f27f70`
+**Candidate branch:** `Fix/RollingPluginSync`
+**Candidate scope:** `all`
+**Candidate path-set:** `sha256:5c860af4e5a9ba56f45f35dad60e0cad674057ba0a8c33053db624fc17812804 (12 paths)`
+**Candidate bundle:** `C:\Users\TommySeery\AppData\Local\Temp\review\mS7RZPUPbus2bffhy8mjBa\zvnSsFw8ZY6I_eujlpT34r\8FR3O_OaxSOTFXkTZMK9tj`
+**Candidate bundle identity:** `sha256:9d3df3214430ee4724451b39bfd7bd7b4f018e13a280d8db422f69d883908853`
+**Work-order path:** `reviews/Fix-RollingPluginSync.md`
+**Work-order mode:** `append`
+**Pass judgment:** `approved`
+
+### Findings
+
+No new findings. Native review completed in 337.227 seconds with no retained issue; artifact
+`always-latest-plugins-native-review/artifacts/d66b4019383cd2f3-rolling-native-incremental-review.log`.
+Parent workflow/cache security checks completed against the same frozen delta under the unavailable-model
+fallback. The tier gate reported no applicable stack conventions. All prior finding text and first-pass
+judgment are unchanged. Combined rolling runtime suite passed 22 cases (one platform skip) in
+`6786223bd000197f-rolling-final-runtime-regression.log`.
