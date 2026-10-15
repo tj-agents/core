@@ -489,7 +489,8 @@ def claim_work_item(connection, handle, key, role, predecessor=None, branch=None
 
 def claim_registered_work_item(
     connection, host, session_id, cwd, key, repo, feature, item, role,
-    status=None, branch=None, head=None, title=None, plan_path=None, predecessor=None, registration=None,
+    status=None, branch=None, session_branch=None, head=None, title=None, plan_path=None,
+    predecessor=None, registration=None,
 ):
     handle = session_handle(host, session_id)
     connection.execute("BEGIN IMMEDIATE")
@@ -501,7 +502,7 @@ def claim_registered_work_item(
             _start_session_locked(
                 connection, host, session_id, cwd, title=registration.get("title"),
                 pid=registration.get("pid"), pid_started_at=registration.get("pid_started_at"),
-                repo=repo, branch=branch, head=head,
+                repo=repo, branch=session_branch, head=head,
             )
         elif session["ended_at"] is not None:
             raise ValueError(f"{handle} is not a current native session")

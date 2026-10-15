@@ -363,7 +363,7 @@
             ],
             "item"
           ],
-          "justification": "Registers a new planning-only work item with its proposed status and useful title through the shipped local session-store CLI",
+          "justification": "Local work-item status and context updates through the shipped CLI; the owning workflow supplies task authority",
           "match": [
             [
               "python3",
@@ -405,7 +405,7 @@
             ],
             "claim"
           ],
-          "justification": "Claims a new authorized execution owner through the shipped local session-store CLI with the actual host and active status",
+          "justification": "Native-verified work-item ownership claims through the shipped CLI; the owning workflow supplies task authority and the store guards competing owners",
           "match": [
             [
               "python",
