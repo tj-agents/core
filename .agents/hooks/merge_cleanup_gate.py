@@ -175,7 +175,7 @@ def command_is_exempt(command):
 MESSAGE = (
     "MERGE CLEANUP GATE: `gh pr merge` for PR #{pr} ({branch}) ran from {worktree} at {time} "
     "and merge Step 5 cleanup has not completed.\n"
-    "- Not merged yet? Keep monitoring — `{python} .agents/workflows/workflow_ops.py ... "
+    "- Not merged yet? Keep monitoring â€” `{python} .agents/workflows/workflow_ops.py ... "
     "monitor --kind pr --id {pr} --head {head}`, `gh pr view/checks` and `gh run list/view/watch` "
     "are never blocked.\n"
     "- Merged? Finish Step 6 and the report. For a removable linked checkout, from inside {worktree} run `{python} -B {cleanup_proof}` "
@@ -324,10 +324,14 @@ def resolved_target_matches(capability, obligation):
     cwd = capability.get("cwd")
     if not isinstance(target, dict) or not nonempty_string(cwd):
         return False
+    invocation_cwd = absolute_path(cwd)
+    worktree = absolute_path(obligation.get("worktree"))
+    if invocation_cwd is None or worktree is None:
+        return False
     pid = target.get("pid")
     pid_started_at = target.get("pid_started_at")
     return (
-        same_path(cwd, obligation.get("worktree", ""))
+        under_or_equal(invocation_cwd, worktree)
         and target.get("session_id") == obligation.get("session_id")
         and nonempty_string(target.get("cwd"))
         and same_path(target["cwd"], obligation.get("worktree", ""))
