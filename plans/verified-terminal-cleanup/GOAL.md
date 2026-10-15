@@ -25,8 +25,9 @@ Canonical source is `.agents/`; host trees stay thin and generated `plugins/*` s
 ## Current ownership and pickup
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-VerifiedTerminalCleanup
-Branch: Fix/VerifiedTerminalCleanup
-PR: https://github.com/tj-agents/core/pull/252 (draft, unmerged)
+Branch: Docs/VerifiedTerminalCleanupGuidance
+PR: not opened
+Published runtime review: https://github.com/tj-agents/core/pull/252, merged e8246a30dbe062ae695ab53ee4eb57e6ccb13f1b.
 Current native owner: Codex 01a139aa-62c8-7453-a1e4-aa9d3a665086, verified PID30000/start1792061248.38945 on this resume. Re-resolve process identity before destructive actions; former PID32732 is stale.
 Continuation owner: 83fea3cfce3e33df31aa8d22, foreground claimed through supported API. No supported unattended wake exists; earlier scheduler registration was rejected by automatic review. Do not claim unattended continuation or replace the immutable full-goal condition.
 
@@ -40,7 +41,7 @@ Origin session01a13c73-d06c-7853-aff8-473067d44a58 (PID19488/start1792051293.978
 
 Byte-preservation ZIP (SHA25651744002e7cc8f7b657bf1038002cc088f6e64d38dacb7b31589cc5ec7241116),32-entry manifest and patches remain at C:/Users/TommySeery/.agents-state/migrations/work-item-sessions-20261015/retained-checkout-closeout. Final objective audit: origin-closeout-final-20261015.json there. cleanup_proof's legitimate PR264 exact-head mismatch remains recorded; authorized native-Git fallback verified all four migration PR merges/main containment, no independent live claimant, fresh archived bytes and host/tab exit. No forged receipt, reset, force removal or primary cleanup. Do not repeat this closeout.
 
-## First delivery slice and split assessment
+## Published first delivery slice and split assessment
 
 Purpose: exact title-only terminal discovery, evidenced retention, supported close/finish refusal production, truthful report readiness versus full cleanup and approved retention-command permissions. Owning review: PR252. Verified validator checkpoint781378fd merged published records/main a4c702cea8f6da1f28cbcae154de9f4faaec67f7, producing a24ea624acd03f7698cc5949bdd6968f03be8159. Existing continuation owner was supported-rebound and reclaimed at that head.
 
@@ -50,21 +51,23 @@ Rejected boundaries: separating report_ready from either continuation consumer c
 
 ## Latest valid evidence and review gate
 
-Canonical work order: reviews/Fix-VerifiedTerminalCleanup.md. R1-R7 resolved; independent native/workflow review completed b7d5e557..a24ea624 with validated v2 evidence and passed review-host-check. R8 MEDIUM: retention permission requires -B but both emitted --clear instructions omit it. R8 is implemented in the gate and existing output test; exact reminder/block command regression passed (1 test,55.628s). L4 write lease released; append fresh fixing review. Original pass identities/findings/judgments remain immutable. Catalog/generated observations were disproved against actual PR scope and CI regeneration; generic unchanged PowerShell validation parity is outside this repair.
+Canonical runtime work order: reviews/Fix-VerifiedTerminalCleanup.md. R1-R8 resolved. Independent native/workflow fixing review approved bcadb13ead612aa96fa6748c106ddd88c048a5b6 with validated v2 evidence and passed review-host-check. Both retention instructions emit approved -B; exact reminder/block command regression passed1test/55.628s and the previously launched full gate suite passed53tests/190.612s (eb3c127febffadc9-retention-command-python-gate-suite.log). Final actual PR scope20paths,1187additions/30deletions,115plan lines,1102substantive changed lines; bounded R8 stayed within the frozen atomic exception. Original completed review identities/judgments are retained. Parent corrected its invalid clean metadata spelling to approved without changing candidate or evidence.
 
 Prior captured source validation passed the gate/close/finish, completion, Stop and focused continuation suites, both-host descendant-cwd producer cases and restored UTF-8 output checks. Disposable native Windows cases passed with required process access; sandbox startup restriction was separately established. Detailed evidence remains in the canonical review and private run artifacts.
 
-Exact-head CI38726822792 passed guard, Windows and Linux at a24ea624 (authoritative terminal read verified); pending R8 changes need their own exact-head validation. Earlier5540 run38719777442 failed both platforms from the same invalid manifest, captured in permissions-fix-20261015/artifacts/ddda8134c9d212b4-ci-failure-5540.log. Completed L3 retention-prefix-design.json assessed the false positive; checkpoint781378fd corrects validator/direct tests. Terminal matcher after literal prefix is admitted; earlier wildcards/misplaced matchers rejected. Checks passed51permissions/sync/schema,6focused and32sync/repository tests (artifact168839ea01781443-retention-prefix-final-permissions-sync-schema.log). CI catalog/package refresh was required;25generated/catalog paths restored uncommitted. Approved --clear declarations remain narrow; no project-token bypass or hook-specific exception. Parent owns goal/review/delivery.
+Exact-head CI38733216824 passed guard, Windows and Linux at bcadb13ead612aa96fa6748c106ddd88c048a5b6, then guarded normal merge landed PR252 at e8246a30dbe062ae695ab53ee4eb57e6ccb13f1b. Its causal main run38735910999 has one supported active monitor; GitHub owns terminal publication evidence. Earlier a24CI38726822792 passed; earlier5540CI failure provenance and the verified bounded validator correction remain in permissions-fix-20261015 artifacts. The correction passed51permissions/sync/schema,6focused and32sync/repository checks after required catalog/package refresh; generated output restored uncommitted. Approved retention declarations remain narrow, with no project-token bypass or hook-specific exception.
 
 Records PR265 merged46f77de6; causal regenerationa4c702ce/run38717646780green. Published M020 and both D001 records verified; temporary docs checkout/branch removed. Audit: core/.git/agent-workflow/runs/terminal-cleanup-records-fixing-20261015/publication.json. Later prevention updates this same M020, preserving unrelated primary records.
 
 ## Remaining delivery sequence and retained design questions
 
-After first-slice merge/publication, validate the existing supported post-report/handoff cleanup route. Completed L3 evidence rejects adding a persistence-only observer because it cannot enable safe closure; no additional approval gate is introduced. Preparatory report-observer-design.json in the original run directory is read-only input, not implementation approval or host acceptance. Real native transcripts contain multiple final_answer messages in one turn before task_complete; phase alone is insufficient. New pinned-source evidence in report-observer-boundary-evidence-20261015.json resolves two limits: task_complete persists before client enqueue/render, and no supported conditional no-new-input TUI shutdown exists. Never label native persistence delivered or claim polling serializes a prompt race. L3 recommends avoiding a persistence-only observer: it cannot unlock closure. Preserve strict safeguards and existing post-report/handoff routes; assess actual same-host collaborating cleanup acceptance before final closeout. No new CLI is required. Host-owned render acknowledgement plus conditional shutdown is the objective unblock condition for automatic prearm. Claude prearm must refuse until equivalent supported accepted-turn evidence exists; keep existing exact native/handoff fallback. No new controller/skill or deferred handoff-policy repair.
+PR252 is merged; continue its causal publication and validate the existing supported post-report/handoff cleanup route. Completed L3 evidence rejects adding a persistence-only observer because it cannot enable safe closure; no additional approval gate is introduced. Preparatory report-observer-design.json in the original run directory is read-only input, not implementation approval or host acceptance. Real native transcripts contain multiple final_answer messages in one turn before task_complete; phase alone is insufficient. New pinned-source evidence in report-observer-boundary-evidence-20261015.json resolves two limits: task_complete persists before client enqueue/render, and no supported conditional no-new-input TUI shutdown exists. Never label native persistence delivered or claim polling serializes a prompt race. L3 recommends avoiding a persistence-only observer: it cannot unlock closure. Preserve strict safeguards and existing post-report/handoff routes; assess actual same-host collaborating cleanup acceptance before final closeout. No new CLI is required. Host-owned render acknowledgement plus conditional shutdown is the objective unblock condition for automatic prearm. Claude prearm must refuse until equivalent supported accepted-turn evidence exists; keep existing exact native/handoff fallback. No new controller/skill or deferred handoff-policy repair.
 
-Then deliver durable governing guidance on a separate Docs/* slice, reconcile/publish M020 prevention and perform this owner's truthful final report/cleanup. Tommy's concise guidance request remains: shared agent-lifecycle failures are P1, reconcile a verified live repair owner before dispatching, and pause unrelated launches/work until repair is addressed; avoid duplicate handoffs and per-commit review ceremony.
+Current slice delivers durable governing guidance and the scoped canonical-primary M020 prevention update together on Docs/VerifiedTerminalCleanupGuidance, followed by this owner's truthful final report/cleanup. Tommy's concise guidance request remains: shared agent-lifecycle failures are P1, reconcile a verified live repair owner before dispatching, and pause unrelated launches/work until repair is addressed; avoid duplicate handoffs and per-commit review ceremony.
 
-Immutable continuation owner cannot change branches. After first-slice merge/publication: supported waiting checkpoint/reclaim rebinds exact HEAD while binding is fresh; preserve/release merged delivery binding; terminally checkpoint/archive that runtime slice at unchangedHEAD for the branch-transfer capability boundary, then initialize/claim the next owner against this same still-active full goal. Retiring a runtime receipt never means the whole repair is complete or user-paused. Tokens/secrets stay outside tracked source.
+The PR252 runtime was terminally checkpointed at unchanged bcadb13ead612aa96fa6748c106ddd88c048a5b6 for its immutable-branch transfer boundary; full goal remains active. Binding snapshot, terminal receipt and complete old continuation directory are preserved in verified-terminal-cleanup-r8-review-20261015. Merged delivery binding released; checkout reused on Docs/VerifiedTerminalCleanupGuidance from fetched origin/main and a foreground owner initialized/claimed against this same canonical goal and unchanged action/authority limits. No scheduler or competing writer was created.
+
+Observed native acceptance: a read-only collaborator reverified root PID30000/start1792061248.38945/SID/checkout, attached its console, confirmed PID membership and read11970characters from its210x57screen. The screen was scrolled away (Earlier messages available/New activity), so report delivery and own closure remain unproved. Private post-report-console-acceptance.json records the exact procedure: after final release require complete distinguishable report visibly present, fresh unchanged activity/identity, then existing guarded argument-free close/finish and independent exit/removal proof. Missing or offscreen text requires retention; resolver is display latest final and re-read or a supported render acknowledgement. No new observer/controller, input-race guarantee or installed close acceptance is claimed.
 
 ## Agent-host coverage
 
@@ -81,7 +84,7 @@ Immutable continuation owner cannot change branches. After first-slice merge/pub
       "verification": {
         "level": "planned",
         "result": "pending",
-        "evidence": "Prior source checks passed; fixing-head review/CI pending. Observer and installed-hook acceptance unclaimed."
+        "evidence": "Runtime source checks, independent fixing review and exact-head Windows/Linux CI passed. Governing guidance validation/publication and own report-before-close acceptance remain pending; installed-hook acceptance unclaimed."
       }
     },
     {
@@ -92,7 +95,7 @@ Immutable continuation owner cannot change branches. After first-slice merge/pub
       "verification": {
         "level": "planned",
         "result": "pending",
-        "evidence": "Prior source checks passed; fixing-head review/CI pending. Observer and installed-hook acceptance unclaimed."
+        "evidence": "Runtime source checks, independent fixing review and exact-head Windows/Linux CI passed. Governing guidance validation/publication and own report-before-close acceptance remain pending; installed-hook acceptance unclaimed."
       }
     }
   ]
@@ -101,15 +104,15 @@ Immutable continuation owner cannot change branches. After first-slice merge/pub
 
 ## Next Steps
 
-Commit verified R8 with this material checkpoint. Refresh current main while clean, freeze a24ea624..fixing-head, append independent native-general/workflow review and both-host coverage, push one stable candidate with exact transport binding, require exact-head Windows/Linux CI, then normal merge and causal publication. Continue governing guidance/M020 and supported owner closeout under the same full authorization; do not stop at this PR. Tommy deferred documentation/work-item batching design until after this task; retain discussion context in the existing private run, with no new repair or PR for that proposal now.
+Complete the three-file governing guidance edit and scoped canonical-primary M020 update with this checkpoint. Verify generation/packaging and frozen docs reachability; synchronize actual base once, freeze one guidance candidate, run ordinary independent native/docs review, publish one stable PR with exact-head CI and scoped merge authority, and follow both causal source publications. Then verify supported final report/cleanup or retain with actual refusal evidence and concrete resolver/resume condition. Tommy deferred documentation/work-item batching and recurring hook-timeout repair until after this task; retain exact15s and named harness_permissions_sync.py7s observations in the existing private run, with no new repair or PR for either now.
 
 Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: PR252 terminal discovery/retention/readiness correction plus its approved permission-validator integration.
+Current slice: Docs/VerifiedTerminalCleanupGuidance governing P1/verified-owner/pause rule and canonical M020 prevention publication; PR252 runtime correction merged.
 Remaining scope: supported post-report/handoff acceptance; governing guidance/M020 prevention publication; verified own report-before-close/cleanup.
 Done when: all scoped source/records are reviewed, tested, merged and causally published, both finished predecessors have verified cleanup or explicit objective safety disposition, and the repair owner's final report and own applicable cleanup are truthful and verified.
 
 ## Execution readiness
 
-Verdict: first-slice implementation verified; auto-prearm unsupported on pinned host, existing guarded fallback retained.
+Verdict: runtime PR252 merged after exact-head review/CI; governing guidance/M020 underway. Native console inspection observed, own report-before-close acceptance unproved; auto-prearm unsupported and existing guarded fallback retained.
 Execution authorization: implementation through bounded delivery and terminal closeout.
 Transfer: current pickup complete; receipt and first-action evidence above. No new transfer selected.

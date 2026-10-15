@@ -13,6 +13,15 @@ skill, hook, workflow, or host enforcement may have caused or failed to prevent 
 not replace the active user task: answer the user's direct question first, keep that task's owner and
 writer lease, then create one bounded, independently actionable Core side workstream.
 
+## Shared agent-lifecycle failures
+
+A shared agent-lifecycle failure that makes ownership, completion, handoff, or cleanup untrustworthy is
+P1 by default. Before dispatching, use `machine:recover-agents` to check for a verified live causal
+repair owner; reconcile that owner rather than dispatching a duplicate. Until the causal correction is
+verified or the user explicitly defers it, the originating session pauses unrelated work and new
+launches; repair and preservation actions may continue. Other mistakes use the independent-work route
+below.
+
 ## Establish the repair boundary
 
 1. Identify the governing Core behavior and the observed mistake. Read the directly governing source and
@@ -35,15 +44,16 @@ writer lease, then create one bounded, independently actionable Core side workst
 
 Use `engineering:handoff` in bounded side-workstream mode after it admits the repair. The repair gets an
 isolated Core checkout and one selected successor; the originating session retains its original goal and
-continues only independent work. A capability, dependency, conflict, or capacity obstacle is recorded as
-a linked deferred disposition with its resolver and observable resume condition. The handoff is complete
+continues only independent work. Shared agent-lifecycle failures follow the exception above. A
+capability, dependency, conflict, or capacity obstacle is recorded as a linked deferred disposition with
+its resolver and observable resume condition. The handoff is complete
 only when the native launcher reports successful submission. A skill load, prompt text, collaboration
 worker, claimed intent, or failed launcher is not a handoff.
 
 If the launcher fails, preserve the canonical repair goal and report the actual capability failure. Do not
 claim that the repair was handed off, do not create a second successor, and do not allow that failure to
 silently discharge the active repair obligation. Resume the original task only where its next action is
-independent of the unlaunched repair.
+independent of the unlaunched repair and not subject to the shared agent-lifecycle exception.
 
 This standing authorization covers the bounded Core repair through implementation, tests, review, pull
 request, merge, and publication once the source repository's gates pass. It does not authorize installing
@@ -66,6 +76,7 @@ check gates; it never authorizes taking over an unrelated pending delivery.
 
 The callout response is complete only after the bounded source repair has a verified native launch, a
 verified existing owner, or a current typed deferred disposition, and the original task has a precise
-independent next action. The successor then owns diagnosis, implementation, tests, review, delivery, and
+independent next action. The shared agent-lifecycle exception still governs resumption after dispatch or
+a deferred disposition. The successor then owns diagnosis, implementation, tests, review, delivery, and
 merged publication under the recorded standards-defect authority. A source change does not alter
 instructions already loaded in the originating session.
