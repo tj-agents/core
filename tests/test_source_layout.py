@@ -150,7 +150,7 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/resources/machine/scripts/history.py",
             "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
-            "plugins/machine/skills/bootstrap-capabilities/scripts/bootstrap_capabilities.py",
+            "plugins/machine/skills/plugin-lock/scripts/bootstrap_capabilities.py",
             "plugins/machine/skills/hook-control/scripts/hook_control.py",
             "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
             "plugins/machine/catalog/catalog.json",
@@ -429,7 +429,7 @@ class SourceLayoutTests(unittest.TestCase):
             for plugin in release["plugins"]
             if plugin["id"] == "base-agents/machine"
         )
-        machine["digest_excludes"].append("codex-skills/bootstrap-capabilities/SKILL.md")
+        machine["digest_excludes"].append("codex-skills/plugin-lock/SKILL.md")
         path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "digest exclusion drift"):
             SYNC.build(self.root, validate_catalog_digests=False)

@@ -1,13 +1,13 @@
 ---
-name: bootstrap-capabilities
-description: Preview, apply or verify an exact project capability lock in an isolated Codex or Claude profile. Use when installing the repository's selected agent plugins, checking a reproducible installation, or diagnosing lock/catalog drift.
+name: plugin-lock
+description: Create or bump a repository's plugin lock, generate its Claude and Codex plugin settings, and preview, apply or verify a legacy capability lock in an isolated profile. Use when adopting plugins for a repository or stack, moving repositories to another marketplace tag, or diagnosing lock drift.
 
 kind: utility
 domain: machine
 route: infer
 ---
 
-# Bootstrap locked capabilities
+# Plugin lock
 
 The commands below show Windows paths and use `python` in Windows PowerShell. On Linux/macOS, use
 `python3` with POSIX paths and the same script arguments.

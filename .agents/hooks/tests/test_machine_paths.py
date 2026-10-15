@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "machine_paths.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "plugin-lock" / "scripts" / "machine_paths.py"
 sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("machine_paths", SCRIPT)
 machine_paths = importlib.util.module_from_spec(spec)
