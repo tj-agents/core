@@ -5,7 +5,7 @@ import argparse
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import socket
 import subprocess
@@ -21,6 +21,7 @@ _BOUNDED_ROLE_RE = re.compile(r"^bounded: (?P<scope>.+)$")
 _SESSION_STORE = None
 _AGENT_RECOVERY = None
 _REGISTER_SESSION = None
+_SESSION_CLOSE = None
 
 
 def _session_store():
@@ -51,22 +52,43 @@ def _agent_recovery():
     raise RuntimeError(f"The shared agent_recovery.py helper was not found relative to {HERE}.")
 
 
+def _peer_cli_script(name):
+    peer = HERE.parent / "utility/peer-cli/scripts" / f"{name}.py"
+    packaged = tuple(
+        HERE.parents[2] / layout / "peer-cli/scripts" / f"{name}.py"
+        for layout in ("skills", "codex-skills")
+    ) if len(HERE.parents) > 2 else ()
+    for candidate in (peer, *packaged):
+        if candidate.is_file():
+            return candidate
+    raise RuntimeError(f"The shared {name}.py helper was not found relative to {HERE}.")
+
+
 def _register_session():
     global _REGISTER_SESSION
     if _REGISTER_SESSION is not None:
         return _REGISTER_SESSION
-    peer = HERE.parent / "utility/peer-cli/scripts/register_session.py"
-    packaged = tuple(
-        HERE.parents[2] / layout / "peer-cli/scripts/register_session.py" for layout in ("skills", "codex-skills")
-    ) if len(HERE.parents) > 2 else ()
-    for path in (peer, *packaged):
-        if path.is_file():
-            spec = importlib.util.spec_from_file_location("work_item_sessions_register_session", path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            _REGISTER_SESSION = module
-            return module
-    raise RuntimeError(f"The shared register_session.py helper was not found relative to {HERE}.")
+    candidate = _peer_cli_script("register_session")
+    spec = importlib.util.spec_from_file_location("work_item_sessions_register_session", candidate)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _REGISTER_SESSION = module
+    return module
+
+
+def _session_close():
+    global _SESSION_CLOSE
+    if _SESSION_CLOSE is not None:
+        return _SESSION_CLOSE
+    candidate = _peer_cli_script("session_close")
+    parent = str(candidate.parent)
+    if parent not in sys.path:
+        sys.path.insert(0, parent)
+    spec = importlib.util.spec_from_file_location("work_item_sessions_session_close", candidate)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _SESSION_CLOSE = module
+    return module
 
 
 def _parse_work_item(value):
@@ -115,6 +137,43 @@ def _require_repo_branch_head(cwd):
     return repo, branch, head
 
 
+def _repository_root(cwd):
+    root = _session_store()._git(cwd, "rev-parse", "--show-toplevel")
+    if not root:
+        raise ValueError(f"could not determine the repository root from {cwd}")
+    return Path(root).resolve()
+
+
+def _validate_title(title):
+    if title is None:
+        return None
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("--title must be non-empty")
+    return title.strip()
+
+
+def _validate_plan_path(plan_path, cwd):
+    if plan_path is None:
+        return None
+    if not isinstance(plan_path, str) or not plan_path.strip():
+        raise ValueError("--plan-path must be a non-empty repository-relative path")
+    value = plan_path.strip()
+    if "\\" in value or value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        raise ValueError("--plan-path must be a repository-relative '/' path")
+    path = PurePosixPath(value)
+    if not path.parts or any(part in (".", "..") for part in path.parts):
+        raise ValueError("--plan-path must not traverse outside the repository")
+    root = _repository_root(cwd)
+    target = root.joinpath(*path.parts)
+    try:
+        resolved = target.resolve(strict=True)
+    except OSError as error:
+        raise ValueError(f"--plan-path does not name an existing repository file: {value}") from error
+    if not resolved.is_file() or not resolved.is_relative_to(root):
+        raise ValueError("--plan-path must name an existing file inside the repository")
+    return path.as_posix()
+
+
 def _current_session_id(host):
     variable = "CODEX_THREAD_ID" if host == "codex" else "CLAUDE_CODE_SESSION_ID"
     return os.environ.get(variable)
@@ -126,6 +185,27 @@ def _require_session_id(host):
         variable = "CODEX_THREAD_ID" if host == "codex" else "CLAUDE_CODE_SESSION_ID"
         raise ValueError(f"missing or invalid session id in {variable}")
     return session_id
+
+
+def _registered_current_session(connection, host, cwd):
+    session_id = _current_session_id(host)
+    if session_id and _agent_recovery().SESSION_ID.fullmatch(session_id):
+        handle = _session_store().session_handle(host, session_id)
+        session = _session_store().get_session(connection, handle)
+        if session is not None and session["pid"] is not None and session["pid_started_at"] is not None:
+            return session_id, None
+    try:
+        entry = _session_close().own_host_and_entry(cwd)
+    except Exception as error:
+        raise ValueError(f"could not verify the current native {host} session: {error}") from error
+    if entry.get("host") != host:
+        raise ValueError(f"the verified current native session is {entry.get('host')!r}, not {host!r}")
+    registered_id = entry.get("session_id")
+    if not isinstance(registered_id, str) or not _agent_recovery().SESSION_ID.fullmatch(registered_id):
+        raise ValueError("the verified native session has no valid session id")
+    if session_id and session_id != registered_id:
+        raise ValueError("the native session id does not match the verified registry attachment")
+    return registered_id, entry
 
 
 def _path_key(value):
@@ -203,23 +283,26 @@ def _resume_roots(row):
     return {host: Path(row["profile"]) / subdirectory}
 
 
-def cmd_claim(work_item, host, role=None, predecessor=None, cwd=None):
+def cmd_claim(work_item, host, role=None, predecessor=None, status=None, title=None, plan_path=None, cwd=None):
     store = _session_store()
     cwd = cwd or Path.cwd()
     feature, item = _parse_work_item(work_item)
     role = _validate_role(role)
-    repo, branch, _head = _require_repo_branch_head(cwd)
+    title = _validate_title(title)
+    plan_path = _validate_plan_path(plan_path, cwd)
+    repo, branch, head = _require_repo_branch_head(cwd)
     key = store.work_item_key(repo, feature, item)
-    session_id = _require_session_id(host)
-    handle = store.session_handle(host, session_id)
     record_branch = _branch_to_record(cwd, branch)
     connection = store.connect()
     try:
-        store.ensure_session(connection, host, session_id, cwd)
-        if store.get_work_item(connection, key) is None:
-            store.upsert_work_item(connection, key, repo, feature, item, status="active", branch=record_branch)
+        session_id, registration = _registered_current_session(connection, host, cwd)
+        handle = store.session_handle(host, session_id)
         result = {"handle": handle, "work_item": f"{feature}/{item}"}
-        removed = store.claim_work_item(connection, handle, key, role, predecessor=predecessor, branch=record_branch)
+        removed = store.claim_registered_work_item(
+            connection, host, session_id, cwd, key, repo, feature, item, role,
+            status=status, branch=record_branch, head=head, title=title, plan_path=plan_path,
+            predecessor=predecessor, registration=registration,
+        )
         if removed:
             result["removed"] = removed
         return result
@@ -252,6 +335,8 @@ def cmd_status(work_item, cwd=None):
     return {
         "work_item": f"{feature}/{item}",
         "status": item_row["status"] if item_row else None,
+        "title": item_row["title"] if item_row else None,
+        "plan_path": item_row["plan_path"] if item_row else None,
         "sessions": sessions,
     }
 
@@ -376,19 +461,29 @@ def cmd_end(host, reason, successor=None):
     return {"handle": handle, "reason": reason}
 
 
-def cmd_item(work_item, status, pr=None, cwd=None):
+def cmd_item(work_item, status, pr=None, title=None, plan_path=None, cwd=None):
     store = _session_store()
     feature, item = _parse_work_item(work_item)
     cwd = cwd or Path.cwd()
+    title = _validate_title(title)
+    plan_path = _validate_plan_path(plan_path, cwd)
     repo, branch, _head = _require_repo_branch_head(cwd)
     record_branch = _branch_to_record(cwd, branch)
     key = store.work_item_key(repo, feature, item)
     connection = store.connect()
     try:
         if store.get_work_item(connection, key) is None:
-            store.upsert_work_item(connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr)
+            if title is None:
+                raise ValueError("a non-empty --title is required when creating a work item")
+            store.upsert_work_item(
+                connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr,
+                title=title, plan_path=plan_path,
+            )
         else:
-            store.set_work_item_status(connection, key, status, pr=pr, branch=record_branch)
+            store.upsert_work_item(
+                connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr,
+                title=title, plan_path=plan_path,
+            )
     finally:
         connection.close()
     return {"work_item": f"{feature}/{item}", "status": status}
@@ -405,6 +500,9 @@ def _build_parser():
     claim_parser.add_argument("--host", required=True, choices=("claude", "codex"))
     claim_parser.add_argument("--role", default="owner")
     claim_parser.add_argument("--predecessor")
+    claim_parser.add_argument("--status", choices=WORK_ITEM_STATUSES)
+    claim_parser.add_argument("--title")
+    claim_parser.add_argument("--plan-path")
 
     status_parser = subparsers.add_parser("status")
     status_parser.add_argument("work_item")
@@ -432,6 +530,8 @@ def _build_parser():
     item_parser.add_argument("work_item")
     item_parser.add_argument("--status", required=True, choices=WORK_ITEM_STATUSES)
     item_parser.add_argument("--pr")
+    item_parser.add_argument("--title")
+    item_parser.add_argument("--plan-path")
 
     return parser
 
@@ -440,7 +540,10 @@ def main(argv=None):
     args = _build_parser().parse_args(argv)
     try:
         if args.command == "claim":
-            result = cmd_claim(args.work_item, args.host, role=args.role, predecessor=args.predecessor)
+            result = cmd_claim(
+                args.work_item, args.host, role=args.role, predecessor=args.predecessor,
+                status=args.status, title=args.title, plan_path=args.plan_path,
+            )
         elif args.command == "status":
             result = cmd_status(args.work_item)
         elif args.command == "find":
@@ -455,7 +558,9 @@ def main(argv=None):
         elif args.command == "end":
             result = cmd_end(args.host, args.reason, successor=args.successor)
         elif args.command == "item":
-            result = cmd_item(args.work_item, args.status, pr=args.pr)
+            result = cmd_item(
+                args.work_item, args.status, pr=args.pr, title=args.title, plan_path=args.plan_path,
+            )
         else:
             raise ValueError(f"Unknown command: {args.command}")
     except (ValueError, RuntimeError) as exc:

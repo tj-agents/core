@@ -58,14 +58,34 @@ class WorkItemSessionsTests(unittest.TestCase):
             raise RuntimeError(result.stderr)
         return result.stdout.strip()
 
+    def _register_current_session(self, host, session_id, title):
+        connection = self._connection()
+        try:
+            STORE.start_session(
+                connection, host, session_id, self.repo, title=title,
+                pid=os.getpid(), pid_started_at=time.time(),
+            )
+        finally:
+            connection.close()
+
+    def _write_plan(self, name="GOAL.md"):
+        path = self.repo / "plans" / "work-item-sessions" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Plan\n", encoding="utf-8")
+        return path.relative_to(self.repo).as_posix()
+
+
     def _claim_claude(self, session_id="a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", **kwargs):
         with mock.patch.dict(os.environ, {
             "CLAUDE_CODE_SESSION_ID": session_id,
             "CLAUDE_CONFIG_DIR": str(self.root / "claude-profile"),
         }, clear=False):
+            self._register_current_session("claude", session_id, "Claude tab")
             return WIS.cmd_claim(
                 kwargs.pop("work_item", "example-feature/example-item"), "claude",
-                role=kwargs.pop("role", "owner"), predecessor=kwargs.pop("predecessor", None), cwd=self.repo,
+                role=kwargs.pop("role", "owner"), predecessor=kwargs.pop("predecessor", None),
+                status=kwargs.pop("status", "active"), title=kwargs.pop("title", "Example task"),
+                plan_path=kwargs.pop("plan_path", None), cwd=self.repo,
             )
 
     def _claim_codex(self, session_id="01a12aa7-5b58-7312-9400-ef710762147f", **kwargs):
@@ -73,13 +93,28 @@ class WorkItemSessionsTests(unittest.TestCase):
             "CODEX_THREAD_ID": session_id,
             "CODEX_HOME": str(self.root / "codex-profile"),
         }, clear=False):
+            self._register_current_session("codex", session_id, "Codex tab")
             return WIS.cmd_claim(
                 kwargs.pop("work_item", "example-feature/example-item"), "codex",
-                role=kwargs.pop("role", "bounded: docs"), predecessor=kwargs.pop("predecessor", None), cwd=self.repo,
+                role=kwargs.pop("role", "bounded: docs"), predecessor=kwargs.pop("predecessor", None),
+                status=kwargs.pop("status", "active"), title=kwargs.pop("title", "Example task"),
+                plan_path=kwargs.pop("plan_path", None), cwd=self.repo,
             )
 
     def _connection(self):
         return STORE.connect()
+
+    def test_peer_cli_loader_finds_a_packaged_session_close(self):
+        for layout in ("skills", "codex-skills"):
+            with self.subTest(layout=layout):
+                package_root = self.root / f"machine-package-{layout}"
+                packaged_here = package_root / "resources" / "machine" / "scripts"
+                candidate = package_root / layout / "peer-cli" / "scripts" / "session_close.py"
+                packaged_here.mkdir(parents=True)
+                candidate.parent.mkdir(parents=True)
+                candidate.touch()
+                with mock.patch.object(WIS, "HERE", packaged_here):
+                    self.assertEqual(candidate, WIS._peer_cli_script("session_close"))
 
     def test_claim_creates_work_item_and_owner(self):
         self._claim_claude()
@@ -91,6 +126,195 @@ class WorkItemSessionsTests(unittest.TestCase):
             self.assertEqual("owner", row["role"])
         finally:
             connection.close()
+
+    def test_claim_keeps_durable_metadata_separate_from_host_tab_titles(self):
+        plan_path = self._write_plan()
+        self._claim_claude(title="Persist durable metadata", plan_path=plan_path)
+        self._claim_codex(
+            work_item="second-feature/second-item", role="owner", title="Codex durable task",
+        )
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+            claude = STORE.get_session(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875")
+            codex = STORE.get_session(connection, "codex:01a12aa7-5b58-7312-9400-ef710762147f")
+            STORE.start_session(
+                connection, "claude", "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", self.repo,
+                title="Renamed Claude tab",
+            )
+            reopened = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertEqual("Persist durable metadata", item["title"])
+        self.assertEqual(plan_path, item["plan_path"])
+        self.assertEqual("Claude tab", claude["title"])
+        self.assertEqual("owner", claude["role"])
+        self.assertEqual("Codex tab", codex["title"])
+        self.assertEqual("owner", codex["role"])
+        self.assertEqual("Persist durable metadata", reopened["title"])
+        self.assertEqual(plan_path, reopened["plan_path"])
+        status = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
+        self.assertEqual("Persist durable metadata", status["title"])
+        self.assertEqual(plan_path, status["plan_path"])
+
+    def test_item_supports_quick_chores_and_planning_without_an_owner(self):
+        plan_path = self._write_plan("LEGACY-GOAL.md")
+        WIS.cmd_item("quick-chore/rename", "proposed", title="Rename a small file", cwd=self.repo)
+        WIS.cmd_item(
+            "planned-work/prepare", "proposed", title="Prepare planned work", plan_path=plan_path, cwd=self.repo,
+        )
+        quick = WIS.cmd_status("quick-chore/rename", cwd=self.repo)
+        planned = WIS.cmd_status("planned-work/prepare", cwd=self.repo)
+        self.assertEqual("Rename a small file", quick["title"])
+        self.assertIsNone(quick["plan_path"])
+        self.assertEqual([], quick["sessions"])
+        self.assertEqual(plan_path, planned["plan_path"])
+        self.assertEqual([], planned["sessions"])
+
+    def test_invalid_plan_paths_are_rejected(self):
+        cases = ("../README.md", "/README.md", "C:/README.md", "README.md\\child", "missing/GOAL.md")
+        for value in cases:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                WIS.cmd_item("invalid-plan/path", "proposed", title="Invalid plan", plan_path=value, cwd=self.repo)
+        outside = self.root / "outside-plan.md"
+        outside.write_text("# Outside\n", encoding="utf-8")
+        escaped = self.repo / "escaped-plan.md"
+        try:
+            escaped.symlink_to(outside)
+        except OSError:
+            return
+        with self.assertRaises(ValueError):
+            WIS.cmd_item("invalid-plan/symlink", "proposed", title="Invalid plan", plan_path=escaped.name, cwd=self.repo)
+
+    def test_omitted_claim_status_preserves_an_existing_item_status(self):
+        self._claim_claude(status="paused", title="Paused task")
+        self._claim_claude(status=None, title=None)
+        result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
+        self.assertEqual("paused", result["status"])
+        self.assertEqual("Paused task", result["title"])
+
+    def test_claim_refuses_an_ended_stored_identity(self):
+        self._claim_claude()
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"}, clear=False):
+            WIS.cmd_end("claude", "closed")
+            with self.assertRaisesRegex(ValueError, "not a current native session"):
+                WIS.cmd_claim("example-feature/example-item", "claude", title="Changed task", cwd=self.repo)
+        result = WIS.cmd_status("example-feature/example-item", cwd=self.repo)
+        self.assertEqual("active", result["status"])
+        self.assertEqual("Example task", result["title"])
+
+    def test_fallback_registration_claims_atomically_with_current_git_context(self):
+        plan_path = self._write_plan()
+        entry = {
+            "host": "claude",
+            "session_id": "fallback-claude",
+            "pid": os.getpid(),
+            "pid_started_at": time.time(),
+            "title": "Native Claude tab",
+        }
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": ""}, clear=False), \
+                mock.patch.object(WIS, "_session_close", return_value=types.SimpleNamespace(
+                    own_host_and_entry=mock.Mock(return_value=entry),
+                )):
+            WIS.cmd_claim(
+                "fallback-feature/fallback-item", "claude", status="proposed", title="Fallback task",
+                plan_path=plan_path, cwd=self.repo,
+            )
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:fallback-feature/fallback-item")
+            session = STORE.get_session(connection, "claude:fallback-claude")
+        finally:
+            connection.close()
+        self.assertEqual("proposed", item["status"])
+        self.assertEqual("Fallback task", item["title"])
+        self.assertEqual(plan_path, item["plan_path"])
+        self.assertEqual("owner", session["role"])
+        self.assertEqual("github.com/tj-agents/core", session["repo"])
+        self.assertEqual(self._run_git(self.repo, "rev-parse", "HEAD"), session["head"])
+        self.assertEqual("Native Claude tab", session["title"])
+
+    def test_refused_fallback_claim_rolls_back_registration_and_metadata(self):
+        plan_path = self._write_plan()
+        self._claim_claude(title="Original task", plan_path=plan_path)
+        entry = {
+            "host": "codex",
+            "session_id": "fallback-codex",
+            "pid": os.getpid(),
+            "pid_started_at": time.time(),
+            "title": "Native Codex tab",
+        }
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": ""}, clear=False), \
+                mock.patch.object(WIS, "_session_close", return_value=types.SimpleNamespace(
+                    own_host_and_entry=mock.Mock(return_value=entry),
+                )):
+            with self.assertRaises(ValueError):
+                WIS.cmd_claim(
+                    "example-feature/example-item", "codex", status="paused", title="Replacement task",
+                    cwd=self.repo,
+                )
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+            rejected = STORE.get_session(connection, "codex:fallback-codex")
+        finally:
+            connection.close()
+        self.assertEqual("active", item["status"])
+        self.assertEqual("Original task", item["title"])
+        self.assertEqual(plan_path, item["plan_path"])
+        self.assertIsNone(rejected)
+
+    def test_refused_claim_does_not_create_a_placeholder_or_update_metadata(self):
+        plan_path = self._write_plan()
+        self._claim_claude(title="Original task", plan_path=plan_path)
+        codex_id = "01a12aa7-5b58-7312-9400-ef710762147f"
+        self._register_current_session("codex", codex_id, "Codex tab")
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": codex_id}, clear=False):
+            with self.assertRaises(ValueError):
+                WIS.cmd_claim(
+                    "example-feature/example-item", "codex", role="owner", status="paused",
+                    title="Replacement task", cwd=self.repo,
+                )
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+            owner = STORE.get_session(connection, "claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875")
+            rejected = STORE.get_session(connection, f"codex:{codex_id}")
+        finally:
+            connection.close()
+        self.assertEqual("active", item["status"])
+        self.assertEqual("Original task", item["title"])
+        self.assertEqual(plan_path, item["plan_path"])
+        self.assertEqual("owner", owner["role"])
+        self.assertIsNone(rejected["work_item"])
+        self.assertIsNone(rejected["role"])
+
+    def test_claim_refuses_unknown_current_native_identity(self):
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "unknown"}, clear=False), \
+                mock.patch.object(WIS, "_session_close", side_effect=RuntimeError("no attachment")):
+            with self.assertRaisesRegex(ValueError, "could not verify"):
+                WIS.cmd_claim("unknown-session/item", "claude", title="Unknown session", cwd=self.repo)
+
+    def test_claim_does_not_treat_a_metadata_poor_session_as_registered_identity(self):
+        session_id = "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"
+        connection = self._connection()
+        try:
+            STORE.start_session(connection, "claude", session_id, self.repo)
+        finally:
+            connection.close()
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": session_id}, clear=False), \
+                mock.patch.object(WIS, "_session_close", side_effect=RuntimeError("no attachment")):
+            with self.assertRaisesRegex(ValueError, "could not verify"):
+                WIS.cmd_claim("metadata-poor/item", "claude", title="Should not claim", cwd=self.repo)
+        connection = self._connection()
+        try:
+            session = STORE.get_session(connection, f"claude:{session_id}")
+            self.assertIsNone(STORE.get_work_item(connection, "github.com/tj-agents/core:metadata-poor/item"))
+        finally:
+            connection.close()
+        self.assertIsNone(session["work_item"])
+        self.assertIsNone(session["role"])
+
 
     def test_second_owner_without_handoff_is_refused(self):
         self._claim_claude()
@@ -395,6 +619,8 @@ class WorkItemSessionsTests(unittest.TestCase):
         recovery.open_session.assert_not_called()
 
     def test_concurrent_claims_wrap_the_live_owner_check_and_write_in_one_transaction(self):
+        self._register_current_session("claude", "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875", "Claude tab")
+        self._register_current_session("codex", "01a12aa7-5b58-7312-9400-ef710762147f", "Codex tab")
         original_live_owners = STORE.live_owners
 
         def slow_live_owners(connection, key):
@@ -409,7 +635,7 @@ class WorkItemSessionsTests(unittest.TestCase):
             os.environ[env_key] = env_value
             try:
                 results[name] = WIS.cmd_claim(
-                    "example-feature/example-item", host, role="owner", cwd=self.repo,
+                    "example-feature/example-item", host, role="owner", title="Concurrent task", cwd=self.repo,
                 )
             except ValueError as error:
                 errors[name] = error
@@ -471,6 +697,21 @@ class WorkItemSessionsTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertIsNone(item["branch"])
+
+    def test_existing_branch_survives_status_and_owner_claims_from_another_branch(self):
+        self._run_git(self.repo, "checkout", "-b", "owner-branch")
+        self._claim_claude()
+        self._run_git(self.repo, "checkout", "-b", "other-branch")
+        WIS.cmd_item("example-feature/example-item", "paused", cwd=self.repo)
+        self._claim_codex(
+            role="owner", predecessor="claude:a2bcd5c4-bf6d-4087-95e3-d7ba7f711875",
+        )
+        connection = self._connection()
+        try:
+            item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
+        finally:
+            connection.close()
+        self.assertEqual("owner-branch", item["branch"])
 
     def test_claim_on_a_non_default_branch_records_the_branch(self):
         self._run_git(self.repo, "checkout", "-b", "feature-branch")
@@ -553,7 +794,7 @@ class WorkItemSessionsTests(unittest.TestCase):
 
     def test_item_on_the_default_branch_does_not_record_a_branch(self):
         self._run_git(self.repo, "branch", "-M", "main")
-        WIS.cmd_item("example-feature/example-item", "active", cwd=self.repo)
+        WIS.cmd_item("example-feature/example-item", "active", title="Example task", cwd=self.repo)
         connection = self._connection()
         try:
             item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")
@@ -603,7 +844,7 @@ class WorkItemSessionsTests(unittest.TestCase):
 
     def test_item_status_fills_a_null_branch_from_a_non_default_branch(self):
         self._run_git(self.repo, "branch", "-M", "main")
-        WIS.cmd_item("example-feature/example-item", "active", cwd=self.repo)
+        WIS.cmd_item("example-feature/example-item", "active", title="Example task", cwd=self.repo)
         connection = self._connection()
         try:
             item = STORE.get_work_item(connection, "github.com/tj-agents/core:example-feature/example-item")

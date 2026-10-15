@@ -61,13 +61,13 @@ class SchemaTests(unittest.TestCase):
         }
         self.assertEqual({"sessions", "work_items"}, tables)
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        self.assertEqual(2, version)
+        self.assertEqual(3, version)
 
     def test_reconnecting_does_not_lose_the_schema_version(self):
         STORE.connect(self.db_path).close()
         connection = STORE.connect(self.db_path)
         self.addCleanup(connection.close)
-        self.assertEqual(2, connection.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual(3, connection.execute("PRAGMA user_version").fetchone()[0])
 
     def test_migration_deduplicates_legacy_owner_rows_before_creating_the_index(self):
         self.db_path.parent.mkdir()
@@ -95,7 +95,63 @@ class SchemaTests(unittest.TestCase):
             "SELECT handle FROM sessions WHERE work_item = 'key-1' AND role = 'owner'"
         ).fetchall()
         self.assertEqual(["codex:new"], [row[0] for row in owners])
-        self.assertEqual(2, migrated.execute("PRAGMA user_version").fetchone()[0])
+        self.assertEqual(3, migrated.execute("PRAGMA user_version").fetchone()[0])
+
+    def test_v2_migration_preserves_rows_constraints_and_reopens_idempotently(self):
+        self.db_path.parent.mkdir()
+        connection = sqlite3.connect(self.db_path)
+        connection.executescript(
+            """
+            CREATE TABLE work_items (
+                key TEXT PRIMARY KEY,
+                repo TEXT NOT NULL,
+                feature TEXT NOT NULL,
+                item TEXT NOT NULL,
+                status TEXT NOT NULL,
+                branch TEXT,
+                pr TEXT,
+                updated_at REAL
+            );
+            CREATE TABLE sessions (
+                handle TEXT PRIMARY KEY,
+                host TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                work_item TEXT REFERENCES work_items(key),
+                role TEXT
+            );
+            CREATE UNIQUE INDEX idx_sessions_one_owner_per_work_item
+            ON sessions(work_item) WHERE role = 'owner';
+            """
+        )
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA user_version = 2")
+        connection.execute(
+            "INSERT INTO work_items VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("key-1", "repo", "feature", "item", "active", "topic", "https://example.test/pr/1", 10.0),
+        )
+        connection.execute(
+            "INSERT INTO sessions (handle, host, session_id, work_item, role) VALUES (?, ?, ?, ?, ?)",
+            ("claude:one", "claude", "one", "key-1", "owner"),
+        )
+        connection.commit()
+        connection.close()
+
+        migrated = STORE.connect(self.db_path)
+        self.addCleanup(migrated.close)
+        item = STORE.get_work_item(migrated, "key-1")
+        self.assertEqual("topic", item["branch"])
+        self.assertEqual("https://example.test/pr/1", item["pr"])
+        self.assertIsNone(item["title"])
+        self.assertIsNone(item["plan_path"])
+        self.assertEqual("claude:one", STORE.get_session(migrated, "claude:one")["handle"])
+        self.assertEqual(3, migrated.execute("PRAGMA user_version").fetchone()[0])
+        migrated.close()
+
+        reopened = STORE.connect(self.db_path)
+        self.addCleanup(reopened.close)
+        self.assertEqual("key-1", STORE.get_work_item(reopened, "key-1")["key"])
+        self.assertEqual(3, reopened.execute("PRAGMA user_version").fetchone()[0])
+
 
     def test_migration_starts_an_immediate_transaction_before_reading_legacy_owners(self):
         class RecordingConnection(sqlite3.Connection):
@@ -691,6 +747,20 @@ class ClaimWorkItemTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertEqual("feature-branch", item["branch"])
+
+    def test_registered_claim_rejects_blank_title_without_writing_a_session_or_work_item(self):
+        connection = self._connection()
+        try:
+            with self.assertRaisesRegex(ValueError, "title must be non-empty"):
+                STORE.claim_registered_work_item(
+                    connection, "claude", "registered", self.temp.name, "key-1", "repo", "feature", "item",
+                    "owner", title="  ", registration={"title": "Claude tab", "pid": 1, "pid_started_at": 1.0},
+                )
+            self.assertIsNone(STORE.get_work_item(connection, "key-1"))
+            self.assertIsNone(STORE.get_session(connection, "claude:registered"))
+        finally:
+            connection.close()
+
 
 
 if __name__ == "__main__":

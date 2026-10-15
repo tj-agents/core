@@ -346,19 +346,95 @@
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-              "claim"
+              "end"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+            ],
+            "item"
+          ],
+          "justification": "Registers a new planning-only work item with its proposed status and useful title through the shipped local session-store CLI",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+              "item",
+              "feature/item",
+              "--status",
+              "proposed",
+              "--title",
+              "Plan the feature"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+              "item"
             ],
             [
               "python3",
               "-B",
               "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
               "end"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+            ],
+            "claim"
+          ],
+          "justification": "Claims a new authorized execution owner through the shipped local session-store CLI with the actual host and active status",
+          "match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "claim",
+              "feature/item",
+              "--host",
+              "codex",
+              "--role",
+              "owner",
+              "--status",
+              "active",
+              "--title",
+              "Implement the feature"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/scripts/other.py",
+              "claim"
             ],
             [
-              "python3",
+              "python",
               "-B",
-              "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-              "item"
+              "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+              "end"
             ]
           ]
         },
