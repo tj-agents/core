@@ -2,18 +2,31 @@
 """Single SQLite-backed store for session and work-item status, written by hooks (Python 3.9+)."""
 
 import argparse
+import importlib.util
 import json
 import os
-import re
 import socket
 import sqlite3
 import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
-SCHEMA_VERSION = 2
+
+def _load_repository_identity():
+    path = Path(__file__).resolve().with_name("repository_identity.py")
+    spec = importlib.util.spec_from_file_location("session_store_repository_identity", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"The shared repository_identity.py helper was not found relative to {path.parent}.")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_repository_identity = _load_repository_identity()
+normalise_remote = _repository_identity.normalise_remote
+
+SCHEMA_VERSION = 3
 GIT_TIMEOUT = 3
 HOOK_GIT_TIMEOUT = 2
 _LOCK_RETRY_DELAY = 0.05
@@ -27,6 +40,8 @@ CREATE TABLE IF NOT EXISTS work_items (
     status TEXT NOT NULL,
     branch TEXT,
     pr TEXT,
+    title TEXT,
+    plan_path TEXT,
     updated_at REAL
 )
 """
@@ -61,9 +76,6 @@ SESSIONS_ONE_OWNER_INDEX = """
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_one_owner_per_work_item
 ON sessions(work_item) WHERE role = 'owner'
 """
-
-_SSH_SCP_RE = re.compile(r"^[^/@\s]+@(?P<host>[^:/\s]+):(?P<path>.+)$")
-
 
 def state_directory():
     override = os.environ.get("AGENT_STATE_DIRECTORY")
@@ -111,12 +123,24 @@ def _ensure_schema(connection):
         if version < 2:
             _deduplicate_owner_rows(connection)
         connection.execute(SESSIONS_ONE_OWNER_INDEX)
+        if version < 3:
+            _add_work_item_metadata_columns(connection)
         if version < SCHEMA_VERSION:
             connection.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
         connection.commit()
     except Exception:
         connection.rollback()
         raise
+
+
+def _add_work_item_metadata_columns(connection):
+    columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(work_items)").fetchall()
+    }
+    if "title" not in columns:
+        connection.execute("ALTER TABLE work_items ADD COLUMN title TEXT")
+    if "plan_path" not in columns:
+        connection.execute("ALTER TABLE work_items ADD COLUMN plan_path TEXT")
 
 
 def _deduplicate_owner_rows(connection):
@@ -175,57 +199,6 @@ def _git(cwd, *args, timeout=GIT_TIMEOUT):
     return output
 
 
-def _host_and_path(url):
-    if url.startswith(("ssh://", "https://", "http://", "git://")):
-        parsed = urlparse(url)
-        host = (parsed.hostname or "").casefold()
-        return (host or None), parsed.path
-    match = _SSH_SCP_RE.match(url)
-    if not match:
-        return None, None
-    return match.group("host").casefold(), match.group("path")
-
-
-def _normalise_remote(url):
-    url = (url or "").strip()
-    if not url:
-        return None
-    host, path = _host_and_path(url)
-    if not host or not path:
-        return None
-    path = path.strip("/")
-    if path.endswith(".git"):
-        path = path[: -len(".git")]
-    if not path:
-        return None
-    if host in ("ssh.dev.azure.com", "vs-ssh.visualstudio.com"):
-        parts = [part for part in path.split("/") if part]
-        if parts and parts[0] == "v3":
-            parts = parts[1:]
-        if len(parts) != 3:
-            return None
-        org, project, repository = parts
-        host = "dev.azure.com"
-        path = f"{org}/{project}/_git/{repository}"
-    elif host.endswith(".visualstudio.com"):
-        org = host[: -len(".visualstudio.com")]
-        if not org or "." in org:
-            return None
-        parts = [part for part in path.split("/") if part]
-        if parts and parts[0].casefold() == "defaultcollection":
-            parts = parts[1:]
-        if len(parts) == 2 and parts[0] == "_git":
-            repository = parts[1]
-            project = repository
-        elif len(parts) == 3 and parts[1] == "_git":
-            project, _git_segment, repository = parts
-        else:
-            return None
-        host = "dev.azure.com"
-        path = f"{org}/{project}/_git/{repository}"
-    return f"{host}/{path}".casefold()
-
-
 def _branch_from_symbolic_ref(value):
     if not value:
         return None
@@ -255,17 +228,11 @@ def _rev_parse_probe(cwd, timeout):
 
 
 def _collect_repo_branch_head(cwd, timeout=HOOK_GIT_TIMEOUT):
-    origin = _git(cwd, "config", "--get", "remote.origin.url", timeout=timeout)
-    head, branch, common_dir = _rev_parse_probe(cwd, timeout)
-    repo = _normalise_remote(origin) if origin else None
-    if not repo and common_dir:
-        path = Path(common_dir)
-        if not path.is_absolute():
-            path = Path(cwd) / path
-        try:
-            repo = str(path.resolve())
-        except OSError:
-            repo = None
+    head, branch, _common_dir = _rev_parse_probe(cwd, timeout)
+    repo = _repository_identity.repository_identity(
+        cwd,
+        lambda directory, *arguments: _git(directory, *arguments, timeout=timeout),
+    )
     return repo, branch, head
 
 
@@ -287,11 +254,13 @@ def work_item_key(repo, feature, item):
     return f"{repo}:{feature}/{item}"
 
 
-def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_started_at=None):
+def _start_session_locked(
+    connection, host, session_id, cwd, title=None, pid=None, pid_started_at=None,
+    repo=None, branch=None, head=None,
+):
     handle = session_handle(host, session_id)
     machine = current_machine()
     profile = profile_directory(host)
-    repo, branch, head = _collect_repo_branch_head(cwd)
     now = time.time()
     connection.execute(
         """
@@ -318,6 +287,15 @@ def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_s
         """,
         (handle, host, session_id, machine, profile, title, str(cwd), repo, branch, head,
          pid, pid_started_at, now, now),
+    )
+    return handle
+
+
+def start_session(connection, host, session_id, cwd, title=None, pid=None, pid_started_at=None):
+    repo, branch, head = _collect_repo_branch_head(cwd)
+    handle = _start_session_locked(
+        connection, host, session_id, cwd, title=title, pid=pid, pid_started_at=pid_started_at,
+        repo=repo, branch=branch, head=head,
     )
     connection.commit()
     if repo and branch:
@@ -416,19 +394,31 @@ def get_work_item(connection, key):
     return dict(row) if row else None
 
 
-def upsert_work_item(connection, key, repo, feature, item, status=None, branch=None, pr=None):
+def _upsert_work_item_locked(
+    connection, key, repo, feature, item, status=None, branch=None, pr=None, title=None, plan_path=None,
+):
     now = time.time()
     connection.execute(
         """
-        INSERT INTO work_items (key, repo, feature, item, status, branch, pr, updated_at)
-        VALUES (?, ?, ?, ?, COALESCE(?, 'active'), ?, ?, ?)
+        INSERT INTO work_items (key, repo, feature, item, status, branch, pr, title, plan_path, updated_at)
+        VALUES (?, ?, ?, ?, COALESCE(?, 'active'), ?, ?, ?, ?, ?)
         ON CONFLICT(key) DO UPDATE SET
             status = COALESCE(?, work_items.status),
-            branch = COALESCE(?, work_items.branch),
+            branch = COALESCE(work_items.branch, ?),
             pr = COALESCE(?, work_items.pr),
+            title = COALESCE(?, work_items.title),
+            plan_path = COALESCE(?, work_items.plan_path),
             updated_at = ?
         """,
-        (key, repo, feature, item, status, branch, pr, now, status, branch, pr, now),
+        (key, repo, feature, item, status, branch, pr, title, plan_path, now,
+         status, branch, pr, title, plan_path, now),
+    )
+
+
+def upsert_work_item(connection, key, repo, feature, item, status=None, branch=None, pr=None, title=None, plan_path=None):
+    _upsert_work_item_locked(
+        connection, key, repo, feature, item, status=status, branch=branch, pr=pr,
+        title=title, plan_path=plan_path,
     )
     connection.commit()
 
@@ -463,28 +453,70 @@ def _demote_other_owners_locked(connection, item, keep_handle):
     )
 
 
+def _claim_work_item_locked(connection, handle, key, role, predecessor=None, branch=None):
+    removed = None
+    if role == "owner":
+        others = [row for row in live_owners(connection, key) if row["handle"] != handle]
+        if others:
+            other = others[0]
+            if predecessor and predecessor == other["handle"]:
+                _end_session_locked(connection, predecessor, "handed_off", successor=handle)
+                removed = predecessor
+            else:
+                raise ValueError(
+                    f"{other['handle']} already owns this work item; hand off before taking ownership"
+                )
+        _demote_other_owners_locked(connection, key, handle)
+    _set_session_ownership_locked(connection, handle, role, key, predecessor=predecessor)
+    if role == "owner" and branch:
+        connection.execute(
+            "UPDATE work_items SET branch = COALESCE(branch, ?), updated_at = ? WHERE key = ?",
+            (branch, time.time(), key),
+        )
+    return removed
+
+
 def claim_work_item(connection, handle, key, role, predecessor=None, branch=None):
     connection.execute("BEGIN IMMEDIATE")
     try:
-        removed = None
-        if role == "owner":
-            others = [row for row in live_owners(connection, key) if row["handle"] != handle]
-            if others:
-                other = others[0]
-                if predecessor and predecessor == other["handle"]:
-                    _end_session_locked(connection, predecessor, "handed_off", successor=handle)
-                    removed = predecessor
-                else:
-                    raise ValueError(
-                        f"{other['handle']} already owns this work item; hand off before taking ownership"
-                    )
-            _demote_other_owners_locked(connection, key, handle)
-        _set_session_ownership_locked(connection, handle, role, key, predecessor=predecessor)
-        if role == "owner" and branch:
-            connection.execute(
-                "UPDATE work_items SET branch = COALESCE(branch, ?), updated_at = ? WHERE key = ?",
-                (branch, time.time(), key),
+        removed = _claim_work_item_locked(connection, handle, key, role, predecessor=predecessor, branch=branch)
+        connection.commit()
+        return removed
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def claim_registered_work_item(
+    connection, host, session_id, cwd, key, repo, feature, item, role,
+    status=None, branch=None, session_branch=None, head=None, title=None, plan_path=None,
+    predecessor=None, registration=None,
+):
+    handle = session_handle(host, session_id)
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        session = get_session(connection, handle)
+        if session is None:
+            if registration is None:
+                raise ValueError(f"{handle} is not a registered current native session")
+            _start_session_locked(
+                connection, host, session_id, cwd, title=registration.get("title"),
+                pid=registration.get("pid"), pid_started_at=registration.get("pid_started_at"),
+                repo=repo, branch=session_branch, head=head,
             )
+        elif session["ended_at"] is not None:
+            raise ValueError(f"{handle} is not a current native session")
+        existing = get_work_item(connection, key)
+        if title is not None and (not isinstance(title, str) or not title.strip()):
+            raise ValueError("work item title must be non-empty")
+        if existing is None and title is None:
+            raise ValueError("a non-empty --title is required when creating a work item")
+        item_branch = branch if existing is None or role == "owner" else None
+        _upsert_work_item_locked(
+            connection, key, repo, feature, item, status=status, branch=item_branch,
+            title=title, plan_path=plan_path,
+        )
+        removed = _claim_work_item_locked(connection, handle, key, role, predecessor=predecessor, branch=branch)
         connection.commit()
         return removed
     except Exception:

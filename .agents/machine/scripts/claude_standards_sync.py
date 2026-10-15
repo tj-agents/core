@@ -835,7 +835,7 @@ def apply_harness_permissions(project: Path | None = None, run=subprocess.run) -
     function rather than duplicating it -- can supply a fake for its own tests.
     """
     package_root = Path(__file__).resolve().parents[3]
-    script = package_root / ".agents" / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "harness_permissions_sync.py"
+    script = package_root / ".agents" / "machine" / "utility" / "plugin-lock" / "scripts" / "harness_permissions_sync.py"
     if not script.is_file():
         return
     try:

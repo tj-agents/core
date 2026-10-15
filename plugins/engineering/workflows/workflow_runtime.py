@@ -1,15 +1,19 @@
 import json
+import os
 import re
+import sqlite3
 import subprocess
+import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Protocol
-
 
 CONTRACT_VERSION = "v2"
 RELEASES = ("A", "B", "C")
 ENTRY_KINDS = ("compatibility-entry", "driver")
 ENTRY_STATUSES = ("supported", "deprecated", "retained")
 IDENTITY_FIELDS = ("contract_version", "workflow_id", "workflow_run_id", "stage_id", "dispatch_id")
+WORK_ITEM_STATUSES = ("proposed", "active", "delivery-gated", "blocked", "paused", "done")
+WORK_ITEM_SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 
 
 class ContractViolation(ValueError):
@@ -534,8 +538,33 @@ def _git(root, *arguments):
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     return completed.stdout.strip()
+
+
+def _read_only_git(root, *arguments):
+    try:
+        return _git(root, *arguments)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _repository_identity(root):
+    paths = (
+        Path(__file__).resolve().with_name("repository_identity.py"),
+        Path(__file__).resolve().parents[1] / "machine" / "scripts" / "repository_identity.py",
+    )
+    path = next((candidate for candidate in paths if candidate.is_file()), None)
+    if path is None:
+        raise ContractViolation("work-item resolution requires the shipped repository identity helper")
+    spec = importlib.util.spec_from_file_location("workflow_repository_identity", path)
+    if spec is None or spec.loader is None:
+        raise ContractViolation("work-item resolution cannot load the shipped repository identity helper")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.repository_identity(root, _read_only_git)
 
 
 def _section(text, heading):
@@ -572,6 +601,116 @@ def _open_review_findings(root, reviews):
     return findings
 
 
+def _work_item_document(root, ledger):
+    key = _repository_path_key(ledger, root)
+    if key is None:
+        return None
+    path = root.joinpath(*PurePosixPath(key).parts).resolve()
+    try:
+        relative = path.relative_to(root.resolve())
+    except ValueError as error:
+        raise ContractViolation("work-item README escapes the repository") from error
+    parts = relative.parts
+    if (
+        len(parts) != 6
+        or parts[0].casefold() != "plans"
+        or parts[1].casefold() != "features"
+        or parts[3].casefold() != "work-items"
+        or parts[5] != "README.md"
+    ):
+        return None
+    if not re.fullmatch(WORK_ITEM_SLUG, parts[2]) or not re.fullmatch(WORK_ITEM_SLUG, parts[4]):
+        raise ContractViolation("work-item README path must use lowercase kebab-case feature and work-item names")
+    if not path.is_file():
+        raise ContractViolation("work-item README does not exist")
+    return path, f"{parts[2]}/{parts[4]}", PurePosixPath(*parts[:3], "README.md").as_posix()
+
+
+class ReadOnlyWorkItemStore:
+    def __init__(self, database=None):
+        root = Path(os.environ.get("AGENT_STATE_DIRECTORY", Path.home() / ".agents-state"))
+        self.database = Path(database) if database is not None else root / "sessions.db"
+
+    def _connection(self):
+        if not self.database.is_file():
+            raise ContractViolation(f"work-item session store does not exist: {self.database}")
+        connection = None
+        try:
+            connection = sqlite3.connect(f"{self.database.resolve().as_uri()}?mode=ro", uri=True)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA query_only = ON")
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version not in {2, 3}:
+                raise ContractViolation(f"work-item session store has unsupported schema version {version}")
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            if not {"work_items", "sessions"}.issubset(tables):
+                raise ContractViolation("work-item session store is missing required tables")
+            required = {
+                "work_items": {"key", "status", "pr"},
+                "sessions": {"handle", "repo", "branch", "cwd", "work_item", "role", "ended_at"},
+            }
+            for table, columns in required.items():
+                available = {
+                    row[1]
+                    for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+                }
+                missing = columns - available
+                if missing:
+                    raise ContractViolation(
+                        f"work-item session store table {table} is missing required columns {sorted(missing)!r}"
+                    )
+            return connection
+        except ContractViolation:
+            if connection is not None:
+                connection.close()
+            raise
+        except sqlite3.DatabaseError as error:
+            if connection is not None:
+                connection.close()
+            raise ContractViolation(f"work-item session store cannot be read: {error}") from error
+
+    def work_item(self, key):
+        connection = self._connection()
+        try:
+            rows = connection.execute(
+                "SELECT key, status, pr FROM work_items WHERE key = ?", (key,)
+            ).fetchall()
+            if not rows:
+                raise ContractViolation(f"work item {key} is not registered in the session store")
+            if len(rows) > 1:
+                raise ContractViolation(f"work item {key} has conflicting registered rows")
+            row = rows[0]
+            value = dict(row)
+            if value.get("status") not in WORK_ITEM_STATUSES:
+                raise ContractViolation(f"work item {key} has unsupported status {value.get('status')!r}")
+            return value
+        except sqlite3.DatabaseError as error:
+            raise ContractViolation(f"work-item session store query failed: {error}") from error
+        finally:
+            connection.close()
+
+    def owner(self, key):
+        connection = self._connection()
+        try:
+            rows = connection.execute(
+                "SELECT handle, repo, branch, cwd FROM sessions "
+                "WHERE work_item = ? AND role = 'owner' AND ended_at IS NULL",
+                (key,),
+            ).fetchall()
+            if len(rows) > 1:
+                raise ContractViolation(f"work item {key} has multiple active session owners")
+            return dict(rows[0]) if rows else None
+        except sqlite3.DatabaseError as error:
+            raise ContractViolation(f"work-item session store query failed: {error}") from error
+        finally:
+            connection.close()
+
+
 class RepositoryStateProvider:
     provider_id = "repository"
 
@@ -604,7 +743,192 @@ class RepositoryStateProvider:
         }
         return self.contract.validate("provider", record)
 
+    def work_item_status(self, ledger):
+        document = _work_item_document(self.root, ledger)
+        if document is None:
+            return None
+        _path, identifier, _roadmap = document
+        repository = _repository_identity(self.root)
+        if not repository:
+            raise ContractViolation("work-item resolution requires a repository identity")
+        row = ReadOnlyWorkItemStore().work_item(f"{repository}:{identifier}")
+        return row["status"]
+
+    def _resolve_work_item(self, ledger, workflow_run_id, stage_id, document):
+        ledger_path, identifier, roadmap = document
+        text = ledger_path.read_text(encoding="utf-8")
+        headers = _headers(text)
+        required = ("Worktree", "Branch")
+        missing = [name for name in required if not headers.get(name)]
+        if missing:
+            raise ContractViolation(f"work-item README is missing headers {missing!r}")
+        actual_worktree = Path(_git(self.root, "rev-parse", "--show-toplevel")).resolve()
+        recorded_worktree = Path(headers["Worktree"]).resolve()
+        if str(recorded_worktree).casefold() != str(actual_worktree).casefold():
+            raise ContractViolation("work-item README worktree does not match the repository provider")
+        branch = _git(self.root, "branch", "--show-current")
+        if headers["Branch"] != branch:
+            raise ContractViolation("work-item README branch does not match the repository provider")
+        head = _git(self.root, "rev-parse", "HEAD")
+        roadmap_path = self.root.joinpath(*PurePosixPath(roadmap).parts).resolve()
+        if not roadmap_path.is_file():
+            raise ContractViolation("work-item feature README does not exist")
+        marker = f"`{identifier}`"
+        matches = re.findall(
+            rf"^(?:- \[[ xX]\].*|\|\s*\[[ xX]\]\s*\|.*){re.escape(marker)}.*$",
+            roadmap_path.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        if len(matches) != 1:
+            raise ContractViolation("work-item feature README must contain exactly one checklist marker")
+        if not re.search(r"(?m)^## Decisions\s*$", text):
+            raise ContractViolation("work-item README requires a Decisions section")
+        next_steps = _section(text, "Next Steps")
+        if not next_steps:
+            raise ContractViolation("work-item README has no resolved Next Steps")
+        scope_fields = {}
+        for field in ("Scope", "Current slice", "Remaining scope", "Done when"):
+            match = re.search(rf"(?mi)^{re.escape(field)}:\s*(.+)$", next_steps)
+            if match:
+                scope_fields[field] = match.group(1).strip()
+        if set(scope_fields) != {"Scope", "Current slice", "Remaining scope", "Done when"}:
+            raise ContractViolation("work-item README Next Steps do not expose the complete execution scope")
+        scope_prefixes = tuple(f"{field}:" for field in scope_fields)
+        action_steps = "\n".join(
+            line for line in next_steps.splitlines() if not line.startswith(scope_prefixes)
+        ).strip()
+        repository = _repository_identity(self.root)
+        if not repository:
+            raise ContractViolation("work-item resolution requires a repository identity")
+        key = f"{repository}:{identifier}"
+        store = ReadOnlyWorkItemStore()
+        item = store.work_item(key)
+        owner_record = store.owner(key)
+        if owner_record:
+            if owner_record.get("repo") and owner_record["repo"].casefold() != repository.casefold():
+                raise ContractViolation("session owner repository does not match the work-item repository")
+            if owner_record.get("branch") and owner_record["branch"] != branch:
+                raise ContractViolation("session owner branch does not match the work-item branch")
+            if owner_record.get("cwd") and Path(owner_record["cwd"]).resolve() != actual_worktree:
+                raise ContractViolation("session owner worktree does not match the work-item worktree")
+        next_kind = "continue"
+        status = "active"
+        transition_kind = "continue"
+        owner = None
+        blocker = None
+        resume_condition = None
+        target_stage = None
+        if action_steps.startswith("Paused:"):
+            next_kind = "pause"
+            status = "paused"
+            transition_kind = "pause"
+            first_line = action_steps.splitlines()[0]
+            owner = re.split(r"\s+(?:—|-)\s+", first_line.removeprefix("Paused:").strip(), maxsplit=1)[0]
+            resume_condition = first_line
+        elif action_steps.startswith("Blocked:"):
+            next_kind = "block"
+            status = "blocked"
+            transition_kind = "block"
+            fields = dict(
+                line.split(":", 1)
+                for line in action_steps.splitlines()
+                if ":" in line and line.split(":", 1)[0] in {"Blocked", "Blocked by", "Unblock action", "Resume when"}
+            )
+            if set(fields) != {"Blocked", "Blocked by", "Unblock action", "Resume when"}:
+                raise ContractViolation("blocked Next Steps do not contain the four required fields")
+            owner = fields["Blocked by"].strip()
+            resume_condition = fields["Resume when"].strip()
+            blocker = self.contract.gate("dependency", "open", owner, fields["Unblock action"].strip(), resume_condition, [fields["Blocked"].strip()])
+        elif action_steps.startswith("Transfer:"):
+            next_kind = "transfer"
+            transition_kind = "transfer"
+            fields = dict(
+                line.split(":", 1)
+                for line in action_steps.splitlines()
+                if ":" in line and line.split(":", 1)[0] in {"Transfer", "Transfer to", "Resume stage", "Resume when"}
+            )
+            if set(fields) != {"Transfer", "Transfer to", "Resume stage", "Resume when"}:
+                raise ContractViolation("transfer Next Steps do not contain the four required fields")
+            owner = fields["Transfer to"].strip()
+            target_stage = fields["Resume stage"].strip()
+            resume_condition = fields["Resume when"].strip()
+        elif (
+            action_steps == "Complete"
+            or action_steps == "Terminal"
+            or action_steps.startswith("Complete:")
+            or action_steps.startswith("Terminal:")
+        ):
+            next_kind = "complete"
+            status = "complete"
+            transition_kind = "complete"
+        expected_actions = {
+            "proposed": {"continue", "transfer"},
+            "active": {"continue", "transfer"},
+            "delivery-gated": {"continue", "transfer"},
+            "blocked": {"block"},
+            "paused": {"pause"},
+            "done": {"complete"},
+        }
+        if next_kind not in expected_actions[item["status"]]:
+            raise ContractViolation(
+                f"work-item status {item['status']!r} conflicts with Next Steps action {next_kind!r}"
+            )
+        reviews_text = _section(text, "Reviews")
+        reviews = []
+        for candidate in re.findall(r"(?:`|\()((?:reviews/)[^`)\s]+\.md)", reviews_text):
+            review = _repository_path_key(candidate, self.root)
+            if review is None or not review.startswith("reviews/"):
+                raise ContractViolation(f"review path must stay under reviews/: {candidate}")
+            if review not in reviews:
+                reviews.append(review)
+        ledger_key = ledger_path.relative_to(self.root).as_posix()
+        state = {
+            "contract_version": self.contract.version,
+            "workflow_id": identifier,
+            "workflow_run_id": workflow_run_id,
+            "stage_id": stage_id,
+            "status": status,
+            "provider_id": self.provider_id,
+            "owner": {
+                "repository": self.root.name,
+                "worktree": str(actual_worktree),
+                "branch": branch,
+                "head": head,
+            },
+            "artifacts": {"plan": ledger_key, "ledger": ledger_key, "roadmap": roadmap, "reviews": reviews},
+            "decisions": _bullets(_section(text, "Decisions")),
+            "open_findings": _open_review_findings(self.root, reviews),
+            "next_action": {
+                "kind": next_kind,
+                "description": action_steps,
+                "scope": scope_fields["Scope"],
+                "current_slice": scope_fields["Current slice"],
+                "remaining_scope": scope_fields["Remaining scope"],
+                "done_when": scope_fields["Done when"],
+            },
+            "transition": self.contract.transition(
+                transition_kind,
+                "The work-item README resolved the current next action.",
+                target_stage_id=target_stage if transition_kind == "transfer" else stage_id if transition_kind == "continue" else None,
+                resume_condition=resume_condition,
+            ),
+        }
+        if owner:
+            state["next_action"]["owner"] = owner
+        if owner_record and owner_record.get("handle"):
+            state["owner"]["session_id"] = owner_record["handle"]
+        if "pr" in item:
+            state["artifacts"]["pull_request"] = item["pr"]
+        if resume_condition:
+            state["next_action"]["resume_condition"] = resume_condition
+        if blocker:
+            state["blocker"] = blocker
+        return self.contract.validate("state", state)
+
     def resolve(self, ledger, workflow_run_id, stage_id):
+        document = _work_item_document(self.root, ledger)
+        if document is not None:
+            return self._resolve_work_item(ledger, workflow_run_id, stage_id, document)
         ledger_path = (self.root / ledger).resolve()
         try:
             ledger_path.relative_to(self.root)
@@ -658,7 +982,7 @@ class RepositoryStateProvider:
             transition_kind = "pause"
             first_line = action_steps.splitlines()[0]
             paused = first_line.removeprefix("Paused:").strip()
-            owner = re.split(r"\s+[—-]\s+", paused, maxsplit=1)[0]
+            owner = re.split(r"\s+(?:—|-)\s+", paused, maxsplit=1)[0]
             resume_condition = first_line
         elif action_steps.startswith("Blocked:"):
             next_kind = "block"
