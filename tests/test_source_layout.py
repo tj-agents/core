@@ -150,11 +150,11 @@ class SourceLayoutTests(unittest.TestCase):
             "plugins/machine/resources/machine/scripts/history.py",
             "plugins/machine/skills/followup-codex/scripts/codex_followup.py",
             "plugins/machine/codex-skills/followup-codex/scripts/codex_followup.py",
-            "plugins/machine/skills/plugin-lock/scripts/bootstrap_capabilities.py",
+            "plugins/machine/skills/plugin-lock/scripts/repo_config.py",
             "plugins/machine/skills/hook-control/scripts/hook_control.py",
             "plugins/machine/codex-skills/hook-control/scripts/hook_control.py",
             "plugins/machine/catalog/catalog.json",
-            "plugins/machine/catalog/capabilities.lock.schema.json",
+            "plugins/machine/catalog/plugins.lock.schema.json",
             "CAPABILITIES.md",
         ):
             self.assertIn(relative, output)

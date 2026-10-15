@@ -109,8 +109,8 @@ establish installed-host trust or acceptance.
 - [`SKILL_KINDS.md`](SKILL_KINDS.md) defines the shared open taxonomy used by every agent marketplace repo.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
 - `.agents/catalog/catalog.json` records this repository's immutable releases and package digests. The generated
-  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers selecting other standards
-  commit a composed catalog of owner-published release records beside their capability lock.
+  [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers select plugins in a
+  committed `.agents/plugins.lock.json` that pins one `tj-agents/marketplace` revision.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
@@ -148,10 +148,10 @@ python -B scripts/update_catalog_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
-The `machine:plugin-lock` skill previews, applies and verifies exact project locks through native
-Codex or Claude plugin commands. It uses installation-owned Git checkouts at full locked commits and isolated
-`CODEX_HOME` or `CLAUDE_CONFIG_DIR` profile paths. Preview changes nothing; verify is offline-safe; apply only
-adds the selected catalog marketplaces and plugins. It never performs an unconditional marketplace refresh.
+The `machine:plugin-lock` skill creates a repository's `.agents/plugins.lock.json` (plugin names plus one
+`tj-agents/marketplace` revision) and generates the committed Claude and Codex plugin settings from it, so a
+fresh clone installs exactly what it selects. It also moves repositories to another marketplace tag and audits
+a machine for old user-level plugin settings.
 
 Catalog releases use immutable semantic tags. Codex manifests carry matching package versions; Claude remains
 commit/tag based until its dependency/version behavior has a separately verified gate. `sha256-tree-v1` hashes
@@ -253,8 +253,7 @@ claude plugin update engineering@base-agents
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
-Use a project capability lock and `machine:plugin-lock` when a cross-marketplace selection must
-resolve and verify its complete dependency closure reproducibly.
+Use `machine:plugin-lock` to give a repository its own pinned plugin selection.
 
 Codex does not load agent definitions directly from plugins. After installing or updating the marketplace,
 install the engineering package's shared agents once into the active Codex profile. The installer defaults

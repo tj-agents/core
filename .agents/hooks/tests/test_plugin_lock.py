@@ -19,7 +19,7 @@ def load(name):
 
 plugin_lock = load("plugin_lock")
 repo_config = load("repo_config")
-BootstrapError = repo_config.bootstrap.BootstrapError
+LockError = repo_config.lock_io.LockError
 
 
 class PluginLockTests(unittest.TestCase):
@@ -40,7 +40,7 @@ class PluginLockTests(unittest.TestCase):
         self.lock.write_text(json.dumps(self.document), encoding="utf-8")
 
     def run_mode(self, mode, scope="project"):
-        return repo_config.run(self.lock, None, mode, root=self.root, scope=scope)
+        return repo_config.run(self.lock, mode, root=self.root, scope=scope)
 
     def test_generates_both_hosts_from_the_marketplace_pin_without_a_catalog(self):
         self.assertEqual([".claude/settings.json", ".codex/config.toml"], self.run_mode("check"))
@@ -69,7 +69,7 @@ class PluginLockTests(unittest.TestCase):
     def test_lock_must_select_every_core_plugin(self):
         self.document["plugins"].remove("machine")
         self.save()
-        with self.assertRaisesRegex(BootstrapError, "omits core plugins: tj-agents/machine"):
+        with self.assertRaisesRegex(LockError, "omits core plugins: tj-agents/machine"):
             self.run_mode("write")
         self.assertFalse((self.root / ".claude").exists())
 
@@ -84,7 +84,7 @@ class PluginLockTests(unittest.TestCase):
         for label, (key, value) in cases.items():
             with self.subTest(label):
                 broken = dict(self.document, **{key: value})
-                with self.assertRaises(BootstrapError):
+                with self.assertRaises(LockError):
                     plugin_lock.validate(broken)
 
     def test_full_commit_revision_is_accepted(self):
@@ -94,28 +94,21 @@ class PluginLockTests(unittest.TestCase):
     def test_overlay_plugin_must_be_selected(self):
         overlay = {"schema_version": 1, "requires": {"marketplaces": [], "plugins": ["tj-agents/react"], "hooks": [], "permissions": {"claude_allow": [], "codex_prefix_rules": []}}}
         (self.lock.parent / "repository-harness.json").write_text(json.dumps(overlay), encoding="utf-8")
-        with self.assertRaisesRegex(BootstrapError, "harness-required plugins"):
+        with self.assertRaisesRegex(LockError, "harness-required plugins"):
             self.run_mode("write")
 
     def test_machine_specific_paths_still_block_generation(self):
         settings = self.root / ".claude" / "settings.json"
         settings.parent.mkdir()
         settings.write_text(json.dumps({"hooks": {"Stop": [{"command": "C:\\Users\\Someone\\hook.ps1"}]}}), encoding="utf-8")
-        with self.assertRaisesRegex(BootstrapError, "machine-specific paths"):
+        with self.assertRaisesRegex(LockError, "machine-specific paths"):
             self.run_mode("check")
-
-    def test_resolve_prefers_the_current_name_and_forwards_the_legacy_one(self):
-        legacy = self.lock.parent / "capabilities.lock.json"
-        self.assertEqual(self.lock, plugin_lock.resolve(self.root))
-        self.lock.rename(legacy)
-        self.assertEqual(legacy, plugin_lock.resolve(self.root))
-        self.save()
-        with self.assertRaisesRegex(BootstrapError, "remove the legacy lock"):
-            plugin_lock.resolve(self.root)
 
     def test_cli_resolves_the_lock_from_the_root(self):
         self.assertEqual(0, repo_config.main(["--root", str(self.root), "--mode", "write"]))
         self.assertEqual(0, repo_config.main(["--root", str(self.root), "--mode", "check"]))
+    def test_resolve_names_the_plugin_lock_in_the_agents_directory(self):
+        self.assertEqual(self.lock, plugin_lock.resolve(self.root))
 
 
 if __name__ == "__main__":
