@@ -14,7 +14,7 @@ owner.
 
 1. Reconcile the named record, or select one actionable high-value record quickly. Do not deep-rank every
    record. Prefer an unblocked `P0` or `P1`, then the first useful `P2` or `P3`; priority does not pause
-   unrelated work.
+   unrelated work except for `engineering:self-repair`'s shared agent-lifecycle exception.
 2. Reconcile an existing goal, session, branch, PR, or writer before writing or dispatching. If another
    owner already has the causal repair, update the record with the link and evidence instead of starting a
    second writer. Update blocked records with their real reason and resume condition.

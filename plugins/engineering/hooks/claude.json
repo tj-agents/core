@@ -1,5 +1,5 @@
 {
-  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files. Claude result and stop events enforce the red-run repair loop.",
+  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files. Cleanup obligations cover direct and guarded merge invocations. Claude result and stop events enforce the red-run repair loop.",
   "hooks": {
     "SessionStart": [
       {
