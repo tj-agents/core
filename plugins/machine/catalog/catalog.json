@@ -207,7 +207,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:f92eb61477d2d6a7e6bf3f25cef30e46079b683ac6467ecff3534dd49184d012",
+          "digest": "sha256:e94f036213c160ede7a9018c85f75944f0f0060513e0244bb4173b1349730a5a",
           "harness": {
             "marketplaces": [
               {
@@ -527,7 +527,7 @@
                       "--root",
                       "${PROJECT_ROOT}"
                     ],
-                    "justification": "rechecks the freshly validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+                    "justification": "Rechecks required authorization, checkout identity, readiness, review, and security evidence before arming auto-merge for this declared checkout.",
                     "match": [
                       [
                         "python",
