@@ -1,7 +1,7 @@
 # Agent capabilities
 
 Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).
-Select exact releases in a project's `.agents/capabilities.lock.json`; do not copy definitions between repositories.
+Select plugins in a project's `.agents/plugins.lock.json`; do not copy definitions between repositories.
 
 ## base-agents 2.1.16
 

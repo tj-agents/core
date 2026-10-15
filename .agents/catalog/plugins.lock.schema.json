@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tj-agents/core/catalog/plugins.lock.schema.json",
+  "title": "Repository plugin lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "marketplace", "plugins"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "marketplace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "revision"],
+      "properties": {
+        "repository": {"const": "tj-agents/marketplace"},
+        "revision": {"type": "string", "pattern": "^(v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)|[0-9a-f]{40})$"}
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+      "allOf": [
+        {"contains": {"const": "base"}},
+        {"contains": {"const": "engineering"}},
+        {"contains": {"const": "machine"}}
+      ]
+    }
+  }
+}
