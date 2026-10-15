@@ -42,6 +42,11 @@ below.
 
 ## Hand off the source repair
 
+When the current task already owns the causal Core repair, continue in its existing goal and checkout.
+Reconcile follow-up evidence with that verified owner and the current callout gate; do not create another
+goal, successor, branch, or delivery solely because the user repeats the same callout. A distinct source
+repair or an actual context transfer uses the handoff below.
+
 Use `engineering:handoff` in bounded side-workstream mode after it admits the repair. The repair gets an
 isolated Core checkout and one selected successor; the originating session retains its original goal and
 continues only independent work. Shared agent-lifecycle failures follow the exception above. A
