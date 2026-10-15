@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / "repo_config.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "plugin-lock" / "scripts" / "repo_config.py"
 sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("repo_config", SCRIPT)
 repo_config = importlib.util.module_from_spec(spec)

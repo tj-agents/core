@@ -10,7 +10,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts"
+SCRIPTS = ROOT / ".agents/machine/utility/plugin-lock/scripts"
 sys.path.insert(0, str(SCRIPTS))
 import bootstrap_capabilities as bootstrap
 
@@ -29,7 +29,7 @@ class RepositoryAdoptionTests(unittest.TestCase):
         self.core, core_commit = self.source(
             "core", "base-agents", "tj-agents/core",
             {"base": ([], ["base-rule"]), "engineering": (["base-agents/base"], ["feature"]),
-             "machine": (["base-agents/base"], ["bootstrap-capabilities"])},
+             "machine": (["base-agents/base"], ["plugin-lock"])},
         )
         self.dotnet, dotnet_commit = self.source(
             "dotnet", "dotagents", "tj-agents/dotnet",

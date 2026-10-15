@@ -15,7 +15,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts/bootstrap_capabilities.py"
+SCRIPT = ROOT / ".agents/machine/utility/plugin-lock/scripts/bootstrap_capabilities.py"
 SPEC = importlib.util.spec_from_file_location("bootstrap_capabilities", SCRIPT)
 BOOT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BOOT)

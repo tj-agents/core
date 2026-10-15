@@ -10,7 +10,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / '.agents/machine/utility/bootstrap-capabilities/scripts/selection_profiles.py'
+SCRIPT = ROOT / '.agents/machine/utility/plugin-lock/scripts/selection_profiles.py'
 SPEC = importlib.util.spec_from_file_location('selection_profiles', SCRIPT)
 profiles = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(profiles)

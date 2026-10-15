@@ -1,4 +1,4 @@
-# Tech debt — bootstrap-capabilities
+# Tech debt — plugin-lock
 
 ## The harness permission sync redoes its whole check on every session start
 
