@@ -26,7 +26,7 @@ Canonical source is `.agents/`; host trees stay thin and generated `plugins/*` s
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-VerifiedTerminalCleanup
 Branch: Fix/GuardedMergeCleanup
-PR: pending for the guarded-wrapper correction; owning review reviews/Fix-GuardedMergeCleanup.md.
+PR: https://github.com/tj-agents/core/pull/267 atc11cd07cb90d5b87dd7f905d3a84901c656dccc3; owning review reviews/Fix-GuardedMergeCleanup.md.
 Published guidance: https://github.com/tj-agents/core/pull/266, merged b6c61f46cd99ae672e31c4bf42257366b9dfe222 at2026-10-15T13:19:48Z; exact reviewed head19e90d46f8a591b7efdc7d84532041f11738556d.
 Published runtime review: https://github.com/tj-agents/core/pull/252, merged e8246a30dbe062ae695ab53ee4eb57e6ccb13f1b.
 Current native owner: Codex 01a139aa-62c8-7453-a1e4-aa9d3a665086, verified PID30000/start1792061248.38945 on this resume. Re-resolve process identity before destructive actions; former PID32732 is stale.
@@ -98,6 +98,18 @@ Immutable candidate9decb30170491bcd7f891adbed77a21ebd4f05a1 was synchronized onc
 
 Both retained review corrections are implemented in the same two source/test files. Direct raw optional-session behavior is restored only for direct merges; wrapper native-session validation remains strict. Wrapper suffix uses host filesystem case normalization. New sessionless-direct and mixed-case-platform regressions plus direct canonical, queued and invalid/missing-session wrapper coverage passed5 tests in19.804s; AST and diff whitespace checks passed. Source lease released. Parent accepted the bounded diff; L7 coherent local checkpoint then L4 incremental review follows.
 
+## Guarded wrapper delivery checkpoint - 2026-10-15
+
+R1/R2 fixing commitc11cd07cb90d5b87dd7f905d3a84901c656dccc3 contains only the two source/test files and this maintained goal. Independent native incremental review completed successfully in154.864s (a116f4f4ef1e88fb-native-incremental-guarded-merge.log); fresh typed workflow lens returned no claims and validated against its exact dispatch. Parent approved the fixing delta; canonical work order is complete/approved with its single watermark atc11cd07, prior full-pass identities and changes-requested judgment preserved, both findings resolved and both-host source coverage valid. Disposable bundles removed after identity/patch preservation in private run state. No installed adoption or own report/exit claim.
+
+Draft PR267 is the same bounded substantive repair; inline preflight resolved canonical standalone goal ownership (no duplicate ledger), all code committed, zero behind base, scope454 changed lines/six paths, no generated-sync blocker and exact-head host coverage valid. Authoritative body checks passed. Same owner83fea3cfce3e33df31aa8d22 adopted exact PR267/head binding and unchanged full completion condition/authority, with workflow handoff to causal-publication-and-own-report-cleanup. Single reconnect-safe PR monitor owns exact-head CI run38752843906; Windows/Linux remain pending. No unattended wake, observation-only commit or new deferred-work PR.
+
+## Guarded wrapper merge checkpoint - 2026-10-15
+
+PR267 merged normally atbf5b4cad95707f641caeea9a3f91241b2747ec8a at14:59:43Z, exact approved/pushed headc11cd07cb90d5b87dd7f905d3a84901c656dccc3. Authoritative terminal CI38752843906 passed guard, Linux14:39:56Z and Windows14:55:12Z; regenerate skipped as expected on a PR. Final actual-base preflight had zero blockers and no movement, current body validation passed, draft was marked ready and guarded auto_merge completed successfully. Same PR monitor confirmed MERGED and terminated after18 queries. No generated output, source or review-transport tail was pushed.
+
+Causal push CI38756374647 at exact mergeheadbf5b4cad, attempt1, is owned by one supported run monitor. Causal publication remains pending. Spent untracked work order was byte-preserved as guarded-merge-cleanup-20261015/terminal-source-review.md in Git-private run state and removed. Current own report/closure remains unverified and deferred timeout/docs-batching work remains unchanged.
+
 ## Agent-host coverage
 
 ```agent-host-coverage
@@ -131,17 +143,25 @@ Both retained review corrections are implemented in the same two source/test fil
 }
 ```
 
+## Workflow delay investigation - October 15, 2026
+
+Tommy explicitly authorized investigating and fixing excessive workflow overhead: standards should support autonomous work and remain proportionate. Continue with this goal and owner. L3 investigation used one bounded read-only policy audit; resulting specified policy edits are L4 implementation. The postponed daily canonical documentation branch/batching design and hook-timeout repair remain separate.
+
+Root transcript window10:47:31Z-15:13:48Z:428exec calls, about99minutes cumulative tool round-trip time (includes waits; not an additive wall-time breakdown);154SKILL.md path mentions across30skills,14agent launches and7context compactions. Mentions do not prove every read succeeded. PR267 Windows CI took19m07s:5m53s source/package tests and12m04s shared runtime tests. Its native reviewer repeated an already-passed approximately4minute suite. Existing policies already forbid repeated satisfied preparation; the owner failed to apply them consistently.
+
+Correct mandatory separate delivery for related guidance, repeated lane setup and unavailable-cheaper-model blocking, serial-review ambiguity and automatic extra lenses, and unclear reuse of the current causal repair owner. Reuse exact-candidate verification and preserve authorization plus required CI/review/security gates. No new framework, controller, skill, or documentation batching architecture.
+
+PR267 causal main run38756374647 succeeded: Windows15:15:23Z, Linux15:04:19Z, regenerate15:00:27Z. Generated commitb06774118619cc80d5d4a4851f85189b969c4790 has direct parentbf5b4cad95707f641caeea9a3f91241b2747ec8a. Original cleanup source repair is merged and verified. Active user dialogue keeps this session open; own exit/removal is unclaimed.
+
 ## Next Steps
 
-Finish the two retained review corrections, commit focused verified changes, and complete incremental review from9decb301; then deliver the same substantive source slice through exact-head Windows/Linux CI, normal merge and causal publication. Do not create a record-only PR. Then checkpoint the final report/cleanup boundary, preserve runtime/local plan evidence, obtain a fresh legitimate cleanup proof, and verify supported final report/cleanup or retain with actual refusal evidence and concrete resolver/resume condition. PR252/266 are merged after approved independent reviews and exact-head Windows/Linux CI; PR252 and PR266 causal runs are green; PR266 generated commit96c1ba34 is published. Tommy's documentation/work-item batching and recurring hook-timeout repair remain deferred; no new repair or PR for those now.
+Verify packaging and reachability of the focused workflow-proportionality correction, obtain one independent review of the frozen candidate, then deliver through required CI and causal publication under existing authority. Reuse satisfied evidence; do not reopen PR252/266/267. Keep this CLI open during active dialogue. Own final report/cleanup requires truthful delivery and fresh applicable safety proof.
 
-Scope: whole plan through all remaining phases and terminal delivery.
-Current slice: bounded guarded-merge cleanup recording correction, same M020 and canonical goal; prior PR252 runtime andPR266 governing guidance are merged.
-Remaining scope: guarded merge cleanup-recording correction and its reviewed/CI-verified publication; supported post-report/handoff acceptance; verified own report-before-close/cleanup.
-Done when: all scoped source/records are reviewed, tested, merged and causally published, both finished predecessors have verified cleanup or explicit objective safety disposition, and the repair owner's final report and own applicable cleanup are truthful and verified.
+Scope: original repair plus explicitly authorized workflow-delay correction.
+Current slice: Fix/WorkflowProportionality, based on published mainb0677411; seven policy/role files and harness declaration.
+Remaining scope: review, required validation and publication of proportionality correction; truthful final report and applicable cleanup when dialogue permits.
+Done when: both source outcomes are reviewed, tested, merged and causally published, and any cleanup claim has actual evidence.
 
 ## Execution readiness
 
-Verdict: runtime PR252 and governing-guidance PR266 causally published with Windows/Linux CI green. Supported guarded-merge path lacks cleanup recording, requiring the bounded causal follow-on before own terminal acceptance. Native console inspection observed, own report-before-close acceptance unproved; auto-prearm unsupported and existing guarded fallback retained.
-Execution authorization: implementation through bounded delivery and terminal closeout.
-Transfer: current pickup complete; receipt and first-action evidence above. No new transfer selected.
+Original correction causally published. Delay diagnosis complete; specified policy correction in progress. Existing authorization covers implementation and source delivery. No new transfer or user design gate.

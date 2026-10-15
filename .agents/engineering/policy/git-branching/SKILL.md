@@ -173,7 +173,7 @@ only for work that needs one now. Before another dependency restore or build, ac
 space and the generated outputs already present in existing checkouts. Retire completed worktrees through
 `engineering:open-worktree` once their commits and required evidence are safely preserved.
 
-## Working docs ride along; durable guidance does not
+## Documentation follows its delivery scope
 
 Non-code working markdown is non-breaking. Plans, roadmaps, and ledgers ride the branch that owns their active
 delivery slice, so a material update can share the substantive commit instead of creating a transport tail.
@@ -181,7 +181,7 @@ Planning-only authoring needs no worktree, but one logical ledger must never be 
 Scratch notes and tech-debt files may ride the branch that owns their subject. Never force-push to tidy a
 stray markdown file swept in by `git add -A`.
 
-**Durable global guidance is different.** When feature work changes an always-loaded instruction file, a
-playbook, or a skill, split that change immediately onto a `Docs/*` branch cut from the remote default,
-review it, and land it on its own. Never leave guidance stranded behind a feature PR or mixed into a
-runtime commit — every later session reads the guidance, not the feature.
+Guidance required to explain, enforce, or operate a candidate's behavior ships with that behavior in the
+same reviewed delivery slice. Separate guidance when it has an independent outcome and does not depend
+on the candidate. A documentation file alone does not justify another branch, review, or merge. Keep
+unrelated documentation in its canonical owner under the repository's documentation policy.
