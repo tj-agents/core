@@ -502,7 +502,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         posttooluse = self.run_hook({
             "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
             "tool_input": {"command": merge_command},
-            "tool_response": "✓ Squashed and merged pull request #3 (feature)",
+            "tool_response": "Ã¢Å“â€œ Squashed and merged pull request #3 (feature)",
         })
         self.assertEqual(0, posttooluse.returncode, posttooluse.stderr)
         obligation = json.loads(path.read_text(encoding="utf-8"))
@@ -527,9 +527,9 @@ class MergeCleanupGateTests(unittest.TestCase):
         worktree = add_feature_worktree(primary, self.root, "feature")
         merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
         for output in (
-            "✓ Merged pull request #3 (feature)",
-            "✓ Squashed and merged pull request #3 (feature)",
-            "✓ Rebased and merged pull request #3 (feature)",
+            "Ã¢Å“â€œ Merged pull request #3 (feature)",
+            "Ã¢Å“â€œ Squashed and merged pull request #3 (feature)",
+            "Ã¢Å“â€œ Rebased and merged pull request #3 (feature)",
             "",
         ):
             with self.subTest(output=output):
@@ -620,7 +620,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.run_hook({
             "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "session_id": "s1",
             "tool_input": {"command": merge_command},
-            "error": "✓ Squashed and merged pull request org/repo#3 (feature)\nfailed to delete local branch feature",
+            "error": "Ã¢Å“â€œ Squashed and merged pull request org/repo#3 (feature)\nfailed to delete local branch feature",
         })
         self.assertTrue(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
 
@@ -629,8 +629,8 @@ class MergeCleanupGateTests(unittest.TestCase):
         worktree = add_feature_worktree(primary, self.root, "feature")
         merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash --auto'
         for output in (
-            "✓ Pull request #3 will be automatically merged when all requirements are met",
-            "✓ Squashed and merged pull request #3 (feature)",
+            "Ã¢Å“â€œ Pull request #3 will be automatically merged when all requirements are met",
+            "Ã¢Å“â€œ Squashed and merged pull request #3 (feature)",
         ):
             with self.subTest(output=output):
                 self.run_hook(self.payload(merge_command, codex=False, session="s1"))
@@ -762,7 +762,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         result = self.run_hook({
             "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "session_id": "s1",
             "tool_input": {"command": merge_command},
-            "tool_response": "✓ Squashed and merged pull request tj-agents/core#3 (feature)\n"
+            "tool_response": "Ã¢Å“â€œ Squashed and merged pull request tj-agents/core#3 (feature)\n"
                              "X a later step failed",
         })
         self.assertEqual(0, result.returncode, result.stderr)
@@ -846,7 +846,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         confirm = self.run_hook({
             "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "claude-session",
             "tool_input": {"command": merge_command},
-            "tool_response": "✓ Merged pull request #3 (feature)",
+            "tool_response": "Ã¢Å“â€œ Merged pull request #3 (feature)",
         })
         self.assertEqual(0, confirm.returncode, confirm.stderr)
         stop = self.run_hook({"hook_event_name": "Stop", "session_id": "claude-session"})
@@ -928,6 +928,8 @@ class MergeCleanupGateTests(unittest.TestCase):
             "missing-target": lambda detail: detail.pop("resolved_target"),
             "wrong-target-session": lambda detail: detail["resolved_target"].update(session_id="other"),
             "wrong-cwd": lambda detail: detail.update(cwd=str(primary)),
+            "sibling-cwd": lambda detail: detail.update(cwd=str(worktree.with_name(worktree.name + "-other"))),
+            "escaping-cwd": lambda detail: detail.update(cwd=str(worktree / ".." / "other")),
             "wrong-peer": lambda detail: detail.update(argv=[sys.executable, str(PEER_CLI_SCRIPT.resolve()), "close", "other", "--force"]),
         }
         for name, mutate in cases.items():
@@ -948,40 +950,44 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.run_hook(self.payload(f'pushd "{worktree}" && gh pr merge 3 --squash'))
         _, obligation = self.sole_obligation()
         receipt = {"head": obligation["head"], "primary": str(primary), "branch": "feature", "default": "main"}
-        for module in (own_close, finish):
-            for host in ("codex", "claude"):
-                with self.subTest(command=module.__name__, host=host):
-                    entry = {"session_id": "s1", "cwd": str(worktree), "host": host,
-                             "pid": 123, "pid_started_at": 1.0, "started_at": 1.0}
-                    with mock.patch.dict(os.environ, self.env), \
-                            mock.patch.object(session_close, "own_host_and_entry", return_value=entry), \
-                            mock.patch.object(session_close, "worktree_from_cwd", return_value=worktree), \
-                            mock.patch.object(session_close.os, "getcwd", return_value=str(worktree)), \
-                            mock.patch.object(session_close, "awaiting_input_activity", return_value=1.0), \
-                            mock.patch.object(session_close, "fresh_removable_receipt", return_value=receipt), \
-                            mock.patch.object(session_close, "other_live_claimant", return_value=None), \
-                            mock.patch.object(session_close, "git", return_value=(0, "", "")), \
-                            mock.patch.object(session_close, "qualified_windows_wrapper", return_value=None), \
-                            mock.patch.object(session_close, "start_observer", side_effect=session_close.Refusal(
-                                "timed out starting detached cleanup observer")), \
-                            mock.patch.object(module, "close_host") as closer:
-                        with self.assertRaisesRegex(session_close.Refusal, "timed out"):
-                            module.main([])
-                        closer.assert_not_called()
-                    attempts = Path(self.state.name) / "merge-cleanup" / "close-attempts"
-                    attempt = max(attempts.glob("*.json"), key=lambda item: item.stat().st_mtime_ns)
-                    detail = json.loads(attempt.read_text(encoding="utf-8"))["capability"]
-                    self.assertEqual(entry["session_id"], detail["resolved_target"]["session_id"])
-                    self.assertEqual(123, detail["resolved_target"]["pid"])
-                    self.assertEqual(2, detail["returncode"])
-                    self.assertNotIn("fallback", detail)
-                    self.assertFalse(gate.capability_evidence_is_valid({"capability": detail}, obligation))
-                    detail["fallback"] = {"outcome": "unavailable", "source": "fixture fallback result",
-                                          "evidence": "No supported fallback in this fixture."}
-                    evidence = self.clear_evidence(worktree, obligation, "capability", detail)
-                    result = self.run_hook(argv=["--clear", str(worktree), "--reason", "capability",
-                                                 "--evidence", str(evidence)])
-                    self.assertEqual(0, result.returncode, result.stderr)
+        nested_cwd = worktree / "src" / "nested"
+        nested_cwd.mkdir(parents=True)
+        for invocation_cwd in (worktree, nested_cwd):
+            for module in (own_close, finish):
+                for host in ("codex", "claude"):
+                    with self.subTest(command=module.__name__, host=host, cwd=invocation_cwd):
+                        entry = {"session_id": "s1", "cwd": str(worktree), "host": host,
+                                 "pid": 123, "pid_started_at": 1.0, "started_at": 1.0}
+                        with mock.patch.dict(os.environ, self.env), \
+                                mock.patch.object(session_close, "own_host_and_entry", return_value=entry), \
+                                mock.patch.object(session_close, "worktree_from_cwd", return_value=worktree), \
+                                mock.patch.object(session_close.os, "getcwd", return_value=str(invocation_cwd)), \
+                                mock.patch.object(session_close, "awaiting_input_activity", return_value=1.0), \
+                                mock.patch.object(session_close, "fresh_removable_receipt", return_value=receipt), \
+                                mock.patch.object(session_close, "other_live_claimant", return_value=None), \
+                                mock.patch.object(session_close, "git", return_value=(0, "", "")), \
+                                mock.patch.object(session_close, "qualified_windows_wrapper", return_value=None), \
+                                mock.patch.object(session_close, "start_observer", side_effect=session_close.Refusal(
+                                    "timed out starting detached cleanup observer")), \
+                                mock.patch.object(module, "close_host") as closer:
+                            with self.assertRaisesRegex(session_close.Refusal, "timed out"):
+                                module.main([])
+                            closer.assert_not_called()
+                        attempts = Path(self.state.name) / "merge-cleanup" / "close-attempts"
+                        attempt = max(attempts.glob("*.json"), key=lambda item: item.stat().st_mtime_ns)
+                        detail = json.loads(attempt.read_text(encoding="utf-8"))["capability"]
+                        self.assertEqual(entry["session_id"], detail["resolved_target"]["session_id"])
+                        self.assertEqual(123, detail["resolved_target"]["pid"])
+                        self.assertEqual(str(invocation_cwd), detail["cwd"])
+                        self.assertEqual(2, detail["returncode"])
+                        self.assertNotIn("fallback", detail)
+                        self.assertFalse(gate.capability_evidence_is_valid({"capability": detail}, obligation))
+                        detail["fallback"] = {"outcome": "unavailable", "source": "fixture fallback result",
+                                              "evidence": "No supported fallback in this fixture."}
+                        evidence = self.clear_evidence(worktree, obligation, "capability", detail)
+                        result = self.run_hook(argv=["--clear", str(worktree), "--reason", "capability",
+                                                     "--evidence", str(evidence)])
+                        self.assertEqual(0, result.returncode, result.stderr)
 
     def test_capability_close_tab_selector_must_name_the_obligated_session(self):
         obligation = {"session_id": "ours", "worktree": str(self.root)}
