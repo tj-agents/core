@@ -20,14 +20,21 @@ bootstrap that creates repositories.
 ## The lock
 
 ```json
-{"schema_version": 2,
- "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
- "plugins": ["base", "engineering", "machine", "dotnet"]}
+{"schema_version": 3,
+ "marketplaces": {
+   "tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
+   "agents":    {"repository": "Concertable/agents",    "revision": "<full commit>"}},
+ "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents",
+             "dotnet@tj-agents", "concertable@agents"]}
 ```
 
-`revision` is a `vN.N.N` marketplace tag or a full lowercase commit. The lock must include `base`,
-`engineering` and `machine`, and it lists a stack plugin's required plugins explicitly. The schema is
-`catalog/plugins.lock.schema.json`.
+A lock names each marketplace it installs from and selects plugins as `<plugin>@<marketplace>`. A marketplace
+knows nothing about the repositories that use it; only the consuming repository's lock combines them. The
+`tj-agents` marketplace is required and must be `tj-agents/marketplace`; another marketplace must be a GitHub
+repository owned by `tj-agents` or `Concertable`, its key is the name that marketplace declares for itself, and
+every declared marketplace must supply at least one plugin. `revision` is a `vN.N.N` tag or a full lowercase
+commit. The lock must include `base@tj-agents`, `engineering@tj-agents` and `machine@tj-agents`, and lists a
+stack plugin's required plugins explicitly. The schema is `catalog/plugins.lock.schema.json`.
 
 ## Adopt a stack
 
@@ -37,7 +44,7 @@ python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\reposit
 ```
 
 A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
-`plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
+`plugin-repository`) resolves to its `tj-agents` plugins through `scripts/plugin_roster.json`, so nobody guesses which
 plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Core and each plugin's required
 plugins are always added, existing selections and the existing revision are kept, and a new lock needs
 `--marketplace-revision`. `preview` lists the changed files, `write` applies them together, and `check`
@@ -63,6 +70,10 @@ optional `.codex/rules/agent-harness.rules` and `.agents/repo-capabilities.local
 exact Git exclusions, preserves unrelated selections and approvals, and refuses tracked targets, changed
 owned settings and links that escape the root. Local settings need Python 3.11 or newer.
 
+A plugin from another marketplace is added as `--plugin <plugin>@<marketplace>` together with
+`--marketplace <marketplace>=<owner>/<repository>@<revision>`, for example
+`--plugin concertable@agents --marketplace agents=Concertable/agents@<full commit>`. It is kept on later runs.
+
 ## Move repositories to another marketplace tag
 
 ```powershell
@@ -70,7 +81,8 @@ python -B '<skill-directory>\scripts\bump_plugin_lock.py' --revision v1.1.0 `
   --root C:\path\to\one --root C:\path\to\two --mode preview
 ```
 
-It previews by default. `--mode write` rewrites each lock's revision and regenerates its settings; a
+`--marketplace <name>` moves a marketplace other than `tj-agents`. It previews by default. `--mode write`
+rewrites that marketplace's revision in each lock and regenerates its settings; a
 repository that fails validation is left unchanged and the others still proceed.
 
 ## Audit a machine
