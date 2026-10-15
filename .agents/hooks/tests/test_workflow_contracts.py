@@ -1974,6 +1974,72 @@ class RepositoryProviderTests(unittest.TestCase):
         self.assertEqual(["reviews/runtime.md#BUG1", "reviews/runtime.md#NAT1"], state["open_findings"])
         self.assertEqual(before, after)
 
+    def test_read_only_work_item_store_accepts_v3_and_refuses_invalid_stores_without_writes(self):
+        state = self.root / "v3-reader-state"
+        state.mkdir()
+        database = state / "sessions.db"
+        source = ROOT / ".agents" / "machine" / "scripts" / "session_store.py"
+        spec = importlib.util.spec_from_file_location("workflow_contract_v3_session_store", source)
+        session_store = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(session_store)
+        key = "github.com/example/runtime:runtime-bridge/readme-reader"
+        connection = sqlite3.connect(database)
+        connection.executescript(session_store.WORK_ITEMS_SCHEMA)
+        connection.executescript(session_store.SESSIONS_SCHEMA)
+        connection.execute("PRAGMA user_version = 3")
+        connection.execute(
+            "INSERT INTO work_items "
+            "(key, repo, feature, item, status, branch, pr, title, plan_path, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                key,
+                "github.com/example/runtime",
+                "runtime-bridge",
+                "readme-reader",
+                "active",
+                "Feature/provider-fixture",
+                None,
+                "Read the v3 work item",
+                "plans/features/runtime-bridge/work-items/readme-reader/README.md",
+                0,
+            ),
+        )
+        connection.commit()
+        connection.close()
+
+        before = database.read_bytes()
+        self.assertEqual("active", ReadOnlyWorkItemStore(database).work_item(key)["status"])
+        self.assertEqual(before, database.read_bytes())
+
+        missing = state / "missing.db"
+        with self.assertRaisesRegex(ContractViolation, "does not exist"):
+            ReadOnlyWorkItemStore(missing).work_item(key)
+        self.assertFalse(missing.exists())
+
+        malformed = state / "malformed.db"
+        connection = sqlite3.connect(malformed)
+        connection.executescript(
+            "CREATE TABLE work_items (key TEXT, status TEXT, title TEXT, plan_path TEXT);"
+            "CREATE TABLE sessions (handle TEXT, repo TEXT, branch TEXT, cwd TEXT, work_item TEXT, "
+            "role TEXT, ended_at REAL);"
+            "PRAGMA user_version = 3;"
+        )
+        connection.commit()
+        connection.close()
+        before = malformed.read_bytes()
+        with self.assertRaisesRegex(ContractViolation, "missing required columns"):
+            ReadOnlyWorkItemStore(malformed).work_item(key)
+        self.assertEqual(before, malformed.read_bytes())
+
+        connection = sqlite3.connect(database)
+        connection.execute("PRAGMA user_version = 4")
+        connection.commit()
+        connection.close()
+        before = database.read_bytes()
+        with self.assertRaisesRegex(ContractViolation, "unsupported schema version 4"):
+            ReadOnlyWorkItemStore(database).work_item(key)
+        self.assertEqual(before, database.read_bytes())
+
     def test_work_item_readme_preserves_a_registered_null_pull_request(self):
         document = self.write_work_item()
         state_root = self.write_session_store("active")
