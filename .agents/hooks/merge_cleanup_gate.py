@@ -185,7 +185,7 @@ MESSAGE = (
     "- If `finish.py` or `close.py` cannot resolve a verified registry attachment, do not force-close the host. "
     "Use Step 5's native-host or handoff fallback to retain verified cleanup ownership.\n"
     "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
-    "`{python} \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
+    "`{python} -B \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
     "This repeats every 10 minutes until cleanup completes, a handoff launcher transfers it, "
     "or verified session exit clears it."
 )
@@ -767,7 +767,7 @@ def reminder_line(obligation):
     return (
         f"merge-cleanup: PR #{obligation.get('pr') or '?'} ({obligation.get('branch') or '?'}) "
         f"at {obligation.get('worktree')} still needs merge Step 5 cleanup "
-        f"(`{python} \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
+        f"(`{python} -B \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
     )
 
 
