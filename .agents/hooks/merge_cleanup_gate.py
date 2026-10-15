@@ -4,6 +4,8 @@ and surface a reminder to any session whose checkout still owns it. `--clear <wo
 is the deliberate-retention escape.
 """
 
+import argparse
+import math
 import os
 import sys
 
@@ -48,6 +50,14 @@ RECONCILE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 GIT_TIMEOUT_SECONDS = 5
 
 CLEANUP_PROOF_RELATIVE = "engineering/workflow/merge/scripts/cleanup_proof.py"
+
+CLEAR_REASONS = ("capability", "keep-open")
+CLOSE_COMMANDS = {"close.py", "finish.py", "peer_cli.py", "close_tab.py"}
+PYTHON_NO_VALUE_FLAGS = {"-B", "-E", "-I", "-O", "-OO", "-q", "-s", "-S", "-u"}
+TRANSIENT_REFUSAL_RE = re.compile(
+    r"not\s+awaiting\s+input|activity\s+changed|active\s+dialogue|already\s+ended",
+    re.IGNORECASE,
+)
 
 RESULT_KEYS = ("tool_response", "tool_result", "tool_output", "tool_error", "error")
 TEXT_FIELDS = ("stdout", "stderr", "output", "content", "error", "message")
@@ -175,7 +185,7 @@ MESSAGE = (
     "- If `finish.py` or `close.py` cannot resolve a verified registry attachment, do not force-close the host. "
     "Use Step 5's native-host or handoff fallback to retain verified cleanup ownership.\n"
     "- Deliberately retaining the worktree (preserve verdict, closed-unmerged PR)? "
-    "`{python} \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
+    "`{python} -B \"{hook_path}\" --clear \"{worktree}\"` records retention; verified session exit is still required.\n"
     "This repeats every 10 minutes until cleanup completes, a handoff launcher transfers it, "
     "or verified session exit clears it."
 )
@@ -221,6 +231,185 @@ def save_obligation(path, data):
     finally:
         if os.path.exists(temp):
             os.unlink(temp)
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def absolute_path(value):
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return Path(value).expanduser().resolve()
+    except OSError:
+        return None
+
+
+def same_path(left, right):
+    return normalize_path_text(left) == normalize_path_text(right)
+
+
+def evidence_binding_matches(evidence, obligation):
+    worktree = obligation.get("worktree")
+    session_id = obligation.get("session_id")
+    recorded_at = obligation.get("recorded_at")
+    return (
+        isinstance(evidence, dict)
+        and nonempty_string(worktree)
+        and nonempty_string(session_id)
+        and isinstance(recorded_at, (int, float)) and not isinstance(recorded_at, bool) and math.isfinite(recorded_at)
+        and nonempty_string(evidence.get("worktree"))
+        and nonempty_string(evidence.get("session_id"))
+        and same_path(evidence["worktree"], worktree)
+        and evidence["session_id"] == session_id
+        and evidence.get("recorded_at") == recorded_at
+        and all(nonempty_string(evidence.get(field)) for field in ("owner", "next_action", "resume_when"))
+    )
+
+
+def nonempty_string(value):
+    return isinstance(value, str) and bool(value.strip())
+
+
+def close_command_invocation(argv):
+    if not isinstance(argv, list) or not argv or not all(isinstance(value, str) and value.strip() for value in argv):
+        return None
+    names = [value.replace("\\", "/").rsplit("/", 1)[-1].casefold() for value in argv]
+    if names[0] in CLOSE_COMMANDS:
+        return names[0], argv[1:]
+    if names[0] in {"python", "python3", "python.exe", "python3.exe", "py", "py.exe"}:
+        script_index = 1
+        while script_index < len(argv) and argv[script_index] in PYTHON_NO_VALUE_FLAGS:
+            script_index += 1
+        if script_index < len(names) and names[script_index] in CLOSE_COMMANDS:
+            return names[script_index], argv[script_index + 1:]
+    return None
+
+
+def command_is_close_attempt(argv):
+    return close_command_invocation(argv) is not None
+
+
+def close_command_matches_obligation(argv, obligation):
+    invocation = close_command_invocation(argv)
+    if invocation is None:
+        return False
+    command, arguments = invocation
+    worktree = obligation.get("worktree")
+    session_id = obligation.get("session_id")
+    if command == "close.py":
+        return not arguments
+    if command == "finish.py":
+        return not arguments or (
+            len(arguments) == 2 and arguments[0] == "--worktree" and same_path(arguments[1], worktree)
+        )
+    if command == "peer_cli.py":
+        return arguments in (["close", session_id], ["close", session_id, "--force"])
+    if command != "close_tab.py":
+        return False
+    return arguments in (
+        ["--session", session_id],
+        ["--session", session_id, "--force"],
+        ["--force", "--session", session_id],
+    )
+
+
+def resolved_target_matches(capability, obligation):
+    target = capability.get("resolved_target")
+    cwd = capability.get("cwd")
+    if not isinstance(target, dict) or not nonempty_string(cwd):
+        return False
+    invocation_cwd = absolute_path(cwd)
+    worktree = absolute_path(obligation.get("worktree"))
+    if invocation_cwd is None or worktree is None:
+        return False
+    pid = target.get("pid")
+    pid_started_at = target.get("pid_started_at")
+    return (
+        under_or_equal(invocation_cwd, worktree)
+        and target.get("session_id") == obligation.get("session_id")
+        and nonempty_string(target.get("cwd"))
+        and same_path(target["cwd"], obligation.get("worktree", ""))
+        and type(pid) is int and pid > 0
+        and isinstance(pid_started_at, (int, float)) and not isinstance(pid_started_at, bool)
+        and math.isfinite(pid_started_at) and pid_started_at > 0
+    )
+
+
+def capability_evidence_is_valid(evidence, obligation):
+    capability = evidence.get("capability")
+    if not isinstance(capability, dict):
+        return False
+    observed_at = capability.get("observed_at")
+    returncode = capability.get("returncode")
+    refusal_output = capability.get("refusal_output")
+    fallback = capability.get("fallback")
+    recorded_at = obligation.get("recorded_at")
+    return (
+        close_command_matches_obligation(capability.get("argv"), obligation)
+        and resolved_target_matches(capability, obligation)
+        and type(returncode) is int and returncode != 0
+        and nonempty_string(refusal_output)
+        and not TRANSIENT_REFUSAL_RE.search(refusal_output)
+        and isinstance(observed_at, (int, float)) and not isinstance(observed_at, bool) and math.isfinite(observed_at)
+        and isinstance(recorded_at, (int, float)) and not isinstance(recorded_at, bool) and math.isfinite(recorded_at)
+        and observed_at > recorded_at
+        and isinstance(fallback, dict)
+        and fallback.get("outcome") in {"refused", "unavailable"}
+        and nonempty_string(fallback.get("evidence"))
+        and nonempty_string(fallback.get("source"))
+    )
+
+
+def keep_open_evidence_is_valid(evidence):
+    keep_open = evidence.get("keep_open")
+    return (
+        isinstance(keep_open, dict)
+        and nonempty_string(keep_open.get("instruction"))
+        and nonempty_string(keep_open.get("source"))
+    )
+
+
+def evidence_is_valid(reason, evidence, obligation):
+    if not evidence_binding_matches(evidence, obligation):
+        return False
+    if reason == "capability":
+        return capability_evidence_is_valid(evidence, obligation)
+    if reason == "keep-open":
+        return keep_open_evidence_is_valid(evidence)
+    return False
+
+
+def admitted_disposition(obligation):
+    disposition = obligation.get("disposition")
+    if not isinstance(disposition, dict) or disposition.get("status") != "pending":
+        return False
+    reason = disposition.get("reason")
+    if reason not in CLEAR_REASONS:
+        return False
+    if not evidence_binding_matches(disposition, obligation):
+        return False
+    evidence_info = disposition.get("evidence")
+    if not isinstance(evidence_info, dict):
+        return False
+    path = absolute_path(evidence_info.get("path"))
+    if path is None or not path.is_file() or not isinstance(evidence_info.get("sha256"), str):
+        return False
+    try:
+        if file_sha256(path) != evidence_info["sha256"]:
+            return False
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return (
+        evidence_is_valid(reason, evidence, obligation)
+        and all(disposition.get(field) == evidence.get(field) for field in ("owner", "next_action", "resume_when"))
+    )
 
 
 def git(cwd, *args, timeout=GIT_TIMEOUT_SECONDS):
@@ -364,6 +553,7 @@ def record_obligation(command, data):
         "nagged_at": None,
         "transferred_at": None,
         "transferred_by": None,
+        "disposition": None,
     })
 
 
@@ -385,6 +575,9 @@ def stamp_transfer(command, data):
 
 def evaluate_codex_obligation(obligation, session, cwd, now):
     if not obligation.get("session_exit_required") and not worktree_still_exists(obligation):
+        return None
+    disposition = obligation.get("disposition")
+    if isinstance(disposition, dict) and disposition.get("reason") == "keep-open" and admitted_disposition(obligation):
         return None
     transferred_at = obligation.get("transferred_at")
     if transferred_at is None:
@@ -562,6 +755,7 @@ def handle_stop(data):
             and obligation.get("session_id") == session
             and obligation.get("confirmed_merged")
             and (obligation.get("session_exit_required") or worktree_still_exists(obligation))
+            and not admitted_disposition(obligation)
         ):
             json.dump({"decision": "block", "reason": deny_message(obligation, codex)}, sys.stdout)
             sys.stdout.write("\n")
@@ -573,7 +767,7 @@ def reminder_line(obligation):
     return (
         f"merge-cleanup: PR #{obligation.get('pr') or '?'} ({obligation.get('branch') or '?'}) "
         f"at {obligation.get('worktree')} still needs merge Step 5 cleanup "
-        f"(`{python} \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
+        f"(`{python} -B \"{Path(__file__).resolve()}\" --clear \"{obligation.get('worktree')}\"` to retain the checkout; self-close is still required)."
     )
 
 
@@ -656,13 +850,24 @@ def reconcile():
 
 
 def cli_clear(args):
-    if not args:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("worktree", nargs="?")
+    parser.add_argument("--reason", choices=CLEAR_REASONS)
+    parser.add_argument("--evidence")
+    try:
+        parsed = parser.parse_args(args)
+    except SystemExit:
+        return 1
+    if not parsed.worktree:
         print("merge-cleanup-gate: --clear requires a worktree path.", file=sys.stderr)
         return 1
+    if (parsed.reason is None) != (parsed.evidence is None):
+        print("merge-cleanup-gate: --reason and --evidence must be supplied together.", file=sys.stderr)
+        return 1
     try:
-        target = Path(args[0]).resolve()
+        target = Path(parsed.worktree).resolve()
     except OSError:
-        print(f"merge-cleanup-gate: cannot resolve {args[0]}", file=sys.stderr)
+        print(f"merge-cleanup-gate: cannot resolve {parsed.worktree}", file=sys.stderr)
         return 1
     try:
         path = obligation_path(target)
@@ -671,6 +876,39 @@ def cli_clear(args):
             raise FileNotFoundError
         obligation["checkout_retained"] = True
         obligation["session_exit_required"] = True
+        if parsed.reason is None:
+            obligation["disposition"] = {
+                "status": "pending",
+                "reason": "retained",
+                "worktree": obligation.get("worktree"),
+                "session_id": obligation.get("session_id"),
+                "recorded_at": obligation.get("recorded_at"),
+            }
+        else:
+            evidence_path = absolute_path(parsed.evidence)
+            if evidence_path is None or not evidence_path.is_file():
+                print(f"merge-cleanup-gate: evidence file is unavailable: {parsed.evidence}", file=sys.stderr)
+                return 1
+            try:
+                evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+                digest = file_sha256(evidence_path)
+            except (OSError, ValueError) as error:
+                print(f"merge-cleanup-gate: evidence is unreadable: {error}", file=sys.stderr)
+                return 1
+            if not evidence_is_valid(parsed.reason, evidence, obligation):
+                print("merge-cleanup-gate: evidence does not admit pending cleanup retention.", file=sys.stderr)
+                return 1
+            obligation["disposition"] = {
+                "status": "pending",
+                "reason": parsed.reason,
+                "worktree": obligation.get("worktree"),
+                "session_id": obligation.get("session_id"),
+                "recorded_at": obligation.get("recorded_at"),
+                "evidence": {"path": str(evidence_path), "sha256": digest},
+                "owner": evidence["owner"],
+                "next_action": evidence["next_action"],
+                "resume_when": evidence["resume_when"],
+            }
         save_obligation(path, obligation)
     except FileNotFoundError:
         print(f"merge-cleanup-gate: no obligation recorded for {target}")
@@ -678,7 +916,10 @@ def cli_clear(args):
     except OSError as error:
         print(f"merge-cleanup-gate: cannot clear {target}: {error}", file=sys.stderr)
         return 1
-    print(f"merge-cleanup-gate: retained checkout {target}; verified session exit is still required")
+    if parsed.reason is None:
+        print(f"merge-cleanup-gate: retained checkout {target}; cleanup remains pending and session exit is still required")
+    else:
+        print(f"merge-cleanup-gate: recorded pending {parsed.reason} retention for {target}")
     return 0
 
 

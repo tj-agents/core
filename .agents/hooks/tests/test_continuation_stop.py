@@ -154,6 +154,44 @@ class ContinuationStopTests(unittest.TestCase):
         self.goal.write_text("# Goal\n", encoding="utf-8")
         self.assertIn("completion check", self.call())
 
+    def test_complete_allows_pending_cleanup_for_both_hosts(self):
+        self.goal.write_text(
+            "# Goal\n\n```completion\n"
+            + json.dumps({"outcome": "done", "acceptance": [{"id": "a", "criterion": "done", "evidence": [{"source": "test", "result": "pass"}], "owner": "", "next_action": ""}], "deliveries": [], "open_tasks": []})
+            + "\n```\n",
+            encoding="utf-8",
+        )
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        obligations = Path(state.name) / "merge-cleanup" / "obligations"
+        obligations.mkdir(parents=True)
+        obligations.joinpath("own.json").write_text(json.dumps({
+            "worktree": str(self.root),
+            "session_exit_required": True,
+            "checkout_retained": True,
+            "disposition": {"status": "pending", "reason": "keep-open"},
+        }), encoding="utf-8")
+        with patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state.name}):
+            for host in ("codex", "claude"):
+                with self.subTest(host=host):
+                    self.write_owner(self.owner("complete", harness=host))
+                    self.assertIsNone(self.call())
+
+    def test_complete_requires_fresh_report_readiness_despite_owner_snapshot(self):
+        workflows = continuation_stop.workflow_root()
+        completion = continuation_stop.module("completion", workflows)
+        self.write_owner(self.owner("complete", completion_snapshot={
+            "report_ready": True,
+            "ready": True,
+            "cleanup_status": "verified",
+            "pending_cleanup": [],
+        }))
+        for report_ready in (False, None):
+            with self.subTest(report_ready=report_ready), \
+                 patch.object(completion, "completion_check", return_value={"report_ready": report_ready,
+                                                                              "ready": True, "blockers": []}):
+                self.assertIn("Completion is not verified", self.call())
+
     def test_typed_blocker_and_explicit_pause_allow_stop(self):
         self.write_owner(self.owner("blocked", reason="approval-needed", pr=7))
         self.assertIsNone(self.call())

@@ -665,6 +665,28 @@ def valid_armed(record, expected, observer_record, accepted):
             and verified_live(record["observer_pid"], record["observer_started_at"]))
 
 
+def record_close_refusal(entry, script, arguments, error):
+    if not valid_entry(entry):
+        return None
+    script = Path(script).resolve()
+    value = {
+        "argv": [sys.executable, "-B", str(script), *arguments],
+        "cwd": os.getcwd(),
+        "resolved_target": {key: entry[key] for key in ("session_id", "cwd", "pid", "pid_started_at")},
+        "returncode": 2,
+        "refusal_output": f"{script.stem}: {error}",
+        "observed_at": now(),
+    }
+    path = state_directory() / "merge-cleanup" / "close-attempts" / (uuid.uuid4().hex + ".json")
+    try:
+        write_json(path, {"capability": value})
+    except OSError as capture_error:
+        print(f"{script.stem}: cannot record refusal evidence: {capture_error}", file=sys.stderr)
+        return None
+    print(f"{script.stem}: refusal evidence: {path}", file=sys.stderr)
+    return path
+
+
 def results_path():
     return state_directory() / "merge-cleanup" / "results" / (uuid.uuid4().hex + ".json")
 

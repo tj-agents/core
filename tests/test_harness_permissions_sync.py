@@ -134,6 +134,32 @@ class HarnessPermissionsSyncTests(unittest.TestCase):
         self.assertIn("Bash(user-thing)", allow)
         self.assertIn(str(self.settings_path()), drifted)
 
+    def test_engineering_retention_permissions_load_and_preserve_user_entries(self):
+        manifest = json.loads((ROOT / ".agents/plugins/harness/engineering.json").read_text(encoding="utf-8"))
+        claude_root = install_claude_plugin(self.claude_config, "engineering", "v1", [])
+        codex_root = install_codex_plugin(self.codex_home, "engineering", "v1")
+        for root in (claude_root, codex_root):
+            (root / "harness.json").write_text(json.dumps(manifest), encoding="utf-8")
+        self.write_settings({"permissions": {"allow": ["Bash(user-command)"]}})
+
+        warnings = []
+        loaded = SYNC.load_requires(claude_root, warnings)
+        drifted, sync_warnings = SYNC.synchronize(self.environ, "apply")
+
+        self.assertIsNotNone(loaded)
+        self.assertEqual([], warnings)
+        self.assertEqual([], sync_warnings)
+        self.assertIn(str(self.settings_path()), drifted)
+        allow = json.loads(self.settings_path().read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertIn("Bash(user-command)", allow)
+        expected, _ = harness_permissions.render_permissions(manifest["requires"]["permissions"], claude_root)
+        retention = [entry for entry in expected if "merge_cleanup_gate.py" in entry]
+        self.assertEqual(8, len(retention))
+        self.assertTrue(all(entry in allow for entry in retention))
+        rules = self.rules_path().read_text(encoding="utf-8")
+        self.assertIn("merge_cleanup_gate.py", rules)
+        self.assertIn('"--clear"', rules)
+
     def test_stale_owned_entries_are_removed(self):
         v1 = install_claude_plugin(self.claude_config, "engineering", "v1", [CLEANUP])
         SYNC.synchronize(self.environ, "apply")

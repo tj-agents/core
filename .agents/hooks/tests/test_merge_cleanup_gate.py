@@ -13,6 +13,8 @@ from unittest import mock
 
 HOOK = Path(__file__).resolve().parents[1] / "merge_cleanup_gate.py"
 ADAPTER = Path(__file__).resolve().parents[3] / ".codex" / "adapters" / "pre_tool_use.py"
+CLOSE_SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "peer-cli" / "scripts" / "close.py"
+PEER_CLI_SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "peer-cli" / "scripts" / "peer_cli.py"
 sys.path.insert(0, str(HOOK.parent))
 
 
@@ -105,6 +107,38 @@ class MergeCleanupGateTests(unittest.TestCase):
         data.update(fields)
         path.write_text(json.dumps(data), encoding="utf-8")
 
+    def clear_evidence(self, worktree, obligation, reason, detail):
+        evidence = {
+            "worktree": str(worktree),
+            "session_id": obligation["session_id"],
+            "recorded_at": obligation["recorded_at"],
+            "owner": "cleanup owner",
+            "next_action": "Retry verified cleanup.",
+            "resume_when": "The host can accept a close request.",
+            reason.replace("-", "_"): detail,
+        }
+        path = self.root / f"{reason}-evidence.json"
+        path.write_text(json.dumps(evidence), encoding="utf-8")
+        return path
+
+    def capability_detail(self, worktree, obligation, **overrides):
+        detail = {
+            "argv": [sys.executable, str(CLOSE_SCRIPT.resolve())],
+            "cwd": str(worktree),
+            "resolved_target": {
+                "session_id": obligation["session_id"],
+                "cwd": str(worktree),
+                "pid": 123,
+                "pid_started_at": 1.0,
+            },
+            "returncode": 1,
+            "refusal_output": "Windows Terminal target is absent or ambiguous.",
+            "observed_at": obligation["recorded_at"] + 1,
+            "fallback": {"outcome": "unavailable", "evidence": "Target was absent.", "source": "close.py result"},
+        }
+        detail.update(overrides)
+        return detail
+
 
     def test_merge_enable_records_obligation_for_canonical_target(self):
         bare, primary = init_repo(self.root)
@@ -141,6 +175,24 @@ class MergeCleanupGateTests(unittest.TestCase):
         queued = {"merge_mode": "queued"}
         self.assertEqual(gate.DIRECT_GRACE_SECONDS, gate.grace_seconds(direct))
         self.assertEqual(gate.QUEUED_GRACE_SECONDS, gate.grace_seconds(queued))
+
+    def test_capability_argv_requires_an_executed_close_script(self):
+        self.assertTrue(gate.command_is_close_attempt(["python", "-B", "C:/tools/close.py"]))
+        self.assertFalse(gate.command_is_close_attempt(["echo", "close.py"]))
+        self.assertFalse(gate.command_is_close_attempt(["python", "-c", "close.py"]))
+        self.assertFalse(gate.command_is_close_attempt(["python", "-m", "close.py"]))
+        self.assertFalse(gate.close_command_matches_obligation(
+            ["python", str(CLOSE_SCRIPT), "--worktree", "C:/unrelated"],
+            {"worktree": "C:/expected", "session_id": "s1"},
+        ))
+        evidence = {
+            "worktree": str(self.root), "session_id": "s1", "recorded_at": 1,
+            "owner": "owner", "next_action": "retry", "resume_when": "available",
+            "keep_open": {"instruction": "Keep it open.", "source": "user message"},
+        }
+        self.assertFalse(gate.evidence_is_valid("keep-open", evidence, {
+            "worktree": str(self.root), "session_id": None, "recorded_at": 1,
+        }))
 
 
     def test_deny_once_then_cooldown_then_denies_again_after_cooldown(self):
@@ -357,7 +409,8 @@ class MergeCleanupGateTests(unittest.TestCase):
                 self.assertIn("PR #3", context)
                 self.assertIn("self-close is still required", context)
                 interpreter = "python" if os.name == "nt" else "python3"
-                self.assertIn(f"`{interpreter} ", context)
+                clear_command = f"`{interpreter} -B \"{HOOK.resolve()}\" --clear \"{worktree}\"`"
+                self.assertIn(clear_command, context)
         self.assertTrue(path.exists())
 
         other_session = self.run_hook(self.payload(
@@ -367,6 +420,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         denied = self.run_hook(self.payload("Set-Content -Path x.txt -Value 1", cwd=str(primary)))
         self.assertEqual(2, denied.returncode, denied.stderr)
         self.assertIn("MERGE CLEANUP GATE", denied.stderr)
+        self.assertIn(clear_command, denied.stderr)
 
         unconfirmed_stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1"})
         self.assertEqual(0, unconfirmed_stop.returncode, unconfirmed_stop.stderr)
@@ -814,6 +868,192 @@ class MergeCleanupGateTests(unittest.TestCase):
         retained = json.loads(path.read_text())
         self.assertTrue(retained["checkout_retained"])
         self.assertTrue(retained["session_exit_required"])
+        self.assertEqual("pending", retained["disposition"]["status"])
+        self.assertEqual("retained", retained["disposition"]["reason"])
+        self.edit_obligation(path, confirmed_merged=True)
+        stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1", "turn_id": "t1"})
+        self.assertEqual("block", json.loads(stop.stdout)["decision"])
+
+    def test_capability_evidence_releases_stop_only_while_its_bytes_and_binding_remain_current(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        self.run_hook(self.payload(merge_command, session="s1"))
+        path, obligation = self.sole_obligation()
+        evidence = self.clear_evidence(worktree, obligation, "capability", self.capability_detail(worktree, obligation))
+
+        result = self.run_hook(data=None, argv=["--clear", str(worktree), "--reason", "capability", "--evidence", str(evidence)])
+        self.assertEqual(0, result.returncode, result.stderr)
+        retained = json.loads(path.read_text(encoding="utf-8"))
+        self.assertTrue(retained["session_exit_required"])
+        self.assertEqual("pending", retained["disposition"]["status"])
+        self.assertIsNotNone(gate.evaluate_codex_obligation(
+            retained, "s1", str(worktree), time.time() + gate.DIRECT_GRACE_SECONDS + 1,
+        ))
+        self.edit_obligation(path, confirmed_merged=True)
+        stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1", "turn_id": "t1"})
+        self.assertEqual("", stop.stdout.strip())
+
+        evidence.write_text(evidence.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1", "turn_id": "t1"})
+        self.assertEqual("block", json.loads(stop.stdout)["decision"])
+
+    def test_capability_evidence_rejects_transient_active_dialogue_and_stale_binding(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        self.run_hook(self.payload(merge_command, session="s1"))
+        path, obligation = self.sole_obligation()
+        evidence = self.clear_evidence(worktree, obligation, "capability", self.capability_detail(
+            worktree, obligation, refusal_output="Session has active dialogue.",
+        ))
+        result = self.run_hook(data=None, argv=["--clear", str(worktree), "--reason", "capability", "--evidence", str(evidence)])
+        self.assertEqual(1, result.returncode)
+
+        invalid = json.loads(evidence.read_text(encoding="utf-8"))
+        invalid["capability"]["refusal_output"] = "Target is absent."
+        invalid["recorded_at"] -= 1
+        evidence.write_text(json.dumps(invalid), encoding="utf-8")
+        result = self.run_hook(data=None, argv=["--clear", str(worktree), "--reason", "capability", "--evidence", str(evidence)])
+        self.assertEqual(1, result.returncode)
+        self.edit_obligation(path, confirmed_merged=True)
+        stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1", "turn_id": "t1"})
+        self.assertEqual("block", json.loads(stop.stdout)["decision"])
+
+    def test_capability_evidence_rejects_missing_or_unrelated_resolved_target(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        self.run_hook(self.payload(merge_command, session="s1"))
+        _, obligation = self.sole_obligation()
+        cases = {
+            "missing-target": lambda detail: detail.pop("resolved_target"),
+            "wrong-target-session": lambda detail: detail["resolved_target"].update(session_id="other"),
+            "wrong-cwd": lambda detail: detail.update(cwd=str(primary)),
+            "sibling-cwd": lambda detail: detail.update(cwd=str(worktree.with_name(worktree.name + "-other"))),
+            "escaping-cwd": lambda detail: detail.update(cwd=str(worktree / ".." / "other")),
+            "wrong-peer": lambda detail: detail.update(argv=[sys.executable, str(PEER_CLI_SCRIPT.resolve()), "close", "other", "--force"]),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name=name):
+                detail = self.capability_detail(worktree, obligation)
+                mutate(detail)
+                evidence = self.clear_evidence(worktree, obligation, "capability", detail)
+                result = self.run_hook(data=None, argv=["--clear", str(worktree), "--reason", "capability", "--evidence", str(evidence)])
+                self.assertEqual(1, result.returncode)
+
+    def test_production_close_refusal_can_be_admitted_with_separate_fallback_evidence(self):
+        sys.path.insert(0, str(CLOSE_SCRIPT.parent))
+        import close as own_close
+        import finish
+        import session_close
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.run_hook(self.payload(f'pushd "{worktree}" && gh pr merge 3 --squash'))
+        _, obligation = self.sole_obligation()
+        receipt = {"head": obligation["head"], "primary": str(primary), "branch": "feature", "default": "main"}
+        nested_cwd = worktree / "src" / "nested"
+        nested_cwd.mkdir(parents=True)
+        for invocation_cwd in (worktree, nested_cwd):
+            for module in (own_close, finish):
+                for host in ("codex", "claude"):
+                    with self.subTest(command=module.__name__, host=host, cwd=invocation_cwd):
+                        entry = {"session_id": "s1", "cwd": str(worktree), "host": host,
+                                 "pid": 123, "pid_started_at": 1.0, "started_at": 1.0}
+                        with mock.patch.dict(os.environ, self.env), \
+                                mock.patch.object(session_close, "own_host_and_entry", return_value=entry), \
+                                mock.patch.object(session_close, "worktree_from_cwd", return_value=worktree), \
+                                mock.patch.object(session_close.os, "getcwd", return_value=str(invocation_cwd)), \
+                                mock.patch.object(session_close, "awaiting_input_activity", return_value=1.0), \
+                                mock.patch.object(session_close, "fresh_removable_receipt", return_value=receipt), \
+                                mock.patch.object(session_close, "other_live_claimant", return_value=None), \
+                                mock.patch.object(session_close, "git", return_value=(0, "", "")), \
+                                mock.patch.object(session_close, "qualified_windows_wrapper", return_value=None), \
+                                mock.patch.object(session_close, "start_observer", side_effect=session_close.Refusal(
+                                    "timed out starting detached cleanup observer")), \
+                                mock.patch.object(module, "close_host") as closer:
+                            with self.assertRaisesRegex(session_close.Refusal, "timed out"):
+                                module.main([])
+                            closer.assert_not_called()
+                        attempts = Path(self.state.name) / "merge-cleanup" / "close-attempts"
+                        attempt = max(attempts.glob("*.json"), key=lambda item: item.stat().st_mtime_ns)
+                        detail = json.loads(attempt.read_text(encoding="utf-8"))["capability"]
+                        self.assertEqual(entry["session_id"], detail["resolved_target"]["session_id"])
+                        self.assertEqual(123, detail["resolved_target"]["pid"])
+                        self.assertEqual(str(invocation_cwd), detail["cwd"])
+                        self.assertEqual(2, detail["returncode"])
+                        self.assertNotIn("fallback", detail)
+                        self.assertFalse(gate.capability_evidence_is_valid({"capability": detail}, obligation))
+                        detail["fallback"] = {"outcome": "unavailable", "source": "fixture fallback result",
+                                              "evidence": "No supported fallback in this fixture."}
+                        evidence = self.clear_evidence(worktree, obligation, "capability", detail)
+                        result = self.run_hook(argv=["--clear", str(worktree), "--reason", "capability",
+                                                     "--evidence", str(evidence)])
+                        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_capability_close_tab_selector_must_name_the_obligated_session(self):
+        obligation = {"session_id": "ours", "worktree": str(self.root)}
+        prefix = [sys.executable, "-B", str(CLOSE_SCRIPT.with_name("close_tab.py"))]
+        for arguments in (["--session", "ours"], ["--session", "ours", "--force"],
+                          ["--force", "--session", "ours"]):
+            self.assertTrue(gate.close_command_matches_obligation(prefix + arguments, obligation))
+        for arguments in (["--title", "unrelated"], ["unrelated"], ["--title", "ours"],
+                          ["--session", "other"], ["--session", "ours", "--title", "other"],
+                          ["--session", "ours", "--all"], ["--session", "ours", "--force", "--force"]):
+            with self.subTest(arguments=arguments):
+                self.assertFalse(gate.close_command_matches_obligation(prefix + arguments, obligation))
+
+    def test_revalidated_keep_open_allows_codex_tools_then_tampering_reenforces(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+        self.run_hook(self.payload(merge_command, session="s1"))
+        path, _ = self.sole_obligation()
+        self.edit_obligation(path, recorded_at=time.time() - gate.DIRECT_GRACE_SECONDS - 1)
+        obligation = json.loads(path.read_text(encoding="utf-8"))
+        evidence = self.clear_evidence(worktree, obligation, "keep-open", {
+            "instruction": "Keep this session open until I return.",
+            "source": "user message",
+        })
+        result = self.run_hook(data=None, argv=["--clear", str(worktree), "--reason", "keep-open", "--evidence", str(evidence)])
+        self.assertEqual(0, result.returncode, result.stderr)
+        allowed = self.run_hook(self.payload(
+            'Set-Content -Path x.txt -Value 1', session="s1", cwd=str(worktree),
+        ))
+        self.assertEqual(0, allowed.returncode, allowed.stderr)
+
+        evidence.write_text(evidence.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        denied = self.run_hook(self.payload(
+            'Set-Content -Path x.txt -Value 2', session="s1", cwd=str(worktree),
+        ))
+        self.assertEqual(2, denied.returncode)
+
+    def test_keep_open_evidence_releases_codex_and_claude_stop_without_clearing_exit_obligation(self):
+        for codex in (True, False):
+            with self.subTest(codex=codex):
+                case_root = self.root / ("codex" if codex else "claude")
+                case_root.mkdir()
+                bare, primary = init_repo(case_root)
+                worktree = add_feature_worktree(primary, case_root, "feature")
+                merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
+                self.run_hook(self.payload(merge_command, codex=codex, session="s1"))
+                path, obligation = self.sole_obligation()
+                evidence = self.clear_evidence(worktree, obligation, "keep-open", {
+                    "instruction": "Keep this session open until I return.",
+                    "source": "user message",
+                })
+                result = self.run_hook(data=None, argv=["--clear", str(worktree), "--reason", "keep-open", "--evidence", str(evidence)])
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.edit_obligation(path, confirmed_merged=True)
+                stop = self.run_hook({
+                    "hook_event_name": "Stop", "session_id": "s1",
+                    **({"turn_id": "t1"} if codex else {}),
+                })
+                self.assertEqual("", stop.stdout.strip())
+                retained = json.loads(path.read_text(encoding="utf-8"))
+                self.assertTrue(retained["checkout_retained"])
+                self.assertTrue(retained["session_exit_required"])
+                path.unlink()
 
 
     def test_reminder_prefix_match_and_common_dir_fallback(self):
