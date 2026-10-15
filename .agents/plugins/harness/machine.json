@@ -22,14 +22,14 @@
     ],
     "hooks": [
       {
-        "path": ".agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+        "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
         "hosts": [
           "claude",
           "codex"
         ]
       },
       {
-        "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
+        "path": ".agents/machine/utility/plugin-lock/scripts/harness_permissions_sync.py",
         "hosts": [
           "claude",
           "codex"
@@ -112,14 +112,30 @@
         "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
         "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-        "Bash(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-        "Bash(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)"
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -446,18 +462,18 @@
             ],
             "-B",
             [
-              "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
-              "${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py",
-              "${PLUGIN_ROOT}/codex-skills/bootstrap-capabilities/scripts/adopt_repository.py"
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
+              "${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py",
+              "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/adopt_plugins.py"
             ],
             "--root"
           ],
-          "justification": "machine:bootstrap-capabilities composes and applies the repository-declared immutable capability selection",
+          "justification": "machine:plugin-lock creates a repository's marketplace-pinned plugin lock and generates its host settings",
           "match": [
             [
               "python3",
               "-B",
-              "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
               "--root",
               "/workspace/project"
             ]
@@ -466,7 +482,75 @@
             [
               "python3",
               "-B",
-              "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/other.py",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
+              "--root",
+              "/workspace/project"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
+              "${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py",
+              "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/bump_plugin_lock.py"
+            ],
+            "--revision"
+          ],
+          "justification": "machine:plugin-lock moves repositories to another marketplace revision and regenerates their host settings",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
+              "--revision",
+              "/workspace/project"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
+              "--root",
+              "/workspace/project"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
+              "${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py",
+              "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/repo_config.py"
+            ],
+            "--root"
+          ],
+          "justification": "machine:plugin-lock generates a repository's committed Claude and Codex plugin settings from its plugin lock",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
+              "--root",
+              "/workspace/project"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
               "--root",
               "/workspace/project"
             ]

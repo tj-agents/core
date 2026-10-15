@@ -27,7 +27,7 @@ EXPECTED = {
         ('.agents/machine/utility/peer-cli/scripts/register_session.py', []),
         ('resources/machine/scripts/reap_orphans.py', ['--notice']),
         ('resources/machine/scripts/codex_terminal_profile.py', []),
-        ('.agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py', ['--apply']),
+        ('.agents/machine/utility/plugin-lock/scripts/harness_permissions_sync.py', ['--apply']),
     ]),
 }
 

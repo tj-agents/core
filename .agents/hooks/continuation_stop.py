@@ -2,7 +2,6 @@ import importlib.util
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 
@@ -91,36 +90,7 @@ def supervised(owner):
 
 
 def documented_blocker(owner):
-    if not (isinstance(owner.get("reason"), str) and owner["reason"].strip()
-            and isinstance(owner.get("next_action"), str) and owner["next_action"].strip()):
-        return False
-    try:
-        text = Path(owner["goal"]).read_text(encoding="utf-8")
-    except (OSError, UnicodeError, KeyError):
-        return False
-    match = re.search(r"^##\s+Next Steps\s*$([\s\S]*?)(?=^##\s|\Z)", text, re.MULTILINE)
-    if match is None:
-        return False
-    lines = [line.strip() for line in match.group(1).splitlines() if line.strip()]
-    fields = ("Blocked", "Blocked by", "Unblock action", "Resume when")
-    metadata = ("Scope", "Current slice", "Remaining scope", "Done when")
-    if len(lines) >= len(fields) and all(
-        line.startswith(f"{field}:") and line.removeprefix(f"{field}:").strip()
-        for line, field in zip(lines, fields)
-    ):
-        remaining = lines[len(fields):]
-        requires_metadata = False
-    elif lines and lines[0].startswith("Paused:") and lines[0].removeprefix("Paused:").strip():
-        remaining = lines[1:]
-        requires_metadata = True
-    else:
-        return False
-    return (not remaining and not requires_metadata) or (
-        len(remaining) == len(metadata) and all(
-            line.startswith(f"{field}:") and line.removeprefix(f"{field}:").strip()
-            for line, field in zip(remaining, metadata)
-        )
-    )
+    return all(isinstance(owner.get(key), str) and owner[key].strip() for key in ("reason", "next_action"))
 
 
 def binding_active(runtime, root, artifact=None):

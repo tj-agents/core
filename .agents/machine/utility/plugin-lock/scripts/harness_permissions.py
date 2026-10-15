@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import bootstrap_capabilities as bootstrap
+import lock_io
 
 
 PLUGIN_ROOT_TOKEN = "${PLUGIN_ROOT}"
@@ -18,18 +18,18 @@ SCRIPT_SUFFIXES = (".py", ".ps1")
 def _require_tokens(value: Any, label: str) -> None:
     if isinstance(value, str):
         if not value:
-            raise bootstrap.BootstrapError(f"{label} must be a non-empty string")
+            raise lock_io.LockError(f"{label} must be a non-empty string")
         return
     if isinstance(value, list):
         if not value or any(not isinstance(item, str) or not item for item in value):
-            raise bootstrap.BootstrapError(f"{label} must be a list of non-empty strings")
+            raise lock_io.LockError(f"{label} must be a list of non-empty strings")
         return
-    raise bootstrap.BootstrapError(f"{label} must be a string or a list of strings")
+    raise lock_io.LockError(f"{label} must be a string or a list of strings")
 
 
 def _require_rule_field(value: Any, label: str) -> None:
     if not isinstance(value, list) or not value:
-        raise bootstrap.BootstrapError(f"{label} must be a non-empty list")
+        raise lock_io.LockError(f"{label} must be a non-empty list")
     for index, item in enumerate(value):
         _require_tokens(item, f"{label}[{index}]")
 
@@ -45,38 +45,38 @@ def _has_unbounded_script_arguments(command: str) -> bool:
 
 def validate_requires(requires: dict, label: str) -> None:
     if not isinstance(requires, dict) or set(requires) != {"marketplaces", "plugins", "hooks", "permissions"}:
-        raise bootstrap.BootstrapError(f"{label}: invalid harness requirements")
+        raise lock_io.LockError(f"{label}: invalid harness requirements")
     if not isinstance(requires["marketplaces"], list) or not isinstance(requires["hooks"], list):
-        raise bootstrap.BootstrapError(f"{label}: invalid marketplace or hook requirements")
-    bootstrap.require_string_list(requires["plugins"], f"{label}.plugins")
+        raise lock_io.LockError(f"{label}: invalid marketplace or hook requirements")
+    lock_io.require_string_list(requires["plugins"], f"{label}.plugins")
     permissions = requires["permissions"]
     if not isinstance(permissions, dict) or set(permissions) not in (
         {"claude_allow", "codex_prefix_rules"},
         {"claude_allow", "codex_prefix_rules", "auto_merge"},
     ):
-        raise bootstrap.BootstrapError(f"{label}: invalid harness permissions")
+        raise lock_io.LockError(f"{label}: invalid harness permissions")
     _validate_permissions(permissions, label)
     if "auto_merge" in permissions:
         conditional = permissions["auto_merge"]
         if not isinstance(conditional, dict) or set(conditional) != {"claude_allow", "codex_prefix_rules"}:
-            raise bootstrap.BootstrapError(f"{label}: invalid auto-merge permissions")
+            raise lock_io.LockError(f"{label}: invalid auto-merge permissions")
         _validate_permissions(conditional, f"{label}.auto_merge")
 
 
 def _validate_permissions(permissions: dict, label: str) -> None:
-    bootstrap.require_string_list(permissions["claude_allow"], f"{label}.claude_allow")
+    lock_io.require_string_list(permissions["claude_allow"], f"{label}.claude_allow")
     for command in permissions["claude_allow"]:
         if _has_unbounded_script_arguments(command):
-            raise bootstrap.BootstrapError(f"{label}.claude_allow script arguments require :*: {command}")
+            raise lock_io.LockError(f"{label}.claude_allow script arguments require :*: {command}")
     rules = permissions["codex_prefix_rules"]
     if not isinstance(rules, list):
-        raise bootstrap.BootstrapError(f"{label}: invalid Codex prefix rules")
+        raise lock_io.LockError(f"{label}: invalid Codex prefix rules")
     for rule in rules:
         if not isinstance(rule, dict) or set(rule) != {"pattern", "justification", "match", "not_match"}:
-            raise bootstrap.BootstrapError(f"{label}: invalid Codex prefix rule")
+            raise lock_io.LockError(f"{label}: invalid Codex prefix rule")
         for field in ("pattern", "match", "not_match"):
             _require_rule_field(rule[field], f"{label}.{field}")
-        bootstrap.require_string(rule["justification"], f"{label}.justification")
+        lock_io.require_string(rule["justification"], f"{label}.justification")
 
 
 def contains_template(value: Any) -> bool:
