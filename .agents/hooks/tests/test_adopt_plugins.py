@@ -20,7 +20,7 @@ def load(name):
 
 
 adopt_plugins = load("adopt_plugins")
-BootstrapError = adopt_plugins.bootstrap.BootstrapError
+LockError = adopt_plugins.lock_io.LockError
 
 
 class AdoptPluginsTests(unittest.TestCase):
@@ -60,19 +60,18 @@ class AdoptPluginsTests(unittest.TestCase):
         self.assertFalse((self.root / ".agents").exists())
 
     def test_unknown_stack_and_plugin_are_rejected_with_choices(self):
-        with self.assertRaisesRegex(BootstrapError, "Unknown stack: cobol; choose from .*dotnet"):
+        with self.assertRaisesRegex(LockError, "Unknown stack: cobol; choose from .*dotnet"):
             adopt_plugins.run(self.root, "v1.0.0", ["cobol"], [], "write")
-        with self.assertRaisesRegex(BootstrapError, "Unknown plugin: cobol"):
+        with self.assertRaisesRegex(LockError, "Unknown plugin: cobol"):
             adopt_plugins.run(self.root, "v1.0.0", [], ["cobol"], "write")
         self.assertFalse((self.root / ".agents").exists())
 
-    def test_new_lock_needs_a_revision_and_a_legacy_lock_is_not_extended(self):
-        with self.assertRaisesRegex(BootstrapError, "needs --marketplace-revision"):
+    def test_new_lock_needs_a_revision_and_an_old_schema_is_not_extended(self):
+        with self.assertRaisesRegex(LockError, "needs --marketplace-revision"):
             adopt_plugins.run(self.root, None, ["dotnet"], [], "write")
-        legacy = self.root / ".agents" / "capabilities.lock.json"
-        legacy.parent.mkdir()
-        legacy.write_text(json.dumps({"schema_version": 1, "plugins": []}), encoding="utf-8")
-        with self.assertRaisesRegex(BootstrapError, "legacy lock cannot be extended"):
+        self.lock.parent.mkdir()
+        self.lock.write_text(json.dumps({"schema_version": 1, "plugins": []}), encoding="utf-8")
+        with self.assertRaisesRegex(LockError, "not a schema 2 plugin lock"):
             adopt_plugins.run(self.root, "v1.0.0", ["dotnet"], [], "write")
 
     def test_cli_reports_drift_and_exit_status(self):

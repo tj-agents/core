@@ -33,7 +33,7 @@ class BumpPluginLockTests(unittest.TestCase):
             (root / ".agents").mkdir(parents=True)
             self.roots.append(root)
             self.save(root, "v1.0.0")
-            repo_config.run(root / ".agents" / "plugins.lock.json", None, "write", root=root)
+            repo_config.run(root / ".agents" / "plugins.lock.json", "write", root=root)
 
     def save(self, root, revision, plugins=("base", "engineering", "machine", "react")):
         document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": revision}, "plugins": list(plugins)}
@@ -66,7 +66,7 @@ class BumpPluginLockTests(unittest.TestCase):
         for root in self.roots:
             self.assertEqual(("v1.1.0", "v1.1.0"), self.revision(root))
             self.assertIn('ref = "v1.1.0"', (root / ".codex" / "config.toml").read_text(encoding="utf-8"))
-            self.assertEqual([], repo_config.run(root / ".agents" / "plugins.lock.json", None, "check", root=root))
+            self.assertEqual([], repo_config.run(root / ".agents" / "plugins.lock.json", "check", root=root))
 
     def test_invalid_revision_fails_without_touching_the_root(self):
         status, _, errors = self.run_main("--revision", "main", "--mode", "write", "--root", str(self.roots[0]))
@@ -81,13 +81,6 @@ class BumpPluginLockTests(unittest.TestCase):
         self.assertIn("moved v1.0.0 -> v1.1.0", output)
         self.assertEqual(("v1.1.0", "v1.1.0"), self.revision(self.roots[1]))
         self.assertIn(str(self.roots[0]), errors)
-
-    def test_legacy_lock_name_is_refused(self):
-        lock = self.roots[0] / ".agents" / "plugins.lock.json"
-        lock.rename(self.roots[0] / ".agents" / "capabilities.lock.json")
-        status, _, errors = self.run_main("--revision", "v1.1.0", "--root", str(self.roots[0]))
-        self.assertEqual(1, status)
-        self.assertIn("rename it to plugins.lock.json", errors)
 
 
 if __name__ == "__main__":

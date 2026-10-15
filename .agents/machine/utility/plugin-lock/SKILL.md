@@ -1,6 +1,6 @@
 ---
 name: plugin-lock
-description: Create or bump a repository's plugin lock, generate its Claude and Codex plugin settings, and preview, apply or verify a legacy capability lock in an isolated profile. Use when adopting plugins for a repository or stack, moving repositories to another marketplace tag, or diagnosing lock drift.
+description: Create or bump a repository's plugin lock and generate its Claude and Codex plugin settings. Use when adopting plugins for a repository or stack, moving repositories to another marketplace tag, or auditing a machine before removing old user-level plugin settings.
 
 kind: utility
 domain: machine
@@ -12,12 +12,12 @@ route: infer
 The commands below show Windows paths and use `python` in Windows PowerShell. On Linux/macOS, use
 `python3` with POSIX paths and the same script arguments.
 
-## Generate repository host settings
+A repository commits `.agents/plugins.lock.json`, `.claude/settings.json` and `.codex/config.toml`. A fresh
+clone then installs exactly the plugins it selects, pinned to one `tj-agents/marketplace` revision, without
+depending on any machine's user settings. User scope holds only `base`, `engineering` and `machine`, the
+bootstrap that creates repositories.
 
-### Plugin lock (`.agents/plugins.lock.json`)
-
-The current lock needs no catalog. It selects plugin names and pins one `tj-agents/marketplace`
-revision, a `vN.N.N` tag or a full commit:
+## The lock
 
 ```json
 {"schema_version": 2,
@@ -25,242 +25,64 @@ revision, a `vN.N.N` tag or a full commit:
  "plugins": ["base", "engineering", "machine", "dotnet"]}
 ```
 
-`repo_config.py --root <repository> --mode write` reads it and generates `<plugin>@tj-agents` selections
-for Claude and Codex, both pinned to that marketplace revision. The lock must include `base`,
-`engineering` and `machine`; list stack plugins and their required plugins explicitly. Without `--lock`
-the command reads `.agents/plugins.lock.json` and, until 2027-03-31, forwards to a legacy
-`.agents/capabilities.lock.json` when only that exists. Having both is an error. The lock has no
-`required_skills`, `path_scopes` or `exceptions`, and the bootstrap `apply` and `verify` modes still read
-only the legacy lock. The legacy form below remains until the migration finishes.
+`revision` is a `vN.N.N` marketplace tag or a full lowercase commit. The lock must include `base`,
+`engineering` and `machine`, and it lists a stack plugin's required plugins explicitly. The schema is
+`catalog/plugins.lock.schema.json`.
 
-Create or extend a repository's lock with `adopt_plugins.py --root <repository> --stack <name>
-[--plugin <name>] [--marketplace-revision <tag>] --mode preview|check|write`. A stack
-(`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
+## Adopt a stack
+
+```powershell
+python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\repository `
+  --stack dotnet --marketplace-revision v1.0.0 --mode preview
+```
+
+A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
 `plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
-plugins a project type needs. Core and each plugin's required plugins are always added, existing
-selections and the existing revision are kept, and a new lock needs `--marketplace-revision`. It writes
-the lock and both hosts' settings and no catalog. An unknown stack or plugin is rejected with the valid
-choices.
+plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Core and each plugin's required
+plugins are always added, existing selections and the existing revision are kept, and a new lock needs
+`--marketplace-revision`. `preview` lists the changed files, `write` applies them together, and `check`
+exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
 
-To move repositories to another marketplace tag, run `bump_plugin_lock.py --revision <tag> --root <repository>`
-(repeat `--root`). It previews by default; `--mode write` rewrites each lock's revision and regenerates its
-Claude and Codex settings, and a repository that fails validation is left unchanged.
-
-### Legacy lock (`.agents/capabilities.lock.json`)
-
-Keep `.agents/capabilities.lock.json` in the project. Select `base`, `engineering`, and `machine`
-from `base-agents` alongside the project's stack plugins. Commit the selected owners' release
-records as `.agents/catalog/catalog.json` when selecting plugins outside core. Generate host
-settings from that catalog and the lock:
+## Generate settings from an existing lock
 
 ```powershell
-python -B '<skill-directory>\scripts\repo_config.py' `
-  --lock C:\path\to\project\.agents\capabilities.lock.json --mode write
+python -B '<skill-directory>\scripts\repo_config.py' --root C:\path\to\repository --mode write
 ```
 
-On Linux or macOS, run the same command in a POSIX shell with `python3` and POSIX paths:
+`--lock` defaults to `<root>/.agents/plugins.lock.json`. The generator owns Claude's marketplace,
+enabled-plugin and `permissions.allow` keys and Codex's marketplace and plugin tables plus
+`.codex/rules/agent-harness.rules`; other project settings stay. Existing Claude allow entries outside the
+declared harness must move into `.agents/repository-harness.json` first. Project scope also rejects
+machine-specific absolute paths (Windows drive and UNC paths, `/home/<user>`, `/Users/<user>`, `/mnt/<drive>`)
+anywhere in the committed `.claude/settings.json`, `.codex/config.toml` or `.codex/hooks.json`, in every mode,
+reporting `file:line`. Replace such a path with a repository-relative one, or move the setting to an
+uncommitted local file. `machine_paths.py --root <checkout>` runs that scan alone.
 
-```sh
-python3 -B '<skill-directory>/scripts/repo_config.py' \
-  --lock /path/to/project/.agents/capabilities.lock.json --mode write
-```
+For per-clone adoption pass `--scope local`, which writes `.claude/settings.local.json`, `.codex/config.toml`,
+optional `.codex/rules/agent-harness.rules` and `.agents/repo-capabilities.local.json` ownership state, keeps
+exact Git exclusions, preserves unrelated selections and approvals, and refuses tracked targets, changed
+owned settings and links that escape the root. Local settings need Python 3.11 or newer.
 
-CI uses the same command with `--mode check`; it exits nonzero if either generated file drifts.
-Project scope also rejects machine-specific absolute paths, in every mode, anywhere in the
-committed `.claude/settings.json`, `.codex/config.toml` or `.codex/hooks.json`, including hook
-commands it does not own: Windows drive and UNC paths, `/home/<user>`, `/Users/<user>` and
-`/mnt/<drive>`. Each finding is reported as `file:line`. Replace such a path with a
-repository-relative path or move the setting to an uncommitted local settings file. To scan a
-checkout without a lock, run `machine_paths.py --root <checkout>` from the same directory;
-it exits 1 when it finds one.
-Each GitHub source must match the owner in its catalog release. The generator
-owns Claude's marketplace, enabled-plugin, and `permissions.allow` keys, plus Codex's
-marketplace and plugin tables and `.codex/rules/agent-harness.rules`. Existing Claude allow
-entries outside the declared harness must be moved into `.agents/repository-harness.json`
-before generation. Other project settings remain in place. Release commits are selected by
-the lock, while host settings pin the corresponding GitHub marketplace revision and plugin
-selection.
-
-For per-clone adoption, pass an explicit root and local scope. Local settings generation
-requires Python 3.11 or newer. Preview lists every changed output without writing:
+## Move repositories to another marketplace tag
 
 ```powershell
-python -B '<skill-directory>\scripts\repo_config.py' `
-  --root C:\path\to\checkout --scope local `
-  --lock C:\path\to\checkout\.agents\capabilities.lock.json --mode preview
+python -B '<skill-directory>\scripts\bump_plugin_lock.py' --revision v1.1.0 `
+  --root C:\path\to\one --root C:\path\to\two --mode preview
 ```
 
-On Linux or macOS, run the same preview in a POSIX shell with `python3` and POSIX paths:
+It previews by default. `--mode write` rewrites each lock's revision and regenerates its settings; a
+repository that fails validation is left unchanged and the others still proceed.
 
-```sh
-python3 -B '<skill-directory>/scripts/repo_config.py' \
-  --root /path/to/checkout --scope local \
-  --lock /path/to/checkout/.agents/capabilities.lock.json --mode preview
-```
+## Audit a machine
 
-Use the same arguments with `--mode write` to apply or `--mode check` to detect drift.
-Local mode writes `.claude/settings.local.json`, `.codex/config.toml`, optional
-`.codex/rules/agent-harness.rules`, and `.agents/repo-capabilities.local.json` ownership
-state. It preserves unrelated native selections, settings and existing approvals, removes
-stale grants it added, and restores prior Claude values when owned selections become stale.
-Changed owned settings and collisions with unmanaged Codex tables fail before writing.
-Keep the ownership state with the clone; deleting it prevents safely updating existing
-managed Codex configuration or rules.
-
-All output paths, including Git exclusions, are checked against each other and the lock,
-catalog and repository overlay by canonical path and file identity before mutation. Multiply
-linked output files are rejected. Local mode rejects tracked targets and links that escape
-the explicit root, including links above missing output files. A failed write restores the
-attempted outputs to their prior bytes so approvals and ownership remain paired on retry.
-For a Git checkout, it maintains exact file exclusions through
-`git rev-parse --git-path info/exclude`; linked worktrees use their actual shared exclusion
-file with separate blocks owned by each checkout. Explicit non-Git workspace roots are supported
-without exclusions. Locks and catalogs remain read inputs; this command does not compose them
-or change their tracking. A later adoption caller can use `plan(..., prospective_paths=[...])`
-or `preflight_paths(...)` to validate its own prospective lock, catalog and receipt paths.
-The default `--scope project` retains the existing project settings contract.
-
-## Adopt an immutable repository selection
-
-Use `adopt_repository.py` when a repository is being created or an additional standards package is
-being selected. Its `--input` is the composition request described in
-[Compose immutable source catalogs](#compose-immutable-source-catalogs); it reads only the exact
-commits named there.
-For a first adoption, include the Core three-package source and every requested stack source in that
-input. For an addition, compose the new packages together with their complete required package
-dependencies and every declared marketplace owner. Preserved owners not required by that composition
-may be omitted and are reused from the committed catalog. An existing owner supplied again must
-match the lock's pinned commit.
-
-```powershell
-python -B '<skill-directory>\scripts\adopt_repository.py' `
-  --root C:\path\to\repository `
-  --input C:\path\to\sources.json `
-  --plugin dotagents/dotnet `
-  --plugin azure-agents/azure `
-  --mode preview
-```
-
-Use `python3` and POSIX paths on Linux or macOS. Repeat `--plugin` for every requested package.
-The command always includes the three Core packages and required package dependencies. It preserves
-existing selections and their required skills, path scopes, exceptions and other project lock fields.
-
-`preview` lists the repository lock, composed catalog and host-setting changes without writing.
-`write` updates those files together. `check` exits nonzero when any managed file drifts. Commit the
-resulting `.agents/capabilities.lock.json`, `.agents/catalog/catalog.json`, `.claude/settings.json`
-and `.codex/config.toml`, plus `.codex/rules/agent-harness.rules` when emitted, with the repository.
-
-Adding packages is additive only. A known marketplace can contribute further packages only at its
-already pinned snapshot; a changed owner, package record or snapshot is rejected. An existing tagged
-catalog release without a selected full commit cannot supply a new package. The command preflights
-all output paths against the composition input and repository harness overlay before mutation, and
-rolls back a failed write batch.
-
-After each repository has adopted its generated project settings, audit the machine before removing
-old user-profile behavior:
+After every repository carries its own settings, audit the machine before removing old user-profile behavior:
 
 ```powershell
 python -B '<skill-directory>\scripts\verify_machine.py' --home C:\Users\name --repository C:\path\to\project
 ```
 
-The verifier is read-only and requires Python 3.11 or newer for TOML inspection. Repeat
-`--repository` for each project being migrated; it checks project Codex agents and local
-marketplace sources in Codex and Claude settings. GitHub marketplace declarations are allowed.
-It reports user-scope plugin selections, marketplaces, hooks, notifications, instruction files,
-agent settings, and loose agents or skills. Codex's recorded hook trust hashes and built-in marketplaces are
-runtime state and are not reported. Use `--json` for stable finding codes, paths, settings, and
-clean or drift status. Exit status 1 means findings or an inspection failure remain. Output
-never includes configuration values.
-
-Use the packaged Python entry point. The lock and composed catalog are project-owned; core's
-bundled catalog covers only core packages. `--profile` is the actual Codex or Claude configuration
-directory, not a label.
-
-```powershell
-python -B '<skill-directory>\scripts\bootstrap_capabilities.py' `
-  --lock C:\path\to\project\.agents\capabilities.lock.json `
-  --harness codex `
-  --profile C:\path\to\isolated-codex-home `
-  --mode preview
-```
-
-The modes have deliberately different authority:
-
-- `preview` validates catalog closure, lock selections, exact commits, required skills and prerequisites.
-  It prints the planned native operations and changes nothing. `--report` may write that report explicitly.
-- `apply` maintains only the catalog marketplaces and plugins selected in the lock. It clones installation-owned
-  checkouts at the locked commits, registers those local marketplaces and installs/enables the selected plugins.
-  When a managed release or repository source changes, it journals the prior and target identities before
-  touching the checkout, accepts only the recorded old or new commit while resuming, refreshes installed plugin
-  bytes, verifies their versions and digests, and only then finalizes managed state. It never removes an unrelated
-  marketplace, plugin or setting.
-- `verify` is offline-safe. It does not fetch, install, update or refresh. It verifies checkout commits, package
-  digests, completed managed state, and the host's installed versions and package digests, then emits a report.
-
-The bootstrap uses argument arrays for Git and host CLIs. A failed operation leaves completed checkouts and
-host registrations in place and records the failing step; rerunning `apply` resumes from observable state.
-Exit zero means the selected mode completed. Invalid locks, cycles, missing prerequisites, drift and partial
-application exit nonzero.
-
-## Compose immutable source catalogs
-
-Use `compose_catalog.py` before lock selection when combining source owners. Its input is an
-explicit JSON object with `schema_version: 1` and a non-empty `sources` list. Each source declares
-`repository` (`owner/repo`), an absolute local `checkout`, a full lowercase commit SHA,
-`plugins` (canonical package names), and `version_plugin` (one selected package):
-
-```json
-{
-  "schema_version": 1,
-  "sources": [{
-    "repository": "example/capabilities",
-    "checkout": "C:/sources/capabilities",
-    "commit": "0123456789abcdef0123456789abcdef01234567",
-    "plugins": ["base", "compiler"],
-    "version_plugin": "base"
-  }]
-}
-```
-
-```powershell
-python -B '<skill-directory>\scripts\compose_catalog.py' `
-  --input C:\path\to\sources.json --platform windows
-```
-
-The composed v1 catalog is printed to stdout; the composer writes no files.
-`--platform` defaults to the current platform. Source-owned catalog entries
-supply platforms, executable prerequisites, status and digest exclusions when present; otherwise
-the entry records only that consumption platform and no additional declared executable
-prerequisites. Those defaults describe the supplied catalog, without establishing owner support.
-
-The composer reads immutable Git blobs, so working-tree edits cannot change its output. It checks
-the GitHub origin, both native marketplace/package identities, actual `N.N.N` package versions
-supported by catalog v1, shipped skills, required harness declarations and their hook payloads. Top-level `selection.json`
-prerequisites/dependencies must agree with harness plugin requirements; local names qualify to
-the package's own marketplace in both dependency edges and emitted harness declarations.
-Skill-level library requirements do not become plugin edges.
-Unresolved dependencies, contradictory owners, cycles and linked payloads fail before output.
-Each package keeps its own native version. The selected anchor supplies only the release grouping
-version; the full commit and `sha256-tree-v1` payload digest identify the snapshot. Composition
-requires every inspected Git object to be locally available, disables Git lazy fetching, and
-performs no fetch, snapshot execution, lock selection, installation or profile changes. Git must
-support `--no-lazy-fetch`; unsupported versions fail before inspecting snapshot objects.
-
-## Catalog and digest contract
-
-The bundled catalog uses `sha256-tree-v1`: sort package files by forward-slash relative path, then hash each
-path, a NUL, its byte length, a NUL, and its bytes. Symlinks are rejected. A plugin may declare narrow
-`digest_excludes`; the machine package excludes only `catalog/catalog.json`, whose own digest field would
-otherwise be self-referential. Schemas and every other bootstrap resource remain covered.
-
-A lock records full lowercase 40-character source commits. Catalog revisions accept semantic
-`vN.N.N` release tags or exact lowercase 40-character commit SHAs. A SHA revision must equal
-the lock and managed-state commit before preview or mutation. `apply` fetches tags through their
-tag refs and SHAs directly, then verifies the revision identifies the locked commit object.
-Branches, abbreviated or uppercase SHAs, object expressions, and tag-object SHAs are rejected.
-Offline verification uses the same identity checks; version strings alone never select content.
-Existing tag recovery retains its recorded prior/target checks. Matching legacy release and
-commit records may acquire the catalog SHA; ambiguous legacy identity remains an error.
-
-Do not use this utility to refresh a normal profile opportunistically. Use an isolated profile for projects that
-select incompatible releases, and keep authentication/trust decisions separate from package installation.
+The verifier is read-only and needs Python 3.11 or newer. Repeat `--repository` for each project; it checks
+project Codex agents and local marketplace sources in Codex and Claude settings. GitHub marketplace
+declarations are allowed. It reports user-scope plugin selections, marketplaces, hooks, notifications,
+instruction files, agent settings, and loose agents or skills. `--json` gives stable finding codes. Exit
+status 1 means findings or an inspection failure remain. Output never includes configuration values.

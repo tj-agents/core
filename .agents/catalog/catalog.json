@@ -613,14 +613,14 @@
                 "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)"
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -871,18 +871,18 @@
                     ],
                     "-B",
                     [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py",
-                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py",
-                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/adopt_repository.py"
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
+                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py",
+                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/adopt_plugins.py"
                     ],
                     "--root"
                   ],
-                  "justification": "machine:plugin-lock composes and applies the repository-declared immutable capability selection",
+                  "justification": "machine:plugin-lock creates a repository's marketplace-pinned plugin lock and generates its host settings",
                   "match": [
                     [
                       "python3",
                       "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
                       "--root",
                       "/workspace/project"
                     ]
