@@ -49,7 +49,7 @@ those bounded checks returned to the parent over the same frozen bundle.
   validate marketplace/plugin identity components before composing cache destinations. Add a sentinel
   regression proving an outside directory stays byte-identical. Confidence high.
 
-- [ ] **R3 — HIGH — workflow** — `.agents/machine/scripts/startup_binding.py:88`
+- [x] **R3 — HIGH — workflow** — `.agents/machine/scripts/startup_binding.py:88`
   Both permission-helper candidates miss the shipped `.agents/machine/utility/plugin-selection` path
   when the coordinator runs from `resources/machine/scripts`. Every selected packaged session fails
   before launch. Include the package's canonical `.agents` location and exercise both helper lookups
@@ -122,3 +122,7 @@ R2 fix evidence: cache writes/deletes, locks, checkouts and promotions reject li
 ancestors before mutation. Identity components and publisher URL segments are validated before paths
 are composed. Windows junction sentinel, lock, checkout and traversal cases passed in
 `380524bbd0cec6b3-rolling-cache-boundary-review-fix.log` (four boundary tests).
+
+R3 fix evidence: packaged permission lookup includes the canonical `.agents` directory. Eight startup
+binding cases passed, including both helper imports from a disposable packaged layout, in
+`024ca2385dff225c-rolling-packaged-coordinator-review-fix.log`.
