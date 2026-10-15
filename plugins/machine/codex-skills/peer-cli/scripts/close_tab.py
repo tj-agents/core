@@ -30,6 +30,12 @@ def is_windows():
     return os.name == "nt"
 
 
+def nonempty_text(value):
+    if not isinstance(value, str):
+        return None
+    return value if value.strip() else None
+
+
 def run(command):
     try:
         return subprocess.run(
@@ -163,22 +169,45 @@ def windows_inventory():
         raise TerminalUnavailable("Windows Terminal returned a non-array inventory")
     targets = []
     for item in value:
-        if not isinstance(item, dict) or not item.get("automationId"):
+        if not isinstance(item, dict):
             continue
+        title = str(item.get("title") or "")
+        automation_id = nonempty_text(item.get("automationId"))
+        if not automation_id and not title:
+            continue
+        identity = {"kind": "windows-terminal"}
+        if automation_id:
+            identity["automation_id"] = automation_id
+        else:
+            identity["title"] = title
         targets.append({
-            "title": str(item.get("title") or ""),
-            "identity": {"kind": "windows-terminal",
-                         "automation_id": str(item["automationId"])},
+            "title": title,
+            "identity": identity,
             "actual": True,
         })
     return targets
 
 
+def entry_terminal_identity(entry):
+    identity = entry.get("terminal")
+    if not isinstance(identity, dict):
+        return None
+    if identity.get("kind") != "windows-terminal":
+        return identity
+    automation_id = nonempty_text(identity.get("automation_id"))
+    if automation_id:
+        return {**identity, "automation_id": automation_id}
+    title = entry.get("title")
+    if not isinstance(title, str) or not title:
+        return dict(identity)
+    return {**identity, "title": title}
+
+
 def registered_targets():
     targets = []
     for _path, entry in session_close.entries():
-        identity = entry.get("terminal")
-        if not isinstance(identity, dict):
+        identity = entry_terminal_identity(entry)
+        if identity is None:
             continue
         targets.append({"title": entry.get("title") or "", "identity": identity,
                         "actual": False, "entry": entry,
@@ -212,9 +241,17 @@ def inventory_for_identity(identity):
 
 
 def require_closed(identity):
+    fallback_title = None
+    if identity.get("kind") == "windows-terminal" and not nonempty_text(
+            identity.get("automation_id")):
+        fallback_title = nonempty_text(identity.get("title"))
     for attempt in range(CLOSE_CONFIRM_ATTEMPTS):
         targets = inventory_for_identity(identity)
-        if not any(same_target(target["identity"], identity) for target in targets):
+        if fallback_title:
+            remains = any(target["title"] == fallback_title for target in targets)
+        else:
+            remains = any(same_target(target["identity"], identity) for target in targets)
+        if not remains:
             return
         if attempt + 1 < CLOSE_CONFIRM_ATTEMPTS:
             time.sleep(CLOSE_CONFIRM_INTERVAL_SECONDS)
@@ -232,7 +269,13 @@ def same_target(left, right):
         return (left.get("pane_id") == right.get("pane_id")
                 and left.get("socket") == right.get("socket"))
     if kind == "windows-terminal":
-        return left.get("automation_id") == right.get("automation_id")
+        left_id = nonempty_text(left.get("automation_id"))
+        right_id = nonempty_text(right.get("automation_id"))
+        if left_id or right_id:
+            return bool(left_id and right_id and left_id == right_id)
+        left_title = nonempty_text(left.get("title"))
+        right_title = nonempty_text(right.get("title"))
+        return bool(left_title and right_title and left_title == right_title)
     if kind == "konsole":
         return (left.get("service"), left.get("session")) == (
             right.get("service"), right.get("session"))
@@ -244,7 +287,7 @@ def target_liveness(target, fallback_entry=None):
     targets = registered_targets()
     for registered in targets:
         entry = registered["entry"]
-        if same_target(entry.get("terminal", {}), target.get("identity", {})):
+        if same_target(entry_terminal_identity(entry) or {}, target.get("identity", {})):
             matched.append(registered["live"])
     if not matched and fallback_entry is not None:
         titled = [item for item in targets if item["entry"].get("title") == target.get("title")]
@@ -334,8 +377,16 @@ def close_actual(target, force=False, fallback_entry=None):
         adapter = Path(__file__).with_name("windows_terminal_uia.ps1")
         if not is_windows() or not adapter.is_file():
             raise TerminalUnavailable("Windows Terminal control is available only on Windows")
+        automation_id = nonempty_text(identity.get("automation_id"))
+        if automation_id:
+            selector = ["-TabId", automation_id]
+        else:
+            title = nonempty_text(identity.get("title"))
+            if not title:
+                raise TerminalRefusal("Windows Terminal target has no automation ID or title")
+            selector = ["-Title", title]
         result = run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-                      str(adapter), "-TabId", identity["automation_id"]])
+                      str(adapter), *selector])
     else:
         raise TerminalRefusal("global inventory cannot safely close this terminal target")
     if result.returncode:
@@ -358,7 +409,7 @@ def close_stale_entry(entry):
         targets = windows_inventory()
     else:
         raise TerminalRefusal("stale-tab close is unsupported for this terminal")
-    title_only = kind == "windows-terminal" and not identity.get("automation_id")
+    title_only = kind == "windows-terminal" and not nonempty_text(identity.get("automation_id"))
     if title_only:
         registered = [item for _path, item in session_close.entries()
                       if item.get("title") == title]
@@ -419,10 +470,10 @@ def close_entry(entry, force=False):
             raise TerminalUnavailable("Windows Terminal control is available only on Windows")
         targets = windows_inventory()
         title = entry.get("title")
-        tab_id = identity.get("automation_id")
+        tab_id = nonempty_text(identity.get("automation_id"))
         if tab_id:
             matches = [target for target in targets
-                       if target["identity"]["automation_id"] == str(tab_id)]
+                       if target["identity"].get("automation_id") == tab_id]
         else:
             registered = [item for _path, item in session_close.entries()
                           if item.get("title") == title]

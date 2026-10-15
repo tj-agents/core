@@ -41,6 +41,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args(argv)
     entry = session_close.own_host_and_entry()
+    try:
+        return close_session(entry)
+    except (session_close.Refusal, close_tab.TerminalRefusal) as error:
+        session_close.record_close_refusal(entry, __file__, list(argv) if argv is not None else sys.argv[1:], error)
+        raise
+
+
+def close_session(entry):
     worktree = session_close.worktree_from_cwd()
     if not session_close.under_or_equal(os.getcwd(), entry["cwd"]):
         raise session_close.Refusal("current directory is not this session's registered attachment")
