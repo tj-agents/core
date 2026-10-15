@@ -43,18 +43,11 @@ condition.
 
 ## Select the execution lane
 
-Before choosing either execution mode below or making a deliverable edit, load `engineering:lanes`
-through the host's skill invocation or read its advertised SKILL.md in full. Select and record the lane
-for the next bounded phase using that contract and resolve it from the current host's canonical table.
-Repeat selection when the phase changes, including after design approval, review entry, or fallback.
-Approval supplies execution authority; it does not carry the design lane into implementation.
-
-Apply the selected lane through a supported host control or a bounded lane worker before implementing.
-Direct execution is appropriate when the current owner already runs at the selected lane. Preserve the
-canonical contract's tiny inline follow-up allowance and its distinction between in-session workers and
-a fresh execution owner after substantial critical-plan design. If the host cannot apply the lane,
-follow that contract's capability-limit procedure; do not treat inherited session settings as selection.
-This step applies to standalone work and runtime-unavailable work as well as repository execution.
+Use `engineering:lanes` for substantive capability selection and fallback. Reuse its loaded contract and
+avoid written lane rationales for routine work. Cheap leaf lanes and bounded clerical workers remain
+available without changing the task owner. Approval supplies execution authority; capability selection
+alone supplies none. These rules
+also apply to standalone work and runtime-unavailable execution.
 
 ## Standalone or runtime-unavailable execution
 
