@@ -204,6 +204,7 @@ class WorkItemSessionsTests(unittest.TestCase):
         self.assertEqual("Example task", result["title"])
 
     def test_fallback_registration_claims_atomically_with_current_git_context(self):
+        self._run_git(self.repo, "branch", "-M", "main")
         plan_path = self._write_plan()
         entry = {
             "host": "claude",
@@ -232,7 +233,9 @@ class WorkItemSessionsTests(unittest.TestCase):
         self.assertEqual("owner", session["role"])
         self.assertEqual("github.com/tj-agents/core", session["repo"])
         self.assertEqual(self._run_git(self.repo, "rev-parse", "HEAD"), session["head"])
+        self.assertEqual("main", session["branch"])
         self.assertEqual("Native Claude tab", session["title"])
+        self.assertIsNone(item["branch"])
 
     def test_refused_fallback_claim_rolls_back_registration_and_metadata(self):
         plan_path = self._write_plan()
