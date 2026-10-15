@@ -20,7 +20,7 @@ bootstrap that creates repositories.
 ## The lock
 
 ```json
-{"schema_version": 2,
+{"schema_version": 3,
  "marketplaces": {
    "tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
    "agents":    {"repository": "Concertable/agents",    "revision": "<full commit>"}},

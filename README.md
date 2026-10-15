@@ -110,7 +110,7 @@ establish installed-host trust or acceptance.
 - [`PACKAGING.md`](PACKAGING.md) is the rule that a utility skill's runtime dependencies ship with it.
 - `.agents/catalog/catalog.json` records this repository's immutable releases and package digests. The generated
   [`CAPABILITIES.md`](CAPABILITIES.md) is its human-readable index. Consumers select plugins in a
-  committed `.agents/plugins.lock.json` that pins one `tj-agents/marketplace` revision.
+  committed `.agents/plugins.lock.json` that pins each marketplace it installs from.
 - `plugins/*` is generated distribution output assembled from canonical shared definitions and the
   selected host adapter. Nothing under it is an authored source.
 - `shell/` owns the PowerShell profile, one concern per file.
@@ -148,8 +148,8 @@ python -B scripts/update_catalog_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
-The `machine:plugin-lock` skill creates a repository's `.agents/plugins.lock.json` (plugin names plus one
-`tj-agents/marketplace` revision) and generates the committed Claude and Codex plugin settings from it, so a
+The `machine:plugin-lock` skill creates a repository's `.agents/plugins.lock.json` (`<plugin>@<marketplace>`
+selections plus a pinned revision per marketplace) and generates the committed Claude and Codex plugin settings from it, so a
 fresh clone installs exactly what it selects. It also moves repositories to another marketplace tag and audits
 a machine for old user-level plugin settings.
 

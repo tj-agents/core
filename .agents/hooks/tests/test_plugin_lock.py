@@ -30,7 +30,7 @@ class PluginLockTests(unittest.TestCase):
         self.lock = self.root / ".agents" / "plugins.lock.json"
         self.lock.parent.mkdir()
         self.document = {
-            "schema_version": 2,
+            "schema_version": 3,
             "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.2.3"}},
             "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "dotnet@tj-agents"],
         }
@@ -109,6 +109,8 @@ class PluginLockTests(unittest.TestCase):
         self.assertIn("[marketplaces.agents]", codex)
         self.assertIn('source = "https://github.com/Concertable/agents.git"', codex)
         self.assertIn('[plugins."concertable@agents"]', codex)
+        agents_table = codex.split("[marketplaces.agents]", 1)[1].split("\n\n", 1)[0]
+        self.assertNotIn("sparse_paths", agents_table)
         self.assertEqual([], self.run_mode("check"))
 
     def test_full_commit_revision_is_accepted(self):
@@ -134,6 +136,30 @@ class PluginLockTests(unittest.TestCase):
 
     def test_resolve_names_the_plugin_lock_in_the_agents_directory(self):
         self.assertEqual(self.lock, plugin_lock.resolve(self.root))
+
+
+    def test_owner_case_reserved_name_and_dot_repositories(self):
+        for repository, ok in (("concertable/agents", True), ("Concertable/..", False), ("tj-agents/Marketplace", False)):
+            with self.subTest(repository=repository):
+                document = dict(self.document)
+                document["marketplaces"] = dict(self.document["marketplaces"], other={"repository": repository, "revision": "cccccccccccccccccccccccccccccccccccccccc"})
+                document["plugins"] = self.document["plugins"] + ["p@other"]
+                if ok:
+                    plugin_lock.validate(document)
+                else:
+                    with self.assertRaises(LockError):
+                        plugin_lock.validate(document)
+
+    def test_a_previous_schema_version_is_not_read(self):
+        self.document["schema_version"] = 2
+        with self.assertRaisesRegex(LockError, "schema_version 3"):
+            plugin_lock.validate(self.document)
+
+    def test_the_published_schema_matches_the_validator_on_the_tj_agents_entry(self):
+        schema = json.loads((Path(__file__).resolve().parents[2] / "catalog" / "plugins.lock.schema.json").read_text(encoding="utf-8"))
+        tj = schema["properties"]["marketplaces"]["properties"]["tj-agents"]
+        self.assertEqual({"$ref": "#/$defs/pin"}, tj["allOf"][0])
+        self.assertEqual(3, schema["properties"]["schema_version"]["const"])
 
 
 if __name__ == "__main__":
