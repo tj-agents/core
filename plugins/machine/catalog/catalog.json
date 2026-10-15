@@ -151,6 +151,7 @@
             "handoff-format",
             "incremental-review",
             "lanes",
+            "list-work",
             "merge",
             "merge-docs",
             "merging",
@@ -183,7 +184,6 @@
             "sync-checkout",
             "unmerged",
             "update-roadmap",
-            "workboard",
             "worktree",
             "write-bug",
             "write-debt",
@@ -207,7 +207,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:821b7ca1f3a86b4f3bcf6873c51077eaa02491ef8f505cc1214bfa0d11d54b5a",
+          "digest": "sha256:46695e8a82e3b09fdf9303811f31a091086f59b1d2c4efecc0db59e8b937517b",
           "harness": {
             "marketplaces": [
               {
@@ -349,7 +349,15 @@
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -412,6 +420,47 @@
                     [
                       "python",
                       "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python.exe",
+                      "python3",
+                      "py"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+                      "${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py",
+                      "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+                    ]
+                  ],
+                  "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+                      "postgres"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
                     ]
                   ]
                 }
