@@ -148,7 +148,7 @@ python -B scripts/update_catalog_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
-The `machine:bootstrap-capabilities` skill previews, applies and verifies exact project locks through native
+The `machine:plugin-lock` skill previews, applies and verifies exact project locks through native
 Codex or Claude plugin commands. It uses installation-owned Git checkouts at full locked commits and isolated
 `CODEX_HOME` or `CLAUDE_CONFIG_DIR` profile paths. Preview changes nothing; verify is offline-safe; apply only
 adds the selected catalog marketplaces and plugins. It never performs an unconditional marketplace refresh.
@@ -253,7 +253,7 @@ claude plugin update engineering@base-agents
 
 Never edit an installed plugin cache, disable hooks, or rewrite continuation state to clear the block.
 
-Use a project capability lock and `machine:bootstrap-capabilities` when a cross-marketplace selection must
+Use a project capability lock and `machine:plugin-lock` when a cross-marketplace selection must
 resolve and verify its complete dependency closure reproducibly.
 
 Codex does not load agent definitions directly from plugins. After installing or updating the marketplace,

@@ -16,7 +16,7 @@ SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sy
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
 
-PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts"
+PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/plugin-lock/scripts"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 

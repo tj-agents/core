@@ -473,7 +473,6 @@
           ],
           "skills": [
             "auto-memory",
-            "bootstrap-capabilities",
             "clip",
             "followup-codex",
             "handoff-claude",
@@ -483,6 +482,7 @@
             "open-claude",
             "open-codex",
             "peer-cli",
+            "plugin-lock",
             "recover-agents",
             "search",
             "search-claude",
@@ -523,14 +523,14 @@
             ],
             "hooks": [
               {
-                "path": ".agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+                "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
                 "hosts": [
                   "claude",
                   "codex"
                 ]
               },
               {
-                "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
+                "path": ".agents/machine/utility/plugin-lock/scripts/harness_permissions_sync.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -613,14 +613,14 @@
                 "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)"
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -871,18 +871,18 @@
                     ],
                     "-B",
                     [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
-                      "${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py",
-                      "${PLUGIN_ROOT}/codex-skills/bootstrap-capabilities/scripts/adopt_repository.py"
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/adopt_repository.py"
                     ],
                     "--root"
                   ],
-                  "justification": "machine:bootstrap-capabilities composes and applies the repository-declared immutable capability selection",
+                  "justification": "machine:plugin-lock composes and applies the repository-declared immutable capability selection",
                   "match": [
                     [
                       "python3",
                       "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_repository.py",
                       "--root",
                       "/workspace/project"
                     ]
@@ -891,7 +891,7 @@
                     [
                       "python3",
                       "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/other.py",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
                       "--root",
                       "/workspace/project"
                     ]

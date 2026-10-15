@@ -272,5 +272,8 @@ with a test that `review-prepare` names the skill for such a path.
   - reword plan templates so "slice" does not imply "PR".
 - **Resolution condition:** a multi-part goal with no user-approved staging produces one PR per repository in a
   session test, and the stack path is only entered on an explicit user instruction.
+- **Update (Tommy, 2026-10-15):** the stacked-PR requirement belongs in his work standards (professional
+  work), not Core or his own repositories. Core's default is one PR per repository for a goal; stack only on
+  an explicit instruction.
 - **Related:** D007 (idling on background tests), D008 (documentation-only records need a PR); PR #257 already
   removes compatibility aliases for clean skill renames, which changes the rename plan.

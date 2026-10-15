@@ -171,7 +171,7 @@ port so each delivery remains reviewable.
 On 2026-10-10 a full `.agents/hooks/tests` run failed six `test_repo_config` cases with
 `Root is not the exact Git checkout: /tmp/tmp…` while two other sessions ran the suites on the same machine.
 The file passed alone and on two immediate reruns, and in eight earlier full runs that day.
-`bootstrap-capabilities`' `repo_config.preflight_paths` raises that error when a parent of the root holds
+`plugin-lock`' `repo_config.preflight_paths` raises that error when a parent of the root holds
 `.git` (`/tmp` or `/` for these roots) or when `git rev-parse --show-toplevel` disagrees with the root. Which
 one fired, and what caused it, was not identified.
 

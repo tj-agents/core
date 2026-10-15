@@ -14,7 +14,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / '.agents/machine/utility/bootstrap-capabilities/scripts'))
+sys.path.insert(0, str(ROOT / '.agents/machine/utility/plugin-lock/scripts'))
 import bootstrap_capabilities as bootstrap
 import compose_catalog as composer
 import repo_config
@@ -157,7 +157,7 @@ class CatalogCompositionTests(unittest.TestCase):
     def test_cli_prints_catalog_and_failure_emits_no_catalog(self):
         request = self.checkout / 'sources.json'
         request.write_text(json.dumps(self.document()), encoding='utf-8')
-        script = ROOT / '.agents/machine/utility/bootstrap-capabilities/scripts/compose_catalog.py'
+        script = ROOT / '.agents/machine/utility/plugin-lock/scripts/compose_catalog.py'
         command = [sys.executable, '-B', str(script), '--input', str(request), '--platform', 'linux']
         result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(result.returncode, 0, result.stderr)
