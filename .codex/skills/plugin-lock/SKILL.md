@@ -1,6 +1,6 @@
 ---
 name: plugin-lock
-description: Create or bump a repository's plugin lock, generate its Claude and Codex plugin settings, and preview, apply or verify a legacy capability lock in an isolated profile. Use when adopting plugins for a repository or stack, moving repositories to another marketplace tag, or diagnosing lock drift.
+description: Create or bump a repository's plugin lock and generate its Claude and Codex plugin settings. Use when adopting plugins for a repository or stack, moving repositories to another marketplace tag, or auditing a machine before removing old user-level plugin settings.
 
 kind: utility
 domain: machine
