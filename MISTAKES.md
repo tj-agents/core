@@ -292,3 +292,42 @@ Current ownership verification - 2026-10-13: PR212 and PR128 are merged and cont
 **Next action:** preserve the session and checkout when no supported post-report close exists; verify the remaining installed-host acceptance only when that capability and authorized scope are available. **Resolution condition:** observed or focused host acceptance proves report-before-close and preservation of explicit continue/keep-open on both hosts, without closing peers; reviewed source correction and this record reach remote main. **Verification evidence:** exact close.py invocation followed by aborted tool output and user's CLI-closure report; docs already merged at main365dc8e; parent promised not to invoke close again. Source PR248 at673e8308 passed exact-session active/missing/mismatched/ended guards, actual temporary session-store prompt/Stop transitions for Codex and Claude identities, positive disposable-host integrations, independent review and Windows/Linux CI38475715788. Source correction is merged; fixtures do not prove completion-report receipt or installed-host keep-open behavior. No originating or peer CLI was closed for acceptance.
 
 **Blocked reason:** this host API has no supported tool execution after the final completion report, and installed-host report/keep-open acceptance is outside this source-only repair. **blocked_by:** capability. **Resolver:** existing machine peer-cli / engineering session-guidance host-acceptance owner. **Resume condition:** authorized installed-host acceptance can exercise a supported report-before-close sequence and explicit continue/keep-open on both hosts. No new job or consumer installation is authorized.
+
+## M021 - Work-item migration discussion and withdrawn approval/continuation assessment
+
+**Kind:** mistake record. **Observed/reported:** 2026-10-14; the migration handoff recorded confusion between Core's workboard skill and the separate application/repository, the archive-target discussion, unclear delivered/proposed explanations and a reported delay. The earlier record also attributed an approval/continuation failure to Core.
+
+**User correction:** Tommy explicitly withdrew that approval/continuation repair: "ignore this, this was me misunderstanding codex it actually did follow the plan". This correction supersedes the earlier causal attribution and prevention acceptance criteria. Do not diagnose, implement, dispatch or publish the cancelled repair as an established Core defect.
+
+**Cause:** the earlier approval/continuation assessment was based on a misunderstanding, per Tommy's correction. No causal approval/continuation source defect is established. The observed scope/skill/app/archival discussion is retained as history without treating it as authority for the cancelled repair.
+
+**Impact and priority:** P2 historical communication concern. The reported five hours is not a verified active-compute total; prior review/CI results remain in the migration goal without an invented timing breakdown.
+
+**Source owner:** original assessment concerned Core planning/continuation; no active source-repair owner remains for the withdrawn assessment. **State:** resolved by explicit withdrawal, not by a source fix. **Delivery history:** the retired work-item/session goal recorded this correction; the distinct naming repair is M022.
+
+**Next action:** none for the cancelled approval/continuation repair. Retain this correction and follow the independently reviewed A/B and naming scope. **Resolution condition:** the canonical plan and incident reflect the withdrawal and no cancelled source repair is launched. **Verification evidence:** Tommy's explicit correction and updated canonical goal; no such source repair was implemented or launched. Repository unarchive was separately authorized and completed. This record preserves the withdrawal; no cancelled source repair is part of its delivery.
+
+## M022 - Old names retained when the user wants clean replacements
+
+**Kind:** mistake. **Observed/reported:** 2026-10-14; the migration proposal retained workboard as a compatibility entry/alias after introducing list-work. Tommy explicitly instructed "never preserve old names", called this recurring behavior, and requested that its fix be written into the plan. Prior occurrences are user-reported, not independently enumerated here.
+
+**Cause:** confirmed in this proposal: the consumed engineering:skill-authoring standard unconditionally requires keeping published names working, and the assistant copied that requirement into A. It failed to provide the user's desired clean replacement. The explicit user instruction now overrides that generic compatibility rule and must be reflected in canonical source guidance.
+
+**Impact and priority:** P2; obsolete interfaces and repeated user correction. **Source owner:** Core .agents/engineering/convention/skill-authoring/SKILL.md and directly governing rename guidance. **State:** resolved. **Delivery history:** PR257 and PR262 below complete the naming correction; no separate native repair session/job exists.
+
+**Declarative prevention:** For user-directed clean renames, replace the name, remove old entries/aliases/forwarders, and update in-scope callers and both host adapters together. Published-name status alone must not override explicit user direction. Historical evidence and native session data are preserved; this grants no unrelated name-retirement sweep.
+
+**Next action:** none for this naming correction; the owning A/B goal continues its separately approved registration scope. **Resolution condition:** satisfied: canonical guidance honors explicit clean replacement and reviewed source/packages expose list-work without active workboard entries, aliases or forwarding paths. **Verification evidence:** naming PR257 merged reviewed eb27f95d72e96c330491615e7c32b43f5644d392 at ebf07da02015db1e520e8d658115fb5e0286bc21; its causal CI38656434335 and publication d4752ef3cf371f722847c7c41ded3e5481a4c711 passed. Listing PR262 merged reviewed 07edfad824c193e6fc9d66d462c7f3a42e132b96 at f4412a4403f63661fa18f86f609b0095cfa75525; 47 listing tests, 15 harness tests, frozen native/workflow review and Windows/Linux exact-head CI38659730612 passed. Causal CI38660949674 passed; generated child 02506db816df10fa43f7940cfeceae80d63e3c2b has no active old-name paths, and all three packaged listing scripts equal source. Both isolated naming/listing checkouts and local branches were removed after supported cleanup proof.
+
+**Authority:** Tommy approved the revised A/B and naming scope with "yep good lets go". This correction remains owned by the existing goal and does not revive the cancelled M021 repair or authorize a new handoff.
+
+
+## M023 - Merge requested before exact-head validation finished
+
+**Kind:** mistake. **Observed:** 2026-10-15 during the work-item/session goal. PR262 at reviewed head07edfad824c193e6fc9d66d462c7f3a42e132b96 merged at2026-10-15T00:35:57Z while its Windows check remained in progress. That check passed at00:42:49Z; exact-head run38659730612 and causal main run38660949674 ultimately succeeded.
+
+**Cause:** execution treated the automatic merge request as a guaranteed wait for CI. Existing persistent-delivery guidance already requires green exact-head validation and the guarded merge wrapper; no missing Core rule or source defect is established.
+
+**Impact and priority:** P2 process failure; the candidate reached main before Windows validation finished. No failing result or observed product regression followed. **Source owner:** execution of the work-item/session goal, completed through PR257, PR262 and PR263. **State:** resolved by correct execution of the existing delivery gates; no separate repair or continuation workstream.
+
+**Next action:** none for this ordering correction. **Resolution condition:** satisfied: PR263 remained draft until frozen review approved49e49f2130c063fc16a706bff4fafb0ab08e6364 and exact-head Windows/Linux checks succeeded. **Verification evidence:** CI38664798772 Windows completed successfully at2026-10-15T01:30:44Z; Linux completed successfully at01:22:05Z. The existing guarded auto_merge.py accepted that exact head and PR263 merged at01:32:07Z as90d38f0fa6ac285755397ad0c8792c0493d2d39f. The naming/continuation repair cancellation remains unchanged.
