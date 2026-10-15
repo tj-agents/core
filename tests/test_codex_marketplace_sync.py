@@ -211,6 +211,69 @@ class SyncCodexStandardsTests(unittest.TestCase):
             SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
         self.assertIn('base-agents', str(raised.exception))
 
+    def test_an_error_naming_both_a_relevant_and_an_unrelated_marketplace_still_blocks(self):
+        # Only the FIRST backtick-quoted name in the message must not decide relevance: a
+        # dependency-style message can legitimately name a second, actually relevant one.
+        def run(argv, cwd=None, **kwargs):
+            arguments = argv[1:]
+            if arguments == ['plugin', 'marketplace', 'upgrade', '--json']:
+                return completed(argv, 0, stdout=json.dumps({'errors': [
+                    "Could not upgrade marketplace `agent-standards`; "
+                    "dependent marketplace `base-agents` must be upgraded first",
+                ]}))
+            if arguments == ['plugin', 'list', '--available', '--json']:
+                return completed(argv, 0, stdout=json.dumps({
+                    'installed': [{'pluginId': 'base@base-agents', 'enabled': True,
+                                   'marketplaceSource': {'sourceType': 'git'}}],
+                    'available': [],
+                }))
+            raise AssertionError(f'No call beyond the inventory lookup should happen: {arguments}')
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('base-agents', str(raised.exception))
+
+    def test_a_malformed_pluginid_without_an_at_sign_does_not_crash_the_sync(self):
+        def run(argv, cwd=None, **kwargs):
+            if argv[0] == sys.executable:
+                return completed(argv, 0, stdout='trust tj-agents hooks\n')
+            arguments = argv[1:]
+            if arguments == ['plugin', 'marketplace', 'upgrade', '--json']:
+                return completed(argv, 0, stdout=json.dumps({
+                    'errors': ["Failed to upgrade marketplace `agent-standards`: offline"],
+                }))
+            if arguments == ['plugin', 'list', '--available', '--json']:
+                return completed(argv, 0, stdout=json.dumps({
+                    'installed': [
+                        {'pluginId': 'base@base-agents', 'enabled': True,
+                         'marketplaceSource': {'sourceType': 'git'}},
+                        {'pluginId': 'malformed', 'enabled': True,
+                         'marketplaceSource': {'sourceType': 'git'}},
+                    ],
+                    'available': [],
+                }))
+            if len(arguments) == 4 and arguments[:2] == ['plugin', 'add']:
+                return completed(argv, 0, stdout=json.dumps({'pluginId': arguments[2]}))
+            raise AssertionError(f'Unexpected fake Codex command: {arguments}')
+
+        selected = SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertEqual(selected, ['base@base-agents', 'malformed'])
+
+    def test_an_empty_post_failure_inventory_blocks_rather_than_assumes_irrelevance(self):
+        def run(argv, cwd=None, **kwargs):
+            arguments = argv[1:]
+            if arguments == ['plugin', 'marketplace', 'upgrade', '--json']:
+                return completed(argv, 0, stdout=json.dumps({
+                    'errors': ["Failed to upgrade marketplace `agent-standards`: catalog corrupted"],
+                }))
+            if arguments == ['plugin', 'list', '--available', '--json']:
+                return completed(argv, 0, stdout=json.dumps({'installed': [], 'available': []}))
+            raise AssertionError(f'No call beyond the inventory lookup should happen: {arguments}')
+
+        with self.assertRaises(SYNC.SyncError) as raised:
+            SYNC.sync_codex_standards('Invoke-FakeCodex', self.project, out=self.out, run=run)
+        self.assertIn('agent-standards', str(raised.exception))
+
     def test_a_mismatched_plugin_add_response_is_a_sync_error(self):
         def run(argv, cwd=None, **kwargs):
             arguments = argv[1:]

@@ -205,6 +205,19 @@ class MergeCleanupGateTests(unittest.TestCase):
         _, obligation = self.sole_obligation()
         self.assertEqual("9", obligation["pr"])
 
+    def test_a_merge_naming_a_repository_with_no_readable_origin_fails_closed_and_still_records(self):
+        # Mirrors merge_review_gate's fail-CLOSED handling of the same "cannot tell" case
+        # (it blocks the merge outright): recording nothing here would silently drop Step 5
+        # tracking for what could well be a genuinely local merge.
+        bare, primary = init_repo(self.root)
+        git(primary, "remote", "remove", "origin")
+        command = "gh pr merge 9 --repo owner/this --merge"
+        result = self.run_hook(self.payload(command, cwd=str(primary)))
+        self.assertEqual(0, result.returncode, result.stderr)
+        _, obligation = self.sole_obligation()
+        self.assertEqual("9", obligation["pr"])
+        self.assertIsNone(obligation["repo"])
+
     def test_a_merge_without_a_repo_flag_still_records(self):
         bare, primary = init_repo(self.root)
         git(primary, "remote", "set-url", "origin", "https://github.com/owner/this.git")

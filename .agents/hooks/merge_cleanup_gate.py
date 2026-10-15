@@ -641,7 +641,12 @@ def local_binding_identity(root, binding):
     return {"worktree": str(root), "repository": normalized_repository, "branch": branch, "head": head}
 
 
-def record_obligation_for_identity(command, data, worktree, pr, merge_mode, expected_identity=None):
+_NO_REPOSITORY_HINT = object()
+
+
+def record_obligation_for_identity(
+    command, data, worktree, pr, merge_mode, expected_identity=None, repository_hint=_NO_REPOSITORY_HINT
+):
     from merge_review_gate import normalize_slug
 
     session = native_session_id(data) if expected_identity is not None else data.get("session_id") or data.get("sessionId")
@@ -650,8 +655,11 @@ def record_obligation_for_identity(command, data, worktree, pr, merge_mode, expe
     if expected_identity is None:
         branch = git(worktree, "rev-parse", "--abbrev-ref", "HEAD")
         head = git(worktree, "rev-parse", "HEAD")
-        origin_url = git(worktree, "remote", "get-url", "origin")
-        repository = normalize_slug(origin_url) if origin_url else None
+        if repository_hint is _NO_REPOSITORY_HINT:
+            origin_url = git(worktree, "remote", "get-url", "origin")
+            repository = normalize_slug(origin_url) if origin_url else None
+        else:
+            repository = repository_hint
     else:
         if not same_path(expected_identity.get("worktree"), worktree):
             return False
@@ -702,16 +710,23 @@ def record_obligation(command, data):
     except OSError:
         return
     named = repo_flag(command)
+    repository_hint = _NO_REPOSITORY_HINT
     if named is not None:
         # Mirrors merge_review_gate's own jurisdiction rule: a `--repo <other>` merge is that
         # repository's business, not this checkout's. Recording it here attributed PR #9 of
         # core's own, unrelated branch to a `gh pr merge` that actually merged a marketplace PR.
+        # Fail closed on an unreadable origin (no remote named `origin`, a transient git error):
+        # unlike the review gate, which can refuse the merge outright, this gate has no safe
+        # "can't tell" exit other than recording the obligation anyway -- dropping it silently
+        # would leave a real, local merge with no Step 5 tracking at all.
         origin_url = git(worktree, "remote", "get-url", "origin")
         local = normalize_slug(origin_url) if origin_url else None
-        if local != named:
+        if local is not None and local != named:
             return
+        repository_hint = local
     record_obligation_for_identity(
-        command, data, worktree, pr_number(command), "queued" if "--auto" in command else "direct"
+        command, data, worktree, pr_number(command), "queued" if "--auto" in command else "direct",
+        repository_hint=repository_hint,
     )
 
 

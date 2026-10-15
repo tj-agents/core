@@ -49,6 +49,11 @@ class InvocationTests(unittest.TestCase):
         # class `[;&|\n]` misread it as a real pipe and gate a grep that never ran a merge.
         self.assertFalse(gate.invokes_merge('grep -n "SOME_RE|' + M + '" merge_cleanup_gate.py'))
 
+    def test_an_unmatched_quote_does_not_swallow_a_later_real_merge(self):
+        # A lone apostrophe in ordinary unquoted prose (a contraction, say) must not open a
+        # quote span that blanks everything after it -- including a real merge invocation.
+        self.assertTrue(gate.invokes_merge("echo don't skip && " + M + " 613 --squash"))
+
     def test_a_real_merge_after_a_quoted_decoy_still_gates(self):
         self.assertTrue(gate.invokes_merge(
             'grep -n "SOME_RE|' + M + '" merge_cleanup_gate.py && ' + M + " 613 --squash"

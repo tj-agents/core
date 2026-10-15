@@ -135,7 +135,7 @@ _INVOCATION_RE = re.compile(r"(?:^|[;&|\n]|&&|\|\|)\s*(?:[A-Za-z_][\w]*=\S+\s+)*
 
 
 def mask_quoted(command):
-    """`command` with every quoted span's interior blanked out, same length, same positions.
+    """`command` with every BALANCED quoted span's interior blanked out, same length, same positions.
 
     `_INVOCATION_RE` reads `;`, `&` and `|` as shell operators by character class alone, so a
     quoted argument that merely contains one of them — a grep pattern's `gh pr merge|...`
@@ -143,17 +143,24 @@ def mask_quoted(command):
     gated a command that never ran a merge. Blanking quoted interiors first removes that text
     from consideration while leaving every unquoted character at its original offset, so a
     position-dependent caller (`invokes_pushd_before_merge`) still slices the real command.
+
+    A quote mark with no later matching close (an apostrophe in ordinary unquoted prose, say)
+    is left alone rather than opening a span that swallows the rest of the command to blanks —
+    including a real merge invocation after it. Mirrors `skill_router.py`'s own `_mask_quoted`,
+    which already guards exactly this with the same `str.find` lookahead.
     """
     chars = list(command)
-    quote = None
-    for index, char in enumerate(command):
-        if quote:
-            if char == quote:
-                quote = None
-            else:
-                chars[index] = " "
-        elif char in "'\"":
-            quote = char
+    index = 0
+    while index < len(command):
+        quote = command[index]
+        if quote in "'\"":
+            close = command.find(quote, index + 1)
+            if close != -1:
+                for position in range(index + 1, close):
+                    chars[position] = " "
+                index = close + 1
+                continue
+        index += 1
     return "".join(chars)
 
 
