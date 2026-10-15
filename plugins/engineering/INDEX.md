@@ -27,6 +27,7 @@ Generated from canonical `.agents/` definitions.
 - `handoff-format` — convention — `.agents/engineering/convention/handoff-format/SKILL.md`
 - `incremental-review` — workflow — `.agents/engineering/workflow/incremental-review/SKILL.md`
 - `lanes` — policy — `.agents/engineering/policy/lanes/SKILL.md`
+- `list-work` — utility — `.agents/engineering/utility/list-work/SKILL.md`
 - `merge` — workflow — `.agents/engineering/workflow/merge/SKILL.md`
 - `merge-docs` — workflow — `.agents/engineering/workflow/merge-docs/SKILL.md`
 - `merging` — policy — `.agents/engineering/policy/merging/SKILL.md`
@@ -59,7 +60,6 @@ Generated from canonical `.agents/` definitions.
 - `sync-checkout` — operation — `.agents/engineering/operation/sync-checkout/SKILL.md`
 - `unmerged` — utility — `.agents/engineering/utility/unmerged/SKILL.md`
 - `update-roadmap` — workflow — `.agents/engineering/workflow/update-roadmap/SKILL.md`
-- `workboard` — utility — `.agents/engineering/utility/workboard/SKILL.md`
 - `worktree` — utility — `.agents/engineering/utility/worktree/SKILL.md`
 - `write-bug` — convention — `.agents/engineering/convention/write-bug/SKILL.md`
 - `write-debt` — convention — `.agents/engineering/convention/write-debt/SKILL.md`
