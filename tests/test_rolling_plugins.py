@@ -304,5 +304,59 @@ class RollingBoundaryTests(unittest.TestCase):
         self.assertEqual(supplied, {'enabledPlugins': {'other@core': True}, 'cli': 'retained'})
 
 
+    def linked_directory(self, link, target):
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if os.name == 'nt':
+            subprocess.run(['cmd.exe', '/d', '/c', 'mklink', '/J', str(link), str(target)],
+                           check=True, capture_output=True)
+            self.addCleanup(link.rmdir)
+        else:
+            link.symlink_to(target, target_is_directory=True)
+            self.addCleanup(link.unlink)
+
+    def test_redirected_cache_ancestor_cannot_write_or_delete_outside_files(self):
+        outside = self.root / 'outside'
+        (outside / 'package').mkdir(parents=True)
+        (outside / 'package/keep.txt').write_bytes(b'preserved')
+        staging = outside / f'.package.{os.getpid()}.tmp'
+        staging.mkdir()
+        (staging / 'keep.txt').write_bytes(b'staged sentinel')
+        cache = self.root / 'cache'
+        link = cache / 'packages'
+        self.linked_directory(link, outside)
+        destination = link / 'package'
+        before = {p.relative_to(outside): p.read_bytes() for p in outside.rglob('*') if p.is_file()}
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'linked or reparse ancestor'):
+            ROLLING._write_tree(destination, {'new.txt': (b'new', False)})
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'linked or reparse ancestor'):
+            ROLLING._remove_cache_tree(destination, destination.parent)
+        self.assertEqual(before, {p.relative_to(outside): p.read_bytes() for p in outside.rglob('*') if p.is_file()})
+
+    def test_redirected_cache_lock_and_git_checkout_fail_before_mutation(self):
+        outside = self.root / 'outside'
+        outside.mkdir()
+        cache = self.root / 'cache'
+        self.linked_directory(cache, outside)
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'linked or reparse ancestor'):
+            with ROLLING.exclusive(cache):
+                self.fail('redirected lock acquired')
+        with mock.patch.object(ROLLING, '_run') as run:
+            with self.assertRaisesRegex(ROLLING.RollingPluginError, 'linked or reparse ancestor'):
+                ROLLING._fetch_main('https://github.com/tj-agents/core.git', cache)
+            run.assert_not_called()
+        self.assertEqual([], list(outside.iterdir()))
+
+    def test_selection_cache_components_reject_traversal_and_identity_mismatch(self):
+        for identity, marketplace in (
+            ('../base@core', 'core'), ('base@../core', '../core'), ('base@core', 'other'),
+            ('base@core.', 'core.'), ('base@core/other', 'core/other'), ('CON@core', 'core'),
+        ):
+            with self.subTest(identity=identity), self.assertRaises(ROLLING.RollingPluginError):
+                ROLLING.Selection(identity, 'https://github.com/tj-agents/core.git', marketplace)
+        for source in ('https://github.com/tj-agents/%2e%2e.git', 'https://github.com/tj-agents/core?x.git'):
+            with self.subTest(source=source):
+                self.assertIsNone(ROLLING.canonical_source(source))
+
+
 if __name__ == '__main__':
     unittest.main()
