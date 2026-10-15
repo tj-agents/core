@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -139,6 +140,36 @@ class MergeCleanupGateTests(unittest.TestCase):
         detail.update(overrides)
         return detail
 
+    def write_auto_merge_binding(self, worktree, pr=3, **overrides):
+        import merge_review_gate
+
+        head = git(worktree, "rev-parse", "HEAD")
+        repository = merge_review_gate.normalize_slug(git(worktree, "remote", "get-url", "origin"))
+        if repository is None:
+            git(worktree, "remote", "set-url", "origin", "https://github.com/example/repository.git")
+            repository = "example/repository"
+        artifact = {
+            "repo": repository,
+            "pr": pr,
+            "pr_url": f"https://github.com/{repository}/pull/{pr}",
+            "branch": git(worktree, "rev-parse", "--abbrev-ref", "HEAD"),
+            "worktree": str(worktree.resolve()),
+            "head": head,
+            "pending_evidence": [],
+            "review": {"work_order": "reviews/feature.md", "work_order_order": ["full"], "reviewed_sha": None},
+            "merge_authorization": {"mode": "auto", "instruction": "Merge when green."},
+            "auto_merge": True,
+            "completion_condition": "The bound PR reaches MERGED.",
+        }
+        artifact.update(overrides)
+        path = worktree / ".agents" / "persistent-workflow-binding.json"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps(artifact), encoding="utf-8")
+        return path, artifact
+
+    def auto_merge_command(self, script, root):
+        return f'python -B "{script}" --root "{root}"'
+
 
     def test_merge_enable_records_obligation_for_canonical_target(self):
         bare, primary = init_repo(self.root)
@@ -169,6 +200,174 @@ class MergeCleanupGateTests(unittest.TestCase):
         result = self.run_hook(self.payload("git status"))
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual([], self.obligation_files())
+
+    def test_auto_merge_wrapper_records_a_queued_obligation_for_both_native_session_shapes(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        command = self.auto_merge_command(self.root / ".agents" / "workflows" / "auto_merge.py", worktree)
+        payloads = []
+        payloads.append(self.payload(command, session="snake", cwd=str(primary)))
+        camel = self.payload(command, tool_name="Bash", field="command", codex=False, session="ignored", cwd=str(primary))
+        camel["sessionId"] = camel.pop("session_id")
+        payloads.append(camel)
+        for payload in payloads:
+            with self.subTest(session=payload.get("session_id") or payload.get("sessionId")):
+                result = self.run_hook(payload)
+                self.assertEqual(0, result.returncode, result.stderr)
+                _, obligation = self.sole_obligation()
+                self.assertEqual(payload.get("session_id") or payload.get("sessionId"), obligation["session_id"])
+                self.assertEqual("3", obligation["pr"])
+                self.assertEqual("queued", obligation["merge_mode"])
+                self.assertFalse(obligation["confirmed_merged"])
+                self.assertEqual(command, obligation["command"])
+                self.obligation_files()[0].unlink()
+
+    def test_auto_merge_wrapper_accepts_source_installed_and_snapshot_script_suffixes(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        scripts = (
+            self.root / ".agents" / "workflows" / "auto_merge.py",
+            self.root / "installed package Ω" / "workflows" / "auto_merge.py",
+            self.root / "retained snapshot Ω" / "workflows" / "auto_merge.py",
+        )
+        for script in scripts:
+            with self.subTest(script=script):
+                result = self.run_hook(self.payload(self.auto_merge_command(script, worktree), cwd=str(primary)))
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.sole_obligation()
+                self.obligation_files()[0].unlink()
+
+    def test_auto_merge_wrapper_reads_the_packaged_delivery_runtime_without_an_author_checkout(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        packaged_root = self.root / "package Ω"
+        packaged_hooks = packaged_root / "hooks"
+        packaged_hooks.mkdir(parents=True)
+        for source in HOOK.parent.glob("*.py"):
+            shutil.copy2(source, packaged_hooks / source.name)
+        packaged_workflows = packaged_root / "workflows"
+        packaged_workflows.mkdir()
+        for source in (HOOK.parent.parent / "workflows").glob("*.py"):
+            shutil.copy2(source, packaged_workflows / source.name)
+        packaged_hook = packaged_hooks / HOOK.name
+        command = self.auto_merge_command(
+            packaged_hooks.parent / "workflows" / "auto_merge.py", worktree
+        )
+        result = subprocess.run(
+            [sys.executable, "-B", str(packaged_hook)], input=json.dumps(self.payload(command, cwd=str(primary))),
+            capture_output=True, text=True, env=self.env, cwd=str(self.root / "package Ω"), timeout=20,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        _, obligation = self.sole_obligation()
+        self.assertEqual("queued", obligation["merge_mode"])
+
+    def test_auto_merge_wrapper_uses_its_explicit_root_and_rejects_descendants(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        script = self.root / ".agents" / "workflows" / "auto_merge.py"
+        nested = worktree / "nested"
+        nested.mkdir()
+        result = self.run_hook(self.payload(self.auto_merge_command(script, worktree), cwd=str(primary)))
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.sole_obligation()
+        self.obligation_files()[0].unlink()
+
+        result = self.run_hook(self.payload(self.auto_merge_command(script, nested), cwd=str(worktree)))
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], self.obligation_files())
+
+    def test_auto_merge_wrapper_rejects_missing_sessions_and_invalid_bindings(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        binding_path, binding = self.write_auto_merge_binding(worktree)
+        command = self.auto_merge_command(self.root / ".agents" / "workflows" / "auto_merge.py", worktree)
+        missing_session = self.payload(command, cwd=str(worktree))
+        missing_session.pop("session_id")
+        self.assertEqual(0, self.run_hook(missing_session).returncode)
+        self.assertEqual([], self.obligation_files())
+
+        cases = {
+            "malformed": {},
+            "null-pr-url": dict(binding, pr_url=None),
+            "null-pending-evidence": dict(binding, pending_evidence=None),
+            "null-review": dict(binding, review=None),
+            "wrong-worktree": dict(binding, worktree=str(primary.resolve())),
+            "wrong-repository": dict(binding, repo="other/repository", pr_url="https://github.com/other/repository/pull/3"),
+            "wrong-branch": dict(binding, branch="other"),
+            "wrong-head": dict(binding, head="0" * 40),
+        }
+        for name, artifact in cases.items():
+            with self.subTest(name=name):
+                binding_path.write_text(json.dumps(artifact), encoding="utf-8")
+                result = self.run_hook(self.payload(command, cwd=str(worktree)))
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual([], self.obligation_files())
+
+    def test_auto_merge_wrapper_rejects_nonexecutions_and_extra_arguments(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        script = self.root / ".agents" / "workflows" / "auto_merge.py"
+        command = self.auto_merge_command(script, worktree)
+        for value in (
+            f'echo "{command}"',
+            f'python -c "{command}"',
+            f'python -m auto_merge --root "{worktree}"',
+            command + " --verbose",
+            command + " && git status",
+            command + "; git status",
+            command + " | Out-Null",
+            command + "\n git status",
+            f'python -B "{script}" --root "{worktree}" $(Get-Location)',
+        ):
+            with self.subTest(command=value):
+                result = self.run_hook(self.payload(value, cwd=str(worktree)))
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual([], self.obligation_files())
+
+    def test_auto_merge_wrapper_stays_unconfirmed_until_owning_session_monitor_evidence(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        command = self.auto_merge_command(self.root / ".agents" / "workflows" / "auto_merge.py", worktree)
+        self.run_hook(self.payload(command, codex=False, session="s1", cwd=str(worktree)))
+        path, obligation = self.sole_obligation()
+        self.assertEqual("queued", obligation["merge_mode"])
+        for event in ("PostToolUse", "PostToolUseFailure"):
+            result = self.run_hook({
+                "hook_event_name": event, "tool_name": "Bash", "session_id": "s1",
+                "tool_input": {"command": command}, "tool_response": "Merged pull request #3",
+            })
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertFalse(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
+        result = self.run_hook({
+            "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "other",
+            "tool_input": {"command": "gh pr view 3 --json state"}, "tool_response": '{"state":"MERGED"}',
+        })
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertFalse(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
+        result = self.run_hook({
+            "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
+            "tool_input": {"command": "gh pr view 3 --json state"}, "tool_response": '{"state":"MERGED"}',
+        })
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertTrue(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
+
+    def test_auto_merge_wrapper_is_not_denied_by_zero_grace_after_recording(self):
+        bare, primary = init_repo(self.root)
+        worktree = add_feature_worktree(primary, self.root, "feature")
+        self.write_auto_merge_binding(worktree)
+        command = self.auto_merge_command(self.root / ".agents" / "workflows" / "auto_merge.py", worktree)
+        result = self.run_hook(
+            self.payload(command, cwd=str(worktree)),
+            env=dict(self.env, AGENT_MERGE_CLEANUP_GRACE_SECONDS="0"),
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.sole_obligation()
 
     def test_grace_selection_direct_vs_queued(self):
         direct = {"merge_mode": "direct"}
