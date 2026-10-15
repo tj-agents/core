@@ -276,13 +276,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/plan_handoff_stop.py",
-      "destination": "hooks/plan_handoff_stop.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/hooks/plan_handoff_stop_launcher.py",
-      "destination": "hooks/plan_handoff_stop_launcher.py"
+      "source": ".agents/machine/scripts/repository_identity.py",
+      "destination": "workflows/repository_identity.py"
     },
     {
       "plugin": "engineering",
