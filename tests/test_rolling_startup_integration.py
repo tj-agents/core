@@ -31,10 +31,13 @@ CONVERGENCE = load("rolling_verified_convergence", SCRIPTS / "verified_convergen
 
 
 def git(path: Path, *arguments: str) -> str:
-    return subprocess.run(
-        ["git", "-C", str(path), *arguments], check=True, capture_output=True,
-        text=True, encoding="utf-8",
-    ).stdout.strip()
+    completed = subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid", "-C", str(path), *arguments],
+        capture_output=True, text=True, encoding="utf-8",
+    )
+    if completed.returncode:
+        raise RuntimeError(f"Git fixture command failed: {arguments}: {completed.stderr}")
+    return completed.stdout.strip()
 
 
 class RollingStartupIntegrationTests(unittest.TestCase):
@@ -74,6 +77,12 @@ class RollingStartupIntegrationTests(unittest.TestCase):
         self.project = self.root / "project"
         self.project.mkdir()
         self.codex_home = self.root / "codex"
+        original_module = BINDING._module
+        trust = mock.Mock()
+        loader = mock.patch.object(BINDING, "_module", side_effect=lambda name, paths:
+                                   trust if name == "codex_hook_trust" else original_module(name, paths))
+        loader.start()
+        self.addCleanup(loader.stop)
         self.environ = {
             "CODEX_HOME": str(self.codex_home),
             "CLAUDE_CONFIG_DIR": str(self.root / "claude"),
@@ -208,6 +217,7 @@ class RollingStartupIntegrationTests(unittest.TestCase):
             (),
             tuple(sorted(revisions.items())),
             self.codex_home / "plugins",
+            ROLLING.Deadline(),
         )
 
     def test_current_catalog_resolves_selected_closure_then_converges_permissions_and_owned_agents(self):
@@ -225,7 +235,7 @@ class RollingStartupIntegrationTests(unittest.TestCase):
         user_agent.parent.mkdir(parents=True)
         user_agent.write_text("name = 'personal'\n", encoding="utf-8")
         with mock.patch.dict(os.environ, self.environ, clear=False):
-            BINDING._converge(prepared, self.project)
+            BINDING._converge(prepared, "fixture-codex", self.project)
         self.assertEqual("name = 'personal'\n", user_agent.read_text(encoding="utf-8"))
         self.assertTrue((self.codex_home / "agents" / "lane-old.toml").is_file())
         self.assertIn("workflow.py", (self.codex_home / "rules" / "base-agents.rules").read_text(encoding="utf-8"))
@@ -237,7 +247,7 @@ class RollingStartupIntegrationTests(unittest.TestCase):
         engineering = next(package for package in packages if package.identity == "engineering@base-agents")
         self.assertFalse((engineering.root / "obsolete.txt").exists())
         with mock.patch.dict(os.environ, self.environ, clear=False):
-            BINDING._converge(self._prepared(packages, revisions), self.project)
+            BINDING._converge(self._prepared(packages, revisions), "fixture-codex", self.project)
         self.assertFalse((self.codex_home / "agents" / "lane-old.toml").exists())
         self.assertEqual("name = 'new'\n", (self.codex_home / "agents" / "lane-new.toml").read_text(encoding="utf-8"))
         self.assertEqual("name = 'personal'\n", user_agent.read_text(encoding="utf-8"))
@@ -261,7 +271,7 @@ class RollingStartupIntegrationTests(unittest.TestCase):
         self.assertEqual(2, len(engineering))
         self.assertEqual({root.revision for root in engineering}, {git(self.core, "rev-parse", "HEAD")})
         with mock.patch.dict(os.environ, self.environ, clear=False):
-            BINDING._converge(prepared, self.project)
+            BINDING._converge(prepared, "fixture-codex", self.project)
         self.assertTrue((self.codex_home / "agents" / "lane-old.toml").is_file())
 
         self._publish_core("v2")

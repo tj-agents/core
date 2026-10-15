@@ -73,6 +73,9 @@ class TerminalProfileWiringTests(unittest.TestCase):
         root = self.root / "active"
         script = root / "resources" / "machine" / "scripts" / f"{host}_terminal_launcher.py"
         script.parent.mkdir(parents=True, exist_ok=True)
+        catalog = root / "catalog"
+        catalog.mkdir(exist_ok=True)
+        (catalog / "catalog.json").write_text("{}", encoding="utf-8")
         script.write_text(
             "import os, sys\n"
             "with open(os.environ['CALLS'], 'a', encoding='utf-8') as output:\n"
@@ -105,6 +108,9 @@ class TerminalProfileWiringTests(unittest.TestCase):
         root = self.root / f"{host}-argument-spy"
         script = root / "resources" / "machine" / "scripts" / f"{host}_terminal_launcher.py"
         script.parent.mkdir(parents=True, exist_ok=True)
+        catalog = root / "catalog"
+        catalog.mkdir(exist_ok=True)
+        (catalog / "catalog.json").write_text("{}", encoding="utf-8")
         script.write_text(
             "import json, os, sys\n"
             "with open(os.environ['ARGUMENTS'], 'w', encoding='utf-8') as output:\n"
@@ -126,7 +132,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
                 "#!/usr/bin/env python3\n"
                 "import json, sys\n"
                 "if sys.argv[1:] == ['plugin', 'list', '--json']:\n"
-                " print(json.dumps({'installed': [{'pluginId': 'machine@base-agents', 'version': 'test', 'enabled': True}]}))\n",
+                " print(json.dumps({'installed': [{'pluginId': 'machine@base-agents', 'version': 'test', 'enabled': True, 'marketplaceName': 'base-agents', 'name': 'machine', 'marketplaceSource': {'sourceType': 'git', 'source': 'https://github.com/tj-agents/core.git'}}]}))\n",
                 encoding="utf-8",
             )
             native.chmod(native.stat().st_mode | 0o111)
@@ -135,7 +141,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
         source.write_text(
             "using System; class Program { public static int Main(string[] args) { "
             "if (args.Length == 3 && args[0] == \"plugin\" && args[1] == \"list\" && args[2] == \"--json\") "
-            "Console.Write(\"{\\\"installed\\\":[{\\\"pluginId\\\":\\\"machine@base-agents\\\",\\\"version\\\":\\\"test\\\",\\\"enabled\\\":true}]}\"); return 0; } }",
+            "Console.Write(\"{\\\"installed\\\":[{\\\"pluginId\\\":\\\"machine@base-agents\\\",\\\"version\\\":\\\"test\\\",\\\"enabled\\\":true,\\\"marketplaceName\\\":\\\"base-agents\\\",\\\"name\\\":\\\"machine\\\",\\\"marketplaceSource\\\":{\\\"sourceType\\\":\\\"git\\\",\\\"source\\\":\\\"https://github.com/tj-agents/core.git\\\"}}]}\"); return 0; } }",
             encoding="utf-8",
         )
         compiler = shutil.which("powershell.exe")
@@ -151,6 +157,24 @@ class TerminalProfileWiringTests(unittest.TestCase):
                                   text=True, capture_output=True, check=False)
         self.assertEqual(0, compiled.returncode, compiled.stderr)
         return native
+
+    def claude_package(self, cache: Path, active: Path, version: str) -> Path:
+        package = cache / "base-agents" / "machine" / version
+        package.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(active, package, dirs_exist_ok=True)
+        catalog = package / "catalog"
+        catalog.mkdir(exist_ok=True)
+        (catalog / "catalog.json").write_text("{}", encoding="utf-8")
+        return package
+
+    def configure_claude_coordinator(self, cache: Path, package: Path) -> None:
+        cache.mkdir(exist_ok=True)
+        (cache / "known_marketplaces.json").write_text(json.dumps({
+            "base-agents": {"source": "https://github.com/tj-agents/core.git"},
+        }), encoding="utf-8")
+        (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
+            "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
+        }}), encoding="utf-8")
 
     def versioned_python(self, name: str, version: tuple[int, int], label: str) -> Path:
         if os.name == "nt":
@@ -194,13 +218,16 @@ class TerminalProfileWiringTests(unittest.TestCase):
             "    output.write(('hooks' if '--hooks' in sys.argv else 'refresh') + '\\n')\n",
             encoding="utf-8",
         )
+        catalog = active / "catalog"
+        catalog.mkdir(exist_ok=True)
+        (catalog / "catalog.json").write_text("{}", encoding="utf-8")
         target = self.executable("codex", "raise SystemExit(88)\n")
         if os.name == "nt":
             self.native_codex(target)
         else:
             native = self.bin / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / "codex"
             native.parent.mkdir(parents=True)
-            native.write_text("#!/bin/sh\nprintf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"version\":\"test\",\"enabled\":true}]}'\n", encoding="utf-8")
+            native.write_text("#!/bin/sh\nprintf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"version\":\"test\",\"enabled\":true,\"marketplaceName\":\"base-agents\",\"name\":\"machine\",\"marketplaceSource\":{\"sourceType\":\"git\",\"source\":\"https://github.com/tj-agents/core.git\"}}]}'\n", encoding="utf-8")
             native.chmod(native.stat().st_mode | 0o111)
         codex_home = self.root / "codex-interpreter-home"
         cache = codex_home / "plugins" / "cache" / "base-agents" / "machine" / "test"
@@ -212,8 +239,8 @@ class TerminalProfileWiringTests(unittest.TestCase):
         self.calls.unlink(missing_ok=True)
         active = self.active_launcher("claude")
         cache = self.root / "claude-cache"
-        cache.mkdir(exist_ok=True)
-        (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {"machine@base-agents": [{"scope": "user", "installPath": str(active)}]}}), encoding="utf-8")
+        package = self.claude_package(cache, active, "test")
+        self.configure_claude_coordinator(cache, package)
         self.environment.update({"CLAUDE_CODE_PLUGIN_CACHE_DIR": str(cache), "CLAUDE_CONFIG_DIR": str(self.root / "claude-config")})
         self.executable("claude", "import os, sys\nopen(os.environ['CALLS'], 'a').write('claude ' + ' '.join(sys.argv[1:]) + '\\n')\n")
         self.install_profile(CLAUDE)
@@ -263,17 +290,17 @@ class TerminalProfileWiringTests(unittest.TestCase):
             with self.subTest(shell=shell):
                 self.assert_claude_wiring(lambda command: self.run_powershell(shell, command), f". '{self.profile_path()}'; claude plugin list; claude --resume session; claude")
 
-    def test_claude_powershell_falls_back_when_its_registry_cannot_be_read(self):
+    def test_claude_powershell_fails_closed_when_its_registry_cannot_be_read(self):
         self.executable("claude", "print('fallback')\n")
         self.install_profile(CLAUDE)
         for shell in self.powershells():
             with self.subTest(shell=shell):
                 completed = self.run_powershell(shell, f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
-                self.assertEqual(0, completed.returncode, completed.stderr)
-                self.assertEqual("fallback\n", completed.stdout)
+                self.assertNotEqual(0, completed.returncode)
+                self.assertNotIn("fallback", completed.stdout)
                 self.assertIn("registry could not be read", completed.stderr)
 
-    def test_claude_powershell_falls_back_without_a_usable_python(self):
+    def test_claude_powershell_fails_closed_without_a_usable_python(self):
         self.executable("claude", "print('fallback')\n")
         self.install_profile(CLAUDE)
         override = (
@@ -283,12 +310,10 @@ class TerminalProfileWiringTests(unittest.TestCase):
         )
         for shell in self.powershells():
             with self.subTest(shell=shell):
-                completed = self.run_powershell(shell, override + f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
-                self.assertEqual(0, completed.returncode, completed.stderr)
-                self.assertEqual("", completed.stderr)
-                self.assertEqual("fallback", completed.stdout.splitlines()[-1])
-                self.assertEqual(1, completed.stdout.splitlines().count("fallback"))
-                self.assertIn("no usable Python", completed.stdout)
+                completed = self.run_powershell(shell, override + f". '{self.profile_path()}'; $result = claude; if ($result -eq 125) {{ exit 125 }}; exit 1")
+                self.assertEqual(125, completed.returncode, completed.stderr)
+                self.assertNotIn("fallback", completed.stdout)
+                self.assertIn("no usable Python", completed.stderr)
 
     def test_claude_powershell_preserves_a_real_cli_exit_125_without_a_second_launch(self):
         active = self.root / "exit-status-active"
@@ -302,10 +327,8 @@ class TerminalProfileWiringTests(unittest.TestCase):
             encoding="utf-8",
         )
         cache = self.root / "exit-status-cache"
-        cache.mkdir()
-        (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-            "machine@base-agents": [{"scope": "user", "installPath": str(active)}],
-        }}), encoding="utf-8")
+        package = self.claude_package(cache, active, "test")
+        self.configure_claude_coordinator(cache, package)
         self.environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
         self.executable("claude", "import os\nopen(os.environ['CALLS'], 'a').write('cli\\n')\n")
         self.install_profile(CLAUDE)
@@ -332,13 +355,16 @@ class TerminalProfileWiringTests(unittest.TestCase):
                 encoding="utf-8",
             )
             packages.append(package)
+        first = self.claude_package(cache, packages[0], "first")
+        second_package = self.claude_package(cache, packages[1], "second")
+        self.configure_claude_coordinator(cache, first)
         registry = cache / "installed_plugins.json"
         second = cache / "second.json"
         registry.write_text(json.dumps({"plugins": {
-            "machine@base-agents": [{"scope": "user", "installPath": str(packages[0])}],
+            "machine@base-agents": [{"scope": "user", "installPath": str(first)}],
         }}), encoding="utf-8")
         second.write_text(json.dumps({"plugins": {
-            "machine@base-agents": [{"scope": "user", "installPath": str(packages[1])}],
+            "machine@base-agents": [{"scope": "user", "installPath": str(second_package)}],
         }}), encoding="utf-8")
         self.environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
         self.install_profile(CLAUDE)
@@ -346,7 +372,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
             with self.subTest(shell=shell):
                 self.calls.unlink(missing_ok=True)
                 registry.write_text(json.dumps({"plugins": {
-                    "machine@base-agents": [{"scope": "user", "installPath": str(packages[0])}],
+                    "machine@base-agents": [{"scope": "user", "installPath": str(first)}],
                 }}), encoding="utf-8")
                 command = (
                     f". '{self.profile_path()}'; claude; "
@@ -390,10 +416,8 @@ class TerminalProfileWiringTests(unittest.TestCase):
         active = self.active_argument_spy("claude")
         arguments = self.root / "arguments.json"
         cache = self.root / "alias-cache"
-        cache.mkdir()
-        (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-            "machine@base-agents": [{"scope": "user", "installPath": str(active)}]
-        }}), encoding="utf-8")
+        package = self.claude_package(cache, active, "test")
+        self.configure_claude_coordinator(cache, package)
         self.environment.update(CLAUDE_CODE_PLUGIN_CACHE_DIR=str(cache), ARGUMENTS=str(arguments), OS="Windows_NT")
         self.executable("claude", "raise SystemExit(88)\n")
         stub = r"C:\Users\test\WindowsApps\python.exe"
@@ -441,7 +465,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
                     self.calls.unlink(missing_ok=True)
                     interpreters.unlink(missing_ok=True)
                     completed = subprocess.run(
-                        ["/bin/bash", "--noprofile", "--norc", "-c", f". {shlex.quote(str(first))}; . {shlex.quote(str(second))}; codex plugin list; codex-hooks status"],
+                        ["/bin/bash", "--noprofile", "--norc", "-c", f". {shlex.quote(str(first))}; . {shlex.quote(str(second))}; _base_agents_bootstrap='import sys; sys.exit(0)'; codex plugin list; codex-hooks status"],
                         env=environment, text=True, encoding="utf-8", capture_output=True, check=False,
                     )
                     self.assertEqual(0, completed.returncode, completed.stderr)
@@ -452,7 +476,7 @@ class TerminalProfileWiringTests(unittest.TestCase):
                 with self.subTest(shell=shell, order=(first.name, second.name)):
                     self.calls.unlink(missing_ok=True)
                     interpreters.unlink(missing_ok=True)
-                    command = f"$PSNativeCommandArgumentPassing = 'Legacy'; . '{first}'; . '{second}'; codex plugin list; codex-hooks status; exit $LASTEXITCODE"
+                    command = f"$PSNativeCommandArgumentPassing = 'Legacy'; . '{first}'; . '{second}'; $baseAgentsBootstrap = 'import sys; sys.exit(0)'; codex plugin list; codex-hooks status; exit $LASTEXITCODE"
                     completed = subprocess.run([shell, "-NoProfile", "-Command", command], env=environment,
                                                text=True, encoding="utf-8", capture_output=True, check=False)
                     self.assertEqual(0, completed.returncode, completed.stderr)
@@ -497,10 +521,8 @@ class TerminalProfileWiringTests(unittest.TestCase):
             self.environment["ARGUMENTS"] = str(arguments_path)
             if host == "claude":
                 cache = self.root / "claude-arguments-cache"
-                cache.mkdir(exist_ok=True)
-                (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-                    "machine@base-agents": [{"scope": "user", "installPath": str(active)}]
-                }}), encoding="utf-8")
+                package = self.claude_package(cache, active, "test")
+                self.configure_claude_coordinator(cache, package)
                 self.environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
                 target = self.executable("claude", "raise SystemExit(88)\n")
             else:
