@@ -228,7 +228,7 @@ def _claude_option_values(arguments: Iterable[str]) -> tuple[tuple[str, ...], ob
         parts = tuple(part.strip().casefold() for part in payload.replace(";", ",").split(",") if part.strip())
         if not parts or any(part not in {"user", "project", "local"} for part in parts):
             raise RollingPluginError("Claude --setting-sources must name user, project, or local sources")
-        sources = parts
+        sources = tuple(source for source in ("user", "project", "local") if source in parts)
     return sources, settings
 
 
@@ -257,13 +257,16 @@ def claude_settings(config: Path, project: Path, arguments: Iterable[str] = ()) 
         "local": project / ".claude" / "settings.local.json",
     }
     effective: dict[str, object] = {}
-    for source in sources:
-        path = paths[source]
-        if path.exists():
-            effective.update(_json(path))
     supplied = _claude_settings_value(override, project)
-    if override is not None:
-        effective.update(supplied)
+    layers = [_json(paths[source]) for source in sources if paths[source].exists()]
+    layers.append(supplied)
+    for layer in layers:
+        for key, value in layer.items():
+            previous = effective.get(key)
+            if key in {"enabledPlugins", "extraKnownMarketplaces"} and isinstance(previous, dict) and isinstance(value, dict):
+                effective[key] = dict(previous, **value)
+            else:
+                effective[key] = value
     return effective, supplied
 
 
@@ -907,16 +910,19 @@ def _prepare(host: str, target: Path, project: Path, arguments: Mapping[str, obj
     if not packages:
         return Prepared(host, (), verified, catalog, environment, tuple(selections), tuple(sorted(revisions.items())), plugins,
                         deadline, tuple(sorted(disabled)))
-    settings, _supplied = claude_settings(target, project, arguments.get("argv") or ())
-    enabled = settings.get("enabledPlugins")
+    effective, supplied = claude_settings(target, project, arguments.get("argv") or ())
+    settings = dict(supplied)
+    enabled = effective.get("enabledPlugins")
     enabled = dict(enabled) if isinstance(enabled, dict) else {}
     enabled.update({package.identity: True for package in packages})
     settings["enabledPlugins"] = enabled
     marketplaces = settings.get("extraKnownMarketplaces")
     marketplaces = dict(marketplaces) if isinstance(marketplaces, dict) else {}
     known = _json(plugins / "known_marketplaces.json")
+    effective_marketplaces = effective.get("extraKnownMarketplaces")
+    effective_marketplaces = effective_marketplaces if isinstance(effective_marketplaces, dict) else {}
     for marketplace in {package.marketplace for package in packages}:
-        configured = marketplaces.get(marketplace)
+        configured = effective_marketplaces.get(marketplace)
         configured = dict(configured) if isinstance(configured, dict) else {}
         if "source" not in configured:
             registered = known.get(marketplace)
