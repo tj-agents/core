@@ -43,6 +43,17 @@ class InvocationTests(unittest.TestCase):
     def test_writing_it_into_a_file_is_not_a_merge(self):
         self.assertFalse(gate.invokes_merge("cat > pr.md <<'EOF'\nUse " + M + " 613 --admin\nEOF"))
 
+    def test_a_quoted_pipe_character_is_not_read_as_a_shell_separator(self):
+        # A search pattern's own `|` alternation operator sits inside quotes, immediately
+        # before the literal words "gh pr merge" -- exactly the shape that made the character
+        # class `[;&|\n]` misread it as a real pipe and gate a grep that never ran a merge.
+        self.assertFalse(gate.invokes_merge('grep -n "SOME_RE|' + M + '" merge_cleanup_gate.py'))
+
+    def test_a_real_merge_after_a_quoted_decoy_still_gates(self):
+        self.assertTrue(gate.invokes_merge(
+            'grep -n "SOME_RE|' + M + '" merge_cleanup_gate.py && ' + M + " 613 --squash"
+        ))
+
 
 class EnablingTokenTests(unittest.TestCase):
     def test_disable_auto_alone_is_not_an_enable(self):
@@ -326,6 +337,16 @@ class CanonicalTargetContractTests(unittest.TestCase):
     def test_pushd_before_the_enabling_merge_in_a_re_assert_compound_is_detected(self):
         command = (
             M + " 17 --disable-auto && pushd \"relative\" && " + M + " 17 --squash --auto"
+        )
+
+        self.assertTrue(gate.invokes_pushd_before_merge(command))
+
+    def test_a_quoted_decoy_merge_does_not_shift_the_pushd_boundary(self):
+        # A quoted `|gh pr merge` decoy earlier in the command must not be mistaken for the
+        # real merge invocation, which would misplace the boundary `invokes_pushd_before_merge`
+        # searches up to.
+        command = (
+            'grep -n "SOME_RE|' + M + '" merge_cleanup_gate.py && pushd "relative" && ' + M + " 17 --squash"
         )
 
         self.assertTrue(gate.invokes_pushd_before_merge(command))

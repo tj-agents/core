@@ -427,6 +427,28 @@ def worktree_still_exists(obligation):
     return isinstance(worktree, str) and Path(worktree).is_dir()
 
 
+def is_primary_checkout(obligation):
+    primary = obligation.get("primary")
+    worktree = obligation.get("worktree")
+    return nonempty_string(primary) and nonempty_string(worktree) and same_path(worktree, primary)
+
+
+def obligation_pending(obligation):
+    """Whether Step 5 cleanup is still outstanding for `obligation`.
+
+    A linked worktree's mere existence is real signal — it still needs removing — so it
+    keeps nagging even once `session_exit_required` is cleared. A primary checkout is never
+    removed, so its directory existing forever is not evidence of anything; without this
+    carve-out, a plain `--clear` on a retained primary checkout could never actually end the
+    reminder, because `worktree_still_exists` is trivially always true for it.
+    """
+    if obligation.get("session_exit_required"):
+        return True
+    if is_primary_checkout(obligation):
+        return False
+    return worktree_still_exists(obligation)
+
+
 def grace_seconds(obligation):
     override = os.environ.get(GRACE_ENV)
     if override:
@@ -672,13 +694,22 @@ def record_obligation_for_identity(command, data, worktree, pr, merge_mode, expe
 
 
 def record_obligation(command, data):
-    from merge_review_gate import canonical_merge_target_dir, merge_target_dir, pr_number
+    from merge_review_gate import canonical_merge_target_dir, merge_target_dir, normalize_slug, pr_number, repo_flag
 
     target = canonical_merge_target_dir(command) or pushd_target(command) or merge_target_dir(command, data)
     try:
         worktree = Path(target).resolve()
     except OSError:
         return
+    named = repo_flag(command)
+    if named is not None:
+        # Mirrors merge_review_gate's own jurisdiction rule: a `--repo <other>` merge is that
+        # repository's business, not this checkout's. Recording it here attributed PR #9 of
+        # core's own, unrelated branch to a `gh pr merge` that actually merged a marketplace PR.
+        origin_url = git(worktree, "remote", "get-url", "origin")
+        local = normalize_slug(origin_url) if origin_url else None
+        if local != named:
+            return
     record_obligation_for_identity(
         command, data, worktree, pr_number(command), "queued" if "--auto" in command else "direct"
     )
@@ -712,7 +743,7 @@ def stamp_transfer(command, data):
 
 
 def evaluate_codex_obligation(obligation, session, cwd, now):
-    if not obligation.get("session_exit_required") and not worktree_still_exists(obligation):
+    if not obligation_pending(obligation):
         return None
     disposition = obligation.get("disposition")
     if isinstance(disposition, dict) and disposition.get("reason") == "keep-open" and admitted_disposition(obligation):
@@ -894,7 +925,7 @@ def handle_stop(data):
             obligation is not None
             and obligation.get("session_id") == session
             and obligation.get("confirmed_merged")
-            and (obligation.get("session_exit_required") or worktree_still_exists(obligation))
+            and obligation_pending(obligation)
             and not admitted_disposition(obligation)
         ):
             json.dump({"decision": "block", "reason": deny_message(obligation, codex)}, sys.stdout)
@@ -920,8 +951,7 @@ def emit(event, context):
 def handle_reminder(event, data):
     obligations = [
         obligation for obligation in (load_obligation(path) for path in iter_obligation_paths())
-        if obligation is not None
-        and (obligation.get("session_exit_required") or worktree_still_exists(obligation))
+        if obligation is not None and obligation_pending(obligation)
     ]
     if not obligations:
         return
@@ -1015,7 +1045,8 @@ def cli_clear(args):
         if obligation is None:
             raise FileNotFoundError
         obligation["checkout_retained"] = True
-        obligation["session_exit_required"] = True
+        primary_retained = parsed.reason is None and is_primary_checkout(obligation)
+        obligation["session_exit_required"] = not primary_retained
         if parsed.reason is None:
             obligation["disposition"] = {
                 "status": "pending",
@@ -1057,7 +1088,10 @@ def cli_clear(args):
         print(f"merge-cleanup-gate: cannot clear {target}: {error}", file=sys.stderr)
         return 1
     if parsed.reason is None:
-        print(f"merge-cleanup-gate: retained checkout {target}; cleanup remains pending and session exit is still required")
+        if primary_retained:
+            print(f"merge-cleanup-gate: retained primary checkout {target}; cleanup is complete and the reminder is cleared")
+        else:
+            print(f"merge-cleanup-gate: retained checkout {target}; cleanup remains pending and session exit is still required")
     else:
         print(f"merge-cleanup-gate: recorded pending {parsed.reason} retention for {target}")
     return 0

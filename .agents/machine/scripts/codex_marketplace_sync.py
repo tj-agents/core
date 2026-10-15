@@ -13,6 +13,7 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -139,6 +140,53 @@ def enabled_git_plugins(entries):
     return found
 
 
+_UPGRADE_ERROR_MARKETPLACE_RE = re.compile(r"marketplace `([^`]+)`")
+
+
+def upgrade_error_marketplace(error):
+    """The marketplace name a `plugin marketplace upgrade --json` error names, or None.
+
+    Codex reports each failed marketplace as a free-form string -- e.g. "Failed to upgrade
+    marketplace `agent-standards`: upgraded marketplace name `agents` does not match configured
+    marketplace `agent-standards`" -- never a structured field, so this is the only way to tell
+    which marketplace an error is actually about.
+    """
+    if not isinstance(error, str):
+        return None
+    match = _UPGRADE_ERROR_MARKETPLACE_RE.search(error)
+    return match.group(1) if match else None
+
+
+def partition_upgrade_errors(codex_executable, resolved, run, errors, out):
+    """Split a marketplace upgrade's `errors` into (inventory-or-None, blocking).
+
+    A stale, unrelated marketplace -- a different repository's, still registered in the user's
+    profile -- must not refuse a launch this repository has nothing to do with. An error this
+    function can positively attribute to a marketplace none of THIS project's own enabled
+    plugins use is reported as a warning and dropped. Every other error -- including one it
+    cannot attribute to any specific marketplace at all -- still blocks the sync: failing open
+    on an error it cannot place is exactly the risk this gate exists to avoid. The inventory
+    fetched to resolve "this project's own marketplaces" is returned so the caller can reuse it
+    instead of asking Codex for the same list twice.
+    """
+    named = [(error, upgrade_error_marketplace(error)) for error in errors]
+    if not any(name is not None for _, name in named):
+        return None, list(errors)
+    inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                           cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+    relevant = {
+        identity.rsplit('@', 1)[1]
+        for identity in enabled_git_plugins((*(inventory.get('installed') or []), *(inventory.get('available') or [])))
+    }
+    blocking = []
+    for error, name in named:
+        if name is not None and name not in relevant:
+            out(f'codex-marketplace-sync: ignoring an unrelated marketplace error: {error}')
+            continue
+        blocking.append(error)
+    return inventory, blocking
+
+
 def sync_codex_standards(codex_executable, working_directory, out=print, run=subprocess.run):
     """Refresh every enabled git-sourced Codex plugin and trust tj-agents' own hooks among them.
 
@@ -165,11 +213,15 @@ def sync_codex_standards(codex_executable, working_directory, out=print, run=sub
             upgrade = invoke_codex_sync_command(codex_executable, ['plugin', 'marketplace', 'upgrade', '--json'],
                                                  cwd=resolved, run=run, timeout=MARKETPLACE_TIMEOUT_SECONDS)
             errors = upgrade.get('errors') or []
+            inventory = None
             if errors:
-                raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(errors)}')
+                inventory, blocking = partition_upgrade_errors(codex_executable, resolved, run, errors, out)
+                if blocking:
+                    raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(blocking)}')
 
-            inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
-                                                   cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+            if inventory is None:
+                inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                                       cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
             installed = inventory.get('installed') or []
             available = inventory.get('available') or []
             selected = sorted(enabled_git_plugins((*installed, *available)))
