@@ -25,8 +25,8 @@ Canonical source is `.agents/`; host trees stay thin and generated `plugins/*` s
 ## Current ownership and pickup
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-VerifiedTerminalCleanup
-Branch: Fix/GuardedMergeCleanup
-PR: https://github.com/tj-agents/core/pull/267 atc11cd07cb90d5b87dd7f905d3a84901c656dccc3; owning review reviews/Fix-GuardedMergeCleanup.md.
+Branch: Fix/WorkflowProportionality
+PR: https://github.com/tj-agents/core/pull/268; owning review reviews/Fix-WorkflowProportionality.md. Prior PR267 is merged and causally published; it no longer owns the active delivery.
 Published guidance: https://github.com/tj-agents/core/pull/266, merged b6c61f46cd99ae672e31c4bf42257366b9dfe222 at2026-10-15T13:19:48Z; exact reviewed head19e90d46f8a591b7efdc7d84532041f11738556d.
 Published runtime review: https://github.com/tj-agents/core/pull/252, merged e8246a30dbe062ae695ab53ee4eb57e6ccb13f1b.
 Current native owner: Codex 01a139aa-62c8-7453-a1e4-aa9d3a665086, verified PID30000/start1792061248.38945 on this resume. Re-resolve process identity before destructive actions; former PID32732 is stale.
@@ -155,7 +155,7 @@ PR267 causal main run38756374647 succeeded: Windows15:15:23Z, Linux15:04:19Z, re
 
 ## Next Steps
 
-Verify packaging and reachability of the focused workflow-proportionality correction, obtain one independent review of the frozen candidate, then deliver through required CI and causal publication under existing authority. Reuse satisfied evidence; do not reopen PR252/266/267. Keep this CLI open during active dialogue. Own final report/cleanup requires truthful delivery and fresh applicable safety proof.
+Policy candidate2380644a is independently reviewed and approved; native review73.521s and validated workflow lens, both-host source coverage valid, packaging/reachability/harness/catalog checks passed. PR268 CI38760554488 failed because generated catalog digest was included and delivery tests asserted obsolete lane prose. Restored the catalog from published base and removed wording-only assertions while retaining exact packaged-contract delivery checks. All three affected cross-host test methods passed in26.092s (4062ca786a2fd477). Commit/push this focused correction, review only its delta, then own the new exact-head CI and causal publication. Reuse satisfied evidence; do not reopen PR252/266/267. Keep this CLI open during active dialogue. Own final report/cleanup requires truthful delivery and fresh applicable safety proof.
 
 Scope: original repair plus explicitly authorized workflow-delay correction.
 Current slice: Fix/WorkflowProportionality, based on published mainb0677411; seven policy/role files and harness declaration.
