@@ -19,15 +19,18 @@ def bump(root: Path, revision: str, mode: str) -> str:
     document = lock_io.load_json(lock)
     if not plugin_lock.is_current(document):
         raise lock_io.LockError(f"{lock}: not a schema {plugin_lock.SCHEMA_VERSION} plugin lock")
-    previous = document["marketplace"]["revision"]
+    previous = plugin_lock.validate(document)[0]["revision"]
     document["marketplace"]["revision"] = revision
     plugin_lock.validate(document)
     targets = repo_config.plan(lock, root=root, scope="project", lock_document=document)
     changed = {path: expected for path, expected in targets.items() if repo_config.text_at(path) != expected}
     drift = [path.relative_to(root).as_posix() for path in changed]
+    lock_text = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+    if repo_config.text_at(lock) != lock_text:
+        drift.insert(0, lock.relative_to(root).as_posix())
     if mode == "write":
         original = lock.read_bytes()
-        lock.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        lock.write_text(lock_text, encoding="utf-8")
         try:
             repo_config.write_batch(changed)
         except BaseException:

@@ -46,19 +46,19 @@ def requested_plugins(stacks: list[str], plugins: list[str], roster: dict) -> se
 
 def lock_document(root: Path, revision: str | None, requested: set[str], roster: dict) -> dict:
     lock = plugin_lock.resolve(root)
-    existing = None
+    kept: list[str] = []
     if lock.is_file():
         existing = lock_io.load_json(lock)
         if not plugin_lock.is_current(existing):
             raise lock_io.LockError(f"{lock}: not a schema {plugin_lock.SCHEMA_VERSION} plugin lock")
-        requested = requested | set(existing["plugins"])
-        revision = revision or existing["marketplace"]["revision"]
+        marketplace, kept = plugin_lock.validate(existing)
+        revision = revision or marketplace["revision"]
     if revision is None:
         raise lock_io.LockError("A new plugin lock needs --marketplace-revision")
     document = {
         "schema_version": plugin_lock.SCHEMA_VERSION,
         "marketplace": {"repository": plugin_lock.MARKETPLACE_REPOSITORY, "revision": revision},
-        "plugins": expand(requested, roster),
+        "plugins": sorted(set(expand(requested, roster)) | set(kept)),
     }
     plugin_lock.validate(document)
     return document
