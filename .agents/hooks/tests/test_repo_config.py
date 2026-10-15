@@ -28,7 +28,7 @@ class RepoConfigTests(unittest.TestCase):
         self.save_lock()
 
     def save_lock(self):
-        document = {"schema_version": 2, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": self.plugins}
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": self.plugins}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
 
     def test_generates_both_hosts_preserving_unrelated_settings_and_checks_drift(self):
