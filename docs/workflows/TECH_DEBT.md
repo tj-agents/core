@@ -195,3 +195,85 @@ with a test that `review-prepare` names the skill for such a path.
   - add a gate that blocks a terminal report while the session has noticed a problem without recording it.
 - **Resolution condition:** in a hook test, a session that observes a defect and then tries to finish
   without a matching ledger entry on `main` is blocked, and recording the entry releases it.
+
+## D007 — An agent idles on a background test run instead of continuing the authorized work
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-15. After focused tests passed on a slice, the agent started the full
+  `.agents/hooks/tests` and `tests` suites in the background and ended its turn to wait for them, with
+  further authorized slices unstarted. Tommy: "u can walk and chew gum right ... run those individual tests
+  (definitely not all if its incremental) ... but then continue with the work? note that down as a fix".
+- **Impact and priority:** P2. Wasted wall-clock time and repeated prompts; the full suites take over ten
+  minutes and block nothing the next slice needs.
+- **Cause:** `engineering:plan-execution` says a phase boundary is not a stopping condition but does not say
+  that a pending background check is not one either, nor which tests an incremental change should run.
+- **Source owner:** core engineering (`plan-execution`, `failing-tests`).
+- **State:** open.
+- **Next action:**
+  - state in `plan-execution` that a slice runs only the focused tests for the paths it changed, in the
+    background when slow, and the agent continues with the next authorized work while they run;
+  - leave the full suites to CI and to a change that is broad enough to need them;
+  - make the focused-test selection discoverable (a changed-path to test mapping) so the agent does not
+    guess.
+- **Resolution condition:** the `plan-execution` text carries the rule and a session that has a background
+  check pending is not blocked from, or reminded to stop before, starting the next slice.
+
+## D008 — A documentation-only record needs a whole PR
+
+- **Kind:** debt.
+- **Observed/reported:** 2026-10-15. Recording D007 meant a branch, a PR with a validated body, a delivery
+  binding and a hook gate for a ledger edit with no runtime effect. Tommy: "is there a way we can just make
+  it so you can just directly push to main ... provided it's only docs ... it's ridiculously unnecessary".
+  The agent also bundled D007 into a code PR instead of landing it on `main` (D003), because the direct
+  route does not exist.
+- **Impact and priority:** P2. Every noticed-problem record, plan update and docs fix pays PR overhead, and
+  the cheaper habit (riding along in an unrelated PR) leaves records off `main` and invisible to other
+  sessions, which is D006's failure.
+- **Source owner:** core engineering (`merge-docs`, `write-debt`, the repository's branch protection and the
+  CI guard that classifies docs-only paths).
+- **State:** open.
+- **Next action:**
+  - define the docs-only path allowlist already used by `merge-docs` as a single machine-readable list;
+  - let the agent push a commit whose changed paths are all in that list straight to `main` from a
+    non-worktree checkout, run no test suites for it, and refuse any commit that touches another path;
+  - decide whether this needs a branch-protection bypass for the agent identity or a push-time hook.
+- **Resolution condition:** an agent records a ledger entry on `main` with one push and no PR, a commit
+  touching a non-docs path is rejected by the same route, and no test suite runs for the docs-only push.
+
+## D009 — Core splits small single-purpose work into many PRs and wraps each in process
+
+- **Kind:** debt (standard and workflow defect).
+- **Observed/reported:** 2026-10-15. One small goal (plugin-scoping Core change, which Tommy was not going to
+  review slice by slice) became four stacked Core PRs (#258 to #261) plus a marketplace PR. Each carried its own
+  validated body, delivery binding and gate round trip, so the same files (`SKILL.md`, `repo_config.py`) were
+  edited on sibling branches and a later merge conflicted on them. Tommy: stacked PRs only make sense for "a
+  very big plan, like a huge refactor, where we're going to be doing it in stages" and only when he says so;
+  otherwise "just do one fucking PR". "What the fuck is core doing?"
+- **Impact and priority:** P1. Wasted wall-clock and tokens on every multi-part task, review fragmentation,
+  merge conflicts between the agent's own branches, and repeated frustration.
+- **Cause (observed, not all verified):**
+  - `engineering:session-guidance` "Keep large changes reviewable" says to define PR-sized slices before a
+    "large refactor or multi-concern change" and "Deliver one slice at a time by default", with "A phase label or
+    an existing open PR never justifies accumulating the whole goal in one diff". Nothing says that a small or
+    single-purpose goal, or one the user will not review in stages, is one PR.
+  - The inherited plan said "one PR each" per phase slice, and the agent applied it literally.
+  - The Concertable delivery-binding gate expects one PR per checkout, so each stacked PR forced a manual
+    re-bind.
+  - `engineering:open-pr` opens a draft per slice and has no "one PR for the goal" default.
+- **Source owner:** core engineering (`session-guidance`, `git-branching`, `open-pr`, `plan-authoring` slice
+  wording) and the delivery-binding gate.
+- **State:** open.
+- **Next action:**
+  - make one PR per repository the default for a goal, and require an explicit user statement (or a recorded
+    multi-stage plan the user approved) before opening a stack;
+  - state that "reviewable" is measured against what the user will actually review, and that the user is the
+    judge of staging;
+  - make the delivery-binding gate accept several PRs per checkout, or stop re-binding on every new PR;
+  - reword plan templates so "slice" does not imply "PR".
+- **Resolution condition:** a multi-part goal with no user-approved staging produces one PR per repository in a
+  session test, and the stack path is only entered on an explicit user instruction.
+- **Update (Tommy, 2026-10-15):** the stacked-PR requirement belongs in his work standards (professional
+  work), not Core or his own repositories. Core's default is one PR per repository for a goal; stack only on
+  an explicit instruction.
+- **Related:** D007 (idling on background tests), D008 (documentation-only records need a PR); PR #257 already
+  removes compatibility aliases for clean skill renames, which changes the rename plan.
