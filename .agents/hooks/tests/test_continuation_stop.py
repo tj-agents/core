@@ -155,7 +155,6 @@ class ContinuationStopTests(unittest.TestCase):
         self.assertIn("completion check", self.call())
 
     def test_typed_blocker_and_explicit_pause_allow_stop(self):
-        self.goal.write_text("## Next Steps\n\nBlocked: external\nBlocked by: approval\nUnblock action: approve\nResume when: approved\n", encoding="utf-8")
         self.write_owner(self.owner("blocked", reason="approval-needed", pr=7))
         self.assertIsNone(self.call())
         self.write_owner(self.owner())
@@ -163,60 +162,13 @@ class ContinuationStopTests(unittest.TestCase):
             self.assertIsNone(self.call(self.receipt(prompt=prompt)))
         self.assertIsNotNone(self.call(self.receipt(prompt="Why did it stop?\n```text\nstop\n```")))
 
-    def test_documented_blocker_requires_a_published_boundary_without_trailing_tasks(self):
-        published = (
-            "## Next Steps\n\n"
-            "Blocked: external approval\n"
-            "Blocked by: release owner\n"
-            "Unblock action: approve the release\n"
-            "Resume when: approval is recorded\n"
-        )
-        paused = "## Next Steps\n\nPaused: waiting for the release owner\n"
-        metadata = (
-            "Scope: whole plan\n"
-            "Current slice: await release approval\n"
-            "Remaining scope: delivery and closeout\n"
-            "Done when: the release is approved\n"
-        )
-        self.goal.write_text(published, encoding="utf-8")
-        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
-
-        self.goal.write_text(published + metadata, encoding="utf-8")
-        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
-
-        self.goal.write_text(paused + metadata, encoding="utf-8")
-        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
-
-        invalid = (
-            "## Next Steps\n\n"
-            "Blocked:\n"
-            "Blocked by: release owner\n"
-            "Unblock action: approve the release\n"
-            "Resume when: approval is recorded\n",
-            paused,
-            "## Next Steps\n\nPaused:\n",
-            published + "Scope: release\n",
-            paused + "Current slice: Run the authorized test suite.\n",
-            published + metadata.removesuffix("Done when: the release is approved\n"),
-            published + metadata + "Scope: duplicate\n",
-            published + metadata + "Run the authorized test suite.\n",
-        )
-        for text in invalid:
-            with self.subTest(text=text):
-                self.goal.write_text(text, encoding="utf-8")
-                self.assertFalse(continuation_stop.documented_blocker(self.owner("blocked")))
-
+    def test_documented_blocker_needs_only_a_reason_and_next_action(self):
         self.goal.write_text("# Goal\n", encoding="utf-8")
-        for reason in ("continuation-budget-exhausted", "host-capability-or-permission-unavailable"):
-            with self.subTest(reason=reason):
-                self.assertFalse(continuation_stop.documented_blocker(
-                    self.owner("blocked", reason=reason)
-                ))
-
-        self.goal.write_text(published, encoding="utf-8")
-        self.assertTrue(continuation_stop.documented_blocker(
-            self.owner("blocked", reason="continuation-budget-exhausted")
-        ))
+        self.assertTrue(continuation_stop.documented_blocker(self.owner("blocked")))
+        for key in ("reason", "next_action"):
+            for value in ("", "  ", None):
+                with self.subTest(key=key, value=value):
+                    self.assertFalse(continuation_stop.documented_blocker(self.owner("blocked", **{key: value})))
 
     def test_old_completed_owner_cannot_satisfy_new_execution_obligation(self):
         self.write_owner(self.owner("complete", updated_at=1))

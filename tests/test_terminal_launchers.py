@@ -453,11 +453,11 @@ class TerminalLaunchersTests(unittest.TestCase):
                     ]
                     for name in names:
                         shutil.copy2(SCRIPTS / name, scripts / name)
-                    utility = package / ".agents" / "machine" / "utility" / "bootstrap-capabilities" / "scripts"
+                    utility = package / ".agents" / "machine" / "utility" / "plugin-lock" / "scripts"
                     utility.mkdir(parents=True)
-                    for name in ("bootstrap_capabilities.py", "harness_permissions.py", "harness_permissions_sync.py"):
+                    for name in ("lock_io.py", "harness_permissions.py", "harness_permissions_sync.py"):
                         shutil.copy2(
-                            ROOT / ".agents" / "machine" / "utility" / "bootstrap-capabilities" / "scripts" / name,
+                            ROOT / ".agents" / "machine" / "utility" / "plugin-lock" / "scripts" / name,
                             utility / name,
                         )
                     (package / "harness.json").write_text(json.dumps({
