@@ -44,6 +44,11 @@ def requested_plugins(stacks: list[str], plugins: list[str], roster: dict) -> se
     return set(plugins).union(*(roster["stacks"][stack] for stack in stacks))
 
 
+def refuse_local_clone(root: Path) -> None:
+    if (root / repo_config.LOCAL_STATE).exists():
+        raise lock_io.LockError(f"{root}: adopted with --scope local; use repo_config.py --scope local for this clone")
+
+
 def lock_document(root: Path, revision: str | None, requested: set[str], roster: dict) -> dict:
     lock = plugin_lock.resolve(root)
     kept: list[str] = []
@@ -51,8 +56,12 @@ def lock_document(root: Path, revision: str | None, requested: set[str], roster:
         existing = lock_io.load_json(lock)
         if not plugin_lock.is_current(existing):
             raise lock_io.LockError(f"{lock}: not a schema {plugin_lock.SCHEMA_VERSION} plugin lock")
-        marketplace, kept = plugin_lock.validate(existing)
+        if not isinstance(existing.get("plugins"), list):
+            raise lock_io.LockError(f"{lock}: plugins must be a list")
+        repaired = dict(existing, plugins=sorted({*existing["plugins"], *plugin_lock.CORE_PLUGINS}, key=str))
+        marketplace, kept = plugin_lock.validate(repaired)
         revision = revision or marketplace["revision"]
+        requested = requested | {name for name in kept if name in roster["plugins"]}
     if revision is None:
         raise lock_io.LockError("A new plugin lock needs --marketplace-revision")
     document = {
@@ -68,6 +77,7 @@ def plan(root: Path, revision: str | None, stacks: list[str], plugins: list[str]
     root = root.expanduser().resolve()
     if root.exists() and not root.is_dir():
         raise lock_io.LockError(f"Repository root is not a directory: {root}")
+    refuse_local_clone(root)
     roster = load_roster()
     document = lock_document(root, revision, requested_plugins(stacks, plugins, roster), roster)
     lock = root / ".agents" / plugin_lock.LOCK_NAME

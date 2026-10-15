@@ -96,5 +96,20 @@ class BumpPluginLockTests(unittest.TestCase):
         self.assertEqual(("v1.1.0", "v1.1.0"), self.revision(self.roots[1]))
 
 
+    def test_a_local_scope_clone_is_refused_untouched(self):
+        (self.roots[0] / ".agents" / "repo-capabilities.local.json").write_text("{}", encoding="utf-8")
+        status, _, errors = self.run_main("--revision", "v1.1.0", "--mode", "write", "--root", str(self.roots[0]))
+        self.assertEqual(1, status)
+        self.assertIn("adopted with --scope local", errors)
+        self.assertEqual(("v1.0.0", "v1.0.0"), self.revision(self.roots[0]))
+
+    def test_bumping_to_the_pinned_revision_changes_nothing(self):
+        before = (self.roots[0] / ".agents" / "plugins.lock.json").read_bytes()
+        status, output, _ = self.run_main("--revision", "v1.0.0", "--mode", "write", "--root", str(self.roots[0]))
+        self.assertEqual(0, status)
+        self.assertIn("no host settings change", output)
+        self.assertEqual(before, (self.roots[0] / ".agents" / "plugins.lock.json").read_bytes())
+
+
 if __name__ == "__main__":
     unittest.main()
