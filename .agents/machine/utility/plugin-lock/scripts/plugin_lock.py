@@ -78,9 +78,11 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
         raise lock_io.LockError(f"marketplaces must be an object that includes {MARKETPLACE_NAME}")
     for name, value in marketplaces.items():
         validate_marketplace(name, value)
-    repositories = [value["repository"].lower() for value in marketplaces.values()]
-    if len(set(repositories)) != len(repositories):
-        raise lock_io.LockError("Two marketplaces pin the same repository")
+    seen: dict[str, str] = {}
+    for name, value in marketplaces.items():
+        other = seen.setdefault(value["repository"].lower(), name)
+        if other != name:
+            raise lock_io.LockError(f"Marketplaces {other} and {name} pin the same repository {value['repository']}")
     identities = lock["plugins"]
     if not isinstance(identities, list) or any(not isinstance(identity, str) for identity in identities):
         raise lock_io.LockError("plugins must be a list of <plugin>@<marketplace> names")
