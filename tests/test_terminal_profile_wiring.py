@@ -123,10 +123,8 @@ class TerminalProfileWiringTests(unittest.TestCase):
 
     def native_codex(self, shim: Path) -> Path:
         name = "codex.exe" if os.name == "nt" else "codex"
-        native = shim.parent / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / name
+        native = shim if os.name != "nt" else shim.parent / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / name
         native.parent.mkdir(parents=True, exist_ok=True)
-        if native.is_file():
-            return native
         if os.name != "nt":
             native.write_text(
                 "#!/usr/bin/env python3\n"
@@ -136,6 +134,8 @@ class TerminalProfileWiringTests(unittest.TestCase):
                 encoding="utf-8",
             )
             native.chmod(native.stat().st_mode | 0o111)
+            return native
+        if native.is_file():
             return native
         source = self.root / "native_codex.cs"
         source.write_text(
