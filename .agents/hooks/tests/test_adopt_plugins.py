@@ -129,5 +129,19 @@ class AdoptPluginsTests(unittest.TestCase):
             adopt_plugins.run(self.root, "v1.0.0", ["react"], [], "write")
 
 
+    def test_duplicate_or_unhashable_plugin_entries_are_reported_not_normalised(self):
+        self.lock.parent.mkdir()
+        for plugins in (["base", "base", "engineering", "machine"], ["base", ["x"], "engineering", "machine"]):
+            with self.subTest(plugins=plugins):
+                document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}, "plugins": plugins}
+                self.lock.write_text(json.dumps(document), encoding="utf-8")
+                with self.assertRaisesRegex(LockError, "list of unique plugin names"):
+                    adopt_plugins.run(self.root, None, ["react"], [], "write")
+
+    def test_a_second_run_with_no_request_is_stable(self):
+        adopt_plugins.run(self.root, "v1.0.0", ["azure"], [], "write")
+        self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+
+
 if __name__ == "__main__":
     unittest.main()

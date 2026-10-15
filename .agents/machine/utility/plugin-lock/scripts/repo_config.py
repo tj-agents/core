@@ -386,6 +386,14 @@ def reject_machine_paths(root: Path, targets: dict[Path, str | None]) -> None:
         raise lock_io.LockError("Committed host settings contain machine-specific paths:\n" + "\n".join(problems))
 
 
+def refuse_local_clone(root: Path) -> None:
+    if (root / LOCAL_STATE).exists():
+        raise lock_io.LockError(
+            f"{root}: adopted with --scope local; adopt_plugins and bump_plugin_lock do not support local clones yet "
+            "(see the plugin-lock TECH_DEBT.md), and repo_config.py --scope local cannot change the pin"
+        )
+
+
 def write_batch(targets: dict[Path, str | None]) -> None:
     originals = {path: path.read_bytes() if path.is_file() else None for path in targets}
     attempted = []
