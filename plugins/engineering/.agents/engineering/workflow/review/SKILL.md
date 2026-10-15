@@ -97,7 +97,7 @@ identity and confirmed findings must remain durable.
 
 ## Stage 3 — native layer
 
-Run the host's own native reviewer first, covering correctness, simplification, reuse, efficiency, and
+Run the host's own native reviewer, covering correctness, simplification, reuse, efficiency, and
 error handling, over the frozen range `<frozen-base>..<frozen-head>` and scope. `review`'s host entry point
 names that reviewer and its invocation (`<engineering>/skills/review/SKILL.md` in Claude Code,
 `<engineering>/codex-skills/review/SKILL.md` in Codex). It is a tool call; reading the diff yourself is not
@@ -110,6 +110,11 @@ A `native-general` dispatch receives the frozen base, head, path digest, exact s
 bundle path and identity, effort, rule-independent objective, read-only tools, and no prior lens
 conclusions. Validate the result against Workflow v2 before using it. Agent/role/model unavailability falls
 back to the parent over the same descriptor and bundle.
+
+Prepare independent native, specialist, and required security checks as one concurrent wave. Each valid
+result satisfies its layer once for that frozen candidate. Supply captured test results with their exact
+candidate identity; reviewers reuse them and run an additional check only to resolve a concrete concern.
+Review does not repeat a passed suite merely to establish another copy of verification evidence.
 
 ## Stage 4 — load applicable rules
 
@@ -159,8 +164,8 @@ Choose only lenses supported by the frozen paths, rules, and risk:
 Each bounded dispatch uses `review-lens`, a unique dispatch/context identity, the same immutable candidate
 artifacts including the materialized bundle path and identity, one exact lens or region, read-only
 permissions, no subdispatch, and no sibling conclusions.
-Dispatch the helper-selected lenses together in its single wave. A small candidate normally selects only
-`native-general` plus a path-proven specialist lens. If a lens depends on another result, return that check to
+Dispatch the helper-selected lenses together in its single wave. Select a specialist only for a concrete
+path- and risk-supported concern beyond the native layer. If a lens depends on another result, return that check to
 the parent instead of starting another source-review wave. Very large candidates route to `big-review` for
 staged coverage. Writers never participate in review production.
 

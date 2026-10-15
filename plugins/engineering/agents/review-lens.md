@@ -23,3 +23,6 @@ decisions that directly constrain the candidate.
 
 Do not assign severity, approve the change, or make the final review judgment. Do not edit files, run another
 agent, or inspect a different diff. Return `complete` with no claims when the scoped lens finds no defect.
+
+Reuse supplied verification results bound to the frozen candidate. Run an additional check only when a
+concrete review concern requires it; do not repeat a passed suite as routine review preparation.
