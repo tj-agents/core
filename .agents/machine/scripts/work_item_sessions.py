@@ -300,7 +300,8 @@ def cmd_claim(work_item, host, role=None, predecessor=None, status=None, title=N
         result = {"handle": handle, "work_item": f"{feature}/{item}"}
         removed = store.claim_registered_work_item(
             connection, host, session_id, cwd, key, repo, feature, item, role,
-            status=status, branch=record_branch, head=head, title=title, plan_path=plan_path,
+            status=status, branch=record_branch, session_branch=branch, head=head,
+            title=title, plan_path=plan_path,
             predecessor=predecessor, registration=registration,
         )
         if removed:
