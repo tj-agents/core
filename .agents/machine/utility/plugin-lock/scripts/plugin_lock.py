@@ -10,13 +10,13 @@ import lock_io
 
 
 LOCK_NAME = "plugins.lock.json"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
 ALLOWED_OWNERS = ("tj-agents", "Concertable")
 CORE_PLUGINS = ("base", "engineering", "machine")
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
-REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/[A-Za-z0-9_.-]+\Z")
+REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/(?P<name>[A-Za-z0-9_][A-Za-z0-9_.-]*)\Z")
 REVISION = re.compile(r"v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\Z|[0-9a-f]{40}\Z")
 
 
@@ -37,6 +37,19 @@ def split(identity: str) -> tuple[str, str]:
     return name, marketplace
 
 
+def valid_identity(identity: object) -> bool:
+    if not isinstance(identity, str) or identity.count("@") != 1:
+        return False
+    name, marketplace = split(identity)
+    return bool(NAME.fullmatch(name) and NAME.fullmatch(marketplace))
+
+
+def overlay_id(identity: str) -> str:
+    """The `<marketplace>/<plugin>` form used by harness requirement overlays."""
+    name, marketplace = split(identity)
+    return f"{marketplace}/{name}"
+
+
 def validate_marketplace(name: str, value: object) -> dict:
     if not isinstance(name, str) or not NAME.fullmatch(name):
         raise lock_io.LockError(f"Invalid marketplace name: {name!r}")
@@ -44,9 +57,9 @@ def validate_marketplace(name: str, value: object) -> dict:
         raise lock_io.LockError(f"marketplaces.{name} must contain exactly repository and revision")
     repository, revision = value["repository"], value["revision"]
     match = REPOSITORY.fullmatch(repository) if isinstance(repository, str) else None
-    if match is None or match["owner"] not in ALLOWED_OWNERS:
+    if match is None or match["owner"].lower() not in {owner.lower() for owner in ALLOWED_OWNERS}:
         raise lock_io.LockError(f"marketplaces.{name}.repository must be a GitHub repository owned by " + " or ".join(ALLOWED_OWNERS))
-    if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
+    if (name == MARKETPLACE_NAME) != (repository.lower() == MARKETPLACE_REPOSITORY.lower()):
         raise lock_io.LockError(f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name")
     if not isinstance(revision, str) or not REVISION.fullmatch(revision):
         raise lock_io.LockError(f"marketplaces.{name}.revision must be a vN.N.N tag or a full lowercase commit")
@@ -66,8 +79,7 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
     if not isinstance(identities, list) or any(not isinstance(identity, str) for identity in identities):
         raise lock_io.LockError("plugins must be a list of <plugin>@<marketplace> names")
     for identity in identities:
-        name, marketplace = split(identity)
-        if not NAME.fullmatch(name) or marketplace not in marketplaces:
+        if not valid_identity(identity) or split(identity)[1] not in marketplaces:
             raise lock_io.LockError(f"Invalid plugin {identity!r}: use <plugin>@<marketplace> with a declared marketplace")
     if len(set(identities)) != len(identities):
         raise lock_io.LockError("plugins must not repeat a plugin")

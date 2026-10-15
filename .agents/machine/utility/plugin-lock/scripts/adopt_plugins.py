@@ -46,9 +46,12 @@ def requested_plugins(stacks: list[str], plugins: list[str], roster: dict) -> tu
     names = set().union(*(roster["stacks"][stack] for stack in stacks))
     foreign = set()
     for plugin in plugins:
-        name, marketplace = plugin_lock.split(plugin)
-        if marketplace in ("", plugin_lock.MARKETPLACE_NAME):
-            names.add(name)
+        if "@" not in plugin and plugin_lock.NAME.fullmatch(plugin):
+            names.add(plugin)
+        elif not plugin_lock.valid_identity(plugin):
+            raise lock_io.LockError(f"--plugin must be <plugin> or <plugin>@<marketplace>: {plugin}")
+        elif plugin_lock.split(plugin)[1] == plugin_lock.MARKETPLACE_NAME:
+            names.add(plugin_lock.split(plugin)[0])
         else:
             foreign.add(plugin)
     return names, foreign
@@ -107,7 +110,14 @@ def plan(root: Path, revision: str | None, stacks: list[str], plugins: list[str]
     repo_config.refuse_local_clone(root)
     roster = load_roster()
     names, foreign = requested_plugins(stacks, plugins, roster)
-    declared = dict(parse_marketplace(value) for value in marketplaces)
+    declared: dict = {}
+    for value in marketplaces:
+        name, pin = parse_marketplace(value)
+        if name in declared:
+            raise lock_io.LockError(f"--marketplace {name} is given more than once")
+        declared[name] = pin
+    if revision is not None and plugin_lock.MARKETPLACE_NAME in declared:
+        raise lock_io.LockError(f"Use either --marketplace-revision or --marketplace {plugin_lock.MARKETPLACE_NAME}=..., not both")
     document = lock_document(root, revision, names, foreign, declared, roster)
     lock = root / ".agents" / plugin_lock.LOCK_NAME
     host_targets = repo_config.plan(lock, root=root, scope="project", prospective_paths=[lock], lock_document=document)

@@ -71,7 +71,7 @@ class AdoptPluginsTests(unittest.TestCase):
             adopt_plugins.run(self.root, None, ["dotnet"], [], "write")
         self.lock.parent.mkdir()
         self.lock.write_text(json.dumps({"schema_version": 1, "plugins": []}), encoding="utf-8")
-        with self.assertRaisesRegex(LockError, "not a schema 2 plugin lock"):
+        with self.assertRaisesRegex(LockError, "not a schema 3 plugin lock"):
             adopt_plugins.run(self.root, "v1.0.0", ["dotnet"], [], "write")
 
     def test_cli_reports_drift_and_exit_status(self):
@@ -92,7 +92,7 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_extending_keeps_a_plugin_the_roster_does_not_know(self):
         self.lock.parent.mkdir()
-        document = {"schema_version": 2, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}},
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}},
                     "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "newcomer@tj-agents"]}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
         adopt_plugins.run(self.root, None, ["react"], [], "write")
@@ -100,7 +100,7 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_malformed_existing_lock_is_a_reported_error_not_a_crash(self):
         self.lock.parent.mkdir()
-        for text in ('{"schema_version": 2}', '{"schema_version": 2, "plugins": [], "marketplaces": null}'):
+        for text in ('{"schema_version": 3}', '{"schema_version": 3, "plugins": [], "marketplaces": null}'):
             with self.subTest(text=text):
                 self.lock.write_text(text, encoding="utf-8")
                 with self.assertRaises(LockError):
@@ -109,7 +109,7 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_existing_plugins_get_their_roster_dependencies_on_extension(self):
         self.lock.parent.mkdir()
-        document = {"schema_version": 2, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}},
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}},
                     "plugins": ["azure@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents"]}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
         adopt_plugins.run(self.root, None, ["react"], [], "write")
@@ -117,7 +117,7 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_a_lock_missing_core_plugins_is_repaired(self):
         self.lock.parent.mkdir()
-        document = {"schema_version": 2, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": ["react@tj-agents"]}
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": ["react@tj-agents"]}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
         adopt_plugins.run(self.root, None, [], [], "write")
         self.assertEqual(["base", "engineering", "machine", "react"], self.plugins())
@@ -133,7 +133,7 @@ class AdoptPluginsTests(unittest.TestCase):
         self.lock.parent.mkdir()
         for plugins in (["base@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents"], ["base@tj-agents", ["x"], "engineering@tj-agents", "machine@tj-agents"]):
             with self.subTest(plugins=plugins):
-                document = {"schema_version": 2, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": plugins}
+                document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": plugins}
                 self.lock.write_text(json.dumps(document), encoding="utf-8")
                 with self.assertRaisesRegex(LockError, "list of unique plugin names"):
                     adopt_plugins.run(self.root, None, ["react"], [], "write")
@@ -158,6 +158,20 @@ class AdoptPluginsTests(unittest.TestCase):
     def test_a_marketplace_outside_the_allowed_owners_is_rejected(self):
         with self.assertRaisesRegex(LockError, "owned by tj-agents or Concertable"):
             adopt_plugins.run(self.root, "v1.0.0", [], ["x@other"], "write", ["other=someone/plugins@cccccccccccccccccccccccccccccccccccccccc"])
+        self.assertFalse((self.root / ".agents").exists())
+
+
+    def test_malformed_and_conflicting_arguments_are_rejected(self):
+        cases = (
+            (["base@tj-agents@x"], [], "--plugin must be"),
+            (["react@"], [], "--plugin must be"),
+            (["concertable@agents"], ["agents=Concertable/agents@cccccccccccccccccccccccccccccccccccccccc", "agents=Concertable/other@cccccccccccccccccccccccccccccccccccccccc"], "given more than once"),
+            ([], ["tj-agents=tj-agents/marketplace@v1.1.0"], "either --marketplace-revision"),
+        )
+        for plugins, marketplaces, message in cases:
+            with self.subTest(plugins=plugins, marketplaces=marketplaces):
+                with self.assertRaisesRegex(LockError, message):
+                    adopt_plugins.run(self.root, "v1.0.0", [], plugins, "write", marketplaces)
         self.assertFalse((self.root / ".agents").exists())
 
 

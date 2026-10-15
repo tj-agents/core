@@ -36,7 +36,7 @@ class BumpPluginLockTests(unittest.TestCase):
             repo_config.run(root / ".agents" / "plugins.lock.json", "write", root=root)
 
     def save(self, root, revision, plugins=("base", "engineering", "machine", "react")):
-        document = {"schema_version": 2, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": revision}}, "plugins": [f"{name}@tj-agents" for name in plugins]}
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": revision}}, "plugins": [f"{name}@tj-agents" for name in plugins]}
         (root / ".agents" / "plugins.lock.json").write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
     def revision(self, root):
@@ -89,7 +89,7 @@ class BumpPluginLockTests(unittest.TestCase):
         self.assertIn(".agents/plugins.lock.json", output)
 
     def test_malformed_lock_is_reported_and_other_roots_still_move(self):
-        (self.roots[0] / ".agents" / "plugins.lock.json").write_text('{"schema_version": 2}', encoding="utf-8")
+        (self.roots[0] / ".agents" / "plugins.lock.json").write_text('{"schema_version": 3}', encoding="utf-8")
         status, output, errors = self.run_main("--revision", "v1.1.0", "--mode", "write", "--root", str(self.roots[0]), "--root", str(self.roots[1]))
         self.assertEqual(1, status)
         self.assertIn(str(self.roots[0]), errors)
