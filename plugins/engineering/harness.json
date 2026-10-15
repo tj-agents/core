@@ -332,7 +332,7 @@
               "--root",
               "${PROJECT_ROOT}"
             ],
-            "justification": "rechecks the freshly validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+            "justification": "Rechecks required authorization, checkout identity, readiness, review, and security evidence before arming auto-merge for this declared checkout.",
             "match": [
               [
                 "python",
