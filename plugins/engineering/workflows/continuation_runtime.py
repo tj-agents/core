@@ -259,7 +259,15 @@ def apply_receipt(state, receipt):
             completion = completion_check(state["goal"], bound, Path(state["worktree"]))
         except CompletionError as error:
             raise Gate(f"completion-check-invalid: {error}") from error
-        if not completion["ready"]:
+        if completion.get("report_ready") is True:
+            try:
+                state["completion_snapshot"] = {
+                    key: completion[key]
+                    for key in ("report_ready", "ready", "cleanup_status", "pending_cleanup")
+                }
+            except KeyError as error:
+                raise Gate(f"completion-check-invalid: missing {error.args[0]}") from error
+        else:
             raise Gate("completion-unverified: " + "; ".join(completion["blockers"]))
     transition(state, status, receipt["reason"], receipt.get("next_action", ""))
     state["failures"] = 0

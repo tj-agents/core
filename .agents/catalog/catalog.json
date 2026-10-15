@@ -207,7 +207,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:25de82e3a7a84f3360c8d2dacec97d0f62689aee34ebb9762e88640f488c4bd9",
+          "digest": "sha256:f92eb61477d2d6a7e6bf3f25cef30e46079b683ac6467ecff3534dd49184d012",
           "harness": {
             "marketplaces": [
               {
@@ -344,6 +344,10 @@
             ],
             "permissions": {
               "claude_allow": [
+                "Bash(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
                 "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
@@ -360,6 +364,45 @@
                 "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)"
               ],
               "codex_prefix_rules": [
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python.exe",
+                      "python3",
+                      "py"
+                    ],
+                    "-B",
+                    "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
+                    "--clear"
+                  ],
+                  "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
+                  "match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
+                      "--clear",
+                      "${PROJECT_ROOT}",
+                      "--reason",
+                      "capability",
+                      "--evidence",
+                      "evidence.json"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
+                    ],
+                    [
+                      "python",
+                      "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
+                      "--clear"
+                    ]
+                  ]
+                },
                 {
                   "pattern": [
                     [
@@ -555,7 +598,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:9f9dad02e929826767a3402bf310058cf2b46d0011eaba2a6a345d4f82099ea4",
+          "digest": "sha256:3e120ea1573cd6715ffd8af2e5dc0bc7d91c5f017a74a9ebacca6615b68311c0",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -735,7 +778,7 @@
                       "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
                     ]
                   ],
-                  "justification": "After its delivered report, close only this verified unchanged-idle CLI session while retaining its checkout",
+                  "justification": "After its delivered report, close only the exact CLI process PID and start time whose unchanged idle guard still passes; select its native tab by unique exact title when UI Automation has no automation ID, while retaining its checkout",
                   "match": [
                     [
                       "python3",
