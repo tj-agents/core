@@ -1,5 +1,5 @@
 {
-  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files. Codex result-event hooks remain unwired until the host publishes a supported result payload.",
+  "description": "Selected engineering mechanisms. Repository policy gates require their existing opt-in files. Cleanup obligations cover direct and guarded merge invocations. Codex result-event hooks remain unwired until the host publishes a supported result payload.",
   "hooks": {
     "SessionStart": [
       {
