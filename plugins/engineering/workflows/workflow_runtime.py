@@ -640,7 +640,7 @@ class ReadOnlyWorkItemStore:
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA query_only = ON")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version != 2:
+            if version not in {2, 3}:
                 raise ContractViolation(f"work-item session store has unsupported schema version {version}")
             tables = {
                 row[0]
