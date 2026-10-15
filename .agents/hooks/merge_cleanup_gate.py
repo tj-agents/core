@@ -175,7 +175,7 @@ def command_is_exempt(command):
 MESSAGE = (
     "MERGE CLEANUP GATE: `gh pr merge` for PR #{pr} ({branch}) ran from {worktree} at {time} "
     "and merge Step 5 cleanup has not completed.\n"
-    "- Not merged yet? Keep monitoring â€” `{python} .agents/workflows/workflow_ops.py ... "
+    "- Not merged yet? Keep monitoring — `{python} .agents/workflows/workflow_ops.py ... "
     "monitor --kind pr --id {pr} --head {head}`, `gh pr view/checks` and `gh run list/view/watch` "
     "are never blocked.\n"
     "- Merged? Finish Step 6 and the report. For a removable linked checkout, from inside {worktree} run `{python} -B {cleanup_proof}` "
