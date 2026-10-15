@@ -409,7 +409,8 @@ class MergeCleanupGateTests(unittest.TestCase):
                 self.assertIn("PR #3", context)
                 self.assertIn("self-close is still required", context)
                 interpreter = "python" if os.name == "nt" else "python3"
-                self.assertIn(f"`{interpreter} ", context)
+                clear_command = f"`{interpreter} -B \"{HOOK.resolve()}\" --clear \"{worktree}\"`"
+                self.assertIn(clear_command, context)
         self.assertTrue(path.exists())
 
         other_session = self.run_hook(self.payload(
@@ -419,6 +420,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         denied = self.run_hook(self.payload("Set-Content -Path x.txt -Value 1", cwd=str(primary)))
         self.assertEqual(2, denied.returncode, denied.stderr)
         self.assertIn("MERGE CLEANUP GATE", denied.stderr)
+        self.assertIn(clear_command, denied.stderr)
 
         unconfirmed_stop = self.run_hook({"hook_event_name": "Stop", "session_id": "s1"})
         self.assertEqual(0, unconfirmed_stop.returncode, unconfirmed_stop.stderr)
