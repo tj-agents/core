@@ -394,7 +394,7 @@ class WorkflowGenerationTests(unittest.TestCase):
             WorkflowContract(PLUGIN_WORKFLOWS).verify_bundle(),
         )
 
-    def test_workflow_plugin_manifests_deliver_distinct_host_payloads_at_one_version(self):
+    def test_workflow_plugin_manifests_deliver_distinct_host_payloads_without_release_versions(self):
         plugin = ROOT / "plugins" / "engineering"
         codex = json.loads(
             (plugin / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
@@ -402,12 +402,7 @@ class WorkflowGenerationTests(unittest.TestCase):
         claude = json.loads(
             (plugin / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
         )
-        # Codex requires a version and overwrites its payload in place, so it declares one. Claude keys
-        # its cache on <plugin>/<version>/ and treats an unchanged version as already current, so a
-        # declared version there freezes delivery: the payload change merges and reaches no machine while
-        # `plugin update` reports success. Absent, Claude keys on the commit and self-updates, which is
-        # what `dotnet` and `react` have always done.
-        self.assertRegex(codex["version"], r"^\d+\.\d+\.\d+$")
+        self.assertNotIn("version", codex)
         self.assertNotIn("version", claude)
         self.assertEqual("./codex-skills/", codex["skills"])
         self.assertTrue((plugin / "codex-skills" / "persistent-workflow" / "SKILL.md").is_file())
