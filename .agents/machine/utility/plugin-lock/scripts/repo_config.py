@@ -26,7 +26,7 @@ HEADER = re.compile(r"^\s*\[")
 
 def declarations(lock_path: Path, lock: dict) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
     marketplaces, identities_selected = plugin_lock.validate(lock)
-    sources = {name: {"owner_repository": pin["repository"], "revision": pin["revision"], "plugins": []} for name, pin in marketplaces.items()}
+    sources = {name: {"owner_repository": pin["repository"], "revision": pin["revision"]} for name, pin in marketplaces.items()}
     identities = {identity: True for identity in identities_selected}
     selected = {plugin_lock.overlay_id(identity) for identity in identities_selected}
     requirements = []

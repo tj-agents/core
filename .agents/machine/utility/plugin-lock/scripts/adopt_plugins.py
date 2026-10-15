@@ -46,14 +46,14 @@ def requested_plugins(stacks: list[str], plugins: list[str], roster: dict) -> tu
     names = set().union(*(roster["stacks"][stack] for stack in stacks))
     foreign = set()
     for plugin in plugins:
-        if "@" not in plugin and plugin_lock.NAME.fullmatch(plugin):
-            names.add(plugin)
-        elif not plugin_lock.valid_identity(plugin):
+        identity = plugin if "@" in plugin else plugin_lock.plugin_id(plugin)
+        if not plugin_lock.valid_identity(identity):
             raise lock_io.LockError(f"--plugin must be <plugin> or <plugin>@<marketplace>: {plugin}")
-        elif plugin_lock.split(plugin)[1] == plugin_lock.MARKETPLACE_NAME:
-            names.add(plugin_lock.split(plugin)[0])
+        name, marketplace = plugin_lock.split(identity)
+        if marketplace == plugin_lock.MARKETPLACE_NAME:
+            names.add(name)
         else:
-            foreign.add(plugin)
+            foreign.add(identity)
     return names, foreign
 
 

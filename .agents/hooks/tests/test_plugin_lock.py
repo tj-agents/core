@@ -139,7 +139,8 @@ class PluginLockTests(unittest.TestCase):
 
 
     def test_owner_case_reserved_name_and_dot_repositories(self):
-        for repository, ok in (("concertable/agents", True), ("Concertable/..", False), ("tj-agents/Marketplace", False)):
+        for repository, ok in (("Concertable/agents", True), ("concertable/agents", False), ("Concertable/..", False),
+                               ("Concertable/agents.git", False), ("tj-agents/Marketplace", False), ("tj-agents/marketplace", False)):
             with self.subTest(repository=repository):
                 document = dict(self.document)
                 document["marketplaces"] = dict(self.document["marketplaces"], other={"repository": repository, "revision": "cccccccccccccccccccccccccccccccccccccccc"})
@@ -155,11 +156,12 @@ class PluginLockTests(unittest.TestCase):
         with self.assertRaisesRegex(LockError, "schema_version 3"):
             plugin_lock.validate(self.document)
 
-    def test_the_published_schema_matches_the_validator_on_the_tj_agents_entry(self):
+    def test_the_published_schema_agrees_with_the_validator(self):
         schema = json.loads((Path(__file__).resolve().parents[2] / "catalog" / "plugins.lock.schema.json").read_text(encoding="utf-8"))
-        tj = schema["properties"]["marketplaces"]["properties"]["tj-agents"]
-        self.assertEqual({"$ref": "#/$defs/pin"}, tj["allOf"][0])
-        self.assertEqual(3, schema["properties"]["schema_version"]["const"])
+        self.assertEqual(plugin_lock.SCHEMA_VERSION, schema["properties"]["schema_version"]["const"])
+        self.assertEqual({"$ref": "#/$defs/pin"}, schema["properties"]["marketplaces"]["properties"]["tj-agents"]["allOf"][0])
+        owners = schema["$defs"]["pin"]["properties"]["repository"]["pattern"]
+        self.assertTrue(owners.startswith("^(" + "|".join(plugin_lock.ALLOWED_OWNERS) + ")/"), owners)
 
 
 if __name__ == "__main__":

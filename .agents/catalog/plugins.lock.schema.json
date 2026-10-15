@@ -20,7 +20,7 @@
       "properties": {
         "repository": {
           "type": "string",
-          "pattern": "^(tj-agents|Concertable|concertable)/[A-Za-z0-9_][A-Za-z0-9_.-]*$"
+          "pattern": "^(tj-agents|Concertable)/[A-Za-z0-9_][A-Za-z0-9_.-]*(?<!\\.git)$"
         },
         "revision": {
           "type": "string",
