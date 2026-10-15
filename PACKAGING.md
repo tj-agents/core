@@ -8,7 +8,7 @@ marketplaces, hook entry points, and host permissions its skills and workflows r
 or changing any of those requirements updates that package's manifest in the same change.
 The package owner checks its manifest against authored sources and shipped hook wiring; consumers
 check generated project settings against the selected packages' declarations. Core does not
-maintain another package owner's release records or harness manifest.
+maintain another package owner's package declarations or harness manifest.
 
 ## Ownership
 
@@ -28,11 +28,11 @@ hardcoded username.
 A genuine external prerequisite, such as a host CLI or operating-system feature, is named and checked. A
 missing prerequisite must fail clearly. It is not replaced with an invented policy or silently ignored.
 
-Release verification uses `sha256-tree-v1`: hash each sorted forward-slash package-relative path, NUL, byte
+Package verification uses `sha256-tree-v1`: hash each sorted forward-slash package-relative path, NUL, byte
 length, NUL and file bytes. Reject symlinks. Digest exclusions must be declared per catalog entry and kept
 narrow. The machine package excludes only `catalog/catalog.json`, because that file contains the machine
-package's digest; schemas, scripts and the rest of the embedded catalog remain covered. Immutable release tags
-and full commits provide the identity of excluded metadata.
+package's digest; schemas, scripts and the rest of the embedded catalog remain covered. The generated
+publication fingerprint identifies the authored rolling-main inputs while catalog digests are refreshed.
 
 ## Why
 

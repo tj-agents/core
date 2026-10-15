@@ -1,1159 +1,1103 @@
 {
   "schema_version": 1,
   "digest_format": "sha256-tree-v1",
-  "releases": [
+  "packages": [
     {
-      "id": "base-agents@2.1.16",
       "owner_repository": "tj-agents/core",
       "source": "https://github.com/tj-agents/core.git",
       "marketplace": "base-agents",
-      "revision": "v2.1.16",
-      "version": "2.1.16",
-      "plugins": [
-        {
-          "id": "base-agents/base",
-          "name": "base",
-          "package_path": "plugins/base",
-          "version": "2.1.16",
-          "description": "Maintained plans and common agent behavior.",
-          "status": "current",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
-          ],
-          "skills": [
-            "agent-files",
-            "cd",
-            "goal-continuation",
-            "idea-initialization",
-            "plan-artifacts"
-          ],
-          "dependencies": {
-            "required": [],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "python>=3.9"
-            ],
-            "optional": []
-          },
-          "digest": "sha256:524d8945cb2ee5cfc7d440526bbf6076385ed7e339cf1edacc7f5343952d9430",
-          "harness": {
-            "marketplaces": [
-              {
-                "id": "base-agents",
-                "repository": "tj-agents/core"
-              }
-            ],
-            "plugins": [
-              "base-agents/base"
-            ],
-            "hooks": [
-              {
-                "path": ".agents/base/policy/agent-files/scripts/session-context.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": ".agents/base/policy/plan-artifacts/scripts/session-context.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/hook_dispatch.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/pre_tool_use_adapter.py",
-                "hosts": [
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/skill_router.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/tier_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              }
-            ],
-            "permissions": {
-              "claude_allow": [],
-              "codex_prefix_rules": []
-            }
+      "id": "base-agents/base",
+      "name": "base",
+      "package_path": "plugins/base",
+      "description": "Maintained plans and common agent behavior.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "agent-files",
+        "cd",
+        "goal-continuation",
+        "idea-initialization",
+        "plan-artifacts"
+      ],
+      "dependencies": {
+        "required": [],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": []
+      },
+      "digest": "sha256:524d8945cb2ee5cfc7d440526bbf6076385ed7e339cf1edacc7f5343952d9430",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "base-agents",
+            "repository": "tj-agents/core"
           }
-        },
-        {
-          "id": "base-agents/engineering",
-          "name": "engineering",
-          "package_path": "plugins/engineering",
-          "version": "2.1.16",
-          "description": "Selected engineering workflows, reviews and Git operations.",
-          "status": "current",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
-          ],
-          "skills": [
-            "address-bug",
-            "address-debt",
-            "address-mistake",
-            "address-review",
-            "big-review",
-            "big-review-all",
-            "bugfix",
-            "commit",
-            "commit-all",
-            "commit-push",
-            "committing",
-            "continue-roadmap",
-            "docs",
-            "docs-review",
-            "failing-tests",
-            "failure-provenance",
-            "feature",
-            "git-auth",
-            "git-branching",
-            "guide",
-            "guide-build",
-            "handoff",
-            "handoff-format",
-            "incremental-review",
-            "lanes",
-            "list-work",
-            "merge",
-            "merge-docs",
-            "merging",
-            "open-pr",
-            "open-worktree",
-            "persistent-delivery",
-            "persistent-workflow",
-            "plan-authoring",
-            "plan-checkpoint",
-            "plan-execution",
-            "plans",
-            "pr-preflight",
-            "pr-screenshots",
-            "prune-worktrees",
-            "pull",
-            "pull-main",
-            "push",
-            "recents",
-            "remote-validation",
-            "resume-plan",
-            "review",
-            "review-lifecycle",
-            "self-repair",
-            "session-guidance",
-            "skill-authoring",
-            "skill-routes",
-            "stack",
-            "sync",
-            "sync-all",
-            "sync-checkout",
-            "unmerged",
-            "update-roadmap",
-            "worktree",
-            "write-bug",
-            "write-debt",
-            "write-mistake"
-          ],
-          "dependencies": {
-            "required": [
-              "base-agents/base",
-              "base-agents/machine"
-            ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "exe:git",
-              "python>=3.9"
-            ],
-            "optional": [
-              "exe:bash",
-              "exe:gh",
-              "exe:powershell"
+        ],
+        "plugins": [
+          "base-agents/base"
+        ],
+        "hooks": [
+          {
+            "path": ".agents/base/policy/agent-files/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
             ]
           },
-          "digest": "sha256:f92eb61477d2d6a7e6bf3f25cef30e46079b683ac6467ecff3534dd49184d012",
-          "harness": {
-            "marketplaces": [
-              {
-                "id": "base-agents",
-                "repository": "tj-agents/core"
-              }
-            ],
-            "plugins": [
-              "base-agents/base",
-              "base-agents/engineering",
-              "base-agents/machine"
-            ],
-            "hooks": [
-              {
-                "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/callout_repair_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/compact_output_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/continuation_stop.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/delivery_binding_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/denial_prompt.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/forge_poll_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/git_auth_scope_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/harness_grant.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/hook_dispatch.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/merge_cleanup_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/merge_review_gate.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/persistent_workflow_merge_gate.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/pre_tool_use_adapter.py",
-                "hosts": [
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/red_run_gate.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "hooks/workflow_route.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/worktree_cleanup_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/worktree_placement_gate.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              }
-            ],
-            "permissions": {
-              "claude_allow": [
-                "Bash(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)"
-              ],
-              "codex_prefix_rules": [
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python.exe",
-                      "python3",
-                      "py"
-                    ],
-                    "-B",
-                    "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                    "--clear"
-                  ],
-                  "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
-                  "match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                      "--clear",
-                      "${PROJECT_ROOT}",
-                      "--reason",
-                      "capability",
-                      "--evidence",
-                      "evidence.json"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
-                    ],
-                    [
-                      "python",
-                      "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
-                      "--clear"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python.exe",
-                      "python3",
-                      "py"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/workflows/completion.py"
-                    ]
-                  ],
-                  "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
-                  "match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/workflows/completion.py"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "${PLUGIN_ROOT}/workflows/completion.py"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python.exe",
-                      "python3",
-                      "py"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
-                      "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
-                      "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                    ]
-                  ],
-                  "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
-                  "match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python.exe",
-                      "python3",
-                      "py"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
-                      "${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py",
-                      "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
-                    ]
-                  ],
-                  "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
-                      "postgres"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
-                    ]
-                  ]
-                }
-              ],
-              "auto_merge": {
-                "claude_allow": [
-                  "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
-                  "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
+          {
+            "path": ".agents/base/policy/goal-continuation/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/idea-initialization/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": ".agents/base/policy/plan-artifacts/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/pre_tool_use_adapter.py",
+            "hosts": [
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/skill_router.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/tier_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
+        "permissions": {
+          "claude_allow": [],
+          "codex_prefix_rules": []
+        }
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "base-agents",
+      "id": "base-agents/engineering",
+      "name": "engineering",
+      "package_path": "plugins/engineering",
+      "description": "Selected engineering workflows, reviews and Git operations.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "address-bug",
+        "address-debt",
+        "address-mistake",
+        "address-review",
+        "big-review",
+        "big-review-all",
+        "bugfix",
+        "commit",
+        "commit-all",
+        "commit-push",
+        "committing",
+        "continue-roadmap",
+        "docs",
+        "docs-review",
+        "failing-tests",
+        "failure-provenance",
+        "feature",
+        "git-auth",
+        "git-branching",
+        "guide",
+        "guide-build",
+        "handoff",
+        "handoff-format",
+        "incremental-review",
+        "lanes",
+        "list-work",
+        "merge",
+        "merge-docs",
+        "merging",
+        "open-pr",
+        "open-worktree",
+        "persistent-delivery",
+        "persistent-workflow",
+        "plan-authoring",
+        "plan-checkpoint",
+        "plan-execution",
+        "plans",
+        "pr-preflight",
+        "pr-screenshots",
+        "prune-worktrees",
+        "pull",
+        "pull-main",
+        "push",
+        "recents",
+        "remote-validation",
+        "resume-plan",
+        "review",
+        "review-lifecycle",
+        "self-repair",
+        "session-guidance",
+        "skill-authoring",
+        "skill-routes",
+        "stack",
+        "sync",
+        "sync-all",
+        "sync-checkout",
+        "unmerged",
+        "update-roadmap",
+        "worktree",
+        "write-bug",
+        "write-debt",
+        "write-mistake"
+      ],
+      "dependencies": {
+        "required": [
+          "base-agents/base",
+          "base-agents/machine"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "exe:git",
+          "python>=3.9"
+        ],
+        "optional": [
+          "exe:bash",
+          "exe:gh",
+          "exe:powershell"
+        ]
+      },
+      "digest": "sha256:f92eb61477d2d6a7e6bf3f25cef30e46079b683ac6467ecff3534dd49184d012",
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "base-agents",
+            "repository": "tj-agents/core"
+          }
+        ],
+        "plugins": [
+          "base-agents/base",
+          "base-agents/engineering",
+          "base-agents/machine"
+        ],
+        "hooks": [
+          {
+            "path": ".agents/engineering/policy/session-guidance/scripts/session-context.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/callout_repair_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/compact_output_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/continuation_stop.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/delivery_binding_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/denial_prompt.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
+            "path": "hooks/forge_poll_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/git_auth_scope_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/harness_grant.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/merge_cleanup_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/merge_review_gate.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
+            "path": "hooks/persistent_workflow_merge_gate.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
+            "path": "hooks/pre_tool_use_adapter.py",
+            "hosts": [
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/red_run_gate.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
+            "path": "hooks/workflow_route.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/worktree_cleanup_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/worktree_placement_gate.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py --clear:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/workflows/completion.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
                 ],
-                "codex_prefix_rules": [
-                  {
-                    "pattern": [
-                      [
-                        "python",
-                        "python.exe",
-                        "python3",
-                        "py"
-                      ],
-                      "-B",
-                      "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                      "--root",
-                      "${PROJECT_ROOT}"
-                    ],
-                    "justification": "rechecks the freshly validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
-                    "match": [
-                      [
-                        "python",
-                        "-B",
-                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                        "--root",
-                        "${PROJECT_ROOT}"
-                      ]
-                    ],
-                    "not_match": [
-                      [
-                        "python",
-                        "-B",
-                        "${PLUGIN_ROOT}/workflows/auto_merge.py",
-                        "--root"
-                      ]
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "base-agents/machine",
-          "name": "machine",
-          "package_path": "plugins/machine",
-          "version": "2.1.16",
-          "description": "Explicit harness, history and clipboard utilities.",
-          "status": "current",
-          "platforms": [
-            "windows",
-            "linux",
-            "macos"
-          ],
-          "skills": [
-            "auto-memory",
-            "clip",
-            "followup-codex",
-            "handoff-claude",
-            "handoff-codex",
-            "hook-control",
-            "last-conversation",
-            "open-claude",
-            "open-codex",
-            "peer-cli",
-            "plugin-lock",
-            "recover-agents",
-            "search",
-            "search-claude",
-            "search-codex"
-          ],
-          "dependencies": {
-            "required": [
-              "base-agents/base"
-            ],
-            "optional": []
-          },
-          "external_prerequisites": {
-            "required": [
-              "python>=3.9"
-            ],
-            "optional": [
-              "exe:powershell",
-              "exe:codex",
-              "exe:claude",
-              "windows-terminal",
-              "python>=3.11"
-            ]
-          },
-          "digest": "sha256:3e120ea1573cd6715ffd8af2e5dc0bc7d91c5f017a74a9ebacca6615b68311c0",
-          "digest_excludes": [
-            "catalog/catalog.json"
-          ],
-          "harness": {
-            "marketplaces": [
-              {
-                "id": "base-agents",
-                "repository": "tj-agents/core"
-              }
-            ],
-            "plugins": [
-              "base-agents/base",
-              "base-agents/machine"
-            ],
-            "hooks": [
-              {
-                "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": ".agents/machine/utility/plugin-lock/scripts/harness_permissions_sync.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "hooks/hook_dispatch.py",
-                "hosts": [
-                  "codex"
-                ]
-              },
-              {
-                "path": "resources/machine/scripts/claude_terminal_profile.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "resources/machine/scripts/codex_terminal_profile.py",
-                "hosts": [
-                  "codex"
-                ]
-              },
-              {
-                "path": "resources/machine/scripts/prune_plugin_cache.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
-                "path": "resources/machine/scripts/reap_orphans.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              },
-              {
-                "path": "resources/machine/scripts/session_store.py",
-                "hosts": [
-                  "claude",
-                  "codex"
-                ]
-              }
-            ],
-            "permissions": {
-              "claude_allow": [
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)"
+                "-B",
+                "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
+                "--clear"
               ],
-              "codex_prefix_rules": [
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py",
-                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                    ]
-                  ],
-                  "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py",
-                      "${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
-                    ]
-                  ],
-                  "justification": "After its delivered report, close only the exact CLI process PID and start time whose unchanged idle guard still passes; select its native tab by unique exact title when UI Automation has no automation ID, while retaining its checkout",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py",
-                      "${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py",
-                      "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py"
-                    ],
-                    [
-                      "status",
-                      "off",
-                      "on"
-                    ]
-                  ],
-                  "justification": "machine:hook-control: inspect, suspend or restore the requested Codex configuration layer while preserving hook trust and plugin state",
-                  "match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py",
-                      "off"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/other.py",
-                      "off"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py"
-                    ],
-                    [
-                      "search",
-                      "open"
-                    ],
-                    "--host",
-                    "codex"
-                  ],
-                  "justification": "Permits exact-session recovery tooling; callers follow the shared task-recovery contract when preparing private instructions and any per-call approval justification.",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
-                      "search",
-                      "--host",
-                      "codex"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
-                      "open",
-                      "--host",
-                      "codex"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
-                      "search",
-                      "--host",
-                      "codex"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
-                      "search",
-                      "--host",
-                      "claude"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
-                      "recover",
-                      "--host",
-                      "codex"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
-                    ],
-                    [
-                      "status",
-                      "find",
-                      "interrupted",
-                      "resume"
-                    ]
-                  ],
-                  "justification": "machine:recover-agents 'Continue a work item': status, find and interrupted without --resume are read-only; resume and interrupted --resume perform the guarded reopen through agent_recovery.open_session, limited to rows that are not live, foreign or stale on this machine.",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "status"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                      "find"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "interrupted"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                      "resume"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
-                      "status"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "end"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
-                    ],
-                    "item"
-                  ],
-                  "justification": "Local work-item status and context updates through the shipped CLI; the owning workflow supplies task authority",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "item",
-                      "feature/item",
-                      "--status",
-                      "proposed",
-                      "--title",
-                      "Plan the feature"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
-                      "item"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "end"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
-                    ],
-                    "claim"
-                  ],
-                  "justification": "Native-verified work-item ownership claims through the shipped CLI; the owning workflow supplies task authority and the store guards competing owners",
-                  "match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                      "claim",
-                      "feature/item",
-                      "--host",
-                      "codex",
-                      "--role",
-                      "owner",
-                      "--status",
-                      "active",
-                      "--title",
-                      "Implement the feature"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/other.py",
-                      "claim"
-                    ],
-                    [
-                      "python",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
-                      "end"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
-                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py",
-                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/adopt_plugins.py"
-                    ],
-                    "--root"
-                  ],
-                  "justification": "machine:plugin-lock creates a repository's marketplace-pinned plugin lock and generates its host settings",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
-                      "--root",
-                      "/workspace/project"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
-                      "--root",
-                      "/workspace/project"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
-                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py",
-                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/bump_plugin_lock.py"
-                    ],
-                    "--revision"
-                  ],
-                  "justification": "machine:plugin-lock moves repositories to another marketplace revision and regenerates their host settings",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
-                      "--revision",
-                      "/workspace/project"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
-                      "--root",
-                      "/workspace/project"
-                    ]
-                  ]
-                },
-                {
-                  "pattern": [
-                    [
-                      "python",
-                      "python3"
-                    ],
-                    "-B",
-                    [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
-                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py",
-                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/repo_config.py"
-                    ],
-                    "--root"
-                  ],
-                  "justification": "machine:plugin-lock generates a repository's committed Claude and Codex plugin settings from its plugin lock",
-                  "match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
-                      "--root",
-                      "/workspace/project"
-                    ]
-                  ],
-                  "not_match": [
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
-                      "--root",
-                      "/workspace/project"
-                    ]
-                  ]
-                }
+              "justification": "Records an evidenced retention disposition for the exact merged checkout after validating the real close refusal and separate fallback; pending cleanup remains incomplete",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
+                  "--clear",
+                  "${PROJECT_ROOT}",
+                  "--reason",
+                  "capability",
+                  "--evidence",
+                  "evidence.json"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py"
+                ],
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/hooks/merge_cleanup_gate.py",
+                  "--clear"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "justification": "completion-check reads the canonical goal and freshly verifies every recorded delivery before a workflow may report completion; completed preparation or failed CI observation cannot establish the requested outcome",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/workflows/completion.py"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py",
+                  "${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py",
+                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+                ]
+              ],
+              "justification": "engineering:merge Step 5: proves the PR merged at exactly this head before linked-worktree removal; a delivered report and verified idle session remain separate prerequisites for retained-session closure",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/merge/scripts/cleanup_proof.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python.exe",
+                  "python3",
+                  "py"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+                  "${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py",
+                  "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+                ]
+              ],
+              "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+                  "postgres"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
+                ]
               ]
             }
+          ],
+          "auto_merge": {
+            "claude_allow": [
+              "Bash(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")",
+              "PowerShell(python -B ${PLUGIN_ROOT}/workflows/auto_merge.py --root \"${PROJECT_ROOT}\")"
+            ],
+            "codex_prefix_rules": [
+              {
+                "pattern": [
+                  [
+                    "python",
+                    "python.exe",
+                    "python3",
+                    "py"
+                  ],
+                  "-B",
+                  "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                  "--root",
+                  "${PROJECT_ROOT}"
+                ],
+                "justification": "rechecks the freshly validated repository settings preference, current authorization, exact checkout identity, readiness, review, and security evidence before it can arm auto-merge for this declared checkout",
+                "match": [
+                  [
+                    "python",
+                    "-B",
+                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                    "--root",
+                    "${PROJECT_ROOT}"
+                  ]
+                ],
+                "not_match": [
+                  [
+                    "python",
+                    "-B",
+                    "${PLUGIN_ROOT}/workflows/auto_merge.py",
+                    "--root"
+                  ]
+                ]
+              }
+            ]
           }
         }
-      ]
+      }
+    },
+    {
+      "owner_repository": "tj-agents/core",
+      "source": "https://github.com/tj-agents/core.git",
+      "marketplace": "base-agents",
+      "id": "base-agents/machine",
+      "name": "machine",
+      "package_path": "plugins/machine",
+      "description": "Explicit harness, history and clipboard utilities.",
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "skills": [
+        "auto-memory",
+        "clip",
+        "followup-codex",
+        "handoff-claude",
+        "handoff-codex",
+        "hook-control",
+        "last-conversation",
+        "open-claude",
+        "open-codex",
+        "peer-cli",
+        "plugin-selection",
+        "recover-agents",
+        "search",
+        "search-claude",
+        "search-codex"
+      ],
+      "dependencies": {
+        "required": [
+          "base-agents/base"
+        ],
+        "optional": []
+      },
+      "external_prerequisites": {
+        "required": [
+          "python>=3.9"
+        ],
+        "optional": [
+          "exe:powershell",
+          "exe:codex",
+          "exe:claude",
+          "windows-terminal",
+          "python>=3.11"
+        ]
+      },
+      "digest": "sha256:3e120ea1573cd6715ffd8af2e5dc0bc7d91c5f017a74a9ebacca6615b68311c0",
+      "digest_excludes": [
+        "catalog/catalog.json"
+      ],
+      "harness": {
+        "marketplaces": [
+          {
+            "id": "base-agents",
+            "repository": "tj-agents/core"
+          }
+        ],
+        "plugins": [
+          "base-agents/base",
+          "base-agents/machine"
+        ],
+        "hooks": [
+          {
+            "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "hooks/hook_dispatch.py",
+            "hosts": [
+              "codex"
+            ]
+          },
+          {
+            "path": "resources/machine/scripts/claude_terminal_profile.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
+            "path": "resources/machine/scripts/codex_terminal_profile.py",
+            "hosts": [
+              "codex"
+            ]
+          },
+          {
+            "path": "resources/machine/scripts/prune_plugin_cache.py",
+            "hosts": [
+              "claude"
+            ]
+          },
+          {
+            "path": "resources/machine/scripts/reap_orphans.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
+            "path": "resources/machine/scripts/session_store.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          }
+        ],
+        "permissions": {
+          "claude_allow": [
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py:*)"
+          ],
+          "codex_prefix_rules": [
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py",
+                  "${PLUGIN_ROOT}/skills/peer-cli/scripts/finish.py",
+                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
+                ]
+              ],
+              "justification": "engineering:merge Step 5: after cleanup_proof.py, a delivered report and unchanged verified idle session permit finish to remove its merged worktree",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/finish.py"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/finish.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py",
+                  "${PLUGIN_ROOT}/skills/peer-cli/scripts/close.py",
+                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
+                ]
+              ],
+              "justification": "After its delivered report, close only the exact CLI process PID and start time whose unchanged idle guard still passes; select its native tab by unique exact title when UI Automation has no automation ID, while retaining its checkout",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/close.py"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/peer-cli/scripts/close.py"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/other.py"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/utility/hook-control/scripts/hook_control.py",
+                  "${PLUGIN_ROOT}/skills/hook-control/scripts/hook_control.py",
+                  "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py"
+                ],
+                [
+                  "status",
+                  "off",
+                  "on"
+                ]
+              ],
+              "justification": "machine:hook-control: inspect, suspend or restore the requested Codex configuration layer while preserving hook trust and plugin state",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/hook_control.py",
+                  "off"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/codex-skills/hook-control/scripts/other.py",
+                  "off"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py"
+                ],
+                [
+                  "search",
+                  "open"
+                ],
+                "--host",
+                "codex"
+              ],
+              "justification": "Permits exact-session recovery tooling; callers follow the shared task-recovery contract when preparing private instructions and any per-call approval justification.",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                  "search",
+                  "--host",
+                  "codex"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/agent_recovery.py",
+                  "open",
+                  "--host",
+                  "codex"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                  "search",
+                  "--host",
+                  "codex"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                  "search",
+                  "--host",
+                  "claude"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py",
+                  "recover",
+                  "--host",
+                  "codex"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                ],
+                [
+                  "status",
+                  "find",
+                  "interrupted",
+                  "resume"
+                ]
+              ],
+              "justification": "machine:recover-agents 'Continue a work item': status, find and interrupted without --resume are read-only; resume and interrupted --resume perform the guarded reopen through agent_recovery.open_session, limited to rows that are not live, foreign or stale on this machine.",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "status"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "find"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "interrupted"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "resume"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                  "status"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "end"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                ],
+                "item"
+              ],
+              "justification": "Local work-item status and context updates through the shipped CLI; the owning workflow supplies task authority",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "item",
+                  "feature/item",
+                  "--status",
+                  "proposed",
+                  "--title",
+                  "Plan the feature"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                  "item"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                  "end"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                ],
+                "claim"
+              ],
+              "justification": "Native-verified work-item ownership claims through the shipped CLI; the owning workflow supplies task authority and the store guards competing owners",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "claim",
+                  "feature/item",
+                  "--host",
+                  "codex",
+                  "--role",
+                  "owner",
+                  "--status",
+                  "active",
+                  "--title",
+                  "Implement the feature"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/other.py",
+                  "claim"
+                ],
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                  "end"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
+                  "${PLUGIN_ROOT}/skills/plugin-selection/scripts/adopt_plugins.py",
+                  "${PLUGIN_ROOT}/codex-skills/plugin-selection/scripts/adopt_plugins.py"
+                ],
+                "--root"
+              ],
+              "justification": "machine:plugin-selection creates a repository's rolling-main plugin selection and generates its host settings",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
+                  "--root",
+                  "/workspace/project"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/other.py",
+                  "--root",
+                  "/workspace/project"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py",
+                  "${PLUGIN_ROOT}/skills/plugin-selection/scripts/repo_config.py",
+                  "${PLUGIN_ROOT}/codex-skills/plugin-selection/scripts/repo_config.py"
+                ],
+                "--root"
+              ],
+              "justification": "machine:plugin-selection generates a repository's committed Claude and Codex plugin settings from its plugin selection",
+              "match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/repo_config.py",
+                  "--root",
+                  "/workspace/project"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/utility/plugin-selection/scripts/other.py",
+                  "--root",
+                  "/workspace/project"
+                ]
+              ]
+            }
+          ]
+        }
+      }
     }
   ]
 }

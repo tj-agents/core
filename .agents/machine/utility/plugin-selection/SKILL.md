@@ -1,55 +1,53 @@
 ---
-name: plugin-lock
-description: Create or bump a repository's plugin lock and generate its Claude and Codex plugin settings. Use when adopting plugins for a repository or stack, moving repositories to another marketplace tag, or auditing a machine before removing old user-level plugin settings.
+name: plugin-selection
+description: Select a repository's plugins and generate its rolling-main Claude and Codex settings. Use when adopting plugins for a repository or stack, updating a repository's selected packages, or auditing a machine before removing old user-level plugin settings.
 
 kind: utility
 domain: machine
 route: infer
 ---
 
-# Plugin lock
+# Plugin selection
 
 The commands below show Windows paths and use `python` in Windows PowerShell. On Linux/macOS, use
 `python3` with POSIX paths and the same script arguments.
 
-A repository commits `.agents/plugins.lock.json`, `.claude/settings.json` and `.codex/config.toml`. A fresh
-clone then installs exactly the plugins it selects, pinned to one `tj-agents/marketplace` revision, without
-depending on any machine's user settings. User scope holds only `base`, `engineering` and `machine`, the
-bootstrap that creates repositories.
+A repository commits `.agents/plugins.json`, `.claude/settings.json` and `.codex/config.toml`. A fresh
+clone then installs exactly the plugins it selects from `tj-agents/marketplace` on `main`, without depending
+on any machine's user settings.
 
-## The lock
+## The selection
 
 ```json
-{"schema_version": 2,
- "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
+{"schema_version": 1,
+ "marketplace": {"repository": "tj-agents/marketplace"},
  "plugins": ["base", "engineering", "machine", "dotnet"]}
 ```
 
-`revision` is a `vN.N.N` marketplace tag or a full lowercase commit. The lock must include `base`,
-`engineering` and `machine`, and it lists a stack plugin's required plugins explicitly. The schema is
-`catalog/plugins.lock.schema.json`.
+The selection lists every required package explicitly. The schema is `catalog/plugins.schema.json`. A schema
+2 lock is migrated only by running the adoption command, which writes the schema 1 selection and discards its pin.
 
 ## Adopt a stack
 
 ```powershell
 python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\repository `
-  --stack dotnet --marketplace-revision v1.0.0 --mode preview
+  --stack dotnet --mode preview
 ```
 
 A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
 `plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
-plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Core and each plugin's required
-plugins are always added, existing selections and the existing revision are kept, and a new lock needs
-`--marketplace-revision`. `preview` lists the changed files, `write` applies them together, and `check`
+plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
+existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
+engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
 
-## Generate settings from an existing lock
+## Generate settings from an existing selection
 
 ```powershell
 python -B '<skill-directory>\scripts\repo_config.py' --root C:\path\to\repository --mode write
 ```
 
-`--lock` defaults to `<root>/.agents/plugins.lock.json`. The generator owns Claude's marketplace,
+`--lock` defaults to `<root>/.agents/plugins.json`. The generator owns Claude's marketplace,
 enabled-plugin and `permissions.allow` keys and Codex's marketplace and plugin tables plus
 `.codex/rules/agent-harness.rules`; other project settings stay. Existing Claude allow entries outside the
 declared harness must move into `.agents/repository-harness.json` first. Project scope also rejects
@@ -58,20 +56,10 @@ anywhere in the committed `.claude/settings.json`, `.codex/config.toml` or `.cod
 reporting `file:line`. Replace such a path with a repository-relative one, or move the setting to an
 uncommitted local file. `machine_paths.py --root <checkout>` runs that scan alone.
 
-For per-clone adoption pass `--scope local`, which writes `.claude/settings.local.json`, `.codex/config.toml`,
+For per-clone adoption pass `--scope local` to either command, which writes `.claude/settings.local.json`, `.codex/config.toml`,
 optional `.codex/rules/agent-harness.rules` and `.agents/repo-capabilities.local.json` ownership state, keeps
 exact Git exclusions, preserves unrelated selections and approvals, and refuses tracked targets, changed
 owned settings and links that escape the root. Local settings need Python 3.11 or newer.
-
-## Move repositories to another marketplace tag
-
-```powershell
-python -B '<skill-directory>\scripts\bump_plugin_lock.py' --revision v1.1.0 `
-  --root C:\path\to\one --root C:\path\to\two --mode preview
-```
-
-It previews by default. `--mode write` rewrites each lock's revision and regenerates its settings; a
-repository that fails validation is left unchanged and the others still proceed.
 
 ## Audit a machine
 

@@ -1,4 +1,4 @@
-"""Shared errors and file helpers for the plugin-lock scripts."""
+"""Shared errors and file helpers for the plugin-selection scripts."""
 
 from __future__ import annotations
 

@@ -22,7 +22,7 @@ def git(cwd, *arguments):
 
 
 def catalog(digest, description='a package'):
-    return {'releases': [{'plugins': [{'id': 'market/pkg', 'description': description, 'digest': digest}]}]}
+    return {'packages': [{'id': 'market/pkg', 'description': description, 'digest': digest}]}
 
 
 class GeneratedPathGuardTests(unittest.TestCase):
@@ -71,9 +71,26 @@ class GeneratedPathGuardTests(unittest.TestCase):
 
     def test_a_new_catalog_entry_may_arrive_with_its_digest(self):
         added = catalog('sha256:old')
-        added['releases'][0]['plugins'].append({'id': 'market/new', 'digest': 'sha256:first'})
+        added['packages'].append({'id': 'market/new', 'digest': 'sha256:first'})
         self.write(GUARD.CATALOG, added)
         self.commit('new package')
+        self.assertEqual(self.offending(), [])
+
+
+    def test_catalog_format_migration_preserves_digest_guard(self):
+        self.write(GUARD.CATALOG, {'releases': [{'plugins': catalog('sha256:old')['packages']}]})
+        self.commit('historical catalog')
+        git(self.repo, 'branch', '-f', 'main', 'HEAD')
+        self.write(GUARD.CATALOG, catalog('sha256:new'))
+        self.commit('migration changes digest')
+        self.assertEqual(self.offending(), [f'{GUARD.CATALOG} digest of market/pkg'])
+
+    def test_catalog_format_migration_with_unchanged_digest_passes(self):
+        self.write(GUARD.CATALOG, {'releases': [{'plugins': catalog('sha256:old')['packages']}]})
+        self.commit('historical catalog')
+        git(self.repo, 'branch', '-f', 'main', 'HEAD')
+        self.write(GUARD.CATALOG, catalog('sha256:old'))
+        self.commit('migration preserves digest')
         self.assertEqual(self.offending(), [])
 
 

@@ -131,19 +131,16 @@ one-shot `wl-copy`/`xclip` invocation that exits once the data is handed off. Wh
 written here), default mode copies both flavours from one call and this entry is deleted, with a test
 proving a `text/plain` read-back succeeds right after a default-mode copy.
 
-## The pre-launch standards sync has no overall deadline
+## Rolling plugin preflight still needs real-host acceptance
 
-`agent_cli.sync_claude_standards` runs `claude_standards_sync.py` before every Claude launch and waits
-for it with no outer limit, as the PowerShell launcher did. The script bounds each of its own steps
-(180 seconds per marketplace update, 120 per plugin, 20 per `git ls-remote`), but those add up across
-plugins, and on Windows a `claude plugin` grandchild that keeps the output pipe open can hold the wait
-past its own step limit. A slow or wedged check therefore delays the tab, and the launch it was meant
-never to block. A plain outer `subprocess` timeout is not the fix: it kills a check that is still
-within its own budgets and leaves the grandchild running.
+The supported terminal, handoff and recovery launchers now use a bounded preflight that refreshes and
+verifies the selected tj-agents package closure from publisher `main` and blocks launch on any fetch,
+install, trust, verification or deadline failure. The previous fail-open behavior is superseded: an
+installed fallback must never start after a failed refresh.
 
-Resolve when the sync runs under one overall deadline that stops its whole process tree on expiry on
-both Windows and POSIX, reports a `standards:` line and then launches, with a test that a hung
-grandchild cannot hold the launch past that deadline.
+This source contract still needs integrated real-host acceptance on Claude and Codex, including proof
+that the process deadline terminates the full updater tree and that startup remains blocked after each
+failure class. Do not treat source tests or native disposable-profile experiments as that acceptance.
 
 ## A shared parent shell can keep the worktree locked after finish
 
@@ -171,7 +168,7 @@ port so each delivery remains reviewable.
 On 2026-10-10 a full `.agents/hooks/tests` run failed six `test_repo_config` cases with
 `Root is not the exact Git checkout: /tmp/tmp…` while two other sessions ran the suites on the same machine.
 The file passed alone and on two immediate reruns, and in eight earlier full runs that day.
-`plugin-lock`' `repo_config.preflight_paths` raises that error when a parent of the root holds
+`plugin-selection`' `repo_config.preflight_paths` raises that error when a parent of the root holds
 `.git` (`/tmp` or `/` for these roots) or when `git rev-parse --show-toplevel` disagrees with the root. Which
 one fired, and what caused it, was not identified.
 

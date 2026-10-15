@@ -136,12 +136,6 @@ def main(argv=None):
         no_daemon = sys.platform == 'win32' and version['core'] >= (0, 157, 0)
         arguments = build_arguments(working_directory, model, effort, args.bypass_hook_trust, prompt_sentence, no_daemon)
 
-        sync = _load_codex_marketplace_sync(agent_cli)
-        try:
-            sync.sync_codex_standards(codex, working_directory)
-        except sync.SyncError as exc:
-            raise agent_cli.LaunchError(str(exc)) from None
-
         # TERM is CLEARED here, never forced -- the opposite of handoff-claude, and not an oversight.
         # Claude Code exports TERM=xterm-256color; Codex is a Rust/crossterm binary, and on native Windows
         # an unset TERM is what selects the console's truecolor path. Handing it a POSIX terminfo name
@@ -151,7 +145,11 @@ def main(argv=None):
         # that was set -- TERM -- is what broke it. On POSIX this clearing has no effect either way:
         # launch_tab never forces or clears TERM there, because the terminal that actually starts the tab
         # sets TERM for that session itself.
-        agent_cli.launch_tab(working_directory, codex, args.title, arguments=arguments, clear=('TERM',))
+        agent_cli.launch_tab(
+            working_directory, sys.executable, args.title,
+            arguments=agent_cli.bound_terminal_arguments("codex", working_directory, codex, arguments),
+            clear=('TERM',),
+        )
 
         selection = f'{tier}{model}' if model else 'the CLI default model'
         if effort:
