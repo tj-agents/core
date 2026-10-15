@@ -358,5 +358,24 @@ class RollingBoundaryTests(unittest.TestCase):
                 self.assertIsNone(ROLLING.canonical_source(source))
 
 
+    def test_expired_deadline_cannot_spawn_a_child(self):
+        deadline = mock.Mock()
+        deadline.remaining.side_effect = ROLLING.RollingPluginError('expired')
+        with mock.patch.object(ROLLING.subprocess, 'Popen') as start:
+            with self.assertRaisesRegex(ROLLING.RollingPluginError, 'expired'):
+                ROLLING._completed(['git', 'fetch'], None, {}, deadline)
+            start.assert_not_called()
+
+    def test_deadline_expiring_during_spawn_terminates_the_child(self):
+        deadline = mock.Mock()
+        deadline.remaining.side_effect = [1, ROLLING.RollingPluginError('expired')]
+        with mock.patch.object(ROLLING.subprocess, 'Popen') as start, \
+                mock.patch.object(ROLLING, 'terminate_process_tree') as terminate:
+            with self.assertRaisesRegex(ROLLING.RollingPluginError, 'expired'):
+                ROLLING._completed(['git', 'fetch'], None, {}, deadline)
+            terminate.assert_called_once_with(start.return_value)
+            start.return_value.communicate.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

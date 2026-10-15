@@ -375,6 +375,7 @@ def supplied_selections(value: object) -> list[Selection]:
 
 def _completed(command: list[str], cwd: Path | None, environment: Mapping[str, str], deadline: Deadline,
                timeout: int = GIT_TIMEOUT_SECONDS) -> subprocess.CompletedProcess:
+    deadline.remaining(timeout)
     options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
     try:
         process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -386,6 +387,9 @@ def _completed(command: list[str], cwd: Path | None, environment: Mapping[str, s
     except subprocess.TimeoutExpired as error:
         terminate_process_tree(process)
         raise RollingPluginError(f"command timed out: {' '.join(command[:3])}") from error
+    except BaseException:
+        terminate_process_tree(process)
+        raise
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 

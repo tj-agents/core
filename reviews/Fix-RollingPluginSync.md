@@ -56,7 +56,7 @@ those bounded checks returned to the parent over the same frozen bundle.
   from a disposable packaged layout. Confidence high; generated-path existence probe confirmed both
   current candidates absent and the canonical helper present.
 
-- [ ] **R4 — MEDIUM — security** — `.agents/machine/scripts/rolling_plugins.py:353`
+- [x] **R4 — MEDIUM — security** — `.agents/machine/scripts/rolling_plugins.py:353`
   `_completed` spawns a child before asking the shared deadline for its remaining budget. An expired
   deadline raises outside the timeout handler, leaving the child alive after preflight releases its
   lock. Check the budget before spawning and terminate the child on any post-spawn exception.
@@ -126,3 +126,6 @@ are composed. Windows junction sentinel, lock, checkout and traversal cases pass
 R3 fix evidence: packaged permission lookup includes the canonical `.agents` directory. Eight startup
 binding cases passed, including both helper imports from a disposable packaged layout, in
 `024ca2385dff225c-rolling-packaged-coordinator-review-fix.log`.
+
+R4 fix evidence: an expired budget prevents spawn; any post-spawn exception terminates the child.
+Both expiry regressions passed in `165396aa4b823c64-rolling-deadline-review-fix.log`.
