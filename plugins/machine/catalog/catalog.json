@@ -39,7 +39,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:7011cc3369a7ccf8952db908c3aa49834552337f45a40ebff92369a23214b591",
+          "digest": "sha256:524d8945cb2ee5cfc7d440526bbf6076385ed7e339cf1edacc7f5343952d9430",
           "harness": {
             "marketplaces": [
               {
@@ -151,6 +151,7 @@
             "handoff-format",
             "incremental-review",
             "lanes",
+            "list-work",
             "merge",
             "merge-docs",
             "merging",
@@ -183,7 +184,6 @@
             "sync-checkout",
             "unmerged",
             "update-roadmap",
-            "workboard",
             "worktree",
             "write-bug",
             "write-debt",
@@ -207,7 +207,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:be808443210f2b3a3191989f6bd4d7585488f0e82197f67d1a3bea742718517b",
+          "digest": "sha256:8064611bf49f471a655d7b232505d3950d8401cce8153ac117eb23be38025f80",
           "harness": {
             "marketplaces": [
               {
@@ -309,12 +309,6 @@
                 ]
               },
               {
-                "path": "hooks/plan_handoff_stop_launcher.py",
-                "hosts": [
-                  "claude"
-                ]
-              },
-              {
                 "path": "hooks/pre_tool_use_adapter.py",
                 "hosts": [
                   "codex"
@@ -355,7 +349,15 @@
                 "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
                 "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -420,6 +422,47 @@
                       "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
                     ]
                   ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python.exe",
+                      "python3",
+                      "py"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+                      "${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py",
+                      "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+                    ]
+                  ],
+                  "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+                      "postgres"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
+                    ]
+                  ]
                 }
               ],
               "auto_merge": {
@@ -479,7 +522,6 @@
           ],
           "skills": [
             "auto-memory",
-            "bootstrap-capabilities",
             "clip",
             "followup-codex",
             "handoff-claude",
@@ -489,6 +531,7 @@
             "open-claude",
             "open-codex",
             "peer-cli",
+            "plugin-lock",
             "recover-agents",
             "search",
             "search-claude",
@@ -512,7 +555,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:e16196a32b595eecabb06443afac0c330199c54543e4976cf9ece33a3bc4a738",
+          "digest": "sha256:4b2f49321eca2211ee1b520ed47060528c47ae682ca8c5879df4f58f64262653",
           "digest_excludes": [
             "catalog/catalog.json"
           ],
@@ -529,14 +572,14 @@
             ],
             "hooks": [
               {
-                "path": ".agents/machine/utility/bootstrap-capabilities/scripts/harness_permissions_sync.py",
+                "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
                 "hosts": [
                   "claude",
                   "codex"
                 ]
               },
               {
-                "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
+                "path": ".agents/machine/utility/plugin-lock/scripts/harness_permissions_sync.py",
                 "hosts": [
                   "claude",
                   "codex"
@@ -619,14 +662,30 @@
                 "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
                 "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "Bash(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "Bash(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)",
-                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py:*)"
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+                "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+                "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+                "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+                "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)"
               ],
               "codex_prefix_rules": [
                 {
@@ -853,19 +912,7 @@
                       "python3",
                       "-B",
                       "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "claim"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
                       "end"
-                    ],
-                    [
-                      "python3",
-                      "-B",
-                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
-                      "item"
                     ]
                   ]
                 },
@@ -877,18 +924,106 @@
                     ],
                     "-B",
                     [
-                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
-                      "${PLUGIN_ROOT}/skills/bootstrap-capabilities/scripts/adopt_repository.py",
-                      "${PLUGIN_ROOT}/codex-skills/bootstrap-capabilities/scripts/adopt_repository.py"
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
                     ],
-                    "--root"
+                    "item"
                   ],
-                  "justification": "machine:bootstrap-capabilities composes and applies the repository-declared immutable capability selection",
+                  "justification": "Local work-item status and context updates through the shipped CLI; the owning workflow supplies task authority",
                   "match": [
                     [
                       "python3",
                       "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/adopt_repository.py",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "item",
+                      "feature/item",
+                      "--status",
+                      "proposed",
+                      "--title",
+                      "Plan the feature"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                      "item"
+                    ],
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py",
+                      "end"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "${PLUGIN_ROOT}/resources/machine/scripts/work_item_sessions.py"
+                    ],
+                    "claim"
+                  ],
+                  "justification": "Native-verified work-item ownership claims through the shipped CLI; the owning workflow supplies task authority and the store guards competing owners",
+                  "match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "claim",
+                      "feature/item",
+                      "--host",
+                      "codex",
+                      "--role",
+                      "owner",
+                      "--status",
+                      "active",
+                      "--title",
+                      "Implement the feature"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/other.py",
+                      "claim"
+                    ],
+                    [
+                      "python",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py",
+                      "end"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
+                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py",
+                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/adopt_plugins.py"
+                    ],
+                    "--root"
+                  ],
+                  "justification": "machine:plugin-lock creates a repository's marketplace-pinned plugin lock and generates its host settings",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
                       "--root",
                       "/workspace/project"
                     ]
@@ -897,7 +1032,75 @@
                     [
                       "python3",
                       "-B",
-                      "${PLUGIN_ROOT}/.agents/machine/utility/bootstrap-capabilities/scripts/other.py",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
+                      "--root",
+                      "/workspace/project"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
+                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py",
+                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/bump_plugin_lock.py"
+                    ],
+                    "--revision"
+                  ],
+                  "justification": "machine:plugin-lock moves repositories to another marketplace revision and regenerates their host settings",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
+                      "--revision",
+                      "/workspace/project"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
+                      "--root",
+                      "/workspace/project"
+                    ]
+                  ]
+                },
+                {
+                  "pattern": [
+                    [
+                      "python",
+                      "python3"
+                    ],
+                    "-B",
+                    [
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
+                      "${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py",
+                      "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/repo_config.py"
+                    ],
+                    "--root"
+                  ],
+                  "justification": "machine:plugin-lock generates a repository's committed Claude and Codex plugin settings from its plugin lock",
+                  "match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
+                      "--root",
+                      "/workspace/project"
+                    ]
+                  ],
+                  "not_match": [
+                    [
+                      "python3",
+                      "-B",
+                      "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
                       "--root",
                       "/workspace/project"
                     ]

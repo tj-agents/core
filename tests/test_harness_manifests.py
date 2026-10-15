@@ -16,7 +16,7 @@ SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sy
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
 
-PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/bootstrap-capabilities/scripts"
+PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/plugin-lock/scripts"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
@@ -275,6 +275,34 @@ class HarnessPermissionCoverageTests(unittest.TestCase):
         self.assertTrue(any(tokens[2].endswith("other.py") for tokens in rule["not_match"]))
         self.assertTrue(any(tokens[-1] == "claude" for tokens in rule["not_match"]))
         self.assertTrue(any(tokens[3] == "recover" for tokens in rule["not_match"]))
+
+    def test_work_item_registration_permissions_allow_item_and_claim_only(self):
+        claude_allow, codex_rules = self.rendered("machine")
+        self.assertTrue(any("work_item_sessions.py" in entry for entry in claude_allow))
+        rules = [
+            rule
+            for rule in codex_rules
+            if isinstance(rule["pattern"][-1], str)
+            and rule["pattern"][-1] in {"item", "claim"}
+        ]
+        self.assertEqual(2, len(rules))
+        self.assertEqual({"item", "claim"}, {rule["pattern"][-1] for rule in rules})
+        root = self.PLUGIN_ROOT.replace("\\", "/")
+        expected_paths = {
+            f"{root}/.agents/machine/scripts/work_item_sessions.py",
+            f"{root}/resources/machine/scripts/work_item_sessions.py",
+        }
+        for rule in rules:
+            command = rule["pattern"][-1]
+            with self.subTest(command=command):
+                paths = {
+                    path.replace("\\", "/")
+                    for path in rule["pattern"][2]
+                }
+                self.assertEqual(expected_paths, paths)
+                self.assertEqual(command, rule["match"][0][3])
+                self.assertTrue(any(tokens[2].endswith("other.py") for tokens in rule["not_match"]))
+                self.assertTrue(any(tokens[3] == "end" for tokens in rule["not_match"]))
 
     def test_rendered_codex_rules_load_under_execpolicy_when_available(self):
         codex = shutil.which("codex")

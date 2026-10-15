@@ -9,6 +9,7 @@
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/merge_cleanup_gate.py",
+    ".agents/machine/scripts/repository_identity.py",
     ".agents/workflows",
     ".agents/workflows/repository_configuration.py"
   ],
@@ -113,12 +114,6 @@
         ]
       },
       {
-        "path": "hooks/plan_handoff_stop_launcher.py",
-        "hosts": [
-          "claude"
-        ]
-      },
-      {
         "path": "hooks/pre_tool_use_adapter.py",
         "hosts": [
           "codex"
@@ -159,7 +154,15 @@
         "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py)",
         "Bash(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
-        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)"
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/merge/scripts/cleanup_proof.py)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -222,6 +225,47 @@
             [
               "python",
               "${PLUGIN_ROOT}/.agents/engineering/workflow/merge/scripts/cleanup_proof.py"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python.exe",
+              "python3",
+              "py"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+              "${PLUGIN_ROOT}/skills/list-work/scripts/list-work.py",
+              "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+            ]
+          ],
+          "justification": "Reads the current plan corpus and recorded work-item status to report scoped unfinished work; it does not write repository or session state",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py",
+              "postgres"
+            ],
+            [
+              "python",
+              "-B",
+              "${PLUGIN_ROOT}/codex-skills/list-work/scripts/list-work.py"
+            ]
+          ],
+          "not_match": [
+            [
+              "python",
+              "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/list-work.py"
+            ],
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/engineering/utility/list-work/scripts/other.py"
             ]
           ]
         }

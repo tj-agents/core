@@ -1,6 +1,6 @@
 ---
 name: skill-authoring
-description: Authoring an agent skill in a tj-agents plugin repository — whether to extend an existing owner or create a new skill, sizing and splitting by subject and consumption rather than by trigger or section count, choosing a name that collides with nothing on either host, writing the description as the selection trigger, what a skill folder may hold, keeping a published name working through a compatibility entry, and which tests a skill owes. Use when creating, splitting, merging, renaming, retiring or reviewing a skill, or editing a skill's name or description.
+description: Authoring an agent skill in a tj-agents plugin repository — whether to extend an existing owner or create a new skill, sizing and splitting by subject and consumption rather than by trigger or section count, choosing a name that collides with nothing on either host, writing the description as the selection trigger, what a skill folder may hold, choosing a clean rename or an explicitly required compatibility path, and which tests a skill owes. Use when creating, splitting, merging, renaming, retiring or reviewing a skill, or editing a skill's name or description.
 
 kind: convention
 domain: process
@@ -74,19 +74,16 @@ Generation copies every file beside a canonical `SKILL.md` into each package tha
 Keep plans, reviews, working notes and debt records out of a skill folder. Record a skill's debt in the
 `TECH_DEBT.md` of the area that owns it, outside every skill folder.
 
-## Keep a published name working
+## Replace names cleanly
 
-A released skill name is a public interface: plans, route tables, other skills and habits name it.
-Rename, split or retire it only with a compatibility path that stays until a recorded removal date:
+When the user directs a clean rename or says not to preserve old names, remove the old entry,
+aliases and forwarding paths, and update in-scope authored callers and both host adapters in the same
+delivery. Do not infer a compatibility requirement from the old name having been published.
 
-- **One-to-one rename or move**: an alias from the old name to the new one in the repository's
-  compatibility record.
-- **Split, or a rename an alias cannot express**: keep the old name as a thin compatibility entry whose
-  body contains only links to its replacements. Its description says that it is a compatibility entry,
-  names the replacements and gives the removal date. It does not repeat the replacements' trigger words,
-  so a session matching on the task selects a replacement directly instead of the stub.
-- **Removal**: a debt entry in the owning area with the date and an objective condition, such as no
-  repository's route table or instructions on its default branch still naming the old skill.
+Preserve an old interface only when the user or an applicable project contract explicitly requires
+compatibility. Record that requirement and its removal condition in the owning plan or debt entry.
+A required compatibility entry contains only links to its replacements; its description names the
+replacements and removal condition without repeating their selection triggers.
 
 ## Tests
 

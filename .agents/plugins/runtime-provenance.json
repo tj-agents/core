@@ -413,31 +413,6 @@
       "sha256": "ef5013264d119b1806f134e704b6fa9a868cbed2829ffaa667760c9dce6697fe"
     },
     {
-      "path": ".agents/hooks/plan_handoff_stop.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "afe5f139ebf8426f6bab41e4382c79f611ef60b1972604b8e7adf12dec139458"
-    },
-    {
-      "path": ".agents/hooks/plan_handoff_stop_launcher.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "2db295f838a140eeca96cf16644d735ccffbb9b0c83799fe9a1f1942b868174d"
-    },
-    {
-      "path": ".agents/hooks/tests/test_plan_handoff_stop.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "a4edc354e6d2b839882af0a25ab07a6c131c1a3d896edc2e42bc9c0b579fc383"
-    },
-    {
-      "path": ".agents/hooks/tests/test_plan_handoff_stop_launcher.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "647a21db0642dbb412af9d9ab9e25fb652d600914b8db20b0770ccbc70b0680b"
-    },
-    {
-      "path": ".agents/hooks/tests/test_plan_handoff_ownership.py",
-      "source_commit": "d0091a365259297db62af93ec225a749b374db70",
-      "sha256": "c568c914ec348a50886c2800164beda93d5c4a6a464b34ec4b3bd2dfe5dbd894"
-    },
-    {
       "path": ".agents/hooks/tests/test_plan_graph.py",
       "source_commit": "d0091a365259297db62af93ec225a749b374db70",
       "sha256": "2612bbccb357ebb53810a3dec577eb739a5946358782d246b96d395f0e7cd859"
