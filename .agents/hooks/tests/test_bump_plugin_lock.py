@@ -83,5 +83,18 @@ class BumpPluginLockTests(unittest.TestCase):
         self.assertIn(str(self.roots[0]), errors)
 
 
+    def test_preview_names_the_lock_file_it_would_rewrite(self):
+        status, output, _ = self.run_main("--revision", "v1.1.0", "--root", str(self.roots[0]))
+        self.assertEqual(0, status)
+        self.assertIn(".agents/plugins.lock.json", output)
+
+    def test_malformed_lock_is_reported_and_other_roots_still_move(self):
+        (self.roots[0] / ".agents" / "plugins.lock.json").write_text('{"schema_version": 2}', encoding="utf-8")
+        status, output, errors = self.run_main("--revision", "v1.1.0", "--mode", "write", "--root", str(self.roots[0]), "--root", str(self.roots[1]))
+        self.assertEqual(1, status)
+        self.assertIn(str(self.roots[0]), errors)
+        self.assertEqual(("v1.1.0", "v1.1.0"), self.revision(self.roots[1]))
+
+
 if __name__ == "__main__":
     unittest.main()

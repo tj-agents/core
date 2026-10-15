@@ -119,7 +119,23 @@
         "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
         "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
         "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
-        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)"
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/adopt_plugins.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py:*)",
+        "Bash(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+        "Bash(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)",
+        "PowerShell(python3 -B ${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py:*)"
       ],
       "codex_prefix_rules": [
         {
@@ -382,6 +398,74 @@
               "python3",
               "-B",
               "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
+              "--root",
+              "/workspace/project"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
+              "--root",
+              "/workspace/project"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
+              "${PLUGIN_ROOT}/skills/plugin-lock/scripts/bump_plugin_lock.py",
+              "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/bump_plugin_lock.py"
+            ],
+            "--revision"
+          ],
+          "justification": "machine:plugin-lock moves repositories to another marketplace revision and regenerates their host settings",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py",
+              "--revision",
+              "/workspace/project"
+            ]
+          ],
+          "not_match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/other.py",
+              "--root",
+              "/workspace/project"
+            ]
+          ]
+        },
+        {
+          "pattern": [
+            [
+              "python",
+              "python3"
+            ],
+            "-B",
+            [
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
+              "${PLUGIN_ROOT}/skills/plugin-lock/scripts/repo_config.py",
+              "${PLUGIN_ROOT}/codex-skills/plugin-lock/scripts/repo_config.py"
+            ],
+            "--root"
+          ],
+          "justification": "machine:plugin-lock generates a repository's committed Claude and Codex plugin settings from its plugin lock",
+          "match": [
+            [
+              "python3",
+              "-B",
+              "${PLUGIN_ROOT}/.agents/machine/utility/plugin-lock/scripts/repo_config.py",
               "--root",
               "/workspace/project"
             ]
