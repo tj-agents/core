@@ -20,7 +20,7 @@
       "properties": {
         "repository": {
           "type": "string",
-          "pattern": "^(tj-agents|Concertable)/[A-Za-z0-9_][A-Za-z0-9_.-]*(?<!\\.git)$"
+          "pattern": "^(tj-agents|Concertable)/[A-Za-z0-9_][A-Za-z0-9_.-]*$"
         },
         "revision": {
           "type": "string",
@@ -58,7 +58,23 @@
         }
       },
       "additionalProperties": {
-        "$ref": "#/$defs/pin"
+        "allOf": [
+          {
+            "$ref": "#/$defs/pin"
+          },
+          {
+            "not": {
+              "properties": {
+                "repository": {
+                  "const": "tj-agents/marketplace"
+                }
+              },
+              "required": [
+                "repository"
+              ]
+            }
+          }
+        ]
       }
     },
     "plugins": {
