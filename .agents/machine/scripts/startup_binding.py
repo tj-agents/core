@@ -83,7 +83,7 @@ def _converge(prepared, executable: str, project: Path) -> None:
         "harness_permissions_sync",
         (
             HERE.parent / "utility" / "plugin-selection" / "scripts" / "harness_permissions_sync.py",
-            HERE.parents[2] / "machine" / "utility" / "plugin-selection" / "scripts" / "harness_permissions_sync.py",
+            HERE.parents[2] / ".agents" / "machine" / "utility" / "plugin-selection" / "scripts" / "harness_permissions_sync.py",
         ),
     )
     permissions.apply_verified(os.environ, prepared.host, project, prepared.selected_roots)

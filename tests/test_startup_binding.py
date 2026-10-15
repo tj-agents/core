@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -178,6 +179,33 @@ class StartupBindingTests(unittest.TestCase):
             self.assertEqual(0, BINDING.run_session("claude", "typed", self.project, ["session"], timeout=0.01))
 
         self.assertGreater(observed[0], BINDING.STARTUP_TIMEOUT_SECONDS)
+
+    def test_packaged_coordinator_loads_permissions_and_snapshot_helpers(self):
+        package = self.project / "packaged machine"
+        scripts = package / "resources" / "machine" / "scripts"
+        scripts.mkdir(parents=True)
+        permission_scripts = package / ".agents" / "machine" / "utility" / "plugin-selection" / "scripts"
+        shutil.copytree(ROOT / ".agents/machine/utility/plugin-selection/scripts", permission_scripts)
+        hooks = package / "hooks"
+        hooks.mkdir()
+        shutil.copyfile(ROOT / ".agents/hooks/codex_hook_snapshot.py", hooks / "codex_hook_snapshot.py")
+        original_module = BINDING._module
+        loaded = {}
+
+        def modules(name, paths):
+            module = original_module(name, paths)
+            loaded[name] = module
+            module.apply_verified = mock.Mock()
+            return module
+
+        prepared = type("Prepared", (), {"host": "claude", "selected_roots": (self.verified,)})()
+        with mock.patch.object(BINDING, "HERE", scripts), mock.patch.object(BINDING, "_module", side_effect=modules):
+            BINDING._converge(prepared, "fixture-claude", self.project)
+            snapshot = BINDING._snapshot_module()
+        permissions = loaded["harness_permissions_sync"]
+        self.assertEqual(permission_scripts / "harness_permissions_sync.py", Path(permissions.__file__))
+        permissions.apply_verified.assert_called_once_with(os.environ, "claude", self.project, prepared.selected_roots)
+        self.assertEqual(hooks / "codex_hook_snapshot.py", Path(snapshot.__file__))
 
     def test_codex_convergence_applies_permissions_agents_then_trust(self):
         events = []
