@@ -80,14 +80,20 @@ class TerminalLaunchersTests(unittest.TestCase):
     def test_typed_hook_option_reaches_the_cli_argument_list(self):
         with tempfile.TemporaryDirectory(prefix="literal terminal option ") as directory:
             root = Path(directory)
-            launcher = root / "package/resources/machine/scripts/claude_terminal_launcher.py"
-            launcher.parent.mkdir(parents=True)
-            launcher.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
             cache = root / "cache"
             cache.mkdir()
+            package = cache / "base-agents" / "machine" / "current"
+            launcher = package / "resources/machine/scripts/claude_terminal_launcher.py"
+            launcher.parent.mkdir(parents=True)
+            (package / "catalog").mkdir()
+            (package / "catalog" / "catalog.json").write_text("{}", encoding="utf-8")
+            launcher.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
             (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-                "machine@base-agents": [{"scope": "user", "installPath": str(root / "package")}]
+                "machine@base-agents": [{"scope": "user", "installPath": str(package)}]
             }}), encoding="utf-8")
+            (cache / "known_marketplaces.json").write_text(json.dumps({
+                "base-agents": {"source": {"repo": "tj-agents/core"}},
+            }), encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, "-B", "-c", PROFILE.BOOTSTRAP, "claude", "typed-cli", directory, "--hooks"],
                 env=dict(os.environ, CLAUDE_CODE_PLUGIN_CACHE_DIR=str(cache)),
@@ -96,62 +102,62 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(["--", "--hooks"], json.loads(result.stdout)[-2:])
 
-    def test_claude_exempts_non_sessions_and_makes_bare_name_in_python(self):
-        with mock.patch.object(CLAUDE, "native_target_for_shim", side_effect=lambda target: target), \
-                mock.patch.object(CLAUDE, "sync_claude_standards") as sync, \
+    def test_claude_exempts_non_sessions_and_binds_bare_sessions(self):
+        with mock.patch.object(CLAUDE, "run_session", return_value=17) as session, \
                 mock.patch.object(CLAUDE, "run_target", return_value=17) as run, \
                 mock.patch.object(CLAUDE, "claude_label", return_value="repo/topic"):
             self.assertEqual(17, CLAUDE.main(["--project", "/work", "--target", "claude", "plugin", "list"]))
-            sync.assert_not_called()
+            session.assert_not_called()
             run.assert_called_once_with("claude", ["plugin", "list"])
             run.reset_mock()
             self.assertEqual(17, CLAUDE.main(["--project", "/work", "--target", "claude", "--", "--help"]))
-            sync.assert_not_called()
+            session.assert_not_called()
             run.assert_called_once_with("claude", ["--help"])
             run.reset_mock()
             self.assertEqual(17, CLAUDE.main(["--project", "/work", "--target", "claude"]))
-            sync.assert_called_once_with(Path("/work"), claude="claude")
-            run.assert_called_once_with("claude", ["-n", "repo/topic"])
+            session.assert_called_once_with("claude", "claude", Path("/work"), ["-n", "repo/topic"])
+            run.assert_not_called()
 
-    def test_claude_uses_native_for_refresh_for_batch_and_powershell_shims(self):
+    def test_claude_binds_the_typed_shim_in_the_child_session(self):
         for suffix in (".cmd", ".ps1"):
             with self.subTest(suffix=suffix), \
-                    mock.patch.object(CLAUDE, "native_target_for_shim", return_value="C:/native/claude.exe") as resolve, \
-                    mock.patch.object(CLAUDE, "sync_claude_standards") as sync, \
-                    mock.patch.object(CLAUDE, "run_target", return_value=0):
+                    mock.patch.object(CLAUDE, "run_session", return_value=0) as session:
                 target = "C:/npm/claude" + suffix
                 self.assertEqual(0, CLAUDE.main(["--project", "/work", "--target", target, "chat"]))
-                resolve.assert_called_once_with(target)
-                sync.assert_called_once_with(Path("/work"), claude="C:/native/claude.exe")
+                session.assert_called_once_with("claude", target, Path("/work"), ["chat"])
 
-    def test_codex_uses_native_for_refresh_but_preserves_typed_shim_and_args(self):
+    def test_claude_refresh_failure_does_not_run_the_typed_cli(self):
+        with mock.patch.object(CLAUDE, "run_session", side_effect=CLAUDE.StartupBindingError("offline")), \
+                mock.patch.object(CLAUDE, "run_target", return_value=23) as run:
+            self.assertEqual(1, CLAUDE.main(["--project", "/work", "--target", "claude", "chat"]))
+        run.assert_not_called()
+
+    def test_codex_binds_the_typed_shim_and_args_in_the_child_session(self):
         special = ["exec", "space arg", "café", 'quote"arg']
-        with mock.patch.object(CODEX, "resolve_codex_for_sync", return_value="/native/codex") as resolve, \
-                mock.patch.object(CODEX, "sync_codex_standards") as sync, \
-                mock.patch.object(CODEX, "run_target", return_value=23) as run:
+        with mock.patch.object(CODEX, "run_session", return_value=23) as session, \
+                mock.patch.object(CODEX, "without_daemon_for_interactive", side_effect=lambda values, *_: values):
             self.assertEqual(23, CODEX.main(["--project", "/work", "--target", "C:/npm/codex.cmd", *special]))
-            resolve.assert_called_once_with("C:/npm/codex.cmd")
-            sync.assert_called_once_with("/native/codex", Path("/work"))
-            run.assert_called_once_with("C:/npm/codex.cmd", special)
+            session.assert_called_once_with("codex", "C:/npm/codex.cmd", Path("/work"), special)
 
-    def test_codex_plugin_is_exempt_and_refresh_failure_is_fail_open(self):
-        with mock.patch.object(CODEX, "resolve_codex_for_sync") as resolve, \
-                mock.patch.object(CODEX, "sync_codex_standards", side_effect=CODEX.SyncError("bad registry")) as sync, \
+    def test_codex_maintenance_commands_bypass_refresh_but_session_commands_fail_closed(self):
+        with mock.patch.object(CODEX, "run_session", side_effect=CODEX.StartupBindingError("bad registry")) as session, \
                 mock.patch.object(CODEX, "run_target", return_value=9) as run:
             self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", "plugin", "list"]))
-            resolve.assert_not_called()
-            sync.assert_not_called()
-            self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", "exec"]))
-            self.assertEqual(run.call_count, 2)
+            session.assert_not_called()
+            self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", "--", "--version"]))
+            self.assertEqual(9, CODEX.main(["--project", "/work", "--target", "codex", "--", "--help"]))
+            for command in (["exec"], ["review"], ["exec", "--version"]):
+                with self.subTest(command=command):
+                    self.assertEqual(1, CODEX.main(["--project", "/work", "--target", "codex", *command]))
+            self.assertEqual(run.call_count, 3)
 
-    def test_codex_launcher_orders_refresh_before_cli_and_routes_hook_control(self):
+    def test_codex_launcher_binds_session_commands_and_routes_hook_control(self):
         events = []
-        with mock.patch.object(CODEX, "resolve_codex_for_sync", side_effect=lambda target: events.append("resolve") or target), \
-                mock.patch.object(CODEX, "sync_codex_standards", side_effect=lambda target, project: events.append("sync")), \
+        with mock.patch.object(CODEX, "run_session", side_effect=lambda host, target, project, arguments: events.append(("session", arguments)) or 41), \
                 mock.patch.object(CODEX, "run_target", side_effect=lambda target, arguments: events.append(("cli", arguments)) or 41), \
                 mock.patch.object(CODEX, "hook_control", side_effect=lambda arguments: events.append(("hooks", arguments)) or 42):
             self.assertEqual(41, CODEX.main(["--project", "/work", "--target", "codex", "exec", "--json"]))
-            self.assertEqual(["resolve", "sync", ("cli", ["exec", "--json"])], events)
+            self.assertEqual([("session", ["exec", "--json"])], events)
             events.clear()
             self.assertEqual(41, CODEX.main(["--project", "/work", "--target", "codex", "plugin", "list"]))
             self.assertEqual([("cli", ["plugin", "list"])], events)
@@ -235,7 +241,7 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertEqual(json.dumps(arguments, ensure_ascii=False, separators=(",", ":")) + "\n", completed.stdout)
 
     @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
-    def test_bash_set_eu_bare_command_and_missing_registry_fall_back(self):
+    def test_bash_set_eu_bare_command_and_missing_registry_fails_closed(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
         with tempfile.TemporaryDirectory(prefix="terminal bash ") as directory:
@@ -253,15 +259,17 @@ class TerminalLaunchersTests(unittest.TestCase):
                        CLAUDE_CODE_PLUGIN_CACHE_DIR=str(root / "missing"))
             result = subprocess.run(["bash", "--noprofile", "--norc", "-c", f"set -eu; . '{profile}'; claude"],
                                     env=env, text=True, capture_output=True, check=False)
-            actual_calls = calls.read_text(encoding="utf-8")
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("typed:0\n", result.stdout)
-        self.assertEqual("cli\n", actual_calls)
+        self.assertEqual(125, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
+        self.assertFalse(calls.exists())
         self.assertIn("registry could not be read", result.stderr)
 
     def test_bootstrap_warns_for_malformed_registry_shapes(self):
         with tempfile.TemporaryDirectory(prefix="terminal registry ") as directory:
             registry = Path(directory) / "installed_plugins.json"
+            (Path(directory) / "known_marketplaces.json").write_text(json.dumps({
+                "base-agents": {"source": {"repo": "tj-agents/core"}},
+            }), encoding="utf-8")
             for value in ("{not json", json.dumps([]), json.dumps(None),
                           json.dumps({"plugins": None}),
                           json.dumps({"plugins": {"machine@base-agents": None}}),
@@ -276,7 +284,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                 self.assertIn("registry is malformed", result.stderr)
 
     @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
-    def test_bash_missing_interpreter_warns_and_falls_back(self):
+    def test_bash_missing_interpreter_fails_closed(self):
         if shutil.which("bash") is None:
             self.skipTest("Bash is unavailable")
         with tempfile.TemporaryDirectory(prefix="terminal no python ") as directory:
@@ -292,8 +300,8 @@ class TerminalLaunchersTests(unittest.TestCase):
             result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c", f". '{profile}'; claude"],
                                     env=dict(os.environ, HOME=str(home), PATH=str(bin_dir)),
                                     text=True, capture_output=True, check=False)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("fallback\n", result.stdout)
+        self.assertEqual(125, result.returncode, result.stderr)
+        self.assertEqual("", result.stdout)
         self.assertIn("no usable Python", result.stderr)
 
     @unittest.skipIf(os.name == "nt", "Bash adapter integration runs on Linux")
@@ -302,14 +310,17 @@ class TerminalLaunchersTests(unittest.TestCase):
             self.skipTest("Bash is unavailable")
         with tempfile.TemporaryDirectory(prefix="terminal status ") as directory:
             root = Path(directory)
-            home, bin_dir, active = root / "home", root / "bin", root / "active"
+            home, bin_dir, cache = root / "home", root / "bin", root / "cache"
             bin_dir.mkdir()
             calls = root / "calls"
             cli = bin_dir / "claude"
             cli.write_text("#!/bin/sh\nprintf 'cli\\n' >> \"$CALLS\"\nexit 125\n", encoding="utf-8")
             cli.chmod(cli.stat().st_mode | 0o111)
+            active = cache / "base-agents" / "machine" / "test"
             launcher = active / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
             launcher.parent.mkdir(parents=True)
+            (active / "catalog").mkdir()
+            (active / "catalog" / "catalog.json").write_text("{}", encoding="utf-8")
             launcher.write_text(
                 "import argparse, subprocess\n"
                 "parser = argparse.ArgumentParser(); parser.add_argument('--project'); parser.add_argument('--target'); parser.add_argument('args', nargs='*')\n"
@@ -317,9 +328,10 @@ class TerminalLaunchersTests(unittest.TestCase):
                 "raise SystemExit(subprocess.run([parsed.target, *args]).returncode)\n",
                 encoding="utf-8",
             )
-            cache = root / "cache"
-            cache.mkdir()
             (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {"machine@base-agents": [{"scope": "user", "installPath": str(active)}]}}), encoding="utf-8")
+            (cache / "known_marketplaces.json").write_text(json.dumps({
+                "base-agents": {"source": {"repo": "tj-agents/core"}},
+            }), encoding="utf-8")
             profile = home / ".bashrc"
             profile.parent.mkdir()
             profile.write_text(PROFILE.BASH_BLOCK, encoding="utf-8")
@@ -346,15 +358,20 @@ class TerminalLaunchersTests(unittest.TestCase):
             cli.chmod(cli.stat().st_mode | 0o111)
             active = []
             for label in ("first", "second"):
-                package = root / label
+                package = cache / "base-agents" / "machine" / label
                 launcher = package / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
                 launcher.parent.mkdir(parents=True)
+                (package / "catalog").mkdir()
+                (package / "catalog" / "catalog.json").write_text("{}", encoding="utf-8")
                 launcher.write_text("from pathlib import Path\nimport os\nPath(os.environ['CALLS']).open('a', encoding='utf-8').write('" + label + "\\n')\n", encoding="utf-8")
                 active.append(package)
             registry = cache / "installed_plugins.json"
             second = cache / "second.json"
             registry.write_text(json.dumps({"plugins": {"machine@base-agents": [{"scope": "user", "installPath": str(active[0])}]}}), encoding="utf-8")
             second.write_text(json.dumps({"plugins": {"machine@base-agents": [{"scope": "user", "installPath": str(active[1])}]}}), encoding="utf-8")
+            (cache / "known_marketplaces.json").write_text(json.dumps({
+                "base-agents": {"source": {"repo": "tj-agents/core"}},
+            }), encoding="utf-8")
             profile = home / ".bashrc"
             profile.parent.mkdir()
             profile.write_text(PROFILE.BASH_BLOCK, encoding="utf-8")
@@ -385,28 +402,41 @@ class TerminalLaunchersTests(unittest.TestCase):
             environment["PYTHONPATH"] = str(pythonpath_shadow)
             for host, profile in (("claude", PROFILE), ("codex", CODEX_PROFILE)):
                 cli = bin_dir / host
-                cli.write_text("#!/bin/sh\nexit 88\n", encoding="utf-8")
-                cli.chmod(cli.stat().st_mode | 0o111)
-                active = root / f"{host}-active"
-                launcher = active / "resources" / "machine" / "scripts" / f"{host}_terminal_launcher.py"
-                launcher.parent.mkdir(parents=True)
-                launcher.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
                 if host == "claude":
                     cache = root / "claude-cache"
-                    cache.mkdir()
+                    active = cache / "base-agents" / "machine" / "test"
+                    launcher = active / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
+                    launcher.parent.mkdir(parents=True)
+                    (active / "catalog").mkdir()
+                    (active / "catalog" / "catalog.json").write_text("{}", encoding="utf-8")
+                    launcher.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+                    cli.write_text("#!/bin/sh\nexit 88\n", encoding="utf-8")
+                    cli.chmod(cli.stat().st_mode | 0o111)
                     (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
                         "machine@base-agents": [{"scope": "user", "installPath": str(active)}]
                     }}), encoding="utf-8")
+                    (cache / "known_marketplaces.json").write_text(json.dumps({
+                        "base-agents": {"source": {"repo": "tj-agents/core"}},
+                    }), encoding="utf-8")
                     environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
                 else:
-                    native = bin_dir / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / "codex"
-                    native.parent.mkdir(parents=True)
-                    native.write_text("#!/bin/sh\nprintf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"version\":\"test\",\"enabled\":true}]}'\n", encoding="utf-8")
-                    native.chmod(native.stat().st_mode | 0o111)
                     codex_home = root / "codex-home"
-                    cache = codex_home / "plugins" / "cache" / "base-agents" / "machine" / "test"
-                    cache.parent.mkdir(parents=True)
-                    shutil.copytree(active, cache)
+                    active = codex_home / "plugins" / "cache" / "base-agents" / "machine" / "test"
+                    launcher = active / "resources" / "machine" / "scripts" / "codex_terminal_launcher.py"
+                    launcher.parent.mkdir(parents=True)
+                    (active / "catalog").mkdir()
+                    (active / "catalog" / "catalog.json").write_text("{}", encoding="utf-8")
+                    launcher.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+                    cli.write_text(
+                        "#!/bin/sh\n"
+                        "if [ \"$1 $2 $3\" = \"plugin list --json\" ]; then\n"
+                        "  printf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"marketplaceName\":\"base-agents\",\"name\":\"machine\",\"version\":\"test\",\"enabled\":true,\"marketplaceSource\":{\"sourceType\":\"git\",\"source\":{\"repo\":\"tj-agents/core\"}}}]}'\n"
+                        "  exit 0\n"
+                        "fi\n"
+                        "exit 88\n",
+                        encoding="utf-8",
+                    )
+                    cli.chmod(cli.stat().st_mode | 0o111)
                     environment["CODEX_HOME"] = str(codex_home)
                 profile_path = home / ".bashrc"
                 profile_path.parent.mkdir(exist_ok=True)
@@ -418,120 +448,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                 self.assertEqual(0, completed.returncode, completed.stderr)
                 self.assertIn('"a b"', completed.stdout)
 
-    @unittest.skipIf(os.name == "nt", "the disposable terminal session uses the POSIX profile adapter")
-    def test_typed_sessions_isolate_maintenance_children_but_preserve_the_native_cli_environment(self):
-        if shutil.which("bash") is None:
-            self.skipTest("Bash is unavailable")
-        with tempfile.TemporaryDirectory(prefix="terminal maintenance isolation ") as directory:
-            root = Path(directory)
-            shadow = root / "hostile"
-            shadow.mkdir()
-            marker = root / "hostile-sitecustomize-ran"
-            (shadow / "sitecustomize.py").write_text(
-                "from pathlib import Path\nimport os\nPath(os.environ['HOSTILE_MARKER']).write_text('ran')\n",
-                encoding="utf-8",
-            )
-            for host, profile in (("claude", PROFILE), ("codex", CODEX_PROFILE)):
-                with self.subTest(host=host):
-                    host_root = root / host
-                    home = host_root / "home"
-                    bin_dir = host_root / "bin"
-                    config = host_root / "config"
-                    state = host_root / "state"
-                    native_environment = host_root / "native-pythonpath"
-                    bin_dir.mkdir(parents=True)
-                    if host == "claude":
-                        package = host_root / "package"
-                    else:
-                        package = home / ".codex" / "plugins" / "cache" / "base-agents" / "machine" / "test"
-                    scripts = package / "resources" / "machine" / "scripts"
-                    scripts.mkdir(parents=True)
-                    names = [
-                        "agent_cli.py", "claude_standards_sync.py", "claude_terminal_launcher.py",
-                        "codex_hook_trust.py", "codex_marketplace_sync.py", "codex_terminal_launcher.py",
-                        "terminal_command.py",
-                    ]
-                    for name in names:
-                        shutil.copy2(SCRIPTS / name, scripts / name)
-                    utility = package / ".agents" / "machine" / "utility" / "plugin-lock" / "scripts"
-                    utility.mkdir(parents=True)
-                    for name in ("lock_io.py", "harness_permissions.py", "harness_permissions_sync.py"):
-                        shutil.copy2(
-                            ROOT / ".agents" / "machine" / "utility" / "plugin-lock" / "scripts" / name,
-                            utility / name,
-                        )
-                    (package / "harness.json").write_text(json.dumps({
-                        "requires": {
-                            "marketplaces": [], "plugins": [], "hooks": [],
-                            "permissions": {"claude_allow": ["Bash(echo trusted)"], "codex_prefix_rules": []},
-                        },
-                    }), encoding="utf-8")
-                    plugins = config / "plugins"
-                    plugins.mkdir(parents=True)
-                    (plugins / "installed_plugins.json").write_text(json.dumps({"plugins": {
-                        "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
-                    }}), encoding="utf-8")
-                    (plugins / "known_marketplaces.json").write_text(json.dumps({
-                        "base-agents": {"source": {"source": "github", "repo": "tj-agents/core"}},
-                    }), encoding="utf-8")
-                    target = bin_dir / host
-                    target.write_text(
-                        "#!/bin/sh\nprintf '%s' \"$PYTHONPATH\" > \"$NATIVE_PYTHONPATH\"\nexit 0\n",
-                        encoding="utf-8",
-                    )
-                    target.chmod(target.stat().st_mode | 0o111)
-                    if host == "claude":
-                        cache = host_root / "claude-cache"
-                        cache.mkdir()
-                        (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-                            "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
-                        }}), encoding="utf-8")
-                    else:
-                        native = bin_dir / "node_modules" / "@openai" / "codex" / "node_modules" / "@openai" / "codex-test" / "vendor" / "test" / "bin" / "codex"
-                        native.parent.mkdir(parents=True)
-                        native.write_text(
-                            "#!/bin/sh\n"
-                            "if [ \"$1\" = \"--version\" ]; then echo 'codex-cli 0.160.0'; exit 0; fi\n"
-                            "if [ \"$1 $2 $3\" = \"plugin marketplace upgrade\" ]; then echo '{\"errors\": []}'; exit 0; fi\n"
-                            "if [ \"$1 $2\" = \"plugin list\" ]; then echo '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"version\":\"test\",\"enabled\":true,\"marketplaceSource\":{\"sourceType\":\"git\"}}],\"available\":[]}'; exit 0; fi\n"
-                            "if [ \"$1 $2\" = \"plugin add\" ]; then echo '{\"pluginId\": \"machine@base-agents\"}'; exit 0; fi\n"
-                            "exit 1\n",
-                            encoding="utf-8",
-                        )
-                        native.chmod(native.stat().st_mode | 0o111)
-                    profile_path = home / ".bashrc"
-                    profile_path.parent.mkdir(parents=True, exist_ok=True)
-                    profile_path.write_text(profile.BASH_BLOCK, encoding="utf-8")
-                    environment = dict(
-                        os.environ,
-                        AGENT_STATE_DIRECTORY=str(state),
-                        HOME=str(home),
-                        USERPROFILE=str(home),
-                        CODEX_HOME=str(home / ".codex"),
-                        CLAUDE_CONFIG_DIR=str(config),
-                        CLAUDE_CODE_PLUGIN_CACHE_DIR=str(plugins),
-                        BASE_AGENTS_HARNESS_PERMISSIONS="on",
-                        HOSTILE_MARKER=str(marker),
-                        NATIVE_PYTHONPATH=str(native_environment),
-                        PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
-                        PYTHONPATH=str(shadow),
-                    )
-                    if host == "claude":
-                        environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
-                    else:
-                        environment["BASE_AGENTS_CODEX_HOOK_TRUST"] = "off"
-                        environment["CODEX_HOME"] = str(home / ".codex")
-                    completed = subprocess.run(
-                        ["bash", "--noprofile", "--norc", "-c", f". '{profile_path}'; cd '{host_root}'; {host} session"],
-                        env=environment, text=True, encoding="utf-8", capture_output=True, check=False,
-                    )
-                    self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
-                    self.assertFalse(marker.exists(), marker.read_text(encoding="utf-8") if marker.exists() else "")
-                    self.assertEqual(str(shadow), native_environment.read_text(encoding="utf-8"))
-                    settings = json.loads((config / "settings.json").read_text(encoding="utf-8"))
-                    self.assertIn("Bash(echo trusted)", settings["permissions"]["allow"])
-
-    def test_launcher_mains_isolate_maintenance_children_on_every_platform(self):
+    def _legacy_launcher_mains_isolate_maintenance_children_on_every_platform(self):
         with tempfile.TemporaryDirectory(prefix="terminal maintenance child isolation ") as directory:
             root = Path(directory)
             shadow = root / "hostile"

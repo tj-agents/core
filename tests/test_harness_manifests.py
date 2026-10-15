@@ -16,7 +16,7 @@ SPEC = importlib.util.spec_from_file_location("harness_sync", ROOT / "scripts/sy
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
 
-PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/plugin-lock/scripts"
+PERMISSIONS_SCRIPTS = ROOT / ".agents/machine/utility/plugin-selection/scripts"
 sys.path.insert(0, str(PERMISSIONS_SCRIPTS))
 import harness_permissions  # noqa: E402
 
@@ -50,10 +50,9 @@ class HarnessManifestTests(unittest.TestCase):
         manifests = HARNESS.synchronize(ROOT, check=True)
         self.assertEqual({"base", "engineering", "machine"}, set(manifests))
         catalog = HARNESS.load(ROOT / ".agents/catalog/catalog.json")
-        self.assertEqual({"tj-agents/core"}, {release["owner_repository"] for release in catalog["releases"]})
-        for release in catalog["releases"]:
-            for plugin in release["plugins"]:
-                self.assertEqual(manifests[plugin["name"]]["requires"], plugin["harness"])
+        self.assertEqual({"tj-agents/core"}, {package["owner_repository"] for package in catalog["packages"]})
+        for package in catalog["packages"]:
+            self.assertEqual(manifests[package["name"]]["requires"], package["harness"])
 
     def test_additional_roots_require_canonical_owned_shipped_resources(self):
         with tempfile.TemporaryDirectory() as raw:
