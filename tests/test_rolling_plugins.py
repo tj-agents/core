@@ -358,6 +358,26 @@ class RollingBoundaryTests(unittest.TestCase):
                 self.assertIsNone(ROLLING.canonical_source(source))
 
 
+    def test_approved_concertable_marketplace_is_selected_by_both_hosts(self):
+        config = self.root / 'config'
+        project = self.root / 'project'
+        identity = 'concertable@agents'
+        RollingPluginsTests.write(config / 'settings.json', {'enabledPlugins': {identity: True}})
+        RollingPluginsTests.write(config / 'plugins/known_marketplaces.json', {
+            'agents': {'source': {'source': 'github', 'repo': 'Concertable/agents'}},
+        })
+        claude = ROLLING.selected_claude(config, config / 'plugins', project)
+        codex = ROLLING.selected_codex({'installed': [{
+            'pluginId': identity, 'enabled': True,
+            'marketplaceSource': {'sourceType': 'git', 'source': 'https://github.com/Concertable/agents.git'},
+        }]})
+        self.assertEqual(claude, codex)
+        self.assertEqual([ROLLING.Selection(identity, 'https://github.com/concertable/agents.git', 'agents')], claude)
+        with mock.patch.object(ROLLING, '_run', side_effect=['', claude[0].source_url, '', 'a' * 40]) as run:
+            _clone, revision = ROLLING._fetch_main(claude[0].source_url, self.root / 'cache')
+        self.assertEqual('a' * 40, revision)
+        self.assertIn('refs/heads/main:refs/remotes/origin/main', run.call_args_list[2].args[0])
+
     def test_expired_deadline_cannot_spawn_a_child(self):
         deadline = mock.Mock()
         deadline.remaining.side_effect = ROLLING.RollingPluginError('expired')

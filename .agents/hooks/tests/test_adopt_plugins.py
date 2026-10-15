@@ -36,7 +36,7 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_stack_resolves_dependencies_without_a_release_pin(self):
         adopt_plugins.run(self.root, ["cpp-msvc"], [], "write")
-        self.assertEqual(["cpp", "msvc"], self.plugins())
+        self.assertEqual(["cpp@tj-agents", "msvc@tj-agents"], self.plugins())
         claude = json.loads((self.root / ".claude" / "settings.json").read_text(encoding="utf-8"))
         self.assertTrue(claude["extraKnownMarketplaces"]["tj-agents"]["autoUpdate"])
         self.assertNotIn("ref", claude["extraKnownMarketplaces"]["tj-agents"]["source"])
@@ -44,9 +44,9 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_existing_selection_is_extended_and_unknown_packages_are_kept(self):
         self.selection.parent.mkdir()
-        self.selection.write_text(json.dumps({"schema_version": 1, "marketplace": {"repository": "tj-agents/marketplace"}, "plugins": ["newcomer"]}), encoding="utf-8")
+        self.selection.write_text(json.dumps({"schema_version": 1, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}, "plugins": ["newcomer@tj-agents"]}), encoding="utf-8")
         adopt_plugins.run(self.root, [], ["react"], "write")
-        self.assertEqual(["newcomer", "react"], self.plugins())
+        self.assertEqual(["newcomer@tj-agents", "react@tj-agents"], self.plugins())
 
     def test_schema_two_lock_is_migrated_once_and_discards_its_pin(self):
         legacy = self.root / ".agents" / "plugins.lock.json"
@@ -54,14 +54,51 @@ class AdoptPluginsTests(unittest.TestCase):
         legacy.write_text(json.dumps({"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.2.3"}, "plugins": ["base"]}), encoding="utf-8")
         adopt_plugins.run(self.root, [], ["react"], "write")
         selection = json.loads(self.selection.read_text(encoding="utf-8"))
-        self.assertEqual({"repository": "tj-agents/marketplace"}, selection["marketplace"])
+        self.assertEqual({"repository": "tj-agents/marketplace"}, selection["marketplaces"]["tj-agents"])
         self.assertNotIn("revision", json.dumps(selection))
         self.assertFalse(legacy.exists())
         self.assertEqual([], adopt_plugins.run(self.root, [], ["react"], "check"))
 
+    def test_multiple_marketplaces_are_retained_and_schema_three_pins_are_discarded(self):
+        legacy = self.root / ".agents" / "plugins.lock.json"
+        legacy.parent.mkdir()
+        legacy.write_text(json.dumps({
+            "schema_version": 3,
+            "marketplaces": {
+                "tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.2.3"},
+                "agents": {"repository": "Concertable/agents", "revision": "a" * 40},
+            },
+            "plugins": ["base@tj-agents", "concertable@agents"],
+        }), encoding="utf-8")
+        adopt_plugins.run(self.root, [], ["react"], "write")
+        selection = json.loads(self.selection.read_text(encoding="utf-8"))
+        self.assertEqual({"agents": {"repository": "Concertable/agents"},
+                          "tj-agents": {"repository": "tj-agents/marketplace"}}, selection["marketplaces"])
+        self.assertEqual(["base@tj-agents", "concertable@agents", "react@tj-agents"], self.plugins())
+        self.assertNotIn("revision", json.dumps(selection))
+        self.assertFalse(legacy.exists())
+        self.assertEqual([], adopt_plugins.run(self.root, [], ["react"], "check"))
+        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertEqual("Concertable/agents", claude["extraKnownMarketplaces"]["agents"]["source"]["repo"])
+        codex = (self.root / ".codex/config.toml").read_text(encoding="utf-8")
+        self.assertNotIn("ref =", codex)
+        foreign = codex.split("[marketplaces.agents]", 1)[1].split("[marketplaces.", 1)[0]
+        self.assertNotIn("sparse_paths", foreign)
+
+    def test_foreign_selection_requires_a_declared_source_and_survives_later_adoption(self):
+        with self.assertRaises(LockError):
+            adopt_plugins.run(self.root, [], ["concertable@agents"], "write")
+        adopt_plugins.run(self.root, [], ["concertable@agents"], "write", marketplaces=["agents=Concertable/agents"])
+        adopt_plugins.run(self.root, ["react"], [], "write")
+        self.assertEqual(["concertable@agents", "react@tj-agents"], self.plugins())
+        before = self.selection.read_bytes()
+        with self.assertRaisesRegex(LockError, "more than once"):
+            adopt_plugins.run(self.root, [], [], "write", marketplaces=["agents=Concertable/agents"] * 2)
+        self.assertEqual(before, self.selection.read_bytes())
+
     def test_default_adoption_selects_the_core_packages(self):
         adopt_plugins.run(self.root, [], [], "write")
-        self.assertEqual(["base", "engineering", "machine"], self.plugins())
+        self.assertEqual(["base@tj-agents", "engineering@tj-agents", "machine@tj-agents"], self.plugins())
 
     def test_local_scope_preserves_project_settings(self):
         adopt_plugins.run(self.root, [], ["react"], "write", "local")

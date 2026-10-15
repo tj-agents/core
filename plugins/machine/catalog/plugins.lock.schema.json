@@ -4,27 +4,103 @@
   "title": "Repository plugin lock",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "marketplace", "plugins"],
-  "properties": {
-    "schema_version": {"const": 2},
-    "marketplace": {
+  "required": [
+    "schema_version",
+    "marketplaces",
+    "plugins"
+  ],
+  "$defs": {
+    "pin": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "revision"],
+      "required": [
+        "repository",
+        "revision"
+      ],
       "properties": {
-        "repository": {"const": "tj-agents/marketplace"},
-        "revision": {"type": "string", "pattern": "^(v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)|[0-9a-f]{40})$"}
+        "repository": {
+          "type": "string",
+          "pattern": "^(tj-agents|Concertable)/[A-Za-z0-9_][A-Za-z0-9_.-]*$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)|[0-9a-f]{40})$"
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "marketplaces": {
+      "type": "object",
+      "required": [
+        "tj-agents"
+      ],
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "properties": {
+        "tj-agents": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/pin"
+            },
+            {
+              "properties": {
+                "repository": {
+                  "const": "tj-agents/marketplace"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/pin"
+          },
+          {
+            "not": {
+              "properties": {
+                "repository": {
+                  "const": "tj-agents/marketplace"
+                }
+              },
+              "required": [
+                "repository"
+              ]
+            }
+          }
+        ]
       }
     },
     "plugins": {
       "type": "array",
       "minItems": 3,
       "uniqueItems": true,
-      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*@[a-z][a-z0-9-]*$"
+      },
       "allOf": [
-        {"contains": {"const": "base"}},
-        {"contains": {"const": "engineering"}},
-        {"contains": {"const": "machine"}}
+        {
+          "contains": {
+            "const": "base@tj-agents"
+          }
+        },
+        {
+          "contains": {
+            "const": "engineering@tj-agents"
+          }
+        },
+        {
+          "contains": {
+            "const": "machine@tj-agents"
+          }
+        }
       ]
     }
   }

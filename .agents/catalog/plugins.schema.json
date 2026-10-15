@@ -4,22 +4,80 @@
   "title": "Repository plugin selection",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "marketplace", "plugins"],
-  "properties": {
-    "schema_version": {"const": 1},
-    "marketplace": {
+  "required": [
+    "schema_version",
+    "marketplaces",
+    "plugins"
+  ],
+  "$defs": {
+    "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository"],
+      "required": [
+        "repository"
+      ],
       "properties": {
-        "repository": {"const": "tj-agents/marketplace"}
+        "repository": {
+          "type": "string",
+          "pattern": "^(tj-agents|Concertable)/[A-Za-z0-9_][A-Za-z0-9_.-]*$"
+        }
       }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "marketplaces": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "properties": {
+        "tj-agents": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "properties": {
+                "repository": {
+                  "const": "tj-agents/marketplace"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/source"
+          },
+          {
+            "not": {
+              "properties": {
+                "repository": {
+                  "const": "tj-agents/marketplace"
+                }
+              },
+              "required": [
+                "repository"
+              ]
+            }
+          }
+        ]
+      },
+      "minProperties": 1
     },
     "plugins": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*@[a-z][a-z0-9-]*$"
+      }
     }
   }
 }

@@ -215,7 +215,7 @@ def canonical_source(url: str) -> str | None:
         return "https://github.com/tj-agents/dotnet.git"
     if repository == "tomjseery/react-agents":
         return "https://github.com/tj-agents/react.git"
-    if repository is None or not repository.startswith("tj-agents/"):
+    if repository is None or repository.split("/", 1)[0] not in {"tj-agents", "concertable"}:
         return None
     return f"https://github.com/{repository}.git"
 
@@ -405,7 +405,7 @@ def _run(command: list[str], cwd: Path | None = None, deadline: Deadline | None 
 def _cache_name(url: str) -> str:
     authenticated = canonical_source(url)
     if authenticated is None:
-        raise RollingPluginError(f"source is not an authenticated tj-agents GitHub repository: {url}")
+        raise RollingPluginError(f"source is not an authenticated managed GitHub repository: {url}")
     return re.sub(r"[^a-z0-9_.-]+", "-", authenticated.casefold()).strip("-")
 
 
@@ -413,7 +413,7 @@ def _fetch_main(url: str, root: Path, deadline: Deadline | None = None) -> tuple
     deadline = deadline or Deadline()
     authenticated = canonical_source(url)
     if authenticated is None:
-        raise RollingPluginError(f"source is not an authenticated tj-agents GitHub repository: {url}")
+        raise RollingPluginError(f"source is not an authenticated managed GitHub repository: {url}")
     clone = root / "git" / _cache_name(authenticated)
     _unlinked_ancestors(clone)
     if clone.is_dir():
@@ -701,7 +701,7 @@ def _harness_dependencies(package: Package) -> list[tuple[str, str | None]]:
             raise RollingPluginError(f"invalid harness marketplace in {harness}")
         source = canonical_source(f"https://github.com/{repository}.git")
         if source is None:
-            raise RollingPluginError(f"harness marketplace is not tj-agents: {repository}")
+            raise RollingPluginError(f"harness marketplace is not an approved publisher: {repository}")
         sources[identifier] = source
     return [(dependency, sources.get(dependency.split("/", 1)[0])) for dependency in plugins]
 
@@ -714,7 +714,7 @@ def _state(source: str, cache: Path, catalog_cache: dict[str, tuple[Path, str, d
            deadline: Deadline) -> tuple[str, Path, str, dict]:
     authenticated = canonical_source(source)
     if authenticated is None:
-        raise RollingPluginError("publisher is not an authenticated tj-agents source")
+        raise RollingPluginError("publisher is not an authenticated managed publisher source")
     if authenticated not in catalog_cache:
         clone, revision = _fetch_main(authenticated, cache, deadline)
         if authenticated == "https://github.com/tj-agents/core.git" and (authenticated, revision) not in published:

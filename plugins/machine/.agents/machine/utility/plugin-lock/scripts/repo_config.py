@@ -25,10 +25,10 @@ HEADER = re.compile(r"^\s*\[")
 
 
 def declarations(lock_path: Path, lock: dict) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
-    marketplace, names = plugin_lock.validate(lock)
-    sources = {plugin_lock.MARKETPLACE_NAME: {"owner_repository": marketplace["repository"], "revision": marketplace["revision"], "plugins": []}}
-    identities = {f"{name}@{plugin_lock.MARKETPLACE_NAME}": True for name in names}
-    selected = {f"{plugin_lock.MARKETPLACE_NAME}/{name}" for name in names}
+    marketplaces, identities_selected = plugin_lock.validate(lock)
+    sources = {name: {"owner_repository": pin["repository"], "revision": pin["revision"]} for name, pin in marketplaces.items()}
+    identities = {identity: True for identity in identities_selected}
+    selected = {plugin_lock.overlay_id(identity) for identity in identities_selected}
     requirements = []
     overlay_path = lock_path.resolve().parent / "repository-harness.json"
     if overlay_path.is_file():
@@ -100,13 +100,12 @@ def codex_settings(path: Path, sources: dict[str, dict], identities: dict[str, b
 def codex_block(sources: dict, identities: dict) -> str:
     lines = [MANAGED_START]
     for marketplace, release in sources.items():
-        sparse_paths = sorted({".agents/plugins", ".claude-plugin", *(
-            plugin["package_path"].split("/", 1)[0] for plugin in release["plugins"]
-        )})
         lines += [f"[marketplaces.{marketplace}]", 'source_type = "git"',
                   f'source = "https://github.com/{release["owner_repository"]}.git"',
-                  f'ref = "{release["revision"]}"',
-                  f"sparse_paths = {json.dumps(sparse_paths)}", ""]
+                  f'ref = "{release["revision"]}"']
+        if marketplace == plugin_lock.MARKETPLACE_NAME:
+            lines.append(f'sparse_paths = {json.dumps([".agents/plugins", ".claude-plugin"])}')
+        lines.append("")
     for identity, enabled in identities.items():
         lines += [f'[plugins."{identity}"]', f"enabled = {str(enabled).lower()}", ""]
     lines.append(MANAGED_END)
