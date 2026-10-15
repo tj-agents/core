@@ -90,5 +90,22 @@ class AdoptPluginsTests(unittest.TestCase):
             self.assertLessEqual(set(names), set(roster["plugins"]), stack)
 
 
+    def test_extending_keeps_a_plugin_the_roster_does_not_know(self):
+        self.lock.parent.mkdir()
+        document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
+                    "plugins": ["base", "engineering", "machine", "newcomer"]}
+        self.lock.write_text(json.dumps(document), encoding="utf-8")
+        adopt_plugins.run(self.root, None, ["react"], [], "write")
+        self.assertEqual(["base", "engineering", "machine", "newcomer", "react"], self.plugins())
+
+    def test_malformed_existing_lock_is_a_reported_error_not_a_crash(self):
+        self.lock.parent.mkdir()
+        for text in ('{"schema_version": 2}', '{"schema_version": 2, "plugins": [], "marketplace": null}'):
+            with self.subTest(text=text):
+                self.lock.write_text(text, encoding="utf-8")
+                with self.assertRaises(LockError):
+                    adopt_plugins.run(self.root, None, ["react"], [], "write")
+
+
 if __name__ == "__main__":
     unittest.main()
