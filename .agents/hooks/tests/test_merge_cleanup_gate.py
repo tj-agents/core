@@ -502,7 +502,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         posttooluse = self.run_hook({
             "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
             "tool_input": {"command": merge_command},
-            "tool_response": "Ã¢Å“â€œ Squashed and merged pull request #3 (feature)",
+            "tool_response": "✓ Squashed and merged pull request #3 (feature)",
         })
         self.assertEqual(0, posttooluse.returncode, posttooluse.stderr)
         obligation = json.loads(path.read_text(encoding="utf-8"))
@@ -527,9 +527,9 @@ class MergeCleanupGateTests(unittest.TestCase):
         worktree = add_feature_worktree(primary, self.root, "feature")
         merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash'
         for output in (
-            "Ã¢Å“â€œ Merged pull request #3 (feature)",
-            "Ã¢Å“â€œ Squashed and merged pull request #3 (feature)",
-            "Ã¢Å“â€œ Rebased and merged pull request #3 (feature)",
+            "✓ Merged pull request #3 (feature)",
+            "✓ Squashed and merged pull request #3 (feature)",
+            "✓ Rebased and merged pull request #3 (feature)",
             "",
         ):
             with self.subTest(output=output):
@@ -620,7 +620,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         self.run_hook({
             "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "session_id": "s1",
             "tool_input": {"command": merge_command},
-            "error": "Ã¢Å“â€œ Squashed and merged pull request org/repo#3 (feature)\nfailed to delete local branch feature",
+            "error": "✓ Squashed and merged pull request org/repo#3 (feature)\nfailed to delete local branch feature",
         })
         self.assertTrue(json.loads(path.read_text(encoding="utf-8"))["confirmed_merged"])
 
@@ -629,8 +629,8 @@ class MergeCleanupGateTests(unittest.TestCase):
         worktree = add_feature_worktree(primary, self.root, "feature")
         merge_command = f'pushd "{worktree}" && gh pr merge 3 --squash --auto'
         for output in (
-            "Ã¢Å“â€œ Pull request #3 will be automatically merged when all requirements are met",
-            "Ã¢Å“â€œ Squashed and merged pull request #3 (feature)",
+            "✓ Pull request #3 will be automatically merged when all requirements are met",
+            "✓ Squashed and merged pull request #3 (feature)",
         ):
             with self.subTest(output=output):
                 self.run_hook(self.payload(merge_command, codex=False, session="s1"))
@@ -762,7 +762,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         result = self.run_hook({
             "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "session_id": "s1",
             "tool_input": {"command": merge_command},
-            "tool_response": "Ã¢Å“â€œ Squashed and merged pull request tj-agents/core#3 (feature)\n"
+            "tool_response": "✓ Squashed and merged pull request tj-agents/core#3 (feature)\n"
                              "X a later step failed",
         })
         self.assertEqual(0, result.returncode, result.stderr)
@@ -846,7 +846,7 @@ class MergeCleanupGateTests(unittest.TestCase):
         confirm = self.run_hook({
             "hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "claude-session",
             "tool_input": {"command": merge_command},
-            "tool_response": "Ã¢Å“â€œ Merged pull request #3 (feature)",
+            "tool_response": "✓ Merged pull request #3 (feature)",
         })
         self.assertEqual(0, confirm.returncode, confirm.stderr)
         stop = self.run_hook({"hook_event_name": "Stop", "session_id": "claude-session"})
