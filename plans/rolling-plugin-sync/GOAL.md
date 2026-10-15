@@ -93,7 +93,11 @@ The implementation and main integration are committed and draft PR #269 is open 
 The first full review is complete with four findings: Claude selection merge, cache path safety, packaged
 permission-helper resolution, and expired-deadline child cleanup. Independent native review completed;
 its snapshot-helper allegation was disproved against the packaged layout. CI run 38810619930 failed;
-bounded test fixture repairs are underway. Runtime remediation, incremental review and exact-head CI
+all four runtime findings are now fixed in 3dac61f7, 5f5888c8, e4992106 and 0906c406.
+Claude selection cases (4), cache boundary cases (4), deadline cases (2), and startup binding cases (8)
+passed. CI fixture repairs passed: Claude launch/open 68 cases (2 skips), Codex launch/profile 62 cases
+(1 skip), terminal wiring 14 cases (3 skips), and startup integration 4 cases with an empty global Git
+config. Post-fix generation and its check passed. Incremental review and exact-head Windows/Linux CI
 remain delivery gates. Tommy owns merge. Deferred self-repair followups and
 the separate personal-policy design resume after this delivery; they must not divert this implementation.
 
@@ -188,7 +192,7 @@ No merge or branch installation is authorized by refresh. Preserve this worktree
 ## Next Steps
 
 Scope: whole authorized goal through implementation, verification, review, commit and open PR.
-Current slice: first full review complete; resolve findings and failing CI fixtures, then review the fixing head.
+Current slice: runtime findings and CI fixtures repaired; freeze the fixing head for incremental review and CI.
 Remaining scope: independent review, exact-head CI and ready PR; Tommy owns merge.
 Done when: verified implementation and any machine changes are reported with an open reviewed PR.
 

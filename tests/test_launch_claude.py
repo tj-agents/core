@@ -53,6 +53,17 @@ class LaunchClaudeTests(unittest.TestCase):
             code = LAUNCH_CLAUDE.main(argv)
         return code, out.getvalue(), err.getvalue()
 
+    def bound_payload(self):
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(
+            arguments[:10],
+            [
+                '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'claude',
+                '--project', os.path.abspath(self.directory), '--target', '/bin/claude', '--',
+            ],
+        )
+        return arguments[10:]
+
     # --- validation ---
 
     def test_a_missing_working_directory_is_rejected_through_the_real_directory_check(self):
@@ -197,7 +208,7 @@ class LaunchClaudeTests(unittest.TestCase):
 
     def test_dangerously_skip_permissions_then_model_then_the_prompt_sentence(self):
         self.run_main('--dangerously-skip-permissions', '--model', 'explicit-model')
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        arguments = self.bound_payload()
         self.assertEqual(arguments[0], '--dangerously-skip-permissions')
         self.assertEqual(arguments[1], '--model')
         self.assertEqual(arguments[2], 'explicit-model')
@@ -271,13 +282,13 @@ class LaunchClaudeTests(unittest.TestCase):
         force = self.agent_cli.launch_tab.call_args.kwargs['force']
         self.assertEqual(force, {'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
 
-    def test_standards_are_synced_before_launch_in_order(self):
+    def test_executable_is_resolved_before_bound_session_launch(self):
         self.run_main('--model', 'explicit-model')
         self.assertEqual(
             [call[0] for call in self.call_order.mock_calls],
-            ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
+            ['resolve_claude_executable', 'launch_tab'],
         )
-        self.assertEqual(self.agent_cli.sync_claude_standards.call_args.kwargs.get('claude'), '/bin/claude')
+        self.assertEqual(self.bound_payload()[0], '--model')
 
     def test_stdio_is_hardened_against_encoding_errors(self):
         with mock.patch.object(self.agent_cli, 'make_stdio_encoding_lossy') as hardened:
@@ -435,18 +446,22 @@ class LaunchClaudeEndToEndTests(unittest.TestCase):
         self.assertEqual(inner[:5], ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', directory])
         self.assertEqual(inner[5], 'env')
 
-        claude_index = inner.index('/bin/claude')
+        binding_index = inner.index(sys.executable)
         expected_prompt_sentence = (
             f'Read the file at {self.prompt_path.resolve()} and follow its instructions, '
             'working from the current directory.'
         )
         self.assertEqual(
-            inner[claude_index:],
-            ['/bin/claude', '--model', CLAUDE_LANES['lanes']['L3']['model'],
-             '--effort', CLAUDE_LANES['lanes']['L3']['effort'], expected_prompt_sentence],
+            inner[binding_index:],
+            [
+                sys.executable, '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'claude',
+                '--project', directory, '--target', '/bin/claude', '--', '--model',
+                CLAUDE_LANES['lanes']['L3']['model'], '--effort', CLAUDE_LANES['lanes']['L3']['effort'],
+                expected_prompt_sentence,
+            ],
         )
 
-        env_args = inner[6:claude_index]
+        env_args = inner[6:binding_index]
         self.assertIn('-u', env_args)
         self.assertIn('CLAUDECODE', env_args)
         self.assertIn('AGENT_CLI_TAB_TITLE=e2e handoff', env_args)
@@ -455,7 +470,6 @@ class LaunchClaudeEndToEndTests(unittest.TestCase):
         self.assertFalse(any(arg.startswith('TERM=') for arg in env_args))
 
         self.assertEqual(kwargs.get('stdin'), subprocess.DEVNULL)
-        self.agent_cli.sync_claude_standards.assert_called_once()
 
 
 class InstalledLayoutTests(unittest.TestCase):
