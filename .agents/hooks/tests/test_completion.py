@@ -1,9 +1,11 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "workflows"))
 from completion import CompletionError, completion_check, visible_tasks
@@ -47,6 +49,51 @@ class CompletionTests(unittest.TestCase):
         result = completion_check(path, {"repository": "example/test", "pr": 42, "head": HEAD}, path.parent, forge)
         self.assertTrue(result["ready"])
         self.assertEqual([({"repository": "example/test", "pr": 42, "head": HEAD}, path.parent)], requested)
+        self.assertEqual("unobserved", result["cleanup_status"])
+        self.assertEqual([], result["pending_cleanup"])
+
+    def test_pending_cleanup_preserves_report_readiness_and_blocks_cli_exit(self):
+        path = self.write_goal(goal(deliveries=[]))
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        obligations = Path(state.name) / "merge-cleanup" / "obligations"
+        obligations.mkdir(parents=True)
+        obligations.joinpath("own.json").write_text(json.dumps({
+            "worktree": str(path.parent),
+            "session_id": "s1",
+            "session_exit_required": True,
+            "checkout_retained": True,
+            "disposition": {"status": "pending", "reason": "keep-open"},
+        }), encoding="utf-8")
+        obligations.joinpath("other.json").write_text(json.dumps({
+            "worktree": str(Path(state.name) / "other-worktree"),
+            "session_id": "s2",
+            "session_exit_required": True,
+        }), encoding="utf-8")
+        with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state.name}):
+            result = completion_check(path, None, path.parent, lambda *_: {
+                "number": 42, "headRefOid": HEAD, "state": "MERGED", "body": "",
+            })
+            completed = subprocess.run(
+                [sys.executable, "-B", str(Path(__file__).resolve().parents[2] / "workflows/completion.py"),
+                 "--goal", str(path), "--root", str(path.parent)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertTrue(result["report_ready"])
+        self.assertFalse(result["ready"])
+        self.assertIn("cleanup remains pending", result["blockers"])
+        self.assertEqual("pending", result["cleanup_status"])
+        self.assertEqual([{
+            "worktree": str(path.parent.resolve()),
+            "session_id": "s1",
+            "kind": "keep-open",
+            "reason": "keep-open",
+        }], result["pending_cleanup"])
+        self.assertEqual(1, completed.returncode)
+        self.assertTrue(json.loads(completed.stdout)["report_ready"])
+        self.assertFalse(json.loads(completed.stdout)["ready"])
 
     def test_rejects_bound_delivery_omitted_from_goal(self):
         path = self.write_goal(goal(deliveries=[]))
@@ -105,6 +152,29 @@ class CompletionTests(unittest.TestCase):
         path = self.write_goal(goal(acceptance=acceptance))
         with self.assertRaisesRegex(CompletionError, "owner and next_action"):
             completion_check(path, None, path.parent, lambda *_: {})
+
+    def test_acceptance_failure_sets_both_readiness_values_false(self):
+        path = self.write_goal(goal(acceptance=[
+            {"id": "verified", "criterion": "A result is observed.", "evidence": [],
+             "owner": "fixture owner", "next_action": "Run the focused check."},
+        ], deliveries=[]))
+        result = completion_check(path, None, path.parent, lambda *_: {})
+        self.assertFalse(result["report_ready"])
+        self.assertFalse(result["ready"])
+
+    def test_malformed_goal_reports_both_readiness_values_false(self):
+        path = self.write_goal("# Goal\n")
+        completed = subprocess.run(
+            [sys.executable, "-B", str(Path(__file__).resolve().parents[2] / "workflows/completion.py"),
+             "--goal", str(path), "--root", str(path.parent)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(2, completed.returncode)
+        result = json.loads(completed.stdout)
+        self.assertFalse(result["report_ready"])
+        self.assertFalse(result["ready"])
 
     def test_visible_tasks_excludes_examples_and_quotes(self):
         content = "- [ ] live task\n> - [ ] quoted\n```md\n- [ ] fenced\n```\n<!-- - [ ] hidden -->\n    - [ ] indented"

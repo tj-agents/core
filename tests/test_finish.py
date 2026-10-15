@@ -116,6 +116,30 @@ class HostFallbackTests(unittest.TestCase):
                     )
 
 
+class CloseRefusalCaptureTests(unittest.TestCase):
+    def test_missing_native_attachment_cannot_produce_target_evidence(self):
+        with tempfile.TemporaryDirectory() as state:
+            for module in (own_close, finish):
+                with self.subTest(command=module.__name__), \
+                        mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": state}), \
+                        mock.patch.object(session_close, "own_host_and_entry",
+                                          side_effect=session_close.Refusal("attachment unavailable")):
+                    with self.assertRaisesRegex(session_close.Refusal, "attachment unavailable"):
+                        module.main([])
+                    self.assertFalse((Path(state) / "merge-cleanup" / "close-attempts").exists())
+
+    def test_failed_evidence_write_preserves_the_original_close_refusal(self):
+        entry = {"session_id": "ours", "cwd": str(ROOT), "host": "codex", "pid": 123,
+                 "pid_started_at": 1.0, "started_at": 1.0}
+        for module in (own_close, finish):
+            with self.subTest(command=module.__name__), \
+                    mock.patch.object(session_close, "own_host_and_entry", return_value=entry), \
+                    mock.patch.object(module, "close_session", side_effect=session_close.Refusal("original refusal")), \
+                    mock.patch.object(session_close, "write_json", side_effect=PermissionError("denied")):
+                with self.assertRaisesRegex(session_close.Refusal, "original refusal"):
+                    module.main([])
+
+
 def git(cwd, *args):
     return subprocess.run(["git", "-C", str(cwd), *args], text=True, capture_output=True, check=True).stdout.strip()
 
@@ -877,6 +901,9 @@ class SelfCloseActivityGuardTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.state = Path(self.temp.name) / "state"
+        state_environment = mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.state)})
+        state_environment.start()
+        self.addCleanup(state_environment.stop)
         self.cwd = Path(self.temp.name) / "checkout"
         self.cwd.mkdir()
         self.entry = {
