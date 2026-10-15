@@ -2,7 +2,7 @@
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-AlwaysLatestPlugins
 Branch: Fix/RollingPluginSync, originally off baa8f13a; integrated origin/main f2dd95ca.
-PR: not opened
+PR: https://github.com/tj-agents/core/pull/269 (draft; Tommy owns merge)
 Owner: Codex session `01a13fa0-a1c6-7051-b3ce-a63fb26916da`;
 work item `always-latest-plugins/implementation` (stable in-flight identifier).
 
@@ -89,7 +89,12 @@ ran the old wrapper's refresh; subsequent probes use native executable paths and
 This original CLI has not restarted; freshly loaded startup hooks are not claimed. The replacement started
 fresh and was then interrupted. No persistent continuation scheduler was initialized.
 
-The implementation and main integration are committed. Independent review and the PR remain outstanding. Tommy owns merge. Deferred self-repair followups and
+The implementation and main integration are committed and draft PR #269 is open at 1be576a4.
+The first full review is complete with four findings: Claude selection merge, cache path safety, packaged
+permission-helper resolution, and expired-deadline child cleanup. Independent native review completed;
+its snapshot-helper allegation was disproved against the packaged layout. CI run 38810619930 failed;
+bounded test fixture repairs are underway. Runtime remediation, incremental review and exact-head CI
+remain delivery gates. Tommy owns merge. Deferred self-repair followups and
 the separate personal-policy design resume after this delivery; they must not divert this implementation.
 
 ## Implementation decision and delivery boundary
@@ -183,7 +188,7 @@ No merge or branch installation is authorized by refresh. Preserve this worktree
 ## Next Steps
 
 Scope: whole authorized goal through implementation, verification, review, commit and open PR.
-Current slice: authored checkpoint and main integration complete; review and publish the stable candidate for CI.
+Current slice: first full review complete; resolve findings and failing CI fixtures, then review the fixing head.
 Remaining scope: independent review, exact-head CI and ready PR; Tommy owns merge.
 Done when: verified implementation and any machine changes are reported with an open reviewed PR.
 

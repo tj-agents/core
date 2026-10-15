@@ -18,7 +18,7 @@ SPEC.loader.exec_module(ROLLING)
 
 
 def git(path, *arguments):
-    return subprocess.run(['git', '-C', str(path), *arguments], check=True, capture_output=True,
+    return subprocess.run(['git', '-c', 'user.name=test', '-c', 'user.email=test@example.invalid', '-C', str(path), *arguments], check=True, capture_output=True,
                           text=True, encoding='utf-8').stdout.strip()
 
 
@@ -206,7 +206,8 @@ class RollingPluginsTests(unittest.TestCase):
         }
         prepared = ROLLING._prepare('claude', config, project, arguments, self.root / 'cache', ROLLING.Deadline(20))
         settings = json.loads(prepared.launch_args[1])
-        self.assertEqual(settings['unrelated'], {'retained': True})
+        self.assertNotIn('unrelated', settings)
+        self.assertEqual(json.loads((config / 'settings.json').read_text(encoding='utf-8'))['unrelated'], {'retained': True})
         self.assertEqual(settings['cli'], 'kept')
         self.assertEqual(settings['enabledPlugins'], {'engineering@core': True, 'base@core': True})
         self.assertFalse(settings['extraKnownMarketplaces']['core']['autoUpdate'])
@@ -270,6 +271,38 @@ class RollingPluginsTests(unittest.TestCase):
         ROLLING._prune_native_cache(cache, [pinned], [root])
         self.assertTrue(pinned.is_dir())
         self.assertTrue(unrelated.is_dir())
+
+
+class RollingBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='rolling boundaries ')
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+
+    def test_claude_selection_maps_merge_by_identity_in_native_precedence_order(self):
+        config = self.root / 'config'
+        project = self.root / 'project'
+        RollingPluginsTests.write(config / 'settings.json', {
+            'enabledPlugins': {'base@core': True, 'machine@core': False},
+            'extraKnownMarketplaces': {'core': {'autoUpdate': True}},
+        })
+        RollingPluginsTests.write(project / '.claude/settings.json', {
+            'enabledPlugins': {'engineering@core': True},
+            'extraKnownMarketplaces': {'stack': {'autoUpdate': True}},
+        })
+        RollingPluginsTests.write(project / '.claude/settings.local.json', {
+            'enabledPlugins': {'base@core': False},
+        })
+        effective, supplied = ROLLING.claude_settings(config, project, (
+            '--setting-sources', 'local,project,user',
+            '--settings', '{"enabledPlugins":{"other@core":true},"cli":"retained"}',
+        ))
+        self.assertEqual(effective['enabledPlugins'], {
+            'base@core': False, 'machine@core': False, 'engineering@core': True, 'other@core': True,
+        })
+        self.assertEqual(set(effective['extraKnownMarketplaces']), {'core', 'stack'})
+        self.assertEqual(supplied, {'enabledPlugins': {'other@core': True}, 'cli': 'retained'})
+
 
 if __name__ == '__main__':
     unittest.main()
