@@ -82,15 +82,12 @@ model-and-effort pair, so lane inflation cannot reach the tier. Consumers that e
 (the handoff launchers' `-Frontier`) make selecting it a distinct visible act rather than one lane value
 among others.
 
-**Re-route per phase.** For every new task, work type, phase, review entry or fallback, make a fresh lane
-selection before substantive work, even when retaining the same lane. Record the phase, lane and reason in
-the existing task context, and resolve model and effort from the canonical host table. Apply the selection
-under the canonical execution rules: continue directly when the current owner already honors the selected
-lane; otherwise use a supported control or bounded lane worker. Inherited settings or an earlier phase's
-selection do not count. One task is usually open/judgement while it is being designed, then specified and
-test-caught while it is built, then clerical to commit and push. Running the whole task in the rung its
-hardest phase needed is the waste this ladder exists to stop, and running the design phase in the rung its
-cleanup needed is how a bad design gets built efficiently.
+**Reconsider substantive work.** Load this contract once per logical task and reuse it while its source
+identity is unchanged. Select suitable capability for substantive investigation, design, implementation,
+or review; reconsider when the required judgment changes. Routine work needs no written lane rationale.
+Commits, pushes, PR administration, and polls still use their declared cheap leaf lane when supported.
+Batch clerical work and monitoring loops into a bounded cheap worker when worthwhile; one tiny command
+may stay inline when switching would cost more. Neither route needs another skill read or handoff.
 
 Lane selection does not itself transfer task ownership. A Claude parent hands multi-phase work and every
 delegated design, implementation, or review phase to Codex before delegating, unless the user explicitly
@@ -101,13 +98,11 @@ review task to a lane agent. Claude keeps only conversation and tiny inline foll
 Give that agent explicit path and responsibility ownership, avoid overlapping writers, and reconcile its
 result in the parent. A small follow-up can stay with the parent. If delegation is unavailable, use the
 current owner's supported fallback; do not open an independent session solely to change model or cost.
-Direct execution and parent fallback use the selected phase lane. A tiny inline follow-up may remain
-with the parent, but that allowance does not cover an implementation phase or a complete implementation
-goal on L1. If a worker is unavailable, use a supported in-session model/effort control or another
-available bounded worker that honors the selected lane. If neither is available and the current owner
-cannot execute at that lane, report the unavailable control and the blocked phase in the existing goal;
-continue independent authorized preparation and resume implementation when a suitable control or worker
-is available. Never claim a model switch happened merely because a lane was recorded.
+Prefer a supported in-session control or a bounded worker when changing capability saves meaningful work.
+An unavailable cheaper setting does not block an owner capable of safely completing the task. Continue
+with that owner and record a material fallback once; never claim a model switch occurred merely because
+a lane was recorded. Missing capability required for correctness remains a real gate. L1 remains reserved
+for critical design; delegate substantial implementation or review rather than running it at L1.
 For a massive plan whose design is a substantial phase, `engineering:plans` normally transfers execution
 to a fresh harness after a durable phased checkpoint. That decision is about the work and its context,
 not a lane change.
