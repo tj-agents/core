@@ -40,6 +40,15 @@ class Selection:
     source_url: str
     marketplace: str
 
+    def __post_init__(self):
+        if not isinstance(self.identity, str) or self.identity.count("@") != 1:
+            raise RollingPluginError("plugin selection has an invalid identity")
+        name, marketplace = self.identity.rsplit("@", 1)
+        _cache_component(name)
+        _cache_component(marketplace)
+        if self.marketplace != marketplace:
+            raise RollingPluginError("plugin selection marketplace does not match its identity")
+
     @property
     def name(self) -> str:
         return self.identity.rsplit("@", 1)[0]
@@ -160,6 +169,28 @@ def _safe_path(value: str, allow_root: bool = False) -> str:
     return "/".join(parts)
 
 
+
+def _cache_component(value: str) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", value) or value.endswith("."):
+        raise RollingPluginError(f"unsafe plugin cache component: {value!r}")
+    return _safe_path(value)
+
+
+def _unlinked_ancestors(path: Path) -> None:
+    if ".." in path.parts:
+        raise RollingPluginError(f"cache path contains traversal: {path}")
+    current = path.absolute()
+    for candidate in (current, *current.parents):
+        try:
+            status = candidate.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise RollingPluginError(f"cannot inspect cache path {candidate}: {error}") from error
+        if stat.S_ISLNK(status.st_mode) or getattr(status, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+            raise RollingPluginError(f"cache path has a linked or reparse ancestor: {candidate}")
+
+
 def _github_repository(url: str) -> str | None:
     value = url.strip().replace("\\", "/")
     if value.startswith("git@github.com:"):
@@ -172,7 +203,8 @@ def _github_repository(url: str) -> str | None:
     if not value.casefold().startswith("github.com/"):
         return None
     pieces = value.split("/")
-    if len(pieces) != 3 or not all(pieces):
+    if len(pieces) != 3 or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", piece)
+                               or piece.endswith(".") for piece in pieces[1:]):
         return None
     return "/".join(pieces[1:]).casefold()
 
@@ -379,6 +411,9 @@ def _fetch_main(url: str, root: Path, deadline: Deadline | None = None) -> tuple
     if authenticated is None:
         raise RollingPluginError(f"source is not an authenticated tj-agents GitHub repository: {url}")
     clone = root / "git" / _cache_name(authenticated)
+    _unlinked_ancestors(clone)
+    if clone.is_dir():
+        _verified_tree(clone)
     clone.parent.mkdir(parents=True, exist_ok=True)
     if not (clone / ".git").is_dir():
         if clone.exists():
@@ -419,6 +454,7 @@ def _catalog(clone: Path, revision: str, deadline: Deadline | None = None) -> di
 
 
 def _extract_repository(clone: Path, revision: str, destination: Path, deadline: Deadline | None = None) -> None:
+    _unlinked_ancestors(destination)
     archive = _completed(["git", "-C", str(clone), "archive", "--format=tar", revision], None,
                          {"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}, deadline or Deadline())
     if archive.returncode:
@@ -561,6 +597,8 @@ def _tree_files(clone: Path, revision: str, path: str, deadline: Deadline | None
 
 def _write_tree(destination: Path, files: Mapping[str, tuple[bytes, bool]]) -> None:
     staging = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+    _unlinked_ancestors(destination)
+    _unlinked_ancestors(staging)
     if staging.exists():
         _remove_cache_tree(staging, destination.parent)
     for relative, (content, executable) in files.items():
@@ -619,6 +657,8 @@ def _linked(path: Path) -> bool:
 
 
 def _remove_cache_tree(path: Path, cache: Path) -> None:
+    _unlinked_ancestors(cache)
+    _unlinked_ancestors(path)
     if not path.exists():
         return
     try:
@@ -747,8 +787,10 @@ def resolve(selections: Iterable[Selection], cache: Path, disabled: Iterable[str
 
 def _projection(host: str, packages: Iterable[Package], cache: Path) -> tuple[Path, tuple[Path, ...]]:
     packages = list(packages)
+    _unlinked_ancestors(cache)
     if not packages:
         root = cache / "catalogs" / host / "empty"
+        _unlinked_ancestors(root)
         root.mkdir(parents=True, exist_ok=True)
         return root, ()
     digest = hashlib.sha256(json.dumps([
@@ -756,17 +798,18 @@ def _projection(host: str, packages: Iterable[Package], cache: Path) -> tuple[Pa
         for package in sorted(packages, key=lambda item: item.identity)
     ], separators=(",", ":")).encode("utf-8")).hexdigest()
     root = cache / "catalogs" / host / digest
+    _unlinked_ancestors(root)
     if root.exists():
         _remove_cache_tree(root, cache)
     by_market: dict[str, list[Package]] = {}
     for package in packages:
         by_market.setdefault(package.marketplace, []).append(package)
     for marketplace, members in by_market.items():
-        catalog_root = root / marketplace
+        catalog_root = root / _cache_component(marketplace)
         plugins = []
         for package in members:
             _verified_tree(package.root)
-            name = package.identity.rsplit("@", 1)[0]
+            name = _cache_component(package.identity.rsplit("@", 1)[0])
             target = catalog_root / "plugins" / name
             if target.exists():
                 _remove_cache_tree(target, cache)
@@ -787,8 +830,9 @@ def _projection(host: str, packages: Iterable[Package], cache: Path) -> tuple[Pa
 
 @contextmanager
 def exclusive(cache: Path, wait: float = LOCK_WAIT_SECONDS, deadline: Deadline | None = None):
-    cache.mkdir(parents=True, exist_ok=True)
     lock = cache / "rolling-plugins.lock"
+    _unlinked_ancestors(lock)
+    cache.mkdir(parents=True, exist_ok=True)
     until = deadline or Deadline(wait if wait > 0 else 0.001)
     handle = lock.open("a+b")
     while True:
@@ -832,6 +876,8 @@ def exclusive(cache: Path, wait: float = LOCK_WAIT_SECONDS, deadline: Deadline |
 
 def _cache_root(host: str, target: Path, arguments: Mapping[str, object]) -> Path:
     root = Path(arguments.get("cache_root") or target / "plugins" / "cache" / ".tj-agents-rolling" / host)
+    _unlinked_ancestors(root)
+    _unlinked_ancestors(target / "plugins" / "cache")
     expected = (target / "plugins" / "cache").resolve()
     try:
         root.resolve().relative_to(expected)
@@ -960,11 +1006,8 @@ def _promote(source: Path, destination: Path, expected: Path, cache: Path, root:
         destination.parent.resolve().relative_to(cache.resolve())
     except ValueError:
         raise RollingPluginError(f"native plugin cache destination escapes cache: {destination}") from None
-    current = destination.parent
-    while current != cache.parent:
-        if current.exists() and (current.is_symlink() or getattr(current.lstat(), "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT):
-            raise RollingPluginError(f"native plugin cache destination has a linked ancestor: {current}")
-        current = current.parent
+    _unlinked_ancestors(cache)
+    _unlinked_ancestors(destination)
     if destination.exists():
         marker = destination.parent / ".tj-agents-rolling.json"
         owned = _json(marker) if marker.exists() else None
@@ -1096,6 +1139,8 @@ def _prune_native_cache(cache: Path, active: Iterable[Path], roots: Iterable[Ver
 
 def _write_json(path: Path, value: object) -> None:
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    _unlinked_ancestors(path)
+    _unlinked_ancestors(temporary)
     temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
@@ -1141,6 +1186,7 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
     packages = {root.identity: root for root in prepared.selected_roots}
     plugins = prepared.plugins_root or target / "plugins"
     actual_cache = plugins / "cache"
+    _unlinked_ancestors(actual_cache)
     deadline = prepared.deadline or Deadline()
     with tempfile.TemporaryDirectory(prefix=f"tj-agents-{host}-") as temporary:
         temporary_root = Path(temporary)
@@ -1326,7 +1372,7 @@ def terminate_process_tree(process: subprocess.Popen, timeout: float = 5) -> Non
 
 
 def preflight(host: str, target: Path, project: Path, arguments: Mapping[str, object] | None = None) -> Preflight:
-    return Preflight(host, target.resolve(), project.resolve(), arguments)
+    return Preflight(host, target.absolute(), project.resolve(), arguments)
 
 
 def prepare(host: str, target: Path, project: Path, arguments: Mapping[str, object] | None = None) -> Prepared:

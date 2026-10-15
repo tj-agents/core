@@ -41,7 +41,7 @@ those bounded checks returned to the parent over the same frozen bundle.
   Evidence: frozen `claude_settings`/`_prepare`; official Claude plugin-loading reference, "Find where
   a plugin is enabled", checked 2026-10-15. Confidence high.
 
-- [ ] **R2 — HIGH — security** — `.agents/machine/scripts/rolling_plugins.py:559`
+- [x] **R2 — HIGH — security** — `.agents/machine/scripts/rolling_plugins.py:559`
   `_write_tree` creates and removes paths before checking their ancestors; its deletion bound is the
   same potentially redirected `destination.parent`. A junction/symlink in a staging ancestor can
   redirect replacement/deletion into another directory before the later `_verified_tree` rejects it.
@@ -117,3 +117,8 @@ and fixture Git identity; the focused fixture repairs remain a delivery gate alo
 R1 fix evidence: identity-wise merge preserves source precedence and explicit disables; launch overrides
 retain supplied CLI fields without elevating unrelated file settings. Four Claude cases passed in
 `b436dc9b65110cd1-rolling-claude-selection-review-fix.log`.
+
+R2 fix evidence: cache writes/deletes, locks, checkouts and promotions reject linked or reparse
+ancestors before mutation. Identity components and publisher URL segments are validated before paths
+are composed. Windows junction sentinel, lock, checkout and traversal cases passed in
+`380524bbd0cec6b3-rolling-cache-boundary-review-fix.log` (four boundary tests).
