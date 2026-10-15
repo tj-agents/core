@@ -32,7 +32,7 @@ class AdoptPluginsTests(unittest.TestCase):
         self.lock = self.root / ".agents" / "plugins.lock.json"
 
     def plugins(self):
-        return json.loads(self.lock.read_text(encoding="utf-8"))["plugins"]
+        return [item.removesuffix("@tj-agents") for item in json.loads(self.lock.read_text(encoding="utf-8"))["plugins"]]
 
     def test_stack_resolves_to_plugins_and_adds_core_without_a_catalog(self):
         adopt_plugins.run(self.root, "v1.0.0", ["cpp-msvc"], [], "write")
@@ -51,8 +51,8 @@ class AdoptPluginsTests(unittest.TestCase):
         adopt_plugins.run(self.root, "v1.0.0", ["dotnet"], [], "write")
         adopt_plugins.run(self.root, None, ["react"], [], "write")
         document = json.loads(self.lock.read_text(encoding="utf-8"))
-        self.assertEqual("v1.0.0", document["marketplace"]["revision"])
-        self.assertEqual(["base", "dotnet", "engineering", "machine", "react"], document["plugins"])
+        self.assertEqual("v1.0.0", document["marketplaces"]["tj-agents"]["revision"])
+        self.assertEqual(["base", "dotnet", "engineering", "machine", "react"], self.plugins())
 
     def test_preview_changes_nothing(self):
         drift = adopt_plugins.run(self.root, "v1.0.0", ["dotnet"], [], "preview")
@@ -71,7 +71,7 @@ class AdoptPluginsTests(unittest.TestCase):
             adopt_plugins.run(self.root, None, ["dotnet"], [], "write")
         self.lock.parent.mkdir()
         self.lock.write_text(json.dumps({"schema_version": 1, "plugins": []}), encoding="utf-8")
-        with self.assertRaisesRegex(LockError, "not a schema 2 plugin lock"):
+        with self.assertRaisesRegex(LockError, "not a schema 3 plugin lock"):
             adopt_plugins.run(self.root, "v1.0.0", ["dotnet"], [], "write")
 
     def test_cli_reports_drift_and_exit_status(self):
@@ -92,15 +92,15 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_extending_keeps_a_plugin_the_roster_does_not_know(self):
         self.lock.parent.mkdir()
-        document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
-                    "plugins": ["base", "engineering", "machine", "newcomer"]}
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}},
+                    "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents", "newcomer@tj-agents"]}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
         adopt_plugins.run(self.root, None, ["react"], [], "write")
         self.assertEqual(["base", "engineering", "machine", "newcomer", "react"], self.plugins())
 
     def test_malformed_existing_lock_is_a_reported_error_not_a_crash(self):
         self.lock.parent.mkdir()
-        for text in ('{"schema_version": 2}', '{"schema_version": 2, "plugins": [], "marketplace": null}'):
+        for text in ('{"schema_version": 3}', '{"schema_version": 3, "plugins": [], "marketplaces": null}'):
             with self.subTest(text=text):
                 self.lock.write_text(text, encoding="utf-8")
                 with self.assertRaises(LockError):
@@ -109,15 +109,15 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_existing_plugins_get_their_roster_dependencies_on_extension(self):
         self.lock.parent.mkdir()
-        document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"},
-                    "plugins": ["azure", "base", "engineering", "machine"]}
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}},
+                    "plugins": ["azure@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents"]}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
         adopt_plugins.run(self.root, None, ["react"], [], "write")
         self.assertIn("dotnet", self.plugins())
 
     def test_a_lock_missing_core_plugins_is_repaired(self):
         self.lock.parent.mkdir()
-        document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}, "plugins": ["react"]}
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": ["react@tj-agents"]}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
         adopt_plugins.run(self.root, None, [], [], "write")
         self.assertEqual(["base", "engineering", "machine", "react"], self.plugins())
@@ -131,9 +131,9 @@ class AdoptPluginsTests(unittest.TestCase):
 
     def test_duplicate_or_unhashable_plugin_entries_are_reported_not_normalised(self):
         self.lock.parent.mkdir()
-        for plugins in (["base", "base", "engineering", "machine"], ["base", ["x"], "engineering", "machine"]):
+        for plugins in (["base@tj-agents", "base@tj-agents", "engineering@tj-agents", "machine@tj-agents"], ["base@tj-agents", ["x"], "engineering@tj-agents", "machine@tj-agents"]):
             with self.subTest(plugins=plugins):
-                document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}, "plugins": plugins}
+                document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": plugins}
                 self.lock.write_text(json.dumps(document), encoding="utf-8")
                 with self.assertRaisesRegex(LockError, "list of unique plugin names"):
                     adopt_plugins.run(self.root, None, ["react"], [], "write")
@@ -141,6 +141,38 @@ class AdoptPluginsTests(unittest.TestCase):
     def test_a_second_run_with_no_request_is_stable(self):
         adopt_plugins.run(self.root, "v1.0.0", ["azure"], [], "write")
         self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+
+
+    def test_a_foreign_plugin_needs_and_keeps_its_declared_marketplace(self):
+        with self.assertRaisesRegex(LockError, "needs its marketplace declared"):
+            adopt_plugins.run(self.root, "v1.0.0", ["dotnet"], ["concertable@agents"], "write")
+        adopt_plugins.run(self.root, "v1.0.0", ["dotnet"], ["concertable@agents"], "write",
+                          ["agents=Concertable/agents@cccccccccccccccccccccccccccccccccccccccc"])
+        document = json.loads(self.lock.read_text(encoding="utf-8"))
+        self.assertEqual({"repository": "Concertable/agents", "revision": "cccccccccccccccccccccccccccccccccccccccc"}, document["marketplaces"]["agents"])
+        self.assertIn("concertable@agents", document["plugins"])
+        adopt_plugins.run(self.root, None, ["react"], [], "write")
+        self.assertIn("concertable@agents", self.plugins())
+        self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+
+    def test_a_marketplace_outside_the_allowed_owners_is_rejected(self):
+        with self.assertRaisesRegex(LockError, "owned by tj-agents or Concertable"):
+            adopt_plugins.run(self.root, "v1.0.0", [], ["x@other"], "write", ["other=someone/plugins@cccccccccccccccccccccccccccccccccccccccc"])
+        self.assertFalse((self.root / ".agents").exists())
+
+
+    def test_malformed_and_conflicting_arguments_are_rejected(self):
+        cases = (
+            (["base@tj-agents@x"], [], "--plugin must be"),
+            (["react@"], [], "--plugin must be"),
+            (["concertable@agents"], ["agents=Concertable/agents@cccccccccccccccccccccccccccccccccccccccc", "agents=Concertable/other@cccccccccccccccccccccccccccccccccccccccc"], "given more than once"),
+            ([], ["tj-agents=tj-agents/marketplace@v1.1.0"], "either --marketplace-revision"),
+        )
+        for plugins, marketplaces, message in cases:
+            with self.subTest(plugins=plugins, marketplaces=marketplaces):
+                with self.assertRaisesRegex(LockError, message):
+                    adopt_plugins.run(self.root, "v1.0.0", [], plugins, "write", marketplaces)
+        self.assertFalse((self.root / ".agents").exists())
 
 
 if __name__ == "__main__":
