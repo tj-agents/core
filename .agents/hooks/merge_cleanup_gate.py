@@ -562,7 +562,9 @@ def auto_merge_root(command):
     if len(argv) != script_index + 3 or argv[script_index + 1] != "--root":
         return None
     components = argv[script_index].replace("\\", "/").split("/")
-    if components[-2:] != ["workflows", "auto_merge.py"]:
+    if [os.path.normcase(component) for component in components[-2:]] != [
+        os.path.normcase("workflows"), os.path.normcase("auto_merge.py")
+    ]:
         return None
     root = Path(argv[script_index + 2])
     if not root.is_absolute():
@@ -620,8 +622,8 @@ def local_binding_identity(root, binding):
 def record_obligation_for_identity(command, data, worktree, pr, merge_mode, expected_identity=None):
     from merge_review_gate import normalize_slug
 
-    session = native_session_id(data)
-    if session is None or not worktree.is_dir():
+    session = native_session_id(data) if expected_identity is not None else data.get("session_id") or data.get("sessionId")
+    if (expected_identity is not None and session is None) or not worktree.is_dir():
         return False
     if expected_identity is None:
         branch = git(worktree, "rev-parse", "--abbrev-ref", "HEAD")
