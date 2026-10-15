@@ -310,28 +310,13 @@ def close_command_matches_obligation(argv, obligation):
         )
     if command == "peer_cli.py":
         return arguments in (["close", session_id], ["close", session_id, "--force"])
-    if command != "close_tab.py" or "--list" in arguments or "--all" in arguments:
+    if command != "close_tab.py":
         return False
-    selectors = 0
-    index = 0
-    while index < len(arguments):
-        argument = arguments[index]
-        if argument == "--force":
-            index += 1
-            continue
-        if argument in ("--session", "--title"):
-            if index + 1 >= len(arguments) or not nonempty_string(arguments[index + 1]):
-                return False
-            if argument == "--session" and arguments[index + 1] != session_id:
-                return False
-            selectors += 1
-            index += 2
-            continue
-        if argument.startswith("-") or not nonempty_string(argument):
-            return False
-        selectors += 1
-        index += 1
-    return selectors == 1
+    return arguments in (
+        ["--session", session_id],
+        ["--session", session_id, "--force"],
+        ["--force", "--session", session_id],
+    )
 
 
 def resolved_target_matches(capability, obligation):
