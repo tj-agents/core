@@ -36,13 +36,13 @@ class BumpPluginLockTests(unittest.TestCase):
             repo_config.run(root / ".agents" / "plugins.lock.json", "write", root=root)
 
     def save(self, root, revision, plugins=("base", "engineering", "machine", "react")):
-        document = {"schema_version": 2, "marketplace": {"repository": "tj-agents/marketplace", "revision": revision}, "plugins": list(plugins)}
+        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": revision}}, "plugins": [f"{name}@tj-agents" for name in plugins]}
         (root / ".agents" / "plugins.lock.json").write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
     def revision(self, root):
         lock = json.loads((root / ".agents" / "plugins.lock.json").read_text(encoding="utf-8"))
         claude = json.loads((root / ".claude" / "settings.json").read_text(encoding="utf-8"))
-        return lock["marketplace"]["revision"], claude["extraKnownMarketplaces"]["tj-agents"]["source"]["ref"]
+        return lock["marketplaces"]["tj-agents"]["revision"], claude["extraKnownMarketplaces"]["tj-agents"]["source"]["ref"]
 
     def run_main(self, *arguments):
         output, errors = io.StringIO(), io.StringIO()
@@ -53,7 +53,7 @@ class BumpPluginLockTests(unittest.TestCase):
     def test_preview_changes_nothing_and_names_the_files(self):
         status, output, _ = self.run_main("--revision", "v1.1.0", "--root", str(self.roots[0]))
         self.assertEqual(0, status)
-        self.assertIn("would move v1.0.0 -> v1.1.0", output)
+        self.assertIn("would move tj-agents v1.0.0 -> v1.1.0", output)
         self.assertIn(".claude/settings.json", output)
         self.assertEqual(("v1.0.0", "v1.0.0"), self.revision(self.roots[0]))
 
@@ -71,14 +71,14 @@ class BumpPluginLockTests(unittest.TestCase):
     def test_invalid_revision_fails_without_touching_the_root(self):
         status, _, errors = self.run_main("--revision", "main", "--mode", "write", "--root", str(self.roots[0]))
         self.assertEqual(1, status)
-        self.assertIn("marketplace.revision", errors)
+        self.assertIn("marketplaces.tj-agents.revision", errors)
         self.assertEqual(("v1.0.0", "v1.0.0"), self.revision(self.roots[0]))
 
     def test_one_failing_root_does_not_stop_the_others(self):
         (self.roots[0] / ".agents" / "plugins.lock.json").write_text("{}", encoding="utf-8")
         status, output, errors = self.run_main("--revision", "v1.1.0", "--mode", "write", "--root", str(self.roots[0]), "--root", str(self.roots[1]))
         self.assertEqual(1, status)
-        self.assertIn("moved v1.0.0 -> v1.1.0", output)
+        self.assertIn("moved tj-agents v1.0.0 -> v1.1.0", output)
         self.assertEqual(("v1.1.0", "v1.1.0"), self.revision(self.roots[1]))
         self.assertIn(str(self.roots[0]), errors)
 
@@ -89,7 +89,7 @@ class BumpPluginLockTests(unittest.TestCase):
         self.assertIn(".agents/plugins.lock.json", output)
 
     def test_malformed_lock_is_reported_and_other_roots_still_move(self):
-        (self.roots[0] / ".agents" / "plugins.lock.json").write_text('{"schema_version": 2}', encoding="utf-8")
+        (self.roots[0] / ".agents" / "plugins.lock.json").write_text('{"schema_version": 3}', encoding="utf-8")
         status, output, errors = self.run_main("--revision", "v1.1.0", "--mode", "write", "--root", str(self.roots[0]), "--root", str(self.roots[1]))
         self.assertEqual(1, status)
         self.assertIn(str(self.roots[0]), errors)
@@ -109,6 +109,22 @@ class BumpPluginLockTests(unittest.TestCase):
         self.assertEqual(0, status)
         self.assertIn("no host settings change", output)
         self.assertEqual(before, (self.roots[0] / ".agents" / "plugins.lock.json").read_bytes())
+
+
+    def test_moves_a_second_marketplace_without_touching_tj_agents(self):
+        lock = self.roots[0] / ".agents" / "plugins.lock.json"
+        document = json.loads(lock.read_text(encoding="utf-8"))
+        document["marketplaces"]["agents"] = {"repository": "Concertable/agents", "revision": "cccccccccccccccccccccccccccccccccccccccc"}
+        document["plugins"].append("concertable@agents")
+        lock.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+        status, _, errors = self.run_main("--marketplace", "agents", "--revision", "dddddddddddddddddddddddddddddddddddddddd", "--mode", "write", "--root", str(self.roots[0]))
+        self.assertEqual(0, status, errors)
+        document = json.loads(lock.read_text(encoding="utf-8"))
+        self.assertEqual("dddddddddddddddddddddddddddddddddddddddd", document["marketplaces"]["agents"]["revision"])
+        self.assertEqual("v1.0.0", document["marketplaces"]["tj-agents"]["revision"])
+        status, _, errors = self.run_main("--marketplace", "missing", "--revision", "v1.0.0", "--root", str(self.roots[1]))
+        self.assertEqual(1, status)
+        self.assertIn("does not use the missing marketplace", errors)
 
 
 if __name__ == "__main__":
