@@ -51,8 +51,16 @@ def main(argv=None):
     parser.add_argument("--worktree", help="test-only explicit target; normal use is argument-free")
     args = parser.parse_args(argv)
     entry = session_close.own_host_and_entry()
+    try:
+        return close_session(entry, args.worktree)
+    except (session_close.Refusal, close_tab.TerminalRefusal) as error:
+        session_close.record_close_refusal(entry, __file__, list(argv) if argv is not None else sys.argv[1:], error)
+        raise
+
+
+def close_session(entry, target=None):
     attached = session_close.worktree_from_cwd()
-    worktree = Path(args.worktree).resolve() if args.worktree else attached
+    worktree = Path(target).resolve() if target else attached
     if session_close.path_key(worktree) != session_close.path_key(attached) or not session_close.under_or_equal(os.getcwd(), entry["cwd"]):
         raise session_close.Refusal("target is not this session's own attachment")
     activity = session_close.awaiting_input_activity(entry)
