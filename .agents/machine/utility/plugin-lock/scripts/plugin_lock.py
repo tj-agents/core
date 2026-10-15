@@ -17,6 +17,7 @@ ALLOWED_OWNERS = ("tj-agents", "Concertable")
 CORE_PLUGINS = ("base", "engineering", "machine")
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/(?P<name>[A-Za-z0-9_][A-Za-z0-9_.-]*)\Z")
+GIT_SUFFIX = ".git"
 REVISION = re.compile(r"v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\Z|[0-9a-f]{40}\Z")
 
 
@@ -57,9 +58,11 @@ def validate_marketplace(name: str, value: object) -> dict:
         raise lock_io.LockError(f"marketplaces.{name} must contain exactly repository and revision")
     repository, revision = value["repository"], value["revision"]
     match = REPOSITORY.fullmatch(repository) if isinstance(repository, str) else None
-    if match is None or match["owner"].lower() not in {owner.lower() for owner in ALLOWED_OWNERS}:
-        raise lock_io.LockError(f"marketplaces.{name}.repository must be a GitHub repository owned by " + " or ".join(ALLOWED_OWNERS))
-    if (name == MARKETPLACE_NAME) != (repository.lower() == MARKETPLACE_REPOSITORY.lower()):
+    if match is None or match["owner"] not in ALLOWED_OWNERS or match["name"].lower().endswith(GIT_SUFFIX):
+        raise lock_io.LockError(
+            f"marketplaces.{name}.repository must be <owner>/<repository> without .git, owned by " + " or ".join(ALLOWED_OWNERS)
+        )
+    if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
         raise lock_io.LockError(f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name")
     if not isinstance(revision, str) or not REVISION.fullmatch(revision):
         raise lock_io.LockError(f"marketplaces.{name}.revision must be a vN.N.N tag or a full lowercase commit")
@@ -75,6 +78,9 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
         raise lock_io.LockError(f"marketplaces must be an object that includes {MARKETPLACE_NAME}")
     for name, value in marketplaces.items():
         validate_marketplace(name, value)
+    repositories = [value["repository"].lower() for value in marketplaces.values()]
+    if len(set(repositories)) != len(repositories):
+        raise lock_io.LockError("Two marketplaces pin the same repository")
     identities = lock["plugins"]
     if not isinstance(identities, list) or any(not isinstance(identity, str) for identity in identities):
         raise lock_io.LockError("plugins must be a list of <plugin>@<marketplace> names")
