@@ -379,6 +379,10 @@ def disposition_command(value):
         if match is None:
             return None
         fields[flag.replace("-", "_")] = next(item for item in match.groups()[1:] if item is not None)
+    for flag in ("source-root", "host"):
+        match = re.search(rf"--{flag}\s+('([^']+)'|\"([^\"]+)\"|([^\s,;)]+))", text, re.I)
+        if match is not None:
+            fields[flag.replace("-", "_")] = next(item for item in match.groups()[1:] if item is not None)
     if not re.search(r"\bcheck\b", text, re.I):
         return None
     return fields
@@ -423,10 +427,11 @@ def valid_disposition(records, session, prompt, callout_id):
             command = pending.pop(value.get("call_id"), None)
             receipt = result_json(value)
             if command and receipt and not value.get("is_error") and not value.get("error"):
-                if all(command.get(key) == value_ for key, value_ in expected.items()):
+                if command.get("host") in (None, "codex") and all(command.get(key) == value_ for key, value_ in expected.items()):
                     try:
                         result = validate_disposition(
-                            command["record"], command["id"], session, expected["prompt_sha256"], callout_id
+                            command["record"], command["id"], session, expected["prompt_sha256"], callout_id,
+                            source_root=command.get("source_root"), harness=command.get("host")
                         )
                     except (OSError, ValueError, TypeError):
                         result = {"valid": False}
@@ -443,10 +448,11 @@ def valid_disposition(records, session, prompt, callout_id):
                 command = pending.pop(block.get("tool_use_id"), None)
                 receipt = result_json(block)
                 if command and receipt and not block.get("is_error"):
-                    if all(command.get(key) == value_ for key, value_ in expected.items()):
+                    if command.get("host") in (None, "claude") and all(command.get(key) == value_ for key, value_ in expected.items()):
                         try:
                             result = validate_disposition(
-                                command["record"], command["id"], session, expected["prompt_sha256"], callout_id
+                                command["record"], command["id"], session, expected["prompt_sha256"], callout_id,
+                                source_root=command.get("source_root"), harness=command.get("host")
                             )
                         except (OSError, ValueError, TypeError):
                             result = {"valid": False}
