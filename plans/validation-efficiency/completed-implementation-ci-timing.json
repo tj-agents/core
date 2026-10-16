@@ -1,0 +1,355 @@
+{
+  "run": 38902959829,
+  "head": "5b42318ef0369ef59dcbbdde40505dd21a857ad8",
+  "method": "Gaps between successive verbose unittest completion timestamps within a step; includes setup, teardown and log buffering. Not instrumented fixture timings. Captured from the already-required successful run, without rerunning tests.",
+  "suites": [
+    {
+      "job": "verify-windows",
+      "step": "continuation scheduler tests",
+      "tests": 41,
+      "seconds": 2.062
+    },
+    {
+      "job": "verify-windows",
+      "step": "continuation scheduler tests",
+      "tests": 41,
+      "seconds": 2.349
+    },
+    {
+      "job": "verify-windows",
+      "step": "Codex terminal profile tests",
+      "tests": 4,
+      "seconds": 0.014
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "tests": 1217,
+      "seconds": 305.693
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "tests": 1192,
+      "seconds": 680.557
+    },
+    {
+      "job": "verify-linux",
+      "step": "source layout and package tests",
+      "tests": 1217,
+      "seconds": 56.224
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "tests": 1192,
+      "seconds": 130.401
+    }
+  ],
+  "module_completion_gaps": [
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "module": "test_workflow_ops",
+      "seconds": 169.921
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "module": "test_merge_review_gate",
+      "seconds": 100.386
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "module": "test_continuation_runtime",
+      "seconds": 78.98
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "module": "test_workflow_contracts",
+      "seconds": 68.575
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "module": "test_work_item_sessions",
+      "seconds": 45.02
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "module": "test_source_layout",
+      "seconds": 44.271
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "module": "test_merge_cleanup_gate",
+      "seconds": 40.36
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "module": "test_claude_standards_sync",
+      "seconds": 39.019
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "module": "test_hook_dispatch",
+      "seconds": 26.384
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "module": "test_harness_grant",
+      "seconds": 23.349
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_continuation_runtime",
+      "seconds": 27.128
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_hook_dispatch",
+      "seconds": 22.416
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_workflow_contracts",
+      "seconds": 20.052
+    },
+    {
+      "job": "verify-linux",
+      "step": "source layout and package tests",
+      "module": "test_terminal_profile_wiring",
+      "seconds": 14.758
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_merge_review_gate",
+      "seconds": 9.993
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_workflow_route",
+      "seconds": 9.169
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_workflow_ops",
+      "seconds": 7.374
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_merge_cleanup_gate",
+      "seconds": 5.847
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "module": "test_callout_repair_gate",
+      "seconds": 5.325
+    },
+    {
+      "job": "verify-linux",
+      "step": "source layout and package tests",
+      "module": "test_source_layout",
+      "seconds": 4.265
+    }
+  ],
+  "class_completion_gaps": [
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_workflow_ops.ReviewTests",
+      "tests": 40,
+      "seconds": 102.161
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_merge_review_gate.CanonicalEnvelopeShellTests",
+      "tests": 3,
+      "seconds": 84.472
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_continuation_runtime.ContinuationTests",
+      "tests": 38,
+      "seconds": 78.98
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_workflow_contracts.WorkflowGenerationTests",
+      "tests": 23,
+      "seconds": 48.106
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "class": "test_work_item_sessions.WorkItemSessionsTests",
+      "tests": 55,
+      "seconds": 45.02
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "class": "test_source_layout.SourceLayoutTests",
+      "tests": 20,
+      "seconds": 44.271
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_merge_cleanup_gate.MergeCleanupGateTests",
+      "tests": 7,
+      "seconds": 40.36
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_workflow_ops.DeliveryOwnershipTests",
+      "tests": 16,
+      "seconds": 35.662
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "class": "test_claude_standards_sync.StandardsSyncTests",
+      "tests": 18,
+      "seconds": 27.397
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_hook_dispatch.HookDispatchTests",
+      "tests": 20,
+      "seconds": 25.902
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_callout_repair_gate.CalloutRepairGateTests",
+      "tests": 21,
+      "seconds": 23.049
+    },
+    {
+      "job": "verify-windows",
+      "step": "source layout and package tests",
+      "class": "test_terminal_profile_wiring.TerminalProfileWiringTests",
+      "tests": 14,
+      "seconds": 22.947
+    },
+    {
+      "job": "verify-windows",
+      "step": "shared runtime tests",
+      "class": "test_workflow_ops.PrReadinessTests",
+      "tests": 9,
+      "seconds": 4.677
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_continuation_runtime.ContinuationTests",
+      "tests": 38,
+      "seconds": 27.128
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_hook_dispatch.HookDispatchTests",
+      "tests": 20,
+      "seconds": 22.14
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_workflow_contracts.WorkflowGenerationTests",
+      "tests": 23,
+      "seconds": 19.173
+    },
+    {
+      "job": "verify-linux",
+      "step": "source layout and package tests",
+      "class": "test_terminal_profile_wiring.TerminalProfileWiringTests",
+      "tests": 14,
+      "seconds": 14.758
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_merge_review_gate.CanonicalEnvelopeShellTests",
+      "tests": 3,
+      "seconds": 8.129
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_merge_cleanup_gate.MergeCleanupGateTests",
+      "tests": 7,
+      "seconds": 5.847
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_callout_repair_gate.CalloutRepairGateTests",
+      "tests": 21,
+      "seconds": 5.318
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_workflow_route.WorkflowRouteSelectionTests",
+      "tests": 21,
+      "seconds": 4.674
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_workflow_route.WorkflowRouteRecoveryTests",
+      "tests": 11,
+      "seconds": 4.496
+    },
+    {
+      "job": "verify-linux",
+      "step": "source layout and package tests",
+      "class": "test_source_layout.SourceLayoutTests",
+      "tests": 20,
+      "seconds": 4.264
+    },
+    {
+      "job": "verify-linux",
+      "step": "source layout and package tests",
+      "class": "test_codex_pre_tool_adapter.CodexPreToolAdapter",
+      "tests": 9,
+      "seconds": 4.245
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_skill_router.SkillRouterTests",
+      "tests": 36,
+      "seconds": 3.954
+    },
+    {
+      "job": "verify-linux",
+      "step": "shared runtime tests",
+      "class": "test_workflow_ops.PrReadinessTests",
+      "tests": 9,
+      "seconds": 0.175
+    }
+  ]
+}

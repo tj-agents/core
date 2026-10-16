@@ -56,7 +56,7 @@ Source paths above are beneath `.agents/` unless explicitly `.github/`. Core's w
 
 ## Prioritized proposal
 
-These are discussion proposals, not a new implementation authorization.
+These were the investigation proposals before Tommy authorized implementation on 16 October 2026. The implementation outcome below records what subsequently shipped.
 
 | Priority / change | Owner and source | Cost addressed / benefit retained | Acceptance and coordination |
 |---|---|---|---|
@@ -75,4 +75,14 @@ The overlap checkout is 88 commits behind current main and contains only 13 inse
 
 Already fixed: active proportionality guidance, focused routine-docs mode, retry receipts, body/kind integrity, adoption locking/preflight, helper discovery and host binding. Still worth updating: CI breadth, consistent private ordinary-review proof, expensive repeated test setup, and delivery-owner compliance with batching. #269's selection cutover and consumer adoption remain with their existing owners.
 
-The requested investigation is complete. Tommy's decision is whether to authorize a refreshed impact-CI implementation under the existing goal, with private review proof as a separate coordinated slice. The first execution action after that decision is to reconcile that goal's owner and baseline, then define and test the coverage mapping/aggregate against current main. No runtime action is pending under this investigation.
+The requested investigation was completed and returned before Tommy authorized implementation on 16 October 2026. The existing implementation goal was reconciled and reused; the old checkout's two unfinished source edits were preserved.
+
+## Implementation outcome
+
+The authorized follow-up delivered three reviewed PRs on 16 October 2026:
+
+- PR #274 (`621c7a21`): impact-selected PR CI with conservative full fallback and a fail-closed `ci-required` aggregate. Main retains full Windows/Linux validation. Exact-head full CI `38902959829` and causal main CI `38905321932` passed.
+- PR #275 (`f572ed65`): shared private ordinary-review proof and consistent consuming gates, with stale/tampered/foreign evidence and incomplete reviews rejected. Exact-head full CI `38912304559` and causal main CI `38915378822` passed. Generated packages refreshed at `946e53c3`; installed-host upgrade and consumer adoption are separate.
+- PR #276 (`8834fc4c`): immutable per-class Git seeds copied into isolated writable workflow fixtures. All 96 test methods and negative assertions remain unchanged. Required CI `38916073108` selected that module on Windows/Linux; jobs passed in 2m6s/15s. Direct isolation and independent reviews passed. [Fixture measurements](fixture-results.md) record the approximately 77% reduction in the measured local setup/cleanup operation, with no whole-job speedup promise.
+
+The completed goal files are retired by this closeout. Existing stable-push and factual-record batching guidance continues to apply. PR #269, broad consumer adoption and global hook installation remain with their existing owners.
