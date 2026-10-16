@@ -123,16 +123,21 @@ class PrivateReviewTests(unittest.TestCase):
 
     def test_live_durable_findings_take_precedence_over_committed_approval(self):
         legacy = evidence.prepare_path(self.root, BRANCH, durable=True)
+        def git(*args):
+            if args == ("branch", "--show-current"):
+                return BRANCH
+            return HEAD if args == ("rev-parse", "HEAD") else self.body
+
         for body, message in (
             (self.body.replace("`complete`", "`in-progress`"), "incomplete"),
             (self.body + "- [ ] finding\n", "unresolved"),
         ):
             with self.subTest(message=message):
                 legacy.write_text(body, encoding="utf-8")
-                with patch.object(evidence, "git_text", return_value=self.body) as reader:
+                with patch.object(evidence, "git_text", side_effect=lambda root, *args: git(*args)) as reader:
                     self.assertEqual(body, evidence.resolve(self.root, BRANCH, HEAD)["body"])
-                    reader.assert_not_called()
-                with patch.object(ops, "git", return_value=self.body), \
+                    self.assertFalse(any(call.args[1] == "show" for call in reader.call_args_list))
+                with patch.object(ops, "git", side_effect=lambda root, *args: git(*args)), \
                         patch.object(ops, "resolved_commit", return_value=HEAD):
                     self.assertIsNone(ops.review_binding(self.root, BRANCH, HEAD)["reviewed_sha"])
                     with self.assertRaisesRegex(auto_merge.AutoMergeError, message):
@@ -140,6 +145,22 @@ class PrivateReviewTests(unittest.TestCase):
         legacy.unlink()
         with patch.object(evidence, "git_text", return_value=self.body):
             self.assertEqual(self.body, evidence.resolve(self.root, BRANCH, HEAD)["body"])
+
+    def test_other_checked_out_branch_or_head_uses_committed_durable_evidence(self):
+        legacy = evidence.prepare_path(self.root, BRANCH, durable=True)
+        for branch, head in (("Fix/Other", HEAD), (BRANCH, "c" * 40)):
+            for local, committed in ((self.body, self.body + "- [ ] committed finding\n"),
+                                     (self.body + "- [ ] local finding\n", self.body)):
+                with self.subTest(branch=branch, head=head, local=local):
+                    legacy.write_text(local, encoding="utf-8")
+                    def git(*args):
+                        if args == ("branch", "--show-current"):
+                            return branch
+                        if args == ("rev-parse", "HEAD"):
+                            return head
+                        self.assertEqual(("show", f"{HEAD}:reviews/Fix-PrivateReview.md"), args)
+                        return committed
+                    self.assertEqual(committed, evidence.resolve(self.root, BRANCH, HEAD, git)["body"])
 
     def test_private_completion_requires_explicit_unique_final_fields(self):
         descriptor = {"head": HEAD, "branch": BRANCH, "descriptor_id": "b" * 64, "paths": ["src/value.py"]}
