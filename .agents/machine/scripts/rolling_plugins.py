@@ -978,6 +978,8 @@ def _prepare(host: str, target: Path, project: Path, arguments: Mapping[str, obj
             registered = known.get(marketplace)
             if isinstance(registered, Mapping) and isinstance(registered.get("source"), Mapping):
                 configured["source"] = dict(registered["source"])
+            else:
+                configured["source"] = {"source": "directory", "path": str(catalog / marketplace)}
         configured["autoUpdate"] = False
         marketplaces[marketplace] = configured
     settings["extraKnownMarketplaces"] = marketplaces
@@ -1227,12 +1229,13 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
             config = temporary_root / "config"
             plugin_root = temporary_root / "plugins"
             known = _json(plugins / "known_marketplaces.json")
+            selected_marketplaces = {selection.marketplace for selection in prepared.selections}
             entries = {}
             last_updated = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             for identity, expected in packages.items():
                 marketplace = identity.rsplit("@", 1)[1]
                 original = known.get(marketplace)
-                if not isinstance(original, dict):
+                if marketplace in selected_marketplaces and not isinstance(original, dict):
                     raise RollingPluginError(f"selected marketplace is no longer registered: {marketplace}")
                 catalog = prepared.catalog_root / marketplace
                 entries[marketplace] = {
