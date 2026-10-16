@@ -1523,7 +1523,7 @@ class HostCoverageWorkflowTests(RepositoryFixture):
         agent_head = self.commit(".agents/workflows/runtime.py", "shared\n", "change agent runtime")
         work_order = self.write_work_order(agent_head)
         work_order.write_text(
-            work_order.read_text(encoding="utf-8") + f"\nReviewed up to commit: `{agent_head}`\n",
+            work_order.read_text(encoding="utf-8") + f"\n**Reviewed up to commit:** `{agent_head}`\n",
             encoding="utf-8",
         )
         self.git("add", "reviews/Feature-Workflow-ops.md")

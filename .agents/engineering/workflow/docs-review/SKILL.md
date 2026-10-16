@@ -49,7 +49,7 @@ Any surviving path requires review in its explicitly assessed mode.
 
 ## Work order and review layer
 
-Use the same `reviews/<branch-slug>.md` contract from `review-lifecycle`. The parent records status
+Use the same runtime-resolved private or durable work-order contract from `review-lifecycle`. The parent records status
 `in-progress` and the frozen candidate before review.
 
 An ordinary candidate runs the `review` Stage 3 native layer, with the same `native-general` fallback.
