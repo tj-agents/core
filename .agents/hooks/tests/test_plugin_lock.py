@@ -163,6 +163,24 @@ class PluginLockTests(unittest.TestCase):
         owners = schema["$defs"]["pin"]["properties"]["repository"]["pattern"]
         self.assertTrue(owners.startswith("^(" + "|".join(plugin_lock.ALLOWED_OWNERS) + ")/"), owners)
 
+    def test_producer_lock_rejects_mixed_partial_and_impersonated_core(self):
+        import copy
+        producer = {"schema_version": 3, "marketplaces": {"base-agents": {"repository": "tj-agents/core", "revision": "v2.1.18"}}, "plugins": [name + "@base-agents" for name in plugin_lock.CORE_PLUGINS]}
+        plugin_lock.validate(producer)
+        mixed = copy.deepcopy(producer)
+        mixed["marketplaces"]["tj-agents"] = self.document["marketplaces"]["tj-agents"]
+        mixed["plugins"].append("base@tj-agents")
+        partial = copy.deepcopy(producer)
+        partial["plugins"].pop()
+        wrong_source = copy.deepcopy(producer)
+        wrong_source["marketplaces"]["base-agents"]["repository"] = "Concertable/agents"
+        alias = copy.deepcopy(producer)
+        alias["marketplaces"]["other"] = alias["marketplaces"].pop("base-agents")
+        alias["plugins"] = [name + "@other" for name in plugin_lock.CORE_PLUGINS]
+        for document in (mixed, partial, wrong_source, alias):
+            with self.subTest(document=document), self.assertRaises(LockError):
+                plugin_lock.validate(document)
+
 
 if __name__ == "__main__":
     unittest.main()
