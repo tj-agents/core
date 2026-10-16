@@ -134,13 +134,45 @@ def touches_security(changed_paths, patterns=_SECURITY_PATTERNS):
 _INVOCATION_RE = re.compile(r"(?:^|[;&|\n]|&&|\|\|)\s*(?:[A-Za-z_][\w]*=\S+\s+)*gh\s+pr\s+merge\b")
 
 
+def mask_quoted(command):
+    """`command` with every BALANCED quoted span's interior blanked out, same length, same positions.
+
+    `_INVOCATION_RE` reads `;`, `&` and `|` as shell operators by character class alone, so a
+    quoted argument that merely contains one of them — a grep pattern's `gh pr merge|...`
+    alternation, for example — was read exactly like a real pipe before "gh pr merge" and
+    gated a command that never ran a merge. Blanking quoted interiors first removes that text
+    from consideration while leaving every unquoted character at its original offset, so a
+    position-dependent caller (`invokes_pushd_before_merge`) still slices the real command.
+
+    A quote mark with no later matching close (an apostrophe in ordinary unquoted prose, say)
+    is left alone rather than opening a span that swallows the rest of the command to blanks —
+    including a real merge invocation after it. Mirrors `skill_router.py`'s own `_mask_quoted`,
+    which already guards exactly this with the same `str.find` lookahead.
+    """
+    chars = list(command)
+    index = 0
+    while index < len(command):
+        quote = command[index]
+        if quote in "'\"":
+            close = command.find(quote, index + 1)
+            if close != -1:
+                for position in range(index + 1, close):
+                    chars[position] = " "
+                index = close + 1
+                continue
+        index += 1
+    return "".join(chars)
+
+
 def invokes_merge(command):
     """True only when the command actually RUNS the merge, not merely mentions it.
 
     A substring test blocked any command quoting the string — including edits to this
-    file and the PR body describing them.
+    file and the PR body describing them. Checked against the quote-masked command so a
+    merge invocation must be a real, unquoted shell command, not text inside someone else's
+    quoted argument.
     """
-    return _INVOCATION_RE.search(command) is not None
+    return _INVOCATION_RE.search(mask_quoted(command)) is not None
 
 
 def is_merge_enable(command):
@@ -252,7 +284,7 @@ def invokes_pushd_before_merge(command):
     understand.
     """
     merge_start = None
-    for merge in _INVOCATION_RE.finditer(command):
+    for merge in _INVOCATION_RE.finditer(mask_quoted(command)):
         merge_start = merge.start()
     return merge_start is not None and _PUSHD_TOKEN_RE.search(command, 0, merge_start) is not None
 
