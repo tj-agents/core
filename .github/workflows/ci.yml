@@ -49,9 +49,9 @@ jobs:
       - uses: actions/checkout@v4
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         with:
-          repository: tj-agents/kit
-          ref: v1.2.0
-          path: .kit
+          repository: tj-agents/template
+          ref: v1.6.2
+          path: .template
           persist-credentials: false
       - uses: actions/checkout@v4
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
@@ -94,7 +94,7 @@ jobs:
       - name: authored skill references resolve in the public corpus
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
-        run: python -B .kit/.agents/kit/utility/check/scripts/check_skill_references.py --root . --root .kit --root .react --root .dotnet --source-root .
+        run: python -B .template/.agents/template/utility/check/scripts/check_skill_references.py --root . --root .template --root .react --root .dotnet --source-root .
 
       - name: CLI session recovery tests
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
