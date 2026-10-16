@@ -491,6 +491,51 @@ def close_entry(entry, force=False):
     require_closed(identity)
 
 
+def focus_entry(entry):
+    """Bring a verified-live registered session's exact tab to the front without sending keystrokes."""
+    identity = entry_terminal_identity(entry)
+    if identity is None:
+        raise TerminalRefusal("no native terminal identity was recorded")
+    if session_close.liveness(entry) is not True:
+        raise TerminalRefusal("registered host identity is not verified live")
+    kind = identity.get("kind")
+    if kind == "kitty":
+        kitty_target(identity)
+        result = run(["kitty", "@", "--to", identity["listen_on"], "focus-window",
+                      "--match", "id:" + str(identity["window_id"])])
+    elif kind == "tmux":
+        pane, _root = tmux_target(identity)
+        result = run(tmux_command(identity, "select-window", "-t", pane))
+        if not result.returncode:
+            result = run(tmux_command(identity, "select-pane", "-t", pane))
+    elif kind == "windows-terminal":
+        adapter = Path(__file__).with_name("windows_terminal_uia.ps1")
+        if not is_windows() or not adapter.is_file():
+            raise TerminalUnavailable("Windows Terminal control is available only on Windows")
+        automation_id = nonempty_text(identity.get("automation_id"))
+        title = nonempty_text(identity.get("title"))
+        if automation_id:
+            matches = [target for target in windows_inventory()
+                       if target["identity"].get("automation_id") == automation_id]
+            selector = ["-TabId", automation_id]
+        elif title:
+            registered = [item for _path, item in session_close.entries() if item.get("title") == title]
+            if len(registered) != 1:
+                raise TerminalRefusal("Windows Terminal fallback requires a unique registered tab title")
+            matches = [target for target in windows_inventory() if target["title"] == title]
+            selector = ["-Title", title]
+        else:
+            raise TerminalRefusal("Windows Terminal target has no automation ID or title")
+        if len(matches) != 1:
+            raise TerminalRefusal("Windows Terminal target is absent or ambiguous")
+        result = run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                      str(adapter), *selector, "-Focus"])
+    else:
+        raise TerminalUnavailable("this terminal cannot focus an exact tab")
+    if result.returncode:
+        raise TerminalRefusal((result.stderr or result.stdout or "terminal refused focus").strip())
+
+
 def print_inventory(targets):
     payload = [{
         "actual": target["actual"],
@@ -511,7 +556,10 @@ def main(argv=None):
     parser.add_argument("--session")
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--focus", action="store_true", help="focus the --session tab instead of closing it")
     args = parser.parse_args(argv)
+    if args.focus and not args.session:
+        parser.error("--focus requires --session")
     if args.title and args.named_title:
         parser.error("specify a title once")
     title = args.named_title or args.title
@@ -527,7 +575,10 @@ def main(argv=None):
                  if item.get("session_id") == args.session]
         if len(found) != 1:
             raise TerminalRefusal("the requested session is absent or ambiguous")
-        close_entry(found[0], force=args.force)
+        if args.focus:
+            focus_entry(found[0])
+        else:
+            close_entry(found[0], force=args.force)
         return 0
     if not title:
         parser.error("--title (or a positional title), --session, or --list is required")
