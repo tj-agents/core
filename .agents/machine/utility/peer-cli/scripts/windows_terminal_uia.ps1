@@ -48,8 +48,9 @@ if ($Focus) {
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr h);
 '@
     if ([OpenCli.Native]::IsIconic($handle)) { [void] [OpenCli.Native]::ShowWindow($handle, 9) }
-    [void] [OpenCli.Native]::SetForegroundWindow($handle)
+    $raised = [OpenCli.Native]::SetForegroundWindow($handle)
     $matches[0].Window.SetFocus()
+    if (-not $raised) { throw "Windows Terminal tab '$($matches[0].Title)' was selected, but Windows refused to raise its window; look for it in the taskbar." }
     return
 }
 $close = New-Object System.Windows.Automation.PropertyCondition(

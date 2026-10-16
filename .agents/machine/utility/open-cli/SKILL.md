@@ -21,10 +21,11 @@ python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' 
 ```
 
 - `--target` is an exact native session id, a case-insensitive topic matched against ids, tab titles and
-  messages, or an existing directory whose sessions are searched. An exact id wins over a topic.
+  messages, or a directory whose sessions are searched. An exact id wins over a topic. A directory must be
+  written as a path (absolute, or containing a separator, or `.`); a bare word is always a topic.
 - More than one match is refused with the candidates listed. Pass the exact id, or `--latest` to take the
   most recently active match when the user asked for "the last one".
-- `--host claude|codex` only narrows a search; it is never required.
+- `--host claude|codex` narrows a search. It is needed only when one id exists in both hosts' profiles.
 - `--prompt` or `--prompt-path` seeds a reopened session's first turn and is ignored when a live tab is
   focused. Follow the [task recovery context](../../resources/task-recovery.md) for recovery prompts.
 - `--claude-history-root` and `--codex-history-root` select an alternate profile.
@@ -36,5 +37,7 @@ The JSON result carries `action`: `focused` for a verified-live session and `ope
 A session whose recorded process is verified live is never launched a second time, because two writers on
 one conversation corrupt it. Its registered terminal tab is focused instead (Windows Terminal, tmux, kitty).
 If the tab cannot be focused the command fails and names why; report that to the user rather than
-reopening. A session whose liveness is unknown is refused until the user confirms it has no live writer, then
+reopening. Focus needs the tab the session registered at startup, so a session started before the
+registry hook existed has none, and a Windows Terminal tab whose title the CLI has since rewritten may not
+be found. A session whose liveness is unknown is refused until the user confirms it has no live writer, then
 pass `--confirm-closed`. Never retry after an ambiguous terminal result (exit 3).

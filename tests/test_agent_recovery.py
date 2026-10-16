@@ -312,6 +312,17 @@ Observed blocker: no send was attempted."""
         with self.assertRaisesRegex(ValueError, "No Claude or Codex session matched"):
             RECOVERY.resolve_target("no such topic", roots=roots)
 
+    def test_reopen_bare_word_is_a_topic_even_when_a_directory_has_that_name(self):
+        self.write_codex()
+        _, roots = self.roots()
+        (Path.cwd() / "topic_dir_probe").mkdir()
+        self.addCleanup(lambda: (Path.cwd() / "topic_dir_probe").rmdir())
+        with mock.patch.object(RECOVERY, "search", return_value=[]) as search:
+            with self.assertRaises(ValueError):
+                RECOVERY.resolve_target("topic_dir_probe", roots=roots)
+        self.assertEqual("topic_dir_probe", search.call_args.args[1])
+        self.assertIsNone(search.call_args.args[2])
+
     def test_reopen_closed_session_opens_in_its_own_host(self):
         self.write_codex()
         claude, roots = self.roots()

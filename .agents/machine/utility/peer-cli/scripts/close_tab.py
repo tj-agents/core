@@ -508,6 +508,8 @@ def focus_entry(entry):
         result = run(tmux_command(identity, "select-window", "-t", pane))
         if not result.returncode:
             result = run(tmux_command(identity, "select-pane", "-t", pane))
+        if not result.returncode:
+            run(tmux_command(identity, "switch-client", "-t", pane))
     elif kind == "windows-terminal":
         adapter = Path(__file__).with_name("windows_terminal_uia.ps1")
         if not is_windows() or not adapter.is_file():

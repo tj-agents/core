@@ -541,7 +541,7 @@ class FocusEntryTests(unittest.TestCase):
                 mock.patch.object(close_tab, "run", return_value=completed()) as run:
             close_tab.focus_entry(self.entry({"kind": "tmux", "pane_id": "%3"}))
         verbs = [call.args[0][-3] for call in run.call_args_list]
-        self.assertEqual(["select-window", "select-pane"], verbs)
+        self.assertEqual(["select-window", "select-pane", "switch-client"], verbs)
 
     def test_kitty_focuses_the_exact_window(self):
         identity = {"kind": "kitty", "listen_on": "unix:/k", "window_id": "7"}
