@@ -13,6 +13,7 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -139,6 +140,68 @@ def enabled_git_plugins(entries):
     return found
 
 
+_UPGRADE_ERROR_MARKETPLACE_RE = re.compile(r"marketplace `([^`]+)`")
+
+
+def upgrade_error_marketplaces(error):
+    """Every marketplace name a `plugin marketplace upgrade --json` error mentions.
+
+    Codex reports each failed marketplace as a free-form string -- e.g. "Failed to upgrade
+    marketplace `agent-standards`: upgraded marketplace name `agents` does not match configured
+    marketplace `agent-standards`" -- never a structured field, so this is the only way to tell
+    which marketplace an error is actually about. A message naming more than one is attributed
+    to all of them, not just the first: a dependency failure that also quotes a second, genuinely
+    relevant name must never be read as a single-marketplace, unrelated error.
+    """
+    if not isinstance(error, str):
+        return []
+    return _UPGRADE_ERROR_MARKETPLACE_RE.findall(error)
+
+
+def enabled_git_marketplaces(entries):
+    """The marketplace half of every identity `enabled_git_plugins` returns.
+
+    An identity that does not have the `name@marketplace` shape this codebase's own plugins
+    always use is skipped rather than raising: a stray malformed entry from an unrelated
+    marketplace must not crash the whole sync.
+    """
+    return {identity.rsplit('@', 1)[1] for identity in enabled_git_plugins(entries) if '@' in identity}
+
+
+def partition_upgrade_errors(codex_executable, resolved, run, errors, out):
+    """Split a marketplace upgrade's `errors` into (inventory-or-None, blocking).
+
+    A stale, unrelated marketplace -- a different repository's, still registered in the user's
+    profile -- must not refuse a launch this repository has nothing to do with. An error this
+    function can positively attribute to one or more marketplace names, none of which any of
+    THIS project's own enabled plugins use, is reported as a warning and dropped. Every other
+    error -- including one it cannot attribute to any specific marketplace at all, and one
+    naming even one relevant marketplace alongside an unrelated one -- still blocks the sync:
+    failing open on an error it cannot place, or only partly place, is exactly the risk this gate
+    exists to avoid. The inventory fetched to resolve "this project's own marketplaces" is
+    returned so the caller can reuse it instead of asking Codex for the same list twice.
+    """
+    named = [(error, upgrade_error_marketplaces(error)) for error in errors]
+    if not any(names for _, names in named):
+        return None, list(errors)
+    inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                           cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+    installed = inventory.get('installed') or []
+    available = inventory.get('available') or []
+    if not (installed or available):
+        # An inventory this empty cannot prove any named marketplace irrelevant -- the very
+        # upgrade failure being classified could be why it came back empty in the first place.
+        return inventory, list(errors)
+    relevant = enabled_git_marketplaces((*installed, *available))
+    blocking = []
+    for error, names in named:
+        if names and all(name not in relevant for name in names):
+            out(f'codex-marketplace-sync: ignoring an unrelated marketplace error: {error}')
+            continue
+        blocking.append(error)
+    return inventory, blocking
+
+
 def sync_codex_standards(codex_executable, working_directory, out=print, run=subprocess.run):
     """Refresh every enabled git-sourced Codex plugin and trust tj-agents' own hooks among them.
 
@@ -165,11 +228,15 @@ def sync_codex_standards(codex_executable, working_directory, out=print, run=sub
             upgrade = invoke_codex_sync_command(codex_executable, ['plugin', 'marketplace', 'upgrade', '--json'],
                                                  cwd=resolved, run=run, timeout=MARKETPLACE_TIMEOUT_SECONDS)
             errors = upgrade.get('errors') or []
+            inventory = None
             if errors:
-                raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(errors)}')
+                inventory, blocking = partition_upgrade_errors(codex_executable, resolved, run, errors, out)
+                if blocking:
+                    raise SyncError(f'Codex marketplace upgrade failed: {json.dumps(blocking)}')
 
-            inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
-                                                   cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
+            if inventory is None:
+                inventory = invoke_codex_sync_command(codex_executable, ['plugin', 'list', '--available', '--json'],
+                                                       cwd=resolved, run=run, timeout=PLUGIN_TIMEOUT_SECONDS)
             installed = inventory.get('installed') or []
             available = inventory.get('available') or []
             selected = sorted(enabled_git_plugins((*installed, *available)))
