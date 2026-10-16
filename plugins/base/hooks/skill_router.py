@@ -75,6 +75,7 @@ import tempfile
 from pathlib import Path
 
 from hook_runtime import claim_invocation, own_payload_root
+import tier_gate
 
 # Skill descriptions carry non-ASCII punctuation, and this text is what the agent acts on.
 # Windows defaults these streams to cp1252, which renders it as mojibake.
@@ -674,8 +675,14 @@ def skill_description(name, harness):
     return None if resolved is None else description_of(resolved[1])
 
 
+def routed_name(selection, root, name, harness=None):
+    return tier_gate.replacement_skill(
+        selection, name, lambda candidate: tier_gate.installed_replacement(root, candidate, harness)
+    )
+
+
 def transcript_skill_outcomes(transcript_path, codex_skills=()):
-    """Bare skill name -> whether the transcript proves it resolved this session, or None if unreadable.
+    """Selected skill name -> whether the transcript proves it resolved this session, or None if unreadable.
 
     Scans the session's own JSONL transcript for `Skill` tool_use blocks and the `tool_result` each
     one's `id` pairs with. A result carrying `is_error: true` is the harness itself saying the name did
@@ -722,8 +729,8 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
         return normalized[:span], normalized[-span:] if span else ""
 
     codex_proofs = [
-        # Keyed on the trailing delivery segment, not the resolved absolute path - see the docstring.
-        (name, "/skills/%s/skill.md" % name.lower(), anchors(body))
+        (name, "/skills/%s/skill.md" % name.rpartition(":")[2].lower(),
+         "/" + name.partition(":")[0].lower() + "/" if ":" in name else "", anchors(body))
         for name, _, body in codex_skills
     ]
     try:
@@ -755,8 +762,8 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
                         # command which merely mentioned a path, or one which failed, as a skill load.
                         if call_input and output_text.startswith("Script completed\n"):
                             output_text = output_text.replace("\r\n", "\n")
-                            for name, segment, (head, tail) in codex_proofs:
-                                if segment not in call_input:
+                            for name, segment, plugin_segment, (head, tail) in codex_proofs:
+                                if segment not in call_input or plugin_segment not in call_input:
                                     continue
                                 if head and (head in output_text or tail in output_text):
                                     outcomes[name] = True
@@ -771,7 +778,7 @@ def transcript_skill_outcomes(transcript_path, codex_skills=()):
                         tool_id = block.get("id")
                         name = (block.get("input") or {}).get("skill")
                         if tool_id and isinstance(name, str) and name:
-                            pending[tool_id] = name.rpartition(":")[2] or name
+                            pending[tool_id] = name
                     elif block_type == "tool_result":
                         tool_id = block.get("tool_use_id")
                         name = pending.pop(tool_id, None) if tool_id else None
@@ -1189,6 +1196,14 @@ def unresolved_existing_deny_hits(route, rel, content, removed, replaces, delete
 
 def query(argv):
     """`--skills-for <paths>` / paths on stdin -> the skills those files oblige a reader to load."""
+    project = None
+    if "--project" in argv:
+        index = argv.index("--project")
+        if len(argv) <= index + 1:
+            print("SKILL ROUTER - --project requires a repository path")
+            return 2
+        project = Path(argv[index + 1])
+        argv = [item for offset, item in enumerate(argv) if offset not in (index, index + 1)]
     paths = [arg for arg in argv if not arg.startswith("-")]
     if not paths:
         paths = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
@@ -1205,6 +1220,8 @@ def query(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no skill is owed")
         return 0
 
+    selection = tier_gate.assess(project or root)
+    harness = tier_gate.active_host()
     owed, violations = {}, []
     for given in paths:
         rel = repo_relative(given, cwd)
@@ -1215,7 +1232,8 @@ def query(argv):
         except OSError:
             content = ""  # deleted or unreadable: the path still routes, the content gates cannot
         for route in matching_routes(routes, rel, content):
-            for name in route.get("skills") or []:
+            for selected in route.get("skills") or []:
+                name = routed_name(selection, project or root, selected, harness)
                 files = owed.setdefault(name, [])
                 if rel not in files:
                     files.append(rel)
@@ -1240,8 +1258,10 @@ def query(argv):
     return 0
 
 
-def missing_routed_skills(routes, harness):
-    names = {name for route in routes for name in route.get("skills") or []}
+def missing_routed_skills(routes, harness, root):
+    selection = tier_gate.assess(root)
+    names = {routed_name(selection, root, name, harness)
+             for route in routes for name in route.get("skills") or []}
     return sorted(name for name in names if skill_description(name, harness) is None)
 
 
@@ -1263,7 +1283,9 @@ def verify_install(argv):
         print(f"no readable {ROUTES_FILE} above {cwd} - no installation to verify")
         return 2
 
-    names = sorted({name for route in routes for name in route.get("skills") or []})
+    selection = tier_gate.assess(root)
+    names = sorted({routed_name(selection, root, name, harness)
+                    for route in routes for name in route.get("skills") or []})
     try:
         missing = [name for name in names if skill_description(name, harness) is None]
     except NativePluginDiscoveryError as error:
@@ -1344,7 +1366,7 @@ def main():
         sys.exit(0)
 
     try:
-        missing_install = missing_routed_skills(routes, harness)
+        missing_install = missing_routed_skills(routes, harness, root)
     except NativePluginDiscoveryError as error:
         discovery_diagnostic(error)
         sys.exit(2)
@@ -1452,18 +1474,21 @@ def main():
 
     session = data.get("session_id")
     seen = load_seen(session)
+    selection = tier_gate.assess(root)
     pending = []
     for rel, route in matched:
         key = route.get("path")
         if key in seen:
             continue
-        pending.append((rel, route))
+        pending.append((rel, dict(route, skills=[routed_name(selection, root, name, harness)
+                                                 for name in route.get("skills") or []])))
 
     if not pending:
         sys.exit(0)
 
     descriptions = {}
     resolved_paths = {}
+    proof_names = {}
     codex_skills = []
     missing = set()
     for _, route in pending:
@@ -1476,8 +1501,9 @@ def main():
                     skill, body = resolved
                     descriptions[name] = description_of(body)
                     resolved_paths[name] = skill
+                    proof_names[name] = invocable_name(name, skill)
                     if harness == "codex" and descriptions[name] is not None:
-                        codex_skills.append((name.rpartition(":")[2] or name, skill, body))
+                        codex_skills.append((proof_names[name], skill, body))
             if descriptions[name] is None:
                 missing.add(name)
 
@@ -1487,7 +1513,7 @@ def main():
     rejected, unproven = set(), set()
     if not missing and outcomes is not None:
         for name in descriptions:
-            outcome = outcomes.get(name.rpartition(":")[2] or name)
+            outcome = outcomes.get(proof_names[name])
             if outcome is False:
                 rejected.add(name)
             elif outcome is not True:
