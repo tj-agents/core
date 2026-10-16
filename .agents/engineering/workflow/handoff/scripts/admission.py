@@ -11,6 +11,12 @@ import subprocess
 import sys
 from typing import Any
 
+try:
+    from problem_records import RecordError, declaration, read_record
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "hooks"))
+    from problem_records import RecordError, declaration, read_record
+
 
 FENCE = re.compile(r"```agent-handoff-disposition\s*\n(?P<body>.*?)\n```", re.DOTALL | re.IGNORECASE)
 AUTHORIZATION = re.compile(r"standards[- ](?:defect|repair)|source[- ]owner repair", re.I)
@@ -64,6 +70,10 @@ def selected_disposition(record: Path, record_id: str) -> tuple[dict[str, Any] |
         body = record.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return None, "record is unreadable"
+    return disposition_from_body(body, record_id)
+
+
+def disposition_from_body(body: str, record_id: str) -> tuple[dict[str, Any] | None, str | None]:
     matches = []
     for match in FENCE.finditer(body):
         try:
@@ -229,6 +239,8 @@ def canonical_problem_record(goal: Path, record: Path, kind: str) -> bool:
     if primary is None:
         return False
     try:
+        if declaration(primary) is not None:
+            return False
         candidate = record.resolve()
         if kind == "bug":
             return candidate == primary / "BUGS.md"
@@ -337,11 +349,27 @@ def validate(
     session_id: str,
     prompt_sha256: str,
     callout_id: str,
+    source_root: str | None = None,
+    harness: str | None = None,
 ) -> dict[str, Any]:
     record = absolute_path(record_value)
+    remote = None
+    selected_root = None
     if record is None:
-        return {"valid": False, "reason": "record must be an absolute path"}
-    disposition, error = selected_disposition(record, record_id)
+        root = absolute_path(source_root)
+        if root is None:
+            return {"valid": False, "reason": "provider record requires an absolute source root"}
+        selected_root = source_primary_checkout(root / "record-root")
+        if selected_root is None:
+            return {"valid": False, "reason": "provider source root is not a repository checkout"}
+        try:
+            remote = read_record(selected_root, record_value, harness)
+        except RecordError as error:
+            return {"valid": False, "reason": str(error)}
+        record = record_value
+        disposition, error = disposition_from_body(remote["body"], record_id)
+    else:
+        disposition, error = selected_disposition(record, record_id)
     if error:
         return {"valid": False, "reason": error}
     assert disposition is not None
@@ -369,7 +397,10 @@ def validate(
         goal_text = goal.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return {"valid": False, "reason": "repair goal is unreadable"}
-    if not canonical_problem_record(goal, record, disposition["kind"]):
+    if remote is not None:
+        if source_primary_checkout(goal) != selected_root or remote["kind"] != disposition["kind"]:
+            return {"valid": False, "reason": "provider record belongs to a different source or problem kind"}
+    elif not canonical_problem_record(goal, record, disposition["kind"]):
         return {"valid": False, "reason": "record is not the source repository's canonical register"}
     backlink = f"Problem record: {record}#{record_id}"
     authorization = authorization_section(goal_text)
@@ -445,8 +476,10 @@ def main() -> int:
     check.add_argument("--session", required=True)
     check.add_argument("--prompt-sha256", required=True)
     check.add_argument("--callout-id", required=True)
+    check.add_argument("--source-root")
+    check.add_argument("--host", choices=("codex", "claude"))
     args = parser.parse_args()
-    result = validate(args.record, args.id, args.session, args.prompt_sha256, args.callout_id)
+    result = validate(args.record, args.id, args.session, args.prompt_sha256, args.callout_id, args.source_root, args.host)
     print(json.dumps(result, sort_keys=True))
     return 0 if result["valid"] else 2
 

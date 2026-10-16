@@ -1,0 +1,84 @@
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from problem_records import RecordError, declaration, read_record
+
+
+class ProblemRecordTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="record provider ")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.selection = self.root / ".problem-records.json"
+        self.skill = self.root / "installed provider" / "SKILL.md"
+        self.skill.parent.mkdir()
+        self.skill.write_text("provider", encoding="utf-8")
+        self.reader = self.skill.parent / "scripts/read_problem_record.py"
+        self.reader.parent.mkdir()
+        self.reader.write_text("provider", encoding="utf-8")
+        self.reference = "https://example.invalid/repository/issues/1"
+        self.value = {"record": self.reference, "kind": "bug", "state": "open", "body": "current evidence"}
+
+    def select(self, value=None):
+        self.selection.write_text(json.dumps(value or {"schema_version": 1, "provider": "optional:manage"}), encoding="utf-8")
+
+    def test_absence_preserves_files_and_malformed_selection_fails(self):
+        self.assertIsNone(declaration(self.root))
+        with self.assertRaises(RecordError):
+            read_record(self.root, self.reference, "codex")
+        for value in ({"schema_version": True, "provider": "optional:manage"},
+                      {"schema_version": 1, "provider": "manage"},
+                      {"schema_version": 1, "provider": "optional:manage", "script": "elsewhere"}):
+            self.select(value)
+            with self.assertRaises(RecordError):
+                declaration(self.root)
+        self.selection.write_text("{", encoding="utf-8")
+        with self.assertRaises(RecordError):
+            declaration(self.root)
+
+    def test_both_hosts_resolve_the_declared_skill_and_run_its_reader_without_shell(self):
+        self.select()
+        for host in ("codex", "claude"):
+            with self.subTest(host=host), patch("skill_router.resolved_skill", return_value=(self.skill, "provider")) as resolve, patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 0, json.dumps(self.value), "")) as run:
+                self.assertEqual(self.value, read_record(self.root, self.reference, host))
+                resolve.assert_called_once_with("optional:manage", host)
+                self.assertEqual([sys.executable, "-B", str(self.reader), "--root", str(self.root), "--record", self.reference], run.call_args.args[0])
+                self.assertNotIn("shell", run.call_args.kwargs)
+                self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
+
+    def test_missing_provider_reader_and_host_fail_without_fallback(self):
+        self.select()
+        with patch("skill_router.resolved_skill", return_value=None), self.assertRaises(RecordError):
+            read_record(self.root, self.reference, "codex")
+        self.reader.unlink()
+        with patch("skill_router.resolved_skill", return_value=(self.skill, "provider")), self.assertRaises(RecordError):
+            read_record(self.root, self.reference, "claude")
+        with self.assertRaises(RecordError):
+            read_record(self.root, self.reference, "unknown")
+        with self.assertRaises(RecordError):
+            read_record(self.root, "relative/file.md", "codex")
+
+    def test_invalid_closed_and_unrelated_provider_results_fail(self):
+        self.select()
+        values = ["invalid", "[]", json.dumps({**self.value, "state": "closed"}),
+                  json.dumps({**self.value, "record": "another"}), json.dumps({**self.value, "kind": []}),
+                  json.dumps({**self.value, "body": " "}), json.dumps({**self.value, "extra": True})]
+        with patch("skill_router.resolved_skill", return_value=(self.skill, "provider")):
+            for value in values:
+                with self.subTest(value=value), patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 0, value, "")), self.assertRaises(RecordError):
+                    read_record(self.root, self.reference, "codex")
+            with patch("problem_records.subprocess.run", side_effect=subprocess.TimeoutExpired("reader", 15)), self.assertRaises(RecordError):
+                read_record(self.root, self.reference, "codex")
+            with patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
+                read_record(self.root, self.reference, "codex")
+
+
+if __name__ == "__main__":
+    unittest.main()
