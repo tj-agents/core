@@ -470,7 +470,7 @@ def routed_skills(root, paths):
     return route_findings(root, paths)[0]
 
 
-def route_findings(root, paths):
+def route_findings(root, paths, project=None):
     """Every skill the route table owes for these paths, and its deny-pattern hits."""
     route_table = root / ".agents" / "skill-routes.json"
     if not route_table.is_file() or not paths:
@@ -485,7 +485,8 @@ def route_findings(root, paths):
             ".agents/skill-routes.json exists but the engineering package has no skill_router.py"
         )
     completed = subprocess.run(
-        [sys.executable, "-B", str(router), "--skills-for", "--json"],
+        [sys.executable, "-B", str(router), "--skills-for", "--json",
+         "--project", str(project or root)],
         cwd=str(root),
         input="\n".join(paths) + "\n",
         capture_output=True,
@@ -804,7 +805,7 @@ def validate_review_bundle(root, value, locations):
     patch = run_process(["git", "diff", "--binary", "--full-index", value["base"], value["head"]], root, text=False).stdout
     if hashlib.sha256(patch).hexdigest() != value["patch_sha256"]:
         raise WorkflowOperationError("review patch differs from the repository objects")
-    routed, violations = route_findings(required["tree"], paths)
+    routed, violations = route_findings(required["tree"], paths, root)
     if (value.get("routed_skills"), value.get("route_violations")) != (routed, violations):
         raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
     rules = []
@@ -982,7 +983,7 @@ def review_prepare(root, workflow_run_id, base_ref, head_ref, synchronize, docs_
         tree_sha256 = tree_content_digest(locations["tree"])
         security = security_classification(root, locations["tree"], head, paths)
         docs_review = classify_docs_review(request, paths, security)
-        skills, route_violations = route_findings(locations["tree"], paths)
+        skills, route_violations = route_findings(locations["tree"], paths, root)
         agent_paths = coverage_requirement(paths)
         rules = []
         for name in skills:
@@ -1147,7 +1148,7 @@ def load_descriptor(root, workflow_run_id, path):
     if hashlib.sha256(current_patch).hexdigest() != value["patch_sha256"]:
         raise WorkflowOperationError("review patch differs from the repository objects")
     expected_rules = []
-    routed, violations = route_findings(required["tree"], paths)
+    routed, violations = route_findings(required["tree"], paths, root)
     if "routed_skills" in value and (value["routed_skills"], value.get("route_violations")) != (routed, violations):
         raise WorkflowOperationError("review routing differs from the frozen tree routing evidence")
     for name in routed:
