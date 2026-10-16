@@ -10,7 +10,7 @@ This is the existing goal promoted from `Fix-RoutineReviewAndImpactCi/plans/rout
 - Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Investigate-ValidationEfficiency.
 - Branch: Fix/ImpactSelectedCi.
 - Base: origin/main 07cda2b1963b724bd62e6cdbe7e13694ce661d35, integrated before implementation.
-- PR: not opened.
+- PR: https://github.com/tj-agents/core/pull/274; exact head a4a187ddc891706dcdf880202feb0b3253a319a4.
 - Investigation: `plans/validation-efficiency/FINDINGS.md`, local commit 58aab8b7.
 - Routine design delegation: false by absent category in `.agents/settings.json`. The accepted proposal supplies the implementation direction; no new plugin, service or external dependency is selected.
 - Standards loaded: AGENTS.md, README.md, CODE_CONVENTIONS.md, PACKAGING.md; plan-execution, lanes, git-branching, plans, plan-checkpoint, remote-validation, review/review-lifecycle and persistent-workflow contracts. The repository router declares no path-specific skills. C++ style/libraries were loaded as requested by session guidance; these changes use the repository's Python/CI conventions.
@@ -70,7 +70,9 @@ The earlier session-store claim could not verify a native registry attachment. W
 
 ## Reviews
 
-No implementation review yet. Each delivery slice requires a frozen independent review with stale-head/security guarantees; reuse valid evidence and review only later changed deltas.
+CI slice reviewed at a4a187ddc891706dcdf880202feb0b3253a319a4 against 07cda2b1963b724bd62e6cdbe7e13694ce661d35. Native read-only Codex review completed with no findings; specialist security/workflow role dispatches were unsupported by this account, so their bounded checks returned to the parent as the review contract requires. The local work order `reviews/Fix-ImpactSelectedCi.md` is complete and approved with a current security marker. It remains uncommitted. The first full remote run completed with a deterministic permission-contract failure on both platforms: the Windows verify job now contains 18 commands, while its regression expected 16 and its project Claude allowlist omitted the two new focused-run commands. The failure reproduced in the three-test permissions module. The repair adds only those exact commands for Bash and PowerShell and updates the roster count; all three permission tests now pass. No runtime test assertion is removed. The repair needs incremental review and a fresh exact-head full run.
+
+Draft PR #274 is published and bound; its body is valid. CI run 38901210387 attempt 1 validates this exact head with the full matrix, owned by the supported monitor. Repository delivery binding reports the existing `ci-workflow` stop class. Merge awaits concrete final approval after all preparation. The generic preflight cannot treat this maintained goal as a legacy ledger; its remaining no-ledger `assess-scope` result is resolved by this goal's delivery map and the published slice, not by inventing another ledger.
 
 ## Next Steps
 
@@ -80,3 +82,36 @@ Remaining scope: private ordinary-review proof and measured fixture optimization
 Done when: selected CI and consistent private review evidence are delivered with preserved safeguards, and demonstrated redundant fixture cost is addressed or explicitly dispositioned with evidence.
 
 Implement and test the classifier, focused execution and required aggregate; validate locally through the compact workflow runner, then commit, review and prepare one stable PR. Complete all authorized preparation before requesting any final CI-delivery approval. Continue independent authorized work if one delivery action is gated.
+
+## Host coverage
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": "scripts/ci_selection.py and .github/workflows/ci.yml prescribe the same focused regression commands.",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "The two exact focused-test commands are approved in both project shell permission forms.",
+      "source": ".claude/settings.json",
+      "mapping": "Bash and PowerShell exact allow rules; package permissions remain unchanged because these commands belong only to Core CI.",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "tests/test_repository_permissions.py: all three tests pass, including every prescribed Windows CI command and destructive-delivery denials."
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "The shared selector and focused runner execute through the native command tool and compact workflow runner.",
+      "source": "scripts/ci_selection.py",
+      "mapping": "Native exec_command invokes the platform Python interpreter; no Codex entry point or permissions change is required.",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "21 selector/execution/wiring regressions and an actual mapped handoff-transfer module passed through the native Codex command surface. No installed-host acceptance is claimed."
+      }
+    }
+  ]
+}
+```
