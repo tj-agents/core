@@ -118,17 +118,15 @@ def current_review(root, binding, changed):
         raise AutoMergeError(str(error)) from error
     slug = binding["branch"].replace("/", "-").replace("\\", "-")
     work_order = f"reviews/{slug}.md"
-    result = workflow_ops.run_process(
-        ["git", "show", f"{binding['remote_head_sha']}:{work_order}"], root, check=False
-    )
-    if result.returncode:
-        try:
-            review = (root / work_order).read_text(encoding="utf-8")
-        except OSError as error:
-            raise AutoMergeError("current review work order is absent") from error
-    else:
-        review = result.stdout
-    if merge_review_gate.review_completion_problem(review):
+    try:
+        evidence = workflow_ops.review_evidence.resolve(
+            root, binding["branch"], binding["remote_head_sha"],
+            lambda *args: workflow_ops.git(root, *args),
+        )
+        review = evidence["body"]
+    except workflow_ops.review_evidence.ReviewEvidenceError as error:
+        raise AutoMergeError(str(error)) from error
+    if merge_review_gate.review_completion_problem(review, strict=evidence["private"]):
         raise AutoMergeError("review work order is incomplete")
     reviewed = merge_review_gate.work_order_sha_field(review, "Reviewed up to commit")
     head = binding["remote_head_sha"]
