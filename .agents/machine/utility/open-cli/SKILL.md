@@ -24,7 +24,8 @@ python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' 
   messages, or a directory whose sessions are searched. An exact id wins over a topic. A directory must be
   written as a path (absolute, or containing a separator, or `.`); a bare word is always a topic.
 - More than one match is refused with the candidates listed. Pass the exact id, or `--latest` to take the
-  most recently active match when the user asked for "the last one".
+  most recently active match when the user asked for "the last one". A live match always wins over a more
+  recent closed one, so `--latest` never starts a second writer beside a running session on the same topic.
 - `--host claude|codex` narrows a search. It is needed only when one id exists in both hosts' profiles.
 - `--prompt` or `--prompt-path` seeds a reopened session's first turn and is ignored when a live tab is
   focused. Follow the [task recovery context](../../resources/task-recovery.md) for recovery prompts.
