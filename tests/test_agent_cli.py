@@ -340,34 +340,45 @@ class StandardsSyncTests(unittest.TestCase):
         registry = {'plugins': {'machine@base-agents': [{'scope': scope, 'installPath': str(install_path)}]}}
         (self.config / 'plugins' / 'installed_plugins.json').write_text(json.dumps(registry))
 
-    def test_the_installed_user_plugin_copy_wins_and_receives_the_project_and_claude(self):
+    def write_shipped_sync(self, source):
+        shipped = self.base / 'shipped'
+        shipped.mkdir()
+        script = shipped / 'claude_standards_sync.py'
+        script.write_text(source)
+        return shipped, script
+
+    def test_the_shipped_sibling_wins_over_a_cached_user_plugin_copy(self):
         install = self.base / 'install'
         script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
         script.parent.mkdir(parents=True)
         script.write_text('import sys\nprint("installed", *sys.argv[1:])\n')
         self.register(install)
+        shipped, _ = self.write_shipped_sync('import sys\nprint("shipped", *sys.argv[1:])\n')
         lines = []
-        CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
-        self.assertEqual(lines, [f'installed --project {self.base / "project dir"} --claude /bin/claude'])
+        with mock.patch.object(CLI, 'HERE', shipped):
+            CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
+        self.assertEqual(lines, [f'shipped --project {self.base / "project dir"} --claude /bin/claude'])
 
     def test_falls_back_to_the_shipped_copy_without_a_user_install_or_userprofile(self):
         self.register(self.base / 'elsewhere', scope='project')
         self.assertEqual(CLI.standards_sync_script(), CLI.HERE / 'claude_standards_sync.py')
 
-    def test_a_corrupt_registry_is_not_fatal(self):
-        (self.config / 'plugins' / 'installed_plugins.json').write_text('{not json')
-        self.assertEqual(CLI.standards_sync_script(), CLI.HERE / 'claude_standards_sync.py')
+    def test_returns_none_when_the_shipped_sibling_is_missing(self):
+        with mock.patch.object(CLI, 'HERE', self.base / 'missing'):
+            self.assertIsNone(CLI.standards_sync_script())
+
+    def test_a_missing_shipped_sibling_raises_launch_error(self):
+        with mock.patch.object(CLI, 'HERE', self.base / 'missing'):
+            with self.assertRaisesRegex(CLI.LaunchError, 'was not found'):
+                CLI.sync_claude_standards(self.base / 'project dir')
+
+    def test_a_missing_shipped_sibling_raises_launch_error(self):
+        with mock.patch.object(CLI, 'HERE', self.base / 'missing'):
+            with self.assertRaisesRegex(CLI.LaunchError, 'was not found'):
+                CLI.sync_claude_standards(self.base / 'project dir')
 
     def test_no_outer_timeout_is_imposed_on_a_running_check(self):
-        # H21: claude_standards_sync.py already bounds its own steps (180s marketplace update, 120s per
-        # plugin); an outer timeout here would kill a normally running check and orphan its `claude
-        # plugin` grandchild instead, which an outer timeout cannot even wait out on Windows, where that
-        # grandchild holds the stdout pipe.
-        install = self.base / 'install'
-        script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
-        script.parent.mkdir(parents=True)
-        script.write_text('print("installed")\n')
-        self.register(install)
+        shipped, _ = self.write_shipped_sync('print("shipped")\n')
         captured = {}
         real_run = CLI.subprocess.run
 
@@ -375,34 +386,34 @@ class StandardsSyncTests(unittest.TestCase):
             captured.update(kwargs)
             return real_run(*args, **kwargs)
 
-        with mock.patch.object(CLI.subprocess, 'run', side_effect=spy):
+        with mock.patch.object(CLI, 'HERE', shipped), \
+             mock.patch.object(CLI.subprocess, 'run', side_effect=spy):
             CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lambda line: None)
         self.assertNotIn('timeout', captured)
 
-    def test_a_failure_to_start_the_check_reports_a_standards_line_and_never_raises(self):
-        install = self.base / 'install'
-        script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
-        script.parent.mkdir(parents=True)
-        script.write_text('print("unreachable")\n')
-        self.register(install)
-        lines = []
-        with mock.patch.object(CLI.subprocess, 'run', side_effect=OSError('boom')):
-            CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
-        self.assertEqual(len(lines), 1)
-        self.assertIn('standards:', lines[0])
-        self.assertIn('boom', lines[0])
+    def test_a_failure_to_start_the_check_raises_launch_error(self):
+        shipped, _ = self.write_shipped_sync('print("unreachable")\n')
+        with mock.patch.object(CLI, 'HERE', shipped), \
+             mock.patch.object(CLI.subprocess, 'run', side_effect=OSError('boom')):
+            with self.assertRaisesRegex(CLI.LaunchError, 'boom'):
+                CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude')
 
     def test_output_that_is_not_valid_utf8_is_replaced_rather_than_fatal(self):
-        install = self.base / 'install'
-        script = install / 'resources' / 'machine' / 'scripts' / 'claude_standards_sync.py'
-        script.parent.mkdir(parents=True)
-        script.write_text("import sys\nsys.stdout.buffer.write(b'bad: \\xff\\xfe end\\n')\n")
-        self.register(install)
+        shipped, _ = self.write_shipped_sync("import sys\nsys.stdout.buffer.write(b'bad: \\xff\\xfe end\\n')\n")
         lines = []
-        CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
+        with mock.patch.object(CLI, 'HERE', shipped):
+            CLI.sync_claude_standards(self.base / 'project dir', claude='/bin/claude', out=lines.append)
         self.assertEqual(len(lines), 1)
         self.assertIn('bad:', lines[0])
         self.assertIn('end', lines[0])
+
+    def test_a_nonzero_check_forwards_output_then_raises_launch_error(self):
+        shipped, _ = self.write_shipped_sync('import sys\nprint("failed refresh")\nsys.exit(7)\n')
+        lines = []
+        with mock.patch.object(CLI, 'HERE', shipped):
+            with self.assertRaisesRegex(CLI.LaunchError, 'exit 7'):
+                CLI.sync_claude_standards(self.base / 'project dir', out=lines.append)
+        self.assertEqual(lines, ['failed refresh'])
 
 
 class LaneModelTests(unittest.TestCase):
@@ -871,12 +882,7 @@ class LaunchTabTests(unittest.TestCase):
                                    run=fake_run(), popen=mock.Mock())
 
 
-class OpenClaudeTabTests(unittest.TestCase):
-    """open_claude_tab: the H8 helper shared by open-claude and handoff-claude so executable discovery,
-    pre-launch standards sync and the forced colour environment have one owner. H26: it no longer
-    re-validates the working directory itself -- both launchers already call resolve_tab_directory before
-    calling this, and launch_tab (mocked below, with its own coverage in LaunchTabTests) checks it again
-    for its direct callers."""
+class OpenClaudeTabBindingTests(unittest.TestCase):
 
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='agent cli open tab ')
@@ -884,11 +890,9 @@ class OpenClaudeTabTests(unittest.TestCase):
         self.directory = temp.name
 
         self.resolve_claude_executable = mock.Mock(return_value='/bin/claude')
-        self.sync_claude_standards = mock.Mock()
         self.launch_tab = mock.Mock()
         for name, mocked in (
             ('resolve_claude_executable', self.resolve_claude_executable),
-            ('sync_claude_standards', self.sync_claude_standards),
             ('launch_tab', self.launch_tab),
         ):
             patcher = mock.patch.object(CLI, name, mocked)
@@ -897,36 +901,31 @@ class OpenClaudeTabTests(unittest.TestCase):
 
         self.parent = mock.Mock()
         self.parent.attach_mock(self.resolve_claude_executable, 'resolve_claude_executable')
-        self.parent.attach_mock(self.sync_claude_standards, 'sync_claude_standards')
         self.parent.attach_mock(self.launch_tab, 'launch_tab')
 
-    def test_the_directory_is_not_revalidated_here_launch_tab_remains_the_single_owner(self):
+    def test_binds_a_session_child_without_revalidating_the_directory(self):
         missing = os.path.join(self.directory, 'missing')
         CLI.open_claude_tab(missing, 'Tab', [])
         self.resolve_claude_executable.assert_called_once()
-        self.sync_claude_standards.assert_called_once()
         self.launch_tab.assert_called_once_with(
-            missing, '/bin/claude', 'Tab', arguments=[], force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
+            missing, sys.executable, 'Tab',
+            arguments=CLI.bound_terminal_arguments('claude', missing, '/bin/claude', []),
+            force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
         )
 
-    def test_resolves_syncs_and_launches_in_order_with_the_forced_colour_environment(self):
+    def test_resolves_and_binds_the_typed_target_in_order(self):
         result = CLI.open_claude_tab(self.directory, 'Tab', ['--flag'])
 
         self.assertIsNone(result)
         self.assertEqual(
             [call[0] for call in self.parent.mock_calls],
-            ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
+            ['resolve_claude_executable', 'launch_tab'],
         )
-        self.sync_claude_standards.assert_called_once_with(self.directory, claude='/bin/claude', out=print)
         self.launch_tab.assert_called_once_with(
-            self.directory, '/bin/claude', 'Tab', arguments=['--flag'],
+            self.directory, sys.executable, 'Tab',
+            arguments=CLI.bound_terminal_arguments('claude', self.directory, '/bin/claude', ['--flag']),
             force={'FORCE_COLOR': '1', 'TERM': 'xterm-256color'},
         )
-
-    def test_a_custom_out_reaches_sync_claude_standards(self):
-        lines = []
-        CLI.open_claude_tab(self.directory, 'Tab', [], out=lines.append)
-        self.sync_claude_standards.assert_called_once_with(mock.ANY, claude='/bin/claude', out=lines.append)
 
 
 @unittest.skipIf(CLI.IS_WINDOWS, 'the POSIX inner command is only ever started on POSIX')

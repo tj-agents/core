@@ -10,7 +10,6 @@
     "sessions",
     "handoff"
   ],
-  "version": "2.1.16",
   "skills": "./codex-skills/",
   "interface": {
     "displayName": "Machine utilities",

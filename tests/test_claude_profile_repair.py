@@ -70,35 +70,20 @@ class PackageCompletenessTests(StandardsSyncHarness):
         legacy = replace(installed, git_commit_sha=None, version=f"release-{remote[:12]}")
         self.assertTrue(SYNC.installed_at(legacy, remote))
 
-    def test_same_version_repair_does_not_record_state_when_reinstall_fails(self):
+    def test_rolling_sync_does_not_run_legacy_same_version_repair(self):
         package = self.install()
         shutil.rmtree(package / "skills")
         with mock.patch.dict("os.environ", {"FAKE_CLAUDE_FAIL": "base@core"}):
             code, output = self.sync()
-        self.assertEqual(code, 1)
-        self.assertIn("base@core (user) was not updated", output)
-        self.assertEqual(
-            [entry["argv"] for entry in self.invocations()],
-            [
-                ["plugin", "uninstall", "base@core", "--scope", "user", "--keep-data"],
-                ["plugin", "install", "base@core", "--scope", "user"],
-            ],
-        )
-        self.assertNotIn(self.installed().key, SYNC.load_state(self.state))
+        self.assertEqual((code, output), (0, ""))
+        self.assertEqual(self.invocations(), [])
 
-    def test_same_version_repair_uninstalls_with_keep_data_then_reinstalls(self):
+    def test_rolling_sync_does_not_use_legacy_release_state_for_same_version_repair(self):
         package = self.install()
         shutil.rmtree(package / "skills")
         code, output = self.sync()
         self.assertEqual(code, 0, output)
-        self.assertEqual(
-            [entry["argv"] for entry in self.invocations()],
-            [
-                ["plugin", "uninstall", "base@core", "--scope", "user", "--keep-data"],
-                ["plugin", "install", "base@core", "--scope", "user"],
-            ],
-        )
-        self.assertIn(self.installed().key, SYNC.load_state(self.state))
+        self.assertEqual(self.invocations(), [])
 
 
 class ProfileMigrationTests(StandardsSyncHarness):
@@ -389,7 +374,7 @@ class ProfileMigrationTests(StandardsSyncHarness):
         self.assertEqual(code, 0)
         self.assertEqual(self.profile()["enabledPlugins"], {"dotnet@tj-agents": False})
 
-    def test_cli_preview_reaches_migration_without_writing_the_profile(self):
+    def test_cli_migration_switch_uses_rolling_source_validation_without_writing_the_profile(self):
         self.configure_dotnet_sources()
         self.install("dotnet@dotagents")
         self.install("dotnet@tj-agents")
@@ -415,7 +400,7 @@ class ProfileMigrationTests(StandardsSyncHarness):
             timeout=30,
         )
         self.assertEqual(completed.returncode, 1, completed.stdout + completed.stderr)
-        self.assertIn("profile migration would select dotnet@tj-agents", completed.stdout)
+        self.assertIn("selected plugin dotnet@dotnet has no registered Git marketplace source", completed.stdout)
         self.assertEqual(settings_path.read_bytes(), before)
         self.assertEqual(self.invocations(), [])
 

@@ -6,6 +6,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+env:
+  PYTHONUTF8: '1'
+
 jobs:
   select:
     runs-on: ubuntu-latest
@@ -256,7 +259,7 @@ jobs:
           $staged = git diff --cached --name-only
           if ($staged) {
             git commit -m "Regenerate packages for $env:GITHUB_SHA"
-            python -B scripts/update_catalog_digests.py --check --source base-agents=. --source-revision base-agents=HEAD
+            python -B scripts/update_catalog_digests.py --check
             git push origin HEAD:main
           } else {
             "Generated output already current."

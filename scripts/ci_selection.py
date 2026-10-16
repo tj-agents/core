@@ -29,17 +29,13 @@ FAMILIES = {
     },
     "plugin-adoption": {
         "sources": {
-            ".agents/machine/utility/plugin-lock/scripts/adopt_plugins.py",
-            ".agents/machine/utility/plugin-lock/scripts/plugin_roster.json",
+            ".agents/machine/utility/plugin-selection/scripts/adopt_plugins.py",
+            ".agents/machine/utility/plugin-selection/scripts/plugin_roster.json",
         },
         "tests": {".agents/hooks/tests/test_adopt_plugins.py"},
     },
-    "lock-bump": {
-        "sources": {".agents/machine/utility/plugin-lock/scripts/bump_plugin_lock.py"},
-        "tests": {".agents/hooks/tests/test_bump_plugin_lock.py"},
-    },
     "machine-verification": {
-        "sources": {".agents/machine/utility/plugin-lock/scripts/verify_machine.py"},
+        "sources": {".agents/machine/utility/plugin-selection/scripts/verify_machine.py"},
         "tests": {".agents/hooks/tests/test_verify_machine.py"},
     },
     "handoff-transfer": {

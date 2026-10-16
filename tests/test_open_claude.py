@@ -42,6 +42,17 @@ class OpenClaudeTests(unittest.TestCase):
             code = OPEN_CLAUDE.main(['--working-directory', self.directory, *args])
         return code, out.getvalue(), err.getvalue()
 
+    def bound_payload(self):
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(
+            arguments[:10],
+            [
+                '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'claude',
+                '--project', os.path.abspath(self.directory), '--target', '/bin/claude', '--',
+            ],
+        )
+        return arguments[10:]
+
     # --- option validation ---
 
     def test_resume_and_continue_are_mutually_exclusive(self):
@@ -157,7 +168,7 @@ class OpenClaudeTests(unittest.TestCase):
 
     def test_no_session_or_prompt_flags_means_no_extra_arguments(self):
         self.run_main()
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        arguments = self.bound_payload()
         self.assertEqual(arguments, [])
 
     def test_the_title_reaches_open_claude_tab(self):
@@ -172,7 +183,7 @@ class OpenClaudeTests(unittest.TestCase):
         force = self.agent_cli.launch_tab.call_args.kwargs['force']
         self.assertEqual(force, {'FORCE_COLOR': '1', 'TERM': 'xterm-256color'})
 
-    def test_standards_are_synced_before_launch_in_order(self):
+    def test_executable_is_resolved_before_bound_session_launch(self):
         parent = mock.Mock()
         parent.attach_mock(self.agent_cli.resolve_claude_executable, 'resolve_claude_executable')
         parent.attach_mock(self.agent_cli.sync_claude_standards, 'sync_claude_standards')
@@ -180,9 +191,9 @@ class OpenClaudeTests(unittest.TestCase):
         self.run_main()
         self.assertEqual(
             [call[0] for call in parent.mock_calls],
-            ['resolve_claude_executable', 'sync_claude_standards', 'launch_tab'],
+            ['resolve_claude_executable', 'launch_tab'],
         )
-        self.assertEqual(self.agent_cli.sync_claude_standards.call_args.kwargs.get('claude'), '/bin/claude')
+        self.assertEqual(self.bound_payload(), [])
 
     # --- H6: stdio hardened against an unencodable title or path ---
 
@@ -295,13 +306,17 @@ class OpenClaudeEndToEndTests(unittest.TestCase):
         self.assertEqual(inner[:5], ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', directory])
         self.assertEqual(inner[5], 'env')
 
-        claude_index = inner.index('/bin/claude')
+        binding_index = inner.index(sys.executable)
         self.assertEqual(
-            inner[claude_index:],
-            ['/bin/claude', '--dangerously-skip-permissions', '--model', 'claude-sonnet-5', 'a short instruction'],
+            inner[binding_index:],
+            [
+                sys.executable, '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'claude',
+                '--project', directory, '--target', '/bin/claude', '--', '--dangerously-skip-permissions',
+                '--model', 'claude-sonnet-5', 'a short instruction',
+            ],
         )
 
-        env_args = inner[6:claude_index]
+        env_args = inner[6:binding_index]
         self.assertIn('-u', env_args)
         self.assertIn('CLAUDECODE', env_args)
         self.assertIn('AGENT_CLI_TAB_TITLE=e2e open', env_args)
@@ -310,7 +325,6 @@ class OpenClaudeEndToEndTests(unittest.TestCase):
         self.assertFalse(any(arg.startswith('TERM=') for arg in env_args))
 
         self.assertEqual(kwargs.get('stdin'), subprocess.DEVNULL)
-        self.agent_cli.sync_claude_standards.assert_called_once()
 
 
 class InstalledLayoutTests(unittest.TestCase):

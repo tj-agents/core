@@ -1,0 +1,87 @@
+---
+name: plugin-selection
+description: Select a repository's plugins and generate its rolling-main Claude and Codex settings. Use when adopting plugins for a repository or stack, updating a repository's selected packages, or auditing a machine before removing old user-level plugin settings.
+
+kind: utility
+domain: machine
+route: infer
+---
+
+# Plugin selection
+
+The commands below show Windows paths and use `python` in Windows PowerShell. On Linux/macOS, use
+`python3` with POSIX paths and the same script arguments.
+
+A repository commits `.agents/plugins.json`, `.claude/settings.json` and `.codex/config.toml`. A fresh
+clone then installs exactly the plugins it selects from its declared marketplaces on `main`, without
+depending on any machine's user settings.
+
+## The selection
+
+```json
+{"schema_version": 1,
+ "marketplaces": {
+   "tj-agents": {"repository": "tj-agents/marketplace"},
+   "agents": {"repository": "Concertable/agents"}},
+ "plugins": ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents",
+             "dotnet@tj-agents", "concertable@agents"]}
+```
+
+The selection lists every required package explicitly as `<plugin>@<marketplace>`. A marketplace key must
+match its published identity, and its repository must belong to `tj-agents` or `Concertable`. The `tj-agents`
+name belongs only to `tj-agents/marketplace`. Each declared marketplace supplies a selected plugin, and
+two marketplace names cannot refer to the same repository. The schema is `catalog/plugins.schema.json`.
+Schema 2 and 3 locks migrate only through the adoption command; it preserves their source repositories
+and plugin identities, writes the schema 1 selection, and removes the old lock and all revision pins.
+
+## Adopt a stack
+
+```powershell
+python -B '<skill-directory>\scripts\adopt_plugins.py' --root C:\path\to\repository `
+  --stack dotnet --mode preview
+```
+
+A stack (`dotnet`, `azure`, `react`, `cpp-gcc`, `cpp-msvc`, `win32`, `neovim`, `rust`, `github-actions`,
+`plugin-repository`) resolves to its plugins through `scripts/plugin_roster.json`, so nobody guesses which
+plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Required plugins are added and
+existing selections are kept. With no requested stack or plugin, a new selection uses the default base,
+engineering and machine packages. `preview` lists the changed files, `write` applies them together, and `check`
+exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
+
+A bare `--plugin <name>` selects from `tj-agents`. Add a foreign plugin with
+`--plugin concertable@agents --marketplace agents=Concertable/agents`. Subsequent adoption preserves
+existing foreign marketplaces and selections. Every selected approved publisher follows `main`.
+
+## Generate settings from an existing selection
+
+```powershell
+python -B '<skill-directory>\scripts\repo_config.py' --root C:\path\to\repository --mode write
+```
+
+`--lock` defaults to `<root>/.agents/plugins.json`. The generator owns Claude's marketplace,
+enabled-plugin and `permissions.allow` keys and Codex's marketplace and plugin tables plus
+`.codex/rules/agent-harness.rules`; other project settings stay. Existing Claude allow entries outside the
+declared harness must move into `.agents/repository-harness.json` first. Project scope also rejects
+machine-specific absolute paths (Windows drive and UNC paths, `/home/<user>`, `/Users/<user>`, `/mnt/<drive>`)
+anywhere in the committed `.claude/settings.json`, `.codex/config.toml` or `.codex/hooks.json`, in every mode,
+reporting `file:line`. Replace such a path with a repository-relative one, or move the setting to an
+uncommitted local file. `machine_paths.py --root <checkout>` runs that scan alone.
+
+For per-clone adoption pass `--scope local` to either command, which writes `.claude/settings.local.json`, `.codex/config.toml`,
+optional `.codex/rules/agent-harness.rules` and `.agents/repo-capabilities.local.json` ownership state, keeps
+exact Git exclusions, preserves unrelated selections and approvals, and refuses tracked targets, changed
+owned settings and links that escape the root. Local settings need Python 3.11 or newer.
+
+## Audit a machine
+
+After every repository carries its own settings, audit the machine before removing old user-profile behavior:
+
+```powershell
+python -B '<skill-directory>\scripts\verify_machine.py' --home C:\Users\name --repository C:\path\to\project
+```
+
+The verifier is read-only and needs Python 3.11 or newer. Repeat `--repository` for each project; it checks
+project Codex agents and local marketplace sources in Codex and Claude settings. GitHub marketplace
+declarations are allowed. It reports user-scope plugin selections, marketplaces, hooks, notifications,
+instruction files, agent settings, and loose agents or skills. `--json` gives stable finding codes. Exit
+status 1 means findings or an inspection failure remain. Output never includes configuration values.

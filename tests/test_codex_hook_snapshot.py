@@ -7,6 +7,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -263,6 +264,56 @@ class CodexHookSnapshotTests(unittest.TestCase):
             self.assertEqual(snapshot_result.returncode, 2, snapshot_result.stderr)
             self.assertIn("loader integrity check failed", snapshot_result.stderr)
             self.assertFalse(marker.exists())
+
+    def test_startup_snapshot_loader_keeps_an_existing_session_callable_after_live_loader_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            payload = temporary / "base" / "payload"
+            hooks = payload / "hooks"
+            hooks.mkdir(parents=True)
+            loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+            (hooks / "codex_hook_snapshot.py").write_text(loader, encoding="utf-8")
+            probe = hooks / "probe.py"
+            probe.write_text("print('verified snapshot')\n", encoding="utf-8")
+            expected = SNAPSHOT.digest_tree(payload, "base")
+            bootstrap = GENERATOR.codex_snapshot_bootstrap(loader)
+            snapshots = temporary / "snapshots"
+            environment = dict(os.environ, TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY=str(snapshots))
+            command = [sys.executable, "-I", "-B", "-c", bootstrap, str(payload), expected, "base", str(probe)]
+
+            first = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual("verified snapshot\n", first.stdout)
+
+            (hooks / "codex_hook_snapshot.py").write_text("raise RuntimeError('new loader')\n", encoding="utf-8")
+            resumed = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30)
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertEqual("verified snapshot\n", resumed.stdout)
+
+    def test_startup_snapshot_loader_keeps_an_existing_session_callable_after_live_loader_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            payload = temporary / "base" / "payload"
+            hooks = payload / "hooks"
+            hooks.mkdir(parents=True)
+            loader = (ROOT / ".agents" / "hooks" / "codex_hook_snapshot.py").read_text(encoding="utf-8")
+            (hooks / "codex_hook_snapshot.py").write_text(loader, encoding="utf-8")
+            probe = hooks / "probe.py"
+            probe.write_text("print('verified snapshot')\n", encoding="utf-8")
+            expected = SNAPSHOT.digest_tree(payload, "base")
+            bootstrap = GENERATOR.codex_snapshot_bootstrap(loader)
+            snapshots = temporary / "snapshots"
+            environment = dict(os.environ, TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY=str(snapshots))
+            command = [sys.executable, "-I", "-B", "-c", bootstrap, str(payload), expected, "base", str(probe)]
+
+            first = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual("verified snapshot\n", first.stdout)
+
+            (hooks / "codex_hook_snapshot.py").write_text("raise RuntimeError('new loader')\n", encoding="utf-8")
+            resumed = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=30)
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertEqual("verified snapshot\n", resumed.stdout)
 
     def test_hook_survives_deleted_cache_path_and_rejects_modified_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
