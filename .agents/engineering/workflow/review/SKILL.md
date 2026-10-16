@@ -118,31 +118,21 @@ Review does not repeat a passed suite merely to establish another copy of verifi
 
 ## Stage 4 — load applicable rules
 
-Two mechanical rule sources; neither depends on anything wired into the reviewed repository.
-
-**Tier conventions — every repository.** Run the tier gate shipped with this plugin in conventions mode
-against the reviewed repository root, using `python` on Windows or `python3` on Linux/macOS:
-
-```bash
-python <engineering>/hooks/tier_gate.py --conventions --project <repository-root>
-```
-
-The base package's tiers README owns the output contract. Read every listed convention whose domain the
-frozen paths plainly touch, and check each changed file against the conventions of the tier(s) that own
-its language. Do not substitute the session's already-loaded skill list for this resolution; the gate
-reads the same installed declarations that gated the session.
-
-**Repository routes — repositories that carry them.** When the frozen tree ships `.agents/skill-routes.json`,
+When the frozen tree ships `.agents/skill-routes.json`,
 `review-prepare` runs this plugin's router over it: the descriptor's `routed_skills` names every skill the
-frozen paths owe, plugin-owned ones included, and `route_violations` holds each deny-pattern hit. A
-repository without a route table owes only its tier conventions; that absence is normal, not a defect.
+frozen paths owe after installed company replacement, and `route_violations` holds each deny-pattern hit.
+Tier applicability uses the reviewed repository's origin while paths and route content come from the
+frozen tree.
+Tier applicability uses the reviewed repository's origin while paths and route content come from the
+frozen tree.
+A repository without a route table has no routed technical rules.
 
 Read every routed skill, the root and nearest changed-path `AGENTS.md` files, and the architecture premise
 from the exported frozen tree, never the live checkout. A route violation is evidence, not a hint.
-Invoke additional standards only when the diff plainly touches their domain; a missing route is a
-route-table defect rather than a list to duplicate here. If the candidate contains plans or
-implementation-ready design references, load plans and apply its implementation-design review gate to
-those artifacts, including their implementation-path standards.
+If the diff plainly touches a domain absent from the route table, report the missing route as a
+route-table defect. If the candidate contains plans or implementation-ready design references,
+apply the plans workflow's implementation-design review gate to those artifacts using routed
+implementation-path standards.
 
 Record the owning `review` lifecycle and the helper's routed technical rule identities with
 `<engineering>/workflows/workflow_ops.py skills`. Read only identities returned as `load`; an unchanged
