@@ -14,7 +14,6 @@
     "nvim": [],
     "rust": [],
     "github-actions": [],
-    "kit": [],
     "template": []
   },
   "stacks": {
@@ -27,6 +26,6 @@
     "neovim": ["nvim"],
     "rust": ["rust"],
     "github-actions": ["github-actions"],
-    "plugin-repository": ["kit", "template"]
+    "plugin-repository": ["template"]
   }
 }
