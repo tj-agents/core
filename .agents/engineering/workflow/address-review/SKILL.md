@@ -12,7 +12,7 @@ This is the separate write side of the review family. It may begin only when the
 fixes, passes `--fix` to `review`, or the original implementation workflow already authorizes repairing
 its reviewed candidate. Review-only requests end after the judgment.
 
-Read `review-lifecycle`, then resolve the current branch's canonical work order with `workflow_ops.py review-path`. If the user
+Read `review-lifecycle`, then resolve the current branch's canonical work order with `<engineering>/workflows/workflow_ops.py review-path`. If the user
 names a file, normalize it to a repository-relative path and reject it unless it equals the derived path
 exactly.
 

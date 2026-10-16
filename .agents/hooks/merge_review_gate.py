@@ -408,13 +408,13 @@ def staged_work_order(review):
     return False
 
 
-def review_completion_problem(review):
+def review_completion_problem(review, strict=False):
     status = review_status(review)
     judgment = review_judgment(review)
     notes_status = work_order_field(review, "Cross-area notes status")
     summary_status = work_order_field(review, "Parent summary status")
     if status is None:
-        if any(value is not None for value in (judgment, notes_status, summary_status)):
+        if strict or any(value is not None for value in (judgment, notes_status, summary_status)):
             return "uses new-format review fields but has no `Review status`"
         return None
     if status != "complete":
@@ -611,7 +611,7 @@ def main():
     except review_evidence.ReviewEvidenceError as error:
         block("MERGE GATE: " + str(error) + ". Run /review or /incremental-review before merging.")
 
-    completion_problem = review_completion_problem(review)
+    completion_problem = review_completion_problem(review, strict=evidence["private"])
     if completion_problem:
         block(
             "MERGE GATE: " + review_label + " " + completion_problem + ". "

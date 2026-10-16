@@ -2055,7 +2055,7 @@ def review_binding(root, branch, head):
         gate = review_gate_module()
         reviewed = gate.work_order_sha_field(body, "Reviewed up to commit")
         reviewed = resolved_commit(root, reviewed) if reviewed not in (None, "invalid") else None
-        if (not gate.review_completion_problem(body) and not gate.unresolved_review_items(body)
+        if (not gate.review_completion_problem(body, strict=evidence["private"]) and not gate.unresolved_review_items(body)
                 and reviewed is not None and review_is_current(root, reviewed, head)):
             watermark = reviewed
         path = evidence["path"]
@@ -2082,14 +2082,14 @@ def review_record(root, workflow_run_id, descriptor_path, work_order):
     raw = expected.read_bytes()
     body = raw.decode("utf-8")
     gate = review_gate_module()
-    if gate.review_completion_problem(body):
+    private = expected != review_evidence.legacy_path(root, descriptor["branch"])
+    if gate.review_completion_problem(body, strict=private):
         raise WorkflowOperationError("review work order is incomplete")
     if gate.work_order_sha_field(body, "Reviewed up to commit") != descriptor["head"]:
         raise WorkflowOperationError("review completion does not match the frozen candidate")
     if coverage_requirement(descriptor["paths"]):
         if not host_coverage_module().validate_documents([expected], "review", descriptor["head"])["valid"]:
             raise WorkflowOperationError("review host coverage is incomplete")
-    private = expected != review_evidence.legacy_path(root, descriptor["branch"])
     if private:
         review_evidence.record(root, descriptor["branch"], descriptor["head"], descriptor["descriptor_id"], expected, raw)
     return {"operation": "review-record", "head": descriptor["head"], "work_order": str(expected), "private": private}

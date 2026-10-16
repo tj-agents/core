@@ -123,7 +123,7 @@ def resolve(root, branch, head, git=None):
     path = legacy_path(root, branch)
     relative = path.relative_to(Path(root)).as_posix()
     try:
-        body = reader("show", f"{head}:{relative}")
+        body = path.read_text(encoding="utf-8") if path.exists() else reader("show", f"{head}:{relative}")
     except (OSError, RuntimeError, subprocess.SubprocessError):
         try:
             body = path.read_text(encoding="utf-8")

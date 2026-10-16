@@ -10,7 +10,7 @@ domain: process
 
 A review file is one branch's live work order, not an archive. Ordinary full, incremental, documentation
 and combined reviews use an editable body in repository-private Git state. Resolve its absolute path with
-`workflow_ops.py --root <checkout> --workflow-run-id <id> review-path`; never assemble a machine-local path.
+`<engineering>/workflows/workflow_ops.py --root <checkout> --workflow-run-id <id> review-path`; never assemble a machine-local path.
 Big/staged reviews use `review-path --durable`, retaining `reviews/<branch-slug>.md` with `/` replaced by `-`.
 That operation promotes an existing private body without losing its findings. Existing durable work orders
 remain canonical through their lifecycle. If the user names a path, resolve it and reject it unless it

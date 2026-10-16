@@ -9,8 +9,8 @@ This is the existing goal promoted from `Fix-RoutineReviewAndImpactCi/plans/rout
 - Owner: codex:01a1447f-62b8-70e0-a7a3-20a040f97690.
 - Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Investigate-ValidationEfficiency.
 - Branch: Fix/PrivateReviewEvidence (successor to merged Fix/ImpactSelectedCi).
-- Base: origin/main 07cda2b1963b724bd62e6cdbe7e13694ce661d35, integrated before implementation.
-- Delivered CI: PR #274, head 5b42318ef0369ef59dcbbdde40505dd21a857ad8, merged at 621c7a21. Private-proof PR not yet published.
+- Base: origin/main 621c7a21ec2684fe7d252b1944ece5689f94f398 for the private-proof slice.
+- Delivered CI: PR #274, head 5b42318ef0369ef59dcbbdde40505dd21a857ad8, merged at 621c7a21. Private-proof PR #275, initial head ff3504864217cf0b048a78c997a2d354d15117a2; review/CI repair in progress.
 - Investigation: `plans/validation-efficiency/FINDINGS.md`, local commit 58aab8b7.
 - Routine design delegation: false by absent category in `.agents/settings.json`. The accepted proposal supplies the implementation direction; no new plugin, service or external dependency is selected.
 - Standards loaded: AGENTS.md, README.md, CODE_CONVENTIONS.md, PACKAGING.md; plan-execution, lanes, git-branching, plans, plan-checkpoint, remote-validation, review/review-lifecycle and persistent-workflow contracts. The repository router declares no path-specific skills. C++ style/libraries were loaded as requested by session guidance; these changes use the repository's Python/CI conventions.
@@ -64,7 +64,7 @@ Use timing from a required validation run to choose the smallest test-fixture op
 
 ## Current state
 
-Ownership/baseline reconciled. The investigation remains complete; this follow-up supersedes its investigation-only execution restriction for the approved implementation. The selector, focused runner, fail-closed aggregate and workflow wiring are delivered. Causal main run 38905321932 also passed, including regenerate, both platforms and ci-required. The successor private-proof cutover is implemented and in focused validation. Mappings cover five bounded runtime families; shared helpers and every unknown surface retain full coverage. Test imports extend changed-test closure. Main remains full, selection never cancels prior runs, and Linux focused execution keeps stdin closed.
+Ownership/baseline reconciled. The investigation remains complete; this follow-up supersedes its investigation-only execution restriction for the approved implementation. The selector, focused runner, fail-closed aggregate and workflow wiring are delivered. Causal main run 38905321932 also passed, including regenerate, both platforms and ci-required. The successor private-proof cutover is published as PR #275; independent review and full CI identified repairs now being verified. Mappings cover five bounded runtime families; shared helpers and every unknown surface retain full coverage. Test imports extend changed-test closure. Main remains full, selection never cancels prior runs, and Linux focused execution keeps stdin closed.
 
 Focused selector/execution/wiring tests pass (21 cases, about 10 seconds), existing generated-path guard tests pass (4 cases, about 8 seconds), and the exact docs reachability command passes. An initial selector syntax error was fixed before these passes. The GitHub rulesets API returns an empty list and the prior branch-protection query returned 404: there is no observed server-side required-check configuration to migrate. The aggregate participates in the existing all-checks merge validator; README documents requiring `ci-required` if server enforcement is enabled. No server configuration is changed.
 
@@ -78,6 +78,10 @@ CI slice reviewed at a4a187ddc891706dcdf880202feb0b3253a319a4 against 07cda2b196
 
 PR #274 was reviewed, body-validated, marked ready and merged at 621c7a21ec2684fe7d252b1944ece5689f94f398 on 16 October 2026. Its delivery binding was released; this active checkout is retained for the same goal. Causal main run 38905321932 is monitored separately. CI run 38901210387 attempt 1 failed the permission contract; the repaired stable candidate 5b42318ef0369ef59dcbbdde40505dd21a857ad8 is published and bound to full CI run 38902959829 attempt 1 through the supported monitor. Repository delivery binding reports the existing `ci-workflow` stop class. Tommy supplied the concrete final CI-workflow approval on 16 October 2026, conditional on green full Windows/Linux CI; no policy table or stop class is changed. The generic preflight cannot treat this maintained goal as a legacy ledger; its remaining no-ledger `assess-scope` result is resolved by this goal's delivery map and the published slice, not by inventing another ledger.
 
+Private-proof review at ff350486: native Codex and the workflow lens found no defects. The integrity lens required one elevated-read follow-up, then returned two confirmed defects: committed legacy evidence hid newer local findings, and private finalization inherited legacy tolerance for missing completion fields. Repairs prefer the existing live durable body and require explicit unique completion/judgment fields for private publication and every consuming gate. Sixteen private-proof tests pass, including both regressions; existing merge-gate and auto-merge regressions pass. Full CI run 38909183928 failed both platforms on five unqualified installed-helper references in the new contracts; those references now use the engineering resource path. The source-suite assertions remain intact. The local packaging check first saw stale generated copies; regeneration repaired that fixture state before focused recheck. These repairs will share one stable push and a fresh incremental review.
+
+The isolated twelve-sample workflow fixture measurement completed with a 1.8319s median and 21.5683s total for setup, cleanup and two baseline verification Git calls. It creates independent writable repositories each sample. Raw compact evidence is in the Git-private validation-efficiency-fixture run; retain that baseline for slice 3.
+
 ## Next Steps
 
 Scope: whole plan through all remaining phases and terminal delivery, subject to existing delivery approval gates.
@@ -85,7 +89,7 @@ Current slice: private ordinary-review proof on Fix/PrivateReviewEvidence.
 Remaining scope: private ordinary-review proof and measured fixture optimization; batching applies throughout.
 Done when: selected CI and consistent private review evidence are delivered with preserved safeguards, and demonstrated redundant fixture cost is addressed or explicitly dispositioned with evidence.
 
-Implement the recorded private-proof cutover and its focused regressions, review and deliver it under the existing goal authorization. Continue observing the causal post-merge main run 38905321932; retain its generated result without adopting unrelated consumer work. Profile the completed required PR logs, then deliver the smallest demonstrated fixture optimization as the final slice.
+Finish the confirmed private-proof review/CI repairs, checkpoint and publish one stable candidate, then incremental-review and deliver PR #275. Causal main run 38905321932 is already green. After private-proof delivery, implement the measured immutable baseline fixture with isolated writable copies, verify before/after timing and behavior, then deliver that final slice.
 
 ## Host coverage
 
