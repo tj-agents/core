@@ -1,7 +1,8 @@
 param(
     [string] $TabId,
     [string] $Title,
-    [switch] $Json
+    [switch] $Json,
+    [switch] $Focus
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
@@ -17,7 +18,7 @@ foreach ($window in @($root.FindAll([System.Windows.Automation.TreeScope]::Child
         [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
         [System.Windows.Automation.ControlType]::TabItem)
     foreach ($tab in @($window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $tabType))) {
-        $tabs += [pscustomobject]@{ Title = $tab.Current.Name; AutomationId = $tab.Current.AutomationId; Element = $tab }
+        $tabs += [pscustomobject]@{ Title = $tab.Current.Name; AutomationId = $tab.Current.AutomationId; Element = $tab; Window = $window }
     }
 }
 if ($Json) {
@@ -37,6 +38,20 @@ $matches = @($tabs | Where-Object {
     ($TabId -and $_.AutomationId -eq $TabId) -or ($Title -and $_.Title -eq $Title)
 })
 if ($matches.Count -ne 1) { throw 'Windows Terminal target is absent or ambiguous.' }
+if ($Focus) {
+    # Select the tab inside its window, then raise and focus that window. No keystrokes are sent.
+    $matches[0].Element.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    $handle = [IntPtr] $matches[0].Window.Current.NativeWindowHandle
+    Add-Type -Namespace OpenCli -Name Native -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr h, int c);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsIconic(System.IntPtr h);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr h);
+'@
+    if ([OpenCli.Native]::IsIconic($handle)) { [void] [OpenCli.Native]::ShowWindow($handle, 9) }
+    [void] [OpenCli.Native]::SetForegroundWindow($handle)
+    $matches[0].Window.SetFocus()
+    return
+}
 $close = New-Object System.Windows.Automation.PropertyCondition(
     [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'CloseButton')
 $button = $matches[0].Element.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $close)
