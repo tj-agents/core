@@ -203,6 +203,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
             "worktree": r"C:\source\agent-standards.worktrees\Feature-plan-execution",
             "branch": "Feature/Plan-execution",
             "remote_head_sha": SUCCESSOR_HEAD,
+            "review": {**self.binding["review"], "work_order": "C:/source/.git/agent-workflow/reviews/successor/work-order.md"},
             "pending_evidence": [
                 {
                     "check_id": "check-71",
@@ -227,7 +228,7 @@ class PersistentDeliveryRouterTests(unittest.TestCase):
             self.router.binding_key(rebound),
         )
         self.assertEqual(
-            "reviews/Feature-Plan-execution.md",
+            successor["review"]["work_order"],
             rebound["review"]["work_order"],
         )
         self.assertIsNone(rebound["review"]["reviewed_sha"])

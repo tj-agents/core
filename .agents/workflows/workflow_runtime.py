@@ -588,6 +588,21 @@ def _bullets(text):
 
 def _open_review_findings(root, reviews):
     findings = []
+    private = Path(__file__).resolve().with_name("review_evidence.py")
+    spec = importlib.util.spec_from_file_location("workflow_review_evidence", private)
+    if spec is None or spec.loader is None:
+        raise ContractViolation("private review resolver is unavailable")
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    try:
+        branch = _read_only_git(root, "branch", "--show-current")
+        locations = evidence.private_paths(root, branch) if branch else None
+        if locations and locations["body"].is_file():
+            body = locations["body"].read_text(encoding="utf-8")
+            for finding_id in re.findall(r"(?m)^- \[(?: |~)\] \*\*([A-Za-z0-9._/-]+)", body):
+                findings.append(f"{locations['body']}#{finding_id}")
+    except (evidence.ReviewEvidenceError, OSError) as error:
+        raise ContractViolation(str(error)) from error
     for relative in reviews:
         key = _repository_path_key(relative, root)
         if key is None or not key.startswith("reviews/"):

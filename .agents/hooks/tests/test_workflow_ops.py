@@ -27,10 +27,25 @@ ops = load_operations()
 
 
 class RepositoryFixture(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._baseline_temp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._baseline_temp.cleanup)
+        baseline = RepositoryFixture()
+        baseline.root = Path(cls._baseline_temp.name) / "repo"
+        baseline._initialize_repository()
+        cls._baseline_root = baseline.root
+        cls._baseline_head = baseline.base
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name) / "repo"
+        shutil.copytree(self._baseline_root, self.root)
+        self.base = self._baseline_head
+
+    def _initialize_repository(self):
         subprocess.run(["git", "init", "-q", "-b", "main", str(self.root)], check=True)
         self.git("config", "user.email", "workflow@example.test")
         self.git("config", "user.name", "Workflow Fixture")
@@ -1593,7 +1608,7 @@ class HostCoverageWorkflowTests(RepositoryFixture):
         agent_head = self.commit(".agents/workflows/runtime.py", "shared\n", "change agent runtime")
         work_order = self.write_work_order(agent_head)
         work_order.write_text(
-            work_order.read_text(encoding="utf-8") + f"\nReviewed up to commit: `{agent_head}`\n",
+            work_order.read_text(encoding="utf-8") + f"\n**Reviewed up to commit:** `{agent_head}`\n",
             encoding="utf-8",
         )
         self.git("add", "reviews/Feature-Workflow-ops.md")
