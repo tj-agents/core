@@ -20,21 +20,26 @@ LOCKS_GUARD = threading.Lock()
 MODULES = {}
 
 
-def _load(name):
+def _script_path(name):
     peer = HERE.parent / "utility/peer-cli/scripts" / f"{name}.py"
     packaged = tuple(HERE.parents[2] / layout / "peer-cli/scripts" / f"{name}.py"
                      for layout in ("skills", "codex-skills")) if len(HERE.parents) > 2 else ()
     for path in (HERE / f"{name}.py", HERE / "resources/machine/scripts" / f"{name}.py", peer, *packaged):
         if path.is_file():
-            identity = str(path.resolve())
-            if identity in MODULES:
-                return MODULES[identity]
-            spec = importlib.util.spec_from_file_location(f"agent_recovery_{name}_{len(MODULES)}", path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            MODULES[identity] = module
-            return module
+            return path
     raise RuntimeError(f"The shared {name}.py helper was not found relative to {HERE}.")
+
+
+def _load(name):
+    path = _script_path(name)
+    identity = str(path.resolve())
+    if identity in MODULES:
+        return MODULES[identity]
+    spec = importlib.util.spec_from_file_location(f"agent_recovery_{name}_{len(MODULES)}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    MODULES[identity] = module
+    return module
 
 
 def _registry_root():
@@ -371,11 +376,66 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
         lock.release()
 
 
+def focus_session(host, session_id):
+    result = subprocess.run([sys.executable, "-B", str(_script_path("close_tab")), "--session", session_id, "--focus"],
+                            text=True, encoding="utf-8", capture_output=True, timeout=60)
+    if result.returncode:
+        raise ValueError("That session is verified live but its terminal tab could not be focused: "
+                         + (result.stderr or result.stdout or "no detail").strip())
+
+
+def resolve_target(target, hosts=("codex", "claude"), roots=None, pick_latest=False):
+    if target and SESSION_ID.fullmatch(target):
+        exact = []
+        for host in hosts:
+            try:
+                exact.append(find(host, target, roots))
+            except ValueError:
+                continue
+        if len(exact) == 1:
+            return exact[0]
+        if len(exact) > 1:
+            raise ValueError("That id exists in more than one host profile; pass --host to select one.")
+    directory = Path(target).expanduser() if target else None
+    path_like = bool(target) and (directory.is_absolute() or any(mark in target for mark in ("/", "\\")) or target in (".", ".."))
+    by_directory = path_like and directory.is_dir()
+    found = []
+    unavailable = []
+    for host in hosts:
+        try:
+            found.extend(search((host,), None if by_directory else target,
+                                os.path.abspath(directory) if by_directory else None, 25, roots))
+        except ValueError as exc:
+            unavailable.append(str(exc))
+    found.sort(key=lambda item: item.get("activity") or "", reverse=True)
+    if not found:
+        raise ValueError("No Claude or Codex session matched " + repr(target) + "."
+                         + "".join(" " + message for message in unavailable))
+    if len(found) > 1 and not pick_latest:
+        listing = "; ".join(f"{item['host']}:{item['id']} {item['title'] or item['preview'][:60]!r}" for item in found[:10])
+        raise ValueError("More than one session matched; pass the exact id or --latest. Matches: " + listing)
+    item = next((candidate for candidate in found if candidate["status"] == "live"), found[0])
+    if not item["cwd"] or not Path(item["cwd"]).is_dir():
+        raise ValueError("The recorded session directory is missing; refusing to resume it elsewhere.")
+    return item
+
+
+def reopen(target, hosts=("codex", "claude"), roots=None, pick_latest=False, focus=None, **options):
+    item = resolve_target(target, hosts, roots, pick_latest)
+    if item["status"] == "live":
+        (focus or focus_session)(item["host"], item["id"])
+        return {**item, "action": "focused"}
+    opened = open_session(item["host"], item["id"], roots=roots, **options)
+    return {**opened, "action": "opened"}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Search and safely reopen exact native Codex or Claude sessions.")
-    parser.add_argument("operation", choices=("search", "open", "recover"))
+    parser.add_argument("operation", choices=("search", "open", "recover", "reopen"))
     parser.add_argument("--host", choices=("codex", "claude", "both"), default="both")
     parser.add_argument("--id")
+    parser.add_argument("--target")
+    parser.add_argument("--latest", action="store_true")
     parser.add_argument("--topic")
     parser.add_argument("--checkout")
     parser.add_argument("--count", type=int, default=10)
@@ -427,6 +487,15 @@ def main(argv=None):
                         print(f"Already opened: {', '.join(item['host'] + ':' + item['id'] for item in opened)}", file=sys.stderr)
                     raise
             print(json.dumps(opened, indent=2))
+            return 0
+        if args.operation == "reopen":
+            if not args.target:
+                raise ValueError("reopen requires --target: a session id, a topic or a directory.")
+            result = reopen(args.target, hosts, roots, args.latest,
+                            prompt=args.prompt if args.prompt_path else args.prompt or "Continue the requested work.",
+                            title=args.title, confirm_closed=args.confirm_closed,
+                            prompt_path=args.prompt_path, model=args.model)
+            print(json.dumps(result, indent=2))
             return 0
         if len(hosts) != 1 or not args.id:
             raise ValueError("open requires one --host and an exact --id.")

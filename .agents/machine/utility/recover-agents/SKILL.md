@@ -8,8 +8,9 @@ route: infer
 
 # Recover agent work
 
-Use `search-codex` and `search-claude` for the requested topic or checkout, then use `open-codex` and
-`open-claude` for the relevant exact sessions with a concise instruction to continue. The user's recovery
+Use `search-codex` and `search-claude` for the requested topic or checkout, then use `open-cli` with each
+relevant exact id and a concise instruction to continue; it chooses the host and focuses a live tab itself.
+`recover --select` below refuses a live session instead of focusing it. The user's recovery
 request authorizes those resumes; clarify only when the relevant session or live identity is ambiguous.
 
 Inventory both native histories first. The result groups the host, original checkout, title and exact native id.
