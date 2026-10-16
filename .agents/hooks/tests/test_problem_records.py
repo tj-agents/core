@@ -65,6 +65,12 @@ class ProblemRecordTests(unittest.TestCase):
         with self.assertRaises(RecordError):
             read_record(self.root, "relative/file.md", "codex")
 
+    def test_native_discovery_failure_becomes_an_actionable_provider_error(self):
+        from skill_router import NativePluginDiscoveryError
+        self.select()
+        with patch("skill_router.resolved_skill", side_effect=NativePluginDiscoveryError("codex", "unavailable")), self.assertRaisesRegex(RecordError, "could not be resolved"):
+            read_record(self.root, self.reference, "codex")
+
     def test_invalid_closed_and_unrelated_provider_results_fail(self):
         self.select()
         values = ["invalid", "[]", json.dumps({**self.value, "state": "closed"}),

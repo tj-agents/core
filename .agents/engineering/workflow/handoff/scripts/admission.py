@@ -11,11 +11,13 @@ import subprocess
 import sys
 from typing import Any
 
-try:
-    from problem_records import RecordError, declaration, read_record
-except ModuleNotFoundError:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "hooks"))
-    from problem_records import RecordError, declaration, read_record
+script = Path(__file__).resolve()
+helper_directories = [script.parent] + [script.parents[index] / "hooks" for index in (3, 4, 5) if index < len(script.parents)]
+helper_directory = next((path for path in helper_directories if (path / "problem_records.py").is_file()), None)
+if helper_directory is None:
+    raise ImportError("Core's shipped problem-record helper is unavailable; repair the package installation")
+sys.path.insert(0, str(helper_directory))
+from problem_records import RecordError, declaration, read_record
 
 
 FENCE = re.compile(r"```agent-handoff-disposition\s*\n(?P<body>.*?)\n```", re.DOTALL | re.IGNORECASE)

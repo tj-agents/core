@@ -108,6 +108,14 @@ class HandoffAdmissionTests(unittest.TestCase):
             self.assertFalse(validate(reference, self.record_id, self.session, self.prompt, self.callout, str(self.primary), "codex")["valid"])
         self.assertFalse(validate(reference, self.record_id, self.session, self.prompt, self.callout)["valid"])
 
+    def test_shipped_helper_precedes_unrelated_pythonpath_modules(self):
+        shadow = self.base / "shadow"
+        shadow.mkdir()
+        (shadow / "problem_records.py").write_text("raise RuntimeError('unrelated module')", encoding="utf-8")
+        result = subprocess.run([sys.executable, "-B", str(SCRIPTS / "admission.py"), "--help"], capture_output=True,
+                                text=True, encoding="utf-8", timeout=15, env=dict(os.environ, PYTHONPATH=str(shadow)))
+        self.assertEqual(0, result.returncode, result.stderr)
+
     def test_missing_read_capability_admits_a_linked_deferred_record(self):
         self.write_record(self.disposition())
         self.assertTrue(self.check()["valid"])
