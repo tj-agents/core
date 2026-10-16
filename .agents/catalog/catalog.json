@@ -39,7 +39,7 @@
             ],
             "optional": []
           },
-          "digest": "sha256:524d8945cb2ee5cfc7d440526bbf6076385ed7e339cf1edacc7f5343952d9430",
+          "digest": "sha256:50bb95fa9be48444988c13841781b5bec9735b55d50265c5e03a16277dbf8f15",
           "harness": {
             "marketplaces": [
               {
@@ -207,7 +207,7 @@
               "exe:powershell"
             ]
           },
-          "digest": "sha256:1b030d3e19c0dba288f5bce77290b36b1228a573fef5f21cd1980c075e829f7a",
+          "digest": "sha256:74b8db959ab6beb9a649300e648da3b70d52ef5b2f4cd2810f5757041892cbfd",
           "harness": {
             "marketplaces": [
               {
