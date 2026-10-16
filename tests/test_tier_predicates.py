@@ -101,12 +101,12 @@ class Predicates(unittest.TestCase):
         self.assertEqual(result.blocked, [declaration])
         self.assertNotIn(gate.OVERRIDE_VARIABLE, gate.refusal(declaration, "example", self.root))
 
-    def test_review_and_session_report_unknown_configuration(self):
+    def test_session_reports_unknown_configuration(self):
         declaration = gate.Declaration("example", "test", {
             "schema_version": 3, "tier": "example", "applies": "stack-present", "detect": {"fact": "unknown"}})
-        for output in (gate.statement(self.root, [declaration]), gate.conventions(self.root, [declaration])):
-            self.assertIn("Configuration diagnostic", output)
-            self.assertIn("Provide scoped evidence for fact: unknown", output)
+        output = gate.statement(self.root, [declaration])
+        self.assertIn("Configuration diagnostic", output)
+        self.assertIn("Provide scoped evidence for fact: unknown", output)
 
     def test_discovery_reports_version_and_parse_failures(self):
         for name, body in (("future", json.dumps({"schema_version": 99})), ("broken", "{")):
@@ -185,12 +185,11 @@ class Predicates(unittest.TestCase):
             result = gate.assess(self.root)
             self.assertEqual([item.plugin for item, _ in result.applicable], ["valid1", "valid2", "valid3"])
             self.assertNotIn("ordinary", [item.plugin for item in result.blocked])
-            listing = gate.conventions(self.root)
+            listing = gate.statement(self.root)
             self.assertIn("Configuration diagnostic", listing)
             self.assertIn("Provide scoped evidence for fact: missing", listing)
             for version in (1, 2, 3):
-                self.assertIn("valid" + str(version) + " (", listing)
-            self.assertEqual(listing.count("  rule - "), 3)
+                self.assertIn("Applies here: `valid" + str(version) + ":*`", listing)
             for hook in self.hook_payloads("ordinary", ordinary):
                 self.assertEqual(gate.gate(hook), 0)
             diagnostics = []

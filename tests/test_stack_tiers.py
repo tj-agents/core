@@ -349,46 +349,6 @@ class SessionStatement(TemporaryProject):
         self.assertIn("canonical source files", text)
         self.assertIn("does not load them as governing instructions", text)
         self.assertNotIn("do not read, invoke or cite", text)
-        self.assertIn("no stack tier applies", gate.conventions(self.project, found))
-
-
-class Conventions(TemporaryProject):
-    def installed(self, skills):
-        cache = tempfile.TemporaryDirectory()
-        self.addCleanup(cache.cleanup)
-        payload = Path(cache.name) / "dotagents" / "dotnet" / "1.0.0"
-        for name, kind in skills:
-            skill = payload / "skills" / name
-            skill.mkdir(parents=True)
-            (skill / "SKILL.md").write_text(
-                f"---\nname: {name}\ndescription: rule\nkind: {kind}\n---\n\n# {name}\n",
-                encoding="utf-8",
-            )
-        (payload / "tier.json").write_text(json.dumps(DOTNET), encoding="utf-8")
-        return gate.declarations([cache.name])
-
-    def test_legacy_new_and_mixed_payloads_discover_the_same_conventions(self):
-        (self.project / "Api.csproj").write_text("", encoding="utf-8")
-        excluded = [(kind, kind) for kind in ("operation", "policy", "utility", "workflow", "knowledge", "custom")]
-        for kinds in (("contract", "contract"), ("convention", "convention"), ("contract", "convention")):
-            with self.subTest(kinds=kinds):
-                found = self.installed(list(zip(("persistence", "style"), kinds)) + excluded)
-                payload = found[0].payload_dir
-                self.assertEqual([name for name, _ in gate.contract_skills(payload)], ["persistence", "style"])
-                text = gate.conventions(self.project, found)
-                self.assertIn("dotnet (.NET detected (Api.csproj)): 2 convention(s)", text)
-                self.assertIn("persistence", text)
-                self.assertIn("style", text)
-                for name, _ in excluded:
-                    self.assertNotIn("  " + name + " -", text)
-
-    def test_no_applicable_tier_is_said_explicitly(self):
-        for kind in ("contract", "convention"):
-            with self.subTest(kind=kind):
-                found = self.installed([("persistence", kind)])
-                text = gate.conventions(self.project, found)
-                self.assertIn("no stack tier applies", text)
-                self.assertNotIn("persistence", text)
 
 
 class Gate(TemporaryProject):
