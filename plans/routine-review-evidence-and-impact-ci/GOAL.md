@@ -8,9 +8,9 @@ This is the existing goal promoted from `Fix-RoutineReviewAndImpactCi/plans/rout
 
 - Owner: codex:01a1447f-62b8-70e0-a7a3-20a040f97690.
 - Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Investigate-ValidationEfficiency.
-- Branch: Fix/PrivateReviewEvidence (successor to merged Fix/ImpactSelectedCi).
-- Base: origin/main 621c7a21ec2684fe7d252b1944ece5689f94f398 for the private-proof slice.
-- Delivered CI: PR #274, head 5b42318ef0369ef59dcbbdde40505dd21a857ad8, merged at 621c7a21. Private-proof PR #275, initial head ff3504864217cf0b048a78c997a2d354d15117a2; review/CI repair in progress.
+- Branch: Fix/WorkflowFixtureEfficiency (successor to merged Fix/PrivateReviewEvidence).
+- Base: origin/main 946e53c3d1647de2d4e0c7291322136abed9300a, including the private-proof merge and generated refresh.
+- Delivered CI: PR #274, head 5b42318ef0369ef59dcbbdde40505dd21a857ad8, merged at 621c7a21. Private-proof PR #275, reviewed head eb0fb8b3b759bfade8fb2d767bfb6e557b17a360, merged at f572ed65b9bc879f83b55ec3b163f35c890093df.
 - Investigation: `plans/validation-efficiency/FINDINGS.md`, local commit 58aab8b7.
 - Routine design delegation: false by absent category in `.agents/settings.json`. The accepted proposal supplies the implementation direction; no new plugin, service or external dependency is selected.
 - Standards loaded: AGENTS.md, README.md, CODE_CONVENTIONS.md, PACKAGING.md; plan-execution, lanes, git-branching, plans, plan-checkpoint, remote-validation, review/review-lifecycle and persistent-workflow contracts. The repository router declares no path-specific skills. C++ style/libraries were loaded as requested by session guidance; these changes use the repository's Python/CI conventions.
@@ -52,7 +52,7 @@ The aggregate passes only when classification succeeded and every job selected b
 
 Verification: focused selector tests include actual disposable Git ranges, rename/deletion, unknown ranges/paths, binary/large changes, source-family unions, test additions, failed/missing/cancelled/skipped selected jobs and invalid plan data. Check workflow wiring and run the relevant existing guard tests. This CI-changing PR itself receives the full matrix remotely. Required-check server configuration is inspected and kept as a concrete delivery dependency if changes are needed; no server permission is silently changed.
 
-### 2. Private ordinary-review proof (current slice)
+### 2. Private ordinary-review proof (delivered)
 
 After slice 1 lands, reconcile `merge_review_gate.py`, `auto_merge.py`, `workflow_ops.py`, `delivery_runtime.py`, review contracts and host tests as one coherent cutover. Reuse the old goal's intended outcome, not its incomplete two-file patch. Preserve current-main foreign-repository and command-text fixes. Define proof identity and recovery before source changes; retain big/staged work orders. Record exact scope/size before beginning this slice.
 
@@ -64,7 +64,7 @@ Use timing from a required validation run to choose the smallest test-fixture op
 
 ## Current state
 
-Ownership/baseline reconciled. The investigation remains complete; this follow-up supersedes its investigation-only execution restriction for the approved implementation. The selector, focused runner, fail-closed aggregate and workflow wiring are delivered. Causal main run 38905321932 also passed, including regenerate, both platforms and ci-required. The successor private-proof cutover is published as PR #275; independent review and full CI identified repairs now being verified. Mappings cover five bounded runtime families; shared helpers and every unknown surface retain full coverage. Test imports extend changed-test closure. Main remains full, selection never cancels prior runs, and Linux focused execution keeps stdin closed.
+Ownership/baseline reconciled. The investigation remains complete; this follow-up supersedes its investigation-only execution restriction for the approved implementation. The selector, focused runner, fail-closed aggregate and workflow wiring are delivered. Causal main run 38905321932 also passed, including regenerate, both platforms and ci-required. The private-proof cutover is delivered as PR #275 after its confirmed review/CI repairs. The measured fixture optimization is the final slice. Mappings cover five bounded runtime families; shared helpers and every unknown surface retain full coverage. Test imports extend changed-test closure. Main remains full, selection never cancels prior runs, and Linux focused execution keeps stdin closed.
 
 Focused selector/execution/wiring tests pass (21 cases, about 10 seconds), existing generated-path guard tests pass (4 cases, about 8 seconds), and the exact docs reachability command passes. An initial selector syntax error was fixed before these passes. The GitHub rulesets API returns an empty list and the prior branch-protection query returned 404: there is no observed server-side required-check configuration to migrate. The aggregate participates in the existing all-checks merge validator; README documents requiring `ci-required` if server enforcement is enabled. No server configuration is changed.
 
@@ -82,42 +82,48 @@ Private-proof review at ff350486: native Codex and the workflow lens found no de
 
 The isolated twelve-sample workflow fixture measurement completed with a 1.8319s median and 21.5683s total for setup, cleanup and two baseline verification Git calls. It creates independent writable repositories each sample. Raw compact evidence is in the Git-private validation-efficiency-fixture run; retain that baseline for slice 3.
 
+Final fixture slice scope: change only RepositoryFixture setup in .agents/hooks/tests/test_workflow_ops.py plus this goal and compact measured evidence. Initialize an immutable Git baseline once per test class, then copy it into each test’s independent TemporaryDirectory. Keep all 96 test methods and their negative assertions unchanged, real Git operations, distinct index/refs/config/files and per-test cleanup. No result cache, runtime change, workflow rewrite or shared writable repository. The existing class-level cleanup owns each seed. Expected code delta about 16 added lines. Acceptance: identical test-method ASTs; direct mutation-isolation checks; all 96 affected tests; lower isolated setup cost; Windows/Linux impact-selected CI; independent exact-head review and delivery.
+
+The prepared source SHA-256 is 94b69e58933d45e64c420ee6194ccdb2d06957d05fd5c9bcac3e320132d41210. All 96 unchanged methods passed in 455.289s against the temporary prepared source and the same cumulative runtime now on main; copying those exact bytes does not require repeating that module locally. Both fixture copies and the seed preserved independent files, index, refs, branch and Git configuration under actual mutations. Twelve after samples measured median 0.4293s versus 1.8319s before; after sample total 5.2075s plus a once-per-class 2.3078s seed. Evidence: plans/validation-efficiency/fixture-results.md.
+
+PR #275 full run 38912304559 passed both platforms and ci-required at eb0fb8b3 (Windows 20m20s, Linux 4m38s). Native and workflow incremental reviews completed without new findings; host coverage and delivery preflight passed. Its existing untracked durable work order was retired, binding released, checkout retained for this goal. Causal main run 38915378822 at f572ed65 is monitored; generated packages are already refreshed at 946e53c3. No installed-host upgrade is claimed.
+
 ## Next Steps
 
 Scope: whole plan through all remaining phases and terminal delivery, subject to existing delivery approval gates.
-Current slice: private ordinary-review proof on Fix/PrivateReviewEvidence.
-Remaining scope: private ordinary-review proof and measured fixture optimization; batching applies throughout.
+Current slice: measured fixture optimization on Fix/WorkflowFixtureEfficiency.
+Remaining scope: measured fixture optimization, its delivery and goal closeout; batching applies throughout.
 Done when: selected CI and consistent private review evidence are delivered with preserved safeguards, and demonstrated redundant fixture cost is addressed or explicitly dispositioned with evidence.
 
-Finish the confirmed private-proof review/CI repairs, checkpoint and publish one stable candidate, then incremental-review and deliver PR #275. Causal main run 38905321932 is already green. After private-proof delivery, implement the measured immutable baseline fixture with isolated writable copies, verify before/after timing and behavior, then deliver that final slice.
+Apply the exact tested fixture source, verify selection and source identity, checkpoint/publish the final slice, then obtain fresh native/selected review and Windows/Linux CI. Complete the causal main generation consequence, deliver this final slice, and run the completion/closeout procedure for the same goal.
 
 ## Host coverage
 
 ```agent-host-coverage
 {
   "schema_version": 1,
-  "shared_source": "The shipped review_evidence resolver supplies the same private identity and completion checks to review workflows, merge gates and delivery binding.",
+  "shared_source": "The common workflow-operation test fixture prepares one immutable class seed and independent writable copies for shared engineering validation.",
   "hosts": [
     {
       "host": "claude",
-      "behavior": "The Bash and PowerShell merge hooks resolve the canonical private receipt and retain the existing security and foreign-repository boundaries.",
-      "source": ".agents/hooks/merge_review_gate.py",
-      "mapping": "Canonical hook calls workflows/review_evidence.py, shipped to both hosts by the engineering resource mapping.",
+      "behavior": "Shared engineering workflow validation preserves isolated real Git repositories for every test.",
+      "source": ".agents/hooks/tests/test_workflow_ops.py",
+      "mapping": "One host-neutral Python test module validates the runtime shipped for both Claude and Codex.",
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "14 focused private-evidence regressions and the existing merge-gate regressions, including private acceptance and tamper rejection; installed-host adoption is outside this source change."
+        "evidence": "All 96 unchanged tests passed against exact prepared bytes; direct file/index/ref/branch/config isolation and unchanged test-method AST checks passed. Platform CI remains the delivery gate."
       }
     },
     {
       "host": "codex",
-      "behavior": "The canonical pushd merge envelope resolves the same checkout and consumes the shared private receipt.",
-      "source": ".agents/hooks/merge_review_gate.py",
-      "mapping": "Canonical hook calls workflows/review_evidence.py, shipped to both hosts by the engineering resource mapping.",
+      "behavior": "Shared engineering workflow validation preserves isolated real Git repositories for every test.",
+      "source": ".agents/hooks/tests/test_workflow_ops.py",
+      "mapping": "One host-neutral Python test module validates the runtime shipped for both Claude and Codex.",
       "verification": {
         "level": "source",
         "result": "passed",
-        "evidence": "Existing canonical-envelope/foreign-repository regressions and focused private merge-hook integration; independent native review remains required before delivery."
+        "evidence": "All 96 unchanged tests passed against exact prepared bytes; direct file/index/ref/branch/config isolation and unchanged test-method AST checks passed. Platform CI remains the delivery gate."
       }
     }
   ]
