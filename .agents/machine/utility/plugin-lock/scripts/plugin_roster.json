@@ -2,31 +2,67 @@
   "schema_version": 1,
   "plugins": {
     "base": [],
-    "engineering": ["base"],
-    "machine": ["base"],
+    "engineering": [
+      "base"
+    ],
+    "machine": [
+      "base"
+    ],
     "cpp": [],
-    "gpp": ["cpp"],
-    "msvc": ["cpp"],
-    "win32": ["cpp"],
+    "gpp": [
+      "cpp"
+    ],
+    "msvc": [
+      "cpp"
+    ],
+    "win32": [
+      "cpp"
+    ],
     "dotnet": [],
-    "azure": ["dotnet"],
+    "azure": [
+      "dotnet"
+    ],
     "react": [],
     "nvim": [],
     "rust": [],
     "github-actions": [],
-    "kit": [],
     "template": []
   },
   "stacks": {
-    "dotnet": ["dotnet"],
-    "azure": ["dotnet", "azure"],
-    "react": ["react"],
-    "cpp-gcc": ["cpp", "gpp"],
-    "cpp-msvc": ["cpp", "msvc"],
-    "win32": ["cpp", "msvc", "win32"],
-    "neovim": ["nvim"],
-    "rust": ["rust"],
-    "github-actions": ["github-actions"],
-    "plugin-repository": ["kit", "template"]
+    "dotnet": [
+      "dotnet"
+    ],
+    "azure": [
+      "dotnet",
+      "azure"
+    ],
+    "react": [
+      "react"
+    ],
+    "cpp-gcc": [
+      "cpp",
+      "gpp"
+    ],
+    "cpp-msvc": [
+      "cpp",
+      "msvc"
+    ],
+    "win32": [
+      "cpp",
+      "msvc",
+      "win32"
+    ],
+    "neovim": [
+      "nvim"
+    ],
+    "rust": [
+      "rust"
+    ],
+    "github-actions": [
+      "github-actions"
+    ],
+    "plugin-repository": [
+      "template"
+    ]
   }
 }
