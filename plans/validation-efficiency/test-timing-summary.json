@@ -1,0 +1,456 @@
+{
+  "windows": {
+    "observed_test_lines": 2350,
+    "largest_module_completion_gaps": [
+      {
+        "module": "test_workflow_ops",
+        "seconds": 177.075,
+        "test_lines": 96
+      },
+      {
+        "module": "test_continuation_runtime",
+        "seconds": 95.142,
+        "test_lines": 38
+      },
+      {
+        "module": "test_merge_cleanup_gate",
+        "seconds": 83.749,
+        "test_lines": 63
+      },
+      {
+        "module": "test_workflow_contracts",
+        "seconds": 76.381,
+        "test_lines": 76
+      },
+      {
+        "module": "test_work_item_sessions",
+        "seconds": 49.419,
+        "test_lines": 55
+      },
+      {
+        "module": "test_claude_standards_sync",
+        "seconds": 46.984,
+        "test_lines": 27
+      },
+      {
+        "module": "test_merge_cleanup_proof",
+        "seconds": 45.595,
+        "test_lines": 19
+      },
+      {
+        "module": "test_source_layout",
+        "seconds": 38.558,
+        "test_lines": 22
+      },
+      {
+        "module": "test_terminal_profile_wiring",
+        "seconds": 35.968,
+        "test_lines": 14
+      },
+      {
+        "module": "test_engineering_hooks",
+        "seconds": 35.837,
+        "test_lines": 16
+      },
+      {
+        "module": "test_harness_grant",
+        "seconds": 34.687,
+        "test_lines": 25
+      },
+      {
+        "module": "test_claude_profile_repair",
+        "seconds": 24.71,
+        "test_lines": 23
+      },
+      {
+        "module": "test_hook_dispatch",
+        "seconds": 24.463,
+        "test_lines": 23
+      },
+      {
+        "module": "test_workflow_route",
+        "seconds": 22.693,
+        "test_lines": 32
+      },
+      {
+        "module": "test_merge_review_gate",
+        "seconds": 21.346,
+        "test_lines": 84
+      },
+      {
+        "module": "test_plan_workflows",
+        "seconds": 20.468,
+        "test_lines": 19
+      },
+      {
+        "module": "test_callout_repair_gate",
+        "seconds": 19.65,
+        "test_lines": 22
+      },
+      {
+        "module": "test_continuation_stop",
+        "seconds": 19.571,
+        "test_lines": 33
+      },
+      {
+        "module": "test_session_store",
+        "seconds": 18.585,
+        "test_lines": 50
+      },
+      {
+        "module": "test_list_work",
+        "seconds": 15.28,
+        "test_lines": 38
+      }
+    ],
+    "largest_individual_completion_gaps": [
+      {
+        "seconds": 21.421,
+        "ending_test": "test_generator_preserves_authored_host_files_and_prunes_plugin_orphans",
+        "module": "test_workflow_contracts",
+        "line": 2797
+      },
+      {
+        "seconds": 20.349,
+        "ending_test": "test_a_build_error_is_not_a_red_run",
+        "module": "test_plan_workflows",
+        "line": 2491
+      },
+      {
+        "seconds": 12.974,
+        "ending_test": "test_codex_installer_manages_profile_roles_and_migrates_project_copies",
+        "module": "test_workflow_contracts",
+        "line": 2782
+      },
+      {
+        "seconds": 12.391,
+        "ending_test": "test_codex_hooks_requires_python_311_without_running_hook_control",
+        "module": "test_terminal_profile_wiring",
+        "line": 1593
+      },
+      {
+        "seconds": 9.603,
+        "ending_test": "test_planning_intent_recovery_matches_prompt_routing_and_delivers_once",
+        "module": "test_workflow_route",
+        "line": 2905
+      },
+      {
+        "seconds": 9.011,
+        "ending_test": "test_routine_docs_review_refuses_missing_rationale_and_ineligible_or_sensitive_paths",
+        "module": "test_workflow_ops",
+        "line": 2886
+      },
+      {
+        "seconds": 8.744,
+        "ending_test": "test_powershell_payload_preserves_literal_arguments_for_each_host_and_mode",
+        "module": "test_terminal_profile_wiring",
+        "line": 1598
+      },
+      {
+        "seconds": 8.523,
+        "ending_test": "test_duplicate_wakes_kernel_lock_and_child",
+        "module": "test_continuation_runtime",
+        "line": 1777
+      },
+      {
+        "seconds": 8.241,
+        "ending_test": "test_opted_in_timeout_denies_allow_ask_defer_and_missing_decisions",
+        "module": "test_hook_dispatch",
+        "line": 2115
+      },
+      {
+        "seconds": 7.748,
+        "ending_test": "test_wholly_missing_bundle_restores_the_frozen_identity_after_head_moves",
+        "module": "test_workflow_ops",
+        "line": 2895
+      },
+      {
+        "seconds": 6.41,
+        "ending_test": "test_missing_marketplace_and_hook_failure_block_in_windows_shells",
+        "module": "test_codex_windows_hook_commands",
+        "line": 758
+      },
+      {
+        "seconds": 6.397,
+        "ending_test": "test_codex_installer_recovers_interrupted_apply_ownership",
+        "module": "test_workflow_contracts",
+        "line": 2785
+      },
+      {
+        "seconds": 5.386,
+        "ending_test": "test_absolute_external_goal_survives_claim_yield_repair_and_wake",
+        "module": "test_continuation_runtime",
+        "line": 1772
+      },
+      {
+        "seconds": 5.293,
+        "ending_test": "test_each_host_uses_the_payload_checkout_for_routine_design_delegation",
+        "module": "test_engineering_hooks",
+        "line": 897
+      },
+      {
+        "seconds": 5.209,
+        "ending_test": "test_same_repository_git_subdir_source_respects_its_explicit_ref",
+        "module": "test_claude_standards_sync",
+        "line": 573
+      },
+      {
+        "seconds": 5.124,
+        "ending_test": "test_generation_is_deterministic_and_prunes_only_declared_output",
+        "module": "test_source_layout",
+        "line": 1492
+      },
+      {
+        "seconds": 4.875,
+        "ending_test": "test_planning_intent_routes_with_and_without_an_active_goal",
+        "module": "test_workflow_route",
+        "line": 2921
+      },
+      {
+        "seconds": 4.737,
+        "ending_test": "test_orphan_writer_gate_after_supervisor_exit",
+        "module": "test_continuation_runtime",
+        "line": 1788
+      },
+      {
+        "seconds": 4.663,
+        "ending_test": "test_interrupted_restore_removes_owned_cache_and_retries_exact_identity",
+        "module": "test_workflow_ops",
+        "line": 2875
+      },
+      {
+        "seconds": 4.501,
+        "ending_test": "test_parent_exit_delayed_failure_repair_success_complete",
+        "module": "test_continuation_runtime",
+        "line": 1792
+      }
+    ]
+  },
+  "linux": {
+    "observed_test_lines": 2350,
+    "largest_module_completion_gaps": [
+      {
+        "module": "test_continuation_runtime",
+        "seconds": 29.071,
+        "test_lines": 38
+      },
+      {
+        "module": "test_workflow_contracts",
+        "seconds": 23.216,
+        "test_lines": 76
+      },
+      {
+        "module": "test_hook_dispatch",
+        "seconds": 22.642,
+        "test_lines": 23
+      },
+      {
+        "module": "test_terminal_profile_wiring",
+        "seconds": 19.7,
+        "test_lines": 14
+      },
+      {
+        "module": "test_merge_cleanup_gate",
+        "seconds": 11.045,
+        "test_lines": 63
+      },
+      {
+        "module": "test_workflow_route",
+        "seconds": 9.867,
+        "test_lines": 32
+      },
+      {
+        "module": "test_workflow_ops",
+        "seconds": 6.683,
+        "test_lines": 96
+      },
+      {
+        "module": "test_callout_repair_gate",
+        "seconds": 6.058,
+        "test_lines": 22
+      },
+      {
+        "module": "test_skill_router",
+        "seconds": 5.009,
+        "test_lines": 36
+      },
+      {
+        "module": "test_engineering_hooks",
+        "seconds": 4.414,
+        "test_lines": 16
+      },
+      {
+        "module": "test_codex_pre_tool_adapter",
+        "seconds": 4.337,
+        "test_lines": 9
+      },
+      {
+        "module": "test_source_layout",
+        "seconds": 4.332,
+        "test_lines": 22
+      },
+      {
+        "module": "test_delivery_continuation",
+        "seconds": 4.045,
+        "test_lines": 41
+      },
+      {
+        "module": "test_harness_permissions_sync",
+        "seconds": 3.474,
+        "test_lines": 29
+      },
+      {
+        "module": "test_list_work",
+        "seconds": 3.085,
+        "test_lines": 38
+      },
+      {
+        "module": "test_delivery_binding_gate",
+        "seconds": 2.92,
+        "test_lines": 38
+      },
+      {
+        "module": "test_hook_runtime",
+        "seconds": 2.622,
+        "test_lines": 20
+      },
+      {
+        "module": "test_claude_standards_sync",
+        "seconds": 2.6,
+        "test_lines": 27
+      },
+      {
+        "module": "test_merge_cleanup_proof",
+        "seconds": 2.528,
+        "test_lines": 19
+      },
+      {
+        "module": "test_handoff_transfer",
+        "seconds": 2.494,
+        "test_lines": 11
+      }
+    ],
+    "largest_individual_completion_gaps": [
+      {
+        "seconds": 8.108,
+        "ending_test": "test_opted_in_timeout_denies_allow_ask_defer_and_missing_decisions",
+        "module": "test_hook_dispatch",
+        "line": 1916
+      },
+      {
+        "seconds": 7.592,
+        "ending_test": "test_codex_installer_manages_profile_roles_and_migrates_project_copies",
+        "module": "test_workflow_contracts",
+        "line": 2586
+      },
+      {
+        "seconds": 6.411,
+        "ending_test": "test_duplicate_wakes_kernel_lock_and_child",
+        "module": "test_continuation_runtime",
+        "line": 1578
+      },
+      {
+        "seconds": 5.373,
+        "ending_test": "test_codex_hooks_requires_python_311_without_running_hook_control",
+        "module": "test_terminal_profile_wiring",
+        "line": 1387
+      },
+      {
+        "seconds": 5.051,
+        "ending_test": "test_powershell_payload_preserves_literal_arguments_for_each_host_and_mode",
+        "module": "test_terminal_profile_wiring",
+        "line": 1392
+      },
+      {
+        "seconds": 4.249,
+        "ending_test": "test_planning_intent_recovery_matches_prompt_routing_and_delivers_once",
+        "module": "test_workflow_route",
+        "line": 2709
+      },
+      {
+        "seconds": 4.087,
+        "ending_test": "test_timeout_keeps_default_and_other_events_unchanged",
+        "module": "test_hook_dispatch",
+        "line": 1925
+      },
+      {
+        "seconds": 3.492,
+        "ending_test": "test_orphan_writer_gate_after_supervisor_exit",
+        "module": "test_continuation_runtime",
+        "line": 1589
+      },
+      {
+        "seconds": 3.401,
+        "ending_test": "test_codex_installer_recovers_interrupted_apply_ownership",
+        "module": "test_workflow_contracts",
+        "line": 2589
+      },
+      {
+        "seconds": 3.364,
+        "ending_test": "test_engineering_shaped_untrusted_manifest_never_gets_auto_merge_permission",
+        "module": "test_harness_permissions_sync",
+        "line": 811
+      },
+      {
+        "seconds": 2.595,
+        "ending_test": "test_legacy_powershell_query_serializes_nested_actions_without_registration",
+        "module": "test_delivery_continuation",
+        "line": 633
+      },
+      {
+        "seconds": 2.502,
+        "ending_test": "test_codex_installer_preserves_colliding_unowned_profile_agents",
+        "module": "test_workflow_contracts",
+        "line": 2588
+      },
+      {
+        "seconds": 2.113,
+        "ending_test": "test_planning_intent_routes_with_and_without_an_active_goal",
+        "module": "test_workflow_route",
+        "line": 2725
+      },
+      {
+        "seconds": 2.053,
+        "ending_test": "test_stop_deadline_blocks_with_and_without_finished_siblings",
+        "module": "test_hook_dispatch",
+        "line": 1923
+      },
+      {
+        "seconds": 2.03,
+        "ending_test": "test_monitor_reconnects_to_the_same_identity",
+        "module": "test_workflow_ops",
+        "line": 2650
+      },
+      {
+        "seconds": 2.028,
+        "ending_test": "test_opted_in_timeout_preserves_completed_deny_reason_and_context",
+        "module": "test_hook_dispatch",
+        "line": 1917
+      },
+      {
+        "seconds": 2.027,
+        "ending_test": "test_opted_in_timeout_before_deny_names_stalled_and_skipped_gates",
+        "module": "test_hook_dispatch",
+        "line": 1915
+      },
+      {
+        "seconds": 2.026,
+        "ending_test": "test_a_gate_past_the_deadline_keeps_finished_verdicts_and_reports_the_rest",
+        "module": "test_hook_dispatch",
+        "line": 1909
+      },
+      {
+        "seconds": 1.928,
+        "ending_test": "test_claude_manifest_dispatch_passes_explicit_host_to_router",
+        "module": "test_skill_router",
+        "line": 2470
+      },
+      {
+        "seconds": 1.923,
+        "ending_test": "test_codex_hooks_selects_python_311_without_changing_refresh_selection",
+        "module": "test_terminal_profile_wiring",
+        "line": 1388
+      }
+    ]
+  }
+}
