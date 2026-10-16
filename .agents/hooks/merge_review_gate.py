@@ -15,10 +15,6 @@ merge command the hook fails CLOSED — any doubt (missing/stale/unclean review,
 even an internal error) blocks, because letting an unreviewed merge through is the
 exact failure this guard exists to prevent. Non-merge commands always exit 0.
 
-The review file is what `review` / `docs-review` write:
-`reviews/<branch-with-slashes-as-dashes>.md`, carrying a top-of-file
-`**Reviewed up to commit:** \`<sha>\`` marker and `- [ ]` / `- [x]` findings.
-
 Security layer: when the head being merged touches security-sensitive paths, the merge
 also requires a current `**Security-reviewed up to commit:** \`<sha>\`` marker —
 stamped by `review` Stage 6 after its host security review.
@@ -41,6 +37,9 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workflows"))
+import review_evidence
 
 from hook_runtime import (
     NETWORK_COMMAND_TIMEOUT_SECONDS,
@@ -409,13 +408,13 @@ def staged_work_order(review):
     return False
 
 
-def review_completion_problem(review):
+def review_completion_problem(review, strict=False):
     status = review_status(review)
     judgment = review_judgment(review)
     notes_status = work_order_field(review, "Cross-area notes status")
     summary_status = work_order_field(review, "Parent summary status")
     if status is None:
-        if any(value is not None for value in (judgment, notes_status, summary_status)):
+        if strict or any(value is not None for value in (judgment, notes_status, summary_status)):
             return "uses new-format review fields but has no `Review status`"
         return None
     if status != "complete":
@@ -598,9 +597,6 @@ def main():
                   "until a code-review can be verified.")
 
     slug = branch.replace("/", "-")
-    review_path = toplevel + "/reviews/" + slug + ".md"
-
-    review = None
     if target:
         for ref in (branch, head):
             try:
@@ -608,40 +604,29 @@ def main():
                 break
             except Exception:  # noqa: BLE001 - deleted branch / unfetchable oid; try the next
                 continue
-        try:
-            review = git("show", head + ":reviews/" + slug + ".md")
-        except Exception:  # noqa: BLE001 - fall through to the working tree
-            review = None
-    if review is None:
-        try:
-            with open(review_path, encoding="utf-8") as fh:
-                review = fh.read()
-        except OSError:
-            review = None
-    if review is None:
-        block(
-            "MERGE GATE (AGENTS.md — review before merge): no review file for "
-            "branch '" + branch + "' at reviews/" + slug + ".md. Run /review "
-            "(or /docs-review for a docs-only branch) and address findings, THEN "
-            "merge. Do NOT merge unreviewed."
-        )
+    try:
+        evidence = review_evidence.resolve(Path(toplevel), branch, head, git)
+        review = evidence["body"]
+        review_label = str(evidence["path"])
+    except review_evidence.ReviewEvidenceError as error:
+        block("MERGE GATE: " + str(error) + ". Run /review or /incremental-review before merging.")
 
-    completion_problem = review_completion_problem(review)
+    completion_problem = review_completion_problem(review, strict=evidence["private"])
     if completion_problem:
         block(
-            "MERGE GATE: reviews/" + slug + ".md " + completion_problem + ". "
+            "MERGE GATE: " + review_label + " " + completion_problem + ". "
             "Complete the frozen review pass and its parent judgment before merging."
         )
 
     reviewed = work_order_sha_field(review, "Reviewed up to commit")
     if reviewed in (None, "invalid"):
-        block("MERGE GATE: reviews/" + slug + ".md has no unique valid "
+        block("MERGE GATE: " + review_label + " has no unique valid "
               "`Reviewed up to commit:` marker. Re-run /review to stamp it, then merge.")
 
     if not (head.lower().startswith(reviewed) or reviewed.startswith(head.lower())) \
             and not review_only(reviewed, head):
         block(
-            "MERGE GATE: review is STALE — reviews/" + slug + ".md is stamped at "
+            "MERGE GATE: review is STALE — " + review_label + " is stamped at "
             + reviewed + " but HEAD is " + head[:12] + ". Commits landed since the "
             "review. Re-run /incremental-review (or /review), then merge."
         )
@@ -650,7 +635,7 @@ def main():
     if open_findings:
         block(
             "MERGE GATE: review has " + str(len(open_findings)) + " unresolved item(s) "
-            "in reviews/" + slug + ".md. Address (or explicitly [wontfix]) every "
+            "in " + review_label + ". Address (or explicitly [wontfix]) every "
             "`- [ ]` or `- [~]` item, then merge. First: " + open_findings[0][:120]
         )
 
@@ -663,7 +648,7 @@ def main():
         if sreviewed in (None, "invalid"):
             block(
                 "MERGE GATE (security layer): '" + sensitive + "' is security-sensitive but "
-                "reviews/" + slug + ".md has no unique valid "
+                + review_label + " has no unique valid "
                 "`Security-reviewed up to commit:` marker. Run "
                 "/security-review (or re-run /review, which runs it on sensitive paths and "
                 "stamps the marker), THEN merge."
@@ -673,7 +658,7 @@ def main():
                     sreviewed, head, patterns, "reviews/" + slug + ".md"
                 ):
             block(
-                "MERGE GATE (security layer): security review is STALE — reviews/" + slug + ".md "
+                "MERGE GATE (security layer): security review is STALE — " + review_label + " "
                 "security marker is at " + sreviewed + " but a security-sensitive path changed "
                 "since it, up to " + head[:12] + ". Re-run /security-review, then merge."
             )
