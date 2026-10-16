@@ -31,7 +31,7 @@ class RedRunGateTests(unittest.TestCase):
         self.plugin = self.base / "engineering"
         hooks = self.plugin / "hooks"
         hooks.mkdir(parents=True)
-        for name in ("red_run_gate.py", "skill_router.py", "hook_runtime.py"):
+        for name in ("red_run_gate.py", "skill_router.py", "tier_gate.py", "hook_runtime.py"):
             shutil.copy2(HOOKS / name, hooks / name)
         self.gate = hooks / "red_run_gate.py"
         for name in ("failing-tests", "merging", "integration-debug", "e2e-ui-debug"):

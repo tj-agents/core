@@ -907,6 +907,41 @@ class ReviewTests(RepositoryFixture):
         self.assertEqual(["dotnet:persistence"], result["routed_skills"])
         self.assertEqual([["src/mapping.txt", "no candidate text"]], result["route_violations"])
 
+    def test_review_prepare_uses_employer_from_original_repository(self):
+        self.git("remote", "set-url", "origin", "https://github.com/acme/project.git")
+        (self.root / ".agents/skill-routes.json").write_text(json.dumps({
+            "routes": [{"path": "^src/", "skills": ["stackx:style", "stackx:logging"]}]
+        }), encoding="utf-8")
+        self.commit("src/mapping.txt", "changed\n", "change routed file")
+        self.git("add", ".agents/skill-routes.json")
+        self.git("commit", "-q", "-m", "add routes")
+
+        profile = Path(self.temp.name) / "profile"
+        cache = profile / "plugins/cache"
+        employer = cache / "market/acme/1"
+        context = employer / "skills/context/SKILL.md"
+        context.parent.mkdir(parents=True)
+        context.write_text("---\nname: context\nkind: knowledge\n---\n", encoding="utf-8")
+        (employer / "tier.json").write_text(json.dumps({
+            "schema_version": 3, "tier": "acme", "applies": "stack-present",
+            "detect": {"all": [{"remote_host": "github.com"}, {"remote": "^acme/"}]},
+            "employer": {"context_skill": "context"},
+        }), encoding="utf-8")
+        replacement = cache / "market/acme-stackx/1/skills/style/SKILL.md"
+        replacement.parent.mkdir(parents=True)
+        replacement.write_text("---\nname: style\ndescription: Company style.\n---\n", encoding="utf-8")
+        registry = profile / "plugins/installed_plugins.json"
+        registry.write_text(json.dumps({"plugins": {
+            "acme@market": [{"installPath": str(employer)}],
+            "acme-stackx@market": [{"installPath": str(replacement.parents[2])}],
+        }}), encoding="utf-8")
+
+        with mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(profile),
+                                             "CODEX_HOME": str(profile),
+                                             "HOME": str(profile), "USERPROFILE": str(profile)}):
+            result = ops.review_prepare(self.root, "employer-review", "origin/main", "HEAD", False)
+        self.assertEqual(["acme-stackx:style", "stackx:logging"], result["routed_skills"])
+
     def test_opted_in_review_fails_visibly_when_router_runtime_is_missing(self):
         (self.root / ".agents" / "skill-routes.json").write_text(
             json.dumps({"routes": [{"path": "^src/", "skills": ["feature"]}]}),
