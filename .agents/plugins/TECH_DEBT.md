@@ -175,7 +175,7 @@ Every skill has a canonical `SKILL.md` and two host entry points under `.codex/s
 `.claude/skills/`. The entry points repeat the canonical name, description, kind and domain and a fixed
 reference body. `validate_adapters` in `scripts/sync_plugin_packages.py` fails generation when a copy
 drifts, so the copies cannot silently disagree, but an author still writes each one by hand and every
-description change touches three files. kit-layout repositories already generate their host skill
+description change touches three files. Template repositories already generate their host skill
 directories.
 
 Resolve when generation emits the plain host entry points from the canonical definitions, so only an
