@@ -9,6 +9,9 @@ route: infer
 
 # Open a Claude CLI
 
+This is the Claude host adapter behind [`open-cli`](../open-cli/SKILL.md). Use `open-cli` when the request
+names a session, topic or directory; use this skill only to start a fresh Claude session.
+
 Opens an interactive Claude Code session the user drives themselves. Its sibling `handoff-claude` is for
 delegating prepared work to a second Claude; this one is for putting a terminal in front of the user.
 The terminal invocation and the environment scrub belong to `scripts/agent_cli.py` under
