@@ -250,7 +250,8 @@ class AutoMergeTests(unittest.TestCase):
                 (SimpleNamespace(returncode=0, stdout=clean), ["authorization/token.py"], "security"),
             ]
             for result, changed, message in cases:
-                with self.subTest(message=message), patch.object(AUTO_MERGE.workflow_ops, "run_process", return_value=result), \
+                error = AUTO_MERGE.workflow_ops.WorkflowOperationError("missing") if result.returncode else None
+                with self.subTest(message=message), patch.object(AUTO_MERGE.workflow_ops, "git", return_value=result.stdout, side_effect=error), \
                      patch.object(AUTO_MERGE.merge_review_gate, "security_no_longer_covered", return_value=True):
                     with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, message):
                         AUTO_MERGE.current_review(root, binding, changed)
@@ -264,7 +265,7 @@ class AutoMergeTests(unittest.TestCase):
             review = root / "reviews" / "feature-auto-merge.md"
             review.parent.mkdir()
             review.write_text(f"**Reviewed up to commit:** `{HEAD}`\n- [x] complete\n", encoding="utf-8")
-            with patch.object(AUTO_MERGE.workflow_ops, "run_process", return_value=SimpleNamespace(returncode=1, stdout="")):
+            with patch.object(AUTO_MERGE.workflow_ops, "git", side_effect=AUTO_MERGE.workflow_ops.WorkflowOperationError("missing")):
                 AUTO_MERGE.current_review(root, binding, [])
 
     def test_local_canonical_review_fallback_rejects_stale_findings_and_missing_security(self):
@@ -284,7 +285,7 @@ class AutoMergeTests(unittest.TestCase):
             for content, changed, message in cases:
                 with self.subTest(message=message):
                     review.write_text(content, encoding="utf-8")
-                    with patch.object(AUTO_MERGE.workflow_ops, "run_process", return_value=SimpleNamespace(returncode=1, stdout="")), \
+                    with patch.object(AUTO_MERGE.workflow_ops, "git", side_effect=AUTO_MERGE.workflow_ops.WorkflowOperationError("missing")), \
                          patch.object(AUTO_MERGE.merge_review_gate, "security_no_longer_covered", return_value=True):
                         with self.assertRaisesRegex(AUTO_MERGE.AutoMergeError, message):
                             AUTO_MERGE.current_review(root, binding, changed)

@@ -47,6 +47,20 @@
               }
             }
           ]
+        },
+        "base-agents": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "properties": {
+                "repository": {
+                  "const": "tj-agents/core"
+                }
+              }
+            }
+          ]
         }
       },
       "additionalProperties": {
@@ -58,7 +72,10 @@
             "not": {
               "properties": {
                 "repository": {
-                  "const": "tj-agents/marketplace"
+                  "enum": [
+                    "tj-agents/marketplace",
+                    "tj-agents/core"
+                  ]
                 }
               },
               "required": [

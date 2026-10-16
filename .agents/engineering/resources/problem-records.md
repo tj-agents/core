@@ -4,9 +4,30 @@ Bug, mistake, and debt records preserve an observed problem until its owning rep
 evidence. They make the next action explicit; they do not create authority to repair, publish, dispatch,
 or schedule work.
 
+## Repository selection
+
+A committed `.problem-records.json` in the source repository's primary checkout may select an optional
+provider with `{"schema_version":1,"provider":"plugin:utility"}`. Read this declaration before recording,
+listing or addressing problems. Load that qualified installed skill for the current host and use its
+commands, canonical identities, configuration, publication and retention rules. Keep the common facts,
+repair ownership and evidence below. A missing or invalid selected provider is a blocker; preserve the
+observation in the active goal and report the resolver and resume condition without creating a fallback
+register. Selection requires repository authorization; never adopt a provider merely because it is installed.
+Without a declaration, the existing repository-declared register and file defaults below apply.
+
+Providers keep backend configuration and transport in their own package. For handoff admission they ship
+`scripts/read_problem_record.py` beside the installed skill. Core invokes it with `--root <absolute-source-primary>`
+and `--record <canonical-URI>` using the same Python interpreter. Its only stdout is a JSON object with
+exactly `record` (the requested URI), `kind` (`bug`, `mistake` or `debt`), `state` (`open`) and `body`
+(nonempty current text). Nonzero exit, malformed data, another identity or a closed record fails admission.
+The reader requires Python 3.9 or later and must not rely on machine-local registry entries. Both hosts
+resolve the selected installed skill through Core's existing discovery. A body may contain the existing
+`agent-handoff-disposition` fence; the provider transports it and Core validates its semantics and evidence.
+
 ## Record shape
 
-Use one stable, kind-local identifier. Keep the identifier when details, priority, state, or repair links
+Use the selected provider's canonical identity, retaining legacy identifiers when migrating records.
+For file-backed records, use one stable, kind-local identifier. Keep the identifier when details, priority, state, or repair links
 change. The root defaults use `B001` for bugs and `M001` for mistakes; an existing typed register may use
 its declared identifier syntax.
 
@@ -39,7 +60,10 @@ evidence before proceeding. A missing cause or source owner remains explicitly `
 as the next action; never invent either field to modernize a record. Declared equivalent historic states
 remain valid.
 
-## Location and retention
+## File-backed location and retention
+
+This section applies when no optional provider is selected. A selected provider owns its remote
+publication and retention; a verified remote debt item may close with history retained.
 
 Use a repository-declared problem owner or an existing shared typed register when one exists. Otherwise,
 bugs default to the repository-root `BUGS.md`; mistakes default to root `MISTAKES.md`; debt remains in

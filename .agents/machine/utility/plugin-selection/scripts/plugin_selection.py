@@ -14,6 +14,8 @@ SCHEMA_VERSION = 1
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
 ALLOWED_OWNERS = ("tj-agents", "Concertable")
+CORE_MARKETPLACE = "base-agents"
+CORE_REPOSITORY = "tj-agents/core"
 CORE_PLUGINS = ("base", "engineering", "machine")
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/(?P<name>[A-Za-z0-9_][A-Za-z0-9_.-]*)\Z")
@@ -62,6 +64,8 @@ def validate_marketplace(name: str, value: object) -> dict:
         )
     if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
         raise lock_io.LockError(f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name")
+    if (name == CORE_MARKETPLACE) != (repository == CORE_REPOSITORY):
+        raise lock_io.LockError(f"The {CORE_MARKETPLACE} marketplace must be {CORE_REPOSITORY} and nothing else may use that name")
     return value
 
 
