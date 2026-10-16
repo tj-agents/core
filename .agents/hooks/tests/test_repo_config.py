@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "plugin-lock" / "scripts" / "repo_config.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "machine" / "utility" / "plugin-selection" / "scripts" / "repo_config.py"
 sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location("repo_config", SCRIPT)
 repo_config = importlib.util.module_from_spec(spec)
@@ -22,13 +22,13 @@ class RepoConfigTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
-        self.lock = self.root / ".agents" / "plugins.lock.json"
+        self.lock = self.root / ".agents" / "plugins.json"
         self.lock.parent.mkdir()
         self.plugins = ["base@tj-agents", "engineering@tj-agents", "machine@tj-agents"]
         self.save_lock()
 
     def save_lock(self):
-        document = {"schema_version": 3, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace", "revision": "v1.0.0"}}, "plugins": self.plugins}
+        document = {"schema_version": 1, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}, "plugins": self.plugins}
         self.lock.write_text(json.dumps(document), encoding="utf-8")
 
     def test_generates_both_hosts_preserving_unrelated_settings_and_checks_drift(self):
@@ -44,15 +44,16 @@ class RepoConfigTests(unittest.TestCase):
         c = json.loads(claude.read_text(encoding="utf-8"))
         self.assertEqual("test", c["env"]["MODE"])
         self.assertEqual("tj-agents/marketplace", c["extraKnownMarketplaces"]["tj-agents"]["source"]["repo"])
-        self.assertEqual("v1.0.0", c["extraKnownMarketplaces"]["tj-agents"]["source"]["ref"])
+        self.assertNotIn("ref", c["extraKnownMarketplaces"]["tj-agents"]["source"])
+        self.assertTrue(c["extraKnownMarketplaces"]["tj-agents"]["autoUpdate"])
         self.assertEqual(3, len(c["enabledPlugins"]))
         self.assertNotIn("old@other", c["enabledPlugins"])
         self.assertEqual([], c["permissions"]["allow"])
         d = codex.read_text(encoding="utf-8")
         self.assertIn('model = "test"', d)
         self.assertIn('source = "https://github.com/tj-agents/marketplace.git"', d)
-        self.assertIn('ref = "v1.0.0"', d)
-        self.assertIn('sparse_paths = [".agents/plugins", ".claude-plugin"]', d)
+        self.assertNotIn('ref = ', d)
+        self.assertIn('sparse_paths = [".agents/plugins", ".claude-plugin", "plugins"]', d)
         self.assertEqual(3, d.count('[plugins."'))
 
     def test_overlay_composes_permissions_and_removes_stale_rules(self):

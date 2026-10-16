@@ -49,6 +49,7 @@
     "plugins/base",
     "plugins/engineering",
     "plugins/machine",
+    "plugins/publication.json",
     ".agents/plugins/marketplace.json",
     ".claude-plugin/marketplace.json",
     "CAPABILITIES.md"

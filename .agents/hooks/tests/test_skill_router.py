@@ -665,7 +665,7 @@ class SkillRouterTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-    def test_the_shipped_table_still_carries_the_rename_that_deadlocked_the_router(self):
+    def test_shipped_table_does_not_retain_retired_skill_aliases(self):
         import importlib.util
 
         sys.path.insert(0, str(HOOKS))
@@ -676,8 +676,7 @@ class SkillRouterTests(unittest.TestCase):
 
         aliases = module.skill_aliases()
 
-        self.assertEqual("engineering:review-lifecycle", aliases["base:review-lifecycle"])
-        self.assertNotIn("base:plan-artifacts", aliases)
+        self.assertEqual({}, aliases)
 
 
 
