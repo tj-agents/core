@@ -394,7 +394,8 @@ def resolve_target(target, hosts=("codex", "claude"), roots=None, pick_latest=Fa
         if len(exact) > 1:
             raise ValueError("That id exists in more than one host profile; pass --host to select one.")
     directory = Path(target).expanduser() if target else None
-    by_directory = directory is not None and directory.is_dir()
+    path_like = bool(target) and (directory.is_absolute() or any(mark in target for mark in ("/", "\\")) or target in (".", ".."))
+    by_directory = path_like and directory.is_dir()
     found = []
     unavailable = []
     for host in hosts:
