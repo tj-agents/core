@@ -13,8 +13,8 @@ parent synthesis, work-order schema, and authorization boundary belong to `revie
 
 ## Resolve the existing work order
 
-Derive `reviews/<branch-slug>.md` from the current candidate branch. If the user names a file, normalize it
-to a repository-relative path and reject it unless it equals that derived canonical path exactly. The file
+Resolve the current candidate branch's work order with `<engineering>/workflows/workflow_ops.py review-path`. If the user names a file,
+resolve it and reject it unless it equals that derived canonical path exactly. The file
 must already represent this branch. If no work order exists, route to `review`. If its status is
 `in-progress`, resume or restart that frozen pass rather than starting a competing incremental pass.
 
