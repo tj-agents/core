@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import delivery_runtime
 import delivery_policy
 import workflow_runtime
+import review_evidence
 from pr_body import validate_pr_body
 
 
@@ -424,6 +425,9 @@ def inspect_repository(root, workflow_run_id):
         except workflow_runtime.ContractViolation:
             continue
     reviews = sorted(str(path.relative_to(root)).replace("\\", "/") for path in root.glob("reviews/*.md"))
+    private = review_work_order(root, branch)
+    if private.is_file() and private != review_evidence.legacy_path(root, branch):
+        reviews.append(str(private))
     result = {
         "schema_version": SCHEMA_VERSION,
         "operation": "inspect",
@@ -874,8 +878,7 @@ def descriptor_identity(value):
 
 
 def review_work_order(root, branch):
-    slug = branch.replace("/", "-").replace("\\", "-")
-    return root / "reviews" / f"{slug}.md"
+    return review_evidence.work_order_path(root, branch)
 
 
 def coverage_requirement(paths):
@@ -940,7 +943,7 @@ def review_host_check(root, workflow_run_id, descriptor_path, work_order):
         "operation": "review-host-check",
         "required": bool(paths),
         "paths": paths,
-        "work_order": str(expected.relative_to(root)).replace("\\", "/"),
+        "work_order": str(expected),
         "head": descriptor["head"],
     }
     if paths:
@@ -1801,7 +1804,7 @@ def delivery_host_coverage(root, base_ref):
     }
     if agent_paths:
         work_order = root / review["work_order"]
-        result["work_order"] = str(work_order.relative_to(root)).replace("\\", "/")
+        result["work_order"] = str(work_order)
         result.update(host_coverage_module().validate_documents([work_order], "review", coverage_head))
     else:
         result.update({"stage": "review", "valid": True, "errors": [], "record_count": 0})
@@ -2034,13 +2037,6 @@ def resolved_commit(root, revision):
 
 
 def review_is_current(root, reviewed, head):
-    """Whether review evidence at `reviewed` still covers `head`.
-
-    Stamping the watermark is itself a commit, so evidence can never sit at the commit containing it.
-    `merge_review_gate.review_only` already answers this for the merge; answering it differently here
-    would have the binding call a head unreviewed that the gate calls reviewed, and send every
-    delivery back through a full `review` after each stamp.
-    """
     if reviewed == head:
         return True
     completed = run_process(["git", "diff", "--name-only", f"{reviewed}..{head}"], root, check=False)
@@ -2051,20 +2047,52 @@ def review_is_current(root, reviewed, head):
 
 
 def review_binding(root, branch, head):
-    slug = branch.replace("/", "-").replace("\\", "-")
-    work_order = f"reviews/{slug}.md"
+    path = review_work_order(root, branch)
     watermark = None
     try:
-        body = (root / work_order).read_text(encoding="utf-8")
-    except OSError:
-        body = ""
-    match = re.search(r"Reviewed up to commit:\*{0,2}\s*`([0-9a-f]{7,40})`", body)
-    # Resolve before comparing: an abbreviated stamp at the head is not string-equal to it, and the
-    # empty diff that follows would read as "nothing reviewed" rather than "reviewed here".
-    reviewed = resolved_commit(root, match.group(1)) if match else None
-    if reviewed is not None and review_is_current(root, reviewed, head):
-        watermark = reviewed
-    return {"work_order": work_order, "work_order_order": ["full"], "reviewed_sha": watermark}
+        evidence = review_evidence.resolve(root, branch, head, lambda *args: git(root, *args))
+        body = evidence["body"]
+        gate = review_gate_module()
+        reviewed = gate.work_order_sha_field(body, "Reviewed up to commit")
+        reviewed = resolved_commit(root, reviewed) if reviewed not in (None, "invalid") else None
+        if (not gate.review_completion_problem(body) and not gate.unresolved_review_items(body)
+                and reviewed is not None and review_is_current(root, reviewed, head)):
+            watermark = reviewed
+        path = evidence["path"]
+    except review_evidence.ReviewEvidenceError:
+        pass
+    return {"work_order": str(path), "work_order_order": ["full"], "reviewed_sha": watermark}
+
+
+def review_gate_module():
+    hooks = Path(__file__).resolve().parents[1] / "hooks"
+    if str(hooks) not in sys.path:
+        sys.path.insert(0, str(hooks))
+    import merge_review_gate
+    return merge_review_gate
+
+
+def review_record(root, workflow_run_id, descriptor_path, work_order):
+    descriptor = load_descriptor(root, workflow_run_id, descriptor_path)
+    if git(root, "branch", "--show-current") != descriptor["branch"]:
+        raise WorkflowOperationError("review completion belongs to another branch")
+    expected = review_work_order(root, descriptor["branch"])
+    if Path(work_order).resolve() != expected.resolve():
+        raise WorkflowOperationError("review completion must use the canonical work order")
+    raw = expected.read_bytes()
+    body = raw.decode("utf-8")
+    gate = review_gate_module()
+    if gate.review_completion_problem(body):
+        raise WorkflowOperationError("review work order is incomplete")
+    if gate.work_order_sha_field(body, "Reviewed up to commit") != descriptor["head"]:
+        raise WorkflowOperationError("review completion does not match the frozen candidate")
+    if coverage_requirement(descriptor["paths"]):
+        if not host_coverage_module().validate_documents([expected], "review", descriptor["head"])["valid"]:
+            raise WorkflowOperationError("review host coverage is incomplete")
+    private = expected != review_evidence.legacy_path(root, descriptor["branch"])
+    if private:
+        review_evidence.record(root, descriptor["branch"], descriptor["head"], descriptor["descriptor_id"], expected, raw)
+    return {"operation": "review-record", "head": descriptor["head"], "work_order": str(expected), "private": private}
 
 
 def standing_authorization(root, changed_paths, labels):
@@ -2248,6 +2276,13 @@ def parser():
     review.add_argument("--docs-risk", choices=("ordinary", "routine"), default="ordinary")
     review.add_argument("--docs-rationale")
 
+    review_path = commands.add_parser("review-path")
+    review_path.add_argument("--durable", action="store_true")
+
+    completion = commands.add_parser("review-record")
+    completion.add_argument("--descriptor", required=True)
+    completion.add_argument("--work-order", required=True)
+
     host_check = commands.add_parser("review-host-check")
     host_check.add_argument("--descriptor", required=True)
     host_check.add_argument("--work-order", required=True)
@@ -2332,6 +2367,11 @@ def main(argv=None):
             root, arguments.workflow_run_id, arguments.base, arguments.head, arguments.synchronize,
             arguments.docs_risk, arguments.docs_rationale,
         )
+    elif arguments.operation == "review-path":
+        path = review_evidence.prepare_path(root, git(root, "branch", "--show-current"), arguments.durable)
+        result = {"operation": "review-path", "work_order": str(path)}
+    elif arguments.operation == "review-record":
+        result = review_record(root, arguments.workflow_run_id, arguments.descriptor, arguments.work_order)
     elif arguments.operation == "review-host-check":
         result = review_host_check(root, arguments.workflow_run_id, arguments.descriptor, arguments.work_order)
     elif arguments.operation == "review-reconcile":
@@ -2388,6 +2428,6 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (WorkflowOperationError, OSError, ValueError, json.JSONDecodeError) as error:
+    except (WorkflowOperationError, review_evidence.ReviewEvidenceError, OSError, ValueError, json.JSONDecodeError) as error:
         emit({"schema_version": SCHEMA_VERSION, "operation": "error", "error": str(error)[:DEFAULT_SUMMARY_BYTES]})
         raise SystemExit(2)

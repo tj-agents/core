@@ -8,11 +8,21 @@ domain: process
 
 # Review work-order contract
 
-A review file is one branch's live work order, not an archive. Every full, incremental, staged, documentation,
-and combined review lifecycle uses the canonical path `reviews/<branch-slug>.md`, with `/` in the branch
-replaced by `-`. Derive that path from the candidate branch. If the user names a work-order path, normalize
-it to a repository-relative path and reject it unless it equals the derived canonical path exactly. Selectors
-may add mode-specific sections, but they do not create competing artifacts.
+A review file is one branch's live work order, not an archive. Ordinary full, incremental, documentation
+and combined reviews use an editable body in repository-private Git state. Resolve its absolute path with
+`workflow_ops.py --root <checkout> --workflow-run-id <id> review-path`; never assemble a machine-local path.
+Big/staged reviews use `review-path --durable`, retaining `reviews/<branch-slug>.md` with `/` replaced by `-`.
+That operation promotes an existing private body without losing its findings. Existing durable work orders
+remain canonical through their lifecycle. If the user names a path, resolve it and reject it unless it
+equals the runtime's derived canonical path exactly. Selectors never create competing artifacts.
+
+The strong parent finalizes an ordinary review with `review-record --descriptor <descriptor-path>
+--work-order <canonical-work-order>` on the same workflow command. It verifies frozen-head completion and
+host coverage, then atomically writes a Git-private receipt binding repository, checkout, branch, exact
+head, descriptor identity and body hash. Editing the body invalidates that receipt until a reviewed pass
+is completed again. All merge and delivery readers use the same resolver; invalid private evidence never
+falls back to a committed or local durable file. Legacy durable evidence remains readable during migration.
+Private proof requires the exact head; legacy review-only transport compatibility does not extend it.
 
 The strong parent is the sole writer. Native review and fresh lenses return candidate evidence only. They
 never edit the file, assign final severity, approve the change, or see one another's conclusions.
@@ -55,7 +65,7 @@ Record the descriptor in the pass section:
 **Candidate path-set:** `sha256:<digest>` `(<N> paths)`
 **Candidate bundle:** `<absolute-disposable-directory>`
 **Candidate bundle identity:** `sha256:<digest>`
-**Work-order path:** `reviews/<branch-slug>.md`
+**Work-order path:** `<resolved-canonical-path>`
 **Work-order mode:** `new|append`
 ```
 
@@ -101,7 +111,7 @@ top-level current judgment and its own pass judgment.
 **Candidate path-set:** `sha256:<digest>` `(<N> paths)`
 **Candidate bundle:** `<absolute-disposable-directory>`
 **Candidate bundle identity:** `sha256:<digest>`
-**Work-order path:** `reviews/<branch-slug>.md`
+**Work-order path:** `<resolved-canonical-path>`
 **Work-order mode:** `new|append`
 **Pass judgment:** `pending|approved|changes-requested`
 
@@ -157,7 +167,7 @@ incomplete, the pass is in the explicit `parent-finalization` resume state rathe
 - `incremental-review` appends a pass and moves the marker only after that pass completes.
 - `address-review` may change a finding's status and append disposition or fix evidence. It must not rewrite
   the frozen candidate identity, original finding text, original severity, or any completed pass judgment.
-- The merge gate reads only the canonical file. It requires a completed status when the field is present, a
+- The merge gate resolves canonical private proof or the existing durable file. It requires a completed status when the field is present, a
   current marker, no `[ ]` or `[~]` item, and a current security marker when applicable.
 
 ## Addressing findings
@@ -172,10 +182,12 @@ nor worsens it, and its repair is independent.
 
 ## Retention and deletion
 
-Keep the work order, including a clean no-find review, through merge because it is the local merge gate's
-evidence. It is spent only after the reviewed branch merges or is deliberately retired and every finding has
-a terminal disposition. Then remove an untracked artifact immediately. Delete a tracked artifact in the
-next substantive or final closeout commit; never create a review-only cleanup commit.
+Keep the work order and private receipt, including a clean no-find review, through merge because they are
+the local merge gate's evidence. On interruption, resolve that same body and receipt; retain the immutable
+descriptor and regenerate its bundle only when review work must resume. Missing proof never implies approval.
+They are spent only after the branch merges or is deliberately retired and every finding is terminal. Then
+remove the private body and receipt or untracked durable file. Delete a tracked artifact in the next
+substantive or final closeout commit; never create a review-only cleanup commit or publish ordinary proof.
 
 An artifact with open findings or incomplete staged coverage remains live. A review is never kept as a
 permanent record after its branch is terminal; Git, the PR, durable debt, and the merged changes own history.
