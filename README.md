@@ -148,6 +148,19 @@ python -B scripts/update_catalog_digests.py
 pwsh .agents/sync-generated.ps1
 ```
 
+PR CI uses `scripts/ci_selection.py` (Python 3.9+) to classify the complete base-to-merge change.
+Inert prose runs the documentation reachability check. Changes to mapped problem-record, plugin-adoption,
+lock-bump, machine-verification and handoff-transfer code run their regression modules on Windows and
+Linux, with generation and packaging checks. Changed test modules include their import consumers.
+Unknown paths, shared infrastructure, executable guidance, binary changes, unresolved ranges and broad
+changes retain the full matrix. Main always runs the full matrix. Add the `ci:full` PR label to request
+full coverage; adding or removing a label reevaluates selection.
+
+`ci-required` runs after selection, the generated-path guard and both platform jobs. It fails if
+classification or any selected job fails, disappears, is cancelled or skips. Configure branch protection
+to require this check when enabling server-side enforcement. Existing all-checks merge validation also
+consumes its result. Selection never cancels a prior run or transfers a previous head's test success.
+
 The `machine:plugin-lock` skill creates a repository's `.agents/plugins.lock.json` (`<plugin>@<marketplace>`
 selections plus a pinned revision per marketplace) and generates the committed Claude and Codex plugin settings from it, so a
 fresh clone installs exactly what it selects. It also moves repositories to another marketplace tag and audits
