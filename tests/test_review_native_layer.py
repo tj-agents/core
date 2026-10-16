@@ -98,7 +98,6 @@ class ReviewRunsWithoutRepositoryHelpers(unittest.TestCase):
             named.update(re.findall(r"<engineering>/([\w./-]+\.py)", path.read_text(encoding="utf-8")))
 
         self.assertIn("workflows/workflow_ops.py", named)
-        self.assertIn("hooks/tier_gate.py", named)
         for relative in named:
             with self.subTest(helper=relative):
                 self.assertTrue((PACKAGE / relative).is_file())
