@@ -1258,8 +1258,14 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
             before = before_document.get("plugins")
             if not isinstance(before, dict):
                 raise RollingPluginError("Claude installed plugin registry has invalid plugins")
-            for identity in packages:
-                _native([executable, "plugin", "install", identity, "--scope", "user"], project, environment, deadline)
+            representatives = {}
+            installed_aliases = {}
+            for identity, expected in packages.items():
+                key = (expected.repository, expected.revision, identity.rsplit("@", 1)[0])
+                if key not in representatives:
+                    _native([executable, "plugin", "install", identity, "--scope", "user"], project, environment, deadline)
+                    representatives[key] = identity
+                installed_aliases[identity] = representatives[key]
             maintenance = _json(plugin_root / "installed_plugins.json")
             installed = maintenance.get("plugins")
             if not isinstance(installed, dict):
@@ -1269,7 +1275,7 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
             if not isinstance(registry, dict):
                 raise RollingPluginError("Claude did not write an installed plugin registry")
             for identity, expected in packages.items():
-                records = installed.get(identity)
+                records = installed.get(installed_aliases[identity])
                 user_path = next((item.get("installPath") for item in records or [] if isinstance(item, dict)
                                   and item.get("scope") == "user" and isinstance(item.get("installPath"), str)), None)
                 if not isinstance(user_path, str):
