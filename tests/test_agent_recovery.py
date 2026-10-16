@@ -290,6 +290,102 @@ Observed blocker: no send was attempted."""
             self.assertEqual(RECOVERY.main(["recover", "--host", "codex", "--select", "codex:exact_id", "--select", "codex:exact_id"]), 1)
         opened.assert_not_called()
 
+    def roots(self):
+        claude = self.root / "claude projects"
+        return claude, {"codex": self.root / "sessions", "claude": claude}
+
+    def test_reopen_resolves_an_exact_id_in_either_host_without_a_host_argument(self):
+        self.write_codex()
+        claude, roots = self.roots()
+        self.write_claude(claude)
+        self.assertEqual("codex", RECOVERY.resolve_target("exact_id", roots=roots)["host"])
+        self.assertEqual("claude", RECOVERY.resolve_target("claude_id", roots=roots)["host"])
+
+    def test_reopen_resolves_a_topic_and_a_directory_across_hosts_and_refuses_ambiguity(self):
+        self.write_codex()
+        claude, roots = self.roots()
+        self.write_claude(claude)
+        self.assertEqual("claude_id", RECOVERY.resolve_target("Claude recovery title", roots=roots)["id"])
+        with self.assertRaisesRegex(ValueError, "More than one session matched"):
+            RECOVERY.resolve_target(str(self.cwd), roots=roots)
+        self.assertIn(RECOVERY.resolve_target(str(self.cwd), roots=roots, pick_latest=True)["id"], {"exact_id", "claude_id"})
+        with self.assertRaisesRegex(ValueError, "No Claude or Codex session matched"):
+            RECOVERY.resolve_target("no such topic", roots=roots)
+
+    def test_latest_prefers_a_live_match_over_a_newer_closed_one(self):
+        found = [{"host": "claude", "id": "new", "status": "closed", "activity": "2", "cwd": str(self.cwd), "title": None, "preview": ""},
+                 {"host": "codex", "id": "old", "status": "live", "activity": "1", "cwd": str(self.cwd), "title": None, "preview": ""}]
+        with mock.patch.object(RECOVERY, "search", side_effect=lambda hosts, *_: [item for item in found if item["host"] in hosts]):
+            self.assertEqual("old", RECOVERY.resolve_target("topic", pick_latest=True)["id"])
+
+    def test_reopen_bare_word_is_a_topic_even_when_a_directory_has_that_name(self):
+        self.write_codex()
+        _, roots = self.roots()
+        (self.root / "topic_dir_probe").mkdir()
+        previous = Path.cwd()
+        os.chdir(self.root)
+        self.addCleanup(os.chdir, previous)
+        with mock.patch.object(RECOVERY, "search", return_value=[]) as search:
+            with self.assertRaises(ValueError):
+                RECOVERY.resolve_target("topic_dir_probe", roots=roots)
+        self.assertEqual(("topic_dir_probe", None), search.call_args.args[1:3])
+
+    def test_reopen_closed_session_opens_in_its_own_host(self):
+        self.write_codex()
+        claude, roots = self.roots()
+        self.write_claude(claude)
+        focus = mock.Mock()
+        with mock.patch.object(RECOVERY, "liveness", return_value="closed"), \
+             mock.patch.object(RECOVERY, "open_session", return_value={"host": "claude", "id": "claude_id"}) as opened:
+            result = RECOVERY.reopen("claude_id", roots=roots, focus=focus)
+        self.assertEqual("opened", result["action"])
+        self.assertEqual(("claude", "claude_id"), opened.call_args.args[:2])
+        focus.assert_not_called()
+
+    def test_reopen_live_session_focuses_its_tab_and_never_launches_a_second_writer(self):
+        self.write_codex()
+        _, roots = self.roots()
+        focus = mock.Mock()
+        with mock.patch.object(RECOVERY, "liveness", return_value="live"), \
+             mock.patch.object(RECOVERY, "open_session") as opened:
+            result = RECOVERY.reopen("exact_id", roots=roots, focus=focus)
+        self.assertEqual("focused", result["action"])
+        focus.assert_called_once_with("codex", "exact_id")
+        opened.assert_not_called()
+
+    def test_reopen_live_session_with_unfocusable_tab_fails_without_launching(self):
+        self.write_codex()
+        _, roots = self.roots()
+        focus = mock.Mock(side_effect=ValueError("could not be focused"))
+        with mock.patch.object(RECOVERY, "liveness", return_value="live"), \
+             mock.patch.object(RECOVERY, "open_session") as opened:
+            with self.assertRaisesRegex(ValueError, "could not be focused"):
+                RECOVERY.reopen("exact_id", roots=roots, focus=focus)
+        opened.assert_not_called()
+
+    def test_reopen_unknown_session_is_still_refused_without_confirmation(self):
+        self.write_codex()
+        _, roots = self.roots()
+        focus = mock.Mock()
+        with self.assertRaisesRegex(ValueError, "conflicting or incomplete live identity"):
+            RECOVERY.reopen("exact_id", roots=roots, focus=focus)
+        focus.assert_not_called()
+
+    def test_focus_session_runs_the_peer_cli_focus_and_reports_failure(self):
+        done = subprocess.CompletedProcess([], 0, "", "")
+        with mock.patch.object(RECOVERY.subprocess, "run", return_value=done) as run:
+            RECOVERY.focus_session("codex", "exact_id")
+        self.assertEqual(["--session", "exact_id", "--focus"], run.call_args.args[0][-3:])
+        failed = subprocess.CompletedProcess([], 2, "", "close-tab: absent")
+        with mock.patch.object(RECOVERY.subprocess, "run", return_value=failed):
+            with self.assertRaisesRegex(ValueError, "absent"):
+                RECOVERY.focus_session("codex", "exact_id")
+
+    def test_reopen_main_requires_a_target(self):
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(1, RECOVERY.main(["reopen"]))
+        self.assertIn("--target", err.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
