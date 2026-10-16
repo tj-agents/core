@@ -32,11 +32,10 @@ def catalog_digests(revision: str, root: Path = ROOT) -> dict[str, str]:
         catalog = json.loads(git("show", f"{revision}:{CATALOG}", root=root))
     except subprocess.CalledProcessError:
         return {}
-    return {
-        plugin["id"]: plugin.get("digest")
-        for release in catalog.get("releases", [])
-        for plugin in release.get("plugins", [])
-    }
+    packages = catalog.get("packages")
+    if packages is None:
+        packages = [package for release in catalog.get("releases", []) for package in release.get("plugins", [])]
+    return {package["id"]: package.get("digest") for package in packages}
 
 
 # The catalog itself is authored, but its digests are written by the same post-merge job as plugins/*.

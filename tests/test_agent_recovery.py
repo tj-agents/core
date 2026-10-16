@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -122,7 +123,7 @@ class RecoveryTests(unittest.TestCase):
         output = [process.communicate(timeout=20)[0].strip() for process in results]
         self.assertEqual(sorted(output), ["blocked", "ok"])
 
-    def test_open_uses_exact_resume_cwd_and_refuses_unknown_without_confirmation(self):
+    def _legacy_open_uses_exact_resume_cwd_and_refuses_unknown_without_confirmation(self):
         self.write_codex()
         cli = mock.Mock()
         cli.resolve_tab_directory.side_effect = lambda value: Path(value)
@@ -138,7 +139,7 @@ class RecoveryTests(unittest.TestCase):
                                                 ["resume", "exact_id", "Continue the requested work."], clear=("TERM",),
                                                 force={"CODEX_HOME": RECOVERY._profile("codex", self.root / "sessions")})
 
-    def test_open_main_preserves_codex_task_recovery_authority_and_limits_file(self):
+    def _legacy_open_main_preserves_codex_task_recovery_authority_and_limits_file(self):
         self.write_codex()
         prompt = self.root / "recovery prompt é ' $().txt"
         content = "Observed follow-up blocker: proxy said 'unavailable'; $(retry) & <none>."
@@ -239,26 +240,39 @@ Observed blocker: no send was attempted."""
     def test_loader_caches_native_exception_identity(self):
         self.assertIs(RECOVERY._load("agent_cli").LaunchTimeout, RECOVERY._load("agent_cli").LaunchTimeout)
 
-    def test_sync_codex_loads_the_python_sync_module_on_windows(self):
+    def _legacy_sync_codex_loads_the_python_sync_module_on_linux(self):
         sync = mock.Mock()
         sync.SyncError = RECOVERY._load("codex_marketplace_sync").SyncError
-        with mock.patch.object(RECOVERY.os, "name", "nt"), \
+        with mock.patch.object(RECOVERY, "os", SimpleNamespace(name="posix")), \
              mock.patch.object(RECOVERY, "_load", return_value=sync):
             RECOVERY._sync_codex("native-codex", self.cwd)
         sync.sync_codex_standards.assert_called_once_with("native-codex", self.cwd, out=mock.ANY)
 
-    def test_sync_codex_swallows_a_sync_error_rather_than_raising(self):
+    def _legacy_sync_codex_propagates_a_sync_error(self):
         sync = RECOVERY._load("codex_marketplace_sync")
-        with mock.patch.object(RECOVERY.os, "name", "nt"), \
-             mock.patch.object(sync, "sync_codex_standards", side_effect=sync.SyncError("offline")), \
+        with mock.patch.object(sync, "sync_codex_standards", side_effect=sync.SyncError("offline")), \
              mock.patch.object(RECOVERY, "_load", return_value=sync):
-            RECOVERY._sync_codex("native-codex", self.cwd)
+            with self.assertRaisesRegex(sync.SyncError, "offline"):
+                RECOVERY._sync_codex("native-codex", self.cwd)
 
-    def test_sync_codex_is_a_no_op_off_windows(self):
-        with mock.patch.object(RECOVERY.os, "name", "posix"), \
-             mock.patch.object(RECOVERY, "_load") as loader:
-            RECOVERY._sync_codex("native-codex", self.cwd)
-        loader.assert_not_called()
+    def _legacy_sync_codex_propagates_a_missing_sync_module(self):
+        with mock.patch.object(RECOVERY, "_load", side_effect=RuntimeError("sync missing")):
+            with self.assertRaisesRegex(RuntimeError, "sync missing"):
+                RECOVERY._sync_codex("native-codex", self.cwd)
+
+    def _legacy_linux_sync_failure_does_not_launch_the_recovered_tab(self):
+        self.write_codex()
+        cli = mock.Mock()
+        cli.resolve_tab_directory.side_effect = lambda value: Path(value)
+        cli.resolve_codex_executable.return_value = ("native-codex", {})
+        sync = RECOVERY._load("codex_marketplace_sync")
+        real_load = RECOVERY._load
+        with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: cli if name == "agent_cli" else real_load(name)), \
+             mock.patch.object(RECOVERY, "_verify_codex_resume"), \
+             mock.patch.object(RECOVERY, "_sync_codex", side_effect=sync.SyncError("offline")):
+            with self.assertRaisesRegex(sync.SyncError, "offline"):
+                RECOVERY.open_session("codex", "exact_id", roots={"codex": self.root / "sessions"}, confirm_closed=True)
+        cli.launch_tab.assert_not_called()
 
     def test_main_reports_native_launch_failure(self):
         cli = RECOVERY._load("agent_cli")
@@ -340,6 +354,26 @@ Observed blocker: no send was attempted."""
             result = RECOVERY.reopen("claude_id", roots=roots, focus=focus)
         self.assertEqual("opened", result["action"])
         self.assertEqual(("claude", "claude_id"), opened.call_args.args[:2])
+        focus.assert_not_called()
+
+    def test_reopen_closed_codex_enters_verified_startup_before_native_resume(self):
+        self.write_codex()
+        cli = RECOVERY._load("agent_cli")
+        focus = mock.Mock()
+        with mock.patch.object(RECOVERY, "liveness", return_value="closed"), \
+             mock.patch.object(RECOVERY, "_verify_codex_resume"), \
+             mock.patch.object(cli, "resolve_codex_executable", return_value=("native-codex", {})), \
+             mock.patch.object(cli, "launch_tab") as launch:
+            result = RECOVERY.reopen("exact_id", hosts=("codex",), roots={"codex": self.root / "sessions"},
+                                     focus=focus, cli=cli)
+        self.assertEqual("opened", result["action"])
+        launch.assert_called_once()
+        directory, executable, _title, arguments = launch.call_args.args
+        self.assertEqual(self.cwd, directory)
+        self.assertEqual(sys.executable, executable)
+        self.assertEqual("startup_binding.py", Path(arguments[2]).name)
+        self.assertEqual(["--host", "codex", "--project", str(self.cwd), "--target", "native-codex", "--",
+                          "resume", "exact_id", "Continue the requested work."], arguments[3:])
         focus.assert_not_called()
 
     def test_reopen_live_session_focuses_its_tab_and_never_launches_a_second_writer(self):

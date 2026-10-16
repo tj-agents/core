@@ -52,30 +52,30 @@ def expected_hooks(root: Path, config: dict, plugin: str) -> list[dict]:
 def validate_requires(root: Path, config: dict, catalog: dict, plugin: str, requires: dict) -> None:
     if set(requires) != REQUIRED_KEYS:
         raise ValueError(f"{plugin}: harness requires fields must be {sorted(REQUIRED_KEYS)}")
-    marketplaces = requires["marketplaces"]
-    releases = {release["marketplace"]: release for release in catalog["releases"]}
-    for marketplace in marketplaces:
+    required_marketplaces = requires["marketplaces"]
+    entries = {package["id"]: package for package in catalog["packages"]}
+    catalog_marketplaces = {}
+    for package in entries.values():
+        marketplace = catalog_marketplaces.setdefault(package["marketplace"], package)
+        if marketplace["owner_repository"] != package["owner_repository"] or marketplace["source"] != package["source"]:
+            raise ValueError(f"Catalog marketplace has inconsistent ownership: {package['marketplace']}")
+    for marketplace in required_marketplaces:
         if set(marketplace) != {"id", "repository"}:
             raise ValueError(f"{plugin}: invalid marketplace declaration")
-        release = releases.get(marketplace["id"])
-        if release is None or release["owner_repository"] != marketplace["repository"]:
+        package = catalog_marketplaces.get(marketplace["id"])
+        if package is None or package["owner_repository"] != marketplace["repository"]:
             raise ValueError(f"{plugin}: marketplace declaration disagrees with catalog: {marketplace}")
-        if release["source"].removesuffix(".git") != f"https://github.com/{marketplace['repository']}":
+        if package["source"].removesuffix(".git") != f"https://github.com/{marketplace['repository']}":
             raise ValueError(f"{plugin}: marketplace source disagrees with catalog owner: {marketplace}")
     plugin_id = f"base-agents/{plugin}"
-    entries = {
-        item["id"]: item
-        for release in catalog["releases"]
-        for item in release["plugins"]
-    }
     if plugin_id not in entries:
         raise ValueError(f"{plugin}: missing catalog entry {plugin_id}")
     expected_plugins = sorted([plugin_id, *entries[plugin_id]["dependencies"]["required"]])
     if requires["plugins"] != expected_plugins:
         raise ValueError(f"{plugin}: required plugins must be {expected_plugins}")
     expected_marketplaces = sorted({value.split("/", 1)[0] for value in expected_plugins})
-    actual_marketplaces = sorted(item["id"] for item in marketplaces)
-    if actual_marketplaces != expected_marketplaces or any(value not in releases for value in actual_marketplaces):
+    actual_marketplaces = sorted(item["id"] for item in required_marketplaces)
+    if actual_marketplaces != expected_marketplaces or any(value not in catalog_marketplaces for value in actual_marketplaces):
         raise ValueError(f"{plugin}: marketplace declarations disagree with required plugins")
     if requires["hooks"] != expected_hooks(root, config, plugin):
         raise ValueError(f"{plugin}: declared hooks disagree with both host manifests")

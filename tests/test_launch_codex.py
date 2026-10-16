@@ -72,6 +72,17 @@ class LaunchCodexTests(unittest.TestCase):
             code = LAUNCH_CODEX.main(argv)
         return code, out.getvalue(), err.getvalue()
 
+    def bound_payload(self):
+        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        self.assertEqual(
+            arguments[:10],
+            [
+                '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'codex',
+                '--project', os.path.abspath(self.directory), '--target', '/bin/codex', '--',
+            ],
+        )
+        return arguments[10:]
+
     # --- validation ---
 
     def test_a_missing_working_directory_is_rejected_through_the_real_directory_check(self):
@@ -164,7 +175,7 @@ class LaunchCodexTests(unittest.TestCase):
 
     def test_no_model_lane_or_effort_means_only_cd_and_the_prompt_sentence(self):
         self.run_main()
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        arguments = self.bound_payload()
         if sys.platform == 'win32':
             self.assertEqual(arguments[0], '--no-daemon')
             arguments = arguments[1:]
@@ -176,7 +187,7 @@ class LaunchCodexTests(unittest.TestCase):
 
     def test_argument_order_is_cd_model_config_bypass_then_prompt(self):
         self.run_main('--model', 'explicit-model', '--reasoning-effort', 'high', '--bypass-hook-trust')
-        arguments = self.agent_cli.launch_tab.call_args.kwargs['arguments']
+        arguments = self.bound_payload()
         if sys.platform == 'win32':
             self.assertEqual(arguments[0], '--no-daemon')
             arguments = arguments[1:]
@@ -254,24 +265,27 @@ class LaunchCodexTests(unittest.TestCase):
         self.assertEqual(tuple(clear), ('TERM',))
         self.assertNotIn('force', self.agent_cli.launch_tab.call_args.kwargs)
 
-    def test_standards_are_synced_before_launch_in_order(self):
+    def test_executable_is_resolved_before_bound_session_launch(self):
         self.run_main()
         self.assertEqual(
             [call[0] for call in self.call_order.mock_calls],
-            ['resolve_codex_executable', 'sync_codex_standards', 'launch_tab'],
+            ['resolve_codex_executable', 'launch_tab'],
         )
 
-    def test_sync_is_called_with_the_resolved_codex_path_and_working_directory(self):
+    def test_binding_receives_resolved_codex_path_and_working_directory(self):
         self.run_main()
-        self.sync.sync_codex_standards.assert_called_once_with('/bin/codex', Path(os.path.abspath(self.directory)))
+        arguments = self.bound_payload()
+        if sys.platform == 'win32':
+            self.assertEqual(arguments.pop(0), '--no-daemon')
+        self.assertEqual(arguments[:2], ['--cd', os.path.abspath(self.directory)])
 
-    def test_a_sync_error_is_reported_as_a_launch_error_and_blocks_the_launch(self):
+    def test_parent_does_not_run_legacy_sync_before_opening_bound_session(self):
         self.sync.sync_codex_standards.side_effect = self.sync.SyncError('marketplace upgrade failed')
         code, out, err = self.run_main()
-        self.assertEqual(code, 1)
-        self.assertIn('marketplace upgrade failed', err)
-        self.agent_cli.launch_tab.assert_not_called()
-        self.assertNotIn('Launched', out)
+        self.assertEqual((code, err), (0, ''))
+        self.sync.sync_codex_standards.assert_not_called()
+        self.agent_cli.launch_tab.assert_called_once()
+        self.assertIn('Launched', out)
 
     def test_minimum_version_is_threaded_to_executable_resolution(self):
         self.run_main('--minimum-version', '0.160.0')
@@ -424,20 +438,23 @@ class LaunchCodexEndToEndTests(unittest.TestCase):
         self.assertEqual(inner[:5], ['sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', directory])
         self.assertEqual(inner[5], 'env')
 
-        codex_index = inner.index('/bin/codex')
+        binding_index = inner.index(sys.executable)
         expected_prompt_sentence = (
             f'Read the file at {self.prompt_path.resolve()} and follow its instructions, '
             'working from the current directory.'
         )
         self.assertEqual(
-            inner[codex_index:],
-            ['/bin/codex', *(['--no-daemon'] if sys.platform == 'win32' else []),
-             '--cd', directory, '--model', CODEX_LANES['lanes']['L4']['model'],
-             '--config', f"model_reasoning_effort={CODEX_LANES['lanes']['L4']['reasoning_effort']}",
-             expected_prompt_sentence],
+            inner[binding_index:],
+            [
+                sys.executable, '-I', '-B', str(self.agent_cli.startup_binding_script()), '--host', 'codex',
+                '--project', directory, '--target', '/bin/codex', '--',
+                *(['--no-daemon'] if sys.platform == 'win32' else []), '--cd', directory, '--model',
+                CODEX_LANES['lanes']['L4']['model'], '--config',
+                f"model_reasoning_effort={CODEX_LANES['lanes']['L4']['reasoning_effort']}", expected_prompt_sentence,
+            ],
         )
 
-        env_args = inner[6:codex_index]
+        env_args = inner[6:binding_index]
         self.assertIn('-u', env_args)
         self.assertIn('CLAUDECODE', env_args)
         self.assertIn('AGENT_CLI_TAB_TITLE=e2e handoff', env_args)
@@ -448,7 +465,6 @@ class LaunchCodexEndToEndTests(unittest.TestCase):
         self.assertFalse(any(arg.startswith('FORCE_COLOR') for arg in env_args))
 
         self.assertEqual(kwargs.get('stdin'), subprocess.DEVNULL)
-        self.sync.sync_codex_standards.assert_called_once()
 
 
 class InstalledLayoutTests(unittest.TestCase):
