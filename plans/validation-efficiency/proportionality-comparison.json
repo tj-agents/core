@@ -1,0 +1,80 @@
+[
+  {
+    "path": ".agents/engineering/policy/git-branching/SKILL.md",
+    "fix_commit": "2380644a",
+    "expected_sha256": "e85cf7edf96e8369ebbcdbb66641dbeb2d5e4921ce1e643dd9f7e9e76dd04b5a",
+    "installed": {
+      "exists": true,
+      "matches_fix": true
+    },
+    "session_snapshot": {
+      "exists": true,
+      "matches_fix": true
+    }
+  },
+  {
+    "path": ".agents/engineering/policy/lanes/SKILL.md",
+    "fix_commit": "2380644a",
+    "expected_sha256": "27cd93e63a4219e6544cd9dd8820da2fd7ac3c744be45d1cc32f83aa0c86fe42",
+    "installed": {
+      "exists": true,
+      "matches_fix": true
+    },
+    "session_snapshot": {
+      "exists": true,
+      "matches_fix": true
+    }
+  },
+  {
+    "path": ".agents/engineering/policy/session-guidance/SKILL.md",
+    "fix_commit": "2380644a",
+    "expected_sha256": "3cade358c2d4538804ce155845e7e8cdfde8b0c67aa20f12f4d2f0d899664451",
+    "installed": {
+      "exists": true,
+      "matches_fix": true
+    },
+    "session_snapshot": {
+      "exists": true,
+      "matches_fix": true
+    }
+  },
+  {
+    "path": ".agents/engineering/workflow/plan-execution/SKILL.md",
+    "fix_commit": "2380644a",
+    "expected_sha256": "27abc4fa9f280e99d99fc7c9d0acfdb0751b24a4ff7d673d4d2cf4292f19fccf",
+    "installed": {
+      "exists": true,
+      "matches_fix": true
+    },
+    "session_snapshot": {
+      "exists": true,
+      "matches_fix": true
+    }
+  },
+  {
+    "path": ".agents/engineering/workflow/review/SKILL.md",
+    "fix_commit": "2380644a",
+    "expected_sha256": "0e24846d34cd09da8946fcc6c15187ac2254a4a0835111aaba3e813b7b318599",
+    "installed": {
+      "exists": true,
+      "matches_fix": true
+    },
+    "session_snapshot": {
+      "exists": true,
+      "matches_fix": true
+    }
+  },
+  {
+    "path": ".agents/engineering/workflow/self-repair/SKILL.md",
+    "fix_commit": "2380644a",
+    "expected_sha256": "84ae005c0de664b883fe2d20a630c3ae010b26ed4330222658d3956a11892ab1",
+    "installed": {
+      "exists": true,
+      "matches_fix": true
+    },
+    "session_snapshot": {
+      "exists": true,
+      "matches_fix": true
+    }
+  }
+]
