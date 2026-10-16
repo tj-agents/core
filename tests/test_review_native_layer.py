@@ -189,32 +189,5 @@ class ConsumerRepositoryAcceptance(unittest.TestCase):
             descriptor["security"],
         )
 
-    def test_stage_four_lists_the_installed_tier_conventions_from_the_plugin(self):
-        config = self.root / "claude"
-        cache = config / "plugins" / "cache"
-        installed = cache / "dotagents" / "dotnet" / "installed"
-        stale = cache / "dotagents" / "dotnet" / "stale"
-        for payload in (installed, stale):
-            skill = payload / "skills" / "persistence"
-            skill.mkdir(parents=True)
-            (skill / "SKILL.md").write_text("---\nname: persistence\nkind: contract\n---\n", encoding="utf-8")
-            (payload / "tier.json").write_text(json.dumps({
-                "schema_version": 1, "tier": "dotnet", "applies": "stack-present",
-                "detect": {"files": ["global.json"]},
-            }), encoding="utf-8")
-        registry = {"plugins": {"dotnet@dotagents": [{"scope": "user", "installPath": str(installed)}]}}
-        (config / "plugins" / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
-        self.environment["CLAUDE_CONFIG_DIR"] = str(config)
-
-        completed = self.run_packaged(
-            "hooks/tier_gate.py", "--conventions", "--project", str(self.repository),
-        )
-
-        self.assertEqual(0, completed.returncode, completed.stderr)
-        self.assertIn("dotnet (", completed.stdout)
-        self.assertIn(str(installed / "skills" / "persistence" / "SKILL.md"), completed.stdout)
-        self.assertNotIn(str(stale), completed.stdout)
-
-
 if __name__ == "__main__":
     unittest.main()

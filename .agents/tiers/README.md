@@ -20,10 +20,14 @@ first cache that has it, the running host's first, and from the version that cac
 bad declaration in its owning stack repository. Host skill listings can still show blocked
 skills; the PreToolUse gate prevents their application.
 
-`tier_gate.py --conventions` lists, per applicable tier, the conventions its installed payload
-ships — the skills whose front matter declares `kind: contract` — with their installed paths.
-A review loads exactly that: the applicable tiers' rules, resolved from the installed cache with
-nothing wired into the reviewed repository.
+Reviews load only the skills selected by the reviewed repository's route table for changed paths.
+When one valid version 3 employer declaration applies, a selected `<stack>:<name>` resolves to
+`<employer>-<stack>:<name>` if that plugin and skill are installed. Otherwise it stays
+`<stack>:<name>`. The employer name is the declaring plugin name. The same resolution governs
+route queries, review, invocation checks, and session context. A company plugin can mirror a stack
+skill under the same name to replace that whole skill; no section merge occurs.
+When several employer declarations match, no replacement is selected until the ambiguity is resolved.
+When several employer declarations match, no replacement is selected until the ambiguity is resolved.
 
 `hooks/check_tier_payload.py` enforces the shipped payload shape a tier repository must generate:
 `tier.json` present and schema-valid in every payload declared by `.agents/plugins/payloads.json`
