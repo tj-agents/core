@@ -35,9 +35,6 @@
     },
     "marketplaces": {
       "type": "object",
-      "required": [
-        "tj-agents"
-      ],
       "propertyNames": {
         "pattern": "^[a-z][a-z0-9-]*$"
       },
@@ -55,6 +52,20 @@
               }
             }
           ]
+        },
+        "base-agents": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/pin"
+            },
+            {
+              "properties": {
+                "repository": {
+                  "const": "tj-agents/core"
+                }
+              }
+            }
+          ]
         }
       },
       "additionalProperties": {
@@ -66,7 +77,10 @@
             "not": {
               "properties": {
                 "repository": {
-                  "const": "tj-agents/marketplace"
+                  "enum": [
+                    "tj-agents/marketplace",
+                    "tj-agents/core"
+                  ]
                 }
               },
               "required": [
@@ -75,7 +89,19 @@
             }
           }
         ]
-      }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "tj-agents"
+          ]
+        },
+        {
+          "required": [
+            "base-agents"
+          ]
+        }
+      ]
     },
     "plugins": {
       "type": "array",
@@ -85,21 +111,66 @@
         "type": "string",
         "pattern": "^[a-z][a-z0-9-]*@[a-z][a-z0-9-]*$"
       },
-      "allOf": [
+      "oneOf": [
         {
-          "contains": {
-            "const": "base@tj-agents"
-          }
+          "allOf": [
+            {
+              "contains": {
+                "const": "base@tj-agents"
+              }
+            },
+            {
+              "contains": {
+                "const": "engineering@tj-agents"
+              }
+            },
+            {
+              "contains": {
+                "const": "machine@tj-agents"
+              }
+            },
+            {
+              "not": {
+                "contains": {
+                  "enum": [
+                    "base@base-agents",
+                    "engineering@base-agents",
+                    "machine@base-agents"
+                  ]
+                }
+              }
+            }
+          ]
         },
         {
-          "contains": {
-            "const": "engineering@tj-agents"
-          }
-        },
-        {
-          "contains": {
-            "const": "machine@tj-agents"
-          }
+          "allOf": [
+            {
+              "contains": {
+                "const": "base@base-agents"
+              }
+            },
+            {
+              "contains": {
+                "const": "engineering@base-agents"
+              }
+            },
+            {
+              "contains": {
+                "const": "machine@base-agents"
+              }
+            },
+            {
+              "not": {
+                "contains": {
+                  "enum": [
+                    "base@tj-agents",
+                    "engineering@tj-agents",
+                    "machine@tj-agents"
+                  ]
+                }
+              }
+            }
+          ]
         }
       ]
     }

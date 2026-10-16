@@ -15,10 +15,6 @@ merge command the hook fails CLOSED — any doubt (missing/stale/unclean review,
 even an internal error) blocks, because letting an unreviewed merge through is the
 exact failure this guard exists to prevent. Non-merge commands always exit 0.
 
-The review file is what `review` / `docs-review` write:
-`reviews/<branch-with-slashes-as-dashes>.md`, carrying a top-of-file
-`**Reviewed up to commit:** \`<sha>\`` marker and `- [ ]` / `- [x]` findings.
-
 Security layer: when the head being merged touches security-sensitive paths, the merge
 also requires a current `**Security-reviewed up to commit:** \`<sha>\`` marker —
 stamped by `review` Stage 6 after its host security review.
@@ -41,6 +37,9 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workflows"))
+import review_evidence
 
 from hook_runtime import (
     NETWORK_COMMAND_TIMEOUT_SECONDS,
@@ -134,13 +133,45 @@ def touches_security(changed_paths, patterns=_SECURITY_PATTERNS):
 _INVOCATION_RE = re.compile(r"(?:^|[;&|\n]|&&|\|\|)\s*(?:[A-Za-z_][\w]*=\S+\s+)*gh\s+pr\s+merge\b")
 
 
+def mask_quoted(command):
+    """`command` with every BALANCED quoted span's interior blanked out, same length, same positions.
+
+    `_INVOCATION_RE` reads `;`, `&` and `|` as shell operators by character class alone, so a
+    quoted argument that merely contains one of them — a grep pattern's `gh pr merge|...`
+    alternation, for example — was read exactly like a real pipe before "gh pr merge" and
+    gated a command that never ran a merge. Blanking quoted interiors first removes that text
+    from consideration while leaving every unquoted character at its original offset, so a
+    position-dependent caller (`invokes_pushd_before_merge`) still slices the real command.
+
+    A quote mark with no later matching close (an apostrophe in ordinary unquoted prose, say)
+    is left alone rather than opening a span that swallows the rest of the command to blanks —
+    including a real merge invocation after it. Mirrors `skill_router.py`'s own `_mask_quoted`,
+    which already guards exactly this with the same `str.find` lookahead.
+    """
+    chars = list(command)
+    index = 0
+    while index < len(command):
+        quote = command[index]
+        if quote in "'\"":
+            close = command.find(quote, index + 1)
+            if close != -1:
+                for position in range(index + 1, close):
+                    chars[position] = " "
+                index = close + 1
+                continue
+        index += 1
+    return "".join(chars)
+
+
 def invokes_merge(command):
     """True only when the command actually RUNS the merge, not merely mentions it.
 
     A substring test blocked any command quoting the string — including edits to this
-    file and the PR body describing them.
+    file and the PR body describing them. Checked against the quote-masked command so a
+    merge invocation must be a real, unquoted shell command, not text inside someone else's
+    quoted argument.
     """
-    return _INVOCATION_RE.search(command) is not None
+    return _INVOCATION_RE.search(mask_quoted(command)) is not None
 
 
 def is_merge_enable(command):
@@ -252,7 +283,7 @@ def invokes_pushd_before_merge(command):
     understand.
     """
     merge_start = None
-    for merge in _INVOCATION_RE.finditer(command):
+    for merge in _INVOCATION_RE.finditer(mask_quoted(command)):
         merge_start = merge.start()
     return merge_start is not None and _PUSHD_TOKEN_RE.search(command, 0, merge_start) is not None
 
@@ -377,13 +408,13 @@ def staged_work_order(review):
     return False
 
 
-def review_completion_problem(review):
+def review_completion_problem(review, strict=False):
     status = review_status(review)
     judgment = review_judgment(review)
     notes_status = work_order_field(review, "Cross-area notes status")
     summary_status = work_order_field(review, "Parent summary status")
     if status is None:
-        if any(value is not None for value in (judgment, notes_status, summary_status)):
+        if strict or any(value is not None for value in (judgment, notes_status, summary_status)):
             return "uses new-format review fields but has no `Review status`"
         return None
     if status != "complete":
@@ -566,9 +597,6 @@ def main():
                   "until a code-review can be verified.")
 
     slug = branch.replace("/", "-")
-    review_path = toplevel + "/reviews/" + slug + ".md"
-
-    review = None
     if target:
         for ref in (branch, head):
             try:
@@ -576,40 +604,29 @@ def main():
                 break
             except Exception:  # noqa: BLE001 - deleted branch / unfetchable oid; try the next
                 continue
-        try:
-            review = git("show", head + ":reviews/" + slug + ".md")
-        except Exception:  # noqa: BLE001 - fall through to the working tree
-            review = None
-    if review is None:
-        try:
-            with open(review_path, encoding="utf-8") as fh:
-                review = fh.read()
-        except OSError:
-            review = None
-    if review is None:
-        block(
-            "MERGE GATE (AGENTS.md — review before merge): no review file for "
-            "branch '" + branch + "' at reviews/" + slug + ".md. Run /review "
-            "(or /docs-review for a docs-only branch) and address findings, THEN "
-            "merge. Do NOT merge unreviewed."
-        )
+    try:
+        evidence = review_evidence.resolve(Path(toplevel), branch, head, git)
+        review = evidence["body"]
+        review_label = str(evidence["path"])
+    except review_evidence.ReviewEvidenceError as error:
+        block("MERGE GATE: " + str(error) + ". Run /review or /incremental-review before merging.")
 
-    completion_problem = review_completion_problem(review)
+    completion_problem = review_completion_problem(review, strict=evidence["private"])
     if completion_problem:
         block(
-            "MERGE GATE: reviews/" + slug + ".md " + completion_problem + ". "
+            "MERGE GATE: " + review_label + " " + completion_problem + ". "
             "Complete the frozen review pass and its parent judgment before merging."
         )
 
     reviewed = work_order_sha_field(review, "Reviewed up to commit")
     if reviewed in (None, "invalid"):
-        block("MERGE GATE: reviews/" + slug + ".md has no unique valid "
+        block("MERGE GATE: " + review_label + " has no unique valid "
               "`Reviewed up to commit:` marker. Re-run /review to stamp it, then merge.")
 
     if not (head.lower().startswith(reviewed) or reviewed.startswith(head.lower())) \
             and not review_only(reviewed, head):
         block(
-            "MERGE GATE: review is STALE — reviews/" + slug + ".md is stamped at "
+            "MERGE GATE: review is STALE — " + review_label + " is stamped at "
             + reviewed + " but HEAD is " + head[:12] + ". Commits landed since the "
             "review. Re-run /incremental-review (or /review), then merge."
         )
@@ -618,7 +635,7 @@ def main():
     if open_findings:
         block(
             "MERGE GATE: review has " + str(len(open_findings)) + " unresolved item(s) "
-            "in reviews/" + slug + ".md. Address (or explicitly [wontfix]) every "
+            "in " + review_label + ". Address (or explicitly [wontfix]) every "
             "`- [ ]` or `- [~]` item, then merge. First: " + open_findings[0][:120]
         )
 
@@ -631,7 +648,7 @@ def main():
         if sreviewed in (None, "invalid"):
             block(
                 "MERGE GATE (security layer): '" + sensitive + "' is security-sensitive but "
-                "reviews/" + slug + ".md has no unique valid "
+                + review_label + " has no unique valid "
                 "`Security-reviewed up to commit:` marker. Run "
                 "/security-review (or re-run /review, which runs it on sensitive paths and "
                 "stamps the marker), THEN merge."
@@ -641,7 +658,7 @@ def main():
                     sreviewed, head, patterns, "reviews/" + slug + ".md"
                 ):
             block(
-                "MERGE GATE (security layer): security review is STALE — reviews/" + slug + ".md "
+                "MERGE GATE (security layer): security review is STALE — " + review_label + " "
                 "security marker is at " + sreviewed + " but a security-sensitive path changed "
                 "since it, up to " + head[:12] + ". Re-run /security-review, then merge."
             )

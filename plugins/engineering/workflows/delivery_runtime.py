@@ -351,9 +351,12 @@ class PersistentDeliveryRouter:
         if binding["pr_number"] == successor["pr_number"]:
             raise DeliveryContractViolation("successor must bind a different PR")
         updated = copy.deepcopy(successor)
-        branch_slug = updated["branch"].replace("/", "-").replace("\\", "-")
+        work_order = successor["review"]["work_order"]
+        if work_order == binding["review"]["work_order"]:
+            branch_slug = updated["branch"].replace("/", "-").replace("\\", "-")
+            work_order = f"reviews/{branch_slug}.md"
         updated["review"] = {
-            "work_order": f"reviews/{branch_slug}.md",
+            "work_order": work_order,
             "work_order_order": copy.deepcopy(successor["review"]["work_order_order"]),
             "reviewed_sha": None,
         }

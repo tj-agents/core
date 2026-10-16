@@ -83,8 +83,9 @@ longer trustworthy, finish or restart the frozen pass, and leave later commits t
 
 ## Stage 2 — open the canonical work order
 
-Read `review-lifecycle`. Use only `reviews/<branch-slug>.md`; staged, documentation, and incremental modes
-share it. Before expensive review work, have the parent create the immutable pass identity and set
+Read `review-lifecycle`. Resolve the canonical work order with `<engineering>/workflows/workflow_ops.py review-path`; ordinary
+reviews use Git-private state and staged reviews select `--durable`. Documentation and incremental modes
+reuse that same artifact. Before expensive review work, have the parent create the immutable pass identity and set
 the top-level `Review status`, current `Judgment`, and new `Pass judgment` to `in-progress`, `pending`, and
 `pending`. A first pass has no completion watermark yet. An interrupted
 incremental pass retains the earlier completed watermark but remains merge-blocking through its status.
@@ -212,6 +213,10 @@ On completion, set `Review status` to `complete`, set the current and active-pas
 `Reviewed up to commit:` marker at the frozen head, and stamp the security marker there when required. If
 HEAD moved, this completed pass remains truthful at its frozen head and the later delta belongs to
 `incremental-review`.
+
+Before removing the bundle, run the same workflow command with `review-record --descriptor <descriptor-path>
+--work-order <canonical-work-order>`. A failed completion leaves the review merge-blocking. This records
+private proof without a tracked Markdown stamp or another push; durable staged work orders retain their path.
 
 Remove the disposable candidate bundle after completion, cancellation, or terminal failure. An interrupted
 pass may be resumed only after regenerating the bundle from its recorded descriptor and reproducing the

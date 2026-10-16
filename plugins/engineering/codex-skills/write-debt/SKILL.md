@@ -1,6 +1,6 @@
 ---
 name: write-debt
-description: Recording tech debt — an entry in the TECH_DEBT.md of the area that owns the problem, one entry per owning area, everything deliberately left unfixed written down with its reasoning and an objective resolution condition, and the whole entry deleted once the debt is addressed. Use when logging tech debt, taking a shortcut, or deciding to leave a defect, risk or rule violation unfixed; working an existing entry down to a PR is the address-debt workflow.
+description: Record a deliberate shortcut or deferral with its owning area, reasoning and objective resolution condition. Use the explicitly selected provider, otherwise the owning area TECH_DEBT.md and its verified deletion rule. Use when logging tech debt, taking a shortcut, or deciding to leave a defect, risk or rule violation unfixed; working an existing entry down to a PR is the address-debt workflow.
 
 kind: convention
 domain: process

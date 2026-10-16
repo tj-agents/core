@@ -1,6 +1,6 @@
 ---
 name: write-debt
-description: Recording tech debt — an entry in the TECH_DEBT.md of the area that owns the problem, one entry per owning area, everything deliberately left unfixed written down with its reasoning and an objective resolution condition, and the whole entry deleted once the debt is addressed. Use when logging tech debt, taking a shortcut, or deciding to leave a defect, risk or rule violation unfixed; working an existing entry down to a PR is the address-debt workflow.
+description: Record a deliberate shortcut or deferral with its owning area, reasoning and objective resolution condition. Use the explicitly selected provider, otherwise the owning area TECH_DEBT.md and its verified deletion rule. Use when logging tech debt, taking a shortcut, or deciding to leave a defect, risk or rule violation unfixed; working an existing entry down to a PR is the address-debt workflow.
 
 kind: convention
 domain: process
@@ -13,6 +13,10 @@ fields, priorities, repair links, deduplication, blocked and deferred evidence, 
 
 Known faulty behavior belongs in `engineering:write-bug`; link its repair rather than duplicating that repair
 as debt. A debt entry may still name the deliberate deferral or shortcut in its owning area.
+
+Follow the shared contract's explicit provider selection first. Use its create/read/update and verified
+closure commands, preserving the owning area, reasoning and exit condition. Provider retention applies;
+remote closure may retain history. The file-backed defaults below apply only without a provider.
 
 Record tech debt in the `TECH_DEBT.md` belonging to the area that **owns the problem**; if that area has none,
 create it there rather than adding the entry to a broader parent. **One entry per owning area** — two areas

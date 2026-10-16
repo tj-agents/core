@@ -224,3 +224,11 @@ Done when: verified implementation and any machine changes are reported with an 
    this implementation. Core primary BUGS.md B013 records the failed skill/goal reads, uncommitted for batching.
 4. Activation of rolling startup still waits for Tommy's merge and main regeneration. Report actual machine
    changes and unverified native behavior honestly.
+
+## 16 October 2026 conflict-resolution continuation
+
+Tommy assigned this session to resolve #269 against main in its own worktree, validate the new head, and obtain fresh review. Merge still requires Tommy to say "merge". Consumer adoption, Concertable/agents migration and user-settings cleanup wait for that merge; harness-injection design is explicitly out of scope.
+
+Current checkout: C:/Users/tommy/source/repos/tj-agents/core/.worktrees/Fix-RollingPluginSync, branch Fix/RollingPluginSync. Integrated main c58f71ff. Preserve current-main workflow and review-evidence changes; rolling selection replaces pin-based producer locks, retains producer identities and validates their source. Added migration regression and updated CI paths. No protected checkout or global settings changed.
+
+Focused validation: plugin selection 6 passed; adoption 10 passed; repository config 38 passed; Codex sync 13 passed; rolling runtime 23 passed (one platform skip); CI selection 21 passed. Generation and generation check passed. Source-layout checks are running. Next: commit the merge candidate, freeze fresh review from the prior 38b148ab watermark (including security of the full PR), resolve findings, push once, and verify exact-head Windows/Linux CI and mergeability.
