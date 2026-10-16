@@ -1,22 +1,12 @@
 # Agent capabilities
 
 Generated from [`catalog/catalog.json`](.agents/catalog/catalog.json).
-Select plugins in a project's `.agents/plugins.json`; do not copy definitions between repositories.
+Select plugins in a project's `.agents/plugins.lock.json`; do not copy definitions between repositories.
 
-## base-agents/base
+## base-agents 2.1.16
 
-Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
+Owner: [`tj-agents/core`](https://github.com/tj-agents/core) · immutable revision `v2.1.16`
 
-Maintained plans and common agent behavior.
-
-## base-agents/engineering
-
-Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
-
-Selected engineering workflows, reviews and Git operations.
-
-## base-agents/machine
-
-Owner: [`tj-agents/core`](https://github.com/tj-agents/core)
-
-Explicit harness, history and clipboard utilities.
+- **`base-agents/base`** — Maintained plans and common agent behavior.
+- **`base-agents/engineering`** — Selected engineering workflows, reviews and Git operations.
+- **`base-agents/machine`** — Explicit harness, history and clipboard utilities.
