@@ -27,7 +27,6 @@ When one valid version 3 employer declaration applies, a selected `<stack>:<name
 route queries, review, invocation checks, and session context. A company plugin can mirror a stack
 skill under the same name to replace that whole skill; no section merge occurs.
 When several employer declarations match, no replacement is selected until the ambiguity is resolved.
-When several employer declarations match, no replacement is selected until the ambiguity is resolved.
 
 `hooks/check_tier_payload.py` enforces the shipped payload shape a tier repository must generate:
 `tier.json` present and schema-valid in every payload declared by `.agents/plugins/payloads.json`

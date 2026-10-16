@@ -124,8 +124,6 @@ When the frozen tree ships `.agents/skill-routes.json`,
 frozen paths owe after installed company replacement, and `route_violations` holds each deny-pattern hit.
 Tier applicability uses the reviewed repository's origin while paths and route content come from the
 frozen tree.
-Tier applicability uses the reviewed repository's origin while paths and route content come from the
-frozen tree.
 A repository without a route table has no routed technical rules.
 
 Read every routed skill, the root and nearest changed-path `AGENTS.md` files, and the architecture premise
