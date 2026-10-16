@@ -9,6 +9,7 @@
     ".agents/hooks/docs_reachability.py",
     ".agents/hooks/hook_dispatch.py",
     ".agents/hooks/merge_cleanup_gate.py",
+    ".agents/hooks/problem_records.py",
     ".agents/machine/scripts/repository_identity.py",
     ".agents/workflows",
     ".agents/workflows/repository_configuration.py"
