@@ -572,6 +572,7 @@
             "hook-control",
             "last-conversation",
             "open-claude",
+            "open-cli",
             "open-codex",
             "peer-cli",
             "plugin-lock",
@@ -598,7 +599,7 @@
               "python>=3.11"
             ]
           },
-          "digest": "sha256:8e1d54edc4f0c18adbd990255701a19fb995f7dc240d2ee821bcd40648528bc9",
+          "digest": "sha256:2fda3ff50e32fec4239db6f18c461990d7ace0fa0448a7ea1514fedccf998e5e",
           "digest_excludes": [
             "catalog/catalog.json"
           ],

@@ -505,6 +505,68 @@ class CloseTabTests(unittest.TestCase):
         killer.assert_not_called()
 
 
+class FocusEntryTests(unittest.TestCase):
+    def entry(self, terminal):
+        return {"session_id": "s1", "pid": 10, "pid_started_at": 1.0, "title": "tab", "terminal": terminal}
+
+    def test_refuses_without_verified_live_host_or_terminal_identity(self):
+        with self.assertRaises(close_tab.TerminalRefusal):
+            close_tab.focus_entry({"session_id": "s1"})
+        with mock.patch.object(close_tab.session_close, "liveness", return_value=None):
+            with self.assertRaises(close_tab.TerminalRefusal):
+                close_tab.focus_entry(self.entry({"kind": "tmux", "pane_id": "%1"}))
+
+    def test_windows_terminal_focuses_exact_automation_id_tab(self):
+        target = {"title": "tab", "identity": {"kind": "windows-terminal", "automation_id": "tab-1"}}
+        with mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", return_value=[target]), \
+                mock.patch.object(close_tab, "run", return_value=completed()) as run:
+            close_tab.focus_entry(self.entry({"kind": "windows-terminal", "automation_id": "tab-1"}))
+        command = run.call_args.args[0]
+        self.assertEqual(["-TabId", "tab-1", "-Focus"], command[-3:])
+
+    def test_windows_terminal_refuses_an_absent_tab_without_running_the_adapter(self):
+        with mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                mock.patch.object(close_tab, "is_windows", return_value=True), \
+                mock.patch.object(close_tab, "windows_inventory", return_value=[]), \
+                mock.patch.object(close_tab, "run") as run:
+            with self.assertRaises(close_tab.TerminalRefusal):
+                close_tab.focus_entry(self.entry({"kind": "windows-terminal", "automation_id": "tab-1"}))
+        run.assert_not_called()
+
+    def test_tmux_selects_the_exact_window_and_pane(self):
+        with mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                mock.patch.object(close_tab, "tmux_target", return_value=("%3", mock.Mock())), \
+                mock.patch.object(close_tab, "run", return_value=completed()) as run:
+            close_tab.focus_entry(self.entry({"kind": "tmux", "pane_id": "%3"}))
+        verbs = [call.args[0][-3] for call in run.call_args_list]
+        self.assertEqual(["select-window", "select-pane", "switch-client"], verbs)
+
+    def test_kitty_focuses_the_exact_window(self):
+        identity = {"kind": "kitty", "listen_on": "unix:/k", "window_id": "7"}
+        with mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                mock.patch.object(close_tab, "kitty_target", return_value=({}, {})), \
+                mock.patch.object(close_tab, "run", return_value=completed()) as run:
+            close_tab.focus_entry(self.entry(identity))
+        self.assertIn("focus-window", run.call_args.args[0])
+        self.assertIn("id:7", run.call_args.args[0])
+
+    def test_failed_terminal_command_and_unsupported_terminal_are_reported(self):
+        with mock.patch.object(close_tab.session_close, "liveness", return_value=True), \
+                mock.patch.object(close_tab, "kitty_target", return_value=({}, {})), \
+                mock.patch.object(close_tab, "run", return_value=completed(returncode=1, stderr="no")):
+            with self.assertRaises(close_tab.TerminalRefusal):
+                close_tab.focus_entry(self.entry({"kind": "kitty", "listen_on": "u", "window_id": "7"}))
+        with mock.patch.object(close_tab.session_close, "liveness", return_value=True):
+            with self.assertRaises(close_tab.TerminalUnavailable):
+                close_tab.focus_entry(self.entry({"kind": "konsole", "service": "s", "session": "/1"}))
+
+    def test_focus_flag_requires_a_session(self):
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            close_tab.main(["--focus"])
+
+
 class ConfigureTerminalTabCloseTests(unittest.TestCase):
     def test_write_preserves_windows_line_endings_and_backup_bytes(self):
         with tempfile.TemporaryDirectory() as directory:

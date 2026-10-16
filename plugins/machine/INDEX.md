@@ -10,6 +10,7 @@ Generated from canonical `.agents/` definitions.
 - `hook-control` — utility — `.agents/machine/utility/hook-control/SKILL.md`
 - `last-conversation` — utility — `.agents/machine/utility/last-conversation/SKILL.md`
 - `open-claude` — utility — `.agents/machine/utility/open-claude/SKILL.md`
+- `open-cli` — utility — `.agents/machine/utility/open-cli/SKILL.md`
 - `open-codex` — utility — `.agents/machine/utility/open-codex/SKILL.md`
 - `peer-cli` — utility — `.agents/machine/utility/peer-cli/SKILL.md`
 - `plugin-lock` — utility — `.agents/machine/utility/plugin-lock/SKILL.md`
