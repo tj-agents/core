@@ -13,7 +13,7 @@ The commands below show Windows paths and use `python` in Windows PowerShell. On
 `python3` with POSIX paths and the same script arguments.
 
 A repository commits `.agents/plugins.lock.json`, `.claude/settings.json` and `.codex/config.toml`. A fresh
-clone then installs exactly the plugins it selects, pinned to one `tj-agents/marketplace` revision, without
+clone then installs exactly the plugins it selects, pinned to its declared immutable marketplace revisions, without
 depending on any machine's user settings. User scope holds only `base`, `engineering` and `machine`, the
 bootstrap that creates repositories.
 
@@ -30,11 +30,12 @@ bootstrap that creates repositories.
 
 A lock names each marketplace it installs from and selects plugins as `<plugin>@<marketplace>`. A marketplace
 knows nothing about the repositories that use it; only the consuming repository's lock combines them. The
-`tj-agents` marketplace is required and must be `tj-agents/marketplace`; another marketplace must be a GitHub
+`tj-agents` marketplace, when selected, must be `tj-agents/marketplace`; another marketplace must be a GitHub
 repository owned by `tj-agents` or `Concertable`, its key is the name that marketplace declares for itself, and
 every declared marketplace must supply at least one plugin. `revision` is a `vN.N.N` tag or a full lowercase
-commit. The lock must include `base@tj-agents`, `engineering@tj-agents` and `machine@tj-agents`, and lists a
-stack plugin's required plugins explicitly. The schema is `catalog/plugins.lock.schema.json`.
+commit. The lock must include one complete Core triplet: `base`, `engineering` and `machine` from
+`tj-agents`, or from the `base-agents` producer pinned to `tj-agents/core`. Mixed Core identities fail
+validation. Stack dependencies remain explicit. The schema is `catalog/plugins.lock.schema.json`.
 
 ## Adopt a stack
 
@@ -49,6 +50,21 @@ plugins a project type needs. Repeat `--stack`, or add `--plugin <name>`. Core a
 plugins are always added, existing selections and the existing revision are kept, and a new lock needs
 `--marketplace-revision`. `preview` lists the changed files, `write` applies them together, and `check`
 exits nonzero on drift, which is what CI runs. An unknown stack or plugin is rejected with the valid choices.
+
+## Preserve a producer Core installation
+
+For a project using Core's producer identity, select it explicitly and pin its producer marketplace:
+
+```text
+python -B <skill-directory>/scripts/adopt_plugins.py --root <repository> --core-marketplace base-agents --marketplace base-agents=tj-agents/core@<immutable-revision> --mode write
+```
+
+On Linux/macOS use `python3`. Later extensions preserve this choice. New aggregate locks retain the
+existing default and require `--marketplace-revision`; a stack plugin selected from the aggregate
+also needs that pin. Explicit conversion replaces only the old Core triplet, retaining other plugins
+and marketplace pins. An old marketplace is removed only if it supplies no remaining plugin. This
+writes project settings only. It never changes user installations or disables a differently named
+global copy; inspect actual host selections before conversion and keep one identity enabled.
 
 ## Generate settings from an existing lock
 
