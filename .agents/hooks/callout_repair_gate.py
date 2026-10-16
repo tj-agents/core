@@ -427,7 +427,7 @@ def valid_disposition(records, session, prompt, callout_id):
             command = pending.pop(value.get("call_id"), None)
             receipt = result_json(value)
             if command and receipt and not value.get("is_error") and not value.get("error"):
-                if all(command.get(key) == value_ for key, value_ in expected.items()):
+                if command.get("host") in (None, "codex") and all(command.get(key) == value_ for key, value_ in expected.items()):
                     try:
                         result = validate_disposition(
                             command["record"], command["id"], session, expected["prompt_sha256"], callout_id,
@@ -448,7 +448,7 @@ def valid_disposition(records, session, prompt, callout_id):
                 command = pending.pop(block.get("tool_use_id"), None)
                 receipt = result_json(block)
                 if command and receipt and not block.get("is_error"):
-                    if all(command.get(key) == value_ for key, value_ in expected.items()):
+                    if command.get("host") in (None, "claude") and all(command.get(key) == value_ for key, value_ in expected.items()):
                         try:
                             result = validate_disposition(
                                 command["record"], command["id"], session, expected["prompt_sha256"], callout_id,
