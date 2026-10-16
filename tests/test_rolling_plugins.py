@@ -166,6 +166,10 @@ class RollingPluginsTests(unittest.TestCase):
 
     def test_claude_materializes_declared_dependency_without_saved_marketplace(self):
         config, project, preflight = self.claude_dependency_preflight()
+        self.write(config / 'settings.json', {'enabledPlugins': {
+            'engineering@umbrella': True, 'base@umbrella': True,
+        }})
+        installs = []
         saved = {path: path.read_bytes() for path in
                  (config / 'settings.json', config / 'plugins/known_marketplaces.json')}
         with preflight as active:
@@ -177,6 +181,7 @@ class RollingPluginsTests(unittest.TestCase):
             def native(command, _project, environment, _deadline, json_output=False):
                 if command[1:3] == ['plugin', 'install']:
                     identity = command[3]
+                    installs.append(identity)
                     plugins = Path(environment['CLAUDE_CODE_PLUGIN_CACHE_DIR'])
                     destination = plugins / 'cache' / identity / 'unknown'
                     shutil.copytree(expected[identity].root, destination)
@@ -194,7 +199,10 @@ class RollingPluginsTests(unittest.TestCase):
                     mock.patch.object(ROLLING, '_pin_claude_cache'), \
                     mock.patch.object(ROLLING, '_claude_pinned_paths', return_value=set()):
                 prepared = active.materialize_native('claude')
-            self.assertEqual({root.identity for root in prepared.selected_roots}, {'base@core', 'engineering@umbrella'})
+            self.assertEqual({root.identity for root in prepared.selected_roots}, {
+                'base@core', 'base@umbrella', 'engineering@umbrella',
+            })
+            self.assertEqual(installs, ['base@core', 'engineering@umbrella'])
             self.assertTrue(all((root.root / 'payload.txt').read_text() == 'one' for root in prepared.selected_roots))
             active.acknowledge_binding()
         self.assertEqual(saved, {path: path.read_bytes() for path in saved})
@@ -207,6 +215,64 @@ class RollingPluginsTests(unittest.TestCase):
                 with self.assertRaisesRegex(ROLLING.RollingPluginError, 'no longer registered: umbrella'):
                     active.materialize_native('claude')
             native.assert_not_called()
+
+    def test_claude_alias_reuse_remains_bound_to_publisher_bytes_and_inventory(self):
+        for variation in ('repository', 'revision', 'payload', 'inventory'):
+            with self.subTest(variation=variation):
+                directory = self.root / variation
+                config = directory / 'config'
+                registry_path = config / 'plugins/installed_plugins.json'
+                before = {'version': 2, 'plugins': {}}
+                self.write(registry_path, before)
+                self.write(config / 'plugins/known_marketplaces.json', {})
+                roots = []
+                for marketplace in ('one', 'two'):
+                    root = directory / marketplace
+                    self.write(root / '.claude-plugin/plugin.json', {'name': 'base'})
+                    payload = 'changed' if variation == 'payload' and marketplace == 'two' else 'verified'
+                    (root / 'payload.txt').write_text(payload, encoding='utf-8')
+                    repository = 'https://github.com/tj-agents/core.git'
+                    revision = 'a' * 40
+                    if marketplace == 'two' and variation == 'repository':
+                        repository = 'https://github.com/tj-agents/other.git'
+                    if marketplace == 'two' and variation == 'revision':
+                        revision = 'b' * 40
+                    roots.append(ROLLING.VerifiedRoot(f'base@{marketplace}', root, revision, repository))
+                expected = {root.identity: root for root in roots}
+                prepared = ROLLING.Prepared('claude', (), tuple(roots), directory / 'catalog', {},
+                                            plugins_root=config / 'plugins')
+                installs = []
+
+                def native(command, _project, environment, _deadline, json_output=False):
+                    if command[1:3] == ['plugin', 'install']:
+                        identity = command[3]
+                        installs.append(identity)
+                        plugins = Path(environment['CLAUDE_CODE_PLUGIN_CACHE_DIR'])
+                        destination = plugins / 'cache' / identity / 'unknown'
+                        shutil.copytree(expected[identity].root, destination)
+                        path = plugins / 'installed_plugins.json'
+                        value = json.loads(path.read_text()) if path.exists() else {'plugins': {}}
+                        value['plugins'][identity] = [{'scope': 'user', 'installPath': str(destination)}]
+                        self.write(path, value)
+                        return None
+                    value = json.loads(registry_path.read_text())
+                    return [{'id': identity, 'enabled': True, 'installPath': records[0]['installPath']}
+                            for identity, records in value['plugins'].items()
+                            if variation != 'inventory' or identity != 'base@two']
+
+                with mock.patch.object(ROLLING, '_native', side_effect=native), \
+                        mock.patch.object(ROLLING, '_pin_claude_cache'), \
+                        mock.patch.object(ROLLING, '_claude_pinned_paths', return_value=set()):
+                    if variation in {'payload', 'inventory'}:
+                        message = 'differs from verified Git package' if variation == 'payload' else 'native inventory did not select'
+                        with self.assertRaisesRegex(ROLLING.RollingPluginError, message):
+                            ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
+                        self.assertEqual(installs, ['base@one'])
+                        self.assertEqual(json.loads(registry_path.read_text()), before)
+                    else:
+                        result = ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
+                        self.assertEqual(installs, ['base@one', 'base@two'])
+                        self.assertEqual({root.identity for root in result.selected_roots}, set(expected))
 
     def test_published_executable_bit_is_preserved_in_the_verified_tree(self):
         if os.name == 'nt':
