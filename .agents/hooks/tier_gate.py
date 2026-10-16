@@ -15,14 +15,10 @@ the moment it is installed, with no change here and no release of `base`.
 Plugin and marketplace identity come from the installed path, never from the declaration, so a
 declaration cannot claim to be a plugin it is not.
 
-Three modes, one detection:
+Two modes, one detection:
 
 - `--session-context` (SessionStart) states which tiers apply in this project. It prints nothing at
   all when no stack tier is installed, because a statement about an empty set is pure noise.
-- `--conventions` lists, for every tier that applies here, the conventions its installed payload
-  ships - the skills whose front matter declares `kind: convention` or legacy `kind: contract`. This is what a review loads: the
-  applicable tiers' rules, resolved from the same installed declarations the gate reads, with nothing
-  wired into the reviewed repository.
 - No argument (PreToolUse) blocks invoking a skill that belongs to a tier whose stack is absent.
   Claude sends the `Skill` tool and the qualified name; Codex has no such tool, and its contract is a
   successful shell read of the tier's own `SKILL.md`, so a shell command naming a blocked plugin's
@@ -39,12 +35,14 @@ A gate that wedges a session is worse than a gate that misses one call.
 from __future__ import annotations
 
 import argparse
+import functools
 import fnmatch
 import json
 import os
 from pathlib import Path
 import re
 import runpy
+import shutil
 import subprocess
 import sys
 from urllib.parse import urlsplit
@@ -54,7 +52,6 @@ SCHEMA_VERSIONS = (1, 2, 3)
 DECLARATION_NAME = "tier.json"
 ORPHAN_MARKER = ".orphaned_at"
 FRONT_MATTER_KIND = re.compile(r"^kind:[ \t]*([a-z]+)[ \t]*$", re.MULTILINE)
-CONVENTION_KINDS = frozenset({"contract", "convention"})
 PLUGIN_ROOT_VARIABLES = ("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT", "CODEX_PLUGIN_ROOT")
 OVERRIDE_VARIABLE = "AGENTS_TIER_OVERRIDE"
 SHELL_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "exec", "local_shell"})
@@ -837,6 +834,10 @@ def statement(root, found=None):
         path = employer_context_path(declaration.payload_dir, declaration.employer["context_skill"])
         lines.append("Employer context: `" + declaration.plugin + ":" + declaration.employer["context_skill"]
                      + "` - " + str(path))
+    if len(result.employers) == 1:
+        lines.append("For a selected stack skill `<stack>:<name>`, load `" + result.employers[0][0].plugin
+                     + "-<stack>:<name>` when that plugin and same-name skill are installed. "
+                     "Otherwise load the selected stack skill.")
     for declaration in [*ubiquitous, *(item for item, _ in applicable)]:
         if declaration.session_context:
             lines.append(declaration.session_context)
@@ -856,48 +857,107 @@ def statement(root, found=None):
     return "\n".join(lines)
 
 
+def replacement_skill(selection, name, available):
+    stack, separator, skill = name.partition(":")
+    if not separator or not skill or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", stack):
+        return name
+    if len(selection.employers) != 1:
+        return name
+    company = selection.employers[0][0].plugin
+    if stack == company or stack.startswith(company + "-"):
+        return name
+    candidate = company + "-" + stack + ":" + skill
+    return candidate if available(candidate) else name
+
+
+def active_host():
+    parts = Path(__file__).resolve().parts
+    if ".codex" in parts or os.environ.get("PLUGIN_ROOT") or os.environ.get("CODEX_PLUGIN_ROOT"):
+        return "codex"
+    if ".claude" in parts or os.environ.get("CLAUDE_PLUGIN_ROOT"):
+        return "claude"
+    return None
+
+
+@functools.lru_cache(maxsize=2)
+def native_plugins(harness):
+    binary = shutil.which(harness)
+    if binary is None:
+        return ()
+    try:
+        result = subprocess.run(
+            [binary, "plugin", "list", "--json"], capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        if result.returncode:
+            return ()
+        data = json.loads(result.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return ()
+    entries = data.get("installed") if harness == "codex" and isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        return ()
+    return tuple(item for item in entries if isinstance(item, dict) and item.get("enabled"))
+
+
+def installed_replacement(root, name, harness=None):
+    plugin, _, skill = name.partition(":")
+    profile = None
+    if harness == "codex":
+        profile = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    elif harness == "claude":
+        profile = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+    roots = [profile / "plugins" / "cache"] if profile else cache_roots()
+    for cache in roots:
+        registry = cache.parent / "installed_plugins.json"
+        try:
+            plugins = json.loads(registry.read_text(encoding="utf-8-sig"))["plugins"]
+        except (OSError, UnicodeError, ValueError, KeyError, TypeError):
+            plugins = None
+        if isinstance(plugins, dict):
+            payloads = []
+            for identity, entries in plugins.items():
+                if identity.partition("@")[0] != plugin:
+                    continue
+                for entry in entries if isinstance(entries, list) else ():
+                    if not isinstance(entry, dict) or not entry.get("installPath"):
+                        continue
+                    scope = entry.get("projectPath")
+                    if scope and not _within(_resolved_key(root), _resolved_key(scope)):
+                        continue
+                    payloads.append(Path(entry["installPath"]))
+        else:
+            payloads = []
+            for item in native_plugins(harness) if harness else ():
+                if harness == "codex":
+                    if item.get("name") != plugin:
+                        continue
+                    parts = (item.get("marketplaceName"), plugin, item.get("version"))
+                    if not all(isinstance(part, str) for part in parts):
+                        continue
+                    payloads.append(cache.joinpath(*parts))
+                elif item.get("installPath"):
+                    payloads.append(Path(item["installPath"]))
+        for payload in payloads:
+            if payload.parent.name != plugin or _resolved_key(payload.parent.parent.parent) != _resolved_key(cache):
+                continue
+            if (payload / ORPHAN_MARKER).exists():
+                continue
+            try:
+                body = (payload / "skills" / skill / "SKILL.md").read_text(encoding="utf-8-sig")
+            except (OSError, UnicodeError):
+                continue
+            if re.search(r"^description:[ \t]*\S", front_matter(body), re.MULTILINE):
+                return True
+    return False
+
+
 def front_matter(text):
     if not text.startswith("---"):
         return ""
     end = text.find("\n---", 3)
     return text[:end] if end != -1 else ""
-
-
-def contract_skills(payload_dir):
-    if payload_dir is None:
-        return []
-    try:
-        entries = sorted((Path(payload_dir) / "skills").iterdir())
-    except OSError:
-        return []
-    skills = []
-    for entry in entries:
-        skill = entry / "SKILL.md"
-        try:
-            text = skill.read_text(encoding="utf-8-sig")
-        except OSError:
-            continue
-        match = FRONT_MATTER_KIND.search(front_matter(text))
-        if match and match.group(1) in CONVENTION_KINDS:
-            skills.append((entry.name, skill))
-    return skills
-
-
-def conventions(root, found=None):
-    """The review's rule source: each applicable stack tier's shipped conventions, as one listing."""
-    result = assess(root, found)
-    _, applicable, _ = result
-    lines = ["Tier gate - conventions of every tier that applies to this project." if applicable else
-             "Tier gate - no stack tier applies to this project; no tier conventions to load."]
-    lines.extend("Configuration diagnostic: " + problem["path"] + ": " + problem["message"]
-                 for problem in result.diagnostics)
-    for declaration, reason in applicable:
-        skills = contract_skills(declaration.payload_dir)
-        lines.append("")
-        lines.append(declaration.tier + " (" + reason + "): " + str(len(skills)) + " convention(s)")
-        for name, path in skills:
-            lines.append("  " + name + " - " + str(path))
-    return "\n".join(lines)
 
 
 def requested_skill(payload):
@@ -957,8 +1017,7 @@ def gate(payload, found=None):
     root = project_root(payload)
     result = assess(root, found)
     _, _, blocked = result
-    if not blocked:
-        return 0
+    harness = "claude" if requested_skill(payload) else active_host()
 
     name = requested_skill(payload)
     plugin, separator, skill = name.partition(":")
@@ -968,6 +1027,13 @@ def gate(payload, found=None):
                 print(refusal(declaration, "`" + name + "`", root, selection_diagnostics(result, declaration)), file=sys.stderr)
                 return 2
 
+        replacement = replacement_skill(result, name,
+                                        lambda candidate: installed_replacement(root, candidate, harness))
+        if replacement != name:
+            print("Tier gate redirected `" + name + "` to installed `" + replacement
+                  + "`. Invoke the replacement skill.", file=sys.stderr)
+            return 2
+
     command = shell_command(payload)
     if command and "SKILL.md" in command:
         haystack = command.replace("\\", "/")
@@ -976,6 +1042,18 @@ def gate(payload, found=None):
                 subject = "that read of a `" + declaration.tier + "` standard"
                 print(refusal(declaration, subject, root, selection_diagnostics(result, declaration)), file=sys.stderr)
                 return 2
+        for declaration, _ in result.applicable:
+            match = re.search(r"/" + re.escape(declaration.marketplace) + "/"
+                              + re.escape(declaration.plugin) + r"/[^/]+/skills/([a-z0-9-]+)/SKILL\.md",
+                              haystack)
+            if match:
+                original = declaration.plugin + ":" + match.group(1)
+                replacement = replacement_skill(result, original,
+                                                lambda candidate: installed_replacement(root, candidate, harness))
+                if replacement != original:
+                    print("Tier gate redirected `" + original + "` to installed `" + replacement
+                          + "`. Read the replacement skill.", file=sys.stderr)
+                    return 2
     return 0
 
 
@@ -983,7 +1061,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session-context", action="store_true")
     parser.add_argument("--instruction-fragment", action="store_true")
-    parser.add_argument("--conventions", action="store_true")
     parser.add_argument("--project", default=None)
     arguments = parser.parse_args()
 
@@ -991,7 +1068,7 @@ def main():
         print("tier gate: Python 3.9 or newer is required.", file=sys.stderr)
         return 0
 
-    emitting = arguments.session_context or arguments.instruction_fragment or arguments.conventions
+    emitting = arguments.session_context or arguments.instruction_fragment
     payload = {}
     if not emitting:
         try:
@@ -1007,10 +1084,6 @@ def main():
 
     if arguments.project:
         payload["cwd"] = arguments.project
-
-    if arguments.conventions:
-        print(conventions(project_root(payload)))
-        return 0
 
     if emitting:
         context = statement(project_root(payload))

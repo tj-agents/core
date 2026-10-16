@@ -123,7 +123,7 @@ class DuplicateRegistrationTests(unittest.TestCase):
         plugin = self.root / "installed-plugin"
         hooks = plugin / "hooks"
         hooks.mkdir(parents=True)
-        for source in (SKILL_ROUTER, HOOK_ROOT / "hook_runtime.py"):
+        for source in (SKILL_ROUTER, HOOK_ROOT / "hook_runtime.py", HOOK_ROOT / "tier_gate.py"):
             shutil.copy2(source, hooks / source.name)
         skill = plugin / "skills" / "git-branching"
         skill.mkdir(parents=True)

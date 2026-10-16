@@ -29,7 +29,7 @@ class SkillRouterTests(unittest.TestCase):
         self.plugin = self.base / "engineering"
         hooks = self.plugin / "hooks"
         hooks.mkdir(parents=True)
-        for name in ("skill_router.py", "hook_runtime.py"):
+        for name in ("skill_router.py", "tier_gate.py", "hook_runtime.py"):
             shutil.copy2(HOOKS / name, hooks / name)
         self.router = hooks / "skill_router.py"
         skill = self.plugin / "skills" / "feature"
@@ -99,6 +99,66 @@ class SkillRouterTests(unittest.TestCase):
         inventory = json.loads(self.inventory.read_text(encoding="utf-8"))
         inventory[harness] = value
         self.inventory.write_text(json.dumps(inventory), encoding="utf-8")
+
+    def test_skill_proof_keeps_company_and_stack_qualifiers_distinct(self):
+        transcript = self.base / "transcript.jsonl"
+        transcript.write_text("\n".join(json.dumps(item) for item in (
+            {"message": {"content": [{"type": "tool_use", "name": "Skill", "id": "one",
+                                      "input": {"skill": "stackx:style"}}]}},
+            {"message": {"content": [{"type": "tool_result", "tool_use_id": "one",
+                                      "is_error": False}]}},
+        )), encoding="utf-8")
+        outcomes = self.load_router().transcript_skill_outcomes(transcript)
+        self.assertEqual(outcomes["stackx:style"], True)
+        self.assertNotIn("acme-stackx:style", outcomes)
+
+    def test_codex_proof_requires_the_company_plugin_path(self):
+        transcript = self.base / "codex-transcript.jsonl"
+        body = "---\nname: style\ndescription: Company style.\n---\nCompany body."
+        def proof(plugin):
+            return (
+                {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
+                 "call_id": plugin, "input": "Get-Content C:/cache/market/" + plugin
+                 + "/1/skills/style/SKILL.md"}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call_output",
+                 "call_id": plugin, "output": [{"text": "Script completed\n" + body}]}},
+            )
+        module = self.load_router()
+        skill = [("acme-stackx:style", self.base / "style/SKILL.md", body)]
+        transcript.write_text("\n".join(json.dumps(item) for item in proof("stackx")), encoding="utf-8")
+        self.assertNotIn("acme-stackx:style", module.transcript_skill_outcomes(transcript, skill))
+        transcript.write_text("\n".join(json.dumps(item) for item in proof("acme-stackx")), encoding="utf-8")
+        self.assertTrue(module.transcript_skill_outcomes(transcript, skill)["acme-stackx:style"])
+
+    def test_codex_proof_requires_the_company_plugin_path(self):
+        transcript = self.base / "codex-transcript.jsonl"
+        body = "---\nname: style\ndescription: Company style.\n---\nCompany body."
+        def proof(plugin):
+            return (
+                {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
+                 "call_id": plugin, "input": "Get-Content C:/cache/market/" + plugin
+                 + "/1/skills/style/SKILL.md"}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call_output",
+                 "call_id": plugin, "output": [{"text": "Script completed\n" + body}]}},
+            )
+        module = self.load_router()
+        skill = [("acme-stackx:style", self.base / "style/SKILL.md", body)]
+        transcript.write_text("\n".join(json.dumps(item) for item in proof("stackx")), encoding="utf-8")
+        self.assertNotIn("acme-stackx:style", module.transcript_skill_outcomes(transcript, skill))
+        transcript.write_text("\n".join(json.dumps(item) for item in proof("acme-stackx")), encoding="utf-8")
+        self.assertTrue(module.transcript_skill_outcomes(transcript, skill)["acme-stackx:style"])
+
+    def test_skill_proof_keeps_company_and_stack_qualifiers_distinct(self):
+        transcript = self.base / "transcript.jsonl"
+        transcript.write_text("\n".join(json.dumps(item) for item in (
+            {"message": {"content": [{"type": "tool_use", "name": "Skill", "id": "one",
+                                      "input": {"skill": "stackx:style"}}]}},
+            {"message": {"content": [{"type": "tool_result", "tool_use_id": "one",
+                                      "is_error": False}]}},
+        )), encoding="utf-8")
+        outcomes = self.load_router().transcript_skill_outcomes(transcript)
+        self.assertEqual(outcomes["stackx:style"], True)
+        self.assertNotIn("acme-stackx:style", outcomes)
 
     def test_native_discovery_failures_are_typed_and_cached(self):
         cases = (
