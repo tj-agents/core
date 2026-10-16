@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 import json
@@ -15,6 +14,11 @@ import shutil
 import subprocess
 import sys
 import time
+
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+import rolling_plugins
 
 STATE_DIRECTORY_ENV = "AGENT_STATE_DIRECTORY"
 STATE_FILE = "claude-standards-sync.json"
@@ -726,125 +730,27 @@ def default_claude() -> str | None:
     return str(native) if native.is_file() else shutil.which("claude")
 
 
-def update(market: Marketplace, remote: str, executable: str, project: Path, plugins: Path, state: dict[str, str],
-           renew, out) -> int:
-    pending = [install for install in market.installs if not current(install, remote, state)]
-    before = checkout_head(market)
-    print(f"standards: updating {market.name} to {short(remote)} (installed: {describe(pending or market.installs)})", file=out, flush=True)
-    if market.owned and before != remote:
-        renew()
-        ok, detail = claude(executable, ["plugin", "marketplace", "update", market.name], project, MARKETPLACE_TIMEOUT_SECONDS)
-        if not ok:
-            print(f"standards: {market.name} was not refreshed ({detail}); this session loads {describe(market.installs)}", file=out)
-            return 1
-    reached = checkout_head(market) or remote
-    failed = []
-    for install in market.installs:
-        if current(install, reached, state):
-            state[install.key] = reached
-            continue
-        repair = not package_complete(install) and (
-            state.get(install.key) == reached or install.git_commit_sha == reached or install.version == reached[:12]
-        )
-        cwd = install.project or project
-        if repair:
-            renew()
-            ok, detail = claude(
-                executable,
-                ["plugin", "uninstall", install.identity, "--scope", install.scope, "--keep-data"],
-                cwd,
-                PLUGIN_TIMEOUT_SECONDS,
-            )
-            if ok:
-                renew()
-                ok, detail = claude(
-                    executable,
-                    ["plugin", "install", install.identity, "--scope", install.scope],
-                    cwd,
-                    PLUGIN_TIMEOUT_SECONDS,
-                )
-        else:
-            renew()
-            ok, detail = claude(
-                executable,
-                ["plugin", "update", install.identity, "--scope", install.scope, "--json"],
-                cwd,
-                PLUGIN_TIMEOUT_SECONDS,
-            )
-        refreshed = {candidate.key: candidate for candidate in installs(
-            plugins, project, {candidate.identity for candidate in market.installs}
-        )}
-        reloaded = refreshed.get(install.key)
-        if ok and reloaded is not None and installed_at(reloaded, reached):
-            state[install.key] = reached
-        else:
-            failed.append((install, detail if not ok else "installed package is incomplete"))
-    refreshed = {install.key: install for install in installs(plugins, project, {install.identity for install in market.installs})}
-    print(f"standards: {market.name} at {short(reached)}: {describe([refreshed.get(install.key, install) for install in market.installs])}", file=out)
-    for install, detail in failed:
-        print(f"standards: {install.identity} ({install.scope}) was not updated ({detail}); this session loads {install.version}", file=out)
-    return len(failed)
-
-
 def synchronize(config: Path, plugins: Path, project: Path, state_dir: Path, executable: str | None,
                 check: bool = False, out=sys.stdout, lock_wait: float = LOCK_WAIT_SECONDS,
                 migrate_profile_settings: bool = False) -> int:
-    migration_problems = migrate_profile(config, plugins, project, executable, check, out) if migrate_profile_settings else 0
-    owned = marketplaces(plugins, installs(plugins, project, enabled_plugins(config, project)))
-    groups = external_groups(owned)
-    markets = [market for market in owned if market.installs] + groups
-    if not markets:
-        return migration_problems
-    with ThreadPoolExecutor(max_workers=min(8, len(markets))) as pool:
-        probes = list(pool.map(probe, markets))
-    state = load_state(state_dir)
-    problems = migration_problems
-    stale = []
-    for market, (remote, head, error) in zip(markets, probes):
-        if remote is None:
-            print(f"standards: could not check {market.name} ({error}); this session loads {describe(market.installs)}", file=out)
-            problems += 1
-        elif (market.owned and head != remote) or not all(current(install, remote, state) for install in market.installs):
-            stale.append((market, remote))
-    if check:
-        for market, remote in stale:
-            print(f"standards: {market.name} needs a refresh to {short(remote)} (installed: {describe(market.installs)})", file=out)
-        return int(bool(problems or stale))
-    if not stale:
-        return int(bool(problems))
-    if not executable:
-        print("standards: the claude executable was not found; this session loads the installed plugins", file=out)
-        return 1
+    del state_dir, lock_wait, migrate_profile_settings
     try:
-        with exclusive(state_dir, lock_wait) as renew:
-            state = load_state(state_dir)
-            for market, remote in stale:
-                problems += update(market, remote, executable, project, plugins, state, renew, out)
-                save_state(state_dir, state)
-    except TimeoutError as error:
-        print(f"standards: {error}; this session loads the installed plugins", file=out)
+        with rolling_plugins.preflight("claude", config, project, {"plugins_root": plugins}) as active:
+            prepared = active.prepared
+            if check:
+                active.acknowledge_binding()
+                return 0
+            if prepared is None or not prepared.selected_roots:
+                active.acknowledge_binding()
+                return 0
+            if not executable:
+                raise rolling_plugins.RollingPluginError("the Claude executable was not found")
+            active.materialize_native(executable)
+            active.acknowledge_binding()
+        return 0
+    except rolling_plugins.RollingPluginError as error:
+        print(f"standards: rolling plugin refresh failed: {error}", file=out)
         return 1
-    return int(bool(problems))
-
-
-def apply_harness_permissions(project: Path | None = None, run=subprocess.run) -> None:
-    """Converge this machine's declared harness permissions. Fire-and-forget: any failure here is
-    swallowed rather than turned into a sync failure, because a permissions converge is strictly
-    additional to a standards refresh. `run` defaults to the real `subprocess.run` but is accepted so a
-    caller -- this module's own `main`, or codex_marketplace_sync.py's own sync, which imports this
-    function rather than duplicating it -- can supply a fake for its own tests.
-    """
-    package_root = Path(__file__).resolve().parents[3]
-    script = package_root / ".agents" / "machine" / "utility" / "plugin-lock" / "scripts" / "harness_permissions_sync.py"
-    if not script.is_file():
-        return
-    try:
-        run(
-            [sys.executable, "-I", "-B", str(script), "--apply", "--project", str((project or Path.cwd()).resolve())],
-            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
-        )
-    except Exception:  # noqa: BLE001
-        pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -866,10 +772,8 @@ def main(argv: list[str] | None = None) -> int:
             migrate_profile_settings=arguments.migrate_profile,
         )
     except Exception as error:  # noqa: BLE001
-        print(f"standards: sync failed ({error}); this session loads the installed plugins")
+        print(f"standards: rolling plugin refresh failed ({error})")
         code = 1
-    if not arguments.check:
-        apply_harness_permissions(arguments.project.resolve())
     return code
 
 

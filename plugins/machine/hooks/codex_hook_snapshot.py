@@ -58,18 +58,9 @@ def verified(root, expected, plugin):
         fail("Codex hook package integrity check failed")
 
 
-def main():
-    root = Path(sys.argv[1])
-    expected = sys.argv[2]
-    plugin = sys.argv[3]
-    script = Path(sys.argv[4])
-    relative = script.relative_to(root)
-    if root.parent.name != plugin or relative.is_absolute() or ".." in relative.parts:
-        fail("Codex hook package identity is invalid")
-    data = os.environ.get("PLUGIN_DATA")
-    if not data:
-        fail("Codex hook data directory is unavailable")
-    snapshot_dir = Path(data).resolve() / "hook-snapshots"
+def snapshot_root(root, expected, plugin, snapshot_dir):
+    root = Path(root)
+    snapshot_dir = Path(snapshot_dir)
     key = hashlib.sha256((str(root) + "\0" + expected).encode("utf-8")).hexdigest()
     snapshot = snapshot_dir / key
     if not snapshot.is_dir():
@@ -87,8 +78,24 @@ def main():
         finally:
             if temporary.is_dir():
                 shutil.rmtree(temporary)
-    selected = snapshot
     verified(snapshot, expected, plugin)
+    return snapshot
+
+
+def main():
+    root = Path(sys.argv[1])
+    expected = sys.argv[2]
+    plugin = sys.argv[3]
+    script = Path(sys.argv[4])
+    relative = script.relative_to(root)
+    if root.parent.name != plugin or relative.is_absolute() or ".." in relative.parts:
+        fail("Codex hook package identity is invalid")
+    data = os.environ.get("PLUGIN_DATA")
+    configured = os.environ.get("TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY")
+    if not data and not configured:
+        fail("Codex hook data directory is unavailable")
+    snapshot_dir = Path(configured).resolve() if configured else Path(data).resolve() / "hook-snapshots"
+    selected = snapshot_root(root, expected, plugin, snapshot_dir)
     target = selected / relative
     if not target.is_file():
         fail("Codex hook script is unavailable")
