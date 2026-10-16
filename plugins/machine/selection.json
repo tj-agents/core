@@ -18,7 +18,7 @@
     "open-cli",
     "open-codex",
     "peer-cli",
-    "plugin-lock",
+    "plugin-selection",
     "recover-agents",
     "search",
     "search-claude",
