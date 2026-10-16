@@ -67,10 +67,11 @@ def parse_marketplace(value: str) -> tuple[str, dict]:
     return name, pin
 
 
-def lock_document(root: Path, revision: str | None, names: set[str], foreign: set[str], declared: dict, roster: dict) -> dict:
+def lock_document(root: Path, revision: str | None, names: set[str], foreign: set[str], declared: dict, roster: dict, core_marketplace: str | None = None) -> dict:
     lock = plugin_lock.resolve(root)
     marketplaces: dict = {}
     kept: list[str] = []
+    existing_core = plugin_lock.MARKETPLACE_NAME
     if lock.is_file():
         existing = lock_io.load_json(lock)
         if not plugin_lock.is_current(existing):
@@ -78,9 +79,15 @@ def lock_document(root: Path, revision: str | None, names: set[str], foreign: se
         identities = existing.get("plugins")
         if not isinstance(identities, list) or any(not isinstance(item, str) for item in identities) or len(set(identities)) != len(identities):
             raise lock_io.LockError(f"{lock}: plugins must be a list of unique plugin names")
-        core = [plugin_lock.plugin_id(name) for name in plugin_lock.CORE_PLUGINS]
+        existing_core = plugin_lock.core_marketplace(identities)
+        core = [plugin_lock.plugin_id(name, existing_core) for name in plugin_lock.CORE_PLUGINS]
         repaired = dict(existing, plugins=sorted({*identities, *core}))
         marketplaces, kept = plugin_lock.validate(repaired)
+    chosen_core = core_marketplace or existing_core
+    if chosen_core not in {plugin_lock.MARKETPLACE_NAME, plugin_lock.CORE_MARKETPLACE}:
+        raise lock_io.LockError("Unsupported Core marketplace")
+    kept = [plugin_lock.plugin_id(name, chosen_core) if name in plugin_lock.CORE_PLUGINS and marketplace == existing_core else identity
+            for identity in kept for name, marketplace in [plugin_lock.split(identity)]]
     for identity in kept:
         name, marketplace = plugin_lock.split(identity)
         if marketplace == plugin_lock.MARKETPLACE_NAME and name in roster["plugins"]:
@@ -88,12 +95,16 @@ def lock_document(root: Path, revision: str | None, names: set[str], foreign: se
     marketplaces.update(declared)
     if revision is not None:
         marketplaces[plugin_lock.MARKETPLACE_NAME] = {"repository": plugin_lock.MARKETPLACE_REPOSITORY, "revision": revision}
-    if plugin_lock.MARKETPLACE_NAME not in marketplaces:
-        raise lock_io.LockError("A new plugin lock needs --marketplace-revision")
+    if chosen_core not in marketplaces:
+        required = "--marketplace-revision" if chosen_core == plugin_lock.MARKETPLACE_NAME else "--marketplace base-agents=tj-agents/core@<revision>"
+        raise lock_io.LockError("A new plugin lock needs " + required)
     for identity in foreign:
         if plugin_lock.split(identity)[1] not in marketplaces:
             raise lock_io.LockError(f"{identity} needs its marketplace declared with --marketplace")
-    selected = {plugin_lock.plugin_id(name) for name in expand(names, roster)} | set(kept) | foreign
+    selected = {plugin_lock.plugin_id(name, chosen_core if name in plugin_lock.CORE_PLUGINS else plugin_lock.MARKETPLACE_NAME)
+                for name in expand(names, roster)} | set(kept) | foreign
+    if chosen_core != existing_core and existing_core not in {plugin_lock.split(identity)[1] for identity in selected}:
+        marketplaces.pop(existing_core, None)
     document = {
         "schema_version": plugin_lock.SCHEMA_VERSION,
         "marketplaces": dict(sorted(marketplaces.items())),
@@ -103,7 +114,7 @@ def lock_document(root: Path, revision: str | None, names: set[str], foreign: se
     return document
 
 
-def plan(root: Path, revision: str | None, stacks: list[str], plugins: list[str], marketplaces: list[str] = ()) -> tuple[dict[Path, str | None], Path]:
+def plan(root: Path, revision: str | None, stacks: list[str], plugins: list[str], marketplaces: list[str] = (), core_marketplace: str | None = None) -> tuple[dict[Path, str | None], Path]:
     root = root.expanduser().resolve()
     if root.exists() and not root.is_dir():
         raise lock_io.LockError(f"Repository root is not a directory: {root}")
@@ -118,14 +129,14 @@ def plan(root: Path, revision: str | None, stacks: list[str], plugins: list[str]
         declared[name] = pin
     if revision is not None and plugin_lock.MARKETPLACE_NAME in declared:
         raise lock_io.LockError(f"Use either --marketplace-revision or --marketplace {plugin_lock.MARKETPLACE_NAME}=..., not both")
-    document = lock_document(root, revision, names, foreign, declared, roster)
+    document = lock_document(root, revision, names, foreign, declared, roster, core_marketplace)
     lock = root / ".agents" / plugin_lock.LOCK_NAME
     host_targets = repo_config.plan(lock, root=root, scope="project", prospective_paths=[lock], lock_document=document)
     return {lock: json.dumps(document, indent=2, ensure_ascii=False) + "\n", **host_targets}, root
 
 
-def run(root: Path, revision: str | None, stacks: list[str], plugins: list[str], mode: str, marketplaces: list[str] = ()) -> list[str]:
-    targets, root = plan(root, revision, stacks, plugins, marketplaces)
+def run(root: Path, revision: str | None, stacks: list[str], plugins: list[str], mode: str, marketplaces: list[str] = (), core_marketplace: str | None = None) -> list[str]:
+    targets, root = plan(root, revision, stacks, plugins, marketplaces, core_marketplace)
     changed = {path: value for path, value in targets.items() if repo_config.text_at(path) != value}
     drift = [path.relative_to(root).as_posix() for path in changed]
     if mode == "write":
@@ -137,13 +148,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--marketplace-revision")
+    parser.add_argument("--core-marketplace", choices=(plugin_lock.MARKETPLACE_NAME, plugin_lock.CORE_MARKETPLACE))
     parser.add_argument("--marketplace", action="append", default=[], metavar="NAME=OWNER/REPO@REVISION")
     parser.add_argument("--stack", action="append", default=[])
     parser.add_argument("--plugin", action="append", default=[])
     parser.add_argument("--mode", required=True, choices=("preview", "check", "write"))
     arguments = parser.parse_args(argv)
     try:
-        drift = run(arguments.root, arguments.marketplace_revision, arguments.stack, arguments.plugin, arguments.mode, arguments.marketplace)
+        drift = run(arguments.root, arguments.marketplace_revision, arguments.stack, arguments.plugin, arguments.mode, arguments.marketplace, arguments.core_marketplace)
     except (lock_io.LockError, OSError, UnicodeError, ValueError) as error:
         print(f"Plugin adoption failed: {error}", file=sys.stderr)
         return 1
