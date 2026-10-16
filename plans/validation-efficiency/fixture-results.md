@@ -1,6 +1,6 @@
 # Workflow fixture measurement
 
-This compact record supports the final slice in `../routine-review-evidence-and-impact-ci/GOAL.md`.
+This record preserves the measured fixture result from the validation-efficiency implementation.
 Required CI run 38902959829 identified workflow-operation tests as an expensive Windows module. Source inspection found nine repeated Git setup operations in every inherited test fixture.
 
 | Local measurement, 12 samples each | Before | After |
@@ -15,4 +15,4 @@ The after implementation copies a complete initialized repository into a separat
 
 All 96 test-method ASTs are identical before and after. All 96 tests passed against the exact prepared source in 455.289s. Source SHA-256: `94b69e58933d45e64c420ee6194ccdb2d06957d05fd5c9bcac3e320132d41210`. The cumulative runtime used for this check is unchanged from reviewed PR #275; its generated refresh changes packaging only. No duplicate local module run is required after applying those exact bytes.
 
-Raw compact evidence remains Git-private under workflow run `validation-efficiency-fixture`, labels `workflow-fixture-before`, `workflow-fixture-proposed-isolation-timing` and `workflow-fixture-proposed-module`. Both Windows and Linux CI and the independent review must pass before delivery.
+Raw compact evidence remains Git-private under workflow run `validation-efficiency-fixture`, labels `workflow-fixture-before`, `workflow-fixture-proposed-isolation-timing` and `workflow-fixture-proposed-module`. PR #276 merged at `8834fc4c48f03e6f9a3b6a163a85f5c2e16db5f2`, from reviewed head `ad10281b5f9e787e81e21592d883201521e2e8ad`. Native and independent fixture-isolation reviews found no actionable defects. Required focused CI run `38916073108` passed all 96 tests on each platform: Windows test execution 100.720s (job 2m6s), Linux 6.575s (job 15s). Selection, generated-source/package checks and `ci-required` passed. Main regeneration run `38917958656` also passed its generation job; fixture-only changes produced no package change.
