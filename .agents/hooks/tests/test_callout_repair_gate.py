@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 import uuid
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -431,6 +432,29 @@ class CalloutRepairGateTests(unittest.TestCase):
         registration = next(group for group in codex["hooks"]["PreToolUse"]
                             if "callout_repair_gate.py" in json.dumps(group))
         self.assertEqual(".*", registration["matcher"])
+
+
+class ProviderReceiptTests(unittest.TestCase):
+    def test_both_host_receipts_forward_selection_and_recheck_the_live_record(self):
+        sys.path.insert(0, str(SCRIPT.parent))
+        import callout_repair_gate as gate
+        reference = "https://example.invalid/source/issues/14"
+        command = (f"python plugin/scripts/admission.py check --record {reference} --id B014 "
+                   f"--session session --prompt-sha256 {gate.prompt_digest(PROMPT)} --callout-id nonce "
+                   f"--source-root '/source owner' --host {{host}}")
+        receipt = {"valid": True, "event": "agent-handoff-disposition", "record": reference}
+        for host in ("codex", "claude"):
+            if host == "codex":
+                records = [{"type": "function_call", "call_id": "read", "arguments": {"command": command.format(host=host)}},
+                           {"type": "function_call_output", "call_id": "read", "output": json.dumps(receipt)}]
+            else:
+                records = [{"content": [{"type": "tool_use", "id": "read", "input": {"command": command.format(host=host)}}]},
+                           {"content": [{"type": "tool_result", "tool_use_id": "read", "content": json.dumps(receipt)}]}]
+            with self.subTest(host=host), patch.object(gate, "validate_disposition", return_value=receipt) as validate:
+                self.assertTrue(gate.valid_disposition(records, "session", PROMPT, "nonce"))
+                self.assertEqual({"source_root": "/source owner", "harness": host}, validate.call_args.kwargs)
+            with patch.object(gate, "validate_disposition", return_value={"valid": False}):
+                self.assertFalse(gate.valid_disposition(records, "session", PROMPT, "nonce"))
 
 
 if __name__ == "__main__":
