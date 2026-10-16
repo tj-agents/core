@@ -22,3 +22,7 @@ Do not touch the plugin-scoping work (plans/PluginScoping), consumer repos, or ~
 
 ## Progress
 - 2026-10-16: goal created by the plugin-scoping session (tj-agents [6caeea]). Not started.
+- 2026-10-16: implemented in `Feature/OpenCli` (worktree `.worktrees/Feature-OpenCli`): `agent_recovery.py reopen`
+  (resolve across hosts, focus live, reopen closed), `close_tab.py --session --focus` plus `-Focus` in the Windows
+  Terminal adapter, `machine:open-cli` skill and host entries, `recover-agents` pointer. Focused tests green
+  (agent_recovery, close_tab, open_claude, source_layout); sync `-Check` clean. Next: PR, review, merge.
