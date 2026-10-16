@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -152,6 +153,60 @@ class RollingPluginsTests(unittest.TestCase):
     def test_explicitly_disabled_required_dependency_fails(self):
         with self.assertRaisesRegex(ROLLING.RollingPluginError, 'explicitly disabled'):
             ROLLING.resolve([ROLLING.Selection('engineering@core', str(self.remote), 'core')], self.root / 'cache', {'base@core'})
+
+    def claude_dependency_preflight(self):
+        config = self.root / 'claude'
+        project = self.root / 'project'
+        project.mkdir()
+        self.write(config / 'settings.json', {'enabledPlugins': {'engineering@umbrella': True}})
+        self.write(config / 'plugins/known_marketplaces.json', {
+            'umbrella': {'source': {'source': 'github', 'repo': 'tj-agents/core'}},
+        })
+        return config, project, ROLLING.preflight('claude', config, project, {'cache_root': config / 'plugins/cache/r'})
+
+    def test_claude_materializes_declared_dependency_without_saved_marketplace(self):
+        config, project, preflight = self.claude_dependency_preflight()
+        saved = {path: path.read_bytes() for path in
+                 (config / 'settings.json', config / 'plugins/known_marketplaces.json')}
+        with preflight as active:
+            expected = {root.identity: root for root in active.prepared.selected_roots}
+            settings = json.loads(active.prepared.launch_args[1])
+            source = settings['extraKnownMarketplaces']['core']['source']
+            self.assertEqual(source, {'source': 'directory', 'path': str(active.prepared.catalog_root / 'core')})
+
+            def native(command, _project, environment, _deadline, json_output=False):
+                if command[1:3] == ['plugin', 'install']:
+                    identity = command[3]
+                    plugins = Path(environment['CLAUDE_CODE_PLUGIN_CACHE_DIR'])
+                    destination = plugins / 'cache' / identity / 'unknown'
+                    shutil.copytree(expected[identity].root, destination)
+                    registry_path = plugins / 'installed_plugins.json'
+                    document = json.loads(registry_path.read_text()) if registry_path.exists() else {'version': 2, 'plugins': {}}
+                    document['plugins'][identity] = [{'scope': 'user', 'installPath': str(destination)}]
+                    self.write(registry_path, document)
+                    return None
+                self.assertEqual(command[-3:], ['plugin', 'list', '--json'])
+                document = json.loads((config / 'plugins/installed_plugins.json').read_text())
+                return [{'id': identity, 'enabled': True, 'installPath': records[0]['installPath']}
+                        for identity, records in document['plugins'].items()]
+
+            with mock.patch.object(ROLLING, '_native', side_effect=native), \
+                    mock.patch.object(ROLLING, '_pin_claude_cache'), \
+                    mock.patch.object(ROLLING, '_claude_pinned_paths', return_value=set()):
+                prepared = active.materialize_native('claude')
+            self.assertEqual({root.identity for root in prepared.selected_roots}, {'base@core', 'engineering@umbrella'})
+            self.assertTrue(all((root.root / 'payload.txt').read_text() == 'one' for root in prepared.selected_roots))
+            active.acknowledge_binding()
+        self.assertEqual(saved, {path: path.read_bytes() for path in saved})
+
+    def test_claude_still_refuses_removed_explicit_marketplace_before_native_install(self):
+        config, project, preflight = self.claude_dependency_preflight()
+        with preflight as active:
+            self.write(config / 'plugins/known_marketplaces.json', {})
+            with mock.patch.object(ROLLING, '_native') as native:
+                with self.assertRaisesRegex(ROLLING.RollingPluginError, 'no longer registered: umbrella'):
+                    active.materialize_native('claude')
+            native.assert_not_called()
 
     def test_published_executable_bit_is_preserved_in_the_verified_tree(self):
         if os.name == 'nt':
