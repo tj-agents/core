@@ -312,6 +312,12 @@ Observed blocker: no send was attempted."""
         with self.assertRaisesRegex(ValueError, "No Claude or Codex session matched"):
             RECOVERY.resolve_target("no such topic", roots=roots)
 
+    def test_latest_prefers_a_live_match_over_a_newer_closed_one(self):
+        found = [{"host": "claude", "id": "new", "status": "closed", "activity": "2", "cwd": str(self.cwd), "title": None, "preview": ""},
+                 {"host": "codex", "id": "old", "status": "live", "activity": "1", "cwd": str(self.cwd), "title": None, "preview": ""}]
+        with mock.patch.object(RECOVERY, "search", side_effect=lambda hosts, *_: [item for item in found if item["host"] in hosts]):
+            self.assertEqual("old", RECOVERY.resolve_target("topic", pick_latest=True)["id"])
+
     def test_reopen_bare_word_is_a_topic_even_when_a_directory_has_that_name(self):
         self.write_codex()
         _, roots = self.roots()

@@ -411,7 +411,7 @@ def resolve_target(target, hosts=("codex", "claude"), roots=None, pick_latest=Fa
     if len(found) > 1 and not pick_latest:
         listing = "; ".join(f"{item['host']}:{item['id']} {item['title'] or item['preview'][:60]!r}" for item in found[:10])
         raise ValueError("More than one session matched; pass the exact id or --latest. Matches: " + listing)
-    item = found[0]
+    item = next((candidate for candidate in found if candidate["status"] == "live"), found[0])
     if not item["cwd"] or not Path(item["cwd"]).is_dir():
         raise ValueError("The recorded session directory is missing; refusing to resume it elsewhere.")
     return item
