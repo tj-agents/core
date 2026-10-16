@@ -572,6 +572,7 @@
             "hook-control",
             "last-conversation",
             "open-claude",
+            "open-cli",
             "open-codex",
             "peer-cli",
             "plugin-lock",
