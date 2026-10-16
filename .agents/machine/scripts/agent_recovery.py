@@ -401,7 +401,7 @@ def resolve_target(target, hosts=("codex", "claude"), roots=None, pick_latest=Fa
     for host in hosts:
         try:
             found.extend(search((host,), None if by_directory else target,
-                                str(directory.resolve()) if by_directory else None, 25, roots))
+                                os.path.abspath(directory) if by_directory else None, 25, roots))
         except ValueError as exc:
             unavailable.append(str(exc))
     found.sort(key=lambda item: item.get("activity") or "", reverse=True)
