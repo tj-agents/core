@@ -13,7 +13,7 @@ Generated from canonical `.agents/` definitions.
 - `open-cli` — utility — `.agents/machine/utility/open-cli/SKILL.md`
 - `open-codex` — utility — `.agents/machine/utility/open-codex/SKILL.md`
 - `peer-cli` — utility — `.agents/machine/utility/peer-cli/SKILL.md`
-- `plugin-lock` — utility — `.agents/machine/utility/plugin-lock/SKILL.md`
+- `plugin-selection` — utility — `.agents/machine/utility/plugin-selection/SKILL.md`
 - `recover-agents` — utility — `.agents/machine/utility/recover-agents/SKILL.md`
 - `search` — utility — `.agents/machine/utility/search/SKILL.md`
 - `search-claude` — utility — `.agents/machine/utility/search-claude/SKILL.md`

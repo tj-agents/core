@@ -40,19 +40,21 @@ def command(executable):
     return [executable]
 
 
-def run(arguments, cwd):
+def run(arguments, cwd, timeout=TIMEOUT):
     return subprocess.run(
         arguments, cwd=cwd, check=True, capture_output=True,
-        text=True, encoding="utf-8", timeout=TIMEOUT,
+        text=True, encoding="utf-8", timeout=timeout,
     ).stdout.strip()
 
 
 class AppServer:
-    def __init__(self, executable, cwd):
+    def __init__(self, executable, cwd, launch_args=(), environment=None, timeout=TIMEOUT):
+        self.timeout = timeout
         self.process = subprocess.Popen(
-            [*command(executable), "app-server"], cwd=cwd,
+            [*command(executable), *launch_args, "app-server"], cwd=cwd,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8", bufsize=1,
+            env=dict(os.environ, **(environment or {})),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
         self.messages = queue.Queue()
@@ -76,7 +78,7 @@ class AppServer:
         self.sequence += 1
         request_id = self.sequence
         self.send({"id": request_id, "method": method, "params": params})
-        deadline = time.monotonic() + TIMEOUT
+        deadline = time.monotonic() + self.timeout
         while True:
             try:
                 message = self.messages.get(timeout=max(0, deadline - time.monotonic()))
@@ -191,13 +193,18 @@ def installed_package(hook):
     raise RuntimeError(f"Cannot identify installed plugin package: {hook['pluginId']}")
 
 
-def trust_updates(inventory, entries, cwd):
+def trust_updates(inventory, entries, cwd, verified_roots=None):
+    verified_roots = {root.identity: root for root in verified_roots or ()}
     candidates = {}
     for plugin in inventory.get("installed", []):
+        if not isinstance(plugin, dict):
+            continue
         if plugin.get("installed") and plugin.get("enabled"):
             marketplace = plugin.get("marketplaceSource", {})
             repository = github_repository(marketplace.get("source"))
             if marketplace.get("sourceType") == "git" and repository and repository[0] == TRUSTED_OWNER:
+                candidates[plugin["pluginId"]] = plugin
+            elif marketplace.get("sourceType") == "local" and plugin.get("pluginId") in verified_roots:
                 candidates[plugin["pluginId"]] = plugin
     updates = {}
     verified = set()
@@ -217,10 +224,12 @@ def trust_updates(inventory, entries, cwd):
                 continue
             package = installed_package(hook)
             if (identity, package) not in verified:
-                source = source_package(candidates[identity], cwd, published)
-                if source is None:
-                    continue
-                if package_files(package) != source:
+                provenance = verified_roots.get(identity)
+                if provenance is not None:
+                    source = package_files(provenance.root)
+                else:
+                    source = source_package(candidates[identity], cwd, published)
+                if source is None or package_files(package) != source:
                     raise RuntimeError(f"Installed plugin differs from its Git source: {identity}")
                 verified.add((identity, package))
             key, current_hash = hook["key"], hook["currentHash"]
@@ -230,8 +239,11 @@ def trust_updates(inventory, entries, cwd):
     return updates
 
 
-def apply_trust(executable, cwd, preview=False):
-    with AppServer(executable, cwd) as server:
+def apply_trust(executable, cwd, preview=False, verified_roots=None, launch_args=(), environment=None, timeout=None):
+    limit = TIMEOUT if timeout is None else timeout
+    if limit <= 0:
+        raise RuntimeError("Codex hook trust deadline expired")
+    with AppServer(executable, cwd, launch_args, environment, timeout=limit) as server:
         listing = server.request("hooks/list", {"cwds": [str(cwd)]})
         if not any(
             hook.get("source") == "plugin" and hook.get("enabled")
@@ -239,8 +251,16 @@ def apply_trust(executable, cwd, preview=False):
             for entry in listing["data"] for hook in entry.get("hooks", [])
         ):
             return {}
-        inventory = json.loads(run([*command(executable), "plugin", "list", "--json"], cwd))
-        updates = trust_updates(inventory, listing["data"], cwd)
+        if not launch_args and not environment:
+            inventory = json.loads(run([*command(executable), "plugin", "list", "--json"], cwd, limit))
+        else:
+            completed = subprocess.run(
+                [*command(executable), *launch_args, "plugin", "list", "--json"], cwd=cwd,
+                env=dict(os.environ, **(environment or {})), check=True, capture_output=True,
+                text=True, encoding="utf-8", timeout=limit,
+            )
+            inventory = json.loads(completed.stdout)
+        updates = trust_updates(inventory, listing["data"], cwd, verified_roots)
         if updates and not preview:
             server.request("config/batchWrite", {
                 "edits": [{"keyPath": "hooks.state", "value": updates, "mergeStrategy": "upsert"}],

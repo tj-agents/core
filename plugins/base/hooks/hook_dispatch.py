@@ -248,6 +248,20 @@ def main(argv: list[str]) -> int:
     if not isinstance(data, dict):
         data = {}
     event = data.get("hook_event_name") or data.get("hookEventName") or ""
+    if event == "SessionStart":
+        directory = os.environ.get("TJ_AGENTS_STARTUP_ACK_DIRECTORY")
+        token = os.environ.get("TJ_AGENTS_STARTUP_ACK_TOKEN")
+        if directory and token and len(token) >= 32 and all(value.isalnum() or value in "-_" for value in token):
+            path = Path(directory) / token
+            try:
+                if path.parent.is_dir() and path.parent.resolve() == Path(directory).resolve():
+                    descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                    with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+                        output.write(token)
+            except FileExistsError:
+                pass
+            except OSError:
+                pass
     tool = data.get("tool_name") if isinstance(data.get("tool_name"), str) else ""
 
     gates: list[tuple[str, list[str]]] = []

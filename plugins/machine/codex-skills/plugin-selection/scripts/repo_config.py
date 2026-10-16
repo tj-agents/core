@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate project host settings from a repository's plugin lock."""
+"""Generate project host settings from a repository's plugin selection."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import subprocess
 import harness_permissions
 import lock_io
 import machine_paths
-import plugin_lock
+import plugin_selection
 
 
 MANAGED_START = "# BEGIN repo-declared agent capabilities"
@@ -25,10 +25,10 @@ HEADER = re.compile(r"^\s*\[")
 
 
 def declarations(lock_path: Path, lock: dict) -> tuple[dict[str, dict], dict[str, bool], list[str], list[dict]]:
-    marketplaces, identities_selected = plugin_lock.validate(lock)
-    sources = {name: {"owner_repository": pin["repository"], "revision": pin["revision"]} for name, pin in marketplaces.items()}
-    identities = {identity: True for identity in identities_selected}
-    selected = {plugin_lock.overlay_id(identity) for identity in identities_selected}
+    marketplaces, selected_identities = plugin_selection.validate(lock)
+    sources = {name: {"owner_repository": source["repository"]} for name, source in marketplaces.items()}
+    identities = {identity: True for identity in selected_identities}
+    selected = {plugin_selection.overlay_id(identity) for identity in selected_identities}
     requirements = []
     overlay_path = lock_path.resolve().parent / "repository-harness.json"
     if overlay_path.is_file():
@@ -55,7 +55,7 @@ def declarations(lock_path: Path, lock: dict) -> tuple[dict[str, dict], dict[str
 def claude_settings(path: Path, sources: dict[str, dict], identities: dict[str, bool], allow: list[str]) -> str:
     settings = lock_io.load_json(path) if path.is_file() else {}
     settings["extraKnownMarketplaces"] = {
-        name: {"source": {"source": "github", "repo": release["owner_repository"], "ref": release["revision"]}, "autoUpdate": False}
+        name: {"source": {"source": "github", "repo": release["owner_repository"]}, "autoUpdate": True}
         for name, release in sources.items()
     }
     settings["enabledPlugins"] = identities
@@ -101,10 +101,9 @@ def codex_block(sources: dict, identities: dict) -> str:
     lines = [MANAGED_START]
     for marketplace, release in sources.items():
         lines += [f"[marketplaces.{marketplace}]", 'source_type = "git"',
-                  f'source = "https://github.com/{release["owner_repository"]}.git"',
-                  f'ref = "{release["revision"]}"']
-        if marketplace == plugin_lock.MARKETPLACE_NAME:
-            lines.append(f'sparse_paths = {json.dumps([".agents/plugins", ".claude-plugin"])}')
+                  f'source = "https://github.com/{release["owner_repository"]}.git"']
+        if marketplace == plugin_selection.MARKETPLACE_NAME:
+            lines.append(f'sparse_paths = {json.dumps([".agents/plugins", ".claude-plugin", "plugins"])}')
         lines.append("")
     for identity, enabled in identities.items():
         lines += [f'[plugins."{identity}"]', f"enabled = {str(enabled).lower()}", ""]
@@ -225,7 +224,7 @@ def local_state(path: Path) -> dict:
 def local_claude(path: Path, sources: dict, identities: dict, allow: list[str], previous: dict) -> tuple[str, dict]:
     settings = lock_io.load_json(path) if path.is_file() else {}
     wanted = {
-        "extraKnownMarketplaces": {name: {"source": {"source": "github", "repo": release["owner_repository"], "ref": release["revision"]}, "autoUpdate": False} for name, release in sources.items()},
+        "extraKnownMarketplaces": {name: {"source": {"source": "github", "repo": release["owner_repository"]}, "autoUpdate": True} for name, release in sources.items()},
         "enabledPlugins": identities,
     }
     owned = {}
@@ -385,14 +384,6 @@ def reject_machine_paths(root: Path, targets: dict[Path, str | None]) -> None:
         raise lock_io.LockError("Committed host settings contain machine-specific paths:\n" + "\n".join(problems))
 
 
-def refuse_local_clone(root: Path) -> None:
-    if (root / LOCAL_STATE).exists():
-        raise lock_io.LockError(
-            f"{root}: adopted with --scope local; adopt_plugins and bump_plugin_lock do not support local clones yet "
-            "(see the plugin-lock TECH_DEBT.md), and repo_config.py --scope local cannot change the pin"
-        )
-
-
 def write_batch(targets: dict[Path, str | None]) -> None:
     originals = {path: path.read_bytes() if path.is_file() else None for path in targets}
     attempted = []
@@ -443,7 +434,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scope", choices=("project", "local"), default="project")
     args = parser.parse_args(argv)
     try:
-        lock = args.lock or plugin_lock.resolve((args.root or Path.cwd()).expanduser().resolve())
+        lock = args.lock or plugin_selection.resolve((args.root or Path.cwd()).expanduser().resolve())
         drift = run(lock, args.mode, root=args.root, scope=args.scope)
     except (lock_io.LockError, OSError, UnicodeError) as error:
         print(str(error), file=sys.stderr)
