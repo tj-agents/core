@@ -44,3 +44,5 @@ script configuration. Generic provider, admission and both host receipt callers 
 
 Review and deliver this bounded Core slice, then qualify the work-items adapter
 against the same protocol and run its controlled pilot.
+
+Review correction: deterministic shipped helper resolution is verified for source and all four packaged admission entry layouts. Five provider, fourteen admission and twenty-two gate tests pass (41 total). Native discovery failure and wrong-host receipts fail closed. Package and harness freshness passed before disposable generated output was restored to HEAD for the next native review. No generated distribution or catalog is in the candidate.

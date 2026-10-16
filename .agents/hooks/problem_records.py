@@ -42,10 +42,10 @@ def read_record(root, reference, harness):
         raise RecordError("source repository has no selected problem-record provider")
     if harness not in {"codex", "claude"} or not isinstance(reference, str) or not REFERENCE.fullmatch(reference):
         raise RecordError("provider reads require the actual host and a canonical record URI")
-    from skill_router import resolved_skill
+    from skill_router import NativePluginDiscoveryError, resolved_skill
     try:
         found = resolved_skill(selected["provider"], harness)
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, NativePluginDiscoveryError) as error:
         raise RecordError("selected problem-record provider could not be resolved") from error
     if found is None:
         raise RecordError("selected problem-record provider is not installed")

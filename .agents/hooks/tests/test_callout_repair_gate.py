@@ -455,6 +455,11 @@ class ProviderReceiptTests(unittest.TestCase):
                 self.assertEqual({"source_root": "/source owner", "harness": host}, validate.call_args.kwargs)
             with patch.object(gate, "validate_disposition", return_value={"valid": False}):
                 self.assertFalse(gate.valid_disposition(records, "session", PROMPT, "nonce"))
+            wrong_host = "claude" if host == "codex" else "codex"
+            wrong_records = json.loads(json.dumps(records).replace("--host " + host, "--host " + wrong_host))
+            with patch.object(gate, "validate_disposition", return_value=receipt) as validate:
+                self.assertFalse(gate.valid_disposition(wrong_records, "session", PROMPT, "nonce"))
+                validate.assert_not_called()
 
 
 if __name__ == "__main__":
