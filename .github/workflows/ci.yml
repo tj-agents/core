@@ -47,7 +47,7 @@ jobs:
         if: fromJSON(needs.select.outputs.plan).mode == 'full'
         with:
           repository: tj-agents/template
-          ref: v1.6.2
+          ref: v2.0.0
           path: .template
           persist-credentials: false
       - uses: actions/checkout@v4
