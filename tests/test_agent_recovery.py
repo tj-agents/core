@@ -315,13 +315,14 @@ Observed blocker: no send was attempted."""
     def test_reopen_bare_word_is_a_topic_even_when_a_directory_has_that_name(self):
         self.write_codex()
         _, roots = self.roots()
-        (Path.cwd() / "topic_dir_probe").mkdir()
-        self.addCleanup(lambda: (Path.cwd() / "topic_dir_probe").rmdir())
+        (self.root / "topic_dir_probe").mkdir()
+        previous = Path.cwd()
+        os.chdir(self.root)
+        self.addCleanup(os.chdir, previous)
         with mock.patch.object(RECOVERY, "search", return_value=[]) as search:
             with self.assertRaises(ValueError):
                 RECOVERY.resolve_target("topic_dir_probe", roots=roots)
-        self.assertEqual("topic_dir_probe", search.call_args.args[1])
-        self.assertIsNone(search.call_args.args[2])
+        self.assertEqual(("topic_dir_probe", None), search.call_args.args[1:3])
 
     def test_reopen_closed_session_opens_in_its_own_host(self):
         self.write_codex()

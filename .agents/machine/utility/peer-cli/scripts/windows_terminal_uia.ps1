@@ -50,7 +50,7 @@ if ($Focus) {
     if ([OpenCli.Native]::IsIconic($handle)) { [void] [OpenCli.Native]::ShowWindow($handle, 9) }
     $raised = [OpenCli.Native]::SetForegroundWindow($handle)
     $matches[0].Window.SetFocus()
-    if (-not $raised) { throw "Windows Terminal tab '$($matches[0].Title)' was selected, but Windows refused to raise its window; look for it in the taskbar." }
+    if (-not $raised) { [Console]::Error.WriteLine("Windows Terminal tab '$($matches[0].Title)' was selected, but Windows did not raise its window; look for it in the taskbar.") }
     return
 }
 $close = New-Object System.Windows.Automation.PropertyCondition(
