@@ -4,8 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      plan: ${{ steps.selection.outputs.plan }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: selection
+        name: select affected validation
+        run: python3 -B scripts/ci_selection.py select
+
   guard:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -20,23 +34,30 @@ jobs:
         run: python3 -B scripts/check_generated_paths.py --base "origin/${BASE_REF}"
 
   verify-windows:
+    needs: select
+    if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
     runs-on: windows-latest
+    env:
+      CI_SELECTION: ${{ needs.select.outputs.plan }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/checkout@v4
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         with:
           repository: tj-agents/kit
           ref: v1.2.0
           path: .kit
           persist-credentials: false
       - uses: actions/checkout@v4
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         with:
           repository: tj-agents/react
           path: .react
           persist-credentials: false
       - uses: actions/checkout@v4
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         with:
           repository: tj-agents/dotnet
           path: .dotnet
@@ -68,10 +89,12 @@ jobs:
         run: python -B scripts/sync_harness_manifests.py --check
 
       - name: authored skill references resolve in the public corpus
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: python -B .kit/.agents/kit/utility/check/scripts/check_skill_references.py --root . --root .kit --root .react --root .dotnet --source-root .
 
       - name: CLI session recovery tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: powershell
         run: ./cli-session-recovery/tests/cli-session-vault.tests.ps1
 
@@ -80,34 +103,49 @@ jobs:
         run: ./tests/skill-packaging.tests.ps1
 
       - name: PowerShell host compatibility tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: |
           ./tests/powershell-host-compat.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/powershell-host-compat.tests.ps1
 
       - name: continuation scheduler tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: |
           ./tests/delivery-continuation.tests.ps1
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/delivery-continuation.tests.ps1
 
       - name: Codex terminal profile tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: |
           python -B -m unittest discover -s tests -p test_codex_terminal_profile.py
 
       - name: source layout and package tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: python -B -m unittest discover -s tests -p 'test_*.py' -v
 
       - name: shared runtime tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         shell: pwsh
         run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v
 
+      - name: selected source and package regressions
+        if: fromJSON(needs.select.outputs.plan).mode == 'focused'
+        run: python -B scripts/ci_selection.py run --group source
+
+      - name: selected shared runtime regressions
+        if: fromJSON(needs.select.outputs.plan).mode == 'focused'
+        run: python -B scripts/ci_selection.py run --group runtime
+
   verify-linux:
-    # The same generated-tree checks and Python suites as verify-windows, on Linux, so a POSIX-only regression
-    # fails a pull request instead of surfacing only on a Linux machine.
+    needs: select
+    if: needs.select.outputs.plan != '' && fromJSON(needs.select.outputs.plan).mode != 'docs'
     runs-on: ubuntu-latest
+    env:
+      CI_SELECTION: ${{ needs.select.outputs.plan }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -145,10 +183,34 @@ jobs:
       # Hook subprocesses in some tests read stdin as their payload; a closed stdin stands in for the host,
       # which always closes it, so an inherited runner stdin can never leave a hook waiting.
       - name: source layout and package tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         run: python -B -m unittest discover -s tests -p 'test_*.py' -v < /dev/null
 
       - name: shared runtime tests
+        if: fromJSON(needs.select.outputs.plan).mode == 'full'
         run: python -B -m unittest discover -s .agents/hooks/tests -p 'test_*.py' -v < /dev/null
+
+      - name: selected source and package regressions
+        if: fromJSON(needs.select.outputs.plan).mode == 'focused'
+        run: python3 -B scripts/ci_selection.py run --group source < /dev/null
+
+      - name: selected shared runtime regressions
+        if: fromJSON(needs.select.outputs.plan).mode == 'focused'
+        run: python3 -B scripts/ci_selection.py run --group runtime < /dev/null
+
+  ci-required:
+    if: always()
+    needs: [select, guard, verify-windows, verify-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: require every selected validation job
+        env:
+          CI_SELECTION: ${{ needs.select.outputs.plan }}
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python3 -B scripts/ci_selection.py required
 
   regenerate:
     if: github.event_name == 'push'
