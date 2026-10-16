@@ -10,7 +10,7 @@ domain: process
 
 This partitions one frozen candidate into resumable areas. `review` owns the executable native/lens pipeline
 and parent synthesis; `review-lifecycle` owns the one durable artifact at `reviews/<branch-slug>.md`.
-Resolve it with `workflow_ops.py review-path --durable` before the first stage; this preserves an existing
+Resolve it with `<engineering>/workflows/workflow_ops.py review-path --durable` before the first stage; this preserves an existing
 private body's findings when promoting it. A staged mode
 never creates a `BIG-*` competitor.
 

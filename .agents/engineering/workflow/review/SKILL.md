@@ -83,7 +83,7 @@ longer trustworthy, finish or restart the frozen pass, and leave later commits t
 
 ## Stage 2 — open the canonical work order
 
-Read `review-lifecycle`. Resolve the canonical work order with `workflow_ops.py review-path`; ordinary
+Read `review-lifecycle`. Resolve the canonical work order with `<engineering>/workflows/workflow_ops.py review-path`; ordinary
 reviews use Git-private state and staged reviews select `--durable`. Documentation and incremental modes
 reuse that same artifact. Before expensive review work, have the parent create the immutable pass identity and set
 the top-level `Review status`, current `Judgment`, and new `Pass judgment` to `in-progress`, `pending`, and

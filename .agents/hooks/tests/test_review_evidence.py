@@ -121,6 +121,49 @@ class PrivateReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(auto_merge.AutoMergeError, "changed"):
             auto_merge.current_review(self.root, binding, [])
 
+    def test_live_durable_findings_take_precedence_over_committed_approval(self):
+        legacy = evidence.prepare_path(self.root, BRANCH, durable=True)
+        for body, message in (
+            (self.body.replace("`complete`", "`in-progress`"), "incomplete"),
+            (self.body + "- [ ] finding\n", "unresolved"),
+        ):
+            with self.subTest(message=message):
+                legacy.write_text(body, encoding="utf-8")
+                with patch.object(evidence, "git_text", return_value=self.body) as reader:
+                    self.assertEqual(body, evidence.resolve(self.root, BRANCH, HEAD)["body"])
+                    reader.assert_not_called()
+                with patch.object(ops, "git", return_value=self.body), \
+                        patch.object(ops, "resolved_commit", return_value=HEAD):
+                    self.assertIsNone(ops.review_binding(self.root, BRANCH, HEAD)["reviewed_sha"])
+                    with self.assertRaisesRegex(auto_merge.AutoMergeError, message):
+                        auto_merge.current_review(self.root, {"branch": BRANCH, "remote_head_sha": HEAD}, [])
+        legacy.unlink()
+        with patch.object(evidence, "git_text", return_value=self.body):
+            self.assertEqual(self.body, evidence.resolve(self.root, BRANCH, HEAD)["body"])
+
+    def test_private_completion_requires_explicit_unique_final_fields(self):
+        descriptor = {"head": HEAD, "branch": BRANCH, "descriptor_id": "b" * 64, "paths": ["src/value.py"]}
+        marker = f"**Reviewed up to commit:** `{HEAD}`\n"
+        for body in (
+            marker,
+            marker + "**Review status:** `complete`\n",
+            self.body + "**Review status:** `complete`\n",
+            self.body + "**Judgment:** `approved`\n",
+        ):
+            with self.subTest(body=body):
+                self.path.write_text(body, encoding="utf-8")
+                with patch.object(ops, "load_descriptor", return_value=descriptor), \
+                        patch.object(ops, "git", return_value=BRANCH):
+                    with self.assertRaisesRegex(ops.WorkflowOperationError, "incomplete"):
+                        ops.review_record(self.root, "completion", "descriptor.json", str(self.path))
+                self.record()
+                with patch.object(ops, "resolved_commit", return_value=HEAD):
+                    self.assertIsNone(ops.review_binding(self.root, BRANCH, HEAD)["reviewed_sha"])
+                with self.assertRaisesRegex(auto_merge.AutoMergeError, "incomplete"):
+                    auto_merge.current_review(self.root, {"branch": BRANCH, "remote_head_sha": HEAD}, [])
+                self.assertIsNotNone(gate.review_completion_problem(body, strict=True))
+        self.assertIsNone(gate.review_completion_problem(marker))
+
     def test_private_evidence_preserves_finding_completion_and_security_gates(self):
         binding = {"branch": BRANCH, "remote_head_sha": HEAD}
         for body, paths, message in (
