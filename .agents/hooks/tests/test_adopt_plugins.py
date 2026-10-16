@@ -174,6 +174,54 @@ class AdoptPluginsTests(unittest.TestCase):
                     adopt_plugins.run(self.root, "v1.0.0", [], plugins, "write", marketplaces)
         self.assertFalse((self.root / ".agents").exists())
 
+    def test_producer_only_core_and_foreign_plugin_generate_matching_hosts(self):
+        pins = ["base-agents=tj-agents/core@v2.1.18", "work-items-agents=tj-agents/work-items@" + "a" * 40]
+        adopt_plugins.run(self.root, None, [], ["work-items@work-items-agents"], "write", pins, "base-agents")
+        document = json.loads(self.lock.read_text(encoding="utf-8"))
+        self.assertEqual({"base-agents", "work-items-agents"}, set(document["marketplaces"]))
+        self.assertEqual({"base@base-agents", "engineering@base-agents", "machine@base-agents", "work-items@work-items-agents"}, set(document["plugins"]))
+        self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+        claude = json.loads((self.root / ".claude/settings.json").read_text(encoding="utf-8"))
+        self.assertTrue(claude["enabledPlugins"]["base@base-agents"])
+        self.assertNotIn("base@tj-agents", claude["enabledPlugins"])
+        self.assertIn('[plugins."machine@base-agents"]', (self.root / ".codex/config.toml").read_text(encoding="utf-8"))
+        overlay = {"schema_version": 1, "requires": {"marketplaces": [{"id": "base-agents", "repository": "tj-agents/core"}], "plugins": ["base-agents/base"], "hooks": [], "permissions": {"claude_allow": [], "codex_prefix_rules": []}}}
+        (self.lock.parent / "repository-harness.json").write_text(json.dumps(overlay), encoding="utf-8")
+        self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+
+    def test_explicit_conversion_preserves_stack_foreign_selections_and_pins(self):
+        adopt_plugins.run(self.root, "v1.0.0", ["react"], ["concertable@agents"], "write", ["agents=Concertable/agents@" + "b" * 40])
+        adopt_plugins.run(self.root, None, [], [], "write", ["base-agents=tj-agents/core@v2.1.18"], "base-agents")
+        document = json.loads(self.lock.read_text(encoding="utf-8"))
+        self.assertIn("react@tj-agents", document["plugins"])
+        self.assertIn("concertable@agents", document["plugins"])
+        self.assertNotIn("base@tj-agents", document["plugins"])
+        self.assertEqual("v1.0.0", document["marketplaces"]["tj-agents"]["revision"])
+        self.assertEqual("b" * 40, document["marketplaces"]["agents"]["revision"])
+        adopt_plugins.run(self.root, None, ["azure"], [], "write")
+        self.assertIn("dotnet", self.plugins())
+        self.assertIn("base@base-agents", self.plugins())
+        self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+
+    def test_conversion_removes_only_an_unused_old_core_marketplace(self):
+        adopt_plugins.run(self.root, "v1.0.0", [], [], "write")
+        adopt_plugins.run(self.root, None, [], [], "write", ["base-agents=tj-agents/core@v2.1.18"], "base-agents")
+        document = json.loads(self.lock.read_text(encoding="utf-8"))
+        self.assertEqual({"base-agents"}, set(document["marketplaces"]))
+        self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+        adopt_plugins.run(self.root, "v1.1.0", [], [], "write", core_marketplace="tj-agents")
+        document = json.loads(self.lock.read_text(encoding="utf-8"))
+        self.assertEqual({"tj-agents"}, set(document["marketplaces"]))
+        self.assertEqual([], adopt_plugins.run(self.root, None, [], [], "check"))
+
+    def test_producer_selection_requires_an_explicit_pin_and_never_changes_global_files(self):
+        with self.assertRaisesRegex(LockError, "base-agents=tj-agents/core"):
+            adopt_plugins.run(self.root, None, [], [], "write", core_marketplace="base-agents")
+        self.assertEqual([], list(self.root.iterdir()))
+        with self.assertRaises(LockError):
+            adopt_plugins.run(self.root, None, [], ["base@base-agents"], "write", ["base-agents=Concertable/agents@v1.0.0"], "base-agents")
+        self.assertEqual([], list(self.root.iterdir()))
+
 
 if __name__ == "__main__":
     unittest.main()
