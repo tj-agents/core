@@ -605,6 +605,12 @@ def _write_tree(destination: Path, files: Mapping[str, tuple[bytes, bool]]) -> N
     _unlinked_ancestors(staging)
     if staging.exists():
         _remove_cache_tree(staging, destination.parent)
+    if destination.is_dir():
+        current = _tree_bytes(destination)
+        if current.keys() == files.keys() and all(
+                current[name][0] == content and (os.name == "nt" or current[name][1] == executable)
+                for name, (content, executable) in files.items()):
+            return
     for relative, (content, executable) in files.items():
         target = staging / _safe_path(relative)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -803,28 +809,23 @@ def _projection(host: str, packages: Iterable[Package], cache: Path) -> tuple[Pa
     ], separators=(",", ":")).encode("utf-8")).hexdigest()
     root = cache / "catalogs" / host / digest
     _unlinked_ancestors(root)
-    if root.exists():
-        _remove_cache_tree(root, cache)
+    files = {}
     by_market: dict[str, list[Package]] = {}
     for package in packages:
         by_market.setdefault(package.marketplace, []).append(package)
     for marketplace, members in by_market.items():
-        catalog_root = root / _cache_component(marketplace)
+        marketplace = _cache_component(marketplace)
         plugins = []
         for package in members:
-            _verified_tree(package.root)
             name = _cache_component(package.identity.rsplit("@", 1)[0])
-            target = catalog_root / "plugins" / name
-            if target.exists():
-                _remove_cache_tree(target, cache)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(package.root, target)
+            for relative, content in _tree_bytes(package.root).items():
+                files[f"{marketplace}/plugins/{name}/{relative}"] = content
             relative = f"./plugins/{name}"
             plugins.append({"name": name, "source": relative if host == "claude" else {"source": "local", "path": relative}})
         catalog = {"name": marketplace, "owner": {"name": marketplace}, "plugins": plugins}
-        catalog_path = catalog_root / (".claude-plugin" if host == "claude" else ".agents/plugins") / "marketplace.json"
-        catalog_path.parent.mkdir(parents=True, exist_ok=True)
-        catalog_path.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
+        manifest = ".claude-plugin" if host == "claude" else ".agents/plugins"
+        files[f"{marketplace}/{manifest}/marketplace.json"] = ((json.dumps(catalog, indent=2) + "\n").encode("utf-8"), False)
+    _write_tree(root, files)
     catalog_base = cache / "catalogs" / host
     for candidate in catalog_base.iterdir():
         if candidate != root and candidate.is_dir():
@@ -1005,8 +1006,8 @@ def _native(command: list[str], cwd: Path, environment: Mapping[str, str], deadl
 
 def _promote(source: Path, destination: Path, expected: Path, cache: Path, root: VerifiedRoot,
              allow_adopt: bool = False) -> Path:
-    _verified_tree(source)
-    if _tree_bytes(source) != _tree_bytes(expected):
+    expected_bytes = _tree_bytes(expected)
+    if _tree_bytes(source) != expected_bytes:
         raise RollingPluginError(f"native package differs from verified Git package: {source}")
     try:
         destination.parent.resolve().relative_to(cache.resolve())
@@ -1016,6 +1017,7 @@ def _promote(source: Path, destination: Path, expected: Path, cache: Path, root:
     _unlinked_ancestors(destination)
     if destination.exists():
         marker = destination.parent / ".tj-agents-rolling.json"
+        _unlinked_ancestors(marker)
         owned = _json(marker) if marker.exists() else None
         if owned and (owned.get("identity") != root.identity or owned.get("repository") != root.repository):
             raise RollingPluginError(f"refusing to replace unowned native plugin cache root {destination}")
@@ -1023,6 +1025,11 @@ def _promote(source: Path, destination: Path, expected: Path, cache: Path, root:
             if not allow_adopt:
                 raise RollingPluginError(f"refusing to replace unowned native plugin cache root {destination}")
             _verified_tree(destination)
+        if _tree_bytes(destination) == expected_bytes:
+            _write_json(marker, {
+                "schema_version": 1, "identity": root.identity, "repository": root.repository, "revision": root.revision,
+            })
+            return destination
         _remove_cache_tree(destination, cache)
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, destination)
@@ -1186,6 +1193,21 @@ def _claude_registry_authenticates(registry: Mapping[str, object], known: Mappin
     return isinstance(records, list) and any(isinstance(record, Mapping) for record in records)
 
 
+def _cached_claude_source(expected: VerifiedRoot, cache: Path) -> Path | None:
+    name, marketplace = expected.identity.rsplit("@", 1)
+    destination = cache / marketplace / name / expected.revision
+    _unlinked_ancestors(destination)
+    marker = destination.parent / ".tj-agents-rolling.json"
+    _unlinked_ancestors(marker)
+    if not destination.is_dir() or not marker.is_file():
+        return None
+    owned = _json(marker)
+    if (owned.get("identity"), owned.get("repository"), owned.get("revision")) != (
+            expected.identity, expected.repository, expected.revision):
+        return None
+    return destination if _tree_bytes(destination) == _tree_bytes(expected.root) else None
+
+
 def materialize_native(prepared: Prepared, host: str, target: Path, project: Path, executable: str) -> Prepared:
     if not prepared.selected_roots:
         return prepared
@@ -1260,13 +1282,19 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
                 raise RollingPluginError("Claude installed plugin registry has invalid plugins")
             representatives = {}
             installed_aliases = {}
+            cached_sources = {}
             for identity, expected in packages.items():
                 key = (expected.repository, expected.revision, identity.rsplit("@", 1)[0])
                 if key not in representatives:
-                    _native([executable, "plugin", "install", identity, "--scope", "user"], project, environment, deadline)
+                    cached = _cached_claude_source(expected, actual_cache)
+                    if cached is None:
+                        _native([executable, "plugin", "install", identity, "--scope", "user"], project, environment, deadline)
+                    else:
+                        cached_sources[identity] = str(cached)
                     representatives[key] = identity
                 installed_aliases[identity] = representatives[key]
-            maintenance = _json(plugin_root / "installed_plugins.json")
+            maintenance_path = plugin_root / "installed_plugins.json"
+            maintenance = _json(maintenance_path) if maintenance_path.exists() else {"plugins": {}}
             installed = maintenance.get("plugins")
             if not isinstance(installed, dict):
                 raise RollingPluginError("Claude did not write a disposable plugin registry")
@@ -1276,8 +1304,9 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
                 raise RollingPluginError("Claude did not write an installed plugin registry")
             for identity, expected in packages.items():
                 records = installed.get(installed_aliases[identity])
-                user_path = next((item.get("installPath") for item in records or [] if isinstance(item, dict)
-                                  and item.get("scope") == "user" and isinstance(item.get("installPath"), str)), None)
+                user_path = cached_sources.get(installed_aliases[identity]) or next((
+                    item.get("installPath") for item in records or [] if isinstance(item, dict)
+                    and item.get("scope") == "user" and isinstance(item.get("installPath"), str)), None)
                 if not isinstance(user_path, str):
                     raise RollingPluginError(f"Claude did not install {identity}")
                 name, marketplace = identity.rsplit("@", 1)

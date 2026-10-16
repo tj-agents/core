@@ -106,6 +106,35 @@ class RollingPluginsTests(unittest.TestCase):
         manifest = json.loads((catalog / 'core/.agents/plugins/marketplace.json').read_text(encoding='utf-8'))
         self.assertEqual(manifest['owner']['name'], 'core')
         self.assertEqual(manifest['plugins'][0]['name'], 'base')
+        os.utime(payload, (1000, 1000))
+        stamp = payload.stat().st_mtime_ns
+        ROLLING._projection('codex', [package], self.root / 'cache')
+        self.assertEqual(payload.stat().st_mtime_ns, stamp)
+        obsolete = payload.with_name('obsolete.txt')
+        obsolete.write_bytes(b'removed')
+        payload.write_bytes(b'changed')
+        ROLLING._projection('codex', [package], self.root / 'cache')
+        self.assertEqual(payload.read_bytes(), b'one')
+        self.assertFalse(obsolete.exists())
+
+    def test_verified_tree_reuse_repairs_missing_extra_and_changed_files(self):
+        root = self.root / 'verified'
+        files = {'payload.txt': (b'current', False), 'nested/other.txt': (b'other', False)}
+        ROLLING._write_tree(root, files)
+        payload = root / 'payload.txt'
+        os.utime(payload, (1000, 1000))
+        stamp = payload.stat().st_mtime_ns
+        ROLLING._write_tree(root, files)
+        self.assertEqual(payload.stat().st_mtime_ns, stamp)
+        (root / 'nested/other.txt').unlink()
+        (root / 'obsolete.txt').write_bytes(b'old')
+        payload.write_bytes(b'changed')
+        ROLLING._write_tree(root, files)
+        self.assertEqual(ROLLING._tree_bytes(root), files)
+        if os.name != 'nt':
+            payload.chmod(payload.stat().st_mode | 0o111)
+            ROLLING._write_tree(root, files)
+            self.assertEqual(ROLLING._tree_bytes(root), files)
 
     def test_preflight_holds_its_lock_until_binding_is_acknowledged(self):
         target = self.root / 'profile'
@@ -273,6 +302,35 @@ class RollingPluginsTests(unittest.TestCase):
                         result = ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, ['base@one', 'base@two'])
                         self.assertEqual({root.identity for root in result.selected_roots}, set(expected))
+                        installs.clear()
+                        ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
+                        self.assertEqual(installs, [])
+                        (roots[0].root / 'payload.txt').write_text('new main content', encoding='utf-8')
+                        ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
+                        self.assertEqual(installs, ['base@one'])
+                        self.assertEqual((result.selected_roots[0].root / 'payload.txt').read_text(), 'new main content')
+
+    def test_cached_claude_source_requires_matching_unlinked_ownership(self):
+        source = self.root / 'verified'
+        source.mkdir()
+        (source / 'payload.txt').write_bytes(b'current')
+        expected = ROLLING.VerifiedRoot('base@core', source, 'a' * 40, 'https://github.com/tj-agents/core.git')
+        cache = self.root / 'cache'
+        destination = cache / 'core/base' / expected.revision
+        ROLLING._promote(source, destination, source, cache, expected)
+        self.assertEqual(ROLLING._cached_claude_source(expected, cache), destination)
+        marker = destination.parent / '.tj-agents-rolling.json'
+        marker.unlink()
+        self.assertIsNone(ROLLING._cached_claude_source(expected, cache))
+        self.write(marker, {'identity': expected.identity, 'repository': 'https://github.com/tj-agents/other.git',
+                            'revision': expected.revision})
+        self.assertIsNone(ROLLING._cached_claude_source(expected, cache))
+        marker.unlink()
+        outside = self.root / 'outside'
+        outside.mkdir()
+        RollingBoundaryTests.linked_directory(self, marker, outside)
+        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'linked or reparse ancestor'):
+            ROLLING._cached_claude_source(expected, cache)
 
     def test_published_executable_bit_is_preserved_in_the_verified_tree(self):
         if os.name == 'nt':
