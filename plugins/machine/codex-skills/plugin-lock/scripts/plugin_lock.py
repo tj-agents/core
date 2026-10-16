@@ -14,6 +14,8 @@ SCHEMA_VERSION = 3
 MARKETPLACE_NAME = "tj-agents"
 MARKETPLACE_REPOSITORY = "tj-agents/marketplace"
 ALLOWED_OWNERS = ("tj-agents", "Concertable")
+CORE_MARKETPLACE = "base-agents"
+CORE_REPOSITORY = "tj-agents/core"
 CORE_PLUGINS = ("base", "engineering", "machine")
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 REPOSITORY = re.compile(r"(?P<owner>[A-Za-z0-9-]+)/(?P<name>[A-Za-z0-9_][A-Za-z0-9_.-]*)\Z")
@@ -64,6 +66,8 @@ def validate_marketplace(name: str, value: object) -> dict:
         )
     if (name == MARKETPLACE_NAME) != (repository == MARKETPLACE_REPOSITORY):
         raise lock_io.LockError(f"The {MARKETPLACE_NAME} marketplace must be {MARKETPLACE_REPOSITORY} and nothing else may use that name")
+    if (name == CORE_MARKETPLACE) != (repository == CORE_REPOSITORY):
+        raise lock_io.LockError(f"The {CORE_MARKETPLACE} marketplace must be {CORE_REPOSITORY} and nothing else may use that name")
     if not isinstance(revision, str) or not REVISION.fullmatch(revision):
         raise lock_io.LockError(f"marketplaces.{name}.revision must be a vN.N.N tag or a full lowercase commit")
     return value
@@ -74,8 +78,8 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
     if not is_current(lock) or set(lock) != {"schema_version", "marketplaces", "plugins"}:
         raise lock_io.LockError(f"{LOCK_NAME} must contain exactly schema_version {SCHEMA_VERSION}, marketplaces and plugins")
     marketplaces = lock["marketplaces"]
-    if not isinstance(marketplaces, dict) or MARKETPLACE_NAME not in marketplaces:
-        raise lock_io.LockError(f"marketplaces must be an object that includes {MARKETPLACE_NAME}")
+    if not isinstance(marketplaces, dict) or not ({MARKETPLACE_NAME, CORE_MARKETPLACE} & marketplaces.keys()):
+        raise lock_io.LockError(f"marketplaces must include {MARKETPLACE_NAME} or {CORE_MARKETPLACE}")
     for name, value in marketplaces.items():
         validate_marketplace(name, value)
     seen: dict[str, str] = {}
@@ -94,7 +98,16 @@ def validate(lock: dict) -> tuple[dict, list[str]]:
     unused = sorted(set(marketplaces) - {split(identity)[1] for identity in identities})
     if unused:
         raise lock_io.LockError("Declared marketplaces select no plugin: " + ", ".join(unused))
-    missing = [plugin_id(name) for name in CORE_PLUGINS if plugin_id(name) not in identities]
+    marketplace = core_marketplace(identities)
+    missing = [plugin_id(name, marketplace) for name in CORE_PLUGINS if plugin_id(name, marketplace) not in identities]
     if missing:
         raise lock_io.LockError("Repository lock omits core plugins: " + ", ".join(missing))
     return dict(sorted(marketplaces.items())), sorted(identities)
+
+
+def core_marketplace(identities: list[str]) -> str:
+    selected = {marketplace for identity in identities for name, marketplace in [split(identity)]
+                if name in CORE_PLUGINS and marketplace in {MARKETPLACE_NAME, CORE_MARKETPLACE}}
+    if len(selected) > 1:
+        raise lock_io.LockError("Repository lock mixes Core plugin identities; select one complete Core triplet")
+    return next(iter(selected), MARKETPLACE_NAME)

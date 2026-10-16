@@ -1,0 +1,111 @@
+{
+  "core_baseline": "8bddc8ef158f02704377656ce7c6dce6dfa44979",
+  "core_runs": [
+    {
+      "run": 38832163141,
+      "event": "pull_request",
+      "head": "1b9e948aa468b2669c42b20242f2b6374f15ee2e",
+      "attempt": 1,
+      "created_at": "2026-10-16T00:54:34Z",
+      "updated_at": "2026-10-16T01:13:24Z",
+      "event_window_seconds": 1130,
+      "jobs": [
+        {
+          "name": "verify-windows",
+          "started_at": "2026-10-16T00:54:40Z",
+          "completed_at": "2026-10-16T01:13:23Z",
+          "conclusion": "success",
+          "seconds": 1123
+        },
+        {
+          "name": "verify-linux",
+          "started_at": "2026-10-16T00:54:42Z",
+          "completed_at": "2026-10-16T00:59:02Z",
+          "conclusion": "success",
+          "seconds": 260
+        }
+      ]
+    },
+    {
+      "run": 38834317856,
+      "event": "push",
+      "head": "6aea302b1562b714bc2d1dd9f8e010898bfe2dac",
+      "attempt": 1,
+      "created_at": "2026-10-16T01:17:34Z",
+      "updated_at": "2026-10-16T01:31:03Z",
+      "event_window_seconds": 809,
+      "jobs": [
+        {
+          "name": "verify-windows",
+          "started_at": "2026-10-16T01:17:36Z",
+          "completed_at": "2026-10-16T01:31:03Z",
+          "conclusion": "success",
+          "seconds": 807
+        },
+        {
+          "name": "verify-linux",
+          "started_at": "2026-10-16T01:17:36Z",
+          "completed_at": "2026-10-16T01:22:00Z",
+          "conclusion": "success",
+          "seconds": 264
+        }
+      ]
+    },
+    {
+      "run": 38837295696,
+      "event": "pull_request",
+      "head": "02aa2c51eb821c5e1f45e3705c3fed412ceca34e",
+      "attempt": 1,
+      "created_at": "2026-10-16T01:50:44Z",
+      "updated_at": "2026-10-16T02:10:28Z",
+      "event_window_seconds": 1184,
+      "jobs": [
+        {
+          "name": "verify-linux",
+          "started_at": "2026-10-16T01:50:47Z",
+          "completed_at": "2026-10-16T01:54:49Z",
+          "conclusion": "success",
+          "seconds": 242
+        },
+        {
+          "name": "verify-windows",
+          "started_at": "2026-10-16T01:50:47Z",
+          "completed_at": "2026-10-16T02:10:27Z",
+          "conclusion": "success",
+          "seconds": 1180
+        }
+      ]
+    },
+    {
+      "run": 38840514845,
+      "event": "push",
+      "head": "944cc2aac501c7ceef2e5e6d0e8d69c0aaa9b668",
+      "attempt": 1,
+      "created_at": "2026-10-16T02:27:27Z",
+      "updated_at": "2026-10-16T02:46:52Z",
+      "event_window_seconds": 1165,
+      "jobs": [
+        {
+          "name": "verify-linux",
+          "started_at": "2026-10-16T02:27:29Z",
+          "completed_at": "2026-10-16T02:31:07Z",
+          "conclusion": "success",
+          "seconds": 218
+        },
+        {
+          "name": "verify-windows",
+          "started_at": "2026-10-16T02:27:29Z",
+          "completed_at": "2026-10-16T02:46:51Z",
+          "conclusion": "success",
+          "seconds": 1162
+        }
+      ]
+    }
+  ],
+  "event_window_seconds_sum": 4288,
+  "limitations": [
+    "Run windows are not exclusive agent waiting time.",
+    "Test completion gaps are log observations, not instrumented per-test profiles.",
+    "No complete four-hour host telemetry was available in the supplied artifacts."
+  ]
+}

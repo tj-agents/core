@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -85,6 +86,35 @@ class HandoffAdmissionTests(unittest.TestCase):
 
     def check(self):
         return validate(str(self.record), self.record_id, self.session, self.prompt, self.callout)
+
+    def test_remote_admission_revalidates_source_kind_and_current_evidence(self):
+        self.write_record(self.disposition())
+        reference = "https://example.invalid/source/issues/14"
+        self.goal.write_text(self.goal.read_text(encoding="utf-8").replace(str(self.record), reference), encoding="utf-8")
+        (self.primary / ".problem-records.json").write_text(json.dumps({"schema_version": 1, "provider": "optional:manage"}), encoding="utf-8")
+        body = self.record.read_text(encoding="utf-8")
+        value = {"record": reference, "kind": "bug", "state": "open", "body": body}
+        for host in ("codex", "claude"):
+            with self.subTest(host=host), patch("admission.read_record", return_value=value) as read:
+                result = validate(reference, self.record_id, self.session, self.prompt, self.callout, str(self.feature), host)
+                self.assertTrue(result["valid"], result)
+                self.assertEqual(reference, result["record"])
+                read.assert_called_once_with(self.primary.resolve(), reference, host)
+        self.assertFalse(self.check()["valid"])
+        with patch("admission.read_record", return_value={**value, "kind": "mistake"}):
+            self.assertFalse(validate(reference, self.record_id, self.session, self.prompt, self.callout, str(self.primary), "codex")["valid"])
+        self.target.write_text("recovered", encoding="utf-8")
+        with patch("admission.read_record", return_value=value):
+            self.assertFalse(validate(reference, self.record_id, self.session, self.prompt, self.callout, str(self.primary), "codex")["valid"])
+        self.assertFalse(validate(reference, self.record_id, self.session, self.prompt, self.callout)["valid"])
+
+    def test_shipped_helper_precedes_unrelated_pythonpath_modules(self):
+        shadow = self.base / "shadow"
+        shadow.mkdir()
+        (shadow / "problem_records.py").write_text("raise RuntimeError('unrelated module')", encoding="utf-8")
+        result = subprocess.run([sys.executable, "-B", str(SCRIPTS / "admission.py"), "--help"], capture_output=True,
+                                text=True, encoding="utf-8", timeout=15, env=dict(os.environ, PYTHONPATH=str(shadow)))
+        self.assertEqual(0, result.returncode, result.stderr)
 
     def test_missing_read_capability_admits_a_linked_deferred_record(self):
         self.write_record(self.disposition())
