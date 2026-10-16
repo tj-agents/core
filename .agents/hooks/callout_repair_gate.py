@@ -379,6 +379,10 @@ def disposition_command(value):
         if match is None:
             return None
         fields[flag.replace("-", "_")] = next(item for item in match.groups()[1:] if item is not None)
+    for flag in ("source-root", "host"):
+        match = re.search(rf"--{flag}\s+('([^']+)'|\"([^\"]+)\"|([^\s,;)]+))", text, re.I)
+        if match is not None:
+            fields[flag.replace("-", "_")] = next(item for item in match.groups()[1:] if item is not None)
     if not re.search(r"\bcheck\b", text, re.I):
         return None
     return fields
@@ -426,7 +430,8 @@ def valid_disposition(records, session, prompt, callout_id):
                 if all(command.get(key) == value_ for key, value_ in expected.items()):
                     try:
                         result = validate_disposition(
-                            command["record"], command["id"], session, expected["prompt_sha256"], callout_id
+                            command["record"], command["id"], session, expected["prompt_sha256"], callout_id,
+                            source_root=command.get("source_root"), harness=command.get("host")
                         )
                     except (OSError, ValueError, TypeError):
                         result = {"valid": False}
@@ -446,7 +451,8 @@ def valid_disposition(records, session, prompt, callout_id):
                     if all(command.get(key) == value_ for key, value_ in expected.items()):
                         try:
                             result = validate_disposition(
-                                command["record"], command["id"], session, expected["prompt_sha256"], callout_id
+                                command["record"], command["id"], session, expected["prompt_sha256"], callout_id,
+                                source_root=command.get("source_root"), harness=command.get("host")
                             )
                         except (OSError, ValueError, TypeError):
                             result = {"valid": False}
