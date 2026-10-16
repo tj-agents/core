@@ -13,6 +13,12 @@ This is the *resolution* workflow; where a debt entry lives and when it is delet
 standard. A single item is the default shape; bundling more than one into the same PR is the exception
 below, not a second workflow.
 
+Read [the shared problem-record contract](../../resources/problem-records.md) first. In each repository,
+use its explicitly selected provider to list, read, update and close debt. Selection failures block that
+repository rather than falling back to Markdown. Where the steps below mention a `TECH_DEBT.md` survey,
+use the selected provider's debt list; where they delete a resolved entry, perform the provider's verified
+closure and retention operation. The file survey and deletion rule apply only without selection.
+
 ## Steps
 
 1. **Determine scope, then isolate.** First tell single-repo mode (the working directory, or an ancestor, is

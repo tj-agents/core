@@ -12,6 +12,10 @@ Read [the shared problem-record contract](../../resources/problem-records.md). R
 while the evidence is available, within the current authorization. Recording creates no authority to
 repair, publish, dispatch, or schedule work.
 
+Follow the shared contract's explicit provider selection first. When selected, use that provider's
+create/read/update commands and canonical identity while preserving every shared fact and repair link.
+The following register defaults apply only without a provider.
+
 Use a repository-declared mistake owner or typed shared register. Otherwise add the entry to root
 `MISTAKES.md`. Use a stable `M` identifier and every shared field. Preserve the concrete observation and
 evidence; state whether its cause is confirmed or unknown without inventing an explanation.

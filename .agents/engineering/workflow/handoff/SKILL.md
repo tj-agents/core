@@ -61,6 +61,12 @@ Run `python <skill-directory>/scripts/admission.py check --record <absolute-regi
 --session <session> --prompt-sha256 <digest> --callout-id <nonce>` in the current turn. The successful
 result is a locator only; the gate rereads the selected entry and its evidence before releasing that turn.
 
+For a selected provider, pass its canonical URI as `--record`, plus `--source-root <absolute-source-checkout>`
+and `--host codex` or `--host claude` for the actual host. Selection is read from the source primary
+checkout. The repair goal uses `Problem record: <canonical-URI>#<record-id>` as its exact backlink.
+The gate calls the same provider again when checking the receipt, so a closed, edited or unavailable
+record cannot reuse an earlier success. Use `python3` on Linux/macOS and `python` on Windows.
+
 The linked repair goal declares `Source owner: <owner>` and carries its repair authority inside
 `## Authorization`. Capability evidence names a matching `Required read capability: <absolute-path>` or
 `Required executable: <name>` entry. Dependency evidence names a matching
