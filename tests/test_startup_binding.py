@@ -200,6 +200,151 @@ class StartupBindingTests(unittest.TestCase):
         self.assertNotIn(BINDING.ACK_TOKEN_ENV, captured["env"])
         self.assertNotIn(BINDING.SNAPSHOT_DIRECTORY_ENV, captured["env"])
 
+    def test_empty_codex_selection_clears_inherited_runtime_receipt(self):
+        prepared = type("Prepared", (), {
+            "selected_roots": (), "launch_args": (), "environment": {},
+        })()
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def acknowledge_binding(self):
+                return None
+
+        Active.prepared = prepared
+
+        captured = {}
+
+        def run(_command, **kwargs):
+            captured.update(kwargs)
+            return type("Result", (), {"returncode": 0})()
+
+        inherited = {
+            "CODEX_HOME": str(self.project / "config"),
+            "TJ_AGENTS_CODEX_RUNTIME_RECEIPT": "old-receipt",
+            "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256": "a" * 64,
+            BINDING.ACK_DIRECTORY_ENV: "old-ack",
+            BINDING.ACK_TOKEN_ENV: "old-token",
+            BINDING.SNAPSHOT_DIRECTORY_ENV: "old-snapshot",
+        }
+        with mock.patch.object(BINDING, "preflight", return_value=Active()), \
+                mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}), \
+                mock.patch.object(BINDING, "command_for_target", return_value=["native"]), \
+                mock.patch.object(BINDING.subprocess, "run", side_effect=run), \
+                mock.patch.dict(os.environ, inherited, clear=False):
+            self.assertEqual(0, BINDING.run_session("codex", "typed", self.project, ["session"]))
+
+        for key in ("TJ_AGENTS_CODEX_RUNTIME_RECEIPT", "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256",
+                    BINDING.ACK_DIRECTORY_ENV, BINDING.ACK_TOKEN_ENV, BINDING.SNAPSHOT_DIRECTORY_ENV):
+            self.assertNotIn(key, captured["env"])
+
+    def test_codex_running_child_retains_runtime_paths_when_liveness_is_uncertain(self):
+        events = []
+        logical = type("Prepared", (), {
+            "host": "codex", "selected_roots": (self.verified,), "launch_args": (), "environment": {},
+        })()
+        directory = self.project / "runtime"
+        directory.mkdir()
+        runtime_prepared = type("Prepared", (), {
+            "selected_roots": (self.verified,), "launch_args": (), "environment": {},
+        })()
+        binding = type("Binding", (), {
+            "directory": directory, "prepared": runtime_prepared, "environment": {},
+        })()
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def acknowledge_binding(self):
+                events.append("ack")
+
+        Active.prepared = logical
+
+        class Process:
+            def wait(self):
+                raise KeyboardInterrupt()
+
+            def poll(self):
+                return None
+
+        runtime = mock.Mock()
+        runtime.prepare_runtime.return_value = binding
+        process = Process()
+
+        def launch(_command, **kwargs):
+            events.append("start")
+            self.assertEqual(str(directory / "hook-snapshots"), kwargs["env"][BINDING.SNAPSHOT_DIRECTORY_ENV])
+            self.assertNotIn(BINDING.ACK_DIRECTORY_ENV, kwargs["env"])
+            self.assertNotIn("TJ_AGENTS_CODEX_RUNTIME_RECEIPT", kwargs["env"])
+            return process
+
+        with mock.patch.object(BINDING, "preflight", return_value=Active()), \
+                mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}), \
+                mock.patch.object(BINDING, "_module", side_effect=lambda name, paths: runtime if name == "codex_runtime_binding" else mock.Mock()), \
+                mock.patch.object(BINDING, "_preseed_snapshots"), \
+                mock.patch.object(BINDING, "_converge"), \
+                mock.patch("rolling_plugins.verify_final"), \
+                mock.patch.object(BINDING, "command_for_target", return_value=["native"]), \
+                mock.patch.object(BINDING.subprocess, "Popen", side_effect=launch), \
+                mock.patch.dict(os.environ, {"CODEX_HOME": str(self.project / "config"), BINDING.ACK_DIRECTORY_ENV: "old"}, clear=False):
+            with self.assertRaises(KeyboardInterrupt):
+                BINDING.run_session("codex", "typed", self.project, ["session"])
+
+        self.assertEqual(["ack", "start"], events)
+        runtime.cleanup_runtime.assert_not_called()
+
+    def test_codex_spawn_failure_cleans_the_runtime_once(self):
+        logical = type("Prepared", (), {
+            "host": "codex", "selected_roots": (self.verified,), "launch_args": (), "environment": {},
+        })()
+        directory = self.project / "runtime"
+        directory.mkdir()
+        runtime_prepared = type("Prepared", (), {
+            "selected_roots": (self.verified,), "launch_args": (), "environment": {},
+        })()
+        binding = type("Binding", (), {
+            "directory": directory, "prepared": runtime_prepared, "environment": {},
+        })()
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def acknowledge_binding(self):
+                return None
+
+        Active.prepared = logical
+        runtime = mock.Mock()
+        runtime.prepare_runtime.return_value = binding
+
+        with mock.patch.object(BINDING, "preflight", return_value=Active()), \
+                mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}), \
+                mock.patch.object(BINDING, "_module", side_effect=lambda name, paths: runtime if name == "codex_runtime_binding" else mock.Mock()), \
+                mock.patch.object(BINDING, "_preseed_snapshots"), \
+                mock.patch.object(BINDING, "_converge"), \
+                mock.patch("rolling_plugins.verify_final"), \
+                mock.patch.object(BINDING, "command_for_target", return_value=["native"]), \
+                mock.patch.object(BINDING.subprocess, "Popen", side_effect=OSError("missing native")), \
+                mock.patch.dict(os.environ, {"CODEX_HOME": str(self.project / "config")}, clear=False):
+            with self.assertRaisesRegex(BINDING.StartupBindingError, "missing native"):
+                BINDING.run_session("codex", "typed", self.project, ["session"])
+
+        runtime.cleanup_runtime.assert_called_once_with(binding, (self.project / "config").resolve())
+
     def test_preparation_uses_the_operation_budget_not_the_acknowledgement_timeout(self):
         prepared = type("Prepared", (), {
             "selected_roots": (), "launch_args": (), "environment": {},

@@ -295,13 +295,17 @@ class RollingStartupIntegrationTests(unittest.TestCase):
             def __exit__(self, *details):
                 return None
 
-            def materialize_native(self, executable):
-                return prepared
+        Active.prepared = prepared
+        runtime = mock.Mock()
+        original_module = BINDING._module
 
         with mock.patch.dict(os.environ, self.environ, clear=False), \
                 mock.patch.object(BINDING, "preflight", return_value=Active()), \
                 mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
                 mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}), \
+                mock.patch.object(BINDING, "_module", side_effect=lambda name, paths:
+                                  runtime if name == "codex_runtime_binding" else original_module(name, paths)), \
+                mock.patch.object(ROLLING, "verify_final"), \
                 mock.patch.object(BINDING.subprocess, "Popen") as native:
             with self.assertRaisesRegex(BINDING.StartupBindingError, "unowned or modified"):
                 BINDING.run_session("codex", "typed", self.project, ["exec", "prompt"])

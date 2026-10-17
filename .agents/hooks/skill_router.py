@@ -156,8 +156,53 @@ class NativePluginDiscoveryError(Exception):
         super().__init__(f"{harness} plugin inventory failed: {detail}")
 
 
+def _runtime_receipt_roots():
+    receipt_value = os.environ.get("TJ_AGENTS_CODEX_RUNTIME_RECEIPT")
+    digest = os.environ.get("TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256")
+    if receipt_value is None and digest is None:
+        return None
+    if not receipt_value or not digest or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise NativePluginDiscoveryError("codex", "runtime receipt is incomplete")
+    try:
+        receipt = Path(receipt_value).resolve(strict=True)
+        content = receipt.read_bytes()
+        if hashlib.sha256(content).hexdigest() != digest:
+            raise ValueError("digest mismatch")
+        value = json.loads(content)
+        if not isinstance(value, dict) or value.get("schema_version") != 1:
+            raise ValueError("invalid schema")
+        configured = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
+        if Path(value["codex_home"]).resolve() != configured:
+            raise ValueError("configuration root mismatch")
+        session = receipt.parent.resolve()
+        sessions = configured / "plugins" / "cache" / ".tj-agents-rolling" / "codex" / "sessions"
+        session.relative_to(sessions.resolve())
+        catalog = Path(value["catalog"]).resolve(strict=True)
+        if catalog != session / "catalog":
+            raise ValueError("catalog path mismatch")
+        values = value.get("roots")
+        if not isinstance(values, list) or not values or not all(isinstance(item, str) for item in values):
+            raise ValueError("invalid roots")
+        cache = (configured / "plugins" / "cache").resolve()
+        roots = []
+        for item in values:
+            root = Path(item).resolve(strict=True)
+            root.relative_to(cache)
+            relative = root.relative_to(cache)
+            if len(relative.parts) != 3 or relative.parts[0].startswith("tj-run-") is False or relative.parts[2] != "local":
+                raise ValueError("root escapes runtime cache layout")
+            roots.append(root)
+        return tuple(roots)
+    except (KeyError, OSError, ValueError, TypeError) as error:
+        raise NativePluginDiscoveryError("codex", f"runtime receipt is invalid: {error}") from None
+
+
 @functools.lru_cache(maxsize=2)
 def _native_install_roots(harness):
+    if harness == "codex":
+        runtime = _runtime_receipt_roots()
+        if runtime is not None:
+            return runtime
     binary = shutil.which(harness)
     if binary is None:
         return NativePluginDiscoveryError(harness, "CLI executable is unavailable")
