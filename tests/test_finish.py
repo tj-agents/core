@@ -282,7 +282,11 @@ class FinishReaperProcessTests(unittest.TestCase):
                 'subprocess.run([sys.executable, sys.argv[1], "arm"], check=True)\n'
                 'Path(sys.argv[3]).write_text("armed")\n'
                 'while not Path(sys.argv[4]).exists(): time.sleep(.01)\n'
-                'raise SystemExit(subprocess.run([sys.executable, sys.argv[1], "hook"], input=sys.argv[5], text=True).returncode)\n',
+                'verdict = subprocess.run([sys.executable, sys.argv[1], "hook"], input=sys.argv[5], text=True, capture_output=True, check=True)\n'
+                'assert json.loads(verdict.stdout)["decision"] == "block"\n'
+                'Path(sys.argv[4] + ".stopped").touch()\n'
+                'while not Path(sys.argv[4] + ".accepted").exists(): time.sleep(.01)\n'
+                'raise SystemExit(subprocess.run([sys.executable, sys.argv[1], "complete", "--stop-gates-accepted"]).returncode)\n',
                 encoding='utf-8')
             env = dict(os.environ, AGENT_STATE_DIRECTORY=str(state), AGENT_CLI_HOST_NAMES=host_name,
                        AGENT_FINISH_CLOSE_MODE='', AGENT_FINISH_REAPER_TIMEOUT_SECONDS='10')
@@ -307,6 +311,13 @@ class FinishReaperProcessTests(unittest.TestCase):
                 transcript.write_text(json.dumps({'type': 'assistant', 'message': {
                     'role': 'assistant', 'content': 'Done. The requested work is complete.'}}), encoding='utf-8')
                 (root / 'report').touch()
+                for _ in range(300):
+                    if (root / 'report.stopped').exists() or host.poll() is not None:
+                        break
+                    time.sleep(.02)
+                self.assertTrue((root / 'report.stopped').exists())
+                self.assertIsNone(host.poll(), 'Stop must leave the host alive while other gates can block')
+                (root / 'report.accepted').touch()
                 result = {}
                 for _ in range(400):
                     for path in (state / 'merge-cleanup/results').glob('*.json'):

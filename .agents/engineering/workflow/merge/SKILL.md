@@ -242,7 +242,8 @@ and branch deletion in the current session.
 
 When the session remains attached to the primary checkout or another retained checkout, finish Step 6
 and any plan close-out, then select `machine:close` and arm its retained-checkout operation before the
-final report. Its Stop hook runs this underlying argument-free command after the report:
+final report. After the report and all other Stop gates, its `complete` operation runs this underlying
+argument-free command:
 
 ```
 python3 -B <machine:peer-cli skill-directory>/scripts/close.py  # Linux/macOS
@@ -257,7 +258,8 @@ resolve its registry or attachment evidence before retrying.
 Only when the recorded target is a linked worktree, the host is attached to that target, and the target
 differs from the primary checkout, the session closes itself as the delivery's final action, after Step 6,
 any plan close-out and the report. Run gate 1 below, then select `machine:close` and arm it with
-`--remove-worktree` before the final report. Its Stop hook runs the underlying helper below with
+`--remove-worktree` before the final report. After all other Stop gates, its `complete` operation runs
+the underlying helper below with
 no arguments and no leading `&`, because the harness allow rule matches only this string, written with
 forward slashes since the Bash tool strips backslashes:
 
@@ -272,7 +274,7 @@ next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget
 evidence that the old directory can be deleted.
 
 Run neither underlying command before the completion report is delivered; the close skill's `arm`
-operation runs before the report and its Stop hook supplies the post-report execution path.
+operation runs before the report and its Stop hook routes the post-report `complete` operation.
 Honor an explicit keep-open or continue
 instruction and an active dialogue. Both commands require a live, exact session-store attachment that is
 still `awaiting_input`; they recheck the same idle activity token immediately before recording end or
@@ -431,6 +433,6 @@ needed.
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
 select `machine:close` and arm its post-report operation before the final report. Select removal only
-for the verified removable merged worktree; otherwise retain the checkout. Its Stop hook invokes
-`finish.py` or `close.py` after the report. This is a required operation, including when Tommy merged
+for the verified removable merged worktree; otherwise retain the checkout. After the report and all
+other Stop gates, its `complete` operation invokes `finish.py` or `close.py`. This is required even when Tommy merged
 the PR manually. No preamble.

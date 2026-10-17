@@ -20,11 +20,21 @@ record is not a prerequisite. Select it whenever this CLI has finished all its o
    The default retains the checkout. Only add `--remove-worktree` after `engineering:merge`'s fresh
    cleanup proof has authorized removing this exact merged linked worktree. Never pass a peer identity,
    arbitrary target, force option, or raw process-kill command.
-3. Deliver the completion report, then end the turn. The machine plugin's Stop hook observes that report,
-   refreshes the exact registered host identity, and invokes the existing `close.py` or `finish.py` helper.
-   Do not perform more work after arming. A new user prompt cancels the pending attempt.
+3. Deliver the completion report, then end the turn. The machine plugin's Stop hook observes that report
+   and routes back to this operation without signalling a process. Inspect the complete host Stop-gate
+   feedback. If any other gate requires work, resolve it and prepare a fresh completion report; do not
+   close over the blocker. Other plugins' Stop hooks can run concurrently with this hook.
+4. Only after every other Stop gate accepts completion, run
+   `python -B <skill-directory>/scripts/close_session.py complete --stop-gates-accepted` on Windows,
+   or the same command with `python3` on Linux/macOS. This is the next agent action, not a request for
+   another user message. It refreshes this exact registered host and invokes the existing `close.py` or
+   `finish.py` helper after the report. A new user prompt cancels the pending attempt.
 
-Successful arming proves preparation, not closure. The existing helper still requires an unended
+A cleanup gate whose only remaining action is this session's verified exit permits the close operation;
+it does not require another report or an impossible prior exit. Its checkout-proof requirements still
+apply. A gate requiring unfinished work, validation, delivery, or a user decision does not permit closure.
+
+Successful arming or a Stop callback proves preparation, not closure. The existing helper still requires an unended
 `awaiting_input` turn, unchanged activity immediately before close, exact PID/start-time identity,
 and its verified exit observer. Only observed session exit proves closure. A refusal preserves the
 session and checkout; report the concrete limitation without claiming that the CLI closed or bypassing
