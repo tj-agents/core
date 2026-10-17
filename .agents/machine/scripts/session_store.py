@@ -351,6 +351,17 @@ def record_stop(connection, handle, cwd):
         connection.commit()
 
 
+def record_prepared_stop(connection, handle, expected_activity, expected_state):
+    """Enter post-report idle only if the prepared turn has not received a new prompt."""
+    changed = connection.execute(
+        """UPDATE sessions SET turn_state = 'awaiting_input', last_activity_at = ?
+        WHERE handle = ? AND last_activity_at = ? AND turn_state = ? AND ended_at IS NULL""",
+        (time.time(), handle, expected_activity, expected_state),
+    ).rowcount
+    connection.commit()
+    return changed == 1
+
+
 def _end_session_locked(connection, handle, reason, successor=None):
     connection.execute(
         """
