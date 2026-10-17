@@ -39,6 +39,20 @@ and children; an unavailable continuation capability does not excuse leaving unb
 Preserve higher-priority restrictions; a source change does not update instructions already loaded in an
 active session.
 
+## Close completed CLI sessions
+
+When this CLI has finished all its owned work, select `machine:close`, prepare its verified
+post-report close operation, deliver the completion report and close the session. This applies to
+every consuming repository and to ordinary tasks as well as plans and PR deliveries. Reporting
+"done" is not a substitute for performing the close operation. A skill load or prepared attempt does
+not prove that the session exited.
+
+Keep the session open for an explicit keep-open instruction, active work, a required user answer or
+approval, or an owned check or delivery still in progress. Report an unsupported host or refused close
+honestly; preserve the session and checkout instead of bypassing identity checks. Closing this session
+does not authorize deleting its checkout. `machine:close` owns the executable procedure; it requires
+the selected machine plugin and trusted native hooks for post-report closure.
+
 Before a supported wake, checkpoint the next action and release the foreground lease. A later process
 claims the same owner before acting; it is a fresh context unless the host confirms it resumed the
 original session. Keep one active writer per owner so a scheduled wake cannot race foreground work.

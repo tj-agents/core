@@ -235,13 +235,14 @@ git -C <primary-checkout> pull --ff-only origin <default>
 ```
 
 Compare the recorded target checkout in the delivery binding with the resolved primary checkout and the
-current host attachment before invoking either cleanup path below. Read `machine:peer-cli`'s self-session
+current host attachment before invoking either cleanup path below. Read `machine:close`'s self-session
 execution requirements first. When the target is the primary checkout,
 or the session is already attached to the primary checkout, do not retarget or hand off; continue cleanup
 and branch deletion in the current session.
 
-When the session remains attached to the primary checkout or another retained checkout, finish Step 6,
-any plan close-out and the report, then run exactly this argument-free command as the final action:
+When the session remains attached to the primary checkout or another retained checkout, finish Step 6
+and any plan close-out, then select `machine:close` and arm its retained-checkout operation before the
+final report. Its Stop hook runs this underlying argument-free command after the report:
 
 ```
 python3 -B <machine:peer-cli skill-directory>/scripts/close.py  # Linux/macOS
@@ -255,7 +256,8 @@ resolve its registry or attachment evidence before retrying.
 
 Only when the recorded target is a linked worktree, the host is attached to that target, and the target
 differs from the primary checkout, the session closes itself as the delivery's final action, after Step 6,
-any plan close-out and the report. Run gate 1 below, then from inside that worktree run exactly this, with
+any plan close-out and the report. Run gate 1 below, then select `machine:close` and arm it with
+`--remove-worktree` before the final report. Its Stop hook runs the underlying helper below with
 no arguments and no leading `&`, because the harness allow rule matches only this string, written with
 forward slashes since the Bash tool strips backslashes:
 
@@ -269,7 +271,9 @@ closes this session's CLI and tab. The reaper's result and the cleanup reminder 
 next session. A per-command `workdir`, shell `cd`, or `git -C` does not retarget Codex or Claude and is not
 evidence that the old directory can be deleted.
 
-Run neither command before the completion report is delivered. Honor an explicit keep-open or continue
+Run neither underlying command before the completion report is delivered; the close skill's `arm`
+operation runs before the report and its Stop hook supplies the post-report execution path.
+Honor an explicit keep-open or continue
 instruction and an active dialogue. Both commands require a live, exact session-store attachment that is
 still `awaiting_input`; they recheck the same idle activity token immediately before recording end or
 signalling. That guard is not proof that the report was delivered. If no supported post-report execution
@@ -426,5 +430,7 @@ needed.
 
 Keep it terminal: verify green → enqueue → wait for `MERGED` → complete checkout cleanup → sync the base →
 follow the sync PR to green or migrate it → land the plan close-out → complete checkout cleanup → summarize →
-run `finish.py` when the session is attached to the removable merged worktree, or `close.py` when its
-checkout is retained. No preamble.
+select `machine:close` and arm its post-report operation before the final report. Select removal only
+for the verified removable merged worktree; otherwise retain the checkout. Its Stop hook invokes
+`finish.py` or `close.py` after the report. This is a required operation, including when Tommy merged
+the PR manually. No preamble.
