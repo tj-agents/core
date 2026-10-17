@@ -415,13 +415,17 @@ class SelectionResult:
         return iter((self.ubiquitous, self.applicable, self.blocked))
 
 
+class RuntimeReceiptError(RuntimeError):
+    pass
+
+
 def runtime_install_roots():
     receipt_value = os.environ.get("TJ_AGENTS_CODEX_RUNTIME_RECEIPT")
     digest = os.environ.get("TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256")
     if receipt_value is None and digest is None:
         return None
     if not receipt_value or not digest or not re.fullmatch(r"[0-9a-f]{64}", digest):
-        raise RuntimeError("Codex runtime receipt is incomplete")
+        raise RuntimeReceiptError("Codex runtime receipt is incomplete")
     try:
         receipt = Path(receipt_value).resolve(strict=True)
         content = receipt.read_bytes()
@@ -463,7 +467,7 @@ def runtime_install_roots():
                 roots.append(root)
         return tuple(roots)
     except (KeyError, OSError, ValueError, TypeError) as error:
-        raise RuntimeError(f"Codex runtime receipt is invalid: {error}") from None
+        raise RuntimeReceiptError(f"Codex runtime receipt is invalid: {error}") from None
 
 
 
@@ -1160,5 +1164,8 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except SystemExit:
         raise
+    except RuntimeReceiptError as error:
+        print(f"tier gate: {error}", file=sys.stderr)
+        raise SystemExit(2)
     except Exception:
         raise SystemExit(0)
