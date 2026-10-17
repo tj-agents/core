@@ -240,11 +240,15 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                         time.sleep(0.05)
                     if process.poll() is not None:
                         return process.returncode
-                    terminate_process_tree(process)
                     raise StartupBindingError(f"native {host} did not acknowledge SessionStart before the startup deadline")
-                except BaseException:
+                except BaseException as error:
                     if process.poll() is None:
-                        terminate_process_tree(process)
+                        try:
+                            terminate_process_tree(process)
+                        except Exception as cleanup_error:
+                            raise StartupBindingError(
+                                f"{error}; native {host} cleanup also failed: {cleanup_error}"
+                            ) from error
                     raise
             finally:
                 shutil.rmtree(directory, ignore_errors=True)
