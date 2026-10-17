@@ -4,6 +4,7 @@ from dataclasses import replace
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -159,7 +160,7 @@ class CodexRuntimeBindingTests(unittest.TestCase):
         current = cache / "tj-run-current-employer/employer/local"
         stale = cache / "tj-run-old-employer/employer/local"
         canonical = cache / "employer/employer/local"
-        unmanaged = cache / "outside/standards/1.0"
+        unmanaged = cache / "outside/standards/1.0.0+build.1"
         for payload in (current, stale, canonical, unmanaged):
             payload.mkdir(parents=True)
             (payload / "tier.json").write_text(json.dumps({
@@ -173,7 +174,7 @@ class CodexRuntimeBindingTests(unittest.TestCase):
         inventory = {"installed": [
             {"installed": True, "enabled": True, "pluginId": "employer@tj-run-current-employer"},
             {"installed": True, "enabled": True, "pluginId": "standards@outside",
-             "marketplaceName": "outside", "name": "standards", "version": "1.0"},
+             "marketplaceName": "outside", "name": "standards", "version": "1.0.0+build.1"},
             {"installed": True, "enabled": False, "pluginId": "disabled@outside"},
         ]}
         with mock.patch.object(ROLLING, "_native", return_value=inventory):
@@ -208,6 +209,25 @@ class CodexRuntimeBindingTests(unittest.TestCase):
                 "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256": digest}, clear=True):
             with self.assertRaises(ROUTER.NativePluginDiscoveryError):
                 ROUTER._runtime_receipt_roots()
+
+    def test_invalid_runtime_receipt_blocks_both_hook_entry_points(self):
+        (self.root / ".git").mkdir()
+        routes = self.root / ".agents/skill-routes.json"
+        routes.parent.mkdir()
+        routes.write_text(json.dumps({"routes": [{"path": "**", "skills": ["base:test"]}]}), encoding="utf-8")
+        environment = dict(os.environ, CODEX_HOME=str(self.home),
+                           TJ_AGENTS_CODEX_RUNTIME_RECEIPT=str(self.root / "missing.json"),
+                           TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256="a" * 64)
+        payload = json.dumps({"tool_name": "Write", "cwd": str(self.root),
+                              "tool_input": {"file_path": str(self.root / "file.py"), "content": "x"}})
+        commands = ((ROUTER.tier_gate.__file__, "--session-context", "--project", str(self.root)),
+                    (ROUTER.tier_gate.__file__,), (ROUTER.__file__, "--harness", "codex"))
+        for command in commands:
+            with self.subTest(command=command):
+                result = subprocess.run([sys.executable, *command], input=payload, cwd=self.root,
+                                        env=environment, capture_output=True, text=True, timeout=15)
+                self.assertEqual(2, result.returncode, result.stderr)
+                self.assertIn("runtime receipt", result.stderr.lower())
 
     def test_canonical_machine_refresh_is_retained_after_private_runtime_cleanup(self):
         logical_machine = ROLLING.VerifiedRoot(
