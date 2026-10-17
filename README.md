@@ -195,6 +195,12 @@ native install alone does not establish freshness. Published package bytes becom
 post-merge `regenerate` job commits generated packages to `main`; the updater follows what is currently
 published there. Running sessions retain their already-loaded instructions.
 
+Codex gives each launch temporary native marketplace names, catalogs and package paths while keeping
+its normal user profile and logical plugin selections. Verified preparation releases the refresh lock
+before starting the CLI, so an idle terminal can wait for its first prompt while another CLI refreshes.
+Hook trust and copied plugin policy are supplied only to that child. Its temporary paths remain until
+the child is confirmed exited; uncertain child liveness preserves them.
+
 The updater accepts only the configured tj-agents source closure. Claude permissions are synchronized
 only from the current verified selected-package closure. Codex hook trust follows that same verified
 closure. Startup uses disposable native install settings so selection does not leak into global settings.
