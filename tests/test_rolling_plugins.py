@@ -23,6 +23,39 @@ def git(path, *arguments):
                           text=True, encoding='utf-8').stdout.strip()
 
 
+class ProcessCleanupTests(unittest.TestCase):
+    def test_failed_windows_tree_cleanup_still_terminates_the_native_child(self):
+        failures = (
+            subprocess.TimeoutExpired("taskkill", 1),
+            OSError("taskkill unavailable"),
+            subprocess.CompletedProcess(["taskkill"], 1),
+            subprocess.CompletedProcess(["taskkill"], 0),
+        )
+        for failure in failures:
+            with self.subTest(failure=str(failure)):
+                process = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(60)"])
+                try:
+                    result = {"side_effect": failure} if isinstance(failure, Exception) else {"return_value": failure}
+                    with mock.patch.object(ROLLING.os, "name", "nt"), \
+                            mock.patch.object(ROLLING.subprocess, "run", **result):
+                        ROLLING.terminate_process_tree(process, timeout=0.1)
+                    self.assertIsNotNone(process.poll())
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                    process.wait(timeout=5)
+
+    def test_forceful_cleanup_keeps_its_final_wait_bounded(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.wait.side_effect = subprocess.TimeoutExpired("native", 0.1)
+        with mock.patch.object(ROLLING.os, "name", "nt"), \
+                mock.patch.object(ROLLING.subprocess, "run", side_effect=OSError("unavailable")):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                ROLLING.terminate_process_tree(process, timeout=0.1)
+        self.assertTrue(all(call.kwargs == {"timeout": 0.1} for call in process.wait.call_args_list))
+
+
 class RollingPluginsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='rolling plugins ')
