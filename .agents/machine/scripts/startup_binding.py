@@ -16,6 +16,8 @@ import tempfile
 import time
 from typing import Callable, Mapping, Sequence
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from codex_marketplace_sync import codex_config_selection
 from rolling_plugins import OPERATION_TIMEOUT_SECONDS, RollingPluginError, preflight, terminate_process_tree
 from terminal_command import command_for_target, native_target_for_shim
