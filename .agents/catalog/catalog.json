@@ -561,6 +561,7 @@
       "skills": [
         "auto-memory",
         "clip",
+        "close",
         "followup-codex",
         "handoff-claude",
         "handoff-codex",
@@ -611,6 +612,13 @@
         ],
         "hooks": [
           {
+            "path": ".agents/machine/utility/close/scripts/close_session.py",
+            "hosts": [
+              "claude",
+              "codex"
+            ]
+          },
+          {
             "path": ".agents/machine/utility/peer-cli/scripts/register_session.py",
             "hosts": [
               "claude",
@@ -620,6 +628,7 @@
           {
             "path": "hooks/hook_dispatch.py",
             "hosts": [
+              "claude",
               "codex"
             ]
           },

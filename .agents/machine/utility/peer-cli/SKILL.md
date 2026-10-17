@@ -94,8 +94,10 @@ Its two refusals both exist because they were broken first:
   a kill or cleanup. Force can select an explicit stale terminal target, but never bypasses pid/start-time
   verification for a process signal.
 
-Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
-that through `finish.py`, beside these scripts.
+Closing *this* session is `machine:close`'s job, for ordinary tasks as well as PR deliveries.
+Select that skill and prepare its post-report operation before the final completion report.
+The `close.py` and `finish.py` helpers beside these scripts remain its verified runtime; they are
+not a substitute for invoking the close operation.
 
 For a completed session whose checkout must remain, run exactly
 `python3 -B <skill-directory>/scripts/close.py` on Linux/macOS or
