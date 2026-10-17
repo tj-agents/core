@@ -50,15 +50,22 @@
         "hooks": [
           {
             "type": "command",
-            "timeout": 10,
+            "timeout": 15,
             "command": "python",
             "args": [
               "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "--deadline",
+              "12",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/session_store.py",
               "hook",
               "prompt",
               "--host",
-              "claude"
+              "claude",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
+              "hook"
             ]
           }
         ]
@@ -69,10 +76,17 @@
         "hooks": [
           {
             "type": "command",
-            "timeout": 10,
+            "timeout": 60,
             "command": "python",
             "args": [
               "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "--deadline",
+              "55",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
+              "hook",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/session_store.py",
               "hook",
               "stop",
