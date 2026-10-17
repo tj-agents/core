@@ -1,6 +1,7 @@
 # Close completed CLI sessions through a public Core operation
 
 Status: In progress
+PR: https://github.com/tj-agents/core/pull/285
 Source owner: machine/close and base/goal-continuation
 Repair workflow: engineering:self-repair
 
@@ -31,7 +32,9 @@ OpenCli, HandoffScope, rolling-dependency and harness-injection changes. No forc
 
 ## Validation
 
-The focused operation suite passed 18 regressions. Distribution generation and -Check pass
+The focused operation suite passed 21 regressions; the 39 close/finish, 22 source-layout and 19 harness
+declaration regressions pass. The existing Windows close fixture now waits for its exact observer to
+exit before deleting its temporary state directory. Distribution generation and -Check pass
 after updating the skill roster and declared machine hook. Run the existing closure regressions,
 packaging and source suites, independent review, and both native host acceptance checks before claiming
 the operation has been verified on real CLIs. Tests with mocked helpers do not establish native closure.
@@ -45,3 +48,36 @@ the operation has been verified on real CLIs. Tests with mocked helpers do not e
 3. Publish one Core PR and deliver through the repository's guarded merge workflow and configuration.
 4. Observe generated publication, finish checkout cleanup, report the actual terminal state and invoke
    the close operation if supported in this originating host. Do not call preparation successful closure.
+
+## Host coverage
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/machine/utility/close and .agents/base/policy/goal-continuation",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "Close this CLI after all owned work, report and other Stop gates; retain checkout by default",
+      "source": ".agents/machine/utility/close/SKILL.md and scripts/close_session.py",
+      "mapping": ".claude/skills/close and .agents/plugins/manifests/claude/machine-hooks.json",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Claude transcript parsing, prompt cancellation, post-report routing and permission declarations covered by focused source tests. Windows disposable registered-host closure passed. Installed Claude acceptance is not claimed."
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "Close this CLI after all owned work, report and other Stop gates; retain checkout by default",
+      "source": ".agents/machine/utility/close/SKILL.md and scripts/close_session.py",
+      "mapping": ".codex/skills/close and .agents/plugins/manifests/codex/machine-hooks.json",
+      "verification": {
+        "level": "source",
+        "result": "passed",
+        "evidence": "Codex final-channel transcript parsing, prompt cancellation, post-report routing and permission declarations covered by focused source tests. Windows disposable registered-host closure passed. Installed Codex acceptance is not claimed."
+      }
+    }
+  ]
+}
+```

@@ -21,10 +21,9 @@ KEEP_OPEN = re.compile(r"\b(?:keep|leave)\b[^.!?\n]{0,50}\bopen\b|\b(?:do not|do
 
 
 def peer_scripts():
-    for root in Path(__file__).resolve().parents:
-        candidate = root / '.agents/machine/utility/peer-cli/scripts'
-        if (candidate / 'session_close.py').is_file():
-            return candidate
+    candidate = Path(__file__).resolve().parents[2] / 'peer-cli/scripts'
+    if (candidate / 'session_close.py').is_file():
+        return candidate
     raise RuntimeError('machine:close cannot locate its shipped peer-cli runtime')
 
 
@@ -33,6 +32,16 @@ def runtime():
     if path not in sys.path:
         sys.path.insert(0, path)
     return importlib.import_module('session_close')
+
+
+def verified_entry(shared):
+    entry = shared.own_host_and_entry()
+    for _path, other in shared.entries():
+        if (isinstance(other, dict) and other.get('pid') == entry['pid']
+                and other.get('pid_started_at') == entry['pid_started_at']
+                and other.get('session_id') != entry['session_id']):
+            raise shared.Refusal('registered host is shared by multiple session identities; do not close it')
+    return entry
 
 
 def ticket_path(session):
@@ -64,7 +73,7 @@ def save_ticket(session, value):
 
 def arm(remove_worktree=False):
     shared = runtime()
-    entry = shared.own_host_and_entry()
+    entry = verified_entry(shared)
     store = shared.register_session._load_session_store()
     if store is None:
         raise shared.Refusal('session turn store is unavailable')
@@ -139,7 +148,7 @@ def blocked(reason):
 def complete():
     """Explicit foreground operation after the host returns every Stop-gate verdict."""
     shared = runtime()
-    entry = shared.own_host_and_entry()
+    entry = verified_entry(shared)
     session = entry['session_id']
     ticket = read_ticket(session)
     if not ticket or ticket.get('status') != 'reported':
@@ -205,7 +214,7 @@ def stop(data, session):
         return blocked('Prepared closure expired. Reload machine:close; no host was closed.')
     shared = runtime()
     try:
-        entry = shared.own_host_and_entry()
+        entry = verified_entry(shared)
         expected = ticket.get('entry')
         if not isinstance(expected, dict) or any(entry.get(key) != expected.get(key)
                 for key in ('host', 'session_id', 'pid', 'pid_started_at', 'cwd')) or entry['session_id'] != session:
@@ -265,6 +274,9 @@ def hook(data):
 
 
 def main(argv=None):
+    if sys.version_info < (3, 9):
+        print('machine:close requires Python 3.9 or newer', file=sys.stderr)
+        return 2
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     prepare = commands.add_parser('arm')
