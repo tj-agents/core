@@ -259,6 +259,78 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertTrue(result["session_exited"])
                 self.assertEqual("ours", result["session_id"])
                 self.assertTrue(worktree.is_dir())
+                self.wait_for_observer_exit(result)
+            finally:
+                if host.poll() is None:
+                    host.kill()
+                host.wait(timeout=5)
+
+    def test_public_close_operation_waits_for_report_then_closes_its_disposable_host(self):
+        operation = ROOT / '.agents/machine/utility/close/scripts/close_session.py'
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            worktree, state = root / 'consumer', root / 'state'
+            subprocess.run(['git', 'init', '-q', '-b', 'main', str(worktree)], check=True)
+            executable, host_name = self.fixture_host(root)
+            transcript = root / 'transcript.jsonl'
+            payload = json.dumps({'hook_event_name': 'Stop', 'session_id': 'ours',
+                                  'transcript_path': str(transcript)})
+            runner = root / 'run.py'
+            runner.write_text(
+                'import json, os, subprocess, sys, time\n'
+                'from pathlib import Path\n'
+                'while not Path(sys.argv[2]).exists(): time.sleep(.01)\n'
+                'subprocess.run([sys.executable, sys.argv[1], "arm"], check=True)\n'
+                'Path(sys.argv[3]).write_text("armed")\n'
+                'while not Path(sys.argv[4]).exists(): time.sleep(.01)\n'
+                'verdict = subprocess.run([sys.executable, sys.argv[1], "hook"], input=sys.argv[5], text=True, capture_output=True, check=True)\n'
+                'assert json.loads(verdict.stdout)["decision"] == "block"\n'
+                'Path(sys.argv[4] + ".stopped").touch()\n'
+                'while not Path(sys.argv[4] + ".accepted").exists(): time.sleep(.01)\n'
+                'raise SystemExit(subprocess.run([sys.executable, sys.argv[1], "complete", "--stop-gates-accepted"]).returncode)\n',
+                encoding='utf-8')
+            env = dict(os.environ, AGENT_STATE_DIRECTORY=str(state), AGENT_CLI_HOST_NAMES=host_name,
+                       AGENT_FINISH_CLOSE_MODE='', AGENT_FINISH_REAPER_TIMEOUT_SECONDS='10')
+            host = subprocess.Popen([str(executable), str(runner), str(operation), str(root / 'start'),
+                                     str(root / 'armed'), str(root / 'report'), payload], cwd=worktree, env=env)
+            try:
+                started = self.process_started_at(host.pid)
+                sessions = state / 'cli-sessions'
+                sessions.mkdir(parents=True)
+                (sessions / 'ours.json').write_text(json.dumps({
+                    'session_id': 'ours', 'cwd': str(worktree), 'pid': host.pid,
+                    'pid_started_at': started, 'started_at': time.time(), 'host': host_name,
+                }), encoding='utf-8')
+                self.record_idle_session(state, host_name, 'ours', worktree, host.pid, started)
+                (root / 'start').touch()
+                for _ in range(300):
+                    if (root / 'armed').exists() or host.poll() is not None:
+                        break
+                    time.sleep(.02)
+                self.assertTrue((root / 'armed').exists())
+                self.assertIsNone(host.poll(), 'arming must not close before the report')
+                transcript.write_text(json.dumps({'type': 'assistant', 'message': {
+                    'role': 'assistant', 'content': 'Done. The requested work is complete.'}}), encoding='utf-8')
+                (root / 'report').touch()
+                for _ in range(300):
+                    if (root / 'report.stopped').exists() or host.poll() is not None:
+                        break
+                    time.sleep(.02)
+                self.assertTrue((root / 'report.stopped').exists())
+                self.assertIsNone(host.poll(), 'Stop must leave the host alive while other gates can block')
+                (root / 'report.accepted').touch()
+                result = {}
+                for _ in range(400):
+                    for path in (state / 'merge-cleanup/results').glob('*.json'):
+                        result = json.loads(path.read_text(encoding='utf-8'))
+                    if result.get('status') == 'session-closed':
+                        break
+                    time.sleep(.025)
+                self.assertEqual('session-closed', result.get('status'), result)
+                self.assertTrue(result['session_exited'])
+                self.assertEqual('ours', result['session_id'])
+                self.assertTrue(worktree.is_dir(), 'ordinary task closure retains the consumer checkout')
+                self.wait_for_observer_exit(result)
             finally:
                 if host.poll() is None:
                     host.kill()
@@ -336,6 +408,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertTrue(result["session_exited"])
                 self.assertFalse(worktree.exists())
                 self.assertFalse(obligation.exists())
+                self.wait_for_observer_exit(result)
                 self.assertEqual(
                     1,
                     subprocess.run([
@@ -347,6 +420,15 @@ class FinishReaperProcessTests(unittest.TestCase):
                 if host.poll() is None:
                     host.kill()
                 host.wait(timeout=5)
+
+    def wait_for_observer_exit(self, result):
+        # A final result precedes observer exit; Windows holds its cwd until that exact process exits.
+        for _ in range(200):
+            status = session_close.identity_status(result['observer_pid'], result['observer_started_at'])
+            if status in ('exited', 'reused'):
+                break
+            time.sleep(.025)
+        self.assertIn(status, ('exited', 'reused'))
 
     @staticmethod
     def fixture_host(root):
