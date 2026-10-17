@@ -77,7 +77,7 @@ def _startup_remaining(deadline: float) -> float:
     return remaining
 
 
-def _converge(prepared, executable: str, project: Path) -> None:
+def _converge(prepared, executable: str, project: Path, trust_runtime: bool = True) -> None:
     if not prepared.selected_roots:
         return
     _remaining(prepared, OPERATION_TIMEOUT_SECONDS)
@@ -93,12 +93,13 @@ def _converge(prepared, executable: str, project: Path) -> None:
     if prepared.host == "codex":
         convergence = _module("verified_convergence", (HERE / "verified_convergence.py",))
         convergence.converge(os.environ, project, prepared.selected_roots)
-        trust = _module("codex_hook_trust", (HERE / "codex_hook_trust.py",))
-        trust.apply_trust(
-            executable, project, verified_roots=prepared.selected_roots,
-            launch_args=prepared.launch_args, environment=prepared.environment,
-            timeout=prepared.deadline.remaining(),
-        )
+        if trust_runtime:
+            trust = _module("codex_hook_trust", (HERE / "codex_hook_trust.py",))
+            trust.apply_trust(
+                executable, project, verified_roots=prepared.selected_roots,
+                launch_args=prepared.launch_args, environment=prepared.environment,
+                timeout=prepared.deadline.remaining(),
+            )
         _remaining(prepared, OPERATION_TIMEOUT_SECONDS)
 
 
@@ -140,7 +141,7 @@ def _session_start_dispatcher(roots, host: str) -> bool:
 
 def _binding_environment(directory: Path, token: str, snapshot_directory: Path,
                          prepared_environment: Mapping[str, str], extra_environment: Mapping[str, str] | None):
-    environment = dict(os.environ)
+    environment = _without_binding_state(os.environ)
     environment.update(prepared_environment)
     if extra_environment:
         environment.update(extra_environment)
@@ -148,6 +149,23 @@ def _binding_environment(directory: Path, token: str, snapshot_directory: Path,
     environment[ACK_TOKEN_ENV] = token
     environment[SNAPSHOT_DIRECTORY_ENV] = str(snapshot_directory)
     return environment
+
+
+def _without_binding_state(environment: Mapping[str, str]) -> dict[str, str]:
+    values = dict(environment)
+    values.pop(ACK_DIRECTORY_ENV, None)
+    values.pop(ACK_TOKEN_ENV, None)
+    values.pop(SNAPSHOT_DIRECTORY_ENV, None)
+    values.pop("TJ_AGENTS_CODEX_RUNTIME_RECEIPT", None)
+    values.pop("TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256", None)
+    return values
+
+
+def _cleanup_runtime(runtime, binding, configuration: Path) -> None:
+    try:
+        runtime.cleanup_runtime(binding, configuration)
+    except Exception:
+        pass
 
 
 def _acknowledged(directory: Path, token: str) -> bool:
@@ -195,12 +213,64 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 raise StartupBindingError("Codex effective configuration did not report a project directory")
             effective_project = selected_project
         with preflight(host, configuration, effective_project, preflight_arguments) as active:
+            if host == "codex":
+                logical = getattr(active, "prepared", None)
+                if logical is None:
+                    raise StartupBindingError("Codex rolling preflight did not prepare a package set")
+                if logical.selected_roots:
+                    runtime = _module("codex_runtime_binding", (HERE / "codex_runtime_binding.py",))
+                    binding = runtime.prepare_runtime(
+                        executable, effective_project, configuration, logical, preflight_arguments, arguments,
+                    )
+                    process = None
+                    cleaned = False
+                    try:
+                        from rolling_plugins import verify_final
+                        verify_final(logical, "codex", configuration, effective_project, preflight_arguments)
+                        _converge(logical, executable, effective_project, trust_runtime=False)
+                        snapshot_directory = binding.directory / "hook-snapshots"
+                        snapshot_directory.mkdir()
+                        if os.name != "nt":
+                            snapshot_directory.chmod(0o700)
+                        _preseed_snapshots(binding.prepared.selected_roots, snapshot_directory)
+                        active.acknowledge_binding()
+                        environment = _without_binding_state(os.environ)
+                        environment.update(binding.prepared.environment)
+                        environment.update(binding.environment)
+                        environment[SNAPSHOT_DIRECTORY_ENV] = str(snapshot_directory)
+                        if extra_environment:
+                            environment.update(extra_environment)
+                        try:
+                            process = subprocess.Popen(
+                                command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
+                                cwd=project, env=environment, start_new_session=os.name != "nt",
+                            )
+                            return process.wait()
+                        except OSError as error:
+                            raise StartupBindingError(f"native {host} could not start: {error}") from error
+                        finally:
+                            if process is None or process.poll() is not None:
+                                _cleanup_runtime(runtime, binding, configuration)
+                                cleaned = True
+                    except BaseException:
+                        if not cleaned and (process is None or process.poll() is not None):
+                            _cleanup_runtime(runtime, binding, configuration)
+                        raise
+                active.acknowledge_binding()
+                environment = _without_binding_state(os.environ)
+                environment.update(logical.environment)
+                if extra_environment:
+                    environment.update(extra_environment)
+                try:
+                    return subprocess.run(command_for_target(target, arguments), cwd=project, env=environment).returncode
+                except OSError as error:
+                    raise StartupBindingError(f"native {host} could not start: {error}") from error
             prepared = active.materialize_native(executable)
             _converge(prepared, executable, effective_project)
             launch_arguments = _launch_arguments(arguments, prepared.launch_args)
             if not prepared.selected_roots:
                 active.acknowledge_binding()
-                environment = dict(os.environ)
+                environment = _without_binding_state(os.environ)
                 environment.update(prepared.environment)
                 if extra_environment:
                     environment.update(extra_environment)
