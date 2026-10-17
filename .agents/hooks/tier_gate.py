@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import hashlib
 import fnmatch
 import json
 import os
@@ -414,6 +415,58 @@ class SelectionResult:
         return iter((self.ubiquitous, self.applicable, self.blocked))
 
 
+def runtime_install_roots():
+    receipt_value = os.environ.get("TJ_AGENTS_CODEX_RUNTIME_RECEIPT")
+    digest = os.environ.get("TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256")
+    if receipt_value is None and digest is None:
+        return None
+    if not receipt_value or not digest or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise RuntimeError("Codex runtime receipt is incomplete")
+    try:
+        receipt = Path(receipt_value).resolve(strict=True)
+        content = receipt.read_bytes()
+        if hashlib.sha256(content).hexdigest() != digest:
+            raise ValueError("digest mismatch")
+        value = json.loads(content)
+        if not isinstance(value, dict) or value.get("schema_version") != 1:
+            raise ValueError("invalid schema")
+        configured = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
+        if Path(value["codex_home"]).resolve() != configured:
+            raise ValueError("configuration root mismatch")
+        session = receipt.parent.resolve()
+        sessions = configured / "plugins" / "cache" / ".tj-agents-rolling" / "codex" / "sessions"
+        session.relative_to(sessions.resolve())
+        catalog = Path(value["catalog"]).resolve(strict=True)
+        if catalog != session / "catalog":
+            raise ValueError("catalog path mismatch")
+        values = value.get("roots")
+        if not isinstance(values, list) or not values or not all(isinstance(item, str) for item in values):
+            raise ValueError("invalid roots")
+        cache = (configured / "plugins" / "cache").resolve()
+        roots = []
+        for item in values:
+            root = Path(item).resolve(strict=True)
+            root.relative_to(cache)
+            relative = root.relative_to(cache)
+            if len(relative.parts) != 3 or relative.parts[0].startswith("tj-run-") is False or relative.parts[2] != "local":
+                raise ValueError("root escapes runtime cache layout")
+            roots.append(root)
+        unmanaged = value.get("unmanaged_roots", [])
+        if not isinstance(unmanaged, list) or not all(isinstance(item, str) for item in unmanaged):
+            raise ValueError("invalid unmanaged roots")
+        for item in unmanaged:
+            root = Path(item).resolve(strict=True)
+            relative = root.relative_to(cache)
+            if len(relative.parts) != 3 or relative.parts[0].startswith("."):
+                raise ValueError("unmanaged root escapes native cache layout")
+            if root not in roots:
+                roots.append(root)
+        return tuple(roots)
+    except (KeyError, OSError, ValueError, TypeError) as error:
+        raise RuntimeError(f"Codex runtime receipt is invalid: {error}") from None
+
+
+
 def cache_roots():
     roots = []
 
@@ -510,8 +563,10 @@ def declarations(roots=None, project=None, diagnostics=None):
     answers only for its installed versions; one without falls back to every cached version, newest first.
     """
     found = {}
-    for root in cache_roots() if roots is None else roots:
-        ranked = installed_declarations(root, project)
+    runtime = runtime_install_roots() if roots is None else None
+    sources = (None,) if runtime is not None else (cache_roots() if roots is None else roots)
+    for root in sources:
+        ranked = dict.fromkeys((path / DECLARATION_NAME for path in runtime), -1) if runtime is not None else installed_declarations(root, project)
         if ranked is None:
             try:
                 ranked = dict.fromkeys(sorted(Path(root).glob("*/*/*/" + DECLARATION_NAME)), -1)

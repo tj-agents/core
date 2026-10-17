@@ -2,7 +2,7 @@
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-AlwaysLatestPlugins
 Branch: Fix/RollingDependencyActivation (follow-up); original reviewed head 17ca22dfeb69d38447172c11b8de4c8b298c2971.
-PR: not opened for the idle-startup correction. Previous handoff import/cleanup PR284 merged 17 October 2026 at 14:05:16 UTC as c978ef030e4dbed4c4b49b0be055c85212a3760e and published as 2bc7f61b2ebcd6b3b45615597093d3b3a9d8fa42. Activation #283 and original rolling #269 are already merged. The idle-startup correction continues in this same worktree.
+PR: https://github.com/tj-agents/core/pull/286 (idle-startup correction; draft, final review fixes and exact-head CI pending). Previous handoff import/cleanup PR284 merged 17 October 2026 at 14:05:16 UTC as c978ef030e4dbed4c4b49b0be055c85212a3760e and published as 2bc7f61b2ebcd6b3b45615597093d3b3a9d8fa42. Activation #283 and original rolling #269 are already merged. The idle-startup correction continues in this same worktree.
 Owner: Codex session `01a13fa0-a1c6-7051-b3ce-a63fb26916da`;
 work item `always-latest-plugins/implementation` (stable in-flight identifier).
 
@@ -623,3 +623,17 @@ the published base once, freeze review, obtain independent/native review and run
   ]
 }
 ```
+
+## Idle-startup review correction — 17 October 2026
+
+Frozen review of f4e47908 completed with three confirmed defects: canonical machine coordinator refresh,
+session-scoped tier discovery, and enabled unmanaged-plugin discovery. One serial correction batch
+refreshes only the durable canonical machine package, shares authenticated root validation between the
+router and tier gate, and adds enabled unmanaged native roots to the receipt. Nine runtime regressions
+and thirteen startup tests passed; full Windows/Linux validation belongs to PR286 GitHub Actions.
+The native packaged adoption probe also passed unchanged published engineering hooks: SessionStart
+completed, UserPromptSubmit completed, and Stop blocked unfinished delivery with the exact canonical
+reason. Evidence: Temp/tj-native-packaged-core-stop-r7uckfnt/rpc-observation.jsonl and owned-cleanup-recovery.json.
+The fixture was removed after its native child exited. This closes the disposable-directory ambiguity;
+the historical old-session startup non-invocation remains unrecoverable and is not assigned an invented cause.
+After this correction's incremental review and CI, merge and verify publication, then resume publisher rollout.
