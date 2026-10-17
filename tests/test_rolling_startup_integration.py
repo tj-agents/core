@@ -305,6 +305,7 @@ class RollingStartupIntegrationTests(unittest.TestCase):
                 mock.patch.object(BINDING, "_preflight_arguments", return_value={"project": self.project}), \
                 mock.patch.object(BINDING, "_module", side_effect=lambda name, paths:
                                   runtime if name == "codex_runtime_binding" else original_module(name, paths)), \
+                mock.patch.dict(sys.modules, {"rolling_plugins": ROLLING}), \
                 mock.patch.object(ROLLING, "verify_final"), \
                 mock.patch.object(BINDING.subprocess, "Popen") as native:
             with self.assertRaisesRegex(BINDING.StartupBindingError, "unowned or modified"):
