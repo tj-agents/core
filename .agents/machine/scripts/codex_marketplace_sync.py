@@ -148,7 +148,21 @@ def codex_config_selection(codex_executable, working_directory, launch_args=(), 
                 raise SyncError(f"Codex effective configuration has no authenticated Git source for selected plugin {identity}")
             continue
         selected.append({"identity": identity, "marketplace": marketplace, "source_url": source})
-    return {"selections": selected, "final_selections": selected, "disabled": disabled, "project": directory}
+    hooks = config.get("hooks")
+    hook_state = hooks.get("state") if isinstance(hooks, dict) else {}
+    if hook_state is None:
+        hook_state = {}
+    if not isinstance(hook_state, dict):
+        raise SyncError("Codex effective configuration has invalid hooks.state")
+    return {
+        "selections": selected,
+        "final_selections": selected,
+        "disabled": disabled,
+        "project": directory,
+        "effective_plugin_configuration": dict(plugins),
+        "effective_marketplace_configuration": dict(marketplaces),
+        "hook_state": dict(hook_state),
+    }
 
 
 def _load_agent_cli():

@@ -156,8 +156,19 @@ class NativePluginDiscoveryError(Exception):
         super().__init__(f"{harness} plugin inventory failed: {detail}")
 
 
+def _runtime_receipt_roots():
+    try:
+        return tier_gate.runtime_install_roots()
+    except RuntimeError as error:
+        raise NativePluginDiscoveryError("codex", str(error)) from None
+
+
 @functools.lru_cache(maxsize=2)
 def _native_install_roots(harness):
+    if harness == "codex":
+        runtime = _runtime_receipt_roots()
+        if runtime is not None:
+            return runtime
     binary = shutil.which(harness)
     if binary is None:
         return NativePluginDiscoveryError(harness, "CLI executable is unavailable")
@@ -1594,4 +1605,7 @@ if __name__ == "__main__":
         main()
     except NativePluginDiscoveryError as error:
         discovery_diagnostic(error)
+        sys.exit(2)
+    except tier_gate.RuntimeReceiptError as error:
+        print(f"SKILL ROUTER - blocked, {error}", file=sys.stderr)
         sys.exit(2)

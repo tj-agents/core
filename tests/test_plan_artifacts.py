@@ -48,7 +48,11 @@ class PlanArtifactTests(unittest.TestCase):
             script = ".agents/base/policy/plan-artifacts/scripts/session-context.py"
             if host == "claude":
                 self.assertEqual("python", handler["command"])
-                self.assertEqual(["-B", f"${{CLAUDE_PLUGIN_ROOT}}/{script}"], handler["args"])
+                self.assertEqual(
+                    ["-B", "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+                     "--deadline", "8", "--hook", f"${{CLAUDE_PLUGIN_ROOT}}/{script}"],
+                    handler["args"],
+                )
             else:
                 self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["command"])
                 self.assertIn(f'"${{PLUGIN_ROOT}}/{script}"', handler["commandWindows"])
