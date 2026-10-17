@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -27,13 +28,47 @@ class StartupBindingTests(unittest.TestCase):
         self.project = Path(self.temp.name)
         self.root = self.project / "machine"
         (self.root / "hooks").mkdir(parents=True)
-        (self.root / "hooks" / "claude.json").write_text(
-            '{"hooks":{"SessionStart":"hook_dispatch.py"}}', encoding="utf-8",
+        shutil.copyfile(
+            ROOT / ".agents/plugins/manifests/claude/machine-hooks.json",
+            self.root / "hooks/claude.json",
         )
         self.verified = type("Verified", (), {"root": self.root, "identity": "machine@tj-agents"})()
         self.prepared = type("Prepared", (), {
             "selected_roots": (self.verified,), "launch_args": (), "environment": {},
         })()
+
+    def test_each_shipped_claude_plugin_acknowledges_session_start_through_its_real_manifest(self):
+        token = "a" * 40
+        payload = {"hook_event_name": "SessionStart", "session_id": "fixture", "cwd": str(self.project)}
+        for plugin in ("base", "engineering", "machine"):
+            with self.subTest(plugin=plugin):
+                package = self.project / plugin
+                hooks = package / "hooks"
+                hooks.mkdir(parents=True, exist_ok=True)
+                manifest = json.loads((ROOT / f".agents/plugins/manifests/claude/{plugin}-hooks.json").read_text(encoding="utf-8"))
+                (hooks / "claude.json").write_text(json.dumps(manifest), encoding="utf-8")
+                verified = type("Verified", (), {"root": package})()
+                self.assertTrue(BINDING._session_start_dispatcher((verified,), "claude"))
+                hook = manifest["hooks"]["SessionStart"][0]["hooks"][0]
+                arguments = [item.replace("${CLAUDE_PLUGIN_ROOT}", str(package)) for item in hook["args"]]
+                dispatcher = Path(arguments[1])
+                shutil.copyfile(ROOT / ".agents/hooks/hook_dispatch.py", dispatcher)
+                gate_index = arguments.index("--hook") + 1
+                gate = Path(arguments[gate_index])
+                gate.parent.mkdir(parents=True, exist_ok=True)
+                gate.write_text("import json, sys\nprint(json.dumps({'hookSpecificOutput': {'additionalContext': json.dumps({'argv': sys.argv[1:], 'payload': json.load(sys.stdin)})}}))\n", encoding="utf-8")
+                directory = package / "ack"
+                directory.mkdir()
+                environment = dict(os.environ, TJ_AGENTS_STARTUP_ACK_DIRECTORY=str(directory),
+                                   TJ_AGENTS_STARTUP_ACK_TOKEN=token)
+                result = subprocess.run([sys.executable, *arguments], input=json.dumps(payload),
+                                        env=environment, cwd=self.project, capture_output=True,
+                                        text=True, encoding="utf-8", timeout=hook["timeout"] + 5)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(token, (directory / token).read_text(encoding="utf-8"))
+                output = json.loads(json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
+                self.assertEqual(payload, output["payload"])
+                self.assertEqual(arguments[gate_index + 1:], output["argv"])
 
     def test_isolated_script_loads_shipped_dependencies_outside_the_callers_import_path(self):
         package = self.project / "packaged machine \u00e9" / "resources" / "machine" / "scripts"

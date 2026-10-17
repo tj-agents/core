@@ -9,6 +9,10 @@
             "command": "python",
             "args": [
               "-B",
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook_dispatch.py",
+              "--deadline",
+              "8",
+              "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/base/policy/plan-artifacts/scripts/session-context.py"
             ]
           }
