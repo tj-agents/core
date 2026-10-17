@@ -1,53 +1,129 @@
 # Close completed CLI sessions through a public Core operation
 
-Status: In progress
+Status: Complete
 PR: https://github.com/tj-agents/core/pull/285
 Source owner: machine/close and base/goal-continuation
 Repair workflow: engineering:self-repair
 
-## Problem
+## Problem and authorization
 
-After completing PluginScoping, the originating agent reported "Done" but never invoked the required
-session-close helper. Worktree cleanup and a successful completion check were mistaken for the terminal
-operation. Existing merge-command-triggered cleanup obligations did not cover Tommy's manual merges.
-The close instruction was buried in engineering delivery and peer-session guidance.
+PluginScoping completed and the agent reported done without invoking the buried close helper.
+Tommy authorized a dedicated skill and clarified that this CLI must close whenever all its owned work
+is done, in every Core-consuming repository, for ordinary tasks as well as plans and merges.
+This repair preserves other sessions, their checkouts and unrelated OpenCli, HandoffScope, harness
+injection and plugin-dependency work. No force or hook bypass is authorized.
 
-## Authorization
+## Delivered behavior
 
-Tommy requested a fix and explicitly approved a dedicated skill. He clarified that a CLI must close
-whenever all its owned work is done, in every repository consuming Core, regardless of PR or plan use.
-This work owns only generic session-close behavior. Preserve other sessions' checkouts and their
-OpenCli, HandoffScope, rolling-dependency and harness-injection changes. No force or hook bypass.
+Core #285 merged source head `a8d716be16cb1f067b899e4a4f8b7b2bec2876f4` as
+`16d0d994b42664fb727b2518bcf605fcd006b5a2`. The merge-triggered regeneration job published
+`8ecfe3e9c8626638b7c5c5a1637f94c74c4a80f1` with the shared skill and both host mappings.
 
-## Implementation
+- `machine:close` prepares before the report, routes at Stop, and completes in the foreground after
+  other Stop-gate feedback permits closure. Stop itself never signals a process.
+- Base guidance applies it to all completed CLI-owned work. Code and documentation delivery select
+  the same owner; peer-cli's self-close helpers remain its underlying runtime.
+- A new prompt cancels preparation. Atomic turn-state comparison, exact PID/start-time identity,
+  shared-process refusal and verified exit observers preserve active work and other sessions.
+- Default closure retains the checkout. Removal still requires the existing merged-worktree proof.
+- Runtime dependencies ship together. No author-checkout fallback or per-repo helper is required.
 
-- Public machine:close operation and host adapters; prepare before report, route at Stop, execute the
-  foreground complete operation only after every other Stop-gate verdict has been accepted.
-- Base-owned terminal requirement, selected by ordinary tasks and engineering deliveries alike.
-- Sequential machine-hook chain updates turn state before using existing verified close helpers.
-- Missing preparation on a direct "Done" completion report routes back to the skill; wording alone
-  never authorizes a process signal. This heuristic is a backstop, not proof of task completion.
-- Default retains checkout. Removal still needs the existing merged-worktree proof and helper.
-- New prompts cancel preparation; exact host identity, attachment, activity and observer checks remain.
+## Verification
 
-## Validation
+Exact-head PR CI [39044207226](https://github.com/tj-agents/core/actions/runs/39044207226) passed
+Windows, Linux and the required aggregate. Focused local checks passed: 21 operation regressions,
+39 close/finish regressions, 22 source-layout regressions, 19 harness declarations, the SQLite prompt
+race and a Windows disposable registered-host proof. Generation and -Check passed.
 
-The focused operation suite passed 21 regressions; the 39 close/finish, 22 source-layout and 19 harness
-declaration regressions pass. The existing Windows close fixture now waits for its exact observer to
-exit before deleting its temporary state directory. Distribution generation and -Check pass
-after updating the skill roster and declared machine hook. Run the existing closure regressions,
-packaging and source suites, independent review, and both native host acceptance checks before claiming
-the operation has been verified on real CLIs. Tests with mocked helpers do not establish native closure.
+The initial independent native review findings were fixed. Later native attempts refused unrelated
+publisher-catalog mismatches, and the configured workflow lens was unavailable. The documented parent
+fallback reviewed those frozen deltas; no fresh native approval or installed live-Claude/Codex
+acceptance is claimed. The disposable-host proof establishes the runtime boundaries separately. Post-merge main CI
+[39045611951](https://github.com/tj-agents/core/actions/runs/39045611951) also passed both platforms
+and the regeneration job; the generated publication is on main.
 
 ## Next Steps
 
-1. Finish regression and disposable-host acceptance coverage, including cancellation and refusal.
-2. Address native review findings on Stop-gate ordering and preparation permissions, then freeze and
-   independently review the repaired candidate. The workflow lens is unavailable (unsupported model),
-   so its check returns to the parent as required by the review contract.
-3. Publish one Core PR and deliver through the repository's guarded merge workflow and configuration.
-4. Observe generated publication, finish checkout cleanup, report the actual terminal state and invoke
-   the close operation if supported in this originating host. Do not call preparation successful closure.
+No implementation remains. Core #285 is merged, published and green after the merge. Consuming
+repositories pick up the new shared operation through their normal rolling session sync.
+
+## Completion evidence
+
+```completion
+{
+  "outcome": "Completed CLI work has one shipped Core close operation and a host backstop in every consuming repository.",
+  "acceptance": [
+    {
+      "id": "public-operation",
+      "criterion": "A shipped machine:close operation is discoverable on both hosts",
+      "evidence": [
+        {
+          "source": "https://github.com/tj-agents/core/pull/285",
+          "result": "Merged; regeneration published the canonical utility, both adapters and runtime dependencies."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "generic-selection",
+      "criterion": "Every Core-consuming repository selects closure for all completed CLI-owned work",
+      "evidence": [
+        {
+          "source": ".agents/base/policy/goal-continuation/SKILL.md and merge/merge-docs/peer-cli guidance",
+          "result": "Shared policy and terminal owners select machine:close without requiring a PR or plan."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "safe-lifecycle",
+      "criterion": "Reports, other Stop gates, new prompts and exact registered identities gate closure",
+      "evidence": [
+        {
+          "source": ".agents/machine/utility/close/scripts/close_session.py and focused process/SQLite regressions",
+          "result": "Stop never signals; post-report completion is explicit, new prompts cancel, shared identities refuse, checkout retention is default."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "platform-validation",
+      "criterion": "Required source and runtime checks pass on Windows and Linux",
+      "evidence": [
+        {
+          "source": "https://github.com/tj-agents/core/actions/runs/39044207226",
+          "result": "Success at the exact merged source head, including both platform verification jobs and ci-required."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    },
+    {
+      "id": "publication",
+      "criterion": "The exact merge-triggered publication and post-merge checks succeed",
+      "evidence": [
+        {
+          "source": "https://github.com/tj-agents/core/actions/runs/39045611951",
+          "result": "Succeeded at merge 16d0d994b42664fb727b2518bcf605fcd006b5a2, including regeneration and Windows/Linux verification; generated publication 8ecfe3e9c8626638b7c5c5a1637f94c74c4a80f1 is on main."
+        }
+      ],
+      "owner": null,
+      "next_action": null
+    }
+  ],
+  "deliveries": [
+    {
+      "repository": "tj-agents/core",
+      "pr": 285,
+      "head": "a8d716be16cb1f067b899e4a4f8b7b2bec2876f4"
+    }
+  ],
+  "open_tasks": []
+}
+```
 
 ## Host coverage
 
