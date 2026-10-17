@@ -81,7 +81,7 @@ LAUNCHER_PS1_SCRIPTS = ("launch-codex.ps1", "launch-claude.ps1")
 
 EXEMPT_PY_SCRIPTS = (
     "workflow_ops.py", "cleanup_proof.py", "merge_cleanup_gate.py", "peer_cli.py", "close_tab.py",
-    "finish.py", "close.py", "finish_reaper.py", "configure_terminal_tab_close.py", *LAUNCHER_PY_SCRIPTS,
+    "finish.py", "close.py", "close_session.py", "finish_reaper.py", "configure_terminal_tab_close.py", *LAUNCHER_PY_SCRIPTS,
 )
 EXEMPT_PS1_SCRIPTS = (
     "worktrees.ps1",

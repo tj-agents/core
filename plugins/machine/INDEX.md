@@ -4,6 +4,7 @@ Generated from canonical `.agents/` definitions.
 
 - `auto-memory` — utility — `.agents/machine/utility/auto-memory/SKILL.md`
 - `clip` — utility — `.agents/machine/utility/clip/SKILL.md`
+- `close` — utility — `.agents/machine/utility/close/SKILL.md`
 - `followup-codex` — utility — `.agents/machine/utility/followup-codex/SKILL.md`
 - `handoff-claude` — utility — `.agents/machine/utility/handoff-claude/SKILL.md`
 - `handoff-codex` — utility — `.agents/machine/utility/handoff-codex/SKILL.md`

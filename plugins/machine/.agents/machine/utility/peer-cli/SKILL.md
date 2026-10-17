@@ -94,13 +94,17 @@ Its two refusals both exist because they were broken first:
   a kill or cleanup. Force can select an explicit stale terminal target, but never bypasses pid/start-time
   verification for a process signal.
 
-Closing *this* session's own tab and worktree is not this skill's job: `engineering:merge` Step 5 does
-that through `finish.py`, beside these scripts.
+Closing *this* session is `machine:close`'s job, for ordinary tasks as well as PR deliveries.
+Select that skill and prepare its post-report operation before the final completion report.
+The `close.py` and `finish.py` helpers beside these scripts remain its verified runtime; they are
+not a substitute for invoking the close operation.
 
-For a completed session whose checkout must remain, run exactly
+For a completed session whose checkout must remain, `machine:close`'s post-report `complete` operation
+invokes the underlying runtime command
 `python3 -B <skill-directory>/scripts/close.py` on Linux/macOS or
 `python -B <skill-directory>\scripts\close.py` on Windows, with no
-arguments after the completion report. It requires this host's verified registry entry and attachment,
+arguments after the completion report and the other Stop-gate feedback. Select `machine:close` rather
+than invoking this helper as a replacement for that operation. It requires this host's verified registry entry and attachment,
 an active unended `awaiting_input` turn with an unchanged activity token immediately before close, then
 closes only its own host or uniquely identified tab and records session exit without changing files, branches
 or worktree registration. Idle state does not prove report delivery. Honor keep-open, continue and active
