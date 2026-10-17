@@ -259,6 +259,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertTrue(result["session_exited"])
                 self.assertEqual("ours", result["session_id"])
                 self.assertTrue(worktree.is_dir())
+                self.wait_for_observer_exit(result)
             finally:
                 if host.poll() is None:
                     host.kill()
@@ -329,13 +330,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertTrue(result['session_exited'])
                 self.assertEqual('ours', result['session_id'])
                 self.assertTrue(worktree.is_dir(), 'ordinary task closure retains the consumer checkout')
-                # The result is written just before observer exit. Windows still holds its cwd
-                # until that exact process exits; do not race temporary-directory teardown.
-                for _ in range(200):
-                    if session_close.identity_status(result['observer_pid'], result['observer_started_at']) in ('exited', 'reused'):
-                        break
-                    time.sleep(.025)
-                self.assertIn(session_close.identity_status(result['observer_pid'], result['observer_started_at']), ('exited', 'reused'))
+                self.wait_for_observer_exit(result)
             finally:
                 if host.poll() is None:
                     host.kill()
@@ -413,6 +408,7 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertTrue(result["session_exited"])
                 self.assertFalse(worktree.exists())
                 self.assertFalse(obligation.exists())
+                self.wait_for_observer_exit(result)
                 self.assertEqual(
                     1,
                     subprocess.run([
@@ -424,6 +420,15 @@ class FinishReaperProcessTests(unittest.TestCase):
                 if host.poll() is None:
                     host.kill()
                 host.wait(timeout=5)
+
+    def wait_for_observer_exit(self, result):
+        # A final result precedes observer exit; Windows holds its cwd until that exact process exits.
+        for _ in range(200):
+            status = session_close.identity_status(result['observer_pid'], result['observer_started_at'])
+            if status in ('exited', 'reused'):
+                break
+            time.sleep(.025)
+        self.assertIn(status, ('exited', 'reused'))
 
     @staticmethod
     def fixture_host(root):
