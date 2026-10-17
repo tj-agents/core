@@ -2,7 +2,7 @@
 
 Checkout: C:/Users/TommySeery/source/repos/tj-agents/core/.worktrees/Fix-AlwaysLatestPlugins
 Branch: Fix/RollingDependencyActivation (follow-up); original reviewed head 17ca22dfeb69d38447172c11b8de4c8b298c2971.
-PR: https://github.com/tj-agents/core/pull/286 (idle-startup correction; draft, final review fixes and exact-head CI pending). Previous handoff import/cleanup PR284 merged 17 October 2026 at 14:05:16 UTC as c978ef030e4dbed4c4b49b0be055c85212a3760e and published as 2bc7f61b2ebcd6b3b45615597093d3b3a9d8fa42. Activation #283 and original rolling #269 are already merged. The idle-startup correction continues in this same worktree.
+PR: https://github.com/tj-agents/core/pull/286 (idle-startup correction; prior final head passed review and GitHub CI; reported Claude startup wiring regression being corrected). Previous handoff import/cleanup PR284 merged 17 October 2026 at 14:05:16 UTC as c978ef030e4dbed4c4b49b0be055c85212a3760e and published as 2bc7f61b2ebcd6b3b45615597093d3b3a9d8fa42. Activation #283 and original rolling #269 are already merged. The idle-startup correction continues in this same worktree.
 Owner: Codex session `01a13fa0-a1c6-7051-b3ce-a63fb26916da`;
 work item `always-latest-plugins/implementation` (stable in-flight identifier).
 
@@ -637,3 +637,17 @@ reason. Evidence: Temp/tj-native-packaged-core-stop-r7uckfnt/rpc-observation.jso
 The fixture was removed after its native child exited. This closes the disposable-directory ambiguity;
 the historical old-session startup non-invocation remains unrecoverable and is not assigned an invented cause.
 After this correction's incremental review and CI, merge and verify publication, then resume publisher rollout.
+
+
+## Reported Claude launch blocker — 17 October 2026
+
+The real launch from the tj-agents parent directory failed because the published startup coordinator
+requires a SessionStart dispatcher acknowledgment while every shipped Claude SessionStart hook called
+its script directly. This regression was introduced by the original always-latest implementation, not
+by an old release pin. Each independently selectable Core package now wraps its existing first
+SessionStart command through the shipped dispatcher, retaining its arguments and outer timeout.
+Startup fixtures use the real machine manifest; a regression executes each real manifest command with
+a disposable gate and verifies acknowledgment, forwarded event and arguments. All fourteen focused
+startup tests pass. Full Windows/Linux suites remain GitHub-owned. Prior f42b21ce review and CI were
+green but do not approve this correction. Review this delta, push through GitHub CI, merge and verify
+generated publication and an actual Claude startup before reporting the blocker resolved.
