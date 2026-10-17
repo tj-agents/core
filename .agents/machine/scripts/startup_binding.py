@@ -16,6 +16,8 @@ import tempfile
 import time
 from typing import Callable, Mapping, Sequence
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from codex_marketplace_sync import codex_config_selection
 from rolling_plugins import OPERATION_TIMEOUT_SECONDS, RollingPluginError, preflight, terminate_process_tree
 from terminal_command import command_for_target, native_target_for_shim
@@ -238,11 +240,15 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                         time.sleep(0.05)
                     if process.poll() is not None:
                         return process.returncode
-                    terminate_process_tree(process)
                     raise StartupBindingError(f"native {host} did not acknowledge SessionStart before the startup deadline")
-                except BaseException:
+                except BaseException as error:
                     if process.poll() is None:
-                        terminate_process_tree(process)
+                        try:
+                            terminate_process_tree(process)
+                        except Exception as cleanup_error:
+                            raise StartupBindingError(
+                                f"{error}; native {host} cleanup also failed: {cleanup_error}"
+                            ) from error
                     raise
             finally:
                 shutil.rmtree(directory, ignore_errors=True)
