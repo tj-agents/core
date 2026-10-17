@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -33,6 +34,27 @@ class StartupBindingTests(unittest.TestCase):
         self.prepared = type("Prepared", (), {
             "selected_roots": (self.verified,), "launch_args": (), "environment": {},
         })()
+
+    def test_isolated_script_loads_shipped_dependencies_outside_the_callers_import_path(self):
+        package = self.project / "packaged machine \u00e9" / "resources" / "machine" / "scripts"
+        shutil.copytree(SCRIPTS, package)
+        caller = self.project / "caller"
+        caller.mkdir()
+        (caller / "codex_marketplace_sync.py").write_text(
+            'raise RuntimeError("untrusted caller import")\n', encoding="utf-8",
+        )
+        environment = dict(os.environ, PYTHONPATH=str(caller))
+
+        for scripts in (SCRIPTS, package):
+            with self.subTest(scripts=scripts):
+                completed = subprocess.run(
+                    [sys.executable, "-I", "-B", str(scripts / "startup_binding.py"), "--help"],
+                    cwd=caller, env=environment, capture_output=True, timeout=30,
+                )
+                diagnostics = (completed.stdout + completed.stderr).decode("utf-8", errors="replace")
+                self.assertEqual(0, completed.returncode, diagnostics)
+                self.assertIn(b"--host", completed.stdout)
+                self.assertNotIn(b"untrusted caller import", completed.stderr)
 
     def test_session_start_acknowledgement_releases_the_preflight_after_native_start(self):
         events = []
@@ -75,6 +97,37 @@ class StartupBindingTests(unittest.TestCase):
             self.assertEqual(0, BINDING.run_session("claude", "typed", self.project, ["session"]))
 
         self.assertEqual(["materialize", "start", "ack", "exit"], events)
+
+    def test_missing_session_start_acknowledgement_preserves_the_failure_when_cleanup_fails(self):
+        prepared = self.prepared
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def materialize_native(self, executable):
+                return prepared
+
+        process = mock.Mock()
+        process.poll.return_value = None
+        with mock.patch.object(BINDING, "preflight", return_value=Active()), \
+                mock.patch.object(BINDING, "native_target_for_shim", return_value="native"), \
+                mock.patch.object(BINDING, "_preflight_arguments", return_value={}), \
+                mock.patch.object(BINDING, "_converge"), \
+                mock.patch.object(BINDING, "_remaining", return_value=0), \
+                mock.patch.object(BINDING, "command_for_target", return_value=["native"]), \
+                mock.patch.object(BINDING.subprocess, "Popen", return_value=process), \
+                mock.patch.object(BINDING, "terminate_process_tree", side_effect=OSError("cleanup unavailable")) as terminate, \
+                mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
+            with self.assertRaisesRegex(
+                BINDING.StartupBindingError,
+                "did not acknowledge SessionStart.*cleanup also failed: cleanup unavailable",
+            ):
+                BINDING.run_session("claude", "typed", self.project, ["session"])
+        terminate.assert_called_once_with(process)
 
     def test_selected_packages_without_session_start_dispatcher_fail_before_native_start(self):
         (self.root / "hooks" / "claude.json").write_text('{"hooks":{"SessionStart":[]}}', encoding="utf-8")
