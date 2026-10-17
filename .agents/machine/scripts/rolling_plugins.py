@@ -1393,8 +1393,16 @@ def terminate_process_tree(process: subprocess.Popen, timeout: float = 5) -> Non
     if process.poll() is not None:
         return
     if os.name == "nt":
-        subprocess.run(["taskkill", "/pid", str(process.pid), "/t", "/f"], stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout)
+        try:
+            result = subprocess.run(
+                ["taskkill", "/pid", str(process.pid), "/t", "/f"], stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            process.kill()
+        else:
+            if result.returncode and process.poll() is None:
+                process.kill()
     else:
         try:
             os.killpg(process.pid, signal.SIGTERM)
@@ -1405,12 +1413,14 @@ def terminate_process_tree(process: subprocess.Popen, timeout: float = 5) -> Non
     try:
         process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
-        if os.name != "nt":
+        if os.name == "nt":
+            process.kill()
+        else:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
             except OSError:
                 process.kill()
-        process.wait()
+        process.wait(timeout=timeout)
 
 
 def preflight(host: str, target: Path, project: Path, arguments: Mapping[str, object] | None = None) -> Preflight:
