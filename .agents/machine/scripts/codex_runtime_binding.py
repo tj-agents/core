@@ -242,7 +242,11 @@ def _unmanaged_roots(executable: str, project: Path, configuration: Path,
         if not isinstance(item, dict) or not item.get("installed") or not item.get("enabled") or item.get("pluginId") in managed:
             continue
         components = (item.get("marketplaceName"), item.get("name"), item.get("version"))
-        if not all(isinstance(value, str) and rolling_plugins._cache_component(value) == value for value in components):
+        if not all(isinstance(value, str) and rolling_plugins._cache_component(value) == value for value in components[:2]):
+            raise RuntimeBindingError("Codex unmanaged plugin inventory has an invalid cache path")
+        version = components[2]
+        if not isinstance(version, str) or not version or version in {".", ".."} or any(
+                character in "/\\:\0" or ord(character) < 32 for character in version):
             raise RuntimeBindingError("Codex unmanaged plugin inventory has an invalid cache path")
         path = cache.joinpath(*components).resolve(strict=True)
         if path.relative_to(cache).parts != components or not path.is_dir():

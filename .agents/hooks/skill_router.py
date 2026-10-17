@@ -1606,3 +1606,6 @@ if __name__ == "__main__":
     except NativePluginDiscoveryError as error:
         discovery_diagnostic(error)
         sys.exit(2)
+    except tier_gate.RuntimeReceiptError as error:
+        print(f"SKILL ROUTER - blocked, {error}", file=sys.stderr)
+        sys.exit(2)
