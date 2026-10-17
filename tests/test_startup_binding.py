@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -33,6 +34,27 @@ class StartupBindingTests(unittest.TestCase):
         self.prepared = type("Prepared", (), {
             "selected_roots": (self.verified,), "launch_args": (), "environment": {},
         })()
+
+    def test_isolated_script_loads_shipped_dependencies_outside_the_callers_import_path(self):
+        package = self.project / "packaged machine \u00e9" / "resources" / "machine" / "scripts"
+        shutil.copytree(SCRIPTS, package)
+        caller = self.project / "caller"
+        caller.mkdir()
+        (caller / "codex_marketplace_sync.py").write_text(
+            'raise RuntimeError("untrusted caller import")\n', encoding="utf-8",
+        )
+        environment = dict(os.environ, PYTHONPATH=str(caller))
+
+        for scripts in (SCRIPTS, package):
+            with self.subTest(scripts=scripts):
+                completed = subprocess.run(
+                    [sys.executable, "-I", "-B", str(scripts / "startup_binding.py"), "--help"],
+                    cwd=caller, env=environment, capture_output=True, timeout=30,
+                )
+                diagnostics = (completed.stdout + completed.stderr).decode("utf-8", errors="replace")
+                self.assertEqual(0, completed.returncode, diagnostics)
+                self.assertIn(b"--host", completed.stdout)
+                self.assertNotIn(b"untrusted caller import", completed.stderr)
 
     def test_session_start_acknowledgement_releases_the_preflight_after_native_start(self):
         events = []
