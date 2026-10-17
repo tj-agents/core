@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import importlib.util
 import json
 import os
@@ -149,6 +150,90 @@ class CodexRuntimeBindingTests(unittest.TestCase):
         self.assertFalse(alias.exists())
         self.assertFalse(directory.exists())
         self.assertTrue(unrelated.is_dir())
+
+    def test_runtime_discovery_selects_one_session_and_keeps_enabled_unmanaged_tiers(self):
+        session = self.home / "plugins/cache/.tj-agents-rolling/codex/sessions/current"
+        catalog = session / "catalog"
+        catalog.mkdir(parents=True)
+        cache = self.home / "plugins/cache"
+        current = cache / "tj-run-current-employer/employer/local"
+        stale = cache / "tj-run-old-employer/employer/local"
+        canonical = cache / "employer/employer/local"
+        unmanaged = cache / "outside/standards/1.0"
+        for payload in (current, stale, canonical, unmanaged):
+            payload.mkdir(parents=True)
+            (payload / "tier.json").write_text(json.dumps({
+                "schema_version": 1, "tier": payload.parent.name, "applies": "always",
+            }), encoding="utf-8")
+        prepared = replace(
+            self.prepared, selected_roots=(ROLLING.VerifiedRoot(
+                "employer@tj-run-current-employer", current, "a" * 40,
+                "https://github.com/tj-agents/employer.git"),), catalog_root=catalog,
+        )
+        inventory = {"installed": [
+            {"installed": True, "enabled": True, "pluginId": "employer@tj-run-current-employer"},
+            {"installed": True, "enabled": True, "pluginId": "standards@outside",
+             "marketplaceName": "outside", "name": "standards", "version": "1.0"},
+            {"installed": True, "enabled": False, "pluginId": "disabled@outside"},
+        ]}
+        with mock.patch.object(ROLLING, "_native", return_value=inventory):
+            other = RUNTIME._unmanaged_roots("codex", self.root, self.home, prepared)
+        self.assertEqual((unmanaged.resolve(),), other)
+        receipt, digest = RUNTIME._write_receipt(session, self.home, prepared, other)
+        with mock.patch.dict(os.environ, {
+                "CODEX_HOME": str(self.home),
+                "TJ_AGENTS_CODEX_RUNTIME_RECEIPT": str(receipt),
+                "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256": digest}, clear=True), \
+                mock.patch.object(ROUTER.tier_gate, "cache_roots", side_effect=AssertionError("scanned inactive cache")):
+            self.assertEqual((current.resolve(), unmanaged.resolve()), ROUTER._runtime_receipt_roots())
+            found = ROUTER.tier_gate.declarations()
+        self.assertEqual({current.resolve(), unmanaged.resolve()}, {item.payload_dir.resolve() for item in found})
+        self.assertEqual(1, sum(item.plugin == "employer" for item in found))
+
+    def test_unmanaged_receipt_root_cannot_escape_the_native_cache(self):
+        session = self.home / "plugins/cache/.tj-agents-rolling/codex/sessions/current"
+        catalog = session / "catalog"
+        catalog.mkdir(parents=True)
+        current = self.home / "plugins/cache/tj-run-current-base/base/local"
+        current.mkdir(parents=True)
+        prepared = replace(
+            self.prepared, selected_roots=(ROLLING.VerifiedRoot(
+                self.verified.identity, current, self.verified.revision, self.verified.repository),),
+            catalog_root=catalog,
+        )
+        receipt, digest = RUNTIME._write_receipt(session, self.home, prepared, (self.package,))
+        with mock.patch.dict(os.environ, {
+                "CODEX_HOME": str(self.home),
+                "TJ_AGENTS_CODEX_RUNTIME_RECEIPT": str(receipt),
+                "TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256": digest}, clear=True):
+            with self.assertRaises(ROUTER.NativePluginDiscoveryError):
+                ROUTER._runtime_receipt_roots()
+
+    def test_canonical_machine_refresh_is_retained_after_private_runtime_cleanup(self):
+        logical_machine = ROLLING.VerifiedRoot(
+            "machine@base-agents", self.package, "a" * 40, "https://github.com/tj-agents/core.git",
+        )
+        selected = replace(
+            self.prepared, selected_roots=(self.verified, logical_machine),
+        )
+        canonical = self.home / "plugins/cache/base-agents/machine/local"
+
+        def publish(coordinator, *_arguments):
+            self.assertEqual((logical_machine,), coordinator.selected_roots)
+            canonical.mkdir(parents=True)
+            (canonical / "launcher.py").write_text("current coordinator", encoding="utf-8")
+
+        with mock.patch.object(ROLLING, "materialize_native", side_effect=publish):
+            RUNTIME._refresh_coordinator("codex", self.root, self.home, selected)
+        directory = self.home / "plugins/cache/.tj-agents-rolling/codex/sessions/current"
+        directory.mkdir(parents=True)
+        alias = self.home / "plugins/cache/tj-run-current-base"
+        alias.mkdir(parents=True)
+        binding = RUNTIME.RuntimeBinding(self.prepared, directory, {"base-agents": alias.name},
+                                         directory / "runtime-receipt.json", "digest", {})
+        RUNTIME.cleanup_runtime(binding, self.home)
+        self.assertEqual("current coordinator", (canonical / "launcher.py").read_text(encoding="utf-8"))
+        self.assertFalse(alias.exists())
 
     def test_primary_preparation_error_survives_cleanup_failure(self):
         directory = self.home / "plugins/cache/.tj-agents-rolling/codex/sessions/token"

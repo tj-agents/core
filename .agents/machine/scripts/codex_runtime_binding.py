@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 import math
@@ -218,13 +218,49 @@ def _verify_trust(executable: str, project: Path, prepared: rolling_plugins.Prep
                 raise RuntimeBindingError(f"Codex runtime did not trust hook {key}")
 
 
-def _write_receipt(directory: Path, configuration: Path, prepared: rolling_plugins.Prepared) -> tuple[Path, str]:
+def _refresh_coordinator(executable: str, project: Path, configuration: Path,
+                         prepared: rolling_plugins.Prepared) -> None:
+    roots = tuple(root for root in prepared.selected_roots
+                  if root.identity in {"machine@base-agents", "machine@tj-agents"})
+    if roots:
+        identities = {root.identity for root in roots}
+        coordinator = replace(prepared, selected_roots=roots,
+                              selections=tuple(item for item in prepared.selections if item.identity in identities))
+        rolling_plugins.materialize_native(coordinator, "codex", configuration, project, executable)
+
+
+def _unmanaged_roots(executable: str, project: Path, configuration: Path,
+                     prepared: rolling_plugins.Prepared) -> tuple[Path, ...]:
+    inventory = rolling_plugins._native(
+        [executable, *prepared.launch_args, "plugin", "list", "--json"], project,
+        prepared.environment, prepared.deadline or rolling_plugins.Deadline(), True,
+    )
+    managed = {root.identity for root in prepared.selected_roots}
+    cache = (configuration / "plugins" / "cache").resolve()
+    roots = []
+    for item in rolling_plugins._codex_inventory_entries(inventory):
+        if not isinstance(item, dict) or not item.get("installed") or not item.get("enabled") or item.get("pluginId") in managed:
+            continue
+        components = (item.get("marketplaceName"), item.get("name"), item.get("version"))
+        if not all(isinstance(value, str) and rolling_plugins._cache_component(value) == value for value in components):
+            raise RuntimeBindingError("Codex unmanaged plugin inventory has an invalid cache path")
+        path = cache.joinpath(*components).resolve(strict=True)
+        if path.relative_to(cache).parts != components or not path.is_dir():
+            raise RuntimeBindingError("Codex unmanaged plugin root escapes its native cache path")
+        if path not in roots:
+            roots.append(path)
+    return tuple(roots)
+
+
+def _write_receipt(directory: Path, configuration: Path, prepared: rolling_plugins.Prepared,
+                   unmanaged_roots: Sequence[Path] = ()) -> tuple[Path, str]:
     roots = [str(root.root.resolve()) for root in prepared.selected_roots]
     payload = {
         "schema_version": 1,
         "codex_home": str(configuration.resolve()),
         "catalog": str(prepared.catalog_root.resolve()),
         "roots": roots,
+        "unmanaged_roots": [str(root.resolve()) for root in unmanaged_roots],
     }
     encoded = (json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
     receipt = directory / "runtime-receipt.json"
@@ -238,6 +274,7 @@ def prepare_runtime(executable: str, project: Path, configuration: Path, logical
                     selection: Mapping[str, object], arguments: Sequence[str]) -> RuntimeBinding:
     if not logical.selected_roots:
         raise RuntimeBindingError("Codex runtime aliases require selected packages")
+    _refresh_coordinator(executable, project, configuration, logical)
     directory = _runtime_directory(logical)
     aliases = {
         marketplace: _runtime_marketplace(marketplace, directory.name)
@@ -262,7 +299,8 @@ def prepare_runtime(executable: str, project: Path, configuration: Path, logical
         state = _runtime_hook_state(disabled, updates)
         runtime = _with_hook_state(runtime, state)
         _verify_trust(executable, project, runtime, disabled)
-        receipt, digest = _write_receipt(directory, configuration, runtime)
+        unmanaged = _unmanaged_roots(executable, project, configuration, runtime)
+        receipt, digest = _write_receipt(directory, configuration, runtime, unmanaged)
         return RuntimeBinding(runtime, directory, aliases, receipt, digest, state)
     except BaseException:
         try:
