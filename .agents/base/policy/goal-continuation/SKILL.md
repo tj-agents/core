@@ -39,6 +39,14 @@ and children; an unavailable continuation capability does not excuse leaving unb
 Preserve higher-priority restrictions; a source change does not update instructions already loaded in an
 active session.
 
+Before a supported wake, checkpoint the next action and release the foreground lease. A later process
+claims the same owner before acting; it is a fresh context unless the host confirms it resumed the
+original session. Keep one active writer per owner so a scheduled wake cannot race foreground work.
+
+This SessionStart delivery supplies context only. It does not enforce host behavior, install a
+continuation job, prove that this hook is trusted or active, or establish that a host can resume work.
+Use the host's advertised skill and verify its real runtime before claiming durable continuation.
+
 ## Close completed CLI sessions
 
 When this CLI has finished all its owned work, select `machine:close`, prepare its verified
@@ -52,11 +60,3 @@ approval, or an owned check or delivery still in progress. Report an unsupported
 honestly; preserve the session and checkout instead of bypassing identity checks. Closing this session
 does not authorize deleting its checkout. `machine:close` owns the executable procedure; it requires
 the selected machine plugin and trusted native hooks for post-report closure.
-
-Before a supported wake, checkpoint the next action and release the foreground lease. A later process
-claims the same owner before acting; it is a fresh context unless the host confirms it resumed the
-original session. Keep one active writer per owner so a scheduled wake cannot race foreground work.
-
-This SessionStart delivery supplies context only. It does not enforce host behavior, install a
-continuation job, prove that this hook is trusted or active, or establish that a host can resume work.
-Use the host's advertised skill and verify its real runtime before claiming durable continuation.

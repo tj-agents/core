@@ -18,8 +18,8 @@
           {
             "type": "command",
             "timeout": 15,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook prompt --host codex",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook prompt --host codex"
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook prompt --host codex --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 12 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook prompt --host codex --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook"
           }
         ]
       }
@@ -30,8 +30,8 @@
           {
             "type": "command",
             "timeout": 60,
-            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 55 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook stop --host codex --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook",
-            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 55 --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook stop --host codex --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook"
+            "command": "python3 -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 55 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook stop --host codex",
+            "commandWindows": "python -B \"${PLUGIN_ROOT}/hooks/hook_dispatch.py\" --deadline 55 --hook \"${PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py\" hook --hook \"${PLUGIN_ROOT}/resources/machine/scripts/session_store.py\" hook stop --host codex"
           }
         ]
       }

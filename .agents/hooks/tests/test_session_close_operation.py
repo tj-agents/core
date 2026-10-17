@@ -29,6 +29,9 @@ class CloseOperationTests(unittest.TestCase):
         self.shared.Refusal = RuntimeError
         self.shared.own_host_and_entry.return_value = self.entry
         self.shared.path_key.side_effect = lambda value: str(Path(value).resolve())
+        self.store = self.shared.register_session._load_session_store.return_value
+        self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'working', 'last_activity_at': 100}
+        self.store.record_prepared_stop.return_value = True
 
     def transcript_with(self, answer, host='codex'):
         if host == 'codex':
@@ -98,7 +101,9 @@ class CloseOperationTests(unittest.TestCase):
         helper = mock.Mock()
         helper.main.return_value = 0
         with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module', return_value=helper) as load:
-            close.hook(self.transcript_with('The requested cleanup is complete.'))
+            self.assertEqual('block', close.hook(self.transcript_with('The requested cleanup is complete.'))['decision'])
+            load.assert_not_called()
+            close.complete()
         load.assert_called_once_with('close')
         helper.main.assert_called_once_with([])
 
@@ -127,6 +132,8 @@ class CloseOperationTests(unittest.TestCase):
         data = self.transcript_with('Done.')
         with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module', return_value=helper):
             self.assertEqual('block', close.hook(data)['decision'])
+            with self.assertRaisesRegex(RuntimeError, 'not awaiting input'):
+                close.complete()
             self.assertIn('not awaiting input', close.hook({**data, 'stop_hook_active': True})['systemMessage'])
         helper.main.assert_called_once_with([])
 
@@ -144,6 +151,7 @@ class CloseOperationTests(unittest.TestCase):
         helper.main.return_value = 0
         with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module', return_value=helper):
             close.hook({**data, 'stop_hook_active': True})
+            close.complete()
         helper.main.assert_called_once_with([])
 
     def test_explicit_keep_open_is_honored_even_with_a_done_report(self):
@@ -174,8 +182,25 @@ class CloseOperationTests(unittest.TestCase):
         data = self.transcript_with('Done.')
         with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module', return_value=helper):
             close.hook(data)
+            close.complete()
             self.assertIn('in progress', close.hook(data)['systemMessage'])
         helper.main.assert_called_once_with([])
+
+    def test_new_turn_activity_refuses_even_if_the_cancellation_hook_has_not_run(self):
+        self.prepare()
+        self.store.record_prepared_stop.return_value = False
+        with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module') as load:
+            result = close.hook(self.transcript_with('Done.'))
+            self.assertIn('activity changed', result['reason'])
+            load.assert_not_called()
+
+    def test_complete_requires_a_report_and_explicit_stop_gate_acknowledgement(self):
+        self.prepare()
+        with mock.patch.object(close, 'runtime', return_value=self.shared), self.assertRaisesRegex(RuntimeError, 'no prepared completion report'):
+            close.complete()
+        with mock.patch.object(close, 'runtime') as runtime, self.assertRaises(SystemExit):
+            close.main(['complete'])
+        runtime.assert_not_called()
 
     def test_runtime_resolves_from_source_and_both_packaged_entries(self):
         self.assertTrue((close.peer_scripts() / 'close.py').is_file())

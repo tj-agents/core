@@ -65,10 +65,23 @@ def save_ticket(session, value):
 def arm(remove_worktree=False):
     shared = runtime()
     entry = shared.own_host_and_entry()
+    store = shared.register_session._load_session_store()
+    if store is None:
+        raise shared.Refusal('session turn store is unavailable')
+    connection = store.connect()
+    try:
+        activity = store.get_session(connection, store.session_handle(entry['host'], entry['session_id']))
+    finally:
+        connection.close()
+    if (not isinstance(activity, dict) or activity.get('ended_at') is not None
+            or activity.get('turn_state') not in ('working', 'awaiting_input')
+            or not shared.finite_positive(activity.get('last_activity_at'))):
+        raise shared.Refusal('this session has no active verified turn')
     if remove_worktree:
         shared.fresh_removable_receipt(shared.worktree_from_cwd())
     value = {'entry': entry, 'armed_at': time.time(), 'remove_worktree': remove_worktree,
-             'status': 'armed', 'cwd': str(Path.cwd().resolve()), 'nonce': uuid.uuid4().hex}
+             'status': 'armed', 'cwd': str(Path.cwd().resolve()), 'nonce': uuid.uuid4().hex,
+             'activity': activity['last_activity_at'], 'turn_state': activity['turn_state']}
     save_ticket(entry['session_id'], value)
     return {'operation': 'session-close', 'status': 'armed', 'session_id': entry['session_id'],
             'checkout': 'remove-after-verified-exit' if remove_worktree else 'retain'}
@@ -123,6 +136,45 @@ def blocked(reason):
     return {'decision': 'block', 'reason': 'SESSION CLOSE: ' + reason}
 
 
+def complete():
+    """Explicit foreground operation after the host returns every Stop-gate verdict."""
+    shared = runtime()
+    entry = shared.own_host_and_entry()
+    session = entry['session_id']
+    ticket = read_ticket(session)
+    if not ticket or ticket.get('status') != 'reported':
+        raise shared.Refusal('no prepared completion report has passed through Stop')
+    armed = ticket.get('armed_at')
+    if (not isinstance(armed, (int, float)) or isinstance(armed, bool)
+            or not math.isfinite(armed) or not 0 <= time.time() - armed <= MAX_AGE
+            or not isinstance(ticket.get('nonce'), str)
+            or re.fullmatch('[0-9a-f]{32}', ticket['nonce']) is None):
+        raise shared.Refusal('reported closure expired or has an invalid identity')
+    if ticket.get('entry') != entry or shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd']):
+        raise shared.Refusal('reported host identity or attachment changed')
+    shared.awaiting_input_activity(entry)
+    claim = ticket_path(session).with_suffix('.' + ticket['nonce'] + '.close-claim')
+    try:
+        descriptor = os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        raise shared.Refusal('this close attempt has already been claimed')
+    os.close(descriptor)
+    if read_ticket(session) != ticket:
+        raise shared.Refusal('reported closure was cancelled or replaced')
+    ticket['status'] = 'closing'
+    save_ticket(session, ticket)
+    try:
+        module = importlib.import_module('finish' if ticket.get('remove_worktree') else 'close')
+        result = module.main([])
+        if result:
+            raise shared.Refusal('verified close helper failed')
+    except Exception as error:
+        ticket.update(status='refused', error=str(error))
+        save_ticket(session, ticket)
+        raise
+    return None
+
+
 def stop(data, session):
     ticket = read_ticket(session)
     prompt, answer = turn_messages(data)
@@ -137,6 +189,9 @@ def stop(data, session):
                            'If work remains or the user requested keep-open, explain that actual state instead.')
         return None
     if ticket.get('status') != 'armed':
+        if ticket.get('status') == 'reported':
+            return {'systemMessage': 'SESSION CLOSE: the report is delivered. Resolve every other Stop-gate blocker, '
+                    'then run machine:close complete --stop-gates-accepted. The Stop hook never terminates the host.'}
         if ticket.get('status') == 'closing':
             return {'systemMessage': 'SESSION CLOSE: the prepared attempt is in progress; do not start a second close or claim verified exit.'}
         return {'systemMessage': 'SESSION CLOSE: closure was not verified: ' + str(ticket.get('error', 'unknown refusal'))}
@@ -170,13 +225,24 @@ def stop(data, session):
         os.close(descriptor)
         if read_ticket(session) != ticket:
             raise shared.Refusal('prepared closure was cancelled or replaced')
-        ticket['status'] = 'closing'
+        store = shared.register_session._load_session_store()
+        if store is None:
+            raise shared.Refusal('session turn store is unavailable')
+        connection = store.connect()
+        try:
+            handle = store.session_handle(entry['host'], entry['session_id'])
+            unchanged = store.record_prepared_stop(connection, handle, ticket['activity'], ticket['turn_state'])
+        finally:
+            connection.close()
+        if not unchanged:
+            raise shared.Refusal('prepared turn activity changed; preserve the active dialogue')
+        ticket['status'] = 'reported'
         save_ticket(session, ticket)
-        # The Stop hook runs after the session-store Stop hook; close.py still rechecks activity.
-        module = importlib.import_module('finish' if ticket.get('remove_worktree') else 'close')
-        result = module.main([])
-        if result:
-            raise shared.Refusal('verified close helper failed')
+        # Do not signal a process inside a Stop hook: other plugins may still return block.
+        return blocked('The completion report is delivered. Inspect every Stop-gate verdict and resolve '
+                       'all other blockers before invoking machine:close with '
+                       '`close_session.py complete --stop-gates-accepted`. '
+                       'No host was closed by this hook. No new user answer is needed for this operation.')
     except Exception as error:
         ticket.update(status='refused', error=str(error))
         save_ticket(session, ticket)
@@ -203,10 +269,15 @@ def main(argv=None):
     commands = parser.add_subparsers(dest='command', required=True)
     prepare = commands.add_parser('arm')
     prepare.add_argument('--remove-worktree', action='store_true')
+    finish = commands.add_parser('complete')
+    finish.add_argument('--stop-gates-accepted', action='store_true', required=True,
+                        help='confirm every other Stop gate accepted completion before closing')
     commands.add_parser('hook')
     arguments = parser.parse_args(argv)
     if arguments.command == 'arm':
         output = arm(arguments.remove_worktree)
+    elif arguments.command == 'complete':
+        output = complete()
     else:
         data = json.load(sys.stdin)
         output = hook(data) if isinstance(data, dict) else None
