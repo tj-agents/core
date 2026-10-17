@@ -28,6 +28,7 @@ class CloseOperationTests(unittest.TestCase):
         self.shared = mock.Mock()
         self.shared.Refusal = RuntimeError
         self.shared.own_host_and_entry.return_value = self.entry
+        self.shared.entries.return_value = [('own.json', self.entry)]
         self.shared.path_key.side_effect = lambda value: str(Path(value).resolve())
         self.store = self.shared.register_session._load_session_store.return_value
         self.store.get_session.return_value = {'ended_at': None, 'turn_state': 'working', 'last_activity_at': 100}
@@ -202,8 +203,23 @@ class CloseOperationTests(unittest.TestCase):
             close.main(['complete'])
         runtime.assert_not_called()
 
+    def test_multiplexed_host_cannot_arm_or_close_another_conversation(self):
+        self.shared.entries.return_value.append(('peer.json', {**self.entry, 'session_id': 'peer'}))
+        with mock.patch.object(close, 'runtime', return_value=self.shared), self.assertRaisesRegex(RuntimeError, 'shared by multiple'):
+            close.arm()
+        self.assertIsNone(close.read_ticket('own'))
+
     def test_runtime_resolves_from_source_and_both_packaged_entries(self):
         self.assertTrue((close.peer_scripts() / 'close.py').is_file())
+        for directory in ('skills', 'codex-skills'):
+            entry = ROOT / 'plugins/machine' / directory / 'close/scripts/close_session.py'
+            with mock.patch.object(close, '__file__', str(entry)):
+                self.assertEqual(entry.parents[2] / 'peer-cli/scripts', close.peer_scripts())
+
+    def test_missing_packaged_dependency_cannot_fall_back_to_the_author_checkout(self):
+        missing = ROOT / 'plugins/missing-package/codex-skills/close/scripts/close_session.py'
+        with mock.patch.object(close, '__file__', str(missing)), self.assertRaisesRegex(RuntimeError, 'shipped peer-cli runtime'):
+            close.peer_scripts()
 
 
 if __name__ == '__main__':
