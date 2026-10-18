@@ -42,8 +42,6 @@ routine commands and phase labels do not require another read or lane rationale.
 for clerical work and delegate useful batches under that contract. Reconsider the
 selection when the work's judgment or capability requirements change. The lane contract owns execution
 and capability fallback, including when the engineering runtime is unavailable.
-On Claude, hand multi-phase work and any delegated design, implementation, or review phase to Codex before
-delegating. An explicit user choice of Claude may keep non-frontier work local; otherwise do not fall back.
 
 ## Repository routine-decision delegation
 
