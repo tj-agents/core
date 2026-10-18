@@ -201,7 +201,7 @@
           "exe:powershell"
         ]
       },
-      "digest": "sha256:b8dac21646fa5284f6e7f99e863861f40a73f054e765894befe35113710cd2da",
+      "digest": "sha256:afa89b78733bbd52251a37332981a123c6a543dde0438b0987d9572f5924294f",
       "harness": {
         "marketplaces": [
           {
@@ -589,7 +589,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:7627b3cea90786edfeb83119930deed776dc9e7234ea720085825e00d0305111",
+      "digest": "sha256:3a1bbc3f1e44074360bce09178d67c9e04e853234babbfd5efbacfb27da98ad0",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
