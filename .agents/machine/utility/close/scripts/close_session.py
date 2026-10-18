@@ -209,12 +209,6 @@ def stop(data, session):
         return {'systemMessage': 'SESSION CLOSE: closure was not verified: ' + str(ticket.get('error', 'unknown refusal'))}
     if not answer:
         return None
-    armed = ticket.get('armed_at')
-    if (not isinstance(armed, (int, float)) or isinstance(armed, bool)
-            or not math.isfinite(armed) or not 0 <= time.time() - armed <= MAX_AGE):
-        ticket.update(status='refused', error='prepared closure expired')
-        save_ticket(session, ticket)
-        return blocked('Prepared closure expired. Reload machine:close; no host was closed.')
     shared = runtime()
     try:
         nonce = ticket.get('nonce')
@@ -226,6 +220,10 @@ def stop(data, session):
         except FileExistsError:
             return None
         os.close(descriptor)
+        armed = ticket.get('armed_at')
+        if (not isinstance(armed, (int, float)) or isinstance(armed, bool)
+                or not math.isfinite(armed) or not 0 <= time.time() - armed <= MAX_AGE):
+            raise shared.Refusal('prepared closure expired')
         entry = verified_entry(shared)
         expected = ticket.get('entry')
         if not isinstance(expected, dict) or any(entry.get(key) != expected.get(key)
