@@ -1,4 +1,5 @@
 import importlib.util
+import itertools
 import json
 import os
 from pathlib import Path
@@ -201,8 +202,8 @@ class CloseOperationTests(unittest.TestCase):
         helper.main.assert_called_once_with([])
 
     def test_overlapping_stop_callbacks_cannot_overwrite_the_reported_ticket(self):
-        for host in ('codex', 'claude'):
-            with self.subTest(host=host):
+        for host, expired in itertools.product(('codex', 'claude'), (False, True)):
+            with self.subTest(host=host, expired=expired):
                 self.entry['host'] = host
                 self.prepare()
                 data = self.transcript_with('Done.', host)
@@ -212,6 +213,7 @@ class CloseOperationTests(unittest.TestCase):
                 reported = threading.Event()
                 local = threading.local()
                 real_read, real_save = close.read_ticket, close.save_ticket
+                armed_at = real_read('own')['armed_at']
 
                 def read(session):
                     ticket = real_read(session)
@@ -228,6 +230,10 @@ class CloseOperationTests(unittest.TestCase):
                         raise RuntimeError('first callback did not report')
                     return self.entry
 
+                def now():
+                    late = expired and getattr(local, 'role', None) == 'second'
+                    return armed_at + (close.MAX_AGE + 1 if late else 1)
+
                 def save(session, ticket):
                     real_save(session, ticket)
                     if ticket.get('status') == 'reported':
@@ -240,6 +246,7 @@ class CloseOperationTests(unittest.TestCase):
                 with mock.patch.object(close, 'runtime', return_value=self.shared), \
                         mock.patch.object(close, 'read_ticket', side_effect=read), \
                         mock.patch.object(close, 'save_ticket', side_effect=save), \
+                        mock.patch.object(close.time, 'time', side_effect=now), \
                         mock.patch.object(self.shared, 'own_host_and_entry', side_effect=entry), \
                         ThreadPoolExecutor(max_workers=2) as pool:
                     first = pool.submit(run, 'first')
