@@ -103,8 +103,7 @@ never let it evaporate.
 
 Every added or updated authored skill, standard, or always-loaded instruction contains a concrete fenced
 example in its body. The example shows the rule's actual decision, instead of giving a reader a label that
-can mean several things. Use code, commands, configuration, or an input/output trace; when a rule defines
-collaborators, make their ownership and call site visible.
+can mean several things.
 
 Use code for code patterns; use executable commands or configuration for procedures; and use concrete
 input/output for non-code guidance. When introducing collaborators, show construction and a meaningful call
@@ -122,7 +121,7 @@ demonstrates the rule that changed; the mechanical check only establishes that c
 a nonempty, non-placeholder fenced demonstration. Run it over committed guidance changes:
 
 ```bash
-python -B .agents/engineering/convention/docs/scripts/check_examples.py --root . --base origin/main
+python -B "<skill-directory>/scripts/check_examples.py" --root <repository-root> --base origin/main
 ```
 
 For an uncommitted, explicitly selected file, use `--path` instead of `--base`. The checker ignores generated

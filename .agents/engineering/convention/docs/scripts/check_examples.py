@@ -12,7 +12,7 @@ import sys
 from typing import Iterable
 
 
-ROOT_STANDARDS = {"SOURCE_LAYOUT.md", "SKILL_KINDS.md", "PACKAGING.md"}
+ROOT_STANDARDS = {"SOURCE_LAYOUT.md", "SKILL_KINDS.md", "PACKAGING.md", "CODE_CONVENTIONS.md"}
 EXCLUDED_ROOTS = {
     ".claude", ".codex", ".delivery", "logs", "log", "plans", "plugins", "records", "reviews",
     "template", "templates",
@@ -58,12 +58,12 @@ def normalized_path(raw: str) -> PurePosixPath:
 
 def is_excluded(path: PurePosixPath) -> bool:
     parts = tuple(part.lower() for part in path.parts)
-    if parts[0] in EXCLUDED_ROOTS or "fixtures" in parts:
+    if parts[0] in EXCLUDED_ROOTS or parts[0] == "fixtures":
         return True
     return (
         len(parts) >= 6
         and parts[0] == ".agents"
-        and any(part in {"resources", "templates"} for part in parts[4:-1])
+        and any(part in {"fixtures", "resources", "templates"} for part in parts[4:-1])
     )
 
 
