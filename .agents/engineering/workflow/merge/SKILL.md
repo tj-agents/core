@@ -27,9 +27,11 @@ procedure that goes stale in the repo that renames one.
 - **A green PR is not proof the required end-to-end suites passed.** Suites gated on `merge_group` report
   **`skipping`** on the PR itself — expected, not a failure. They run *after* you enqueue, inside the merge
   group. Only the queue proves them.
-- **`--auto` enqueues; it does not merge.** It returns immediately and the merge lands later, so observe the
-  outcome through persistent-workflow when it must outlive this turn, or the foreground listener procedure below; never assume it landed. A full end-to-end merge
-  is tens of minutes, and waiting for it must not keep the model running.
+- **Resolve the repository's merge configuration before using `--auto`.** With a merge queue it enqueues;
+  without a queue or required branch checks it can merge immediately. Before every merge invocation,
+  including `--auto`, require the exact PR head's own checks to be terminal and green under step 3.
+  The flag is not a check-waiting gate. Observe the actual queued or merged outcome through
+  persistent-workflow or the foreground listener; waiting must not keep the model running.
 - **`--admin` is an escape hatch, not the default.** It force-merges immediately and **bypasses the queue,
   which means the required suites do not run at all.** Use it only when the user explicitly asks to skip the
   queue — a meta-only diff with zero runtime impact (`engineering:merge-docs` is that case as its own
