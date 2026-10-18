@@ -573,6 +573,7 @@
         "peer-cli",
         "plugin-selection",
         "recover-agents",
+        "refresh-cli",
         "search",
         "search-claude",
         "search-codex"
@@ -695,6 +696,14 @@
             "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
             "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/agent_recovery.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py:*)",
+            "Bash(python -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
+            "PowerShell(python -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
+            "Bash(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
+            "PowerShell(python3 -B ${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py:*)",
             "Bash(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
             "PowerShell(python -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
             "Bash(python3 -B ${PLUGIN_ROOT}/.agents/machine/scripts/work_item_sessions.py:*)",
@@ -1197,6 +1206,44 @@
                   "${PLUGIN_ROOT}/other.py",
                   "complete",
                   "--stop-gates-accepted"
+                ]
+              ]
+            },
+            {
+              "pattern": [
+                [
+                  "python",
+                  "python3"
+                ],
+                "-B",
+                [
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py"
+                ]
+              ],
+              "justification": "machine:refresh-cli refreshes the user's own tj-agents plugins from their registered marketplaces through the verified rolling refresh and repairs the host plugin registry.",
+              "match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/refresh_cli.py",
+                  "--project",
+                  "C:/repo"
+                ],
+                [
+                  "python3",
+                  "-B",
+                  "${PLUGIN_ROOT}/.agents/machine/scripts/refresh_cli.py",
+                  "--verify-only"
+                ]
+              ],
+              "not_match": [
+                [
+                  "python",
+                  "-B",
+                  "${PLUGIN_ROOT}/resources/machine/scripts/other.py",
+                  "--project",
+                  "C:/repo"
                 ]
               ]
             }
