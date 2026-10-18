@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from problem_records import RecordError, declaration, read_record
+from problem_records import RecordError, declaration, primary_checkout, read_record
 
 
 class ProblemRecordTests(unittest.TestCase):
@@ -84,6 +84,32 @@ class ProblemRecordTests(unittest.TestCase):
                 read_record(self.root, self.reference, "codex")
             with patch("problem_records.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "private details")), self.assertRaisesRegex(RecordError, "could not read"):
                 read_record(self.root, self.reference, "codex")
+
+
+class PrimaryCheckoutTests(unittest.TestCase):
+    def test_primary_selection_wins_from_feature_and_nested_directory(self):
+        with tempfile.TemporaryDirectory(prefix="selected tracker ") as raw:
+            root = Path(raw).resolve() / "source é"
+            feature = Path(raw).resolve() / "feature é"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "feature", str(feature)], check=True)
+            nested = feature / "nested"
+            nested.mkdir()
+            selected = {"schema_version": 1, "provider": "fixture:manage"}
+            (root / ".problem-records.json").write_text(json.dumps(selected), encoding="utf-8")
+            (feature / ".problem-records.json").write_text("invalid override", encoding="utf-8")
+            for directory in (root, feature, nested):
+                with self.subTest(directory=directory):
+                    self.assertEqual(root, primary_checkout(directory))
+                    self.assertEqual(selected, declaration(primary_checkout(directory)))
+
+    def test_non_repository_and_unavailable_git_fail_visibly(self):
+        with tempfile.TemporaryDirectory() as directory, self.assertRaises(RecordError):
+            primary_checkout(directory)
+        with patch("problem_records.subprocess.run", side_effect=OSError("unavailable")), self.assertRaises(RecordError):
+            primary_checkout(".")
 
 
 if __name__ == "__main__":

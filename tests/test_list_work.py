@@ -1,5 +1,6 @@
 """Drive the list-work script exactly as shipped, under a synthetic HOME."""
 
+import json
 import os
 from pathlib import Path
 import re
@@ -444,6 +445,8 @@ class WorkItemStatusTests(ListWorkHarness):
             script.parent.mkdir(parents=True)
             shutil.copy2(SCRIPT, script)
             shutil.copytree(ROOT / '.agents/workflows', package / 'workflows')
+            (package / 'hooks').mkdir()
+            shutil.copy2(ROOT / '.agents/hooks/problem_records.py', package / 'hooks/problem_records.py')
             shutil.copy2(
                 ROOT / '.agents/machine/scripts/repository_identity.py',
                 package / 'workflows/repository_identity.py',
@@ -460,6 +463,24 @@ class WorkItemStatusTests(ListWorkHarness):
         result = self.capability_result(script)
         self.assertEqual(2, result.returncode)
         self.assertIn('list-work capability failure', result.stderr)
+
+    def test_selected_queue_is_never_reported_as_file_plans(self):
+        self.repo_plan('plans/STALE_BACKLOG.md')
+        (self.here / '.problem-records.json').write_text(
+            json.dumps({'schema_version': 1, 'provider': 'fixture:manage'}), encoding='utf-8')
+        result = self.capability_result(SCRIPT)
+        self.assertEqual(2, result.returncode)
+        self.assertIn('fixture:manage', result.stderr)
+        self.assertIn('list/read', result.stderr)
+        self.assertNotIn('STALE_BACKLOG', result.stdout)
+
+    def test_invalid_selection_never_falls_back_to_plans(self):
+        self.repo_plan('plans/STALE_BACKLOG.md')
+        (self.here / '.problem-records.json').write_text('{', encoding='utf-8')
+        result = self.capability_result(SCRIPT)
+        self.assertEqual(2, result.returncode)
+        self.assertIn('record selection failed', result.stderr)
+        self.assertEqual('', result.stdout)
 
     def test_unsupported_script_anchor_is_a_capability_failure(self):
         script = self.home / 'unknown/list-work.py'
