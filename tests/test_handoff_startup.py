@@ -28,7 +28,7 @@ class HandoffStartupTests(unittest.TestCase):
         self.prompt = self.directory / 'prompt.txt'
         self.prompt.write_text('Continue the authorized source task.', encoding='utf-8')
 
-    def run_launch(self, host, status):
+    def run_launch(self, host, status, terminal_timeout=False):
         launcher = load(f'handoff_startup_{host}', ROOT / f'.agents/machine/utility/handoff-{host}/scripts/launch_{host}.py')
         cli = load(f'handoff_cli_{host}', ROOT / '.agents/machine/scripts/agent_cli.py')
         cli.resolve_codex_executable = mock.Mock(return_value=launcher_test_support.CODEX_EXECUTABLE)
@@ -44,6 +44,8 @@ class HandoffStartupTests(unittest.TestCase):
             self.assertIn('--require-session-start', arguments)
             if status is not None:
                 receipt.write_text(json.dumps(status), encoding='utf-8')
+            if terminal_timeout:
+                raise cli.LaunchTimeout('terminal submission timed out')
 
         cli.launch_tab.side_effect = terminal
         cli.handoff_status_path = lambda: receipt
@@ -114,3 +116,19 @@ class HandoffStartupTests(unittest.TestCase):
             spec.return_value.loader.exec_module = lambda module: None
             with self.assertRaises(cli.LaunchTimeout):
                 cli.await_handoff_startup(receipt, timeout=0, wrapper_timeout=0)
+
+    def test_clean_exit_retains_verified_session_start_without_polling_race(self):
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                result, output, error, _ = self.run_launch(host, {'state': 'exited', 'returncode': 0, 'running_at': 100})
+                self.assertEqual((0, ''), (result, error))
+                self.assertIn('agent-handoff-submitted', output)
+
+    def test_terminal_submission_timeout_keeps_exact_attempt_receipt(self):
+        for host in ('codex', 'claude'):
+            with self.subTest(host=host):
+                result, output, error, receipt = self.run_launch(host, {'state': 'preparing'}, terminal_timeout=True)
+                self.assertEqual(3, result)
+                self.assertIn(str(receipt), error)
+                self.assertTrue(receipt.is_file())
+                self.assertNotIn('agent-handoff-submitted', output)

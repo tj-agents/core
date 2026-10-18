@@ -27,9 +27,19 @@ and verify real pickup separately. The migration task and its docs plan are outs
 ## Progress
 
 - Isolated source checkout created from fetched main; task claimed by this foreground session.
-- Implementation in progress. Tests, review, delivery and original handoff recovery remain pending.
+- Initial focused Windows suites passed: handoff startup6, Codex39, Claude41, startup binding17,
+  shared agent CLI84 and open Claude27. Native review found two bounded polling/receipt defects;
+  both are being corrected with regressions. Independent workflow lens unavailable (unsupported
+  reviewer model); its same bounded check returns to this parent under the documented fallback.
+- Native acceptance: corrected source launcher verified SessionStart on the single retry attempt
+  Temp/tj-agents-handoff-3pd8lh3y/status.json. Preparation began1792328535.86 and native acknowledgement
+  completed1792328715.33, approximately179.5 seconds. Startup slowness remains the existing B016 concern.
+- Actual successor codex:01a14f1d-abd0-74e0-9b75-b814a208ea87 claimed work-items/record-writers as active
+  owner and began source-skill discovery. The second handoff is picked up; no further retry is needed.
+- Review preparation took several minutes while materializing/verifying its bundle; preserve as
+  evidence for the existing validation-efficiency investigation, not a second repair workstream.
 
 ## Next Steps
 
-Complete regression coverage, validate and independently review the immutable candidate, deliver through
-normal source gates, then recover the pending source-skill task with verified startup and actual pickup.
+Finish the two review corrections, validate and review their delta, then deliver through normal source
+gates. Preserve the now-active source-skill successor and the separate migration owner.
