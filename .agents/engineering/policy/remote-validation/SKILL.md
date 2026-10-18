@@ -110,11 +110,12 @@ read one already-bound monitor session and notify only for nonempty output or a 
 still-running read does not wake the model.
 
 When a host documents `functions.exec`, start its documented background cell only after binding the monitor
-session. Inside that cell, use the documented `tools.write_stdin` and `notify` globals directly. This body
-reuses `boundMonitorSessionId`; it does not start a second monitor or invent a durable continuation API:
+session. Replace `12345` with the `session_id` returned for that existing bound monitor; cells do not share
+local variables. Inside the cell, use the documented `tools.write_stdin` and `notify` globals directly. This
+body does not start a second monitor or invent a durable continuation API:
 
 ```js
-const sessionId = boundMonitorSessionId; // Bound before this background cell starts.
+const sessionId = 12345; // Existing bound monitor session_id.
 for (;;) {
   const update = await tools.write_stdin({session_id: sessionId, chars: "", yield_time_ms: 30_000});
   const terminal = update.exit_code !== undefined;
