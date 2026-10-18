@@ -459,6 +459,25 @@ class HookLifecycleTests(unittest.TestCase):
         self.assertIsNotNone(row["ended_at"])
         self.assertEqual("closed", row["end_reason"])
 
+    def test_stop_moves_the_registered_cwd_to_where_the_session_now_runs(self):
+        registry = self.state / "cli-sessions"
+        registry.mkdir(parents=True)
+        entry = {"session_id": "moved-id", "host": "claude", "cwd": str(self.root), "pid": 7,
+                 "pid_started_at": 1.5, "terminal": {"kind": "windows-terminal", "session": "tab"}}
+        (registry / "moved-id.json").write_text(json.dumps(entry), encoding="utf-8")
+        foreign = dict(entry, session_id="other-id", host="codex")
+        (registry / "other-id.json").write_text(json.dumps(foreign), encoding="utf-8")
+        payload = {"session_id": "moved-id", "cwd": str(self.repo)}
+        self._invoke("session-start", "claude", payload)
+        self.assertEqual(0, self._invoke("stop", "claude", payload))
+        self.assertEqual(dict(entry, cwd=str(self.repo)),
+                         json.loads((registry / "moved-id.json").read_text(encoding="utf-8")))
+        self.assertEqual(str(self.repo), self._row("claude:moved-id")["cwd"])
+        self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "other-id", "cwd": str(self.repo)}))
+        self.assertEqual(foreign, json.loads((registry / "other-id.json").read_text(encoding="utf-8")))
+        self.assertEqual(0, self._invoke("stop", "claude", {"session_id": "unregistered", "cwd": str(self.repo)}))
+        self.assertFalse((registry / "unregistered.json").exists())
+
     def test_resume_start_clears_ended_at_and_end_reason(self):
         payload = {"session_id": "exact-id", "cwd": str(self.repo)}
         handle = "codex:exact-id"
