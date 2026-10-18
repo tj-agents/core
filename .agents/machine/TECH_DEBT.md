@@ -133,14 +133,16 @@ proving a `text/plain` read-back succeeds right after a default-mode copy.
 
 ## Rolling plugin preflight still needs real-host acceptance
 
-The supported terminal, handoff and recovery launchers now use a bounded preflight that refreshes and
-verifies the selected tj-agents package closure from publisher `main` and blocks launch on any fetch,
-install, trust, verification or deadline failure. The previous fail-open behavior is superseded: an
-installed fallback must never start after a failed refresh.
+The handoff and recovery launchers use a bounded preflight that refreshes and verifies the selected
+tj-agents package closure from publisher `main` and blocks launch on any fetch, install, trust,
+verification or deadline failure; an installed fallback must never start after a failed refresh there.
+A typed `codex`/`claude` command instead falls back to the native CLI with a warning when that same
+preflight fails, so a standards outage never blocks the user's own command.
 
 This source contract still needs integrated real-host acceptance on Claude and Codex, including proof
-that the process deadline terminates the full updater tree and that startup remains blocked after each
-failure class. Do not treat source tests or native disposable-profile experiments as that acceptance.
+that the process deadline terminates the full updater tree and that handoff/recovery startup remains
+blocked after each failure class. Do not treat source tests or native disposable-profile experiments as
+that acceptance.
 
 ## A shared parent shell can keep the worktree locked after finish
 
