@@ -265,12 +265,14 @@ class WorkflowWiringTests(unittest.TestCase):
         job = jobs["guidance-examples"]
         self.assertIn("fetch-depth: 0", job)
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", job)
+        self.assertIn("repository: tj-agents/template", job)
+        self.assertIn("path: .template", job)
         self.assertIn("github.event.pull_request.base.sha", job)
         self.assertIn("github.event.pull_request.head.sha }}\"", job)
         self.assertIn("github.event.before", job)
         self.assertIn("github.sha }}\"", job)
         self.assertIn("github.ref == 'refs/heads/main'", job)
-        self.assertEqual(2, job.count("check_examples.py --root . --base"))
+        self.assertEqual(2, job.count(".template/.agents/template/utility/check/scripts/check_examples.py --root . --base"))
 
 
 if __name__ == "__main__":

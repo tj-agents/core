@@ -112,16 +112,17 @@ site.
 ```text
 Input: a changed collaborator-naming rule in a SKILL.md
 Owner: engineering:docs requires the changed guidance body to demonstrate the rule
-Call site: check_examples.py --path .agents/example/convention/query/SKILL.md
+Call site: template:check validates the changed guidance body
 Output: the guidance shows the interface name and its caller before the check passes
 ```
 
 One relevant existing example can cover an unchanged rule. The author and reviewer decide whether it
 demonstrates the rule that changed; the mechanical check only establishes that changed authored guidance has
-a nonempty, non-placeholder fenced demonstration. Run it over committed guidance changes:
+a nonempty, non-placeholder fenced demonstration. Use `template:check` to validate committed guidance
+changes:
 
 ```bash
-python -B "<skill-directory>/scripts/check_examples.py" --root <repository-root> --base origin/main
+python -B "<template:check skill-directory>/scripts/check_examples.py" --root <repository-root> --base origin/main
 ```
 
 For an uncommitted, explicitly selected file, use `--path` instead of `--base`. The checker ignores generated
