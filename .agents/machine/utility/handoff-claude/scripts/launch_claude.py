@@ -126,6 +126,7 @@ def build_arguments(args, model, effort, prompt_sentence):
 def main(argv=None):
     agent_cli = _load_agent_cli()
     agent_cli.make_stdio_encoding_lossy()
+    status_path = None
     try:
         args = parse_args(argv, agent_cli)
 
@@ -150,6 +151,8 @@ def main(argv=None):
         print(json.dumps({"event": "agent-handoff-submitted", "worktree": str(working_directory), "prompt_path": str(prompt_path), "startup": "verified", "status_path": str(status_path)}))
         return 0
     except agent_cli.LaunchError as exc:
+        if status_path is not None and isinstance(exc, agent_cli.LaunchTimeout):
+            print(f"Handoff startup receipt: {status_path}", file=sys.stderr)
         return agent_cli.report_launch_failure(exc)
 
 
