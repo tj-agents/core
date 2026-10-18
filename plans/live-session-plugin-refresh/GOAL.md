@@ -85,3 +85,45 @@ A source-only claim of live adoption is insufficient.
 - 2026-10-18 pickup: claude:a727fe94-883c-4713-b4f9-13351c5374aa claimed
   lifecycle/live-session-plugin-refresh as owner/active at baseline 1518a351 (origin/main dc1f7415, no
   newer main commits). Next action: step 2 causal trace.
+
+## Causal trace (2026-10-19, source dc1f7415 + local disk, read-only)
+
+- Binding is launch-only on both hosts. Codex: `startup_binding.run_session` → `rolling_plugins._prepare`
+  (depth-1 fetch of main) → `codex_runtime_binding.prepare_runtime` creates session-owned
+  `cache/tj-run-<nonce>-<marketplace>/<plugin>/local` aliases and `runtime-receipt.json`; hooks then run
+  through `codex_hook_snapshot.py`, which copies the alias root keyed by `sha256(root, package digest)`.
+  The alias content never changes during the process, so the session is frozen at generation A.
+  Claude: hooks are `${CLAUDE_PLUGIN_ROOT}`-relative and the root is the registry `installPath`
+  (`cache/tj-agents/<plugin>/<revision>`) resolved once at process start; `/clear` keeps it.
+- No mid-session generation check exists. Claude has one only at SessionStart
+  (`prune_plugin_cache.superseded_session`/`run_notice`); Codex has none; the UserPromptSubmit chains
+  carry no version logic. Refresh (`refresh_cli`, terminal launchers) updates only the next process.
+- Observed d0aff: every core alias root marker says 669d90ef; the newest locally verified Core main is
+  476e31ce (Codex native `tj-agents/machine` marker) and dc1f7415 (Claude registry). Nothing compared them.
+- Duplicate base-agents/tj-agents aliases: config enables `*@base-agents`, while dotnet/react
+  `harness.json` dependencies name `*@tj-agents`; `resolve` dedupes by identity string only, so both
+  identities resolve. One `resolve` pass fetches each source once (`catalog_cache`), so both aliases bind
+  the same revision and digest (snapshots 6dda1edd/a7a8fcb3 share digest 183fd63a). Expected under the
+  current selection; it doubles hook execution (cf. B019) but did not cause generation disagreement.
+- Native capability: Claude 2.1.282 ships `/reload-plugins` (binary strings, documentation claim;
+  hook rebinding unverified). Codex has no in-process plugin reload; `codex resume <id>` through the
+  launcher binds a fresh generation. Forced restart from a hook is out of scope.
+
+## Repair design (smallest supported boundary)
+
+1. Rolling owner records each host's verified-and-installed generations: after `materialize_native`
+   succeeds, append `{repository, revision, first_installed_at}` to
+   `<host plugins>/cache/.tj-agents-rolling/generations.json` (bounded history, atomic replace, written
+   under the existing host lock). A failed/offline refresh or integrity failure writes nothing.
+2. New machine `plugin_generation.py` UserPromptSubmit gate for both hosts (local reads only, no
+   network): resolves this session's bound roots (Codex: digest-checked runtime receipt, else
+   `PLUGIN_ROOT`; Claude: SessionStart snapshot of the registry with `CLAUDE_PLUGIN_ROOT` authoritative),
+   compares each repository's bound revision with the newest recorded across both hosts, and emits
+   additionalContext every stale prompt plus a user systemMessage once per new state. It names
+   superseded, mixed (one repository at two revisions, incl. duplicate aliases) and unverifiable
+   bindings; it never states "current" for an unrecorded revision.
+3. Adoption guidance is host-truthful: Claude → `/reload-plugins` (the next prompt's check confirms or
+   still reports A, then restart via `claude --resume <id>`); Codex → resume the conversation in a new
+   launcher-bound process. Task ownership and loaded conversation context are unchanged.
+4. Remove the SessionStart-only superseded notice from `prune_plugin_cache.py` so one owner reports it.
+Avoids startup_binding.py/terminal launchers (open PR291) and PR306 paths.
