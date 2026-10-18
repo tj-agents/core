@@ -57,8 +57,9 @@ class StartupBindingTests(unittest.TestCase):
         states = []
 
         def running(*_args, on_running, **_kwargs):
-            on_running()
+            on_running(4242)
             states.append(json.loads(status.read_text(encoding="utf-8"))["state"])
+            self.assertEqual(4242, json.loads(status.read_text(encoding="utf-8"))["child_pid"])
             return 0
 
         with mock.patch.object(BINDING, "run_session", side_effect=running):
@@ -150,6 +151,8 @@ class StartupBindingTests(unittest.TestCase):
                 events.append("ack")
 
         class Process:
+            pid = 4242
+
             def __init__(self, _command, **kwargs):
                 events.append("start")
                 directory = Path(kwargs["env"][BINDING.ACK_DIRECTORY_ENV])
@@ -169,9 +172,12 @@ class StartupBindingTests(unittest.TestCase):
                 mock.patch.object(BINDING, "command_for_target", return_value=["native"]), \
                 mock.patch.object(BINDING.subprocess, "Popen", Process), \
                 mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
-            self.assertEqual(0, BINDING.run_session("claude", "typed", self.project, ["session"]))
+            reported = []
+            self.assertEqual(0, BINDING.run_session("claude", "typed", self.project, ["session"],
+                                                    on_running=reported.append))
 
         self.assertEqual(["materialize", "start", "ack", "exit"], events)
+        self.assertEqual([4242], reported)
 
     def test_missing_session_start_acknowledgement_preserves_the_failure_when_cleanup_fails(self):
         prepared = self.prepared
@@ -345,6 +351,8 @@ class StartupBindingTests(unittest.TestCase):
         Active.prepared = logical
 
         class Process:
+            pid = 4242
+
             def wait(self):
                 raise KeyboardInterrupt()
 
@@ -372,10 +380,12 @@ class StartupBindingTests(unittest.TestCase):
                 mock.patch.object(BINDING, "command_for_target", return_value=["native"]), \
                 mock.patch.object(BINDING.subprocess, "Popen", side_effect=launch), \
                 mock.patch.dict(os.environ, {"CODEX_HOME": str(self.project / "config"), BINDING.ACK_DIRECTORY_ENV: "old"}, clear=False):
+            reported = []
             with self.assertRaises(KeyboardInterrupt):
-                BINDING.run_session("codex", "typed", self.project, ["session"])
+                BINDING.run_session("codex", "typed", self.project, ["session"], on_running=reported.append)
 
         self.assertEqual(["ack", "start"], events)
+        self.assertEqual([4242], reported)
         runtime.cleanup_runtime.assert_not_called()
 
     def test_codex_spawn_failure_cleans_the_runtime_once(self):

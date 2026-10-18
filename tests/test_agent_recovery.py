@@ -113,6 +113,107 @@ class RecoveryTests(unittest.TestCase):
         with mock.patch.object(RECOVERY, "liveness", return_value="closed"):
             self.assertTrue(RECOVERY._claim("codex", "exact_id", "profile").is_file())
 
+    def test_search_skips_a_session_file_removed_during_the_scan(self):
+        self.write_codex()
+        self.write_codex("vanished_id")
+        history = RECOVERY._load("history")
+        real_session = history.session
+
+        def session(path, host):
+            if "vanished_id" in path.name:
+                raise FileNotFoundError(path)
+            return real_session(path, host)
+
+        with mock.patch.object(history, "session", side_effect=session):
+            results = RECOVERY.search(("codex",), topic="topic", roots={"codex": self.root / "sessions"})
+        self.assertEqual(["exact_id"], [item["id"] for item in results])
+
+    def test_launched_receipt_is_released_once_its_wrapper_process_ends(self):
+        receipt = RECOVERY._claim("codex", "exact_id", "profile")
+        RECOVERY._receipt_state(receipt, "codex", "exact_id", "profile", "launched", {"pid": 41, "started_at": 5.0})
+        wrapper = SimpleNamespace(name="python", started_at=5.0)
+        lookup = mock.Mock(return_value=mock.Mock(side_effect=lambda pid: wrapper if pid == 41 else None))
+        register = SimpleNamespace(build_process_lookup=lookup)
+        real_load = RECOVERY._load
+        with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: register if name == "register_session" else real_load(name)):
+            with self.assertRaisesRegex(ValueError, "confirm-closed"):
+                RECOVERY._claim("codex", "exact_id", "profile", confirm_closed=True)
+            wrapper.started_at = 9.0
+            self.assertEqual("pending", json.loads(RECOVERY._claim("codex", "exact_id", "profile").read_text(encoding="utf-8"))["state"])
+
+    def test_launch_ends_only_when_wrapper_and_native_child_are_both_gone(self):
+        processes = {41: SimpleNamespace(started_at=5.0), 42: SimpleNamespace(started_at=6.0)}
+        receipt = {"wrapper": {"pid": 41, "started_at": 5.0, "child": {"pid": 42, "started_at": 6.0}}}
+        lookup = processes.get
+        self.assertFalse(RECOVERY._launch_ended(receipt, lookup))
+        del processes[41]
+        self.assertFalse(RECOVERY._launch_ended(receipt, lookup))
+        processes[42] = SimpleNamespace(started_at=None)
+        self.assertIsNone(RECOVERY._launch_ended(receipt, lookup))
+        processes[42] = SimpleNamespace(started_at=99.0)
+        self.assertTrue(RECOVERY._launch_ended(receipt, lookup))
+        del processes[42]
+        self.assertTrue(RECOVERY._launch_ended(receipt, lookup))
+
+    def test_ambiguous_receipt_rereads_its_status_for_a_child_started_later(self):
+        status = self.root / "attempt.status.json"
+        status.write_text(json.dumps({"pid": 41, "state": "preparing", "at": 5.5}), encoding="utf-8")
+        processes = {41: SimpleNamespace(started_at=5.0)}
+        receipt = {"wrapper": None, "status_file": str(status)}
+        self.assertFalse(RECOVERY._launch_ended(receipt, processes.get))
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running", "at": 7.0}), encoding="utf-8")
+        processes[42] = SimpleNamespace(started_at=6.0)
+        receipt["wrapper"] = {"pid": 41, "started_at": 5.0}
+        del processes[41]
+        self.assertFalse(RECOVERY._launch_ended(receipt, processes.get))
+        processes[42] = SimpleNamespace(started_at=500.0)
+        processes[41] = SimpleNamespace(started_at=600.0)
+        self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
+        processes[42] = SimpleNamespace(started_at=None)
+        self.assertIsNone(RECOVERY._launch_ended(receipt, processes.get))
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "exited", "at": 8.0}), encoding="utf-8")
+        processes[42] = SimpleNamespace(started_at=6.0)
+        self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
+        status.unlink()
+        self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
+        self.assertIsNone(RECOVERY._launch_ended({"wrapper": None, "status_file": str(status)}, processes.get))
+
+    def test_wrapper_identity_records_the_native_child_and_refuses_unreadable_starts(self):
+        status = self.root / "attempt.status.json"
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running"}), encoding="utf-8")
+        processes = {41: SimpleNamespace(started_at=5.0), 42: SimpleNamespace(started_at=6.0)}
+        self.assertEqual({"pid": 41, "started_at": 5.0, "child": {"pid": 42, "started_at": 6.0}},
+                         RECOVERY._wrapper_identity(status, processes.get))
+        del processes[41]
+        self.assertEqual({"pid": 41, "started_at": None, "child": {"pid": 42, "started_at": 6.0}},
+                         RECOVERY._wrapper_identity(status, processes.get))
+        processes[42] = SimpleNamespace(started_at=None)
+        self.assertIsNone(RECOVERY._wrapper_identity(status, processes.get))
+
+    def test_untracked_receipt_is_released_only_by_confirmation_after_pending_settles(self):
+        receipt = RECOVERY._claim("codex", "exact_id", "profile")
+        with self.assertRaises(ValueError):
+            RECOVERY._claim("codex", "exact_id", "profile", confirm_closed=True)
+        RECOVERY._receipt_state(receipt, "codex", "exact_id", "profile", "launched")
+        with self.assertRaises(ValueError):
+            RECOVERY._claim("codex", "exact_id", "profile")
+        self.assertTrue(RECOVERY._claim("codex", "exact_id", "profile", confirm_closed=True).is_file())
+
+    def test_verified_launch_records_its_wrapper_identity(self):
+        self.write_codex()
+        cli = RECOVERY._load("agent_cli")
+        roots = {"codex": self.root / "sessions"}
+        wrapper = {"pid": 41, "started_at": 5.0}
+        with mock.patch.object(RECOVERY, "liveness", return_value="closed"), \
+                mock.patch.object(RECOVERY, "_wrapper_identity", return_value=wrapper), \
+                mock.patch.object(RECOVERY, "_verify_codex_resume"), \
+                mock.patch.object(cli, "resolve_codex_executable", return_value=("native-codex", {})), \
+                mock.patch.object(cli, "launch_tab"):
+            RECOVERY.open_session("codex", "exact_id", roots=roots, cli=cli)
+        receipt = RECOVERY._receipt("codex", "exact_id", RECOVERY._profile("codex", roots["codex"]))
+        recorded = json.loads(receipt.read_text(encoding="utf-8"))
+        self.assertEqual(("launched", wrapper), (recorded["state"], recorded["wrapper"]))
+
     def test_two_processes_retire_one_completed_receipt_once(self):
         registry = RECOVERY._registry_root() / "race_id.json"
         registry.parent.mkdir(parents=True)
@@ -414,8 +515,9 @@ Observed blocker: no send was attempted."""
                 with self.assertRaises(type(outcome)):
                     RECOVERY.open_session("codex", "exact_id", roots=roots, cli=cli)
                 receipt = RECOVERY._receipt("codex", "exact_id", RECOVERY._profile("codex", roots["codex"]))
-                state = json.loads(receipt.read_text(encoding="utf-8"))["state"] if receipt.exists() else None
-                self.assertEqual(remaining, state)
+                recorded = json.loads(receipt.read_text(encoding="utf-8")) if receipt.exists() else {}
+                self.assertEqual(remaining, recorded.get("state"))
+                self.assertEqual(remaining is not None, bool(recorded.get("status_file")))
                 receipt.unlink(missing_ok=True)
 
     def test_main_exits_one_for_failed_and_three_for_unverified_launches(self):
