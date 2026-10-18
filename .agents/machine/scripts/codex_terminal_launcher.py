@@ -119,8 +119,9 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.hooks:
         return hook_control(parsed.arguments)
     if not bypasses_refresh(parsed.arguments):
-        command = without_daemon_for_interactive(parsed.arguments, parsed.target)
+        command = parsed.arguments
         try:
+            command = without_daemon_for_interactive(parsed.arguments, parsed.target)
             flush_before_cli()
             return run_session("codex", parsed.target, parsed.project, command)
         except Exception as error:

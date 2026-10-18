@@ -283,11 +283,11 @@ class TerminalLaunchersTests(unittest.TestCase):
                        CLAUDE_CODE_PLUGIN_CACHE_DIR=str(root / "missing"))
             result = subprocess.run(["bash", "--noprofile", "--norc", "-c", f"set -eu; . '{profile}'; claude"],
                                     env=env, text=True, capture_output=True, check=False)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("typed:0\n", result.stdout)
-        self.assertEqual("cli\n", calls.read_text(encoding="utf-8"))
-        self.assertIn("registry could not be read", result.stderr)
-        self.assertIn("starting Claude without the standards refresh", result.stderr)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual("typed:0\n", result.stdout)
+            self.assertEqual("cli\n", calls.read_text(encoding="utf-8"))
+            self.assertIn("registry could not be read", result.stderr)
+            self.assertIn("starting Claude without the standards refresh", result.stderr)
 
     def test_bootstrap_warns_for_malformed_registry_shapes(self):
         with tempfile.TemporaryDirectory(prefix="terminal registry ") as directory:

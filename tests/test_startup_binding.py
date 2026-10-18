@@ -207,8 +207,29 @@ class StartupBindingTests(unittest.TestCase):
                 BINDING.StartupBindingError,
                 "did not acknowledge SessionStart.*cleanup also failed: cleanup unavailable",
             ):
-                BINDING.run_session("claude", "typed", self.project, ["session"])
+                BINDING.run_session("claude", "typed", self.project, ["session"], require_session_start=True)
         terminate.assert_called_once_with(process)
+
+    def test_typed_session_without_acknowledgement_keeps_running(self):
+        prepared = self.prepared
+
+        class Active:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *details):
+                return None
+
+            def materialize_native(self, executable):
+                return prepared
+
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.wait.return_value = 7
+        with mock.patch.object(BINDING, "preflight", return_value=Active()),                 mock.patch.object(BINDING, "native_target_for_shim", return_value="native"),                 mock.patch.object(BINDING, "_preflight_arguments", return_value={}),                 mock.patch.object(BINDING, "_converge"),                 mock.patch.object(BINDING, "_remaining", return_value=0),                 mock.patch.object(BINDING, "command_for_target", return_value=["native"]),                 mock.patch.object(BINDING.subprocess, "Popen", return_value=process) as popen,                 mock.patch.object(BINDING, "terminate_process_tree") as terminate,                 mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.project / "config")}, clear=False):
+            self.assertEqual(7, BINDING.run_session("claude", "typed", self.project, ["session"]))
+        popen.assert_called_once()
+        terminate.assert_not_called()
 
     def test_selected_packages_without_session_start_dispatcher_fail_before_native_start(self):
         (self.root / "hooks" / "claude.json").write_text('{"hooks":{"SessionStart":[]}}', encoding="utf-8")
