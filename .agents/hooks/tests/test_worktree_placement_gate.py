@@ -429,6 +429,17 @@ class WorktreePlacementGateTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_untokenizable_commands_without_native_creation_are_left_alone(self):
+        commands = (
+            "python - <<'EOF'\nprint(\"it's a heredoc\")\nEOF",
+            "git stash apply $(git stash list --format='%H %gs' | grep wip | cut -d' ' -f1)",
+            "python -c \"print(c.execute('select * from work_items').fetchall())\"",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                result = self.invoke(command)
+                self.assertEqual(0, result.returncode, result.stderr)
+
     def test_accepts_line_continuations_for_a_valid_creation(self):
         destination = self.repo / ".worktrees" / "feature-test"
         command = (
