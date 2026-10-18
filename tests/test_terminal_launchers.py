@@ -117,7 +117,7 @@ class TerminalLaunchersTests(unittest.TestCase):
             run.assert_called_once_with("claude", ["--help"])
             run.reset_mock()
             self.assertEqual(17, CLAUDE.main(["--project", "/work", "--target", "claude"]))
-            session.assert_called_once_with("claude", "claude", Path("/work"), ["-n", "repo/topic"])
+            session.assert_called_once_with("claude", "claude", Path("/work"), ["-n", "repo/topic"], on_running=mock.ANY)
             run.assert_not_called()
 
     def test_claude_binds_the_typed_shim_in_the_child_session(self):
@@ -126,7 +126,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                     mock.patch.object(CLAUDE, "run_session", return_value=0) as session:
                 target = "C:/npm/claude" + suffix
                 self.assertEqual(0, CLAUDE.main(["--project", "/work", "--target", target, "chat"]))
-                session.assert_called_once_with("claude", target, Path("/work"), ["chat"])
+                session.assert_called_once_with("claude", target, Path("/work"), ["chat"], on_running=mock.ANY)
 
     def test_claude_refresh_failure_falls_back_to_the_typed_cli(self):
         buffer = io.StringIO()
@@ -150,7 +150,7 @@ class TerminalLaunchersTests(unittest.TestCase):
         with mock.patch.object(CODEX, "run_session", return_value=23) as session, \
                 mock.patch.object(CODEX, "without_daemon_for_interactive", side_effect=lambda values, *_: values):
             self.assertEqual(23, CODEX.main(["--project", "/work", "--target", "C:/npm/codex.cmd", *special]))
-            session.assert_called_once_with("codex", "C:/npm/codex.cmd", Path("/work"), special)
+            session.assert_called_once_with("codex", "C:/npm/codex.cmd", Path("/work"), special, on_running=mock.ANY)
 
     def test_codex_maintenance_commands_bypass_refresh_and_session_commands_fall_back(self):
         buffer = io.StringIO()
@@ -177,7 +177,7 @@ class TerminalLaunchersTests(unittest.TestCase):
 
     def test_codex_launcher_binds_session_commands_and_routes_hook_control(self):
         events = []
-        with mock.patch.object(CODEX, "run_session", side_effect=lambda host, target, project, arguments: events.append(("session", arguments)) or 41), \
+        with mock.patch.object(CODEX, "run_session", side_effect=lambda host, target, project, arguments, **_options: events.append(("session", arguments)) or 41), \
                 mock.patch.object(CODEX, "run_target", side_effect=lambda target, arguments: events.append(("cli", arguments)) or 41), \
                 mock.patch.object(CODEX, "hook_control", side_effect=lambda arguments: events.append(("hooks", arguments)) or 42):
             self.assertEqual(41, CODEX.main(["--project", "/work", "--target", "codex", "exec", "--json"]))
@@ -188,6 +188,26 @@ class TerminalLaunchersTests(unittest.TestCase):
             events.clear()
             self.assertEqual(42, CODEX.main(["--project", "/work", "--target", "codex", "--hooks", "status"]))
             self.assertEqual([("hooks", ["status"])], events)
+
+    def test_codex_error_after_the_session_started_does_not_launch_again(self):
+        def started_then_failed(host, target, project, arguments, on_running):
+            on_running(1234)
+            raise CODEX.StartupBindingError("unlock failed")
+
+        with mock.patch.object(CODEX, "run_session", side_effect=started_then_failed),                 mock.patch.object(CODEX, "run_target") as target,                 mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            self.assertEqual(1, CODEX.main(["--project", "/work", "--target", "codex", "resume", "id"]))
+        target.assert_not_called()
+        self.assertIn("session ended with a standards error: unlock failed", stderr.getvalue())
+
+    def test_claude_error_after_the_session_started_does_not_launch_again(self):
+        def started_then_failed(host, target, project, arguments, on_running):
+            on_running()
+            raise CLAUDE.StartupBindingError("unlock failed")
+
+        with mock.patch.object(CLAUDE, "run_session", side_effect=started_then_failed),                 mock.patch.object(CLAUDE, "run_target") as target,                 mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            self.assertEqual(1, CLAUDE.main(["--project", "/work", "--target", "claude", "chat"]))
+        target.assert_not_called()
+        self.assertIn("session ended with a standards error: unlock failed", stderr.getvalue())
 
     def test_hook_control_missing_dependency_fails_closed(self):
         with mock.patch.object(CODEX.Path, "is_file", return_value=False):
