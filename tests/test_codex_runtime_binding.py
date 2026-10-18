@@ -84,6 +84,18 @@ class CodexRuntimeBindingTests(unittest.TestCase):
         marketplace = next(value for value in values if value.startswith("marketplaces="))
         self.assertIn('"metadata" = { "keep" = true }', marketplace)
 
+    def test_unset_marketplace_fields_reported_as_null_are_omitted(self):
+        rendered = RUNTIME.toml_value({
+            "base-agents": {"source_type": "git", "source": "https://github.com/tj-agents/core.git",
+                            "ref": None, "sparse_paths": None, "last_updated": None},
+        })
+        self.assertEqual(
+            rendered,
+            '{ "base-agents" = { "source" = "https://github.com/tj-agents/core.git", "source_type" = "git" } }',
+        )
+        with self.assertRaises(RUNTIME.RuntimeBindingError):
+            RUNTIME.toml_value([None])
+
     def test_disabled_logical_hook_state_is_mapped_to_its_runtime_alias(self):
         states = RUNTIME._disabled_hook_states(
             {
