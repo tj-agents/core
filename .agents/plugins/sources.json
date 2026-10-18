@@ -202,18 +202,8 @@
     },
     {
       "plugin": "engineering",
-      "source": ".agents/hooks/callout_repair_gate.py",
-      "destination": "hooks/callout_repair_gate.py"
-    },
-    {
-      "plugin": "engineering",
       "source": ".agents/hooks/problem_records.py",
       "destination": "hooks/problem_records.py"
-    },
-    {
-      "plugin": "engineering",
-      "source": ".agents/engineering/workflow/handoff/scripts/admission.py",
-      "destination": "hooks/handoff_admission.py"
     },
     {
       "plugin": "engineering",
