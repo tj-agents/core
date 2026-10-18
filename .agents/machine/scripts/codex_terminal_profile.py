@@ -110,7 +110,7 @@ BASH_BLOCK = "\n".join((
     "  local target python",
     "  target=$(type -P codex) || { printf '%s\\n' 'codex executable not found on PATH' >&2; return 127; }",
     "  if python=$(_base_agents_python); then",
-    "    if \"$python\" -I -B -c \"$_base_agents_bootstrap\" --probe codex \"$target\" \"$PWD\"; then",
+    "    if \"$python\" -I -B -c \"$_base_agents_bootstrap\" --probe codex \"$target\" \"$PWD\" \"$@\"; then",
     "      if \"$python\" -I -B -c \"$_base_agents_bootstrap\" codex \"$target\" \"$PWD\" \"$@\"; then return 0; else return $?; fi",
     "    fi",
     "  else printf '%s\\n' 'standards: no usable Python was found; session launch is unavailable' >&2; return 125; fi",
@@ -143,6 +143,17 @@ def ensure(path: Path, block: str = POWERSHELL_BLOCK) -> bool:
     raw = path.read_bytes() if path.is_file() else b""
     encoding = profile_encoding(raw)
     text = raw.decode(encoding)
+    original = text
+    obsolete_start = "# >>> core codex no-daemon >>>"
+    obsolete_end = "# <<< core codex no-daemon <<<"
+    obsolete_starts, obsolete_ends = text.count(obsolete_start), text.count(obsolete_end)
+    if (obsolete_starts != obsolete_ends or obsolete_starts > 1 or
+            (obsolete_starts and text.index(obsolete_end) < text.index(obsolete_start))):
+        raise ValueError(f"malformed superseded launcher block in {path}")
+    if obsolete_starts:
+        before, rest = text.split(obsolete_start, 1)
+        _, after = rest.split(obsolete_end, 1)
+        text = before + after
     starts, ends = text.count(START), text.count(END)
     if starts != ends or starts > 1 or (starts and text.index(END) < text.index(START)):
         raise ValueError(f"malformed launcher block in {path}")
@@ -150,8 +161,11 @@ def ensure(path: Path, block: str = POWERSHELL_BLOCK) -> bool:
         before, rest = text.split(START, 1)
         body, after = rest.split(END, 1)
         if (START + body + END).replace("\r\n", "\n") == block.replace("\r\n", "\n"):
-            return False
-        updated = before + block + after
+            if text == original:
+                return False
+            updated = text
+        else:
+            updated = before + block + after
     else:
         prefix = text.rstrip()
         newline = "\r\n" if "\r\n" in text or path.suffix.casefold() == ".ps1" else "\n"

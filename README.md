@@ -1,7 +1,9 @@
 # core
 
 Shared agent behavior, engineering process, and machine utilities for Codex and Claude.
-The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core); the marketplace ID remains `base-agents`.
+The canonical repository is [`tj-agents/core`](https://github.com/tj-agents/core).
+Select `base@tj-agents`, `engineering@tj-agents` and `machine@tj-agents` from
+[`tj-agents/marketplace`](https://github.com/tj-agents/marketplace).
 The repository publishes a minimal `base` package and optional `engineering` and `machine` packages.
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
@@ -129,9 +131,16 @@ interactive starts, resumes, and forks; Codex's batch and maintenance commands k
 arguments. Reopen a terminal after updating the machine plugin so its profile launcher is current.
 The launcher checks that the installed Codex advertises this option and leaves `--remote` sessions alone;
 older CLIs need an update to receive this Windows workaround.
-For an existing installation that cannot yet refresh the machine plugin, run
-`pwsh shell/install-codex-no-daemon.ps1` to add the workaround to both PowerShell profiles;
-`-VerifyOnly` checks that local installation.
+The machine profile installer removes the superseded standalone no-daemon wrapper when refreshing a
+profile, so the current launcher owns the launch path.
+
+If coordinator discovery fails, Codex plugin maintenance remains available through the normal command
+on Windows and Linux. Install the current coordinator with:
+
+```text
+codex plugin marketplace add https://github.com/tj-agents/marketplace.git
+codex plugin add machine@tj-agents
+```
 
 Claude Code can open a visible Git Bash window for each hook. On Windows, run
 `pwsh shell/install-hidden-bash.ps1` once from this checkout. The installer builds the included

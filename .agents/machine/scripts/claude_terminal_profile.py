@@ -133,7 +133,12 @@ def coordinator(candidates, enabled):
         if previous is None or (rank, identity) > (previous[1], previous[0]):
             unique[root] = (identity, rank)
     if not unique:
-        raise ValueError("no authenticated tj-agents machine coordinator is installed")
+        message = "install machine@tj-agents from tj-agents/marketplace"
+        if kind == "codex":
+            message = ("machine@tj-agents is not installed from tj-agents/marketplace; "
+                       "run `codex plugin marketplace add https://github.com/tj-agents/marketplace.git` "
+                       "then `codex plugin add machine@tj-agents`")
+        raise ValueError(message)
     return sorted(((identity, rank, root) for root, (identity, rank) in unique.items()),
                   key=lambda candidate: (-candidate[1], candidate[0], str(candidate[2])))[0][2]
 
@@ -168,9 +173,9 @@ if kind == "claude":
         if not isinstance(known, dict):
             raise TypeError("marketplace registry")
         candidates = []
-        for identity in ("machine@tj-agents", "machine@base-agents"):
+        for identity in ("machine@tj-agents",):
             marketplace = identity.rsplit("@", 1)[1]
-            expected = "tj-agents/marketplace" if marketplace == "tj-agents" else "tj-agents/core"
+            expected = "tj-agents/marketplace"
             entry = known.get(marketplace)
             source = entry.get("source") if isinstance(entry, dict) else None
             if repository(source) != expected:
@@ -202,6 +207,10 @@ if kind == "claude":
 else:
     home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
     try:
+        if not hooks and rest[:1] == ["plugin"]:
+            if probe:
+                sys.exit(0)
+            sys.exit(subprocess.run([native_codex(typed_target), *rest]).returncode)
         cache = home / "plugins" / "cache"
         native = subprocess.run([native_codex(typed_target), "plugin", "list", "--json"], capture_output=True,
                                 text=True, encoding="utf-8", errors="replace", timeout=15)
@@ -213,7 +222,6 @@ else:
             raise TypeError("native plugin inventory")
         candidates = []
         expected = {
-            "machine@base-agents": "tj-agents/core",
             "machine@tj-agents": "tj-agents/marketplace",
         }
         for item in installed:
