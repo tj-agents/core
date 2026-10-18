@@ -429,6 +429,31 @@ class WorktreePlacementGateTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_untokenizable_commands_without_native_creation_are_left_alone(self):
+        commands = (
+            "python - <<'EOF'\nprint(\"it's a heredoc\")\nEOF",
+            "git stash apply $(git stash list --format='%H %gs' | grep wip | cut -d' ' -f1)",
+            "python -c \"print(c.execute('select * from work_items').fetchall())\"",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                result = self.invoke(command)
+                self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_untokenizable_creation_with_quoted_words_is_still_blocked(self):
+        sibling = self.base / "quoted-sibling"
+        for command in (f"git -c a.b=' ' -C \"{self.repo}\" worktree \"add\" -- \"{sibling}\"",
+                        f"git -c a.b=' ' -C \"{self.repo}\" w\"orktree\" add -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" worktree a\"dd\" -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" w\"orktree\" add -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" worktree \\add -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" w\\orktree add -- \"{sibling}\"",
+                        f"g\\it -C \"{self.repo}\" worktree add -- \"{sibling}\"",
+                        f"git -C \"{self.repo}\" worktree $'add' -- \"{sibling}\""):
+            with self.subTest(command=command):
+                result = self.invoke(command)
+                self.assertNotEqual(0, result.returncode)
+
     def test_accepts_line_continuations_for_a_valid_creation(self):
         destination = self.repo / ".worktrees" / "feature-test"
         command = (
