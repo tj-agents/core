@@ -19,6 +19,7 @@ from typing import Callable, Mapping, Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from codex_marketplace_sync import codex_config_selection
+import launch_status
 from rolling_plugins import OPERATION_TIMEOUT_SECONDS, RollingPluginError, preflight, terminate_process_tree
 from terminal_command import command_for_target, native_target_for_shim
 
@@ -196,7 +197,9 @@ def _preseed_snapshots(roots, snapshot_directory: Path) -> None:
 
 def run_session(host: str, target: str, project: Path, arguments: Sequence[str], *,
                 extra_environment: Mapping[str, str] | None = None,
-                timeout: float = STARTUP_TIMEOUT_SECONDS) -> int:
+                timeout: float = STARTUP_TIMEOUT_SECONDS,
+                on_running: Callable[[], None] | None = None) -> int:
+    running = on_running or (lambda: None)
     project = Path(project).resolve()
     configuration = _configuration_root(host).resolve()
     startup_deadline = time.monotonic() + OPERATION_TIMEOUT_SECONDS
@@ -245,6 +248,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                 command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
                                 cwd=project, env=environment, start_new_session=os.name != "nt",
                             )
+                            running()
                             return process.wait()
                         except OSError as error:
                             raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -262,6 +266,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    running()
                     return subprocess.run(command_for_target(target, arguments), cwd=project, env=environment).returncode
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -275,6 +280,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    running()
                     return subprocess.run(command_for_target(target, launch_arguments), cwd=project,
                                           env=environment).returncode
                 except OSError as error:
@@ -306,6 +312,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     while process.poll() is None and time.monotonic() < deadline:
                         if _acknowledged(directory, token):
                             active.acknowledge_binding()
+                            running()
                             return process.wait()
                         time.sleep(0.05)
                     if process.poll() is not None:
@@ -335,14 +342,39 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--host", choices=("claude", "codex"), required=True)
     parser.add_argument("--project", type=Path, required=True)
     parser.add_argument("--target", required=True)
+    parser.add_argument("--status-file", type=Path)
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     parsed = parser.parse_args(argv)
     arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
+    status: dict[str, object] = {"pid": os.getpid()}
+
+    def report(state: str, **details: object) -> None:
+        status.update(details, state=state, at=time.time())
+        if parsed.status_file is not None:
+            try:
+                launch_status.replace(parsed.status_file, status)
+            except OSError:
+                pass
+
+    if parsed.status_file is not None:
+        try:
+            claimed = launch_status.create(parsed.status_file, {**status, "state": "preparing", "at": time.time()})
+        except OSError as error:
+            print(f"standards: {parsed.host} launch status could not be recorded: {error}", file=sys.stderr)
+            return 1
+        if not claimed:
+            print(f"standards: {parsed.host} launch was abandoned or already claimed before startup", file=sys.stderr)
+            return 1
     try:
-        return run_session(parsed.host, parsed.target, parsed.project, arguments)
+        returncode = run_session(parsed.host, parsed.target, parsed.project, arguments,
+                                 on_running=lambda: report("running", running_at=time.time()))
     except StartupBindingError as error:
-        print(f"standards: {parsed.host} refresh failed: {error}", file=sys.stderr)
+        message = f"standards: {parsed.host} refresh failed: {error}"
+        print(message, file=sys.stderr)
+        report("failed", error=message)
         return 1
+    report("exited", returncode=returncode)
+    return returncode
 
 
 if __name__ == "__main__":

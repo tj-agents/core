@@ -596,7 +596,7 @@
           "python>=3.11"
         ]
       },
-      "digest": "sha256:b6eefd531bf8c3995748c929eb984ab993559a7122256af87a5d21bad8704994",
+      "digest": "sha256:fb74426a37c98b7dd85dbd682596a48f734acef84ab88cae502b228abbc45833",
       "digest_excludes": [
         "catalog/catalog.json"
       ],
