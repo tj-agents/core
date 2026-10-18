@@ -146,6 +146,26 @@ def git(cwd, *args):
 
 @unittest.skipUnless(sys.platform == "linux" or os.name == "nt", "Supported process backends")
 class FinishReaperProcessTests(unittest.TestCase):
+    def test_staged_observer_can_load_the_session_store(self):
+        import importlib.util
+
+        def scheduler(arguments, **kwargs):
+            stdout = '"EXAMPLE\\user","S-1-5-21-123-456-789-1001"\r\n' if arguments[0] == "whoami.exe" else ""
+            return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": temporary}), \
+                mock.patch.object(session_close.subprocess, "run", side_effect=scheduler), \
+                mock.patch.object(session_close.subprocess, "Popen", return_value=SimpleNamespace(pid=1)):
+            session_close.start_observer(["--result", "unused"])
+            staging = next((Path(temporary) / "merge-cleanup" / "observers").iterdir())
+            spec = importlib.util.spec_from_file_location("staged_register_session", staging / "register_session.py")
+            staged = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(staged)
+            store = staged._load_session_store()
+        self.assertIsNotNone(store)
+        self.assertTrue(hasattr(store, "delete_session"))
+
     def test_armed_observer_waits_for_exit_then_removes_worktree_and_obligation(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); bare = root / "origin.git"; primary = root / "primary"; worktree = root / "feature"; state = root / "state"

@@ -547,6 +547,10 @@ def start_observer(arguments):
     staging.mkdir(parents=True, exist_ok=False)
     for name in ("finish_reaper.py", "session_close.py", "register_session.py"):
         shutil.copy2(Path(__file__).with_name(name), staging / name)
+    store = register_session.session_store_path()
+    if store is not None:
+        for name in ("session_store.py", "repository_identity.py"):
+            shutil.copy2(store.with_name(name), staging / name)
     command = [sys.executable, str(staging / "finish_reaper.py"), *arguments]
     kwargs = {"cwd": str(state_directory()), "stdin": subprocess.DEVNULL,
               "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}

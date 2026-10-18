@@ -540,18 +540,29 @@ class WorkItemSessionsTests(unittest.TestCase):
         self.assertEqual("done", item["status"])
         self.assertEqual("https://github.com/tj-agents/core/pull/1", item["pr"])
 
-    def test_done_item_deletes_its_other_sessions_and_keeps_the_caller(self):
-        self._claim_claude()
+    def test_done_item_deletes_ended_sessions_and_keeps_live_ones_and_the_caller(self):
+        live = "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"
+        ended = "b3cde6d5-c07e-4198-a6f4-e8cb8a822986"
         caller = "01a12aa7-5b58-7312-9400-ef710762147f"
+        self._claim_claude(session_id=live)
+        self._claim_claude(session_id=ended, role="bounded: notes")
         self._claim_codex(session_id=caller, role="bounded: review")
+        started = WIS._register_session().build_process_lookup()(os.getpid()).started_at
+        connection = self._connection()
+        try:
+            connection.execute("UPDATE sessions SET pid_started_at = ? WHERE handle = ?", (started, f"claude:{live}"))
+            connection.commit()
+            STORE.end_session(connection, f"claude:{ended}", "closed")
+        finally:
+            connection.close()
         with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": caller, "CLAUDE_CODE_SESSION_ID": ""}):
             WIS.cmd_item("example-feature/example-item", "done", cwd=self.repo)
         connection = self._connection()
         try:
-            remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
+            remaining = sorted(row["handle"] for row in connection.execute("SELECT handle FROM sessions"))
         finally:
             connection.close()
-        self.assertEqual([f"codex:{caller}"], remaining)
+        self.assertEqual(sorted([f"claude:{live}", f"codex:{caller}"]), remaining)
 
     def test_invalid_work_item_grammar_is_rejected(self):
         with self.assertRaises(ValueError):
