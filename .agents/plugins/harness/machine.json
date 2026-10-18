@@ -6,6 +6,7 @@
     ".agents/catalog/plugins.schema.json",
     ".agents/hooks/hook_dispatch.py",
     ".agents/machine",
+    ".agents/machine/utility/plugin-selection/scripts/plugin_roster.json",
     ".agents/machine/scripts/claude_standards_sync.py",
     ".agents/workflows/delivery_policy.py",
     ".agents/workflows/repository_configuration.py"
