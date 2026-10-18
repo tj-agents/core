@@ -10,6 +10,10 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import launch_state
+
+launch_state.ready()
+
 from agent_cli import LaunchError
 from startup_binding import StartupBindingError, run_session
 from terminal_command import command_for_target, flush_before_cli, run_target

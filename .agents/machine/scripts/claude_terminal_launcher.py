@@ -9,6 +9,10 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import launch_state
+
+launch_state.ready()
+
 from startup_binding import StartupBindingError, run_session
 from terminal_command import (
     CLAUDE_NON_SESSION_COMMANDS,

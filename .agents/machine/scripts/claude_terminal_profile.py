@@ -15,7 +15,7 @@ START = "# >>> base-agents claude launcher >>>"
 END = "# <<< base-agents claude launcher <<<"
 OPT_OUT_ENV = "BASE_AGENTS_CLAUDE_PROFILE"
 
-BOOTSTRAP = r'''import base64, json, os, subprocess, sys
+BOOTSTRAP = r'''import base64, json, os, subprocess, sys, tempfile
 from pathlib import Path
 
 payload = sys.argv[1:2] == ["--payload"]
@@ -44,6 +44,11 @@ if hooks:
 def unavailable(message):
     print("standards: " + message + "; session launch is unavailable", file=sys.stderr)
     sys.exit(1 if probe else 125)
+
+class Missing(Exception):
+    def __init__(self, message, identity=None):
+        super().__init__(message)
+        self.identity = identity
 
 def repository(source):
     if isinstance(source, dict):
@@ -134,8 +139,9 @@ def coordinator(candidates, enabled):
             unique[root] = (identity, rank)
     if not unique:
         raise ValueError("no authenticated tj-agents machine coordinator is installed")
-    return sorted(((identity, rank, root) for root, (identity, rank) in unique.items()),
-                  key=lambda candidate: (-candidate[1], candidate[0], str(candidate[2])))[0][2]
+    identity, _rank, root = sorted(((identity, rank, root) for root, (identity, rank) in unique.items()),
+                                   key=lambda candidate: (-candidate[1], candidate[0], str(candidate[2])))[0]
+    return identity, root
 
 def component(value):
     return isinstance(value, str) and value not in ("", ".", "..") and "/" not in value and "\\" not in value
@@ -157,95 +163,146 @@ def native_codex(target):
         raise ValueError("native Codex executable")
     return str(sorted(set(paths))[0])
 
-if kind == "claude":
-    config = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
-    plugins = Path(os.environ.get("CLAUDE_CODE_PLUGIN_CACHE_DIR", config / "plugins"))
+def locate():
+    if kind == "claude":
+        config = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
+        plugins = Path(os.environ.get("CLAUDE_CODE_PLUGIN_CACHE_DIR", config / "plugins"))
+        try:
+            registry = json.loads((plugins / "installed_plugins.json").read_text(encoding="utf-8-sig"))
+            if not isinstance(registry, dict) or not isinstance(registry.get("plugins"), dict):
+                raise TypeError("registry root")
+            known = json.loads((plugins / "known_marketplaces.json").read_text(encoding="utf-8-sig"))
+            if not isinstance(known, dict):
+                raise TypeError("marketplace registry")
+            candidates = []
+            for identity in ("machine@tj-agents", "machine@base-agents"):
+                marketplace = identity.rsplit("@", 1)[1]
+                expected = "tj-agents/marketplace" if marketplace == "tj-agents" else "tj-agents/core"
+                entry = known.get(marketplace)
+                source = entry.get("source") if isinstance(entry, dict) else None
+                if repository(source) != expected:
+                    continue
+                entries = registry["plugins"].get(identity, [])
+                if not isinstance(entries, list):
+                    raise TypeError("plugin entries")
+                for entry in entries:
+                    path = entry.get("installPath") if isinstance(entry, dict) else None
+                    if isinstance(path, str):
+                        candidate = contained(path, plugins)
+                        if candidate is not None and candidate.parent.name == "machine" and (candidate / "catalog" / "catalog.json").is_file():
+                            scope = entry.get("scope")
+                            project_path = entry.get("projectPath")
+                            if scope in ("project", "local"):
+                                if not isinstance(project_path, str) or not inside(project, project_path):
+                                    continue
+                                rank = 2
+                            else:
+                                rank = 1
+                            candidates.append((identity, rank, candidate))
+            identity, root = coordinator(candidates, enabled_identities(config, project))
+        except OSError as error:
+            raise Missing("Claude plugin registry could not be read (" + str(error) + ")")
+        except (ValueError, TypeError, KeyError):
+            raise Missing("Claude plugin registry is malformed")
+    else:
+        home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+        try:
+            cache = home / "plugins" / "cache"
+            native = subprocess.run([native_codex(typed_target), "plugin", "list", "--json"], capture_output=True,
+                                    text=True, encoding="utf-8", errors="replace", timeout=15)
+            if native.returncode != 0:
+                raise ValueError("native plugin inventory")
+            inventory = json.loads(native.stdout)
+            installed = inventory.get("installed") if isinstance(inventory, dict) else None
+            if not isinstance(installed, list):
+                raise TypeError("native plugin inventory")
+            candidates = []
+            expected = {
+                "machine@base-agents": "tj-agents/core",
+                "machine@tj-agents": "tj-agents/marketplace",
+            }
+            for item in installed:
+                if not isinstance(item, dict) or item.get("pluginId") not in expected:
+                    continue
+                marketplace = item.get("marketplaceSource")
+                if not isinstance(marketplace, dict) or marketplace.get("sourceType") != "git":
+                    continue
+                if repository(marketplace.get("source")) != expected[item["pluginId"]]:
+                    continue
+                marketplace_name = item.get("marketplaceName")
+                name = item.get("name")
+                version = item.get("version") or "local"
+                if not all(component(value) for value in (marketplace_name, name, version)):
+                    continue
+                root = contained(cache / marketplace_name / name / version, cache)
+                if root is not None and root.parent.name == "machine" and (root / "catalog" / "catalog.json").is_file():
+                    candidates.append((item["pluginId"], int(item.get("enabled") is True), root))
+            identity, root = coordinator(candidates, {identity for identity, enabled, _root in candidates if enabled})
+        except (OSError, ValueError, TypeError) as error:
+            raise Missing("Codex machine coordinator is unavailable (" + str(error) + ")")
+    script = root / "resources" / "machine" / "scripts" / f"{kind}_terminal_launcher.py"
+    if not script.is_file():
+        raise Missing("the active machine " + kind + " launcher is unavailable", identity)
+    return identity, script
+
+def repair(identity):
+    marketplace = identity.rsplit("@", 1)[1]
     try:
-        registry = json.loads((plugins / "installed_plugins.json").read_text(encoding="utf-8-sig"))
-        if not isinstance(registry, dict) or not isinstance(registry.get("plugins"), dict):
-            raise TypeError("registry root")
-        known = json.loads((plugins / "known_marketplaces.json").read_text(encoding="utf-8-sig"))
-        if not isinstance(known, dict):
-            raise TypeError("marketplace registry")
-        candidates = []
-        for identity in ("machine@tj-agents", "machine@base-agents"):
-            marketplace = identity.rsplit("@", 1)[1]
-            expected = "tj-agents/marketplace" if marketplace == "tj-agents" else "tj-agents/core"
-            entry = known.get(marketplace)
-            source = entry.get("source") if isinstance(entry, dict) else None
-            if repository(source) != expected:
-                continue
-            entries = registry["plugins"].get(identity, [])
-            if not isinstance(entries, list):
-                raise TypeError("plugin entries")
-            for entry in entries:
-                path = entry.get("installPath") if isinstance(entry, dict) else None
-                if isinstance(path, str):
-                    candidate = contained(path, plugins)
-                    if candidate is not None and candidate.parent.name == "machine" and (candidate / "catalog" / "catalog.json").is_file():
-                        scope = entry.get("scope")
-                        project_path = entry.get("projectPath")
-                        if scope in ("project", "local"):
-                            if not isinstance(project_path, str) or not inside(project, project_path):
-                                continue
-                            rank = 2
-                        else:
-                            rank = 1
-                        candidates.append((identity, rank, candidate))
-        root = coordinator(candidates, enabled_identities(config, project))
-    except OSError as error:
-        unavailable("Claude plugin registry could not be read (" + str(error) + ")")
-    except (ValueError, TypeError, KeyError):
-        unavailable("Claude plugin registry is malformed")
-    except StopIteration:
-        unavailable("the active machine Claude package is not installed")
-else:
-    home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+        executable = typed_target if kind == "claude" else native_codex(typed_target)
+    except ValueError:
+        return False
+    if kind == "claude":
+        commands = ([executable, "plugin", "marketplace", "update", marketplace], [executable, "plugin", "update", identity])
+    else:
+        commands = ([executable, "plugin", "marketplace", "upgrade", marketplace], [executable, "plugin", "add", identity])
+    print("standards: reinstalling " + identity + " from its marketplace", file=sys.stderr)
+    for command in commands:
+        try:
+            completed = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL, timeout=180)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        if completed.returncode != 0:
+            return False
+    return True
+
+def resolve():
     try:
-        cache = home / "plugins" / "cache"
-        native = subprocess.run([native_codex(typed_target), "plugin", "list", "--json"], capture_output=True,
-                                text=True, encoding="utf-8", errors="replace", timeout=15)
-        if native.returncode != 0:
-            raise ValueError("native plugin inventory")
-        inventory = json.loads(native.stdout)
-        installed = inventory.get("installed") if isinstance(inventory, dict) else None
-        if not isinstance(installed, list):
-            raise TypeError("native plugin inventory")
-        candidates = []
-        expected = {
-            "machine@base-agents": "tj-agents/core",
-            "machine@tj-agents": "tj-agents/marketplace",
-        }
-        for item in installed:
-            if not isinstance(item, dict) or item.get("pluginId") not in expected:
-                continue
-            marketplace = item.get("marketplaceSource")
-            if not isinstance(marketplace, dict) or marketplace.get("sourceType") != "git":
-                continue
-            if repository(marketplace.get("source")) != expected[item["pluginId"]]:
-                continue
-            marketplace_name = item.get("marketplaceName")
-            name = item.get("name")
-            version = item.get("version") or "local"
-            if not all(component(value) for value in (marketplace_name, name, version)):
-                continue
-            root = contained(cache / marketplace_name / name / version, cache)
-            if root is not None and root.parent.name == "machine" and (root / "catalog" / "catalog.json").is_file():
-                candidates.append((item["pluginId"], int(item.get("enabled") is True), root))
-        root = coordinator(candidates, {identity for identity, enabled, _root in candidates if enabled})
-    except (OSError, ValueError, TypeError) as error:
-        unavailable("Codex machine coordinator is unavailable (" + str(error) + ")")
-script = root / "resources" / "machine" / "scripts" / f"{kind}_terminal_launcher.py"
-if not script.is_file():
-    unavailable("the active machine " + kind + " launcher is unavailable")
+        return locate()
+    except Missing as missing:
+        if hooks or missing.identity is None or not repair(missing.identity):
+            unavailable(str(missing))
+    try:
+        return locate()
+    except Missing as missing:
+        unavailable(str(missing))
+
+def launch(script):
+    descriptor, state = tempfile.mkstemp(prefix="base-agents-launch-")
+    os.close(descriptor)
+    command = [sys.executable, "-I", "-B", str(script), "--project", project, "--target", typed_target]
+    command += ["--hooks", "--", *rest] if hooks else ["--", *rest]
+    try:
+        code = subprocess.run(command, env=dict(os.environ, BASE_AGENTS_LAUNCH_STATE=state)).returncode
+        try:
+            reached = Path(state).read_text(encoding="utf-8")
+        except OSError:
+            reached = ""
+    finally:
+        try:
+            os.unlink(state)
+        except OSError:
+            pass
+    return code, reached
+
+identity, script = resolve()
 if probe:
     sys.exit(0)
-launcher = [sys.executable, "-I", "-B", str(script), "--project", project, "--target", typed_target]
-if hooks:
-    launcher += ["--hooks", "--", *rest]
-else:
-    launcher += ["--", *rest]
-sys.exit(subprocess.run(launcher).returncode)
+code, reached = launch(script)
+if code != 0 and reached == "ready" and not hooks and repair(identity):
+    identity, script = resolve()
+    code, reached = launch(script)
+sys.exit(code)
 '''
 
 POWERSHELL_BLOCK = "\r\n".join((

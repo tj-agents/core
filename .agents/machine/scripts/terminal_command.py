@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 import agent_cli
+import launch_state
 
 
 CLAUDE_NON_SESSION_COMMANDS = frozenset({
@@ -61,7 +62,9 @@ def command_for_target(target: str, arguments: list[str]) -> list[str]:
 
 def run_target(target: str, arguments: list[str]) -> int:
     try:
-        return subprocess.run(command_for_target(target, arguments)).returncode
+        command = command_for_target(target, arguments)
+        launch_state.started()
+        return subprocess.run(command).returncode
     except OSError as error:
         print(f"terminal launcher could not start {target}: {error}", file=sys.stderr)
         return 127
