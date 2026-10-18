@@ -116,15 +116,26 @@ class CloseOperationTests(unittest.TestCase):
                 close.hook(data)
                 runtime.assert_not_called()
 
-    def test_pid_reuse_or_attachment_change_refuses_without_calling_close(self):
-        for key, value in (('pid_started_at', 101), ('cwd', str(self.root / 'other'))):
-            self.prepare()
-            self.shared.own_host_and_entry.return_value = {**self.entry, key: value}
-            with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module') as load:
-                result = close.hook(self.transcript_with('Done.'))
-                self.assertEqual('block', result['decision'])
-                load.assert_not_called()
-            self.shared.own_host_and_entry.return_value = self.entry
+    def test_pid_reuse_refuses_without_calling_close(self):
+        self.prepare()
+        self.shared.own_host_and_entry.return_value = {**self.entry, 'pid_started_at': 101}
+        with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module') as load:
+            result = close.hook(self.transcript_with('Done.'))
+            self.assertEqual('block', result['decision'])
+            load.assert_not_called()
+        self.shared.own_host_and_entry.return_value = self.entry
+
+    def test_a_registered_cwd_that_moved_after_arming_still_closes(self):
+        self.prepare()
+        helper = mock.Mock()
+        helper.main.return_value = 0
+        with mock.patch.object(close, 'runtime', return_value=self.shared), mock.patch.object(close.importlib, 'import_module', return_value=helper) as load:
+            self.shared.own_host_and_entry.return_value = {**self.entry, 'cwd': str(self.root / 'moved')}
+            self.assertEqual('block', close.hook(self.transcript_with('The requested cleanup is complete.'))['decision'])
+            close.complete()
+        load.assert_called_once_with('close')
+        helper.main.assert_called_once_with([])
+        self.shared.own_host_and_entry.return_value = self.entry
 
     def test_close_refusal_is_preserved_and_recursive_stop_does_not_loop(self):
         self.prepare()
