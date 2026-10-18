@@ -439,8 +439,19 @@ class RollingPluginsTests(unittest.TestCase):
         stale.mkdir(parents=True)
         (stale / ROLLING.GENERATED_MARKER).write_text('old', encoding='utf-8')
         clone, tip = ROLLING._fetch_main(str(self.remote), cache)
-        generated = ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
-        self.assertEqual([generated], list((cache / 'generated').iterdir()))
+        locked = cache / 'generated' / ('1' * 40)
+        locked.mkdir()
+        real_remove = ROLLING._remove_cache_tree
+
+        def remove(path, root):
+            if path == locked:
+                raise PermissionError('in use')
+            return real_remove(path, root)
+
+        with mock.patch.object(ROLLING, '_remove_cache_tree', side_effect=remove):
+            generated = ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
+        self.assertEqual(sorted([generated, locked]), sorted((cache / 'generated').iterdir()))
+        shutil.rmtree(locked)
         shutil.rmtree(generated)
         with mock.patch.object(ROLLING.os, 'replace', side_effect=PermissionError('in use')), \
                 self.assertRaisesRegex(ROLLING.RollingPluginError, 'generated tree could not be written'):

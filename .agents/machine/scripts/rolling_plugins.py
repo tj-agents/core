@@ -542,7 +542,7 @@ def _generated_publication(clone: Path, revision: str, cache: Path, deadline: De
         if stale.name != revision and not stale.name.startswith("."):
             try:
                 _remove_cache_tree(stale, cache)
-            except RollingPluginError:
+            except (RollingPluginError, OSError):
                 continue
     return destination
 
