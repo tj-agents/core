@@ -217,15 +217,6 @@ def stop(data, session):
         return blocked('Prepared closure expired. Reload machine:close; no host was closed.')
     shared = runtime()
     try:
-        entry = verified_entry(shared)
-        expected = ticket.get('entry')
-        if not isinstance(expected, dict) or any(entry.get(key) != expected.get(key)
-                for key in IDENTITY) or entry['session_id'] != session:
-            raise shared.Refusal('prepared host identity or attachment changed')
-        if shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd']):
-            raise shared.Refusal('prepared working directory changed')
-        if read_ticket(session) != ticket:
-            raise shared.Refusal('prepared closure was cancelled or replaced')
         nonce = ticket.get('nonce')
         if not isinstance(nonce, str) or re.fullmatch('[0-9a-f]{32}', nonce) is None:
             raise shared.Refusal('prepared closure identity is invalid')
@@ -235,6 +226,13 @@ def stop(data, session):
         except FileExistsError:
             return None
         os.close(descriptor)
+        entry = verified_entry(shared)
+        expected = ticket.get('entry')
+        if not isinstance(expected, dict) or any(entry.get(key) != expected.get(key)
+                for key in IDENTITY) or entry['session_id'] != session:
+            raise shared.Refusal('prepared host identity or attachment changed')
+        if shared.path_key(Path.cwd()) != shared.path_key(ticket['cwd']):
+            raise shared.Refusal('prepared working directory changed')
         if read_ticket(session) != ticket:
             raise shared.Refusal('prepared closure was cancelled or replaced')
         store = shared.register_session._load_session_store()
@@ -256,8 +254,9 @@ def stop(data, session):
                        '`close_session.py complete --stop-gates-accepted`. '
                        'No host was closed by this hook. No new user answer is needed for this operation.')
     except Exception as error:
-        ticket.update(status='refused', error=str(error))
-        save_ticket(session, ticket)
+        if read_ticket(session) == ticket:
+            ticket.update(status='refused', error=str(error))
+            save_ticket(session, ticket)
         return blocked('Verified close refused: ' + str(error) + '. Preserve this session and report the limitation; '
                        'do not force-close or claim closure succeeded.')
     return None
