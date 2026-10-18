@@ -18,6 +18,7 @@ from typing import Callable, Mapping, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import launch_state
 from codex_marketplace_sync import codex_config_selection
 from rolling_plugins import OPERATION_TIMEOUT_SECONDS, RollingPluginError, preflight, terminate_process_tree
 from terminal_command import command_for_target, native_target_for_shim
@@ -156,6 +157,7 @@ def _without_binding_state(environment: Mapping[str, str]) -> dict[str, str]:
     values.pop(ACK_DIRECTORY_ENV, None)
     values.pop(ACK_TOKEN_ENV, None)
     values.pop(SNAPSHOT_DIRECTORY_ENV, None)
+    values.pop(launch_state.ENVIRONMENT, None)
     values.pop("TJ_AGENTS_CODEX_RUNTIME_RECEIPT", None)
     values.pop("TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256", None)
     return values
@@ -241,6 +243,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                         if extra_environment:
                             environment.update(extra_environment)
                         try:
+                            launch_state.started()
                             process = subprocess.Popen(
                                 command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
                                 cwd=project, env=environment, start_new_session=os.name != "nt",
@@ -262,6 +265,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    launch_state.started()
                     return subprocess.run(command_for_target(target, arguments), cwd=project, env=environment).returncode
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -275,6 +279,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 if extra_environment:
                     environment.update(extra_environment)
                 try:
+                    launch_state.started()
                     return subprocess.run(command_for_target(target, launch_arguments), cwd=project,
                                           env=environment).returncode
                 except OSError as error:
@@ -295,6 +300,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                                     prepared.environment, extra_environment)
                 process = None
                 try:
+                    launch_state.started()
                     process = subprocess.Popen(
                         command_for_target(target, launch_arguments), cwd=project, env=environment,
                         start_new_session=os.name != "nt",
