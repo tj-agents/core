@@ -28,6 +28,7 @@ OPERATION_TIMEOUT_SECONDS = 300
 LOCK_WAIT_SECONDS = 180
 LOCK_STALE_SECONDS = 900
 SHA = re.compile(r"^[0-9a-f]{40}$")
+PUBLICATION_HISTORY_DEPTH = 50
 
 
 class RollingPluginError(RuntimeError):
@@ -502,6 +503,25 @@ def _publication_gate(clone: Path, revision: str, deadline: Deadline | None = No
             )
 
 
+def _published_revision(clone: Path, revision: str, deadline: Deadline | None = None) -> str:
+    try:
+        _publication_gate(clone, revision, deadline)
+        return revision
+    except RollingPluginError as error:
+        failure = error
+    try:
+        _run(["git", "-C", str(clone), "fetch", "--force", f"--deepen={PUBLICATION_HISTORY_DEPTH}", "origin",
+              "refs/heads/main:refs/remotes/origin/main"], deadline=deadline)
+        previous = _run(["git", "-C", str(clone), "log", "--first-parent", "--format=%H", "-n", "1", revision,
+                         "--", "plugins/publication.json"], deadline=deadline)
+    except RollingPluginError:
+        raise failure from None
+    if not SHA.fullmatch(previous) or previous == revision:
+        raise failure
+    _publication_gate(clone, previous, deadline)
+    return previous
+
+
 def _entry(catalog: dict, name: str) -> dict:
     matches = [item for item in catalog.get("plugins", []) if isinstance(item, dict) and item.get("name") == name]
     if len(matches) != 1:
@@ -724,7 +744,7 @@ def _state(source: str, cache: Path, catalog_cache: dict[str, tuple[Path, str, d
     if authenticated not in catalog_cache:
         clone, revision = _fetch_main(authenticated, cache, deadline)
         if authenticated == "https://github.com/tj-agents/core.git" and (authenticated, revision) not in published:
-            _publication_gate(clone, revision, deadline)
+            revision = _published_revision(clone, revision, deadline)
             published.add((authenticated, revision))
         catalog_cache[authenticated] = clone, revision, _catalog(clone, revision, deadline)
     clone, revision, catalog = catalog_cache[authenticated]
