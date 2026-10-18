@@ -155,6 +155,23 @@ class RecoveryTests(unittest.TestCase):
         del processes[42]
         self.assertTrue(RECOVERY._launch_ended(receipt, lookup))
 
+    def test_ambiguous_receipt_rereads_its_status_for_a_child_started_later(self):
+        status = self.root / "attempt.status.json"
+        status.write_text(json.dumps({"pid": 41, "state": "preparing"}), encoding="utf-8")
+        processes = {41: SimpleNamespace(started_at=5.0)}
+        receipt = {"wrapper": None, "status_file": str(status)}
+        self.assertFalse(RECOVERY._launch_ended(receipt, processes.get))
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running"}), encoding="utf-8")
+        processes[42] = SimpleNamespace(started_at=6.0)
+        receipt["wrapper"] = {"pid": 41, "started_at": 5.0}
+        del processes[41]
+        self.assertFalse(RECOVERY._launch_ended(receipt, processes.get))
+        del processes[42]
+        self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
+        status.unlink()
+        self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
+        self.assertIsNone(RECOVERY._launch_ended({"wrapper": None, "status_file": str(status)}, processes.get))
+
     def test_wrapper_identity_records_the_native_child_and_refuses_unreadable_starts(self):
         status = self.root / "attempt.status.json"
         status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running"}), encoding="utf-8")
@@ -492,8 +509,9 @@ Observed blocker: no send was attempted."""
                 with self.assertRaises(type(outcome)):
                     RECOVERY.open_session("codex", "exact_id", roots=roots, cli=cli)
                 receipt = RECOVERY._receipt("codex", "exact_id", RECOVERY._profile("codex", roots["codex"]))
-                state = json.loads(receipt.read_text(encoding="utf-8"))["state"] if receipt.exists() else None
-                self.assertEqual(remaining, state)
+                recorded = json.loads(receipt.read_text(encoding="utf-8")) if receipt.exists() else {}
+                self.assertEqual(remaining, recorded.get("state"))
+                self.assertEqual(remaining is not None, bool(recorded.get("status_file")))
                 receipt.unlink(missing_ok=True)
 
     def test_main_exits_one_for_failed_and_three_for_unverified_launches(self):
