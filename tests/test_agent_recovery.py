@@ -113,6 +113,58 @@ class RecoveryTests(unittest.TestCase):
         with mock.patch.object(RECOVERY, "liveness", return_value="closed"):
             self.assertTrue(RECOVERY._claim("codex", "exact_id", "profile").is_file())
 
+    def test_search_skips_a_session_file_removed_during_the_scan(self):
+        self.write_codex()
+        self.write_codex("vanished_id")
+        history = RECOVERY._load("history")
+        real_session = history.session
+
+        def session(path, host):
+            if "vanished_id" in path.name:
+                raise FileNotFoundError(path)
+            return real_session(path, host)
+
+        with mock.patch.object(history, "session", side_effect=session):
+            results = RECOVERY.search(("codex",), topic="topic", roots={"codex": self.root / "sessions"})
+        self.assertEqual(["exact_id"], [item["id"] for item in results])
+
+    def test_launched_receipt_is_released_once_its_wrapper_process_ends(self):
+        receipt = RECOVERY._claim("codex", "exact_id", "profile")
+        RECOVERY._receipt_state(receipt, "codex", "exact_id", "profile", "launched", {"pid": 41, "started_at": 5.0})
+        wrapper = SimpleNamespace(name="python", started_at=5.0)
+        lookup = mock.Mock(return_value=mock.Mock(side_effect=lambda pid: wrapper if pid == 41 else None))
+        register = SimpleNamespace(build_process_lookup=lookup)
+        real_load = RECOVERY._load
+        with mock.patch.object(RECOVERY, "_load", side_effect=lambda name: register if name == "register_session" else real_load(name)):
+            with self.assertRaisesRegex(ValueError, "confirm-closed"):
+                RECOVERY._claim("codex", "exact_id", "profile", confirm_closed=True)
+            wrapper.started_at = 9.0
+            self.assertEqual("pending", json.loads(RECOVERY._claim("codex", "exact_id", "profile").read_text(encoding="utf-8"))["state"])
+
+    def test_untracked_receipt_is_released_only_by_confirmation_after_pending_settles(self):
+        receipt = RECOVERY._claim("codex", "exact_id", "profile")
+        with self.assertRaises(ValueError):
+            RECOVERY._claim("codex", "exact_id", "profile", confirm_closed=True)
+        RECOVERY._receipt_state(receipt, "codex", "exact_id", "profile", "launched")
+        with self.assertRaises(ValueError):
+            RECOVERY._claim("codex", "exact_id", "profile")
+        self.assertTrue(RECOVERY._claim("codex", "exact_id", "profile", confirm_closed=True).is_file())
+
+    def test_verified_launch_records_its_wrapper_identity(self):
+        self.write_codex()
+        cli = RECOVERY._load("agent_cli")
+        roots = {"codex": self.root / "sessions"}
+        wrapper = {"pid": 41, "started_at": 5.0}
+        with mock.patch.object(RECOVERY, "liveness", return_value="closed"), \
+                mock.patch.object(RECOVERY, "_wrapper_identity", return_value=wrapper), \
+                mock.patch.object(RECOVERY, "_verify_codex_resume"), \
+                mock.patch.object(cli, "resolve_codex_executable", return_value=("native-codex", {})), \
+                mock.patch.object(cli, "launch_tab"):
+            RECOVERY.open_session("codex", "exact_id", roots=roots, cli=cli)
+        receipt = RECOVERY._receipt("codex", "exact_id", RECOVERY._profile("codex", roots["codex"]))
+        recorded = json.loads(receipt.read_text(encoding="utf-8"))
+        self.assertEqual(("launched", wrapper), (recorded["state"], recorded["wrapper"]))
+
     def test_two_processes_retire_one_completed_receipt_once(self):
         registry = RECOVERY._registry_root() / "race_id.json"
         registry.parent.mkdir(parents=True)

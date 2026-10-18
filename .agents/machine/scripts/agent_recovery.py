@@ -173,7 +173,10 @@ def _record_items(host, root, history):
             continue
         files.extend(directory.rglob("*.jsonl") if host == "codex" else directory.glob("*/*.jsonl"))
     for path in files:
-        item = history.session(path, host)
+        try:
+            item = history.session(path, host)
+        except OSError:
+            continue
         if item and _recoverable(item) and SESSION_ID.fullmatch(item["session"]):
             yield item
 
@@ -449,7 +452,32 @@ def _claim_lock(path):
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def _claim(host, session_id, profile):
+def _wrapper_identity(status_path, process_lookup=None):
+    pid = (_load("launch_status").read(status_path) or {}).get("pid")
+    if not isinstance(pid, int) or isinstance(pid, bool):
+        return None
+    try:
+        process = (process_lookup or _load("register_session").build_process_lookup())(pid)
+    except Exception:
+        return None
+    started = getattr(process, "started_at", None)
+    if isinstance(started, bool) or not isinstance(started, (int, float)) or not math.isfinite(started):
+        return None
+    return {"pid": pid, "started_at": started}
+
+
+def _launch_ended(previous, process_lookup=None):
+    wrapper = previous.get("wrapper")
+    if not isinstance(wrapper, dict):
+        return None
+    try:
+        process = (process_lookup or _load("register_session").build_process_lookup())(wrapper.get("pid"))
+    except Exception:
+        return None
+    return process is None or getattr(process, "started_at", None) != wrapper.get("started_at")
+
+
+def _claim(host, session_id, profile, confirm_closed=False):
     path = _receipt(host, session_id, profile)
     with _claim_lock(path):
         if path.exists():
@@ -461,12 +489,16 @@ def _claim(host, session_id, profile):
             current = _registry(session_id)
             current_fingerprint = _fingerprint(current)
             registered = current_fingerprint and current_fingerprint != before and current.get("started_at", 0) >= previous.get("created_at", float("inf"))
-            if registered and liveness({"host": host, "session": session_id}) == "closed":
+            ended = _launch_ended(previous)
+            settled = previous.get("state") != "pending" or time.time() - previous.get("created_at", 0) > PICKUP_TIMEOUT_SECONDS + WRAPPER_TIMEOUT_SECONDS
+            if ended or (confirm_closed and ended is None and settled) or (
+                    registered and liveness({"host": host, "session": session_id}) == "closed"):
                 path.unlink()
         try:
             descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
-            raise ValueError("A prior launch for that exact host session is pending or ambiguous; check its terminal before retrying.") from None
+            raise ValueError("A prior launch for that exact host session is pending or still running, or predates "
+                             "launch tracking; check its terminal, and if no tab runs it, retry with --confirm-closed.") from None
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump({"host": host, "session": session_id, "profile": profile, "state": "pending",
                        "created_at": time.time(), "registry_fingerprint": _fingerprint(_registry(session_id))}, handle)
@@ -479,7 +511,7 @@ def _fingerprint(entry):
     return json.dumps(entry, sort_keys=True, separators=(",", ":"))
 
 
-def _receipt_state(path, host, session_id, profile, state):
+def _receipt_state(path, host, session_id, profile, state, wrapper=None):
     try:
         previous = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -487,7 +519,8 @@ def _receipt_state(path, host, session_id, profile, state):
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps({"host": host, "session": session_id, "profile": profile, "state": state,
                                      "created_at": previous.get("created_at", time.time()),
-                                     "registry_fingerprint": previous.get("registry_fingerprint")}) + "\n", encoding="utf-8")
+                                     "registry_fingerprint": previous.get("registry_fingerprint"),
+                                     "wrapper": wrapper}) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
 
@@ -591,8 +624,9 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
         raise ValueError("A launch request for that exact session is already in progress.")
     receipt = None
     launched = False
+    status_path = None
     try:
-        receipt = _claim(host, session_id, item["profile"])
+        receipt = _claim(host, session_id, item["profile"], confirm_closed)
         status_path = _status_path(receipt)
         history_path = Path(item["history_file"]) if item.get("history_file") else _history_file(
             host, session_id, item["profile"])
@@ -646,9 +680,10 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
             if (_load("launch_status").read(status_path) or {}).get("state") != "abandoned":
                 status_path.unlink(missing_ok=True)
             raise
+        wrapper = _wrapper_identity(status_path)
         status_path.unlink(missing_ok=True)
         try:
-            _receipt_state(receipt, host, session_id, item["profile"], "launched")
+            _receipt_state(receipt, host, session_id, item["profile"], "launched", wrapper)
         except OSError:
             pass
         return {**item, "launch": "verified", "evidence": evidence}
@@ -659,7 +694,8 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                 receipt.unlink(missing_ok=True)
             elif isinstance(exc, LaunchUnverified) or (isinstance(timeout_type, type) and isinstance(exc, timeout_type)):
                 try:
-                    _receipt_state(receipt, host, session_id, item["profile"], "ambiguous")
+                    _receipt_state(receipt, host, session_id, item["profile"], "ambiguous",
+                                   _wrapper_identity(status_path) if status_path else None)
                 except OSError:
                     pass
             elif not launched:
