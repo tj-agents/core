@@ -419,13 +419,32 @@ class RollingPluginsTests(unittest.TestCase):
         with mock.patch.object(ROLLING, '_extract_repository', side_effect=AssertionError('rebuilt')):
             self.assertEqual(generated, ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60)))
 
-    def test_a_core_main_that_cannot_be_generated_still_fails_startup(self):
+    def test_a_core_main_that_cannot_be_generated_still_fails_startup_with_both_causes(self):
         self.add_generators(exit_code=3)
         cache = self.root / 'cache'
         clone, tip = ROLLING._fetch_main(str(self.remote), cache)
-        with self.assertRaisesRegex(ROLLING.RollingPluginError, 'could not be generated for startup'):
-            ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
+        core = 'https://github.com/tj-agents/core.git'
+        with mock.patch.object(ROLLING, 'canonical_source', return_value=core), \
+                mock.patch.object(ROLLING, '_fetch_main', return_value=(clone, tip)), \
+                mock.patch.object(ROLLING, '_publication_gate', side_effect=ROLLING.RollingPluginError('Catalog digest drift')), \
+                self.assertRaisesRegex(ROLLING.RollingPluginError, 'could not be generated for startup.*Catalog digest drift'):
+            ROLLING._state(core, cache, {}, set(), ROLLING.Deadline(60))
         self.assertFalse((cache / 'generated' / tip).exists())
+        self.assertEqual([], list((cache / 'generated').iterdir()))
+
+    def test_a_newer_generated_main_replaces_older_builds_and_write_failures_are_refresh_errors(self):
+        self.add_generators()
+        cache = self.root / 'cache'
+        stale = cache / 'generated' / ('0' * 40)
+        stale.mkdir(parents=True)
+        (stale / ROLLING.GENERATED_MARKER).write_text('old', encoding='utf-8')
+        clone, tip = ROLLING._fetch_main(str(self.remote), cache)
+        generated = ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
+        self.assertEqual([generated], list((cache / 'generated').iterdir()))
+        shutil.rmtree(generated)
+        with mock.patch.object(ROLLING.os, 'replace', side_effect=PermissionError('in use')), \
+                self.assertRaisesRegex(ROLLING.RollingPluginError, 'generated tree could not be written'):
+            ROLLING._generated_publication(clone, tip, cache, ROLLING.Deadline(60))
         self.assertEqual([], list((cache / 'generated').iterdir()))
 
     def test_publication_gate_runs_the_fetched_generator_in_a_bounded_subprocess(self):

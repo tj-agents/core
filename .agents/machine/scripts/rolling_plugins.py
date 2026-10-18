@@ -515,8 +515,8 @@ def _generated_publication(clone: Path, revision: str, cache: Path, deadline: De
     if (destination / GENERATED_MARKER).is_file():
         return destination
     staging = destination.with_name(f".{revision}.{os.getpid()}.{time.monotonic_ns()}")
-    staging.mkdir(parents=True)
     try:
+        staging.mkdir(parents=True)
         _extract_repository(clone, revision, staging, deadline)
         for script, *flags in (("scripts/update_catalog_digests.py",), ("scripts/sync_plugin_packages.py",),
                                ("scripts/sync_plugin_packages.py", "--check")):
@@ -528,10 +528,22 @@ def _generated_publication(clone: Path, revision: str, cache: Path, deadline: De
                 detail = (completed.stderr or completed.stdout).decode("utf-8", "replace").strip() or "no output"
                 raise RollingPluginError(f"tj-agents/core {revision[:12]} could not be generated for startup: {detail}")
         (staging / GENERATED_MARKER).write_text(revision, encoding="utf-8")
-        shutil.rmtree(destination, ignore_errors=True)
-        os.replace(staging, destination)
+        _remove_cache_tree(destination, cache)
+        try:
+            os.replace(staging, destination)
+        except OSError:
+            if not (destination / GENERATED_MARKER).is_file():
+                raise
+    except OSError as error:
+        raise RollingPluginError(f"tj-agents/core {revision[:12]} generated tree could not be written: {error}") from error
     finally:
         shutil.rmtree(staging, ignore_errors=True)
+    for stale in destination.parent.iterdir():
+        if stale.name != revision and not stale.name.startswith("."):
+            try:
+                _remove_cache_tree(stale, cache)
+            except RollingPluginError:
+                continue
     return destination
 
 
@@ -782,8 +794,11 @@ def _state(source: str, cache: Path, catalog_cache: dict[str, tuple[Path, str, d
         if authenticated == "https://github.com/tj-agents/core.git" and (authenticated, revision) not in published:
             try:
                 _publication_gate(clone, revision, deadline)
-            except RollingPluginError:
-                clone = _generated_publication(clone, revision, cache, deadline)
+            except RollingPluginError as unpublished:
+                try:
+                    clone = _generated_publication(clone, revision, cache, deadline)
+                except RollingPluginError as error:
+                    raise RollingPluginError(f"{error} (publication check: {unpublished})") from unpublished
             published.add((authenticated, revision))
         catalog_cache[authenticated] = clone, revision, _catalog(clone, revision, deadline)
     clone, revision, catalog = catalog_cache[authenticated]
