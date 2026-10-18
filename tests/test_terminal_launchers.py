@@ -134,10 +134,12 @@ class TerminalLaunchersTests(unittest.TestCase):
         buffer = io.StringIO()
         with mock.patch.object(CLAUDE, "run_session", side_effect=CLAUDE.StartupBindingError("offline")) as session, \
                 mock.patch.object(CLAUDE, "run_target", return_value=23) as run, \
+                mock.patch.dict(os.environ, {"TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY": "parent"}), \
                 contextlib.redirect_stderr(buffer):
             self.assertEqual(23, CLAUDE.main(["--project", "/work", "--target", "claude", "chat"]))
         session.assert_called_once()
-        run.assert_called_once_with("claude", ["chat"])
+        run.assert_called_once_with("claude", ["chat"], mock.ANY)
+        self.assertNotIn("TJ_AGENTS_STARTUP_SNAPSHOT_DIRECTORY", run.call_args.args[2])
         self.assertIn("starting Claude without the standards refresh", buffer.getvalue())
 
     def test_claude_successful_session_does_not_run_the_typed_cli_again(self):
