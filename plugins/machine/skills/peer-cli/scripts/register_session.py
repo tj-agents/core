@@ -339,7 +339,7 @@ def terminal_identity(environ=None):
     return None
 
 
-def _load_session_store():
+def session_store_path():
     candidates = []
     if len(HERE.parents) > 2:
         candidates.append(HERE.parents[2] / "scripts" / "session_store.py")
@@ -347,16 +347,20 @@ def _load_session_store():
     if len(HERE.parents) > 4:
         candidates.append(HERE.parents[4] / "resources/machine/scripts/session_store.py")
     candidates.append(HERE / "session_store.py")
-    for path in candidates:
-        if path.is_file():
-            try:
-                spec = importlib.util.spec_from_file_location("register_session_session_store", path)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                return module
-            except Exception:
-                return None
-    return None
+    return next((path for path in candidates if path.is_file()), None)
+
+
+def _load_session_store():
+    path = session_store_path()
+    if path is None:
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location("register_session_session_store", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except Exception:
+        return None
 
 
 def _record_session_start(host, session_id, cwd, title, pid, pid_started_at):
