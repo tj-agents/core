@@ -254,7 +254,8 @@ class RollingPluginsTests(unittest.TestCase):
                     return None
                 self.assertEqual(command[-3:], ['plugin', 'list', '--json'])
                 document = json.loads((config / 'plugins/installed_plugins.json').read_text())
-                return [{'id': identity, 'enabled': True, 'installPath': records[0]['installPath']}
+                return [{'id': identity, 'enabled': True, 'installPath': records[0]['installPath'],
+                         'version': records[0].get('version', 'unknown')}
                         for identity, records in document['plugins'].items()]
 
             with mock.patch.object(ROLLING, '_native', side_effect=native), \
@@ -318,7 +319,8 @@ class RollingPluginsTests(unittest.TestCase):
                         self.write(path, value)
                         return None
                     value = json.loads(registry_path.read_text())
-                    return [{'id': identity, 'enabled': True, 'installPath': records[0]['installPath']}
+                    return [{'id': identity, 'enabled': True, 'installPath': records[0]['installPath'],
+                             'version': records[0].get('version', 'unknown')}
                             for identity, records in value['plugins'].items()
                             if variation != 'inventory' or identity != 'base@two']
 
@@ -335,6 +337,12 @@ class RollingPluginsTests(unittest.TestCase):
                         result = ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, ['base@one', 'base@two'])
                         self.assertEqual({root.identity for root in result.selected_roots}, set(expected))
+                        registry = json.loads(registry_path.read_text())['plugins']
+                        for root in result.selected_roots:
+                            record = registry[root.identity][0]
+                            self.assertEqual(record['installPath'], str(root.root))
+                            self.assertEqual(record['version'], root.root.name)
+                            self.assertEqual(record['gitCommitSha'], root.revision)
                         installs.clear()
                         ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, [])
