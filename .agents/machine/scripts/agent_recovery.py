@@ -21,6 +21,7 @@ TOKEN = re.compile(r"[a-z0-9]+")
 PICKUP_TIMEOUT_SECONDS = 480
 WRAPPER_TIMEOUT_SECONDS = 45
 PICKUP_INTERVAL_SECONDS = 1.0
+STATUS_CLOCK_SLACK_SECONDS = 2.0
 STORE_FIELDS = (
     ("title", "s.title"), ("id", "s.session_id"), ("cwd", "s.cwd"), ("repo", "s.repo"), ("branch", "s.branch"),
     ("work_item", "s.work_item"), ("work_item.title", "w.title"), ("work_item.plan_path", "w.plan_path"),
@@ -488,18 +489,31 @@ def _launch_ended(previous, process_lookup=None):
         lookup = process_lookup or _load("register_session").build_process_lookup()
     except Exception:
         return None
-    identities = [previous.get("wrapper")]
-    status_file = previous.get("status_file")
-    if status_file and _load("launch_status").read(status_file) is not None:
-        refreshed = _wrapper_identity(status_file, lookup)
-        if refreshed is None:
-            return None
-        identities.append(refreshed)
-    recorded_processes = [process for identity in identities if isinstance(identity, dict)
-                          for process in (identity, identity.get("child")) if isinstance(process, dict)]
-    if not recorded_processes:
-        return None
+    wrapper = previous.get("wrapper")
+    recorded_processes = [process for process in (wrapper, wrapper.get("child") if isinstance(wrapper, dict) else None)
+                          if isinstance(process, dict)]
     ended = True
+    status = _load("launch_status").read(previous["status_file"]) if previous.get("status_file") else None
+    if status is not None and status.get("state") not in ("exited", "failed", "abandoned"):
+        reported = status.get("at")
+        if isinstance(reported, bool) or not isinstance(reported, (int, float)) or not math.isfinite(reported):
+            return None
+        for pid in (status.get("pid"), status.get("child_pid")):
+            if pid is None:
+                continue
+            try:
+                process = lookup(pid)
+            except Exception:
+                return None
+            if process is None:
+                continue
+            started = _finite_start(process)
+            if started is None:
+                ended = None
+            elif started <= reported + STATUS_CLOCK_SLACK_SECONDS:
+                return False
+    elif not recorded_processes and status is None:
+        return None
     for recorded in recorded_processes:
         try:
             process = lookup(recorded.get("pid"))

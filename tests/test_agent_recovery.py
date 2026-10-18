@@ -157,16 +157,22 @@ class RecoveryTests(unittest.TestCase):
 
     def test_ambiguous_receipt_rereads_its_status_for_a_child_started_later(self):
         status = self.root / "attempt.status.json"
-        status.write_text(json.dumps({"pid": 41, "state": "preparing"}), encoding="utf-8")
+        status.write_text(json.dumps({"pid": 41, "state": "preparing", "at": 5.5}), encoding="utf-8")
         processes = {41: SimpleNamespace(started_at=5.0)}
         receipt = {"wrapper": None, "status_file": str(status)}
         self.assertFalse(RECOVERY._launch_ended(receipt, processes.get))
-        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running"}), encoding="utf-8")
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "running", "at": 7.0}), encoding="utf-8")
         processes[42] = SimpleNamespace(started_at=6.0)
         receipt["wrapper"] = {"pid": 41, "started_at": 5.0}
         del processes[41]
         self.assertFalse(RECOVERY._launch_ended(receipt, processes.get))
-        del processes[42]
+        processes[42] = SimpleNamespace(started_at=500.0)
+        processes[41] = SimpleNamespace(started_at=600.0)
+        self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
+        processes[42] = SimpleNamespace(started_at=None)
+        self.assertIsNone(RECOVERY._launch_ended(receipt, processes.get))
+        status.write_text(json.dumps({"pid": 41, "child_pid": 42, "state": "exited", "at": 8.0}), encoding="utf-8")
+        processes[42] = SimpleNamespace(started_at=6.0)
         self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
         status.unlink()
         self.assertTrue(RECOVERY._launch_ended(receipt, processes.get))
