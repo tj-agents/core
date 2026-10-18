@@ -82,17 +82,17 @@ class TerminalLaunchersTests(unittest.TestCase):
             root = Path(directory)
             cache = root / "cache"
             cache.mkdir()
-            package = cache / "base-agents" / "machine" / "current"
+            package = cache / "tj-agents" / "machine" / "current"
             launcher = package / "resources/machine/scripts/claude_terminal_launcher.py"
             launcher.parent.mkdir(parents=True)
             (package / "catalog").mkdir()
             (package / "catalog" / "catalog.json").write_text("{}", encoding="utf-8")
             launcher.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
             (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-                "machine@base-agents": [{"scope": "user", "installPath": str(package)}]
+                "machine@tj-agents": [{"scope": "user", "installPath": str(package)}]
             }}), encoding="utf-8")
             (cache / "known_marketplaces.json").write_text(json.dumps({
-                "base-agents": {"source": {"repo": "tj-agents/core"}},
+                "tj-agents": {"source": {"repo": "tj-agents/marketplace"}},
             }), encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, "-B", "-c", PROFILE.BOOTSTRAP, "claude", "typed-cli", directory, "--hooks"],
@@ -268,12 +268,12 @@ class TerminalLaunchersTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="terminal registry ") as directory:
             registry = Path(directory) / "installed_plugins.json"
             (Path(directory) / "known_marketplaces.json").write_text(json.dumps({
-                "base-agents": {"source": {"repo": "tj-agents/core"}},
+                "tj-agents": {"source": {"repo": "tj-agents/marketplace"}},
             }), encoding="utf-8")
             for value in ("{not json", json.dumps([]), json.dumps(None),
                           json.dumps({"plugins": None}),
-                          json.dumps({"plugins": {"machine@base-agents": None}}),
-                          json.dumps({"plugins": {"machine@base-agents": [None]}})):
+                          json.dumps({"plugins": {"machine@tj-agents": None}}),
+                          json.dumps({"plugins": {"machine@tj-agents": [None]}})):
                 registry.write_text(value, encoding="utf-8")
                 env = dict(os.environ, CLAUDE_CODE_PLUGIN_CACHE_DIR=str(Path(directory)))
                 result = subprocess.run(
@@ -316,7 +316,7 @@ class TerminalLaunchersTests(unittest.TestCase):
             cli = bin_dir / "claude"
             cli.write_text("#!/bin/sh\nprintf 'cli\\n' >> \"$CALLS\"\nexit 125\n", encoding="utf-8")
             cli.chmod(cli.stat().st_mode | 0o111)
-            active = cache / "base-agents" / "machine" / "test"
+            active = cache / "tj-agents" / "machine" / "test"
             launcher = active / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
             launcher.parent.mkdir(parents=True)
             (active / "catalog").mkdir()
@@ -328,9 +328,9 @@ class TerminalLaunchersTests(unittest.TestCase):
                 "raise SystemExit(subprocess.run([parsed.target, *args]).returncode)\n",
                 encoding="utf-8",
             )
-            (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {"machine@base-agents": [{"scope": "user", "installPath": str(active)}]}}), encoding="utf-8")
+            (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {"machine@tj-agents": [{"scope": "user", "installPath": str(active)}]}}), encoding="utf-8")
             (cache / "known_marketplaces.json").write_text(json.dumps({
-                "base-agents": {"source": {"repo": "tj-agents/core"}},
+                "tj-agents": {"source": {"repo": "tj-agents/marketplace"}},
             }), encoding="utf-8")
             profile = home / ".bashrc"
             profile.parent.mkdir()
@@ -358,7 +358,7 @@ class TerminalLaunchersTests(unittest.TestCase):
             cli.chmod(cli.stat().st_mode | 0o111)
             active = []
             for label in ("first", "second"):
-                package = cache / "base-agents" / "machine" / label
+                package = cache / "tj-agents" / "machine" / label
                 launcher = package / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
                 launcher.parent.mkdir(parents=True)
                 (package / "catalog").mkdir()
@@ -367,10 +367,10 @@ class TerminalLaunchersTests(unittest.TestCase):
                 active.append(package)
             registry = cache / "installed_plugins.json"
             second = cache / "second.json"
-            registry.write_text(json.dumps({"plugins": {"machine@base-agents": [{"scope": "user", "installPath": str(active[0])}]}}), encoding="utf-8")
-            second.write_text(json.dumps({"plugins": {"machine@base-agents": [{"scope": "user", "installPath": str(active[1])}]}}), encoding="utf-8")
+            registry.write_text(json.dumps({"plugins": {"machine@tj-agents": [{"scope": "user", "installPath": str(active[0])}]}}), encoding="utf-8")
+            second.write_text(json.dumps({"plugins": {"machine@tj-agents": [{"scope": "user", "installPath": str(active[1])}]}}), encoding="utf-8")
             (cache / "known_marketplaces.json").write_text(json.dumps({
-                "base-agents": {"source": {"repo": "tj-agents/core"}},
+                "tj-agents": {"source": {"repo": "tj-agents/marketplace"}},
             }), encoding="utf-8")
             profile = home / ".bashrc"
             profile.parent.mkdir()
@@ -404,7 +404,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                 cli = bin_dir / host
                 if host == "claude":
                     cache = root / "claude-cache"
-                    active = cache / "base-agents" / "machine" / "test"
+                    active = cache / "tj-agents" / "machine" / "test"
                     launcher = active / "resources" / "machine" / "scripts" / "claude_terminal_launcher.py"
                     launcher.parent.mkdir(parents=True)
                     (active / "catalog").mkdir()
@@ -413,15 +413,15 @@ class TerminalLaunchersTests(unittest.TestCase):
                     cli.write_text("#!/bin/sh\nexit 88\n", encoding="utf-8")
                     cli.chmod(cli.stat().st_mode | 0o111)
                     (cache / "installed_plugins.json").write_text(json.dumps({"plugins": {
-                        "machine@base-agents": [{"scope": "user", "installPath": str(active)}]
+                        "machine@tj-agents": [{"scope": "user", "installPath": str(active)}]
                     }}), encoding="utf-8")
                     (cache / "known_marketplaces.json").write_text(json.dumps({
-                        "base-agents": {"source": {"repo": "tj-agents/core"}},
+                        "tj-agents": {"source": {"repo": "tj-agents/marketplace"}},
                     }), encoding="utf-8")
                     environment["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(cache)
                 else:
                     codex_home = root / "codex-home"
-                    active = codex_home / "plugins" / "cache" / "base-agents" / "machine" / "test"
+                    active = codex_home / "plugins" / "cache" / "tj-agents" / "machine" / "test"
                     launcher = active / "resources" / "machine" / "scripts" / "codex_terminal_launcher.py"
                     launcher.parent.mkdir(parents=True)
                     (active / "catalog").mkdir()
@@ -430,7 +430,7 @@ class TerminalLaunchersTests(unittest.TestCase):
                     cli.write_text(
                         "#!/bin/sh\n"
                         "if [ \"$1 $2 $3\" = \"plugin list --json\" ]; then\n"
-                        "  printf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@base-agents\",\"marketplaceName\":\"base-agents\",\"name\":\"machine\",\"version\":\"test\",\"enabled\":true,\"marketplaceSource\":{\"sourceType\":\"git\",\"source\":{\"repo\":\"tj-agents/core\"}}}]}'\n"
+                        "  printf '%s\\n' '{\"installed\":[{\"pluginId\":\"machine@tj-agents\",\"marketplaceName\":\"tj-agents\",\"name\":\"machine\",\"version\":\"test\",\"enabled\":true,\"marketplaceSource\":{\"sourceType\":\"git\",\"source\":{\"repo\":\"tj-agents/marketplace\"}}}]}'\n"
                         "  exit 0\n"
                         "fi\n"
                         "exit 88\n",
@@ -485,13 +485,13 @@ class TerminalLaunchersTests(unittest.TestCase):
                     }), encoding="utf-8")
                     cache.mkdir(parents=True)
                     registry = {"plugins": {
-                        "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
+                        "machine@tj-agents": [{"scope": "user", "installPath": str(package)}],
                     }}
                     for plugins in (config / "plugins", cache):
                         plugins.mkdir(parents=True, exist_ok=True)
                         (plugins / "installed_plugins.json").write_text(json.dumps(registry), encoding="utf-8")
                         (plugins / "known_marketplaces.json").write_text(json.dumps({
-                            "base-agents": {"source": {"source": "github", "repo": "tj-agents/core"}},
+                            "tj-agents": {"source": {"source": "github", "repo": "tj-agents/marketplace"}},
                         }), encoding="utf-8")
                     environment = {
                         "AGENT_STATE_DIRECTORY": str(state),
@@ -523,11 +523,11 @@ class TerminalLaunchersTests(unittest.TestCase):
                                     return {"errors": []}
                                 if arguments == ["plugin", "list", "--available", "--json"]:
                                     return {"installed": [{
-                                        "pluginId": "machine@base-agents", "enabled": True,
+                                        "pluginId": "machine@tj-agents", "enabled": True,
                                         "marketplaceSource": {"sourceType": "git"},
                                     }], "available": []}
-                                if arguments == ["plugin", "add", "machine@base-agents", "--json"]:
-                                    return {"pluginId": "machine@base-agents"}
+                                if arguments == ["plugin", "add", "machine@tj-agents", "--json"]:
+                                    return {"pluginId": "machine@tj-agents"}
                                 raise AssertionError(arguments)
 
                             hook_trust = mock.Mock(
