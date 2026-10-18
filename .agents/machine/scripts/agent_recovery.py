@@ -189,7 +189,7 @@ def _tokens(value):
     return set(TOKEN.findall(str(value or "").casefold()))
 
 
-def _store_rows(hosts):
+def _store_rows(hosts, session_id=None):
     store = _load("session_store")
     if not store.database_path().is_file():
         return []
@@ -197,19 +197,24 @@ def _store_rows(hosts):
     try:
         placeholders = ", ".join("?" for _ in hosts)
         columns = ", ".join(f"{column} AS \"{name}\"" for name, column in STORE_FIELDS)
+        exact = " AND s.session_id = ?" if session_id else ""
         return [dict(row) for row in connection.execute(
             f"SELECT s.host, s.profile, s.last_activity_at, s.started_at, s.ended_at, w.status AS work_item_status, "
             f"{columns} FROM sessions s LEFT JOIN work_items w ON w.key = s.work_item "
-            f"WHERE s.host IN ({placeholders})", tuple(hosts))]
+            f"WHERE s.host IN ({placeholders}){exact}", (*hosts, *((session_id,) if session_id else ())))]
     finally:
         connection.close()
+
+
+def _match_value(name, value):
+    return Path(value).name if name == "cwd" and value else value
 
 
 def _store_match(row, topic):
     if not topic:
         return []
     wanted = _tokens(topic)
-    fields = {name: _tokens(row.get(name)) for name, _column in STORE_FIELDS}
+    fields = {name: _tokens(_match_value(name, row.get(name))) for name, _column in STORE_FIELDS}
     if not wanted or not wanted <= set().union(*fields.values()):
         return None
     return [name for name, tokens in fields.items() if tokens & wanted]
@@ -226,14 +231,41 @@ def _store_item(row, matched_by):
         "id": row["id"], "host": row["host"], "cwd": row["cwd"], "branch": row["branch"],
         "activity": _iso(row["last_activity_at"] or row["started_at"]),
         "preview": row["title"] or row["work_item.title"] or "(no title)",
-        "profile": os.path.normcase(str(Path(row["profile"]).resolve())) if row["profile"] else None,
-        "matched_by": matched_by, "title": row["title"], "source": "sessions.db",
+        "profile": row["profile"], "matched_by": matched_by, "title": row["title"], "source": "sessions.db",
     }
     if row["work_item"]:
         item["work_item"] = {"key": row["work_item"], "title": row["work_item.title"],
                              "status": row["work_item_status"], "plan_path": row["work_item.plan_path"]}
-    item["status"] = liveness({"host": row["host"], "session": row["id"]})
     return item
+
+
+def _finish_store_item(item):
+    item["profile"] = os.path.normcase(str(Path(item["profile"]).resolve()))
+    item["status"] = liveness({"host": item["host"], "session": item["id"]})
+    return item
+
+
+def _history_root(host, profile):
+    return Path(profile) / ("sessions" if host == "codex" else "projects")
+
+
+def _native_stems(host, profile, cache):
+    key = (host, profile)
+    if key not in cache:
+        stems = set()
+        for directory in _roots(host, _history_root(host, profile)):
+            try:
+                files = directory.rglob("*.jsonl") if host == "codex" else directory.glob("*/*.jsonl")
+                stems.update(path.stem for path in files)
+            except OSError:
+                continue
+        cache[key] = stems
+    return cache[key]
+
+
+def _has_history(host, session_id, profile, cache):
+    stems = _native_stems(host, profile, cache)
+    return session_id in stems or any(stem.endswith("-" + session_id) for stem in stems)
 
 
 def _store_search(hosts, topic, checkout, history):
@@ -243,13 +275,14 @@ def _store_search(hosts, topic, checkout, history):
         return []
     variants = history._worktree_variants(checkout) if checkout else None
     results = []
+    native = {}
     for row in rows:
-        if not row["id"] or not SESSION_ID.fullmatch(row["id"]):
+        if not row["id"] or not SESSION_ID.fullmatch(row["id"]) or not row["profile"]:
             continue
         if variants and not history._cwd_under(row["cwd"], variants):
             continue
         matched_by = _store_match(row, topic)
-        if matched_by is None:
+        if matched_by is None or not _has_history(row["host"], row["id"], row["profile"], native):
             continue
         results.append(_store_item(row, matched_by))
     return results
@@ -287,28 +320,35 @@ def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots
                 normal["source"] = "native-history"
                 results.append(normal)
     results.sort(key=lambda item: item.get("activity") or "", reverse=True)
-    return results[:count]
+    return [_finish_store_item(item) if item.get("source") == "sessions.db" else item for item in results[:count]]
 
 
-def _store_find(host, session_id):
+def _store_find(host, session_id, history):
     try:
-        rows = [row for row in _store_rows((host,)) if row["id"] == session_id]
+        rows = _store_rows((host,), session_id)
     except Exception:
         return None
     if not rows or not rows[0]["profile"]:
         return None
-    return _store_item(rows[0], [])
+    path = _history_file(host, session_id, rows[0]["profile"])
+    native = history.session(path, host) if path else None
+    if not native or native.get("session") != session_id or not _recoverable(native):
+        return None
+    item = _finish_store_item(_store_item(rows[0], []))
+    item["cwd"] = native.get("cwd") or item["cwd"]
+    item["branch"] = native.get("branch") or item["branch"]
+    return item
 
 
 def find(host, session_id, roots=None):
     if host not in ("codex", "claude") or not SESSION_ID.fullmatch(session_id):
         raise ValueError("A host and native session id are required.")
-    item = None if roots else _store_find(host, session_id)
+    history = _load("history")
+    item = None if roots else _store_find(host, session_id, history)
     if item:
         if not item["cwd"] or not Path(item["cwd"]).is_dir():
             raise ValueError("The recorded session directory is missing; refusing to resume it elsewhere.")
         return item
-    history = _load("history")
     root = Path((roots or {}).get(host) or history.history_root(host))
     if not root.is_dir():
         raise ValueError(f"No {host} history directory at {root}; select the correct profile or history root.")
@@ -411,12 +451,14 @@ def _receipt_state(path, host, session_id, profile, state):
 
 
 def _history_file(host, session_id, profile):
-    root = Path(profile) / ("sessions" if host == "codex" else "projects")
-    pattern = f"*{session_id}.jsonl" if host == "codex" else f"*/{session_id}.jsonl"
-    try:
-        return next(iter(sorted(root.rglob(pattern) if host == "codex" else root.glob(pattern))), None)
-    except OSError:
-        return None
+    for root in _roots(host, _history_root(host, profile)):
+        try:
+            found = sorted(root.rglob(f"*{session_id}.jsonl") if host == "codex" else root.glob(f"*/{session_id}.jsonl"))
+        except OSError:
+            continue
+        if found:
+            return found[0]
+    return None
 
 
 def _modified(path):
@@ -426,13 +468,25 @@ def _modified(path):
         return None
 
 
-def _registered_since(host, session_id, since):
+def _registered_since(connection, handle, since):
+    if connection is None:
+        return False
     try:
-        rows = [row for row in _store_rows((host,)) if row["id"] == session_id]
+        row = connection.execute("SELECT started_at FROM sessions WHERE handle = ?", (handle,)).fetchone()
     except Exception:
         return False
-    started = rows[0]["started_at"] if rows else None
+    started = row[0] if row else None
     return isinstance(started, (int, float)) and not isinstance(started, bool) and started >= since
+
+
+def _abandon(status_path):
+    try:
+        descriptor = os.open(status_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump({"state": "abandoned", "at": time.time()}, handle)
+    return True
 
 
 def _read_status(path):
@@ -446,28 +500,40 @@ def _read_status(path):
 def await_pickup(host, session_id, status_path, since, history_path=None, timeout=PICKUP_TIMEOUT_SECONDS,
                  wrapper_timeout=WRAPPER_TIMEOUT_SECONDS, interval=PICKUP_INTERVAL_SECONDS,
                  clock=time.monotonic, wait=time.sleep):
+    store = _load("session_store")
+    handle = store.session_handle(host, session_id)
     start = clock()
     history_before = _modified(history_path)
-    wrapper_seen = False
-    while True:
-        status = _read_status(status_path)
-        wrapper_seen = wrapper_seen or status is not None
-        if status and status.get("state") == "failed":
-            raise LaunchFailed(str(status.get("error") or f"{host} startup failed"))
-        if _registered_since(host, session_id, since):
-            return "registered in sessions.db"
-        modified = _modified(history_path)
-        if modified is not None and modified != history_before and modified >= since:
-            return "native history written"
-        if status and status.get("state") == "exited":
-            raise LaunchFailed(f"native {host} exited with {status.get('returncode')} before resuming the session")
-        elapsed = clock() - start
-        if not wrapper_seen and elapsed >= wrapper_timeout:
-            raise LaunchFailed("the terminal never started the launch; no tab ran the startup wrapper")
-        if elapsed >= timeout:
-            raise LaunchUnverified(f"{host} startup began but did not resume the session within {int(timeout)}s; "
-                                   "check the opened tab before retrying")
-        wait(interval)
+    connection = None
+    try:
+        while True:
+            status = _read_status(status_path)
+            state = status.get("state") if status else None
+            if state == "failed":
+                raise LaunchFailed(str(status.get("error") or f"{host} startup failed"))
+            if connection is None and store.database_path().is_file():
+                connection = store.connect()
+            evidence = None
+            if _registered_since(connection, handle, since):
+                evidence = "registered in sessions.db"
+            else:
+                modified = _modified(history_path)
+                if modified is not None and modified != history_before and modified >= since:
+                    evidence = "native history written"
+            if evidence and state == "running":
+                return evidence
+            if state == "exited":
+                raise LaunchFailed(f"native {host} exited with {status.get('returncode')} before resuming the session")
+            elapsed = clock() - start
+            if status is None and elapsed >= wrapper_timeout and _abandon(status_path):
+                raise LaunchFailed("the terminal never started the launch; no tab ran the startup wrapper")
+            if elapsed >= timeout:
+                raise LaunchUnverified(f"{host} startup began but did not resume the session within {int(timeout)}s; "
+                                       "check the opened tab before retrying")
+            wait(interval)
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 def open_session(host, session_id, prompt="Continue the requested work.", title=None, roots=None, confirm_closed=False,

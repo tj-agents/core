@@ -200,3 +200,11 @@ session's repository and branch, or through an explicit `work_item_sessions.py c
 a work item per prompt, so a session working on `main` or an unclaimed branch stays unbound and topic recovery
 can match it only by title, checkout or repository. Resolve when every authorized task's owning session is
 bound to a work item without a manual claim.
+
+## Recovering several sessions waits for each startup in turn
+
+`agent_recovery.py recover` opens each `--select` serially and waits for observed pickup before launching the
+next, so recovering several sessions takes the sum of their bound startups. `open_session` sets
+`CLAUDE_CONFIG_DIR` or `CODEX_HOME` in the process environment around each launch, so the selections cannot
+simply run on threads. Resolve when the launches pass their profile through the launch environment only and the
+pickups are awaited together.
