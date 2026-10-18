@@ -17,7 +17,7 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 import agent_cli  # noqa: E402
-from codex_marketplace_sync import SyncError, codex_config_selection  # noqa: E402
+from codex_marketplace_sync import SyncError, _marketplace_source, codex_config_selection  # noqa: E402
 from startup_binding import StartupBindingError, run_session  # noqa: E402
 
 HOSTS = ("claude", "codex")
@@ -73,9 +73,7 @@ def claude_marketplaces(environ: Mapping[str, str] = os.environ) -> list[str]:
 
 def codex_marketplaces(selection: Mapping[str, object]) -> list[str]:
     configured = selection.get("effective_marketplace_configuration") or {}
-    return sorted(name for name, entry in configured.items()
-                  if isinstance(entry, Mapping) and entry.get("source_type") == "git"
-                  and owned(repository_name(entry.get("source"))))
+    return sorted(name for name, entry in configured.items() if owned(repository_name(_marketplace_source(entry))))
 
 
 def run(command: Sequence[str], cwd: Path, timeout: float) -> None:
@@ -133,34 +131,60 @@ def codex_enabled(selection: Mapping[str, object]) -> set[str]:
             if isinstance(entry, Mapping) and isinstance(entry.get("identity"), str)}
 
 
-def claude_registry_problems(enabled: set[str], environ: Mapping[str, str] = os.environ) -> list[str]:
+def _applies(record: Mapping[str, object], project: Path) -> bool:
+    scope = record.get("scope")
+    if scope in {"user", "managed"}:
+        return True
+    owner = record.get("projectPath")
+    if scope not in {"project", "local"} or not isinstance(owner, str):
+        return False
+    try:
+        project.resolve().relative_to(Path(owner).resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def claude_registry_problems(enabled: set[str], project: Path, environ: Mapping[str, str] = os.environ) -> list[str]:
     path = plugins_root("claude", environ) / "installed_plugins.json"
     try:
         registry = json.loads(path.read_text(encoding="utf-8")).get("plugins", {})
     except (OSError, ValueError, AttributeError) as error:
         return [f"Claude plugin registry could not be read: {error}"]
     problems = []
+    marketplaces = set(claude_marketplaces(environ))
     for identity, records in registry.items() if isinstance(registry, Mapping) else ():
-        if identity not in enabled:
+        if identity not in enabled or identity.rsplit("@", 1)[-1] not in marketplaces:
             continue
         for record in records if isinstance(records, list) else ():
-            if not isinstance(record, Mapping) or record.get("scope") != "user":
+            if not isinstance(record, Mapping) or not _applies(record, project):
                 continue
             install = record.get("installPath")
-            if not isinstance(install, str) or not (Path(install).parent / MARKER).is_file():
+            scope = record.get("scope")
+            marker = Path(install).parent / MARKER if isinstance(install, str) else None
+            if marker is None or not marker.is_file():
+                problems.append(f"{identity} ({scope}): {install!r} is not a rolling install, so Claude loads "
+                                f"an unrefreshed copy")
                 continue
-            if record.get("version") != Path(install).name:
-                problems.append(f"{identity}: registry version {record.get('version')!r} does not name "
+            try:
+                revision = json.loads(marker.read_text(encoding="utf-8")).get("revision")
+            except (OSError, ValueError, AttributeError):
+                revision = None
+            if Path(install).name != revision:
+                problems.append(f"{identity} ({scope}): Claude loads {Path(install).name!r}, but the refreshed "
+                                f"install is {revision!r}")
+            elif record.get("version") != Path(install).name:
+                problems.append(f"{identity} ({scope}): registry version {record.get('version')!r} does not name "
                                 f"its install directory {Path(install).name!r}, so Claude loads another copy")
     return problems
 
 
-def verify(host: str, enabled: set[str], repositories: Callable[[str], str] = main_revision,
+def verify(host: str, enabled: set[str], project: Path, repositories: Callable[[str], str] = main_revision,
            environ: Mapping[str, str] = os.environ) -> dict[str, object]:
     heads: dict[str, str] = {}
     packages = []
     unused_stale = []
-    problems = claude_registry_problems(enabled, environ) if host == "claude" else []
+    problems = claude_registry_problems(enabled, project, environ) if host == "claude" else []
     for package in installed_packages(host, environ):
         repository = repository_name(package["repository"])
         if package["identity"] not in enabled or not owned(repository):
@@ -225,7 +249,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     failed = False
     for host in hosts:
         try:
-            report = verify(host, refresh(host, project, arguments.verify_only))
+            report = verify(host, refresh(host, project, arguments.verify_only), project)
         except (RefreshError, agent_cli.LaunchError, OSError) as error:
             report = {"host": host, "packages": [], "problems": [str(error)]}
         failed = failed or bool(report["problems"])

@@ -12,7 +12,7 @@ Run with `python` on Windows or `python3` on Linux/macOS, from the repository wh
 refreshed:
 
 ```sh
-python '<skill-directory>/../../resources/machine/scripts/refresh_cli.py' --project '<absolute-checkout>'
+python -B '<skill-directory>/../../resources/machine/scripts/refresh_cli.py' --project '<absolute-checkout>'
 ```
 
 For each host it updates every registered tj-agents marketplace, runs the same verified rolling refresh a
