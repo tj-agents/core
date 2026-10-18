@@ -440,6 +440,14 @@ class WorktreePlacementGateTests(unittest.TestCase):
                 result = self.invoke(command)
                 self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_untokenizable_creation_with_quoted_words_is_still_blocked(self):
+        sibling = self.base / "quoted-sibling"
+        for command in (f"git -c a.b=' ' -C \"{self.repo}\" worktree \"add\" -- \"{sibling}\"",
+                        f"git -c a.b=' ' -C \"{self.repo}\" w\"orktree\" add -- \"{sibling}\""):
+            with self.subTest(command=command):
+                result = self.invoke(command)
+                self.assertNotEqual(0, result.returncode)
+
     def test_accepts_line_continuations_for_a_valid_creation(self):
         destination = self.repo / ".worktrees" / "feature-test"
         command = (
