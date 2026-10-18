@@ -667,10 +667,10 @@ def await_handoff_startup(status_path, timeout=480, wrapper_timeout=45,
             raise LaunchError("the launch was abandoned before startup")
         if state == "failed":
             raise LaunchError(str(status.get("error") or "native startup failed"))
+        if state == "running" or (state == "exited" and status.get("running_at") and status.get("returncode") == 0):
+            return
         if state == "exited":
             raise LaunchError(f"native CLI exited with {status.get('returncode')} before handoff confirmation")
-        if state == "running":
-            return
         elapsed = clock() - start
         if not status and elapsed >= wrapper_timeout:
             try:
