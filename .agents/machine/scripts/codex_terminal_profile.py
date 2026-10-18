@@ -110,7 +110,7 @@ BASH_BLOCK = "\n".join((
     "  local target python",
     "  target=$(type -P codex) || { printf '%s\\n' 'codex executable not found on PATH' >&2; return 127; }",
     "  if python=$(_base_agents_python); then",
-    "    if \"$python\" -I -B -c \"$_base_agents_bootstrap\" --probe codex \"$target\" \"$PWD\"; then",
+    "    if \"$python\" -I -B -c \"$_base_agents_bootstrap\" --probe codex \"$target\" \"$PWD\" \"$@\"; then",
     "      if \"$python\" -I -B -c \"$_base_agents_bootstrap\" codex \"$target\" \"$PWD\" \"$@\"; then return 0; else return $?; fi",
     "    fi",
     "  else printf '%s\\n' 'standards: no usable Python was found; session launch is unavailable' >&2; return 125; fi",
