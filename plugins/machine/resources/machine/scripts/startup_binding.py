@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codex_marketplace_sync import codex_config_selection
 import launch_status
 from rolling_plugins import OPERATION_TIMEOUT_SECONDS, RollingPluginError, preflight, terminate_process_tree
-from terminal_command import command_for_target, native_target_for_shim
+from terminal_command import command_for_target, native_target_for_shim, without_binding_state
 
 
 HERE = Path(__file__).resolve().parent
@@ -153,13 +153,7 @@ def _binding_environment(directory: Path, token: str, snapshot_directory: Path,
 
 
 def _without_binding_state(environment: Mapping[str, str]) -> dict[str, str]:
-    values = dict(environment)
-    values.pop(ACK_DIRECTORY_ENV, None)
-    values.pop(ACK_TOKEN_ENV, None)
-    values.pop(SNAPSHOT_DIRECTORY_ENV, None)
-    values.pop("TJ_AGENTS_CODEX_RUNTIME_RECEIPT", None)
-    values.pop("TJ_AGENTS_CODEX_RUNTIME_RECEIPT_SHA256", None)
-    return values
+    return without_binding_state(environment)
 
 
 def _cleanup_runtime(runtime, binding, configuration: Path) -> None:
@@ -199,8 +193,11 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                 extra_environment: Mapping[str, str] | None = None,
                 timeout: float = STARTUP_TIMEOUT_SECONDS,
                 on_running: Callable[..., None] | None = None,
-                require_session_start: bool = False) -> int:
+                require_session_start: bool = False,
+                on_launch: Callable[[], None] | None = None,
+                keep_unacknowledged_session: bool = False) -> int:
     running = on_running or (lambda child_pid=None: None)
+    launched = on_launch or (lambda: None)
     project = Path(project).resolve()
     configuration = _configuration_root(host).resolve()
     startup_deadline = time.monotonic() + OPERATION_TIMEOUT_SECONDS
@@ -257,6 +254,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                                 command_for_target(target, _launch_arguments(arguments, binding.prepared.launch_args)),
                                 cwd=project, env=environment, start_new_session=os.name != "nt",
                             )
+                            launched()
                             if require_session_start:
                                 while process.poll() is None:
                                     if _acknowledged(acknowledgement, token):
@@ -285,6 +283,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     environment.update(extra_environment)
                 try:
                     running()
+                    launched()
                     return subprocess.run(command_for_target(target, arguments), cwd=project, env=environment).returncode
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
@@ -301,6 +300,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     environment.update(extra_environment)
                 try:
                     running()
+                    launched()
                     return subprocess.run(command_for_target(target, launch_arguments), cwd=project,
                                           env=environment).returncode
                 except OSError as error:
@@ -327,6 +327,7 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                     )
                 except OSError as error:
                     raise StartupBindingError(f"native {host} could not start: {error}") from error
+                launched()
                 try:
                     deadline = time.monotonic() + _remaining(prepared, timeout)
                     while process.poll() is None and time.monotonic() < deadline:
@@ -337,6 +338,12 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                         time.sleep(0.05)
                     if process.poll() is not None:
                         return process.returncode
+                    if keep_unacknowledged_session:
+                        print(f"standards: {host} did not confirm its standards hooks; continuing the session without them",
+                              file=sys.stderr)
+                        active.acknowledge_binding()
+                        running(process.pid)
+                        return process.wait()
                     raise StartupBindingError(f"native {host} did not acknowledge SessionStart before the startup deadline")
                 except BaseException as error:
                     if process.poll() is None:
