@@ -79,3 +79,9 @@ A source-only claim of live adoption is insufficient.
 4. Return exact delivery and native-acceptance evidence. Keep this goal current; do not rewrite the
    parent's separate PR306 goal. A definite launch failure or unknown existing owner remains a concrete
    resolver/resume condition, never authority to start a second writer.
+
+## Progress
+
+- 2026-10-18 pickup: claude:a727fe94-883c-4713-b4f9-13351c5374aa claimed
+  lifecycle/live-session-plugin-refresh as owner/active at baseline 1518a351 (origin/main dc1f7415, no
+  newer main commits). Next action: step 2 causal trace.
