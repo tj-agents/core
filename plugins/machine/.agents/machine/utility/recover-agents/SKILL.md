@@ -13,24 +13,30 @@ relevant exact id and a concise instruction to continue; it chooses the host and
 `recover --select` below refuses a live session instead of focusing it. The user's recovery
 request authorizes those resumes; clarify only when the relevant session or live identity is ambiguous.
 
-Inventory both native histories first. The result groups the host, original checkout, title and exact native id.
-Use the current goal or PR state to identify relevant work, then select only its returned `host:id` values. Do not
-reopen every old session or infer unfinished work from a final transcript message. Run both commands below
-with `python` on Windows or `python3` on Linux/macOS.
+The inventory reads the session store (`~/.agents-state/sessions.db`) first: every topic word must appear in the
+session's title, id, checkout, repository, branch, or its work item's key, title or plan path. `matched_by` names
+the fields that matched, and each result carries its work item. Native histories are scanned only when the store
+has no match, or with `--include-history`. Use the current goal or PR state to identify relevant work, then
+select only returned `host:id` values. Do not reopen every old session or infer unfinished work from a final
+transcript message. Run both commands below with `python` on Windows or `python3` on Linux/macOS.
 
 ```sh
-python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --checkout '<absolute-checkout>'
+python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --checkout '<absolute-checkout>'
 ```
 
 `recover` is read-only until an exact selection is supplied:
 
 ```sh
-python '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' recover --checkout '<absolute-checkout>' --select 'codex:<native-id>' --prompt 'Continue the requested work.'
+python -B '<skill-directory>/../../resources/machine/scripts/agent_recovery.py' recover --topic '<topic>' --select 'codex:<native-id>' --prompt 'Continue the requested work.'
 ```
 
+A selected open is reported only after the resumed session registers in the store or writes its native history;
+startup refreshes plugins first and can take several minutes. Exit 1 means the launch failed and prints the
+cause; it can be retried after fixing that. Exit 3 means the tab started but the session was not seen to resume;
+check that tab and do not retry.
+
 Use `--codex-history-root '<profile>/sessions'` or `--claude-history-root '<profile>/projects'` for an alternate
-profile. Unknown live identity requires reconciliation before a
-resume, and ambiguous terminal launch results must not be retried.
+profile. Unknown live identity requires reconciliation before a resume.
 
 ## Continue a work item
 
