@@ -489,6 +489,13 @@ def cmd_item(work_item, status, pr=None, title=None, plan_path=None, cwd=None):
                 connection, key, repo, feature, item, status=status, branch=record_branch, pr=pr,
                 title=title, plan_path=plan_path,
             )
+        if status == "done":
+            keep = [
+                store.session_handle(host, session_id)
+                for host in ("claude", "codex")
+                for session_id in (_current_session_id(host),) if session_id
+            ]
+            store.delete_work_item_sessions(connection, key, keep=keep)
     finally:
         connection.close()
     return {"work_item": f"{feature}/{item}", "status": status}

@@ -162,6 +162,14 @@ class FinishReaperProcessTests(unittest.TestCase):
             host = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=worktree)
             started = self.process_started_at(host.pid)
             result = state / "merge-cleanup/results/result.json"; env = dict(os.environ, AGENT_STATE_DIRECTORY=str(state), AGENT_FINISH_REAPER_TIMEOUT_SECONDS="10")
+            with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
+                store = session_close.register_session._load_session_store()
+                connection = store.connect()
+                try:
+                    store.ensure_session(connection, "claude", "ours")
+                    store.ensure_session(connection, "claude", "other")
+                finally:
+                    connection.close()
             invocation_id = "integration-invocation"
             observer = subprocess.Popen([
                 sys.executable, str(REAPER), "--host-pid", str(host.pid),
@@ -197,6 +205,13 @@ class FinishReaperProcessTests(unittest.TestCase):
                 self.assertFalse(worktree.exists())
                 self.assertFalse(obligation.exists()); self.assertEqual(1, subprocess.run(["git", "-C", str(primary), "show-ref", "--verify", "--quiet", "refs/heads/feature"]).returncode)
                 self.assertEqual("succeeded", json.loads(result.read_text(encoding="utf-8"))["status"])
+                with mock.patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(state)}):
+                    connection = store.connect()
+                    try:
+                        remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
+                    finally:
+                        connection.close()
+                self.assertEqual(["claude:other"], remaining)
             finally:
                 if host.poll() is None:
                     host.kill()
