@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import math
+import secrets
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -249,23 +250,34 @@ def _history_root(host, profile):
     return Path(profile) / ("sessions" if host == "codex" else "projects")
 
 
-def _native_stems(host, profile, cache):
+def _native_files(host, profile, cache):
     key = (host, profile)
     if key not in cache:
-        stems = set()
+        files = {}
         for directory in _roots(host, _history_root(host, profile)):
             try:
-                files = directory.rglob("*.jsonl") if host == "codex" else directory.glob("*/*.jsonl")
-                stems.update(path.stem for path in files)
+                found = directory.rglob("*.jsonl") if host == "codex" else directory.glob("*/*.jsonl")
+                files.update((path.stem, path) for path in found)
             except OSError:
                 continue
-        cache[key] = stems
+        cache[key] = files
     return cache[key]
 
 
-def _has_history(host, session_id, profile, cache):
-    stems = _native_stems(host, profile, cache)
-    return session_id in stems or any(stem.endswith("-" + session_id) for stem in stems)
+def _native_file(host, session_id, profile, cache):
+    files = _native_files(host, profile, cache)
+    if session_id in files:
+        return files[session_id]
+    return next((path for stem, path in files.items() if stem.endswith("-" + session_id)), None)
+
+
+def _resumable(item, history, cache):
+    path = _native_file(item["host"], item["id"], item["profile"], cache)
+    native = history.session(path, item["host"]) if path else None
+    if not native or native.get("session") != item["id"] or not _recoverable(native):
+        return None
+    return {**item, "cwd": native.get("cwd") or item["cwd"], "branch": native.get("branch") or item["branch"],
+            "history_file": str(path)}
 
 
 def _store_search(hosts, topic, checkout, history):
@@ -275,16 +287,14 @@ def _store_search(hosts, topic, checkout, history):
         return []
     variants = history._worktree_variants(checkout) if checkout else None
     results = []
-    native = {}
     for row in rows:
         if not row["id"] or not SESSION_ID.fullmatch(row["id"]) or not row["profile"]:
             continue
         if variants and not history._cwd_under(row["cwd"], variants):
             continue
         matched_by = _store_match(row, topic)
-        if matched_by is None or not _has_history(row["host"], row["id"], row["profile"], native):
-            continue
-        results.append(_store_item(row, matched_by))
+        if matched_by is not None:
+            results.append(_store_item(row, matched_by))
     return results
 
 
@@ -301,9 +311,10 @@ def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots
     if count < 1:
         raise ValueError("--count must be positive")
     history = _load("history")
-    results = [] if roots else _store_search(hosts, topic, checkout, history)
+    stored = [] if roots else _store_search(hosts, topic, checkout, history)
+    results = list(stored)
     found = {(item["host"], item["id"]) for item in results}
-    for host in hosts if include_history or not results else ():
+    for host in hosts if include_history or not stored else ():
         root = (roots or {}).get(host) if roots else None
         root = Path(root) if root else history.history_root(host)
         if not root.is_dir():
@@ -320,7 +331,18 @@ def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots
                 normal["source"] = "native-history"
                 results.append(normal)
     results.sort(key=lambda item: item.get("activity") or "", reverse=True)
-    return [_finish_store_item(item) if item.get("source") == "sessions.db" else item for item in results[:count]]
+    kept = []
+    native = {}
+    for item in results:
+        if item.get("source") == "sessions.db":
+            item = _resumable(item, history, native)
+            if item is None:
+                continue
+            item = _finish_store_item(item)
+        kept.append(item)
+        if len(kept) == count:
+            break
+    return kept
 
 
 def _store_find(host, session_id, history):
@@ -330,14 +352,8 @@ def _store_find(host, session_id, history):
         return None
     if not rows or not rows[0]["profile"]:
         return None
-    path = _history_file(host, session_id, rows[0]["profile"])
-    native = history.session(path, host) if path else None
-    if not native or native.get("session") != session_id or not _recoverable(native):
-        return None
-    item = _finish_store_item(_store_item(rows[0], []))
-    item["cwd"] = native.get("cwd") or item["cwd"]
-    item["branch"] = native.get("branch") or item["branch"]
-    return item
+    item = _resumable(_store_item(rows[0], []), history, {})
+    return _finish_store_item(item) if item else None
 
 
 def find(host, session_id, roots=None):
@@ -479,40 +495,39 @@ def _registered_since(connection, handle, since):
     return isinstance(started, (int, float)) and not isinstance(started, bool) and started >= since
 
 
-def _abandon(status_path):
-    try:
-        descriptor = os.open(status_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        return False
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        json.dump({"state": "abandoned", "at": time.time()}, handle)
-    return True
+def _status_path(receipt):
+    for stale in receipt.parent.glob(f"{receipt.stem}.*.status.json"):
+        try:
+            if time.time() - stale.stat().st_mtime > 86400:
+                stale.unlink()
+        except OSError:
+            continue
+    return receipt.with_name(f"{receipt.stem}.{secrets.token_hex(8)}.status.json")
 
 
-def _read_status(path):
+def _connect(store):
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        return store.connect() if store.database_path().is_file() else None
+    except Exception:
         return None
-    return value if isinstance(value, dict) else None
 
 
 def await_pickup(host, session_id, status_path, since, history_path=None, timeout=PICKUP_TIMEOUT_SECONDS,
                  wrapper_timeout=WRAPPER_TIMEOUT_SECONDS, interval=PICKUP_INTERVAL_SECONDS,
                  clock=time.monotonic, wait=time.sleep):
     store = _load("session_store")
+    status_file = _load("launch_status")
     handle = store.session_handle(host, session_id)
     start = clock()
     history_before = _modified(history_path)
     connection = None
     try:
         while True:
-            status = _read_status(status_path)
+            status = status_file.read(status_path)
             state = status.get("state") if status else None
             if state == "failed":
                 raise LaunchFailed(str(status.get("error") or f"{host} startup failed"))
-            if connection is None and store.database_path().is_file():
-                connection = store.connect()
+            connection = connection or _connect(store)
             evidence = None
             if _registered_since(connection, handle, since):
                 evidence = "registered in sessions.db"
@@ -520,12 +535,13 @@ def await_pickup(host, session_id, status_path, since, history_path=None, timeou
                 modified = _modified(history_path)
                 if modified is not None and modified != history_before and modified >= since:
                     evidence = "native history written"
-            if evidence and state == "running":
+            if evidence and (state == "running" or status.get("running_at")):
                 return evidence
             if state == "exited":
                 raise LaunchFailed(f"native {host} exited with {status.get('returncode')} before resuming the session")
             elapsed = clock() - start
-            if status is None and elapsed >= wrapper_timeout and _abandon(status_path):
+            if status is None and elapsed >= wrapper_timeout and status_file.create(
+                    status_path, {"state": "abandoned", "at": time.time()}):
                 raise LaunchFailed("the terminal never started the launch; no tab ran the startup wrapper")
             if elapsed >= timeout:
                 raise LaunchUnverified(f"{host} startup began but did not resume the session within {int(timeout)}s; "
@@ -555,9 +571,9 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
     launched = False
     try:
         receipt = _claim(host, session_id, item["profile"])
-        status_path = receipt.with_suffix(".status.json")
-        status_path.unlink(missing_ok=True)
-        history_path = _history_file(host, session_id, item["profile"])
+        status_path = _status_path(receipt)
+        history_path = Path(item["history_file"]) if item.get("history_file") else _history_file(
+            host, session_id, item["profile"])
         since = time.time()
         directory = cli.resolve_tab_directory(item["cwd"])
         label = title or f"{host.title()} {session_id[:8]}"

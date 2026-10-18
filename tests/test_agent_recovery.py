@@ -345,6 +345,24 @@ Observed blocker: no send was attempted."""
             self.run_pickup([(1, {"state": "preparing"}), (6, {"state": "failed", "error": "did not acknowledge"})],
                             registered_after=4)
 
+    def test_a_session_that_resumed_and_exited_counts_as_picked_up(self):
+        exited = {"state": "exited", "returncode": 0, "running_at": 2}
+        self.assertEqual("registered in sessions.db",
+                         self.run_pickup([(1, {"state": "preparing"}), (2, exited)], registered_after=2))
+        with self.assertRaisesRegex(RECOVERY.LaunchFailed, "exited with 0"):
+            self.run_pickup([(1, {"state": "preparing"}), (2, exited)])
+
+    def test_status_files_are_created_once_with_content(self):
+        status = RECOVERY._load("launch_status")
+        path = self.root / "attempt.status.json"
+        self.assertTrue(status.create(path, {"state": "preparing"}))
+        self.assertFalse(status.create(path, {"state": "abandoned"}))
+        self.assertEqual({"state": "preparing"}, status.read(path))
+        self.assertTrue(status.replace(path, {"state": "running", "running_at": 1}))
+        self.assertEqual("running", status.read(path)["state"])
+        receipt = RECOVERY._receipt("codex", "exact_id", "profile")
+        self.assertNotEqual(RECOVERY._status_path(receipt), RECOVERY._status_path(receipt))
+
     def test_pickup_failures_carry_the_cause(self):
         with self.assertRaisesRegex(RECOVERY.LaunchFailed, "unsupported value"):
             self.run_pickup([(1, {"state": "preparing"}), (3, {"state": "failed", "error": "unsupported value"})])
