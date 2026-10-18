@@ -86,6 +86,22 @@ def database_path():
     return state_directory() / "sessions.db"
 
 
+def follow_registered_cwd(host, session_id, cwd):
+    path = state_directory() / "cli-sessions" / f"{session_id}.json"
+    try:
+        entry = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if (not isinstance(entry, dict) or entry.get("session_id") != session_id
+            or entry.get("host") not in (None, host) or entry.get("cwd") == str(cwd)):
+        return False
+    entry["cwd"] = str(cwd)
+    staging = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    staging.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(staging, path)
+    return True
+
+
 def _execute_with_lock_retry(connection, statement):
     deadline = time.monotonic() + 5
     while True:
@@ -597,6 +613,7 @@ def run_hook(event, host):
                 record_prompt(connection, handle)
             elif event == "stop":
                 record_stop(connection, handle, cwd)
+                follow_registered_cwd(host, session_id, cwd)
             elif event == "session-end":
                 end_session(connection, handle, "closed")
         finally:
