@@ -41,5 +41,6 @@ If the tab cannot be focused the command fails and names why; report that to the
 reopening. Focus needs the tab the session registered at startup, so a session started before the
 registry hook existed has none, and a Windows Terminal tab whose title the CLI has since rewritten may not
 be found. A session whose liveness is unknown is refused until the user confirms it has no live writer, then
-pass `--confirm-closed`. Never retry after an ambiguous terminal result (exit 3). A prior reopen's launch
-record releases itself once that tab's process exits; one that predates this tracking needs `--confirm-closed`.
+pass `--confirm-closed`. After an ambiguous terminal result (exit 3), check the opened tab and do not retry
+while it may still run. Its launch record releases itself once that tab's process exits; a record that
+predates this tracking needs `--confirm-closed` after the user confirms no tab runs the session.
