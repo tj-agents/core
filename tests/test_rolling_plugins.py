@@ -384,6 +384,37 @@ class RollingPluginsTests(unittest.TestCase):
         package = ROLLING.resolve([ROLLING.Selection('base@core', str(self.remote), 'core')], self.root / 'cache')[0]
         self.assertTrue(package.root.joinpath('payload.txt').stat().st_mode & 0o111)
 
+    def test_unpublished_main_falls_back_to_the_last_published_revision(self):
+        def gate_failing_at(failing):
+            def gate(_clone, revision, _deadline=None):
+                if revision in failing:
+                    raise ROLLING.RollingPluginError('Catalog digest drift')
+            return gate
+
+        cache = self.root / 'cache'
+        clone, unpublished = ROLLING._fetch_main(str(self.remote), cache)
+        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({unpublished})), \
+                self.assertRaisesRegex(ROLLING.RollingPluginError, 'Catalog digest drift'):
+            ROLLING._published_revision(clone, unpublished)
+
+        self.write(self.author / 'plugins/publication.json', {'source_fingerprint': 'one'})
+        git(self.author, 'add', '-A')
+        git(self.author, 'commit', '-m', 'Regenerate packages')
+        git(self.author, 'push', 'origin', 'HEAD:main')
+        regenerated = git(self.author, 'rev-parse', 'HEAD')
+        merged = self.publish('merged source awaiting regeneration')
+        clone, tip = ROLLING._fetch_main(str(self.remote), cache)
+        self.assertEqual(merged, tip)
+        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({tip})):
+            self.assertEqual(regenerated, ROLLING._published_revision(clone, tip))
+        self.assertEqual('one', json.loads(ROLLING._git_text(clone, regenerated, 'plugins/publication.json'))['source_fingerprint'])
+        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({tip, regenerated})), \
+                self.assertRaisesRegex(ROLLING.RollingPluginError, 'Catalog digest drift'):
+            ROLLING._published_revision(clone, tip)
+        with mock.patch.object(ROLLING, '_publication_gate', side_effect=gate_failing_at({regenerated})), \
+                self.assertRaisesRegex(ROLLING.RollingPluginError, 'Catalog digest drift'):
+            ROLLING._published_revision(clone, regenerated)
+
     def test_publication_gate_runs_the_fetched_generator_in_a_bounded_subprocess(self):
         clone = self.root / 'clone'
         clone.mkdir()
