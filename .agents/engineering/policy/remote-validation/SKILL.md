@@ -102,6 +102,39 @@ session resume, or machine suspension; it reconnects to the same identity and ob
 while disconnected. It emits compact JSON only for a material transition, terminal result, query error, or
 bounded timeout. Direct `gh run watch`, ad hoc sleeping forge loops, and model-turn polling are blocked.
 
+### Notify before parking a listener
+
+Before the model parks on a silent process, wire its completion notification. **Do not spend later model turns
+polling a listener handle with `write_stdin`, `functions.wait`, status, or tail calls.** A background relay may
+read one already-bound monitor session and notify only for nonempty output or a terminal result; an empty,
+still-running read does not wake the model.
+
+When a host actually documents `functions.exec`, `tools.write_stdin`, and `notify`, place this body in that
+host's documented background `functions.exec` cell. It reuses `boundMonitorSessionId`; it does not start a
+second monitor or invent a durable continuation API:
+
+```js
+const canRelay =
+  typeof functions !== "undefined" && typeof functions.exec === "function" &&
+  typeof tools !== "undefined" && typeof tools.write_stdin === "function" &&
+  typeof notify === "function";
+
+if (canRelay) {
+  const sessionId = boundMonitorSessionId; // Bound before this background cell starts.
+  for (;;) {
+    const update = await tools.write_stdin({session_id: sessionId, chars: "", yield_time_ms: 30_000});
+    const terminal = update.exit_code !== undefined;
+    const hasOutput = typeof update.output === "string" && update.output.trim() !== "";
+    if (hasOutput || terminal) notify(JSON.stringify({output: update.output, terminal}));
+    if (terminal) break;
+  }
+}
+```
+
+Other hosts use their supported `persistent-workflow` notification or wake mechanism. This policy does not
+define a universal listener API or a durable continuation; `persistent-workflow` owns those host-specific
+details.
+
 `.agents/hooks/forge_poll_gate.py` permits the first forge status read for a PR, head, or run, one more after
 a real wake or observed state change, and exactly one shared monitor per identity. It blocks unchanged
 model-turn reads and every legacy watcher shape. Failure-log reads use the compact executable boundary.
