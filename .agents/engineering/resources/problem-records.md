@@ -47,14 +47,7 @@ If a selected provider is unavailable, invalid or offline, retain unsent facts i
 pending submission evidence and report the blocked operation, resolver and observable resume condition.
 Do not create a fallback register, claim synchronization or adopt another backend.
 
-Providers keep backend configuration and transport in their own package. For handoff admission they ship
-`scripts/read_problem_record.py` beside the installed skill. Core invokes it with `--root <absolute-source-primary>`
-and `--record <canonical-URI>` using the same Python interpreter. Its only stdout is a JSON object with
-exactly `record` (the requested URI), `kind` (`bug`, `mistake` or `debt`), `state` (`open`) and `body`
-(nonempty current text). Nonzero exit, malformed data, another identity or a closed record fails admission.
-The reader requires Python 3.9 or later and must not rely on machine-local registry entries. Both hosts
-resolve the selected installed skill through Core's existing discovery. A body may contain the existing
-`agent-handoff-disposition` fence; the provider transports it and Core validates its semantics and evidence.
+Providers keep backend configuration and transport in their own package.
 
 ## Problem record shape
 

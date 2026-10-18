@@ -89,12 +89,8 @@ Commits, pushes, PR administration, and polls still use their declared cheap lea
 Batch clerical work and monitoring loops into a bounded cheap worker when worthwhile; one tiny command
 may stay inline when switching would cost more. Neither route needs another skill read or handoff.
 
-Lane selection does not itself transfer task ownership. A Claude parent hands multi-phase work and every
-delegated design, implementation, or review phase to Codex before delegating, unless the user explicitly
-chooses Claude for non-frontier work. It keeps conversation and tiny inline follow-ups. If Codex cannot
-launch, report the capability gate and preserve the checkpoint; never silently use Claude for that phase.
-For Codex, the parent normally continues in the same checkout and may give a bounded implementation or
-review task to a lane agent. Claude keeps only conversation and tiny inline follow-ups.
+Lane selection never transfers task ownership. On either host the parent does its own work in the same
+checkout and may give a bounded implementation or review task to a lane agent.
 Give that agent explicit path and responsibility ownership, avoid overlapping writers, and reconcile its
 result in the parent. A small follow-up can stay with the parent. If delegation is unavailable, use the
 current owner's supported fallback; do not open an independent session solely to change model or cost.

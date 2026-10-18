@@ -63,21 +63,6 @@ unfinished authorized goal cannot end without verified completion, a genuine typ
 registered wake, including repeated Stop events and hook refresh/trust activation. Keep that live
 acceptance distinct from source test results.
 
-## Callout enforcement has bounded host signals
-
-The callout-repair gate blocks automatic feedback substitution and checks paired launcher results
-against the prepared standards-repair goal. Both host manifests dispatch the gate at Stop.
-Callout detection covers explicit mistake wording that names standards or workflow mechanisms;
-it cannot establish the meaning of every complaint,
-whether a standard caused it, or whether assistant text substantively answers a question. Specialized
-host tools can bypass normal plugin hooks. Source
-regressions and packaging checks do not establish live activation or interception of SendFeedback.
-
-Resolve when both hosts expose trusted semantic callout and answer signals, successful source-owner
-handoff evidence, and complete feedback/terminal interception; verify those paths in fresh sessions
-with the released hooks trusted. Until then, report the supported boundaries without claiming complete
-enforcement of arbitrary prose.
-
 ## Generated base tier README points to an absent schema path
 
 The source `.agents/tiers/README.md` links to `../schemas/tier.schema.json`, which exists in the source tree. Packaging moves the schema to `plugins/base/tiers/tier.schema.json` but copies the README without adjusting its link. The generated README therefore fails `docs_reachability.py` on the current main branch.
