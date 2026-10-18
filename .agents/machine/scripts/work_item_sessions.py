@@ -277,6 +277,17 @@ def _pid_is_dead(pid, pid_started_at):
     return started != pid_started_at
 
 
+def _finished_elsewhere(row, machine):
+    if (row.get("machine") or "").casefold() != machine.casefold():
+        return False
+    if row.get("ended_at") is not None:
+        return True
+    liveness = _agent_recovery().liveness({"host": row["host"], "session": row["session_id"]})
+    if liveness == "unknown":
+        return _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
+    return liveness != "live"
+
+
 def _resume_roots(row):
     host = row["host"]
     subdirectory = "projects" if host == "claude" else "sessions"
@@ -495,9 +506,9 @@ def cmd_item(work_item, status, pr=None, title=None, plan_path=None, cwd=None):
                 for host in ("claude", "codex")
                 for session_id in (_current_session_id(host),) if session_id
             ]
+            machine = socket.gethostname()
             for row in store.sessions_for_work_item(connection, key):
-                ended = row["ended_at"] is not None
-                if row["handle"] not in keep and (ended or _pid_is_dead(row["pid"], row["pid_started_at"])):
+                if row["handle"] not in keep and _finished_elsewhere(row, machine):
                     store.delete_session(connection, row["session_id"])
     finally:
         connection.close()
