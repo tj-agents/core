@@ -117,7 +117,8 @@ class TerminalLaunchersTests(unittest.TestCase):
             run.assert_called_once_with("claude", ["--help"])
             run.reset_mock()
             self.assertEqual(17, CLAUDE.main(["--project", "/work", "--target", "claude"]))
-            session.assert_called_once_with("claude", "claude", Path("/work"), ["-n", "repo/topic"], on_running=mock.ANY)
+            session.assert_called_once_with("claude", "claude", Path("/work"), ["-n", "repo/topic"], on_launch=mock.ANY,
+                                            keep_unacknowledged_session=True)
             run.assert_not_called()
 
     def test_claude_binds_the_typed_shim_in_the_child_session(self):
@@ -126,7 +127,8 @@ class TerminalLaunchersTests(unittest.TestCase):
                     mock.patch.object(CLAUDE, "run_session", return_value=0) as session:
                 target = "C:/npm/claude" + suffix
                 self.assertEqual(0, CLAUDE.main(["--project", "/work", "--target", target, "chat"]))
-                session.assert_called_once_with("claude", target, Path("/work"), ["chat"], on_running=mock.ANY)
+                session.assert_called_once_with("claude", target, Path("/work"), ["chat"], on_launch=mock.ANY,
+                                            keep_unacknowledged_session=True)
 
     def test_claude_refresh_failure_falls_back_to_the_typed_cli(self):
         buffer = io.StringIO()
@@ -150,7 +152,8 @@ class TerminalLaunchersTests(unittest.TestCase):
         with mock.patch.object(CODEX, "run_session", return_value=23) as session, \
                 mock.patch.object(CODEX, "without_daemon_for_interactive", side_effect=lambda values, *_: values):
             self.assertEqual(23, CODEX.main(["--project", "/work", "--target", "C:/npm/codex.cmd", *special]))
-            session.assert_called_once_with("codex", "C:/npm/codex.cmd", Path("/work"), special, on_running=mock.ANY)
+            session.assert_called_once_with("codex", "C:/npm/codex.cmd", Path("/work"), special, on_launch=mock.ANY,
+                                            keep_unacknowledged_session=True)
 
     def test_codex_maintenance_commands_bypass_refresh_and_session_commands_fall_back(self):
         buffer = io.StringIO()
@@ -190,8 +193,8 @@ class TerminalLaunchersTests(unittest.TestCase):
             self.assertEqual([("hooks", ["status"])], events)
 
     def test_codex_error_after_the_session_started_does_not_launch_again(self):
-        def started_then_failed(host, target, project, arguments, on_running):
-            on_running(1234)
+        def started_then_failed(host, target, project, arguments, **options):
+            options["on_launch"]()
             raise CODEX.StartupBindingError("unlock failed")
 
         with mock.patch.object(CODEX, "run_session", side_effect=started_then_failed),                 mock.patch.object(CODEX, "run_target") as target,                 mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
@@ -200,8 +203,8 @@ class TerminalLaunchersTests(unittest.TestCase):
         self.assertIn("session ended with a standards error: unlock failed", stderr.getvalue())
 
     def test_claude_error_after_the_session_started_does_not_launch_again(self):
-        def started_then_failed(host, target, project, arguments, on_running):
-            on_running()
+        def started_then_failed(host, target, project, arguments, **options):
+            options["on_launch"]()
             raise CLAUDE.StartupBindingError("unlock failed")
 
         with mock.patch.object(CLAUDE, "run_session", side_effect=started_then_failed),                 mock.patch.object(CLAUDE, "run_target") as target,                 mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
