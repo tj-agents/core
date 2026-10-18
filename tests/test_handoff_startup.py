@@ -63,7 +63,7 @@ class HandoffStartupTests(unittest.TestCase):
                 self.assertEqual(1, result)
                 self.assertIn('marketplace unavailable', error)
                 self.assertNotIn('Launched', output)
-                self.assertNotIn('agent-handoff-submitted', output)
+                self.assertNotIn('"startup": "verified"', output)
 
     def test_native_exit_before_confirmation_is_failure_even_with_zero_exit(self):
         for host in ('codex', 'claude'):
@@ -72,7 +72,7 @@ class HandoffStartupTests(unittest.TestCase):
                     result, output, error, _ = self.run_launch(host, {'state': 'exited', 'returncode': returncode})
                     self.assertEqual(1, result)
                     self.assertIn('before handoff confirmation', error)
-                    self.assertNotIn('agent-handoff-submitted', output)
+                    self.assertNotIn('"startup": "verified"', output)
 
     def test_uncertain_preparation_retains_receipt_and_never_retries(self):
         for host in ('codex', 'claude'):
@@ -81,7 +81,7 @@ class HandoffStartupTests(unittest.TestCase):
                 self.assertEqual(3, result)
                 self.assertEqual({'state': 'preparing'}, json.loads(receipt.read_text(encoding='utf-8')))
                 self.assertIn(str(receipt), error)
-                self.assertNotIn('agent-handoff-submitted', output)
+                self.assertNotIn('"startup": "verified"', output)
 
     def test_missing_wrapper_is_abandoned_atomically_for_either_host(self):
         for host in ('codex', 'claude'):
@@ -90,7 +90,7 @@ class HandoffStartupTests(unittest.TestCase):
                 self.assertEqual(1, result)
                 self.assertEqual('abandoned', json.loads(receipt.read_text(encoding='utf-8'))['state'])
                 self.assertIn('late launch is blocked', error)
-                self.assertNotIn('agent-handoff-submitted', output)
+                self.assertNotIn('"startup": "verified"', output)
 
     def test_verified_native_startup_is_bound_to_the_exact_attempt(self):
         for host in ('codex', 'claude'):
@@ -122,7 +122,7 @@ class HandoffStartupTests(unittest.TestCase):
             with self.subTest(host=host):
                 result, output, error, _ = self.run_launch(host, {'state': 'exited', 'returncode': 0, 'running_at': 100})
                 self.assertEqual((0, ''), (result, error))
-                self.assertIn('agent-handoff-submitted', output)
+                self.assertIn('"startup": "verified"', output)
 
     def test_terminal_submission_timeout_keeps_exact_attempt_receipt(self):
         for host in ('codex', 'claude'):
@@ -131,4 +131,4 @@ class HandoffStartupTests(unittest.TestCase):
                 self.assertEqual(3, result)
                 self.assertIn(str(receipt), error)
                 self.assertTrue(receipt.is_file())
-                self.assertNotIn('agent-handoff-submitted', output)
+                self.assertNotIn('"startup": "verified"', output)
