@@ -11,10 +11,20 @@ import subprocess
 import sys
 import threading
 import math
+import secrets
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 HERE = Path(__file__).resolve().parent
 SESSION_ID = re.compile(r"(?!-)[A-Za-z0-9_-]+\Z")
+TOKEN = re.compile(r"[a-z0-9]+")
+PICKUP_TIMEOUT_SECONDS = 480
+WRAPPER_TIMEOUT_SECONDS = 45
+PICKUP_INTERVAL_SECONDS = 1.0
+STORE_FIELDS = (
+    ("title", "s.title"), ("id", "s.session_id"), ("cwd", "s.cwd"), ("repo", "s.repo"), ("branch", "s.branch"),
+    ("work_item", "s.work_item"), ("work_item.title", "w.title"), ("work_item.plan_path", "w.plan_path"),
+)
 LOCKS = {}
 LOCKS_GUARD = threading.Lock()
 MODULES = {}
@@ -168,31 +178,218 @@ def _record_items(host, root, history):
             yield item
 
 
-def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots=None):
+class LaunchFailed(RuntimeError):
+    pass
+
+
+class LaunchUnverified(RuntimeError):
+    pass
+
+
+def unverified_launch(error):
+    if isinstance(error, LaunchUnverified):
+        return True
+    try:
+        timeout = getattr(_load("agent_cli"), "LaunchTimeout", None)
+    except Exception:
+        return False
+    return isinstance(timeout, type) and isinstance(error, timeout)
+
+
+def _tokens(value):
+    return set(TOKEN.findall(str(value or "").casefold()))
+
+
+def _store_rows(hosts, session_id=None):
+    store = _load("session_store")
+    if not store.database_path().is_file():
+        return []
+    connection = store.connect()
+    try:
+        placeholders = ", ".join("?" for _ in hosts)
+        columns = ", ".join(f"{column} AS \"{name}\"" for name, column in STORE_FIELDS)
+        exact = " AND s.session_id = ?" if session_id else ""
+        return [dict(row) for row in connection.execute(
+            f"SELECT s.host, s.profile, s.last_activity_at, s.started_at, s.ended_at, w.status AS work_item_status, "
+            f"{columns} FROM sessions s LEFT JOIN work_items w ON w.key = s.work_item "
+            f"WHERE s.host IN ({placeholders}){exact}", (*hosts, *((session_id,) if session_id else ())))]
+    finally:
+        connection.close()
+
+
+def _match_value(name, value):
+    return Path(value).name if name == "cwd" and value else value
+
+
+def _store_match(row, topic):
+    if not topic:
+        return []
+    wanted = _tokens(topic)
+    fields = {name: _tokens(_match_value(name, row.get(name))) for name, _column in STORE_FIELDS}
+    if not wanted or not wanted <= set().union(*fields.values()):
+        return None
+    return [name for name, tokens in fields.items() if tokens & wanted]
+
+
+def _iso(epoch):
+    if isinstance(epoch, bool) or not isinstance(epoch, (int, float)) or not math.isfinite(epoch):
+        return None
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def _store_item(row, matched_by):
+    item = {
+        "id": row["id"], "host": row["host"], "cwd": row["cwd"], "branch": row["branch"],
+        "activity": _iso(row["last_activity_at"] or row["started_at"]),
+        "preview": row["title"] or row["work_item.title"] or "(no title)",
+        "profile": row["profile"], "matched_by": matched_by, "title": row["title"], "source": "sessions.db",
+    }
+    if row["work_item"]:
+        item["work_item"] = {"key": row["work_item"], "title": row["work_item.title"],
+                             "status": row["work_item_status"], "plan_path": row["work_item.plan_path"]}
+    return item
+
+
+def _finish_store_item(item):
+    item["profile"] = os.path.normcase(str(Path(item["profile"]).resolve()))
+    item["status"] = liveness({"host": item["host"], "session": item["id"]})
+    return item
+
+
+def _history_root(host, profile):
+    return Path(profile) / ("sessions" if host == "codex" else "projects")
+
+
+def _native_files(host, profile, cache):
+    key = (host, str(profile))
+    if key not in cache:
+        files = {}
+        for directory in _roots(host, _history_root(host, profile)):
+            try:
+                found = sorted(directory.rglob("*.jsonl") if host == "codex" else directory.glob("*/*.jsonl"))
+            except OSError:
+                continue
+            for path in found:
+                files.setdefault(path.stem, path)
+                if host == "codex" and len(path.stem) > 36:
+                    files.setdefault(path.stem[-36:], path)
+        cache[key] = files
+    return cache[key]
+
+
+def _native_file(host, session_id, profile, cache):
+    files = _native_files(host, profile, cache)
+    if session_id in files:
+        return files[session_id]
+    return next((path for stem, path in files.items() if stem.endswith("-" + session_id)), None)
+
+
+def _native_header(path, host, history):
+    for _number, event in history.records(path):
+        if host == "codex":
+            payload = event.get("payload")
+            if event.get("type") == "session_meta" and isinstance(payload, dict):
+                source = payload.get("source")
+                if isinstance(source, dict) and "subagent" in source:
+                    return None
+                return {"host": host, "session": payload.get("id"), "cwd": payload.get("cwd"), "source": source,
+                        "branch": (payload.get("git") or {}).get("branch")}
+        elif event.get("type") in ("user", "assistant") and not event.get("isSidechain") and event.get("cwd"):
+            return {"host": host, "session": event.get("sessionId") or path.stem, "cwd": event.get("cwd"),
+                    "branch": event.get("gitBranch")}
+    return None
+
+
+def _resumable(item, history, cache):
+    path = _native_file(item["host"], item["id"], item["profile"], cache)
+    try:
+        native = _native_header(path, item["host"], history) if path else None
+    except (OSError, ValueError):
+        native = None
+    if not native or native.get("session") != item["id"] or not _recoverable(native):
+        return None
+    return {**item, "cwd": native.get("cwd") or item["cwd"], "branch": native.get("branch") or item["branch"],
+            "history_file": str(path)}
+
+
+def _store_search(hosts, topic, checkout, history):
+    try:
+        rows = _store_rows(hosts)
+    except Exception:
+        return []
+    variants = history._worktree_variants(checkout) if checkout else None
+    results = []
+    for row in rows:
+        if not row["id"] or not SESSION_ID.fullmatch(row["id"]) or not row["profile"]:
+            continue
+        if variants and not history._cwd_under(row["cwd"], variants):
+            continue
+        matched_by = _store_match(row, topic)
+        if matched_by is not None:
+            results.append(_store_item(row, matched_by))
+    return results
+
+
+def _native_matched_by(item, topic, title):
+    if not topic:
+        return []
+    query = topic.casefold()
+    fields = (("id", item["session"]), ("title", title or ""))
+    matched = [name for name, value in fields if query in value.casefold()]
+    return matched or ["message"]
+
+
+def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots=None, include_history=False):
     if count < 1:
         raise ValueError("--count must be positive")
     history = _load("history")
-    results = []
-    for host in hosts:
+    native = {}
+    stored = [] if roots else [
+        resumable for resumable in (_resumable(item, history, native) for item in _store_search(hosts, topic, checkout, history))
+        if resumable is not None
+    ]
+    results = list(stored)
+    found = {(item["host"], item["id"]) for item in results}
+    for host in hosts if include_history or not stored else ():
         root = (roots or {}).get(host) if roots else None
         root = Path(root) if root else history.history_root(host)
         if not root.is_dir():
             raise ValueError(f"No {host} history directory at {root}; select the correct profile or history root.")
         titles = _title_index(root)
         for item in _record_items(host, root, history):
+            if (host, item["session"]) in found:
+                continue
             title = titles.get(item["session"])
             if _matches(item, topic, checkout, history, title):
                 normal = _normalise(item, root)
                 normal["title"] = title
+                normal["matched_by"] = _native_matched_by(item, topic, title)
+                normal["source"] = "native-history"
                 results.append(normal)
     results.sort(key=lambda item: item.get("activity") or "", reverse=True)
-    return results[:count]
+    return [_finish_store_item(item) if item.get("source") == "sessions.db" else item for item in results[:count]]
+
+
+def _store_find(host, session_id, history):
+    try:
+        rows = _store_rows((host,), session_id)
+    except Exception:
+        return None
+    if not rows or not rows[0]["profile"]:
+        return None
+    item = _resumable(_store_item(rows[0], []), history, {})
+    return _finish_store_item(item) if item else None
 
 
 def find(host, session_id, roots=None):
     if host not in ("codex", "claude") or not SESSION_ID.fullmatch(session_id):
         raise ValueError("A host and native session id are required.")
     history = _load("history")
+    item = None if roots else _store_find(host, session_id, history)
+    if item:
+        if not item["cwd"] or not Path(item["cwd"]).is_dir():
+            raise ValueError("The recorded session directory is missing; refusing to resume it elsewhere.")
+        return item
     root = Path((roots or {}).get(host) or history.history_root(host))
     if not root.is_dir():
         raise ValueError(f"No {host} history directory at {root}; select the correct profile or history root.")
@@ -294,6 +491,89 @@ def _receipt_state(path, host, session_id, profile, state):
     os.replace(temporary, path)
 
 
+def _history_file(host, session_id, profile):
+    return _native_file(host, session_id, profile, {})
+
+
+def _modified(path):
+    try:
+        return path.stat().st_mtime if path else None
+    except OSError:
+        return None
+
+
+def _registered_since(connection, handle, since):
+    if connection is None:
+        return False
+    try:
+        row = connection.execute("SELECT started_at FROM sessions WHERE handle = ?", (handle,)).fetchone()
+    except Exception:
+        return False
+    started = row[0] if row else None
+    return isinstance(started, (int, float)) and not isinstance(started, bool) and started >= since
+
+
+def _status_path(receipt):
+    for stale in receipt.parent.glob(f"{receipt.stem}.*.status.json"):
+        try:
+            if time.time() - stale.stat().st_mtime > 86400:
+                stale.unlink()
+        except OSError:
+            continue
+    return receipt.with_name(f"{receipt.stem}.{secrets.token_hex(8)}.status.json")
+
+
+def _connect(store):
+    try:
+        return store.connect() if store.database_path().is_file() else None
+    except Exception:
+        return None
+
+
+def await_pickup(host, session_id, status_path, since, history_path=None, timeout=PICKUP_TIMEOUT_SECONDS,
+                 wrapper_timeout=WRAPPER_TIMEOUT_SECONDS, interval=PICKUP_INTERVAL_SECONDS,
+                 clock=time.monotonic, wait=time.sleep):
+    store = _load("session_store")
+    status_file = _load("launch_status")
+    handle = store.session_handle(host, session_id)
+    start = clock()
+    history_before = _modified(history_path)
+    connection = None
+    try:
+        while True:
+            status = status_file.read(status_path)
+            state = status.get("state") if status else None
+            if state == "failed":
+                raise LaunchFailed(str(status.get("error") or f"{host} startup failed"))
+            connection = connection or _connect(store)
+            evidence = None
+            if _registered_since(connection, handle, since):
+                evidence = "registered in sessions.db"
+            else:
+                modified = _modified(history_path)
+                if modified is not None and modified != history_before and modified >= since:
+                    evidence = "native history written"
+            if evidence and (state == "running" or (status or {}).get("running_at")):
+                return evidence
+            if state == "exited":
+                raise LaunchFailed(f"native {host} exited with {status.get('returncode')} before resuming the session")
+            elapsed = clock() - start
+            if status is None and elapsed >= wrapper_timeout:
+                try:
+                    abandoned = status_file.create(status_path, {"state": "abandoned", "at": time.time()})
+                except OSError as error:
+                    raise LaunchUnverified(f"no tab reported starting and the launch could not be abandoned: {error}")
+                if abandoned:
+                    raise LaunchFailed("the terminal never started the launch; no tab ran the startup wrapper")
+            if elapsed >= timeout:
+                raise LaunchUnverified(f"{host} startup began but did not resume the session within {int(timeout)}s; "
+                                       "check the opened tab before retrying")
+            wait(interval)
+    finally:
+        if connection is not None:
+            connection.close()
+
+
 def open_session(host, session_id, prompt="Continue the requested work.", title=None, roots=None, confirm_closed=False,
                  prompt_path=None, model=None, dangerously_skip_permissions=False, cli=None):
     item = find(host, session_id, roots)
@@ -313,6 +593,10 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
     launched = False
     try:
         receipt = _claim(host, session_id, item["profile"])
+        status_path = _status_path(receipt)
+        history_path = Path(item["history_file"]) if item.get("history_file") else _history_file(
+            host, session_id, item["profile"])
+        since = time.time()
         directory = cli.resolve_tab_directory(item["cwd"])
         label = title or f"{host.title()} {session_id[:8]}"
         instruction = cli.prompt_file_argument(prompt_path)[0] if prompt_path else prompt
@@ -326,7 +610,7 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                 if model:
                     arguments += ["--model", model]
                 arguments.append(instruction)
-                cli.open_claude_tab(directory, label, arguments)
+                cli.open_claude_tab(directory, label, arguments, status_file=status_path)
             finally:
                 if old_profile is None:
                     os.environ.pop("CLAUDE_CONFIG_DIR", None)
@@ -344,7 +628,8 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
             try:
                 cli.launch_tab(
                     directory, sys.executable, label,
-                    cli.bound_terminal_arguments("codex", directory, executable, arguments), clear=("TERM",),
+                    cli.bound_terminal_arguments("codex", directory, executable, arguments, status_path),
+                    clear=("TERM",),
                     force={"CODEX_HOME": item["profile"]},
                 )
             finally:
@@ -354,14 +639,25 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                     os.environ["CODEX_HOME"] = old_profile
         launched = True
         try:
+            evidence = await_pickup(host, session_id, status_path, since, history_path)
+        except LaunchUnverified:
+            raise
+        except BaseException:
+            if (_load("launch_status").read(status_path) or {}).get("state") != "abandoned":
+                status_path.unlink(missing_ok=True)
+            raise
+        status_path.unlink(missing_ok=True)
+        try:
             _receipt_state(receipt, host, session_id, item["profile"], "launched")
         except OSError:
             pass
-        return item
+        return {**item, "launch": "verified", "evidence": evidence}
     except Exception as exc:
         if receipt is not None:
             timeout_type = getattr(cli, "LaunchTimeout", None)
-            if isinstance(timeout_type, type) and isinstance(exc, timeout_type):
+            if isinstance(exc, LaunchFailed):
+                receipt.unlink(missing_ok=True)
+            elif isinstance(exc, LaunchUnverified) or (isinstance(timeout_type, type) and isinstance(exc, timeout_type)):
                 try:
                     _receipt_state(receipt, host, session_id, item["profile"], "ambiguous")
                 except OSError:
@@ -439,6 +735,7 @@ def main(argv=None):
     parser.add_argument("--topic")
     parser.add_argument("--checkout")
     parser.add_argument("--count", type=int, default=10)
+    parser.add_argument("--include-history", action="store_true")
     parser.add_argument("--prompt")
     parser.add_argument("--prompt-path")
     parser.add_argument("--model")
@@ -452,16 +749,20 @@ def main(argv=None):
         hosts = ("codex", "claude") if args.host == "both" else (args.host,)
         roots = {host: value for host, value in (("codex", args.codex_history_root), ("claude", args.claude_history_root)) if value}
         if args.operation == "search":
-            print(json.dumps(search(hosts, args.topic, args.checkout, args.count, roots), indent=2))
+            print(json.dumps(search(hosts, args.topic, args.checkout, args.count, roots, args.include_history), indent=2))
             return 0
         if args.operation == "recover":
             candidates = []
             unavailable = []
-            for host in hosts:
-                try:
-                    candidates.extend(search((host,), args.topic, args.checkout, args.count, roots))
-                except ValueError as exc:
-                    unavailable.append({"host": host, "unavailable": str(exc)})
+            try:
+                candidates = search(hosts, args.topic, args.checkout, args.count, roots, args.include_history)
+            except ValueError:
+                for host in hosts:
+                    try:
+                        candidates.extend(search((host,), args.topic, args.checkout, args.count, roots,
+                                                 args.include_history))
+                    except ValueError as exc:
+                        unavailable.append({"host": host, "unavailable": str(exc)})
             if not args.select:
                 print(json.dumps({"sessions": candidates, "unavailable": unavailable}, indent=2))
                 return 0
@@ -503,6 +804,9 @@ def main(argv=None):
                             args.prompt_path, args.model)
         print(json.dumps(item, indent=2))
         return 0
+    except LaunchUnverified as exc:
+        print(str(exc), file=sys.stderr)
+        return 3
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
