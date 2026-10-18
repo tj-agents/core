@@ -1208,6 +1208,12 @@ def _cached_claude_source(expected: VerifiedRoot, cache: Path) -> Path | None:
     return destination if _tree_bytes(destination) == _tree_bytes(expected.root) else None
 
 
+def _claude_install_record(promoted: Path, revision: str, last_updated: str) -> dict[str, str]:
+    # Claude resolves a plugin's cache directory from "version", not "installPath".
+    return {"installPath": str(promoted), "version": promoted.name, "gitCommitSha": revision,
+            "lastUpdated": last_updated}
+
+
 def materialize_native(prepared: Prepared, host: str, target: Path, project: Path, executable: str) -> Prepared:
     if not prepared.selected_roots:
         return prepared
@@ -1330,10 +1336,10 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
                     key = (scope, Path(owner)) if isinstance(owner, str) else (scope, project)
                     if (scope in {"user", "managed"} and any(target_scope == scope for target_scope, _owner in targets)) or (
                             scope in {"project", "local"} and isinstance(owner, str) and any(target_scope == scope and _within(project, target_owner) and _within(Path(owner), target_owner) for target_scope, target_owner in targets)):
-                        item["installPath"] = str(promoted)
+                        item.update(_claude_install_record(promoted, expected.revision, last_updated))
                         paths.append(promoted)
                 if not paths:
-                    existing.append({"scope": "user", "installPath": str(promoted)})
+                    existing.append({"scope": "user", **_claude_install_record(promoted, expected.revision, last_updated)})
                     paths.append(promoted)
                 if any(path != promoted for path in paths):
                     raise RollingPluginError(f"Claude did not repoint every selected install for {identity}")
@@ -1352,7 +1358,8 @@ def materialize_native(prepared: Prepared, host: str, target: Path, project: Pat
                     raise RollingPluginError("Claude did not return its native plugin inventory")
                 for root in roots:
                     entries = [entry for entry in inventory if isinstance(entry, Mapping) and entry.get("id") == root.identity]
-                    if not any(entry.get("enabled") is True and entry.get("installPath") == str(root.root) for entry in entries):
+                    if not any(entry.get("enabled") is True and entry.get("installPath") == str(root.root)
+                               and entry.get("version") == root.root.name for entry in entries):
                         raise RollingPluginError(f"Claude native inventory did not select the promoted root for {root.identity}")
                 if plugins == target / "plugins":
                     _pin_claude_cache(target, deadline)
