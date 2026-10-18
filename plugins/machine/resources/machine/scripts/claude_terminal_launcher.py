@@ -4,18 +4,29 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from startup_binding import StartupBindingError, run_session
+try:
+    from startup_binding import StartupBindingError, run_session
+except Exception as _startup_import_error:
+    _startup_unavailable = f"startup binding could not load ({_startup_import_error})"
+
+    class StartupBindingError(Exception):
+        pass
+
+    def run_session(*_arguments: object, **_options: object) -> int:
+        raise StartupBindingError(_startup_unavailable)
 from terminal_command import (
     CLAUDE_NON_SESSION_COMMANDS,
     claude_label,
     flush_before_cli,
     native_target_for_shim,
     run_target,
+    without_binding_state,
 )
 
 
@@ -29,14 +40,21 @@ def main(argv: list[str] | None = None) -> int:
     if command[:1] == ["--"]:
         command = command[1:]
     if not command or command[0] not in CLAUDE_NON_SESSION_COMMANDS:
+        started: list[bool] = []
         try:
             if not command:
                 command = ["-n", claude_label(parsed.project)]
             flush_before_cli()
-            return run_session("claude", parsed.target, parsed.project, command)
-        except StartupBindingError as error:
-            print(f"standards: Claude refresh failed: {error}", file=sys.stderr)
-            return 1
+            return run_session("claude", parsed.target, parsed.project, command,
+                               on_launch=lambda: started.append(True),
+                               keep_unacknowledged_session=True)
+        except Exception as error:
+            if started:
+                print(f"standards: Claude session ended with a standards error: {error}", file=sys.stderr)
+                return 1
+            print(f"standards: Claude refresh failed: {error}; starting Claude without the standards refresh",
+                  file=sys.stderr)
+            return run_target(parsed.target, command, without_binding_state(os.environ))
     if not command:
         command = ["-n", claude_label(parsed.project)]
     flush_before_cli()

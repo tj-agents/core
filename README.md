@@ -8,6 +8,10 @@ The repository publishes a minimal `base` package and optional `engineering` and
 Stack standards remain in their stack plugins; Concertable policy stays with Concertable.
 The repository also owns explicit PowerShell profile and CLI session-recovery installation.
 
+`engineering:skill-authoring` owns skill selection triggers, names, and sizing; the
+[`template:check` validator](https://github.com/tj-agents/template) owns required skill content and layout
+validation. `engineering:docs` owns the generic guidance-writing convention.
+
 Global architecture and cross-repository designs live in [`tj-agents/docs`](https://github.com/tj-agents/docs)
 (private; organization access required). Core-specific implementation plans and operational documentation
 stay here; shared plans link to their source owners.

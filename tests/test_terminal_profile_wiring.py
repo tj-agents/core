@@ -290,17 +290,18 @@ class TerminalProfileWiringTests(unittest.TestCase):
             with self.subTest(shell=shell):
                 self.assert_claude_wiring(lambda command: self.run_powershell(shell, command), f". '{self.profile_path()}'; claude plugin list; claude --resume session; claude")
 
-    def test_claude_powershell_fails_closed_when_its_registry_cannot_be_read(self):
+    def test_claude_powershell_falls_back_when_its_registry_cannot_be_read(self):
         self.executable("claude", "print('fallback')\n")
         self.install_profile(CLAUDE)
         for shell in self.powershells():
             with self.subTest(shell=shell):
                 completed = self.run_powershell(shell, f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
-                self.assertNotEqual(0, completed.returncode)
-                self.assertNotIn("fallback", completed.stdout)
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn("fallback", completed.stdout)
                 self.assertIn("registry could not be read", completed.stderr)
+                self.assertIn("starting Claude without the standards refresh", completed.stderr)
 
-    def test_claude_powershell_fails_closed_without_a_usable_python(self):
+    def test_claude_powershell_falls_back_without_a_usable_python(self):
         self.executable("claude", "print('fallback')\n")
         self.install_profile(CLAUDE)
         override = (
@@ -310,10 +311,11 @@ class TerminalProfileWiringTests(unittest.TestCase):
         )
         for shell in self.powershells():
             with self.subTest(shell=shell):
-                completed = self.run_powershell(shell, override + f". '{self.profile_path()}'; $result = claude; if ($result -eq 125) {{ exit 125 }}; exit 1")
-                self.assertEqual(125, completed.returncode, completed.stderr)
-                self.assertNotIn("fallback", completed.stdout)
+                completed = self.run_powershell(shell, override + f". '{self.profile_path()}'; claude; exit $LASTEXITCODE")
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                self.assertIn("fallback", completed.stdout)
                 self.assertIn("no usable Python", completed.stderr)
+                self.assertIn("starting Claude without the standards refresh", completed.stderr)
 
     def test_claude_powershell_preserves_a_real_cli_exit_125_without_a_second_launch(self):
         active = self.root / "exit-status-active"

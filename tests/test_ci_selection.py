@@ -42,7 +42,7 @@ class ClassificationTests(unittest.TestCase):
     @staticmethod
     def results():
         return {name: {"result": "success"} for name in
-                ("select", "guard", "verify-windows", "verify-linux")}
+                ("select", "guard", "guidance-examples", "verify-windows", "verify-linux")}
 
     def test_unknown_shared_infrastructure_and_mixed_changes_use_full_coverage(self):
         for path in (".agents/hooks/hook_runtime.py", ".agents/hooks/hook_dispatch.py",
@@ -83,7 +83,7 @@ class AggregateTests(unittest.TestCase):
         results = ClassificationTests.results()
         results["verify-windows"]["result"] = results["verify-linux"]["result"] = "skipped"
         CI.required_results(CI.plan("docs", "prose"), results, "pull_request")
-        for job in ("select", "guard"):
+        for job in ("select", "guard", "guidance-examples"):
             with self.subTest(job=job):
                 broken = {**results, job: {"result": "skipped"}}
                 with self.assertRaises(ValueError):
@@ -235,7 +235,7 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("    if: always()\n", jobs["ci-required"])
         required = re.search(r"^    needs: \[(.*?)\]$", jobs["ci-required"], re.MULTILINE)
         self.assertEqual(set(required[1].split(", ")),
-                         {"select", "guard", "verify-windows", "verify-linux"})
+                         {"select", "guard", "guidance-examples", "verify-windows", "verify-linux"})
         self.assertIn("CI_NEEDS: ${{ toJSON(needs) }}", jobs["ci-required"])
         self.assertIn("scripts/ci_selection.py required", jobs["ci-required"])
         self.assertNotRegex(workflow.split("jobs:\n", 1)[0], r"paths(?:-ignore)?:")
@@ -257,6 +257,27 @@ class WorkflowWiringTests(unittest.TestCase):
                 self.assertIn("mode == 'full'", step)
             self.assertIn("sync-generated.ps1 -Check", job)
             self.assertIn("sync_harness_manifests.py --check", job)
+
+    def test_changed_guidance_examples_run_on_pull_requests_and_default_pushes(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:|\Z)",
+                               workflow.split("jobs:\n", 1)[1], re.MULTILINE | re.DOTALL))
+        job = jobs["guidance-examples"]
+        self.assertIn("fetch-depth: 0", job)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", job)
+        self.assertIn("repository: tj-agents/template", job)
+        self.assertIn("path: .template", job)
+        self.assertIn("github.event.pull_request.base.sha", job)
+        self.assertIn("github.event.pull_request.head.sha }}\"", job)
+        self.assertIn("github.event.before", job)
+        self.assertIn("github.sha }}\"", job)
+        self.assertIn("github.ref == 'refs/heads/main'", job)
+        self.assertEqual(2, job.count(".template/.agents/template/utility/check/scripts/check_examples.py --root . --base"))
+        pull_request_run = next(line for line in job.splitlines()
+                                if "github.event.pull_request.base.sha" in line)
+        push_run = next(line for line in job.splitlines() if "github.event.before" in line)
+        self.assertIn("--merge-base", pull_request_run)
+        self.assertNotIn("--merge-base", push_run)
 
 
 if __name__ == "__main__":
