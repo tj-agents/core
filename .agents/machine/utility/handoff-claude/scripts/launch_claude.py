@@ -139,13 +139,15 @@ def main(argv=None):
         model, effort, tier = resolve_model(args, agent_cli)
         arguments = build_arguments(args, model, effort, prompt_sentence)
 
-        agent_cli.open_claude_tab(working_directory, args.title, arguments)
+        status_path = agent_cli.handoff_status_path()
+        agent_cli.open_claude_tab(working_directory, args.title, arguments, status_file=status_path, require_session_start=True)
+        agent_cli.await_handoff_startup(status_path)
 
         selection = f'{tier}{model}' if model else 'the CLI default model'
         if effort:
             selection += f' at {effort}'
         print(f"Launched claude handoff tab '{args.title}' in {working_directory} on {selection} with prompt {prompt_path}")
-        print(json.dumps({"event": "agent-handoff-submitted", "worktree": str(working_directory), "prompt_path": str(prompt_path)}))
+        print(json.dumps({"event": "agent-handoff-submitted", "worktree": str(working_directory), "prompt_path": str(prompt_path), "startup": "verified", "status_path": str(status_path)}))
         return 0
     except agent_cli.LaunchError as exc:
         return agent_cli.report_launch_failure(exc)
