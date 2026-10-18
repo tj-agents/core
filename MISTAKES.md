@@ -364,8 +364,8 @@ Kind: mistake. Observed: 2026-10-19. Priority: P2; no failed runtime behavior is
 but the merge crossed the required verification boundary. State: in-progress.
 Source owner: Codex personal-projects/standards delivery and Core engineering merge guidance.
 Evidence: Core PR307 head 544cd03911a986ededb06971eb7cb9ad43ed48f9 merged at
-568e6c08f5d6224d330c30c9d5827b0270e35009 while verify-windows in CI39175205937
-was still IN_PROGRESS. Linux had passed. No merge ruleset was returned for this repository.
+568e6c08f5d6224d330c30c9d5827b0270e35009 while verify-windows in CI 39175205937
+was still IN_PROGRESS. Linux had passed. No merge ruleset was returned; the main branch protection API also returned Branch not protected (404).
 Cause confirmed: the agent violated the existing terminal-check prerequisite by assuming
 `gh pr merge --auto` would wait. The consumed merge skill also incorrectly stated that
 `--auto` always enqueues and does not merge, without qualifying repositories lacking a queue.
@@ -376,10 +376,11 @@ ec92dbd0e83b57417581f84d486db2576d2cf3dd; canonical personal-projects/GOAL.md in
 Resolution condition: shared wording is corrected and reviewed, source validation and delivery
 pass, the original exact-head CI plus causal main publication reach a verified result, and the
 next owned merge is preceded by an explicit terminal-green check rather than relying on --auto.
-Verification: original exact-head CI39175205937 and merged-main CI39176000363 now pass.
+Verification: original exact-head CI 39175205937 and merged-main CI 39176000363 now pass.
 The next owned merge (React PR20) was explicitly preceded by terminal-green gh pr checks
-for reviewed head5763345f828a36a4d47b481d6e8d1280ca2a14e9, then merged at
+for reviewed head 5763345f828a36a4d47b481d6e8d1280ca2a14e9, then merged at
 fd4a430d1766cbcbbc3ca4875c0e97180afcf18a. Correction source payload/freshness/docs checks
-and ordinary docs fallback review pass; exact correction CI39176405550 remains monitored.
-Next action: finish correction CI, merge only after a fresh terminal-green check, verify causal
-generation and retain this incident with final verification evidence.
+and ordinary docs fallback review pass. Correction CI 39176405550 passed Windows/Linux;
+PR308 merged at 1c87146b1e56aa93178c78f6bbbfa57d1c63b036 after fresh terminal-green
+checks. Causal merged-main verification and generated-package confirmation remain owned.
+Next action: verify that causal main run and generation, then retain final resolution evidence.

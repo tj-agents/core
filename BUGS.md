@@ -143,7 +143,7 @@
 Kind: bug. Observed: 2026-10-18. Priority: P2; public-corpus validation failed for a valid
 personal-roster integration because shared routing guidance named a no-longer-shipped skill.
 Source owner: tj-agents/core engineering skill-routes guidance. State: resolved.
-Evidence: Windows CI39173332372 rejected `.agents/engineering/convention/skill-routes/SKILL.md`
+Evidence: Windows CI 39173332372 rejected `.agents/engineering/convention/skill-routes/SKILL.md`
 for missing dotnet:persistence after persistence moved to efcore:persistence.
 Cause confirmed: the shared example was not migrated with the skill identity cutover.
 Existing repair link: upstream commit ade368b3 (Use shipped skills in the routing example),
@@ -151,7 +151,7 @@ retained unchanged when reconciling https://github.com/tj-agents/core/pull/307. 
 example uses shipped dotnet:testing and react:testing identities; no parallel repair remains.
 Resolution condition: current public-corpus skill references resolve and Windows/Linux
 validation passes with the upstream repair present.
-Verification: local check resolves168shipped skills across4current repositories; exact
+Verification: local check resolves 168 shipped skills across 4 current repositories; exact
 Core PR307 run39175205937 and merged-main run39176000363 pass Windows/Linux.
 Next action: none for this repaired reference defect. Installed host acceptance remains a
 separate personal-project goal criterion.
