@@ -13,7 +13,12 @@
               "--deadline",
               "8",
               "--hook",
-              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py"
+              "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/peer-cli/scripts/register_session.py",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/plugin_generation.py",
+              "session-start",
+              "--host",
+              "claude"
             ]
           },
           {
@@ -69,7 +74,12 @@
               "claude",
               "--hook",
               "${CLAUDE_PLUGIN_ROOT}/.agents/machine/utility/close/scripts/close_session.py",
-              "hook"
+              "hook",
+              "--hook",
+              "${CLAUDE_PLUGIN_ROOT}/resources/machine/scripts/plugin_generation.py",
+              "prompt",
+              "--host",
+              "claude"
             ]
           }
         ]

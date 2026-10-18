@@ -127,3 +127,62 @@ A source-only claim of live adoption is insufficient.
    launcher-bound process. Task ownership and loaded conversation context are unchanged.
 4. Remove the SessionStart-only superseded notice from `prune_plugin_cache.py` so one owner reports it.
 Avoids startup_binding.py/terminal launchers (open PR291) and PR306 paths.
+
+## Implementation and acceptance evidence (2026-10-19)
+
+- Source: `rolling_plugins.record_generations` appends verified installs to
+  `<host plugins>/cache/.tj-agents-rolling/<host>/generations.json` only after `materialize_native`
+  succeeds; `plugin_generation.py` is wired into both hosts' machine UserPromptSubmit chains (and Claude
+  SessionStart for the loaded-package snapshot); the SessionStart-only superseded notice was removed.
+- Record placement correction found natively: a lone `cache/.tj-agents-rolling/generations.json` was
+  deleted by Claude at startup in an isolated profile; the host rolling root (beside the persisted
+  `rolling-plugins.lock`) survives. Reload correction found natively: a moved `CLAUDE_PLUGIN_ROOT` now
+  re-snapshots the session's packages instead of trusting the SessionStart snapshot.
+- Native Claude 2.1.282, one long-lived `claude -p` stream-json process, isolated
+  `CLAUDE_CODE_PLUGIN_CACHE_DIR`/state, real marketplace shape (`git-subdir` core main), machine hooks
+  trimmed to the gate plus a root echo: prompts 1-2 ran from A; after B was installed mid-session,
+  prompt 2 delivered "runs 111111111111, superseded by 222222222222" as model context and a user notice;
+  `/reload-plugins` ("Reloaded: 1 plugin · 18 skills · 5 agents · 2 hooks") rebound
+  `CLAUDE_PLUGIN_ROOT` to the verified B install; prompt 4 was silent. With a relative-path marketplace
+  source, reload bound `…/machine/unknown` and the gate reported it unverifiable, not current.
+- Codex: no in-process plugin reload exists. Real-disk evaluation of the live d0aff receipt (11 roots,
+  digest verified) with a temp record of 669d90ef→476e31ce reports "runs 669d90ef0c6c, superseded by
+  476e31cea988"; duplicate base-agents/tj-agents aliases at one revision are not mixed. Native Codex
+  turn-level acceptance is limited: driving a launcher-bound interactive Codex across two turns is not
+  automated here; the hook output contract is the one `session-context.py --prompt-context` already
+  delivers to Codex, and `hook_dispatch` subprocess coverage runs on both platforms.
+
+```agent-host-coverage
+{
+  "schema_version": 1,
+  "shared_source": ".agents/machine/scripts/plugin_generation.py and rolling_plugins.record_generations",
+  "hosts": [
+    {
+      "host": "claude",
+      "behavior": "UserPromptSubmit reports superseded, mixed or unverifiable tj-agents generations and the /reload-plugins or resume adoption path",
+      "source": ".agents/plugins/manifests/claude/machine-hooks.json",
+      "mapping": "machine SessionStart session-start snapshot and UserPromptSubmit prompt gate through hook_dispatch",
+      "verification": {
+        "level": "installed",
+        "result": "passed",
+        "evidence": "native claude 2.1.282 long-lived stream-json probe: A-to-B report at next prompt, /reload-plugins rebinds to verified B, then silent"
+      }
+    },
+    {
+      "host": "codex",
+      "behavior": "UserPromptSubmit reports superseded, mixed or unverifiable tj-agents generations from the digest-checked runtime receipt and the resume adoption path",
+      "source": ".agents/plugins/manifests/codex/machine-hooks.json",
+      "mapping": "machine UserPromptSubmit prompt gate through hook_dispatch and codex_hook_snapshot",
+      "verification": {
+        "level": "source",
+        "result": "limited",
+        "evidence": "unit and hook_dispatch subprocess tests plus real-disk evaluation of live session d0aff receipt"
+      },
+      "exception": {
+        "constraint_evidence": "Codex has no in-process plugin reload and no automated two-turn launcher-bound native session driver exists in this repository",
+        "supported_other_host_outcome": "Claude native long-lived acceptance passed with the same shared gate and record"
+      }
+    }
+  ]
+}
+```

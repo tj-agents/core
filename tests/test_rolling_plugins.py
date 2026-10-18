@@ -333,6 +333,7 @@ class RollingPluginsTests(unittest.TestCase):
                             ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, ['base@one'])
                         self.assertEqual(json.loads(registry_path.read_text()), before)
+                        self.assertFalse(ROLLING.generations_path(config / 'plugins', 'claude').exists())
                     else:
                         result = ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, ['base@one', 'base@two'])
@@ -343,6 +344,9 @@ class RollingPluginsTests(unittest.TestCase):
                             self.assertEqual(record['installPath'], str(root.root))
                             self.assertEqual(record['version'], root.root.name)
                             self.assertEqual(record['gitCommitSha'], root.revision)
+                        recorded = ROLLING.read_generations(ROLLING.generations_path(config / 'plugins', 'claude'))
+                        self.assertEqual({(entry['repository'], entry['revision']) for entry in recorded},
+                                         {(root.repository, root.revision) for root in roots})
                         installs.clear()
                         ROLLING.materialize_native(prepared, 'claude', config, directory, 'claude')
                         self.assertEqual(installs, [])
