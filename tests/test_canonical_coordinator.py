@@ -26,7 +26,7 @@ class CanonicalCoordinatorTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="coordinator recovery ")
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        self.root = Path(temporary.name).resolve()
         self.bootstrap = self.root / "bootstrap.py"
         self.bootstrap.write_text(PROFILE.BOOTSTRAP, encoding="utf-8")
         self.home = self.root / "home"
