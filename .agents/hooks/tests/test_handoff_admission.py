@@ -12,7 +12,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPTS = ROOT / ".agents/engineering/workflow/handoff/scripts"
 sys.path.insert(0, str(SCRIPTS))
-from admission import dependency_transition, process_started_at, rank_eligible, validate
+from admission import dependency_transition, process_started_at, rank_eligible, registry_owner, validate
 
 
 class HandoffAdmissionTests(unittest.TestCase):
@@ -280,6 +280,24 @@ class HandoffAdmissionTests(unittest.TestCase):
 
     def test_current_process_start_is_observable(self):
         self.assertIsNotNone(process_started_at(os.getpid()))
+
+    def test_registry_owner_matches_a_session_anywhere_inside_its_worktree(self):
+        registry = self.base / "state" / "cli-sessions"
+        registry.mkdir(parents=True)
+        owner = {"session_id": "owner-session", "harness": "claude", "worktree": str(self.feature)}
+        sibling = self.base / "feature-sibling"
+        sibling.mkdir()
+        entry = registry / "owner-session.json"
+        cases = ((self.feature, True), (self.feature / "tests", True), (self.primary, False), (sibling, False))
+        with patch.dict(os.environ, {"AGENT_STATE_DIRECTORY": str(self.base / "state")}):
+            for cwd, matched in cases:
+                with self.subTest(cwd=cwd.name):
+                    entry.write_text(json.dumps({
+                        "session_id": "owner-session", "host": "claude", "cwd": str(cwd),
+                        "pid": os.getpid(), "pid_started_at": process_started_at(os.getpid()),
+                    }), encoding="utf-8")
+                    observed, path = registry_owner(owner)
+                    self.assertEqual(matched, path == entry)
 
     def test_registered_existing_owner_and_capacity_use_current_process_identity(self):
         state = self.base / "state"
