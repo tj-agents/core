@@ -18,15 +18,15 @@ an authorized task has a future decision that may outlive the current session.
 
 When the user calls out a mistake, answer the direct question first, then load and follow
 `engineering:self-repair`. It owns whether a consumed Core standard caused or failed to prevent the
-mistake, and the required bounded source-repair handoff. Existing user limits and scope gates still apply.
+mistake, and repairing it in this session. Existing user limits and scope gates still apply.
 Questions ask for reasoning: explain and defend recommendations with evidence, change them only for new
 evidence or a stated user decision, and say what changed.
 
 During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
 refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
 snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
-accepted, launch `engineering:handoff` in bounded side-workstream mode to the standard's source owner
-under the standing authorization. Established standards defects still require immediate repair.
+accepted, make the refinement in this session under the standing authorization.
+Established standards defects still require immediate repair.
 
 ## A task has an owning lifecycle — load it before the first edit
 
@@ -42,8 +42,6 @@ routine commands and phase labels do not require another read or lane rationale.
 for clerical work and delegate useful batches under that contract. Reconsider the
 selection when the work's judgment or capability requirements change. The lane contract owns execution
 and capability fallback, including when the engineering runtime is unavailable.
-On Claude, hand multi-phase work and any delegated design, implementation, or review phase to Codex before
-delegating. An explicit user choice of Claude may keep non-frontier work local; otherwise do not fall back.
 
 ## Repository routine-decision delegation
 
@@ -120,8 +118,8 @@ A defect in a consumed standards package or its source repository is the excepti
 standard, including the automation that missed it, is a defect to diagnose, never a manual step to hand
 to the user, and so is a standard that caused or failed to prevent a mistake. Diagnose it and follow
 `engineering:self-repair` in the same turn, after answering the user's direct question and before the
-current task resumes. That workflow owns the repair authorization, admission, disposition, and delivery
-procedure; explicit user limits still hold.
+current task resumes. That workflow owns the repair authorization and delivery procedure; explicit user
+limits still hold.
 Before committing or returning a terminal result, check the work against the standards that governed
 it and reconcile every problem encountered: it is fixed, handed off, or already has the owning debt
 entry. `engineering:write-debt` defines the selected repository convention. Do not create a second

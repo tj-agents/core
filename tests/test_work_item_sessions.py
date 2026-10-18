@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
@@ -539,6 +540,79 @@ class WorkItemSessionsTests(unittest.TestCase):
             connection.close()
         self.assertEqual("done", item["status"])
         self.assertEqual("https://github.com/tj-agents/core/pull/1", item["pr"])
+
+    def test_done_item_deletes_ended_sessions_and_keeps_live_foreign_and_caller_ones(self):
+        live = "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"
+        ended = "b3cde6d5-c07e-4198-a6f4-e8cb8a822986"
+        foreign = "c4def7e6-d18f-42a9-b7a5-f9dc9b933a97"
+        caller = "01a12aa7-5b58-7312-9400-ef710762147f"
+        self._claim_claude(session_id=live)
+        self._claim_claude(session_id=ended, role="bounded: notes")
+        self._claim_claude(session_id=foreign, role="bounded: elsewhere")
+        self._claim_codex(session_id=caller, role="bounded: review")
+        started = WIS._register_session().build_process_lookup()(os.getpid()).started_at
+        connection = self._connection()
+        try:
+            connection.execute("UPDATE sessions SET pid_started_at = ? WHERE handle = ?", (started, f"claude:{live}"))
+            connection.execute("UPDATE sessions SET machine = 'another-host' WHERE handle = ?", (f"claude:{foreign}",))
+            connection.commit()
+            STORE.end_session(connection, f"claude:{ended}", "closed")
+        finally:
+            connection.close()
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": caller, "CLAUDE_CODE_SESSION_ID": ""}):
+            WIS.cmd_item("example-feature/example-item", "done", cwd=self.repo)
+        connection = self._connection()
+        try:
+            remaining = sorted(row["handle"] for row in connection.execute("SELECT handle FROM sessions"))
+        finally:
+            connection.close()
+        self.assertEqual(sorted([f"claude:{live}", f"claude:{foreign}", f"codex:{caller}"]), remaining)
+
+    def test_done_item_judges_a_running_session_by_its_cli_registry_record(self):
+        alive = "a2bcd5c4-bf6d-4087-95e3-d7ba7f711875"
+        gone = "b3cde6d5-c07e-4198-a6f4-e8cb8a822986"
+        self._claim_claude(session_id=alive)
+        self._claim_claude(session_id=gone, role="bounded: notes")
+        started = WIS._register_session().build_process_lookup()(os.getpid()).started_at
+        registry = self.state / "cli-sessions"
+        registry.mkdir(parents=True, exist_ok=True)
+        for session_id, pid_started_at in ((alive, started), (gone, started + 1000)):
+            (registry / f"{session_id}.json").write_text(json.dumps({
+                "host": "claude", "session_id": session_id, "pid": os.getpid(), "pid_started_at": pid_started_at,
+            }), encoding="utf-8")
+        connection = self._connection()
+        try:
+            connection.execute("UPDATE sessions SET pid = NULL, pid_started_at = NULL")
+            connection.commit()
+        finally:
+            connection.close()
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": "", "CLAUDE_CODE_SESSION_ID": ""}):
+            WIS.cmd_item("example-feature/example-item", "done", cwd=self.repo)
+        connection = self._connection()
+        try:
+            remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
+        finally:
+            connection.close()
+        self.assertEqual([f"claude:{alive}"], remaining)
+
+    def test_done_item_deletes_an_ended_session_recorded_on_another_machine(self):
+        other = "c4def7e6-d18f-42a9-b7a5-f9dc9b933a97"
+        self._claim_claude(session_id=other, role="bounded: elsewhere")
+        connection = self._connection()
+        try:
+            connection.execute("UPDATE sessions SET machine = 'another-host' WHERE handle = ?", (f"claude:{other}",))
+            connection.commit()
+            STORE.end_session(connection, f"claude:{other}", "closed")
+        finally:
+            connection.close()
+        with mock.patch.dict(os.environ, {"CODEX_THREAD_ID": "", "CLAUDE_CODE_SESSION_ID": ""}):
+            WIS.cmd_item("example-feature/example-item", "done", cwd=self.repo)
+        connection = self._connection()
+        try:
+            remaining = [row["handle"] for row in connection.execute("SELECT handle FROM sessions")]
+        finally:
+            connection.close()
+        self.assertEqual([], remaining)
 
     def test_invalid_work_item_grammar_is_rejected(self):
         with self.assertRaises(ValueError):

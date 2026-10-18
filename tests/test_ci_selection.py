@@ -36,8 +36,6 @@ class ClassificationTests(unittest.TestCase):
         ])
         self.assertEqual(value["mode"], "focused")
         self.assertTrue({".agents/hooks/tests/test_problem_records.py",
-                         ".agents/hooks/tests/test_handoff_admission.py",
-                         ".agents/hooks/tests/test_callout_repair_gate.py",
                          ".agents/hooks/tests/test_adopt_plugins.py"}.issubset(value["tests"]))
         CI.required_results(value, self.results(), "pull_request")
 
