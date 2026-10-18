@@ -202,3 +202,12 @@ by one skill lives in its package's `TECH_DEBT.md` (for example `.agents/enginee
 
 Resolve when generation excludes `TECH_DEBT.md` from skill-local resources, with a test, and no
 `TECH_DEBT.md` appears under `plugins/` after `pwsh .agents/sync-generated.ps1`.
+
+## The worktree placement gate cannot decode every shell spelling
+
+`worktree_placement_gate.py` recognises a native worktree creation from its tokens and ignores quote, backslash and
+`$` characters in the executable and subcommand words. Bash can still spell those words through ANSI-C escapes
+(`$'add'`) or empty expansions (`a${e}dd`), which the gate does not decode, so such a creation reaches Git
+unchecked. The gate guards cooperative agents' placement, not adversarial input. Resolve when a creation whose
+words need shell decoding is refused, for example by failing closed on any expansion or escape near a `git`
+invocation.
