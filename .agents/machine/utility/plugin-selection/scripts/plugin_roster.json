@@ -9,6 +9,7 @@
     "msvc": ["cpp"],
     "win32": ["cpp"],
     "dotnet": [],
+    "efcore": ["dotnet"],
     "azure": ["dotnet"],
     "react": [],
     "nvim": [],
