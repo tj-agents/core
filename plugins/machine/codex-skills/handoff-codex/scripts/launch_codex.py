@@ -8,6 +8,7 @@ not relied on.
 
 import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -120,6 +121,7 @@ def build_arguments(working_directory, model, effort, bypass_hook_trust, prompt_
 def main(argv=None):
     agent_cli = _load_agent_cli()
     agent_cli.make_stdio_encoding_lossy()
+    status_path = None
     try:
         args = parse_args(argv, agent_cli)
 
@@ -144,18 +146,25 @@ def main(argv=None):
         # that was set -- TERM -- is what broke it. On POSIX this clearing has no effect either way:
         # launch_tab never forces or clears TERM there, because the terminal that actually starts the tab
         # sets TERM for that session itself.
+        status_path = agent_cli.handoff_status_path()
         agent_cli.launch_tab(
             working_directory, sys.executable, args.title,
-            arguments=agent_cli.bound_terminal_arguments("codex", working_directory, codex, arguments),
+            arguments=agent_cli.bound_terminal_arguments("codex", working_directory, codex, arguments,
+                                                        status_path, require_session_start=True),
             clear=('TERM',),
         )
+
+        agent_cli.await_handoff_startup(status_path)
 
         selection = f'{tier}{model}' if model else 'the CLI default model'
         if effort:
             selection += f' at {effort}'
         print(f"Launched codex-cli {version['text']} from {codex} on {selection}")
+        print(json.dumps({"worktree": str(working_directory), "prompt_path": str(prompt_path), "startup": "verified", "status_path": str(status_path)}))
         return 0
     except agent_cli.LaunchError as exc:
+        if status_path is not None and isinstance(exc, agent_cli.LaunchTimeout):
+            print(f"Handoff startup receipt: {status_path}", file=sys.stderr)
         return agent_cli.report_launch_failure(exc)
 
 
