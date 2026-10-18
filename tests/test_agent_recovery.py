@@ -363,6 +363,28 @@ Observed blocker: no send was attempted."""
         receipt = RECOVERY._receipt("codex", "exact_id", "profile")
         self.assertNotEqual(RECOVERY._status_path(receipt), RECOVERY._status_path(receipt))
 
+    def test_registration_without_any_wrapper_status_is_not_a_crash(self):
+        with self.assertRaisesRegex(RECOVERY.LaunchFailed, "never started"):
+            self.run_pickup(registered_after=1)
+
+    def test_an_unresumable_store_row_does_not_hide_native_matches(self):
+        self.store_session("ghost_id", title="recover launch topic", native=False)
+        self.write_codex()
+        history = RECOVERY._load("history")
+        with mock.patch.object(history, "history_root", return_value=self.root / "sessions"):
+            results = RECOVERY.search(("codex",), topic="launch topic")
+        self.assertEqual(["exact_id"], [item["id"] for item in results])
+        self.assertEqual("native-history", results[0]["source"])
+
+    def test_live_rollout_wins_over_its_archived_copy(self):
+        profile = self.root / "profile"
+        live = profile / "sessions" / "2026" / "rollout-a-same_id.jsonl"
+        archived = profile / "archived_sessions" / "rollout-a-same_id.jsonl"
+        for path in (archived, live):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{}", encoding="utf-8")
+        self.assertEqual(live, RECOVERY._history_file("codex", "same_id", profile))
+
     def test_pickup_failures_carry_the_cause(self):
         with self.assertRaisesRegex(RECOVERY.LaunchFailed, "unsupported value"):
             self.run_pickup([(1, {"state": "preparing"}), (3, {"state": "failed", "error": "unsupported value"})])

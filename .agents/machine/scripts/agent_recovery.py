@@ -186,6 +186,16 @@ class LaunchUnverified(RuntimeError):
     pass
 
 
+def unverified_launch(error):
+    if isinstance(error, LaunchUnverified):
+        return True
+    try:
+        timeout = getattr(_load("agent_cli"), "LaunchTimeout", None)
+    except Exception:
+        return False
+    return isinstance(timeout, type) and isinstance(error, timeout)
+
+
 def _tokens(value):
     return set(TOKEN.findall(str(value or "").casefold()))
 
@@ -251,15 +261,18 @@ def _history_root(host, profile):
 
 
 def _native_files(host, profile, cache):
-    key = (host, profile)
+    key = (host, str(profile))
     if key not in cache:
         files = {}
         for directory in _roots(host, _history_root(host, profile)):
             try:
-                found = directory.rglob("*.jsonl") if host == "codex" else directory.glob("*/*.jsonl")
-                files.update((path.stem, path) for path in found)
+                found = sorted(directory.rglob("*.jsonl") if host == "codex" else directory.glob("*/*.jsonl"))
             except OSError:
                 continue
+            for path in found:
+                files.setdefault(path.stem, path)
+                if host == "codex" and len(path.stem) > 36:
+                    files.setdefault(path.stem[-36:], path)
         cache[key] = files
     return cache[key]
 
@@ -271,9 +284,28 @@ def _native_file(host, session_id, profile, cache):
     return next((path for stem, path in files.items() if stem.endswith("-" + session_id)), None)
 
 
+def _native_header(path, host, history):
+    for _number, event in history.records(path):
+        if host == "codex":
+            payload = event.get("payload")
+            if event.get("type") == "session_meta" and isinstance(payload, dict):
+                source = payload.get("source")
+                if isinstance(source, dict) and "subagent" in source:
+                    return None
+                return {"host": host, "session": payload.get("id"), "cwd": payload.get("cwd"), "source": source,
+                        "branch": (payload.get("git") or {}).get("branch")}
+        elif event.get("type") in ("user", "assistant") and not event.get("isSidechain") and event.get("cwd"):
+            return {"host": host, "session": event.get("sessionId") or path.stem, "cwd": event.get("cwd"),
+                    "branch": event.get("gitBranch")}
+    return None
+
+
 def _resumable(item, history, cache):
     path = _native_file(item["host"], item["id"], item["profile"], cache)
-    native = history.session(path, item["host"]) if path else None
+    try:
+        native = _native_header(path, item["host"], history) if path else None
+    except (OSError, ValueError):
+        native = None
     if not native or native.get("session") != item["id"] or not _recoverable(native):
         return None
     return {**item, "cwd": native.get("cwd") or item["cwd"], "branch": native.get("branch") or item["branch"],
@@ -311,7 +343,11 @@ def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots
     if count < 1:
         raise ValueError("--count must be positive")
     history = _load("history")
-    stored = [] if roots else _store_search(hosts, topic, checkout, history)
+    native = {}
+    stored = [] if roots else [
+        resumable for resumable in (_resumable(item, history, native) for item in _store_search(hosts, topic, checkout, history))
+        if resumable is not None
+    ]
     results = list(stored)
     found = {(item["host"], item["id"]) for item in results}
     for host in hosts if include_history or not stored else ():
@@ -331,18 +367,7 @@ def search(hosts=("codex", "claude"), topic=None, checkout=None, count=10, roots
                 normal["source"] = "native-history"
                 results.append(normal)
     results.sort(key=lambda item: item.get("activity") or "", reverse=True)
-    kept = []
-    native = {}
-    for item in results:
-        if item.get("source") == "sessions.db":
-            item = _resumable(item, history, native)
-            if item is None:
-                continue
-            item = _finish_store_item(item)
-        kept.append(item)
-        if len(kept) == count:
-            break
-    return kept
+    return [_finish_store_item(item) if item.get("source") == "sessions.db" else item for item in results[:count]]
 
 
 def _store_find(host, session_id, history):
@@ -467,14 +492,7 @@ def _receipt_state(path, host, session_id, profile, state):
 
 
 def _history_file(host, session_id, profile):
-    for root in _roots(host, _history_root(host, profile)):
-        try:
-            found = sorted(root.rglob(f"*{session_id}.jsonl") if host == "codex" else root.glob(f"*/{session_id}.jsonl"))
-        except OSError:
-            continue
-        if found:
-            return found[0]
-    return None
+    return _native_file(host, session_id, profile, {})
 
 
 def _modified(path):
@@ -535,14 +553,18 @@ def await_pickup(host, session_id, status_path, since, history_path=None, timeou
                 modified = _modified(history_path)
                 if modified is not None and modified != history_before and modified >= since:
                     evidence = "native history written"
-            if evidence and (state == "running" or status.get("running_at")):
+            if evidence and (state == "running" or (status or {}).get("running_at")):
                 return evidence
             if state == "exited":
                 raise LaunchFailed(f"native {host} exited with {status.get('returncode')} before resuming the session")
             elapsed = clock() - start
-            if status is None and elapsed >= wrapper_timeout and status_file.create(
-                    status_path, {"state": "abandoned", "at": time.time()}):
-                raise LaunchFailed("the terminal never started the launch; no tab ran the startup wrapper")
+            if status is None and elapsed >= wrapper_timeout:
+                try:
+                    abandoned = status_file.create(status_path, {"state": "abandoned", "at": time.time()})
+                except OSError as error:
+                    raise LaunchUnverified(f"no tab reported starting and the launch could not be abandoned: {error}")
+                if abandoned:
+                    raise LaunchFailed("the terminal never started the launch; no tab ran the startup wrapper")
             if elapsed >= timeout:
                 raise LaunchUnverified(f"{host} startup began but did not resume the session within {int(timeout)}s; "
                                        "check the opened tab before retrying")
@@ -616,7 +638,15 @@ def open_session(host, session_id, prompt="Continue the requested work.", title=
                 else:
                     os.environ["CODEX_HOME"] = old_profile
         launched = True
-        evidence = await_pickup(host, session_id, status_path, since, history_path)
+        try:
+            evidence = await_pickup(host, session_id, status_path, since, history_path)
+        except LaunchUnverified:
+            raise
+        except BaseException:
+            if (_load("launch_status").read(status_path) or {}).get("state") != "abandoned":
+                status_path.unlink(missing_ok=True)
+            raise
+        status_path.unlink(missing_ok=True)
         try:
             _receipt_state(receipt, host, session_id, item["profile"], "launched")
         except OSError:

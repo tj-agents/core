@@ -351,12 +351,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     def report(state: str, **details: object) -> None:
         status.update(details, state=state, at=time.time())
         if parsed.status_file is not None:
-            launch_status.replace(parsed.status_file, status)
+            try:
+                launch_status.replace(parsed.status_file, status)
+            except OSError:
+                pass
 
-    if parsed.status_file is not None and not launch_status.create(
-            parsed.status_file, {**status, "state": "preparing", "at": time.time()}):
-        print(f"standards: {parsed.host} launch was abandoned or already claimed before startup", file=sys.stderr)
-        return 1
+    if parsed.status_file is not None:
+        try:
+            claimed = launch_status.create(parsed.status_file, {**status, "state": "preparing", "at": time.time()})
+        except OSError as error:
+            print(f"standards: {parsed.host} launch status could not be recorded: {error}", file=sys.stderr)
+            return 1
+        if not claimed:
+            print(f"standards: {parsed.host} launch was abandoned or already claimed before startup", file=sys.stderr)
+            return 1
     try:
         returncode = run_session(parsed.host, parsed.target, parsed.project, arguments,
                                  on_running=lambda: report("running", running_at=time.time()))

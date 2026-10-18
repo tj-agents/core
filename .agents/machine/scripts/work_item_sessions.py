@@ -284,10 +284,7 @@ def _resume_roots(row):
 
 
 def _unverified_launch(error):
-    recovery = _AGENT_RECOVERY
-    if recovery is None:
-        return False
-    return isinstance(error, (recovery.LaunchUnverified, recovery._load("agent_cli").LaunchTimeout))
+    return _AGENT_RECOVERY is not None and _AGENT_RECOVERY.unverified_launch(error)
 
 
 def cmd_claim(work_item, host, role=None, predecessor=None, status=None, title=None, plan_path=None, cwd=None):
@@ -572,10 +569,11 @@ def main(argv=None):
         else:
             raise ValueError(f"Unknown command: {args.command}")
     except Exception as exc:
-        if not isinstance(exc, (ValueError, RuntimeError)) and not _unverified_launch(exc):
+        unverified = _unverified_launch(exc)
+        if not unverified and not isinstance(exc, (ValueError, RuntimeError)):
             raise
         print(json.dumps({"error": str(exc)}))
-        return 3 if _unverified_launch(exc) else 1
+        return 3 if unverified else 1
     print(json.dumps(result, default=str))
     return 0
 
