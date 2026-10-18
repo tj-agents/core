@@ -233,7 +233,16 @@ Observed blocker: no send was attempted."""
         self.assertEqual(seen, [RECOVERY._profile("claude", projects)])
 
     def store_session(self, session="01a1415f-6448", title="Personal workflow policy research", work_title=None,
-                      started_at=1000.0):
+                      started_at=1000.0, native=True):
+        if native:
+            rollout = self.root / "codex profile" / "sessions" / "2026" / f"rollout-x-{session}.jsonl"
+            rollout.parent.mkdir(parents=True, exist_ok=True)
+            events = [
+                {"type": "session_meta", "payload": {"id": session, "cwd": str(self.cwd), "source": "cli"}},
+                {"type": "response_item", "payload": {"type": "message", "role": "user",
+                                                      "content": [{"type": "input_text", "text": "policy"}]}},
+            ]
+            rollout.write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
         store = RECOVERY._load("session_store")
         connection = store.connect()
         try:
@@ -242,7 +251,7 @@ Observed blocker: no send was attempted."""
                                        "github.com/tj-agents/docs", "problem-management", "personal-policy",
                                        status="active", title=work_title, plan_path="plans/problem-management/PLAN.md")
             connection.execute(
-                "INSERT INTO sessions (handle, host, session_id, profile, title, cwd, repo, branch, work_item, "
+                "INSERT OR REPLACE INTO sessions (handle, host, session_id, profile, title, cwd, repo, branch, work_item, "
                 "started_at, last_activity_at) VALUES (?, 'codex', ?, ?, ?, ?, 'github.com/tj-agents/docs', 'main', ?, ?, ?)",
                 (f"codex:{session}", session, str(self.root / "codex profile"), title, str(self.cwd),
                  "github.com/tj-agents/docs:problem-management/personal-policy" if work_title else None,
@@ -262,6 +271,15 @@ Observed blocker: no send was attempted."""
         self.assertEqual("sessions.db", results[0]["source"])
         self.assertIn("work_item.title", results[0]["matched_by"])
         self.assertEqual("plans/problem-management/PLAN.md", results[0]["work_item"]["plan_path"])
+
+    def test_sqlite_ignores_path_words_and_sessions_without_native_history(self):
+        self.store_session(work_title="Optional GitHub work-items package and personal adoption")
+        self.store_session("unresumable", title="Personal workflow policy research", native=False)
+        history = RECOVERY._load("history")
+        with mock.patch.object(history, "history_root", return_value=self.root / "missing"):
+            self.assertEqual(["01a1415f-6448"], [item["id"] for item in RECOVERY.search(topic="personal workflow")])
+            with self.assertRaises(ValueError):
+                RECOVERY.search(("codex",), topic="synthetic recovery")
 
     def test_sqlite_checkout_filter_and_history_fallback(self):
         self.store_session(title="Personal workflow policy research")
@@ -283,6 +301,17 @@ Observed blocker: no send was attempted."""
             item = RECOVERY.find("codex", "01a1415f-6448")
         self.assertEqual(str(self.cwd), item["cwd"])
         self.assertEqual(Path(item["profile"]), (self.root / "codex profile").resolve())
+
+    def test_find_does_not_resume_a_recorded_session_without_cli_history(self):
+        self.store_session("helper_id", native=False)
+        rollout = self.root / "codex profile" / "sessions" / "rollout-x-helper_id.jsonl"
+        rollout.parent.mkdir(parents=True, exist_ok=True)
+        rollout.write_text(json.dumps({"type": "session_meta", "payload": {
+            "id": "helper_id", "cwd": str(self.cwd), "source": "exec"}}), encoding="utf-8")
+        history = RECOVERY._load("history")
+        with mock.patch.object(history, "history_root", return_value=self.root / "missing"):
+            with self.assertRaises(ValueError):
+                RECOVERY.find("codex", "helper_id")
 
     def run_pickup(self, statuses=(), registered_after=None, history_after=None, timeout=10, wrapper_timeout=3):
         self.launches = getattr(self, "launches", 0) + 1
@@ -306,16 +335,25 @@ Observed blocker: no send was attempted."""
         return AWAIT_PICKUP("codex", session, status, before - 1, history, timeout=timeout,
                             wrapper_timeout=wrapper_timeout, interval=1, clock=lambda: now[0], wait=wait)
 
-    def test_pickup_is_verified_by_registration_or_history_growth(self):
-        self.assertEqual("registered in sessions.db",
-                         self.run_pickup([(1, {"state": "preparing"})], registered_after=4))
-        self.assertEqual("native history written", self.run_pickup([(1, {"state": "preparing"})], history_after=4))
+    def test_pickup_is_verified_by_registration_or_history_growth_once_running(self):
+        running = [(1, {"state": "preparing"}), (6, {"state": "running"})]
+        self.assertEqual("registered in sessions.db", self.run_pickup(running, registered_after=4))
+        self.assertEqual("native history written", self.run_pickup(running, history_after=4))
+        with self.assertRaises(RECOVERY.LaunchUnverified):
+            self.run_pickup([(1, {"state": "preparing"})], registered_after=4)
+        with self.assertRaisesRegex(RECOVERY.LaunchFailed, "acknowledge"):
+            self.run_pickup([(1, {"state": "preparing"}), (6, {"state": "failed", "error": "did not acknowledge"})],
+                            registered_after=4)
 
     def test_pickup_failures_carry_the_cause(self):
         with self.assertRaisesRegex(RECOVERY.LaunchFailed, "unsupported value"):
             self.run_pickup([(1, {"state": "preparing"}), (3, {"state": "failed", "error": "unsupported value"})])
         with self.assertRaisesRegex(RECOVERY.LaunchFailed, "never started"):
             self.run_pickup()
+        self.assertEqual("abandoned", json.loads(
+            (self.root / f"pickup_{self.launches}.status.json").read_text(encoding="utf-8"))["state"])
+        self.assertEqual("registered in sessions.db", self.run_pickup(
+            [(3, {"state": "preparing"}), (4, {"state": "running"})], registered_after=4, wrapper_timeout=3))
         with self.assertRaisesRegex(RECOVERY.LaunchFailed, "exited with 1"):
             self.run_pickup([(1, {"state": "exited", "returncode": 1})])
         with self.assertRaises(RECOVERY.LaunchUnverified):
