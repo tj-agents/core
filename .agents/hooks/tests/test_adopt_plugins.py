@@ -42,6 +42,10 @@ class AdoptPluginsTests(unittest.TestCase):
         self.assertNotIn("ref", claude["extraKnownMarketplaces"]["tj-agents"]["source"])
         self.assertEqual([], adopt_plugins.run(self.root, ["cpp-msvc"], [], "check"))
 
+    def test_plugin_repository_stack_selects_template_and_python(self):
+        adopt_plugins.run(self.root, ["plugin-repository"], [], "write")
+        self.assertEqual(["python@tj-agents", "template@tj-agents"], self.plugins())
+
     def test_existing_selection_is_extended_and_unknown_packages_are_kept(self):
         self.selection.parent.mkdir()
         self.selection.write_text(json.dumps({"schema_version": 1, "marketplaces": {"tj-agents": {"repository": "tj-agents/marketplace"}}, "plugins": ["newcomer@tj-agents"]}), encoding="utf-8")
