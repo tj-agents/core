@@ -273,6 +273,11 @@ class WorkflowWiringTests(unittest.TestCase):
         self.assertIn("github.sha }}\"", job)
         self.assertIn("github.ref == 'refs/heads/main'", job)
         self.assertEqual(2, job.count(".template/.agents/template/utility/check/scripts/check_examples.py --root . --base"))
+        pull_request_run = next(line for line in job.splitlines()
+                                if "github.event.pull_request.base.sha" in line)
+        push_run = next(line for line in job.splitlines() if "github.event.before" in line)
+        self.assertIn("--merge-base", pull_request_run)
+        self.assertNotIn("--merge-base", push_run)
 
 
 if __name__ == "__main__":

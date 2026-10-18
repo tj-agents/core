@@ -54,7 +54,7 @@ jobs:
 
       - name: changed authored guidance has concrete examples (pull request)
         if: github.event_name == 'pull_request'
-        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+        run: python3 -B .template/.agents/template/utility/check/scripts/check_examples.py --root . --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}" --merge-base
 
       - name: changed authored guidance has concrete examples (default push)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
