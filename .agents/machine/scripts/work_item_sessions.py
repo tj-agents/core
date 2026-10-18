@@ -4,6 +4,7 @@
 import argparse
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -283,8 +284,10 @@ def _finished_elsewhere(row, machine):
     if (row.get("machine") or "").casefold() != machine.casefold():
         return False
     record = _agent_recovery()._registry(row["session_id"]) or {}
-    if isinstance(record.get("pid"), int) and record.get("pid_started_at") is not None:
-        return _pid_is_dead(record["pid"], record["pid_started_at"])
+    started = record.get("pid_started_at")
+    if (record.get("host") in (None, row["host"]) and isinstance(record.get("pid"), int)
+            and isinstance(started, (int, float)) and not isinstance(started, bool) and math.isfinite(started)):
+        return _pid_is_dead(record["pid"], started)
     return _pid_is_dead(row.get("pid"), row.get("pid_started_at"))
 
 
