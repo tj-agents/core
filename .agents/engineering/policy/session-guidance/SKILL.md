@@ -25,8 +25,8 @@ evidence or a stated user decision, and say what changed.
 During normal work, when an applicable standard is ambiguous, silent or improvable, propose its
 refinement in the same turn as a question to the user: name the standard, the gap, concrete wording or a
 snippet, and why. Continue the current task under the existing standard while awaiting the decision. If
-accepted, make the refinement in this session under the standing authorization. Established standards
-defects still require immediate repair.
+accepted, make the refinement in this session under the standing authorization.
+Established standards defects still require immediate repair.
 
 ## A task has an owning lifecycle — load it before the first edit
 

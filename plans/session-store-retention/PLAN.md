@@ -40,6 +40,13 @@
   `test_resume_start_clears_ended_at_and_end_reason` and the register-session store integration test
   flaked once under full-suite load (the 2s git probe returned `None`); both pass alone and on origin/main.
 
+- 2026-10-18: three commits pushed; PR https://github.com/tj-agents/core/pull/295 open at head
+  b2130b5348162c8b21607b0787f65c631d269e00. Continuation owner initialized
+  (`.agents/continuation/owner.json`, id c1cb02bb672099e35ef3e29c) and yielded.
+- Blocker: registering the scheduled wake (`delivery_continuation.py register`) was denied by the Claude Code
+  auto-mode classifier as unauthorized persistence. Resolver: Tommy. Resume when he says "merge it" (drive
+  CI, review and merge in the foreground) or allows that register command.
+
 ## Next Steps
 
-Finish the gate-removal test run, commit, push, and open the PR with `gh pr create`.
+Drive PR #295 through exact-head CI, independent review and auto-merge once Tommy picks the route above.
