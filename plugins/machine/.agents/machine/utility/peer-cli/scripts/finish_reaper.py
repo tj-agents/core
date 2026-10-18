@@ -187,6 +187,7 @@ def main():
             status = "cancelled" if Path(str(target) + ".cancelled").exists() else "timeout"
             result(target, status, error="verified host (or Windows wrapper) did not exit")
             return 0
+        session_close.delete_own_session(args.session_id)
         if cleanup:
             status, extra = remove_worktree_and_branch(args)
             if status not in {"succeeded", "branch-preserved"}:

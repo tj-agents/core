@@ -18,13 +18,9 @@ FAMILIES = {
     "problem-records": {
         "sources": {
             ".agents/hooks/problem_records.py",
-            ".agents/hooks/callout_repair_gate.py",
-            ".agents/engineering/workflow/handoff/scripts/admission.py",
         },
         "tests": {
             ".agents/hooks/tests/test_problem_records.py",
-            ".agents/hooks/tests/test_callout_repair_gate.py",
-            ".agents/hooks/tests/test_handoff_admission.py",
         },
     },
     "plugin-adoption": {
