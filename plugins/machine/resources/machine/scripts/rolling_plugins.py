@@ -28,6 +28,7 @@ OPERATION_TIMEOUT_SECONDS = 300
 LOCK_WAIT_SECONDS = 180
 LOCK_STALE_SECONDS = 900
 SHA = re.compile(r"^[0-9a-f]{40}$")
+GENERATED_MARKER = ".tj-agents-generated"
 
 
 class RollingPluginError(RuntimeError):
@@ -435,6 +436,11 @@ def _fetch_main(url: str, root: Path, deadline: Deadline | None = None) -> tuple
 
 def _git_text(clone: Path, revision: str, path: str, deadline: Deadline | None = None) -> bytes:
     safe = _safe_path(path)
+    if (clone / GENERATED_MARKER).is_file():
+        try:
+            return (clone / safe).read_bytes()
+        except OSError:
+            raise RollingPluginError(f"missing required generated path {safe} at {revision[:12]}") from None
     completed = _completed(["git", "-C", str(clone), "show", f"{revision}:{safe}"], None,
                            {"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}, deadline or Deadline())
     if completed.returncode:
@@ -502,6 +508,45 @@ def _publication_gate(clone: Path, revision: str, deadline: Deadline | None = No
             )
 
 
+def _generated_publication(clone: Path, revision: str, cache: Path, deadline: Deadline | None = None) -> Path:
+    deadline = deadline or Deadline()
+    destination = cache / "generated" / revision
+    _unlinked_ancestors(destination)
+    if (destination / GENERATED_MARKER).is_file():
+        return destination
+    staging = destination.with_name(f".{revision}.{os.getpid()}.{time.monotonic_ns()}")
+    try:
+        staging.mkdir(parents=True)
+        _extract_repository(clone, revision, staging, deadline)
+        for script, *flags in (("scripts/update_catalog_digests.py",), ("scripts/sync_plugin_packages.py",),
+                               ("scripts/sync_plugin_packages.py", "--check")):
+            if not (staging / script).is_file():
+                raise RollingPluginError(f"tj-agents/core generator {script} is missing at {revision[:12]}")
+            completed = _completed([sys.executable, "-B", str(staging / script), "--root", str(staging), *flags],
+                                   staging, {}, deadline)
+            if completed.returncode:
+                detail = (completed.stderr or completed.stdout).decode("utf-8", "replace").strip() or "no output"
+                raise RollingPluginError(f"tj-agents/core {revision[:12]} could not be generated for startup: {detail}")
+        (staging / GENERATED_MARKER).write_text(revision, encoding="utf-8")
+        _remove_cache_tree(destination, cache)
+        try:
+            os.replace(staging, destination)
+        except OSError:
+            if not (destination / GENERATED_MARKER).is_file():
+                raise
+    except OSError as error:
+        raise RollingPluginError(f"tj-agents/core {revision[:12]} generated tree could not be written: {error}") from error
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    for stale in destination.parent.iterdir():
+        if stale.name != revision and not stale.name.startswith("."):
+            try:
+                _remove_cache_tree(stale, cache)
+            except (RollingPluginError, OSError):
+                continue
+    return destination
+
+
 def _entry(catalog: dict, name: str) -> dict:
     matches = [item for item in catalog.get("plugins", []) if isinstance(item, dict) and item.get("name") == name]
     if len(matches) != 1:
@@ -566,8 +611,31 @@ def _tree_modes(clone: Path, revision: str, path: str, deadline: Deadline | None
     return modes
 
 
+def _generated_files(root: Path, prefix: str) -> dict[str, tuple[bytes, bool]]:
+    base = root if prefix == "." else root / prefix
+    files: dict[str, tuple[bytes, bool]] = {}
+    names: set[str] = set()
+    for entry in sorted(base.rglob("*")) if base.is_dir() else ():
+        if entry.is_dir() and not entry.is_symlink():
+            continue
+        if entry.is_symlink() or not entry.is_file():
+            raise RollingPluginError(f"generated package {prefix} contains an unsupported link or special entry")
+        safe = _safe_path(entry.relative_to(base).as_posix())
+        if safe == GENERATED_MARKER:
+            continue
+        if safe.casefold() in names:
+            raise RollingPluginError(f"generated package {prefix} has case-colliding path {safe}")
+        names.add(safe.casefold())
+        files[safe] = entry.read_bytes(), os.name != "nt" and bool(entry.stat().st_mode & 0o111)
+    if not files:
+        raise RollingPluginError(f"current package tree is empty: {prefix}")
+    return files
+
+
 def _tree_files(clone: Path, revision: str, path: str, deadline: Deadline | None = None) -> dict[str, tuple[bytes, bool]]:
     prefix = _safe_path(path, allow_root=True)
+    if (clone / GENERATED_MARKER).is_file():
+        return _generated_files(clone, prefix)
     subject = revision if prefix == "." else f"{revision}:{prefix}"
     archive = _completed(["git", "-C", str(clone), "archive", "--format=tar", subject], None,
                          {"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}, deadline or Deadline())
@@ -724,7 +792,13 @@ def _state(source: str, cache: Path, catalog_cache: dict[str, tuple[Path, str, d
     if authenticated not in catalog_cache:
         clone, revision = _fetch_main(authenticated, cache, deadline)
         if authenticated == "https://github.com/tj-agents/core.git" and (authenticated, revision) not in published:
-            _publication_gate(clone, revision, deadline)
+            try:
+                _publication_gate(clone, revision, deadline)
+            except RollingPluginError as unpublished:
+                try:
+                    clone = _generated_publication(clone, revision, cache, deadline)
+                except RollingPluginError as error:
+                    raise RollingPluginError(f"{error} (publication check: {unpublished})") from unpublished
             published.add((authenticated, revision))
         catalog_cache[authenticated] = clone, revision, _catalog(clone, revision, deadline)
     clone, revision, catalog = catalog_cache[authenticated]
