@@ -15,7 +15,7 @@ START = "# >>> base-agents claude launcher >>>"
 END = "# <<< base-agents claude launcher <<<"
 OPT_OUT_ENV = "BASE_AGENTS_CLAUDE_PROFILE"
 
-BOOTSTRAP = r'''import base64, json, os, shutil, subprocess, sys, tempfile
+BOOTSTRAP = r'''import base64, json, os, subprocess, sys, tempfile
 from pathlib import Path
 
 payload = sys.argv[1:2] == ["--payload"]
@@ -250,41 +250,38 @@ def locate():
         raise Missing("the active machine " + kind + " launcher is unavailable", package)
     return package, script
 
-def native_clis():
+def native_cli():
     if kind == "codex":
-        return [[native_codex(typed_target)]]
-    if os.name == "nt" and Path(typed_target).suffix.casefold() == ".ps1":
-        shells = [shell for shell in (shutil.which("pwsh"), shutil.which("powershell.exe")) if shell]
-        if not shells:
-            raise ValueError("PowerShell")
-        return [[shell, "-NoProfile", "-File", typed_target] for shell in shells]
-    return [[typed_target]]
+        return native_codex(typed_target)
+    target = Path(typed_target)
+    if os.name == "nt" and target.suffix.casefold() == ".ps1":
+        for suffix in (".exe", ".cmd"):
+            if target.with_suffix(suffix).is_file():
+                return str(target.with_suffix(suffix))
+        raise ValueError("Claude PowerShell shim has no executable sibling")
+    return typed_target
 
 def repair(package):
     identity, scope, directory = package
     marketplace = identity.rsplit("@", 1)[1]
     try:
-        executables = native_clis()
+        executable = native_cli()
     except ValueError:
         return False
+    if kind == "claude":
+        commands = ([executable, "plugin", "marketplace", "update", marketplace], [executable, "plugin", "update", identity, "--scope", scope])
+    else:
+        commands = ([executable, "plugin", "marketplace", "upgrade", marketplace], [executable, "plugin", "add", identity])
     print("standards: reinstalling " + identity + " from its marketplace", file=sys.stderr)
-    for executable in executables:
-        if kind == "claude":
-            commands = ([*executable, "plugin", "marketplace", "update", marketplace], [*executable, "plugin", "update", identity, "--scope", scope])
-        else:
-            commands = ([*executable, "plugin", "marketplace", "upgrade", marketplace], [*executable, "plugin", "add", identity])
+    for command in commands:
         try:
-            for command in commands:
-                completed = subprocess.run(command, cwd=directory, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                           stderr=subprocess.DEVNULL, timeout=180)
-                if completed.returncode != 0:
-                    return False
-            return True
-        except OSError:
-            continue
-        except subprocess.SubprocessError:
+            completed = subprocess.run(command, cwd=directory, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL, timeout=180)
+        except (OSError, subprocess.SubprocessError):
             return False
-    return False
+        if completed.returncode != 0:
+            return False
+    return True
 
 def resolve():
     try:

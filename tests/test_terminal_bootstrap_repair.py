@@ -79,11 +79,10 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
             "machine@base-agents": [{"scope": "user", "installPath": str(package)}],
         }}), encoding="utf-8")
 
-    def powershell_claude(self, repaired: Path) -> Path:
+    def powershell_claude(self, repaired: Path | None) -> Path:
         self.native_claude(repaired)
         target = self.root / "claude.ps1"
-        target.write_text(f"& '{sys.executable}' '{self.root / 'native_claude.py'}' @args\r\nexit $LASTEXITCODE\r\n",
-                          encoding="utf-8")
+        target.write_text("exit 99\r\n", encoding="utf-8")
         return target
 
     def native_claude(self, repaired: Path | None, update_code: int = 0) -> Path:
@@ -201,11 +200,9 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
 
 
     @unittest.skipUnless(os.name == "nt", "PowerShell script shims exist only on Windows; Linux targets run directly")
-    def test_a_powershell_script_shim_is_repaired_through_windows_powershell(self):
+    def test_a_powershell_script_shim_is_repaired_through_its_command_sibling(self):
         fixed = self.package("fixed", STARTED_THEN_EXIT.format(label="fixed", code=0))
         self.install(self.package("broken", READY_THEN_FAIL.format(label="broken")))
-        self.environment["PATH"] = os.pathsep.join(
-            entry for entry in self.environment["PATH"].split(os.pathsep) if "windowsapps" not in entry.casefold())
 
         completed = self.run_bootstrap(self.powershell_claude(fixed))
 
@@ -216,6 +213,17 @@ class TerminalBootstrapRepairTests(unittest.TestCase):
             "claude plugin update machine@base-agents --scope user",
             "fixed",
         ], self.calls_made())
+
+    @unittest.skipUnless(os.name == "nt", "PowerShell script shims exist only on Windows; Linux targets run directly")
+    def test_a_powershell_script_shim_without_a_command_sibling_keeps_the_original_failure(self):
+        self.install(self.package("broken", READY_THEN_FAIL.format(label="broken")))
+        target = self.powershell_claude(None)
+        target.with_suffix(".cmd").unlink()
+
+        completed = self.run_bootstrap(target)
+
+        self.assertEqual(1, completed.returncode, completed.stderr)
+        self.assertEqual(["broken"], self.calls_made())
 
 
 class LaunchStateTests(unittest.TestCase):
