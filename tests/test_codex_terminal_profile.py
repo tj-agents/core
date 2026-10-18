@@ -54,6 +54,37 @@ class CodexTerminalProfileTests(unittest.TestCase):
         self.assertEqual(PROFILE.main(['--documents', str(self.documents)]), 0)
         self.assertFalse(any(path.exists() for path in self.paths))
 
+    def test_refresh_removes_superseded_wrapper_from_a_current_profile(self):
+        path = self.paths[0]
+        path.parent.mkdir(parents=True)
+        obsolete = ('# >>> core codex no-daemon >>>\r\n'
+                    ". 'obsolete-checkout/shell/codex-no-daemon.ps1'\r\n"
+                    '# <<< core codex no-daemon <<<\r\n')
+        for before in (True, False):
+            with self.subTest(wrapper_before_current=before):
+                blocks = obsolete + PROFILE.BLOCK if before else PROFILE.BLOCK + '\r\n' + obsolete
+                original = '# private prefix\r\n' + blocks + '\r\n# private suffix\r\n'
+                path.write_bytes(codecs.BOM_UTF8 + original.encode('utf-8'))
+                self.assertTrue(PROFILE.ensure(path))
+                raw = path.read_bytes()
+                self.assertTrue(raw.startswith(codecs.BOM_UTF8))
+                text = raw.decode('utf-8-sig')
+                self.assertNotIn('core codex no-daemon', text)
+                self.assertNotIn('obsolete-checkout', text)
+                self.assertEqual(1, text.count(PROFILE.START))
+                self.assertTrue(text.startswith('# private prefix\r\n'))
+                self.assertTrue(text.endswith('# private suffix\r\n'))
+                self.assertFalse(PROFILE.ensure(path))
+
+    def test_malformed_superseded_wrapper_is_preserved(self):
+        path = self.paths[0]
+        path.parent.mkdir(parents=True)
+        original = b'# >>> core codex no-daemon >>>\r\nprivate content\r\n'
+        path.write_bytes(original)
+        with self.assertRaisesRegex(ValueError, 'malformed superseded launcher'):
+            PROFILE.ensure(path)
+        self.assertEqual(original, path.read_bytes())
+
 
 if __name__ == '__main__':
     unittest.main()
