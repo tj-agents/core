@@ -241,7 +241,7 @@ else:
             if root is not None and root.parent.name == "machine" and (root / "catalog" / "catalog.json").is_file():
                 candidates.append((item["pluginId"], int(item.get("enabled") is True), root))
         root = coordinator(candidates, {identity for identity, enabled, _root in candidates if enabled})
-    except (OSError, ValueError, TypeError) as error:
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
         unavailable("Codex machine coordinator is unavailable (" + str(error) + ")")
 script = root / "resources" / "machine" / "scripts" / f"{kind}_terminal_launcher.py"
 if not script.is_file():

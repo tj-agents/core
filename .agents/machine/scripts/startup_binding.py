@@ -337,6 +337,9 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
                         time.sleep(0.05)
                     if process.poll() is not None:
                         return process.returncode
+                    if not require_session_start:
+                        running(process.pid)
+                        return process.wait()
                     raise StartupBindingError(f"native {host} did not acknowledge SessionStart before the startup deadline")
                 except BaseException as error:
                     if process.poll() is None:
