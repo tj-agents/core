@@ -76,7 +76,7 @@ stack's rows. Kinds:
 
 - `path` — a regex matched against the repo-relative POSIX path.
 - `skills` — invoked before writing the file. Use `plugin:skill` where a generic standard and this
-  system's roster share a name (`dotnet:persistence` and `concertable:persistence`): both load and the
+  system's roster share a name (`efcore:persistence` and `concertable:persistence`): both load and the
   plugin says which is which. A name with one home stays bare.
 - `content_requires` — an optional regex over the content being written; the row fires only when it also
   matches (a `.csproj` routes to the testing skills only when it declares `<IsTestProject>true`).
