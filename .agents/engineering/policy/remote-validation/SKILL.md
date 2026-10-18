@@ -109,25 +109,18 @@ polling a listener handle with `write_stdin`, `functions.wait`, status, or tail 
 read one already-bound monitor session and notify only for nonempty output or a terminal result; an empty,
 still-running read does not wake the model.
 
-When a host actually documents `functions.exec`, `tools.write_stdin`, and `notify`, place this body in that
-host's documented background `functions.exec` cell. It reuses `boundMonitorSessionId`; it does not start a
-second monitor or invent a durable continuation API:
+When a host documents `functions.exec`, start its documented background cell only after binding the monitor
+session. Inside that cell, use the documented `tools.write_stdin` and `notify` globals directly. This body
+reuses `boundMonitorSessionId`; it does not start a second monitor or invent a durable continuation API:
 
 ```js
-const canRelay =
-  typeof functions !== "undefined" && typeof functions.exec === "function" &&
-  typeof tools !== "undefined" && typeof tools.write_stdin === "function" &&
-  typeof notify === "function";
-
-if (canRelay) {
-  const sessionId = boundMonitorSessionId; // Bound before this background cell starts.
-  for (;;) {
-    const update = await tools.write_stdin({session_id: sessionId, chars: "", yield_time_ms: 30_000});
-    const terminal = update.exit_code !== undefined;
-    const hasOutput = typeof update.output === "string" && update.output.trim() !== "";
-    if (hasOutput || terminal) notify(JSON.stringify({output: update.output, terminal}));
-    if (terminal) break;
-  }
+const sessionId = boundMonitorSessionId; // Bound before this background cell starts.
+for (;;) {
+  const update = await tools.write_stdin({session_id: sessionId, chars: "", yield_time_ms: 30_000});
+  const terminal = update.exit_code !== undefined;
+  const hasOutput = typeof update.output === "string" && update.output.trim() !== "";
+  if (hasOutput || terminal) notify(JSON.stringify({output: update.output, terminal}));
+  if (terminal) break;
 }
 ```
 
