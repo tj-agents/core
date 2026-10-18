@@ -1,3 +1,4 @@
+import importlib.util
 import subprocess
 from pathlib import Path
 import tempfile
@@ -6,6 +7,11 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / ".agents/engineering/convention/docs/scripts/check_examples.py"
+SYNC_SPEC = importlib.util.spec_from_file_location(
+    "check_examples_package_sync", ROOT / "scripts/sync_plugin_packages.py"
+)
+SYNC = importlib.util.module_from_spec(SYNC_SPEC)
+SYNC_SPEC.loader.exec_module(SYNC)
 
 
 class ExampleCheckerTests(unittest.TestCase):
@@ -105,8 +111,59 @@ class ExampleCheckerTests(unittest.TestCase):
     def test_nested_skill_assets_are_excluded_without_excluding_a_template_plugin(self):
         self.write(".agents/example/convention/real/templates/SKILL.md", self.skill("# Generated template\n"))
         self.write(".agents/example/convention/real/resources/SKILL.md", self.skill("# Resource\n"))
+        self.write(".agents/example/convention/real/fixtures/SKILL.md", self.skill("# Fixture\n"))
+        self.write(".agents/fixtures/convention/check/SKILL.md", self.skill("# Plugin namespace\n"))
         self.commit()
-        self.assertEqual(0, self.check("--base", self.base).returncode)
+        failed = self.check("--base", self.base)
+        self.assertEqual(1, failed.returncode)
+        self.assertIn(".agents/fixtures/convention/check/SKILL.md", failed.stderr)
+
+    def test_changed_root_code_conventions_requires_an_example_in_range_mode(self):
+        self.write("CODE_CONVENTIONS.md", "# Code conventions\n\nUse clear names.\n")
+        self.commit()
+        failed = self.check("--base", self.base)
+        self.assertEqual(1, failed.returncode)
+        self.assertIn("CODE_CONVENTIONS.md", failed.stderr)
+
+    def test_packaged_docs_checker_runs_from_an_installed_skill_against_a_consumer(self):
+        _, output, _, _ = SYNC.build(ROOT, validate_catalog_digests=False)
+        package = self.root / "installed-engineering" / "skills" / "docs"
+        prefix = "plugins/engineering/skills/docs/"
+        for relative, content in output.items():
+            if relative.startswith(prefix):
+                destination = package / relative.removeprefix(prefix)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(content)
+
+        self.assertTrue((package / "SKILL.md").is_file())
+        self.assertIn(
+            '"<skill-directory>/scripts/check_examples.py"',
+            (package / "SKILL.md").read_text(encoding="utf-8"),
+        )
+        helper = package / "scripts/check_examples.py"
+        self.assertTrue(helper.is_file())
+        consumer = self.root / "consumer"
+        consumer.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=consumer, check=True)
+        subprocess.run(["git", "config", "user.name", "Consumer"], cwd=consumer, check=True)
+        subprocess.run(["git", "config", "user.email", "consumer@example.invalid"], cwd=consumer, check=True)
+        (consumer / "README.md").write_text("base\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=consumer, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=consumer, check=True)
+        (consumer / "RULES.md").write_text("# Rules\n\n```text\nInput: change\nOutput: reviewed\n```\n", encoding="utf-8")
+
+        passed = subprocess.run(
+            ["python", "-B", str(helper), "--root", str(consumer), "--path", "RULES.md"],
+            text=True, capture_output=True,
+        )
+        self.assertEqual(0, passed.returncode, passed.stderr)
+        (consumer / "RULES.md").write_text("# Rules\n\nNo example.\n", encoding="utf-8")
+        failed = subprocess.run(
+            ["python", "-B", str(helper), "--root", str(consumer), "--path", "RULES.md"],
+            text=True, capture_output=True,
+        )
+        self.assertEqual(1, failed.returncode)
+        self.assertIn("RULES.md", failed.stderr)
 
     def test_example_fenced_inside_an_html_comment_does_not_count(self):
         relative = ".agents/example/convention/commented/SKILL.md"

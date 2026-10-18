@@ -81,10 +81,11 @@ Dispatch only relevant fresh lenses, using the same immutable descriptor and con
 For every changed authored skill, standard, or always-loaded instruction, verify the relevant concrete
 fenced example demonstrates the changed rule. A nonempty fence alone is insufficient: verify the example's
 types, ownership, construction, and call site where the rule defines them. Apply `engineering:docs`' required
-code, procedure, or input/output format. Run the frozen tree's example gate when it ships one:
+code, procedure, or input/output format. Resolve the checker from the installed `engineering:docs` skill
+directory and run it over the source checkout:
 
 ```bash
-python -B .agents/engineering/convention/docs/scripts/check_examples.py --root <source-checkout> --base <base-sha> --head <head-sha>
+python -B "<engineering:docs skill-directory>/scripts/check_examples.py" --root <source-checkout> --base <base-sha> --head <head-sha>
 ```
 
 The checker reads committed files from `<head-sha>`, so it does not rely on mutable source-checkout content.
