@@ -19,6 +19,7 @@ from typing import Callable, Mapping, Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from codex_marketplace_sync import codex_config_selection
+import launch_status
 from rolling_plugins import OPERATION_TIMEOUT_SECONDS, RollingPluginError, preflight, terminate_process_tree
 from terminal_command import command_for_target, native_target_for_shim
 
@@ -336,35 +337,6 @@ def run_session(host: str, target: str, project: Path, arguments: Sequence[str],
         raise StartupBindingError(f"{host} startup preflight could not complete: {error}") from error
 
 
-def claim_status(path: Path | None) -> bool:
-    if path is None:
-        return True
-    try:
-        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        try:
-            return json.loads(path.read_text(encoding="utf-8")).get("state") != "abandoned"
-        except (OSError, ValueError, AttributeError):
-            return True
-    except OSError:
-        return True
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        json.dump({"state": "preparing", "pid": os.getpid(), "at": time.time()}, handle)
-    return True
-
-
-def write_status(path: Path | None, state: str, **details: object) -> None:
-    if path is None:
-        return
-    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    try:
-        temporary.write_text(json.dumps({"state": state, "pid": os.getpid(), "at": time.time(), **details}),
-                             encoding="utf-8")
-        os.replace(temporary, path)
-    except OSError:
-        pass
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", choices=("claude", "codex"), required=True)
@@ -374,18 +346,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     parsed = parser.parse_args(argv)
     arguments = parsed.arguments[1:] if parsed.arguments[:1] == ["--"] else parsed.arguments
-    if not claim_status(parsed.status_file):
-        print(f"standards: {parsed.host} launch was abandoned by its caller before startup", file=sys.stderr)
+    status: dict[str, object] = {"pid": os.getpid()}
+
+    def report(state: str, **details: object) -> None:
+        status.update(details, state=state, at=time.time())
+        if parsed.status_file is not None:
+            launch_status.replace(parsed.status_file, status)
+
+    if parsed.status_file is not None and not launch_status.create(
+            parsed.status_file, {**status, "state": "preparing", "at": time.time()}):
+        print(f"standards: {parsed.host} launch was abandoned or already claimed before startup", file=sys.stderr)
         return 1
     try:
         returncode = run_session(parsed.host, parsed.target, parsed.project, arguments,
-                                 on_running=lambda: write_status(parsed.status_file, "running"))
+                                 on_running=lambda: report("running", running_at=time.time()))
     except StartupBindingError as error:
         message = f"standards: {parsed.host} refresh failed: {error}"
         print(message, file=sys.stderr)
-        write_status(parsed.status_file, "failed", error=message)
+        report("failed", error=message)
         return 1
-    write_status(parsed.status_file, "exited", returncode=returncode)
+    report("exited", returncode=returncode)
     return returncode
 
 
